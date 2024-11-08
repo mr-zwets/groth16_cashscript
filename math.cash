@@ -6,14 +6,15 @@ library Math {
     int result = 1;           // Initialize result to 1
     int current = base % mod;  // Start with base mod p
     int expCopy = exp;         // Copy exp to modify it in the loop
+    int i = 0;                 // Initialize a counter variable
 
-    // Process each bit of `expCopy` by repeatedly dividing by 2
-    for (int i = 0; i < 256; i++) {  // Assuming a 256-bit exponent for BN256
+    unroll(256) {
       if (expCopy % 2 != 0) {        // Check if the least significant bit is set
         result = (result * current) % mod;
       }
       current = (current * current) % mod; // Square current for the next bit
       expCopy = expCopy / 2;         // Move to the next bit by dividing expCopy by 2
+      i = i + 1;
     }
 
     return result % mod;  // Return the final modular exponentiation result

@@ -53,12 +53,14 @@ library BN256 {
     int resY = 0;
     int baseX = x;
     int baseY = y;
+    int i = 0;
 
-    for (int i = 0; i < 254; i++) {
+    unroll(254) {
       if ((k & (1 << i)) != 0) {
         (resX, resY) = pointAdd(resX, resY, baseX, baseY);
       }
       (baseX, baseY) = pointDouble(baseX, baseY);
+      i = i + 1;
     }
 
     return (resX, resY);
@@ -97,21 +99,24 @@ library BN256 {
 
   function millerAlgorithm(int x1, int y1, int x2, int y2, int precomputedBitsInt) returns (int) {
     int result = 1;
-    
-    // For each bit in precomputedBitsInt, we will process line function evaluations
-    for (int i = 0; i < 254; i++) {
-        // Get the current bit by shifting
-        int currentBit = (precomputedBitsInt >> i) & 1;
-        
-        // Perform line doubling (like before)
-        (int a, int b, int c) = lineFuncDouble(x1, y1);
-        result = mulFQ2(result, a);
+    int i = 0;
 
-        // If the current bit is 1, apply lineFuncAdd
-        if (currentBit == 1) {
-            (a, b, c) = lineFuncAdd(x1, y1, x2, y2);
-            result = mulFQ2(result, a);
-        }
+    // Unroll the loop for a fixed number of iterations (254)
+    // For each bit in precomputedBitsInt, we process line function evaluations
+    unroll(254) {
+      // Get the current bit by shifting
+      int currentBit = (precomputedBitsInt >> i) & 1;
+      
+      // Perform line doubling
+      (int a, int b, int c) = lineFuncDouble(x1, y1);
+      result = mulFQ2(result, a);
+
+      // If the current bit is 1, apply lineFuncAdd
+      if (currentBit == 1) {
+        (a, b, c) = lineFuncAdd(x1, y1, x2, y2);
+        result = mulFQ2(result, a);
+      }
+      i = i + 1;
     }
 
     return result;

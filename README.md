@@ -6,17 +6,10 @@
 
 ### No loop syntax
 
-`powMod` in `math.cash` and `millerAlgorithm` in `BN256.cash` both need loop syntax (which can be unrolled by the compiler)
+`powMod` in `math.cash` and `scalarMult` & `millerAlgorithm` in `BN256.cash` both need looping a fixed amount of times which could be unrolled by the compiler
 
 ```solidity
-for (int i = 0; i < 256; i++) {
-  ...
-}
-```
-
-
-```solidity
-for (int i = 0; i < 254; i++) {
+unroll(256) {
   ...
 }
 ```

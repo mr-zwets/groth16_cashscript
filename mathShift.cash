@@ -3,13 +3,15 @@ library Math {
   function powMod(int base, int exp, int mod) returns (int) {
     int result = 1;           // Start with 1 for multiplication
     int current = base % mod;  // Apply modulus to base initially
-    
+    int i = 0;                 // Initialize a counter variable
+
     // Go through each bit of `exp` from least significant to most significant
-    for (int i = 0; i < 256; i++) {  // Assuming a 256-bit exponent for BN256 curve
+    unroll(256) {  // Assuming a 256-bit exponent for BN256 curve
       if ((exp & (1 << i)) != 0) {   // Check if the ith bit of exp is set
         result = (result * current) % mod;
       }
       current = (current * current) % mod; // Square current for the next bit
+      i = i + 1;
     }
 
     return result % mod;
