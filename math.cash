@@ -1,4 +1,26 @@
 library Math {
+  function addMod(int x, int y, int mod) returns (int) {
+    int sum = (x + y) % mod;
+    return sum;
+  }
+
+  function subMod(int x, int y, int mod) returns (int) {
+    int diff = (x - y + mod) % mod;
+    return diff;
+  }
+
+  function mulMod(int x, int y, int mod) returns (int) {
+    int product = (x * y) % mod;
+    return product;
+  }
+
+  // inverseMod uses powMod for modular inversion
+  function inverseMod(int x, int mod) returns (int) {
+    // Fermat's Little Theorem: x^(mod-2) % mod
+    int inv = powMod(x, mod - 2, mod);
+    return inv;
+  }
+
   // Helper function to compute x^y % p (modular exponentiation)
   // Work around not having shift to check if the ith bit of exp is set
   // if ((exp & (1 << i)) != 0) -> if (expCopy % 2 != 0)

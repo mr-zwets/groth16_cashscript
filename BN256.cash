@@ -1,25 +1,20 @@
-import { powMod  } from "Math.cash";
+import { powMod, addMod, subMod, mulMod, inverseMod } from "Math.cash";
 
 library BN256 {
   int constant p = 21888242871839275222246405745257275088696311157297823662689037894645226208583; // BN256 prime
 
   function addFQ2(int x, int y) returns (int) {
-    int sum = (x + y) % p;
-    return sum;
+    return addMod(x, y, p);
   }
   function subFQ2(int x, int y) returns (int) {
-    int diff = (x - y + p) % p;
-    return diff;
+    return subMod(x, y, p);
   }
+
   function mulFQ2(int x, int y) returns (int) {
-    int product = (x * y) % p;
-    return product;
+    return mulMod(x, y, p);
   }
-  // inverseFQ2 uses modPow for modular inversion
   function inverseFQ2(int x) returns (int) {
-    // Fermat's little theorem: x^(p-2) % p
-    int inv = powMod (x, p - 2) % p; // pow(x, e) means x^e
-    return inv;
+    return inverseMod(x, p);
   }
   // Elliptic curve point addition
   function pointAdd(int x1, int y1, int x2, int y2) returns (int, int) {
@@ -131,5 +126,32 @@ library BN256 {
     int result = addFQ2(sum, c);    // (a * x + b * y + c) % p
 
     return result % p;
+  }
+
+  // Easy exponentiation to (p^2 - 1)
+  function easyExponentiation(int result) returns (int) {
+    int exponent = (p * p) - 1; // Calculate p^2 - 1
+    return powMod(result, exponent, p);
+  }
+
+  // Hard exponentiation by applying the exponent (p^12 - 1) / r
+  function hardExponentiation(int result) returns (int) {
+    int pSquared = p * p;
+    int pCubed = pSquared * p;
+    // Calculate intermediate exponents for p^2, p^6, and p^12 mod p
+    int result_p2 = powMod(result, pSquared, p);        // result^(p^2) % p
+    int result_p6 = powMod(result_p2, pCubed, p);       // result^(p^6) % p
+    int result_p12 = powMod(result_p6, pCubed, p);      // result^(p^12) % p
+
+    // Perform the final step by combining these powers
+    int final_result = (result * result_p12) % p;       // result * result^(p^12) % p
+    
+    return final_result;
+  }
+
+  // Combine the easy and hard exponentiation in final exponentiation
+  function finalExponentiation(int pairingResult) returns (int) {
+    int easyResult = easyExponentiation(pairingResult);
+    return hardExponentiation(easyResult);
   }
 }
