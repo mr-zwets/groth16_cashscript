@@ -1,17 +1,21 @@
-pragma cashscript ^0.10.0;
-
 import { finalExponentiation, millerAlgorithm, pointAdd, pointDouble, scalarMult } from "BN256.cash";
+
+// Groth16.cash: Implements a zk-SNARK Groth16 verifier using BN256 elliptic curve operations.
 
 library Groth16 {
   
   // Each public input is specified as a separate int parameter instead of a tuple
   function verify(int a0, int a1, int b0, int b1, int c0, int c1, int input0, int input1) returns (bool) {
     
-    // **Step 1: Prepare verification inputs**
-    // Map the public inputs into curve points or scalars as needed for verification
+    // Define generator coordinates (G1 point) for the curve
+    int gx = 1; // G1 generator x-coordinate for BN256
+    int gy = 2; // G1 generator y-coordinate for BN256
 
-    // Note: Normally, you'd multiply these inputs with specific curve points (G1, G2) and prepare pairing checks.
-    // This will involve using `pointAdd`, `pointDouble`, or `scalarMult` as appropriate.
+    // **Step 1: Prepare verification inputs** 
+    // Aggregate public inputs by mapping them to the curve with `prepareVerificationInput`.
+    // This function multiplies each public input with a generator point and aggregates the results.
+    // The prepared inputs are used in pairing computations.
+    int preparedX, int preparedY = prepareVerificationInput(input0, input1, gx, gy);
 
     // **Step 2: Apply Miller's Algorithm for Pairing Product Calculation**
     // Use Miller’s algorithm to calculate the pairing product with points `a` and `b`.
@@ -24,5 +28,29 @@ library Groth16 {
     // **Step 4: Compare the result to the expected identity**
     // Return true if `finalPairingResult` matches the expected identity, here represented as `1`.
     return finalPairingResult == 1;
+  }
+  
+  function multiplyInputWithGenerator(int input, int gx, int gy) returns (int, int) {
+    // Returns the point (x, y) for G1 * input
+    return scalarMult(gx, gy, input);
+  }
+
+  function aggregateInputPoints(int x1, int y1, int x2, int y2) returns (int, int) {
+    return pointAdd(x1, y1, x2, y2);
+  }
+
+  function prepareVerificationInput(int input0, int input1, int gx, int gy) returns (int, int) {
+      int aggX = 0;
+      int aggY = 0;
+
+      // Multiply input0 with generator and aggregate
+      int px0, int py0 = multiplyInputWithGenerator(input0, gx, gy);
+      aggX, aggY = aggregateInputPoints(aggX, aggY, px0, py0);
+
+      // Multiply input1 with generator and aggregate
+      int px1, int py1 = multiplyInputWithGenerator(input1, gx, gy);
+      aggX, aggY = aggregateInputPoints(aggX, aggY, px1, py1);
+
+      return aggX, aggY;
   }
 }

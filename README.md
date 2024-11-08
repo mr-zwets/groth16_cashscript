@@ -33,6 +33,10 @@ library BN256 {
   int constant p = 21888242871839275222246405745257275088696311157297823662689037894645226208583; // BN256 prime
 ```
 
+### No Array Type
+
+Groth16 in Solidity usually allows for an array of inputs parameters, CashScript doesn't allow for `array` types. If Bitcoin Cash had bounded loops, it would be useful to 'loop' over the number of elements in an array, however this woul require very heavy abstraction on the CashScript side as arrays don't natively exist. There would also need to be two types of arrays: 'fixed-size arrays' & 'dynamic arrays'
+
 ## BCH Shortcomings
 
 ### Need to Unroll Loops

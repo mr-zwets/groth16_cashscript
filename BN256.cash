@@ -1,5 +1,13 @@
 import { powMod, addMod, subMod, mulMod, inverseMod } from "Math.cash";
 
+// BN256.cash: Implements core operations on the BN256 elliptic curve for zk-SNARK verification.
+//
+// Key components include:
+// - Field Arithmetic (addFQ2, subFQ2, mulFQ2, inverseFQ2): Modular operations in the BN256 field.
+// - Point Operations (pointAdd, pointDouble, scalarMult): Curve point addition, doubling, and scalar multiplication.
+// - Pairing Computation (lineFuncAdd, lineFuncDouble, millerAlgorithm, evaluateLineFunction): Functions supporting Miller's algorithm for pairing checks.
+// - Exponentiation Steps (easyExponentiation, hardExponentiation, finalExponentiation): Completes the pairing computation in Groth16 verification.
+
 library BN256 {
   int constant p = 21888242871839275222246405745257275088696311157297823662689037894645226208583; // BN256 prime
 

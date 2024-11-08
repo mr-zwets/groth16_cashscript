@@ -1,3 +1,5 @@
+// Math.cash: Modular arithmetic functions to support elliptic curve operations.
+
 library Math {
   function addMod(int x, int y, int mod) returns (int) {
     int sum = (x + y) % mod;
