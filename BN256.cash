@@ -1,0 +1,130 @@
+import { powMod  } from "Math.cash";
+
+library BN256 {
+  int constant p = 21888242871839275222246405745257275088696311157297823662689037894645226208583; // BN256 prime
+
+  function addFQ2(int x, int y) returns (int) {
+    int sum = (x + y) % p;
+    return sum;
+  }
+  function subFQ2(int x, int y) returns (int) {
+    int diff = (x - y + p) % p;
+    return diff;
+  }
+  function mulFQ2(int x, int y) returns (int) {
+    int product = (x * y) % p;
+    return product;
+  }
+  // inverseFQ2 uses modPow for modular inversion
+  function inverseFQ2(int x) returns (int) {
+    // Fermat's little theorem: x^(p-2) % p
+    int inv = powMod (x, p - 2) % p; // pow(x, e) means x^e
+    return inv;
+  }
+  // Elliptic curve point addition
+  function pointAdd(int x1, int y1, int x2, int y2) returns (int, int) {
+    if (x1 == x2 && y1 == y2) {
+      return pointDouble(x1, y1);
+    }
+
+    int lambda = mulFQ2(subFQ2(y2, y1), inverseFQ2(subFQ2(x2, x1)));
+    int x3 = subFQ2(subFQ2(mulFQ2(lambda, lambda), x1), x2);
+    int y3 = subFQ2(mulFQ2(lambda, subFQ2(x1, x3)), y1);
+
+    return (x3, y3);
+  }
+
+  // Elliptic curve point doubling
+  function pointDouble(int x1, int y1) returns (int, int) {
+    if (y1 == 0) {
+      return (0, 0);
+    }
+
+    int lambda = mulFQ2(mulFQ2(3, mulFQ2(x1, x1)), inverseFQ2(mulFQ2(2, y1)));
+    int x3 = subFQ2(mulFQ2(lambda, lambda), mulFQ2(2, x1));
+    int y3 = subFQ2(mulFQ2(lambda, subFQ2(x1, x3)), y1);
+
+    return (x3, y3);
+  }
+
+  // Scalar multiplication
+  function scalarMult(int x, int y, int k) returns (int, int) {
+    int resX = 0;
+    int resY = 0;
+    int baseX = x;
+    int baseY = y;
+
+    for (int i = 0; i < 254; i++) {
+      if ((k & (1 << i)) != 0) {
+        (resX, resY) = pointAdd(resX, resY, baseX, baseY);
+      }
+      (baseX, baseY) = pointDouble(baseX, baseY);
+    }
+
+    return (resX, resY);
+  }
+
+  // Line function for point addition
+  function lineFuncAdd(int x1, int y1, int x2, int y2) returns (int, int, int) {
+    // Compute slope lambda = (y2 - y1) * inverse(x2 - x1) % p
+    int numerator = subFQ2(y2, y1);         // y2 - y1
+    int denominator = subFQ2(x2, x1);       // x2 - x1
+    int lambda = mulFQ2(numerator, inverseFQ2(denominator));  // lambda = numerator / denominator % p
+
+    // Calculate coefficients a, b, c for line equation ax + by + c = 0
+    int a = lambda;                        // a = lambda
+    int b = p - 1;                         // b = -1 mod p (equivalent to p - 1)
+    int c = subFQ2(y1, mulFQ2(lambda, x1)); // c = y1 - lambda * x1
+
+    return (a, b, c); // Return line function coefficients
+  }
+
+  // Line function for point doubling
+  function lineFuncDouble(int x, int y) returns (int, int, int) {
+    // Compute the slope lambda = (3 * x^2) * inverse(2 * y) % p
+    int xSquared = mulFQ2(x, x);          // x^2
+    int numerator = mulFQ2(3, xSquared);   // 3 * x^2
+    int denominator = mulFQ2(2, y);        // 2 * y
+    int lambda = mulFQ2(numerator, inverseFQ2(denominator)); // lambda = numerator / denominator % p
+
+    // Calculate coefficients a, b, c for line equation ax + by + c = 0
+    int a = lambda;                       // a = lambda
+    int b = p - 1;                        // b = -1 mod p (equivalent to p - 1)
+    int c = subFQ2(y, mulFQ2(lambda, x)); // c = y - lambda * x
+
+    return (a, b, c); // Return line function coefficients
+  }
+
+  function millerAlgorithm(int x1, int y1, int x2, int y2, int precomputedBitsInt) returns (int) {
+    int result = 1;
+    
+    // For each bit in precomputedBitsInt, we will process line function evaluations
+    for (int i = 0; i < 254; i++) {
+        // Get the current bit by shifting
+        int currentBit = (precomputedBitsInt >> i) & 1;
+        
+        // Perform line doubling (like before)
+        (int a, int b, int c) = lineFuncDouble(x1, y1);
+        result = mulFQ2(result, a);
+
+        // If the current bit is 1, apply lineFuncAdd
+        if (currentBit == 1) {
+            (a, b, c) = lineFuncAdd(x1, y1, x2, y2);
+            result = mulFQ2(result, a);
+        }
+    }
+
+    return result;
+  }
+
+  // Helper function to evaluate the line function result on Q during Miller’s algorithm
+  function evaluateLineFunction(int a, int b, int c, int x, int y) returns (int) {
+    // Calculate the line evaluation as (a * x + b * y + c) % p
+    int ax = mulFQ2(a, x);          // a * x in FQ2
+    int by = mulFQ2(b, y);          // b * y in FQ2
+    int sum = addFQ2(ax, by);       // a * x + b * y
+    int result = addFQ2(sum, c);    // (a * x + b * y + c) % p
+
+    return result % p;
+  }
+}

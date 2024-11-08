@@ -1,0 +1,7 @@
+pragma cashscript ^0.10.0;
+
+library Groth16() {
+  function verify() {
+    require(true);
+  }
+}
