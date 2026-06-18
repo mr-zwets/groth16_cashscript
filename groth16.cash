@@ -1,56 +1,77 @@
-import { finalExponentiation, millerAlgorithm, pointAdd, pointDouble, scalarMult } from "BN256.cash";
+import { scalarMult, pointAdd, pointNegate, multiPairing } from "BN256.cash";
 
-// Groth16.cash: Implements a zk-SNARK Groth16 verifier using BN256 elliptic curve operations.
+// Groth16.cash: a zk-SNARK Groth16 verifier over the BN256 curve (a.k.a. BN254 /
+// alt_bn128, the curve used by Ethereum's pairing precompiles).
+//
+// Verification equation (see https://rareskills.io/post/groth16):
+//   e(A, B) == e(alpha, beta) * e(X, gamma) * e(C, delta)
+// where X is the public-input aggregation X = IC[0] + sum_i (input_i * IC[i]).
+//
+// Rearranged into a single multi-pairing product check (the form used by the EVM
+// ecPairing precompile): negate A and require the product to equal the Fp12 identity:
+//   e(-A, B) * e(alpha, beta) * e(X, gamma) * e(C, delta) == 1
+//
+// Groups: A and C are G1 points (x, y in Fp). B is a G2 point (x, y in Fp2, so 4 ints).
+// Verification key: alpha is G1; beta, gamma, delta are G2; IC[0..2] are G1 points
+// (the constant term plus one point per public input).
 
 library Groth16 {
-  
-  // Each public input is specified as a separate int parameter instead of a tuple
-  function verify(int a0, int a1, int b0, int b1, int c0, int c1, int input0, int input1) returns (bool) {
-    
-    // Define generator coordinates (G1 point) for the curve
-    int gx = 1; // G1 generator x-coordinate for BN256
-    int gy = 2; // G1 generator y-coordinate for BN256
 
-    // **Step 1: Prepare verification inputs** 
-    // Aggregate public inputs by mapping them to the curve with `prepareVerificationInput`.
-    // This function multiplies each public input with a generator point and aggregates the results.
-    // The prepared inputs are used in pairing computations.
-    int preparedX, int preparedY = prepareVerificationInput(input0, input1, gx, gy);
+  function verify(
+    // proof
+    int aX, int aY,                                     // A in G1
+    int bX0, int bX1, int bY0, int bY1,                 // B in G2
+    int cX, int cY,                                     // C in G1
+    // verification key
+    int alphaX, int alphaY,                             // alpha in G1
+    int betaX0, int betaX1, int betaY0, int betaY1,     // beta in G2
+    int gammaX0, int gammaX1, int gammaY0, int gammaY1, // gamma in G2
+    int deltaX0, int deltaX1, int deltaY0, int deltaY1, // delta in G2
+    int ic0X, int ic0Y,                                 // IC[0] in G1 (constant term)
+    int ic1X, int ic1Y,                                 // IC[1] in G1
+    int ic2X, int ic2Y,                                 // IC[2] in G1
+    // public inputs
+    int input0, int input1
+  ) returns (bool) {
 
-    // **Step 2: Apply Miller's Algorithm for Pairing Product Calculation**
-    // Use Miller’s algorithm to calculate the pairing product with points `a` and `b`.
-    // The third parameter in `millerAlgorithm` would normally represent bits or a pairing check indicator.
-    int pairingCheckResult = millerAlgorithm(a0, a1, b0, b1, 0); // Substitute '0' as required for pairing computation
+    // Step 1: aggregate the public inputs against the IC points from the verification
+    // key: X = IC[0] + input0 * IC[1] + input1 * IC[2].
+    (int xX, int xY) = prepareVerificationInput(
+      input0, input1, ic0X, ic0Y, ic1X, ic1Y, ic2X, ic2Y
+    );
 
-    // **Step 3: Final Exponentiation**
-    int finalPairingResult = finalExponentiation(pairingCheckResult);
+    // Step 2: negate A so the whole check collapses into one product == 1 in Fp12.
+    (int negAX, int negAY) = pointNegate(aX, aY);
 
-    // **Step 4: Compare the result to the expected identity**
-    // Return true if `finalPairingResult` matches the expected identity, here represented as `1`.
-    return finalPairingResult == 1;
+    // Step 3: product of the four pairings, followed by final exponentiation:
+    //   e(-A, B) * e(alpha, beta) * e(X, gamma) * e(C, delta)
+    int product = multiPairing(
+      negAX, negAY, bX0, bX1, bY0, bY1,
+      alphaX, alphaY, betaX0, betaX1, betaY0, betaY1,
+      xX, xY, gammaX0, gammaX1, gammaY0, gammaY1,
+      cX, cY, deltaX0, deltaX1, deltaY0, deltaY1
+    );
+
+    // Step 4: the proof is valid iff the product is the Fp12 identity (encoded as 1).
+    return product == 1;
   }
-  
-  function multiplyInputWithGenerator(int input, int gx, int gy) returns (int, int) {
-    // Returns the point (x, y) for G1 * input
-    return scalarMult(gx, gy, input);
-  }
 
-  function aggregateInputPoints(int x1, int y1, int x2, int y2) returns (int, int) {
-    return pointAdd(x1, y1, x2, y2);
-  }
+  // X = IC[0] + input0 * IC[1] + input1 * IC[2] (all G1 points).
+  // IC[0] is the constant term and is added directly (it corresponds to a fixed
+  // witness value of 1), so only the per-input points are scalar-multiplied.
+  function prepareVerificationInput(
+    int input0, int input1,
+    int ic0X, int ic0Y, int ic1X, int ic1Y, int ic2X, int ic2Y
+  ) returns (int, int) {
+    int aggX = ic0X;
+    int aggY = ic0Y;
 
-  function prepareVerificationInput(int input0, int input1, int gx, int gy) returns (int, int) {
-      int aggX = 0;
-      int aggY = 0;
+    (int p1X, int p1Y) = scalarMult(ic1X, ic1Y, input0);
+    (aggX, aggY) = pointAdd(aggX, aggY, p1X, p1Y);
 
-      // Multiply input0 with generator and aggregate
-      int px0, int py0 = multiplyInputWithGenerator(input0, gx, gy);
-      aggX, aggY = aggregateInputPoints(aggX, aggY, px0, py0);
+    (int p2X, int p2Y) = scalarMult(ic2X, ic2Y, input1);
+    (aggX, aggY) = pointAdd(aggX, aggY, p2X, p2Y);
 
-      // Multiply input1 with generator and aggregate
-      int px1, int py1 = multiplyInputWithGenerator(input1, gx, gy);
-      aggX, aggY = aggregateInputPoints(aggX, aggY, px1, py1);
-
-      return aggX, aggY;
+    return (aggX, aggY);
   }
 }

@@ -24,21 +24,16 @@ library Math {
   }
 
   // Helper function to compute x^y % p (modular exponentiation)
-  // Work around not having shift to check if the ith bit of exp is set
-  // if ((exp & (1 << i)) != 0) -> if (expCopy % 2 != 0)
+  // Square-and-multiply over the (up to) 256 bits of the exponent.
   function powMod(int base, int exp, int mod) returns (int) {
-    int result = 1;           // Initialize result to 1
+    int result = 1;            // Initialize result to 1
     int current = base % mod;  // Start with base mod p
-    int expCopy = exp;         // Copy exp to modify it in the loop
-    int i = 0;                 // Initialize a counter variable
 
-    unroll(256) {
-      if (expCopy % 2 != 0) {        // Check if the least significant bit is set
+    for (int i = 0; i < 256; i++) {
+      if ((exp & (1 << i)) != 0) {           // Check if the ith bit of exp is set
         result = (result * current) % mod;
       }
-      current = (current * current) % mod; // Square current for the next bit
-      expCopy = expCopy / 2;         // Move to the next bit by dividing expCopy by 2
-      i = i + 1;
+      current = (current * current) % mod;   // Square current for the next bit
     }
 
     return result % mod;  // Return the final modular exponentiation result

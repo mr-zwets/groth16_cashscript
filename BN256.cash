@@ -1,165 +1,218 @@
 import { powMod, addMod, subMod, mulMod, inverseMod } from "Math.cash";
 
-// BN256.cash: Implements core operations on the BN256 elliptic curve for zk-SNARK verification.
+// BN256.cash: core operations on the Barreto-Naehrig curve used by Ethereum, for the
+// Groth16 verifier. The same curve is variously called BN256, BN254, alt_bn128 or
+// bn128; "BN256" matches the go-ethereum / Cloudflare bn256 naming, "BN254" refers to
+// the 254-bit prime. This is the curve behind Ethereum's ecAdd / ecMul / ecPairing
+// precompiles 0x06 / 0x07 / 0x08.
 //
-// Key components include:
-// - Field Arithmetic (addFQ2, subFQ2, mulFQ2, inverseFQ2): Modular operations in the BN256 field.
-// - Point Operations (pointAdd, pointDouble, scalarMult): Curve point addition, doubling, and scalar multiplication.
-// - Pairing Computation (lineFuncAdd, lineFuncDouble, millerAlgorithm, evaluateLineFunction): Functions supporting Miller's algorithm for pairing checks.
-// - Exponentiation Steps (easyExponentiation, hardExponentiation, finalExponentiation): Completes the pairing computation in Groth16 verification.
+// Field tower: Fp -> Fp2 -> Fp6 -> Fp12. G1 points have coordinates in Fp, G2 points
+// in Fp2 (so 4 ints per point), and pairing results live in Fp12. Fp and Fp2
+// arithmetic plus the G1 and G2 point operations are implemented below. The Fp6/Fp12
+// tower (mul, square, Frobenius, inverse), the line-evaluation accumulation inside the
+// Miller loop, and the final exponentiation are the bulk of the remaining work and are
+// only outlined: an Fp12 element is 12 Fp coordinates, which CashScript cannot carry
+// ergonomically without array/struct types (see "No Array Type" in the README).
 
 library BN256 {
-  int constant p = 21888242871839275222246405745257275088696311157297823662689037894645226208583; // BN256 prime
+  // Base field prime.
+  int constant p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+  // Group order r (the scalar field) is:
+  //   21888242871839275222246405745257275088548364400416034343698204186575808495617
+  // The optimal-ate loop bit pattern (6t + 2, in NAF form) is fixed and known at
+  // compile time. Left as a stub here; a real implementation hardcodes it.
+  int constant ateLoopBits = 0;
 
-  function addFQ2(int x, int y) returns (int) {
-    return addMod(x, y, p);
-  }
-  function subFQ2(int x, int y) returns (int) {
-    return subMod(x, y, p);
-  }
+  // ---- Fp arithmetic (base field) ----
+  function addFp(int x, int y) returns (int) { return addMod(x, y, p); }
+  function subFp(int x, int y) returns (int) { return subMod(x, y, p); }
+  function mulFp(int x, int y) returns (int) { return mulMod(x, y, p); }
+  function inverseFp(int x) returns (int) { return inverseMod(x, p); }
+  function negFp(int x) returns (int) { return subMod(0, x, p); } // p - x
 
-  function mulFQ2(int x, int y) returns (int) {
-    return mulMod(x, y, p);
-  }
-  function inverseFQ2(int x) returns (int) {
-    return inverseMod(x, p);
-  }
-  // Elliptic curve point addition
+  // ---- G1 point operations (affine, coordinates in Fp) ----
   function pointAdd(int x1, int y1, int x2, int y2) returns (int, int) {
     if (x1 == x2 && y1 == y2) {
       return pointDouble(x1, y1);
     }
 
-    int lambda = mulFQ2(subFQ2(y2, y1), inverseFQ2(subFQ2(x2, x1)));
-    int x3 = subFQ2(subFQ2(mulFQ2(lambda, lambda), x1), x2);
-    int y3 = subFQ2(mulFQ2(lambda, subFQ2(x1, x3)), y1);
+    int lambda = mulFp(subFp(y2, y1), inverseFp(subFp(x2, x1)));
+    int x3 = subFp(subFp(mulFp(lambda, lambda), x1), x2);
+    int y3 = subFp(mulFp(lambda, subFp(x1, x3)), y1);
 
     return (x3, y3);
   }
 
-  // Elliptic curve point doubling
   function pointDouble(int x1, int y1) returns (int, int) {
     if (y1 == 0) {
       return (0, 0);
     }
 
-    int lambda = mulFQ2(mulFQ2(3, mulFQ2(x1, x1)), inverseFQ2(mulFQ2(2, y1)));
-    int x3 = subFQ2(mulFQ2(lambda, lambda), mulFQ2(2, x1));
-    int y3 = subFQ2(mulFQ2(lambda, subFQ2(x1, x3)), y1);
+    int lambda = mulFp(mulFp(3, mulFp(x1, x1)), inverseFp(mulFp(2, y1)));
+    int x3 = subFp(mulFp(lambda, lambda), mulFp(2, x1));
+    int y3 = subFp(mulFp(lambda, subFp(x1, x3)), y1);
 
     return (x3, y3);
   }
 
-  // Scalar multiplication
+  // Scalar multiplication on G1 via double-and-add over the 254 bits of the scalar.
   function scalarMult(int x, int y, int k) returns (int, int) {
     int resX = 0;
     int resY = 0;
     int baseX = x;
     int baseY = y;
-    int i = 0;
 
-    unroll(254) {
+    for (int i = 0; i < 254; i++) {
       if ((k & (1 << i)) != 0) {
         (resX, resY) = pointAdd(resX, resY, baseX, baseY);
       }
       (baseX, baseY) = pointDouble(baseX, baseY);
-      i = i + 1;
     }
 
     return (resX, resY);
   }
 
-  // Line function for point addition
-  function lineFuncAdd(int x1, int y1, int x2, int y2) returns (int, int, int) {
-    // Compute slope lambda = (y2 - y1) * inverse(x2 - x1) % p
-    int numerator = subFQ2(y2, y1);         // y2 - y1
-    int denominator = subFQ2(x2, x1);       // x2 - x1
-    int lambda = mulFQ2(numerator, inverseFQ2(denominator));  // lambda = numerator / denominator % p
-
-    // Calculate coefficients a, b, c for line equation ax + by + c = 0
-    int a = lambda;                        // a = lambda
-    int b = p - 1;                         // b = -1 mod p (equivalent to p - 1)
-    int c = subFQ2(y1, mulFQ2(lambda, x1)); // c = y1 - lambda * x1
-
-    return (a, b, c); // Return line function coefficients
+  // Negate a G1 point: -(x, y) = (x, -y). Used to fold e(A, B) onto the other side of
+  // the Groth16 equation so the whole check becomes a single product == 1 in Fp12.
+  function pointNegate(int x, int y) returns (int, int) {
+    return (x, negFp(y));
   }
 
-  // Line function for point doubling
-  function lineFuncDouble(int x, int y) returns (int, int, int) {
-    // Compute the slope lambda = (3 * x^2) * inverse(2 * y) % p
-    int xSquared = mulFQ2(x, x);          // x^2
-    int numerator = mulFQ2(3, xSquared);   // 3 * x^2
-    int denominator = mulFQ2(2, y);        // 2 * y
-    int lambda = mulFQ2(numerator, inverseFQ2(denominator)); // lambda = numerator / denominator % p
-
-    // Calculate coefficients a, b, c for line equation ax + by + c = 0
-    int a = lambda;                       // a = lambda
-    int b = p - 1;                        // b = -1 mod p (equivalent to p - 1)
-    int c = subFQ2(y, mulFQ2(lambda, x)); // c = y - lambda * x
-
-    return (a, b, c); // Return line function coefficients
+  // ---- Fp2 arithmetic: elements a = a0 + a1*u with u^2 = -1 ----
+  // Each Fp2 value is a pair (a0, a1). The lack of a struct/array type is why every
+  // operation takes and returns its components as separate ints.
+  function addFp2(int a0, int a1, int b0, int b1) returns (int, int) {
+    return (addFp(a0, b0), addFp(a1, b1));
   }
 
-  function millerAlgorithm(int x1, int y1, int x2, int y2, int precomputedBitsInt) returns (int) {
-    int result = 1;
-    int i = 0;
+  function subFp2(int a0, int a1, int b0, int b1) returns (int, int) {
+    return (subFp(a0, b0), subFp(a1, b1));
+  }
 
-    // Unroll the loop for a fixed number of iterations (254)
-    // For each bit in precomputedBitsInt, we process line function evaluations
-    unroll(254) {
-      // Get the current bit by shifting
-      int currentBit = (precomputedBitsInt >> i) & 1;
-      
-      // Perform line doubling
-      (int a, int b, int c) = lineFuncDouble(x1, y1);
-      result = mulFQ2(result, a);
+  function mulFp2(int a0, int a1, int b0, int b1) returns (int, int) {
+    // (a0 + a1 u)(b0 + b1 u) = (a0 b0 - a1 b1) + (a0 b1 + a1 b0) u, since u^2 = -1
+    int c0 = subFp(mulFp(a0, b0), mulFp(a1, b1));
+    int c1 = addFp(mulFp(a0, b1), mulFp(a1, b0));
+    return (c0, c1);
+  }
 
-      // If the current bit is 1, apply lineFuncAdd
-      if (currentBit == 1) {
-        (a, b, c) = lineFuncAdd(x1, y1, x2, y2);
-        result = mulFQ2(result, a);
+  function negFp2(int a0, int a1) returns (int, int) {
+    return (negFp(a0), negFp(a1));
+  }
+
+  function inverseFp2(int a0, int a1) returns (int, int) {
+    // 1 / (a0 + a1 u) = (a0 - a1 u) / (a0^2 + a1^2)
+    int norm = addFp(mulFp(a0, a0), mulFp(a1, a1));
+    int normInv = inverseFp(norm);
+    return (mulFp(a0, normInv), mulFp(negFp(a1), normInv));
+  }
+
+  // ---- G2 point operations (affine, coordinates in Fp2) ----
+  // A G2 point is (x0, x1, y0, y1): x = x0 + x1 u and y = y0 + y1 u.
+  function g2Double(int x0, int x1, int y0, int y1) returns (int, int, int, int) {
+    // lambda = 3 x^2 / 2y  (in Fp2)
+    (int s0, int s1) = mulFp2(x0, x1, x0, x1);   // x^2
+    (s0, s1) = mulFp2(s0, s1, 3, 0);             // 3 x^2
+    (int d0, int d1) = mulFp2(y0, y1, 2, 0);     // 2y
+    (d0, d1) = inverseFp2(d0, d1);
+    (int l0, int l1) = mulFp2(s0, s1, d0, d1);   // lambda
+
+    // x3 = lambda^2 - 2x
+    (int x30, int x31) = mulFp2(l0, l1, l0, l1);
+    (int t0, int t1) = mulFp2(x0, x1, 2, 0);
+    (x30, x31) = subFp2(x30, x31, t0, t1);
+
+    // y3 = lambda (x - x3) - y
+    (int u0, int u1) = subFp2(x0, x1, x30, x31);
+    (u0, u1) = mulFp2(l0, l1, u0, u1);
+    (int y30, int y31) = subFp2(u0, u1, y0, y1);
+
+    return (x30, x31, y30, y31);
+  }
+
+  function g2Add(
+    int ax0, int ax1, int ay0, int ay1,
+    int bx0, int bx1, int by0, int by1
+  ) returns (int, int, int, int) {
+    // lambda = (by - ay) / (bx - ax)  (in Fp2)
+    (int n0, int n1) = subFp2(by0, by1, ay0, ay1);
+    (int d0, int d1) = subFp2(bx0, bx1, ax0, ax1);
+    (d0, d1) = inverseFp2(d0, d1);
+    (int l0, int l1) = mulFp2(n0, n1, d0, d1);
+
+    // x3 = lambda^2 - ax - bx
+    (int x30, int x31) = mulFp2(l0, l1, l0, l1);
+    (x30, x31) = subFp2(x30, x31, ax0, ax1);
+    (x30, x31) = subFp2(x30, x31, bx0, bx1);
+
+    // y3 = lambda (ax - x3) - ay
+    (int u0, int u1) = subFp2(ax0, ax1, x30, x31);
+    (u0, u1) = mulFp2(l0, l1, u0, u1);
+    (int y30, int y31) = subFp2(u0, u1, ay0, ay1);
+
+    return (x30, x31, y30, y31);
+  }
+
+  // ---- Pairing (optimal ate pairing over BN256) ----
+  //
+  // millerLoop maps a G1 point P and a G2 point Q to an Fp12 element. It accumulates
+  // line evaluations into f while doubling and adding the running G2 point R along the
+  // ate loop. The G2 point arithmetic (g2Double / g2Add) is implemented; the f updates
+  // run in Fp12 and are left as a TODO: implement the tower (see header).
+  // The Fp12 result is represented here as a single-int placeholder.
+  function millerLoop(int px, int py, int qx0, int qx1, int qy0, int qy1) returns (int) {
+    int f = 1; // Fp12 identity (placeholder)
+
+    // Running G2 point R, starts at Q.
+    int rx0 = qx0;
+    int rx1 = qx1;
+    int ry0 = qy0;
+    int ry1 = qy1;
+
+    // Loop length is fixed by the BN256 ate loop (~64 bits). Each step squares f and
+    // multiplies in the tangent-line evaluation at R, then doubles R; on nonzero ate
+    // loop positions it also multiplies in the line through R and Q, then adds Q.
+    for (int i = 0; i < 64; i++) {
+      // f = mulFp12(f, f);                                   // square (TODO: Fp12)
+      // f = mulFp12(f, lineDoubleEval(R, px, py));           // tangent line (TODO: Fp12)
+      (rx0, rx1, ry0, ry1) = g2Double(rx0, rx1, ry0, ry1);
+
+      if (((ateLoopBits >> i) & 1) == 1) {
+        // f = mulFp12(f, lineAddEval(R, Q, px, py));         // chord line (TODO: Fp12)
+        (rx0, rx1, ry0, ry1) = g2Add(rx0, rx1, ry0, ry1, qx0, qx1, qy0, qy1);
       }
-      i = i + 1;
     }
 
-    return result;
+    // Two final addition steps with the Frobenius-mapped Q (Q1, Q2) complete the
+    // optimal ate loop (TODO: Frobenius over Fp2 + Fp12 line accumulation).
+    return f;
   }
 
-  // Helper function to evaluate the line function result on Q during Miller’s algorithm
-  function evaluateLineFunction(int a, int b, int c, int x, int y) returns (int) {
-    // Calculate the line evaluation as (a * x + b * y + c) % p
-    int ax = mulFQ2(a, x);          // a * x in FQ2
-    int by = mulFQ2(b, y);          // b * y in FQ2
-    int sum = addFQ2(ax, by);       // a * x + b * y
-    int result = addFQ2(sum, c);    // (a * x + b * y + c) % p
-
-    return result % p;
+  // Final exponentiation to (p^12 - 1) / r, mapping the Miller output into the r-th
+  // roots of unity in Fp12. Split into an "easy" part (using the p^6 - 1 and p^2 + 1
+  // Frobenius powers) and a "hard" part. Operates in Fp12 (TODO: implement the tower).
+  function finalExponentiation(int f) returns (int) {
+    return f;
   }
 
-  // Easy exponentiation to (p^2 - 1)
-  function easyExponentiation(int result) returns (int) {
-    int exponent = (p * p) - 1; // Calculate p^2 - 1
-    return powMod(result, exponent, p);
-  }
+  // Product of the four Groth16 pairings, then a single final exponentiation:
+  //   e(-A, B) * e(alpha, beta) * e(X, gamma) * e(C, delta)
+  // A, alpha, X, C are G1 points (2 ints); B, beta, gamma, delta are G2 points (4 ints).
+  // Returns the resulting Fp12 element (single-int placeholder, see header note).
+  function multiPairing(
+    int aX, int aY, int bx0, int bx1, int by0, int by1,
+    int alX, int alY, int btx0, int btx1, int bty0, int bty1,
+    int xX, int xY, int gmx0, int gmx1, int gmy0, int gmy1,
+    int cX, int cY, int dlx0, int dlx1, int dly0, int dly1
+  ) returns (int) {
+    int f1 = millerLoop(aX, aY, bx0, bx1, by0, by1);
+    int f2 = millerLoop(alX, alY, btx0, btx1, bty0, bty1);
+    int f3 = millerLoop(xX, xY, gmx0, gmx1, gmy0, gmy1);
+    int f4 = millerLoop(cX, cY, dlx0, dlx1, dly0, dly1);
 
-  // Hard exponentiation by applying the exponent (p^12 - 1) / r
-  function hardExponentiation(int result) returns (int) {
-    int pSquared = p * p;
-    int pCubed = pSquared * p;
-    // Calculate intermediate exponents for p^2, p^6, and p^12 mod p
-    int result_p2 = powMod(result, pSquared, p);        // result^(p^2) % p
-    int result_p6 = powMod(result_p2, pCubed, p);       // result^(p^6) % p
-    int result_p12 = powMod(result_p6, pCubed, p);      // result^(p^12) % p
+    // f = mulFp12(mulFp12(f1, f2), mulFp12(f3, f4)); // TODO: Fp12 multiply
+    int f = f1; // placeholder until the Fp12 tower is implemented
 
-    // Perform the final step by combining these powers
-    int final_result = (result * result_p12) % p;       // result * result^(p^12) % p
-    
-    return final_result;
-  }
-
-  // Combine the easy and hard exponentiation in final exponentiation
-  function finalExponentiation(int pairingResult) returns (int) {
-    int easyResult = easyExponentiation(pairingResult);
-    return hardExponentiation(easyResult);
+    return finalExponentiation(f);
   }
 }
