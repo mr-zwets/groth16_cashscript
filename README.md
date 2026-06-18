@@ -1,24 +1,30 @@
 # Exploration of Groth16 in CashScript
 
-**Note:** this is CashScript pseudo-code to learn how the language needs to be upgraded. The code was written by GPT so likely has errors.
+**Note:** this is CashScript pseudo-code to learn how the language needs to be upgraded. The code was written by AIs and likely has errors.
 
 ## CashScript Remaining Shortcomings
 
 The following limitations still apply as of CashScript v0.13.x and keep this code as pseudo-code that does not yet compile. Each is tracked on the [CashScript v0.14.0 milestone](https://github.com/CashScript/cashscript/milestone/).
 
+### No Reusable Functions
+
+CashScript only allows calling built-in functions. You cannot define your own functions and call them from a contract function or from each other, even within a single file. This verifier relies on that everywhere: `scalarMult` calls `pointAdd` and `pointDouble`, and `verify` calls `prepareVerificationInput` and `multiPairing`.
+
+Tracked in [#369 Add support for reusable function definition / invocation](https://github.com/CashScript/cashscript/issues/369) (tied to the 2026 network upgrade).
+
 ### No Library Support
 
-CashScript does not have library support currently although it is on the roadmap. Because of the complexity of this library they are split up across multiple separate libraries which import each other. CashScript v0.13.x also only allows calling built-in functions, so the cross-library function calls used here are not yet possible.
+Separately from reusable functions within a file, CashScript has no multi-file library construct: there is no `library` keyword and no `import` to pull definitions from another file with a dependency graph. This matters mainly for code organisation, but potentially also for code reuse across contracts if a large implementation has to be broken up across several contracts. This exploration is written as if libraries existed, splitting `Math.cash` -> `BN256.cash` -> `groth16.cash`:
 
 ```solidity
-import { powMod  } from "Math.cash";
+import { powMod } from "Math.cash";
 
 library BN256 {
   ...
 }
 ```
 
-Tracked in [#153 Add support for libraries/macros](https://github.com/CashScript/cashscript/issues/153) and [#369 Add support for reusable function definition / invocation](https://github.com/CashScript/cashscript/issues/369) (the latter tied to the 2026 network upgrade).
+Tracked in [#153 Add support for libraries/macros](https://github.com/CashScript/cashscript/issues/153).
 
 ### No Global Variable Support
 
@@ -31,9 +37,9 @@ Tracked in [#264 Add Global constants](https://github.com/CashScript/cashscript/
 
 ### No Array Type
 
-Groth16 in Solidity usually allows for an array of inputs parameters, CashScript doesn't allow for `array` types. Now that bounded loops exist, it would be useful to 'loop' over the number of elements in an array, however this would require very heavy abstraction on the CashScript side as arrays don't natively exist. There would also need to be two types of arrays: 'fixed-size arrays' & 'dynamic arrays'
+Groth16 in Solidity usually allows for an array of inputs parameters, CashScript doesn't allow for `array` types. Now that bounded loops exist, it would be useful to 'loop' over the number of elements in an array, however this would require very heavy abstraction on the CashScript side as arrays don't natively exist.
 
-Tracked in [#266 Add support for Array types](https://github.com/CashScript/cashscript/issues/266).
+Tracked in [#266 Add support for Array types](https://github.com/CashScript/cashscript/issues/266). Arrays are not strictly needed, and since they would compile to a long concatenated byte string for these 256-bit field elements the performance effect would be small. The main win would be cleaner, more auditable code. See [Arrays and the Field Tower](arrays.md) for details.
 
 ## BCH Shortcomings
 
