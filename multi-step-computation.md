@@ -55,3 +55,7 @@ function step(bytes providedState, ...chunkInputs) {
 - The full state must be re-provided and re-hashed every step, costing bytes (toward the 10,000-byte unlocking limit) and hashing budget.
 - Steps are strictly sequential because each depends on the previous state, so this approach cannot be parallelised.
 - More steps means more transactions, more fees, and more latency. The chunk size per step should be tuned to use as much of each transaction's op-cost budget as possible while staying under the limits.
+
+### Possible future relief: base instruction cost reduction
+
+The number of steps needed is driven by how much computation fits in one input's op-cost budget, and that budget is largely spent on the flat per-opcode base instruction cost (the verifier executes a very large number of cheap field-arithmetic opcodes). A reduction of the [base instruction cost](https://github.com/bitjson/bch-vm-limits#base-instruction-cost) from `100` to `10`, which has been proposed before and may happen in a future upgrade, would lower the cost of each opcode by roughly 10x. Each input would then afford about 10x more computation for the same script length, so a given computation would need less padding to buy its budget and could be split into fewer steps.
