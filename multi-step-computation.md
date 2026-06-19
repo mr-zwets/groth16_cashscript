@@ -58,4 +58,22 @@ function step(bytes providedState, ...chunkInputs) {
 
 ### Possible future relief: base instruction cost reduction
 
-The number of steps needed is driven by how much computation fits in one input's op-cost budget, and that budget is largely spent on the flat per-opcode base instruction cost (the verifier executes a very large number of cheap field-arithmetic opcodes). A reduction of the [base instruction cost](https://github.com/bitjson/bch-vm-limits#base-instruction-cost) from `100` to `10`, which has been proposed before and may happen in a future upgrade, would lower the cost of each opcode by roughly 10x. Each input would then afford about 10x more computation for the same script length, so a given computation would need less padding to buy its budget and could be split into fewer steps.
+A reduction of the [base instruction cost](https://github.com/bitjson/bch-vm-limits#base-instruction-cost) from `100` to `10`, which has been proposed before and may happen in a future upgrade, would lower the flat per-opcode component of op-cost by 10x. The relief for this workload is real but modest, not the ~10x that suggests: the base component is a small share of a field operation's cost (a measured `OP_MUL` + `OP_MOD` over the BN256 prime is ~3,800 op-cost, only ~700 of it base instructions; the rest is operand-length-dependent big-number arithmetic the change does not touch). So it would help the cheap glue opcodes (stack shuffling, `OP_PICK`/`OP_ROLL`, F_p¹² state management) more than the field multiplications that dominate the budget.
+
+## Why keep the singleton: the unchunked ideal
+
+The repo keeps a single-transaction verifier (`singleton/`, benchmarked as `bch-groth16-singleton`) even though it cannot run on BCH. It needs about 157 inputs' worth of op-cost budget and busts the 10,000-byte script cap, so it is not deployable. It is kept on purpose, for two reasons.
+
+First, it is the simplest expression of the verifier. One contract computes `vk_x` on-chain, runs the four pairings, and asserts the product is the F_p¹² identity, with none of the chaining workarounds the chunked version needs: no `hash256` state hand-off between transactions, no per-chunk function prologues, no zero-padding to buy budget, no step counter. That makes it the readable algorithmic reference, and the correctness oracle the chunked steps are graded against.
+
+Second, it anchors what the chunking actually costs. Comparing the two benchmark entries:
+
+| | singleton | chunked |
+|---|---|---|
+| bytes | ~21.9 KB | ~1.59 MB |
+| total op-cost | ~1.26B | ~789M |
+| steps | 1 | 116 |
+
+The gap is almost entirely bytes, not compute. The ~73x byte blow-up is the chunking tax: roughly half is zero-padding that buys each input's op-cost budget (`(41 + len) * 800`), about a third is the per-chunk function prologues re-shipped in every independent transaction, and the rest is the re-provided, re-hashed state plus transaction skeletons. The only compute overhead chunking adds is the per-step `hash256` of the carried state, in and out, across 116 steps, which is small next to the field arithmetic.
+
+One caveat on the op-cost numbers. Counter-intuitively the chunked total (~789M) is *lower* than the singleton's (~1.26B), so the singleton is not literally the op-cost floor the chunks improve on. That is an artifact, not a real inversion: the chunked code received two optimizations that were never back-ported to the singleton, namely a dedicated F_p¹² squaring (`fp12Sqr`, which uses 2 `fp6Mul` instead of the 3 in a full `fp12Mul`) and lazy add-reduction (dropping the `% p` from additions). The singleton's `groth16.cash` and `verify.cash` still use the old reducing `addFp` and the old `fp12Sqr` wrapper. Back-porting both would pull the singleton's op-cost below the chunked total and make it a clean apples-to-apples floor, with the chunked sitting just above it by the per-step hashing cost. Those two back-ports are the remaining work on the singleton; until they land, read it as the byte floor and the algorithmic reference, not as the current op-cost floor.

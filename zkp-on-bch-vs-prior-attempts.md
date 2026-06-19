@@ -30,7 +30,12 @@ other chains.
   Script, over the **BN256 / alt_bn128 / BN254** curve, the same curve this
   repo targets. The verifier was deployable on BSV. The catch is size: the
   first iteration was an **~11 MB transaction**, later optimised down to
-  **~1.5 MB**. The whole verifier runs in **one transaction**.
+  **~1.5 MB**. The whole verifier runs in **one transaction**. (sCrypt later,
+  in Dec 2022, also built a separate **BLS12-381** verifier; an early
+  unoptimised version of it is a ~27.5 MB testnet transaction, optimised in
+  their writeup to a ~480 KB locking script. So the BN256 curve-match above
+  applies specifically to this first Aug 2022 demo, not to every sCrypt
+  verifier.)
 - **nChain (Jul 2024)** verified a Groth16 proof on **BSV mainnet** using
   **BLS12-381**, exploiting BSV's restored large-integer opcodes
   (`OP_MUL`, `OP_MOD` on big numbers). They emphasised being the first to be
@@ -126,7 +131,8 @@ arithmetic" opcodes (`OP_MUL`, `OP_DIV`, `OP_MOD`, the bitwise ops,
 `OP_NUM2BIN`, `OP_BIN2NUM` (re-enabled 2018); `OP_MUL` (2022);
 arbitrary-precision integers (BigInt, 2025); and arithmetic/binary shift opcodes
 plus `OP_INVERT` (CHIP-2025-05 Bitwise, active May 2026, which this repo's
-[`math.cash`](math.cash) `<<`/`>>` compile to). It uses no BSV-exclusive opcode
+`>>` scalar-bit tests, e.g. in [`singleton/vkx.cash`](singleton/vkx.cash), compile
+to). It uses no BSV-exclusive opcode
 and no Taproot construction (BSV and BCH share the pre-2018 Script lineage), so
 with the limits disabled it would essentially run as-is. The limits, not any
 missing instruction, are the whole problem this repo works around.
@@ -144,6 +150,21 @@ So neither approach is blocked on BCH by a missing instruction, only by the
 resource limits BCH retains. BCH's challenge is not "can the VM express it" but
 "can it be made to fit," which is what forces the multi-step covenant design
 below.
+
+### The BSV artifacts are open and reproducible
+
+Both BSV teams published reviewable code, so the opcode-compatibility claim above
+can be checked rather than asserted: nChain released
+[`nchain-innovation/zkscript_package`](https://github.com/nchain-innovation/zkscript_package)
+(a Python library that generates the actual BSV Groth16 Script), and sCrypt
+released [`sCrypt-Inc/snarkjs`](https://github.com/sCrypt-Inc/snarkjs) (their
+verifier toolchain). Two caveats when comparing to this repo: both are **BSV
+Script**, so shift and introspection/sighash patterns need translation to BCH
+(the field-arithmetic core is opcode-compatible); and the curve only matches for
+sCrypt (**BN256**, the same curve this repo's
+[`singleton/pairing/`](singleton/pairing/README.md) targets), not nChain
+(**BLS12-381** / MNT4-753), so per-opcode counts and field-element sizes line up
+for the former but not the latter.
 
 ## The BCH-unique approach: split across sequential stateful transactions
 
@@ -190,16 +211,24 @@ redeem script, provided state, and signatures), so total footprint is bounded by
 `N_steps × ≤10 KB`. The crossover against BSV is therefore roughly ~150 steps to
 match the ~1.5 MB optimised transaction (and ~50 to match nChain's ~500 KB
 locking script, though that mixes locking-script and whole-transaction
-measurements, so treat it as order-of-magnitude). A well-tuned chunking
-plausibly lands in the tens of steps, i.e. low-hundreds of KB total. The
+measurements, so treat it as order-of-magnitude). The completed chunked verifier
+lands at ~116 steps (see below), just under that ~150-step crossover. The
 per-step state-carrying overhead is small in bytes (~600 B of working state plus
 a few hundred bytes of tx skeleton).
 
 The real costs of the multi-step approach are therefore not aggregate bytes but
 latency (one mempool/block hop per step), per-step fees and dust, and the
-op-cost spent re-hashing the full state each step. The one number still unknown
-is `N_steps`, which needs real compilation and op-cost measurement of
-representative chunks to pin down.
+op-cost spent re-hashing the full state each step.
+
+The one number that was still open, `N_steps`, is now pinned by the completed
+chunked verifier: the full Groth16 verifier splits into roughly **116 sequential
+steps** at about **789M total op-cost**, with **every** step inside the per-input
+limits (≤10,000 bytes, ≤8.03M op-cost). At a hard cap of ≤10 KB of unlocking
+bytecode per step that is on the order of ~1 MB of verifier bytecode in
+aggregate, comparable to sCrypt's optimised ~1.5 MB single transaction but spread
+across many small inputs instead of one. It also confirms that, with loops, the
+binding per-input limit is op-cost rather than bytecode size; most steps are
+op-cost-bound and zero-padded to buy their budget.
 
 ## Comparison at a glance
 
