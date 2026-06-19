@@ -32,12 +32,23 @@ twice and would not otherwise compile.
 | FinalExp | `finalexp_ref.mjs` (JS spec) | self-validating | (p¹²−1)/r == noble finalExp | ✅ spec matches noble |
 | **FinalExp** | **`finalexp.cash`** | **`finalexp.mjs`** | **== noble; valid→1, invalid→≠1** | ✅ **cp#3** (~255M, 9.3 KB) |
 
+| **Verdict** | **`verify.cash`** | **`verify.mjs`** | **4 pairs → boundary → finalExp → require==1; valid accepts, invalid rejects** | ✅ **full pairing** (~1.21B, 19.9 KB) |
+
 **The full BN254 Groth16 pairing is implemented + verified in CashScript** (singleton
 oracle): Fp12 tower → Miller boundary (cp#2, byte-for-byte vs golden) → final
-exponentiation (cp#3, verdict matches golden valid/invalid). Combined with `../vkx.cash`
-this is a complete Groth16 verifier. Remaining: split across transactions for BCH
-limits (the chunked/ work) — the singleton Miller is ~957M and finalExp ~255M op-cost,
-vs ~8.03M per input.
+exponentiation (cp#3, verdict matches golden valid/invalid). `verify.cash` ties it into
+the single intrinsic verdict `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)==1`. Combined with
+`../vkx.cash` this is a complete Groth16 verifier.
+
+**In the verifier benchmark:** registered as `bch-pairing-singleton` (leaderboard
+"Groth16 pairing (BCH-native) [single-tx]"). Build vectors with
+`node singleton/pairing/build_vectors.mjs` (writes
+`verifier/src/bch/pairing-singleton-vectors.json`); shows up via `pnpm benchmark`:
+`PASS (1/1✗)`, 20,735 B, 1,211,701,878 op-cost, ~151 inputs, BCH-incompatible
+(script-size + op-cost) — the honest baseline that motivates chunking.
+
+Remaining: split across transactions for BCH limits (the chunked/ work) — the singleton
+Miller is ~957M and finalExp ~255M op-cost, vs ~8.03M per input.
 
 `miller_ref.mjs` is the proven blueprint for the in-script Miller loop: it
 reproduces noble's `millerBoundary` (single-pair on the generators AND the 4-pair
