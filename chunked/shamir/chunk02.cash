@@ -1,0 +1,265 @@
+pragma cashscript ^0.13.0;
+// vk_x chunk 2: Shamir window [32,48) (MSB-first bit positions 221..206), final=False.
+// Public inputs taken at RUNTIME: carried state = (rX,rY,rZ,input0,input1);
+// per-bit add chosen in-script via 2-bit Shamir select over VK consts.
+// EC ops jacDouble/jacAdd/selectPoint are reusable functions (OP_DEFINE/
+// OP_INVOKE) defined ONCE here and invoked per iteration, not inlined.
+contract VkxChunk02() {
+    function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    function sqrFp(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    function jacDouble(int x, int y, int z) returns (int, int, int) {
+        int a = sqrFp(x);
+        int b = sqrFp(y);
+        int c = sqrFp(b);
+        int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
+        int e = mulFp(3, a);
+        int f = sqrFp(e);
+        int nx = subFp(f, mulFp(2, d));
+        int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
+        int nz = mulFp(2, mulFp(y, z));
+        return nx, ny, nz;
+    }
+    function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
+        int rx = bX;
+        int ry = bY;
+        int rz = bZ;
+        if (aZ != 0) {
+            int z1z1 = sqrFp(aZ);
+            int z2z2 = sqrFp(bZ);
+            int u1 = mulFp(aX, z2z2);
+            int u2 = mulFp(bX, z1z1);
+            int s1 = mulFp(mulFp(aY, bZ), z2z2);
+            int s2 = mulFp(mulFp(bY, aZ), z1z1);
+            if (u1 == u2 && s1 == s2) {
+                int da = sqrFp(aX);
+                int db = sqrFp(aY);
+                int dc = sqrFp(db);
+                int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
+                int de = mulFp(3, da);
+                int df = sqrFp(de);
+                int dnx = subFp(df, mulFp(2, dd));
+                int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
+                int dnz = mulFp(2, mulFp(aY, aZ));
+                rx = dnx; ry = dny; rz = dnz;
+            } else {
+                int h = subFp(u2, u1);
+                int i2 = sqrFp(mulFp(2, h));
+                int jj = mulFp(h, i2);
+                int rr = mulFp(2, subFp(s2, s1));
+                int vv = mulFp(u1, i2);
+                int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
+                int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
+                int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
+                rx = anx; ry = any; rz = anz;
+            }
+        }
+        return rx, ry, rz;
+    }
+    function selectPoint(int b0, int b1) returns (int, int, int) {
+        int aX = 0;
+        int aY = 0;
+        int doAdd = 0;
+        if (b0 == 1 && b1 == 1) { aX = 20687098839691105097230132006705975099432129393118730698937199498853576759031; aY = 2784555085364475896955849729890301289648525422842103121195101376751786827234; doAdd = 1; }
+        else { if (b0 == 1) { aX = 10415861484417082502655338383609494480414113902179649885744799961447382638712; aY = 10196215078179488638353184030336251401353352596818396260819493263908881608606; doAdd = 1; }
+               else { if (b1 == 1) { aX = 19033251874843656108471242320417533909414939332036131356573128480367742634479; aY = 20792135454608030201903199625673964159744755218442260092768620403349374102584; doAdd = 1; } } }
+        return aX, aY, doAdd;
+    }
+    function spend(int rX, int rY, int rZ, int input0, int input1) {
+        require(hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40)) == 0xe90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd);
+        // iter j=32 (bit 221): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_32, int dy_32, int dz_32) = jacDouble(rX, rY, rZ);
+            rX = dx_32; rY = dy_32; rZ = dz_32;
+        }
+        int b0_32 = (input0 / 3369993333393829974333376885877453834204643052817571560137951281152) % 2;
+        int b1_32 = (input1 / 3369993333393829974333376885877453834204643052817571560137951281152) % 2;
+        (int aX_32, int aY_32, int doAdd_32) = selectPoint(b0_32, b1_32);
+        if (doAdd_32 == 1) {
+            (int ax_32, int ay_32, int az_32) = jacAdd(rX, rY, rZ, aX_32, aY_32, 1);
+            rX = ax_32; rY = ay_32; rZ = az_32;
+        }
+        // iter j=33 (bit 220): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_33, int dy_33, int dz_33) = jacDouble(rX, rY, rZ);
+            rX = dx_33; rY = dy_33; rZ = dz_33;
+        }
+        int b0_33 = (input0 / 1684996666696914987166688442938726917102321526408785780068975640576) % 2;
+        int b1_33 = (input1 / 1684996666696914987166688442938726917102321526408785780068975640576) % 2;
+        (int aX_33, int aY_33, int doAdd_33) = selectPoint(b0_33, b1_33);
+        if (doAdd_33 == 1) {
+            (int ax_33, int ay_33, int az_33) = jacAdd(rX, rY, rZ, aX_33, aY_33, 1);
+            rX = ax_33; rY = ay_33; rZ = az_33;
+        }
+        // iter j=34 (bit 219): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_34, int dy_34, int dz_34) = jacDouble(rX, rY, rZ);
+            rX = dx_34; rY = dy_34; rZ = dz_34;
+        }
+        int b0_34 = (input0 / 842498333348457493583344221469363458551160763204392890034487820288) % 2;
+        int b1_34 = (input1 / 842498333348457493583344221469363458551160763204392890034487820288) % 2;
+        (int aX_34, int aY_34, int doAdd_34) = selectPoint(b0_34, b1_34);
+        if (doAdd_34 == 1) {
+            (int ax_34, int ay_34, int az_34) = jacAdd(rX, rY, rZ, aX_34, aY_34, 1);
+            rX = ax_34; rY = ay_34; rZ = az_34;
+        }
+        // iter j=35 (bit 218): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_35, int dy_35, int dz_35) = jacDouble(rX, rY, rZ);
+            rX = dx_35; rY = dy_35; rZ = dz_35;
+        }
+        int b0_35 = (input0 / 421249166674228746791672110734681729275580381602196445017243910144) % 2;
+        int b1_35 = (input1 / 421249166674228746791672110734681729275580381602196445017243910144) % 2;
+        (int aX_35, int aY_35, int doAdd_35) = selectPoint(b0_35, b1_35);
+        if (doAdd_35 == 1) {
+            (int ax_35, int ay_35, int az_35) = jacAdd(rX, rY, rZ, aX_35, aY_35, 1);
+            rX = ax_35; rY = ay_35; rZ = az_35;
+        }
+        // iter j=36 (bit 217): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_36, int dy_36, int dz_36) = jacDouble(rX, rY, rZ);
+            rX = dx_36; rY = dy_36; rZ = dz_36;
+        }
+        int b0_36 = (input0 / 210624583337114373395836055367340864637790190801098222508621955072) % 2;
+        int b1_36 = (input1 / 210624583337114373395836055367340864637790190801098222508621955072) % 2;
+        (int aX_36, int aY_36, int doAdd_36) = selectPoint(b0_36, b1_36);
+        if (doAdd_36 == 1) {
+            (int ax_36, int ay_36, int az_36) = jacAdd(rX, rY, rZ, aX_36, aY_36, 1);
+            rX = ax_36; rY = ay_36; rZ = az_36;
+        }
+        // iter j=37 (bit 216): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_37, int dy_37, int dz_37) = jacDouble(rX, rY, rZ);
+            rX = dx_37; rY = dy_37; rZ = dz_37;
+        }
+        int b0_37 = (input0 / 105312291668557186697918027683670432318895095400549111254310977536) % 2;
+        int b1_37 = (input1 / 105312291668557186697918027683670432318895095400549111254310977536) % 2;
+        (int aX_37, int aY_37, int doAdd_37) = selectPoint(b0_37, b1_37);
+        if (doAdd_37 == 1) {
+            (int ax_37, int ay_37, int az_37) = jacAdd(rX, rY, rZ, aX_37, aY_37, 1);
+            rX = ax_37; rY = ay_37; rZ = az_37;
+        }
+        // iter j=38 (bit 215): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_38, int dy_38, int dz_38) = jacDouble(rX, rY, rZ);
+            rX = dx_38; rY = dy_38; rZ = dz_38;
+        }
+        int b0_38 = (input0 / 52656145834278593348959013841835216159447547700274555627155488768) % 2;
+        int b1_38 = (input1 / 52656145834278593348959013841835216159447547700274555627155488768) % 2;
+        (int aX_38, int aY_38, int doAdd_38) = selectPoint(b0_38, b1_38);
+        if (doAdd_38 == 1) {
+            (int ax_38, int ay_38, int az_38) = jacAdd(rX, rY, rZ, aX_38, aY_38, 1);
+            rX = ax_38; rY = ay_38; rZ = az_38;
+        }
+        // iter j=39 (bit 214): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_39, int dy_39, int dz_39) = jacDouble(rX, rY, rZ);
+            rX = dx_39; rY = dy_39; rZ = dz_39;
+        }
+        int b0_39 = (input0 / 26328072917139296674479506920917608079723773850137277813577744384) % 2;
+        int b1_39 = (input1 / 26328072917139296674479506920917608079723773850137277813577744384) % 2;
+        (int aX_39, int aY_39, int doAdd_39) = selectPoint(b0_39, b1_39);
+        if (doAdd_39 == 1) {
+            (int ax_39, int ay_39, int az_39) = jacAdd(rX, rY, rZ, aX_39, aY_39, 1);
+            rX = ax_39; rY = ay_39; rZ = az_39;
+        }
+        // iter j=40 (bit 213): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_40, int dy_40, int dz_40) = jacDouble(rX, rY, rZ);
+            rX = dx_40; rY = dy_40; rZ = dz_40;
+        }
+        int b0_40 = (input0 / 13164036458569648337239753460458804039861886925068638906788872192) % 2;
+        int b1_40 = (input1 / 13164036458569648337239753460458804039861886925068638906788872192) % 2;
+        (int aX_40, int aY_40, int doAdd_40) = selectPoint(b0_40, b1_40);
+        if (doAdd_40 == 1) {
+            (int ax_40, int ay_40, int az_40) = jacAdd(rX, rY, rZ, aX_40, aY_40, 1);
+            rX = ax_40; rY = ay_40; rZ = az_40;
+        }
+        // iter j=41 (bit 212): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_41, int dy_41, int dz_41) = jacDouble(rX, rY, rZ);
+            rX = dx_41; rY = dy_41; rZ = dz_41;
+        }
+        int b0_41 = (input0 / 6582018229284824168619876730229402019930943462534319453394436096) % 2;
+        int b1_41 = (input1 / 6582018229284824168619876730229402019930943462534319453394436096) % 2;
+        (int aX_41, int aY_41, int doAdd_41) = selectPoint(b0_41, b1_41);
+        if (doAdd_41 == 1) {
+            (int ax_41, int ay_41, int az_41) = jacAdd(rX, rY, rZ, aX_41, aY_41, 1);
+            rX = ax_41; rY = ay_41; rZ = az_41;
+        }
+        // iter j=42 (bit 211): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_42, int dy_42, int dz_42) = jacDouble(rX, rY, rZ);
+            rX = dx_42; rY = dy_42; rZ = dz_42;
+        }
+        int b0_42 = (input0 / 3291009114642412084309938365114701009965471731267159726697218048) % 2;
+        int b1_42 = (input1 / 3291009114642412084309938365114701009965471731267159726697218048) % 2;
+        (int aX_42, int aY_42, int doAdd_42) = selectPoint(b0_42, b1_42);
+        if (doAdd_42 == 1) {
+            (int ax_42, int ay_42, int az_42) = jacAdd(rX, rY, rZ, aX_42, aY_42, 1);
+            rX = ax_42; rY = ay_42; rZ = az_42;
+        }
+        // iter j=43 (bit 210): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_43, int dy_43, int dz_43) = jacDouble(rX, rY, rZ);
+            rX = dx_43; rY = dy_43; rZ = dz_43;
+        }
+        int b0_43 = (input0 / 1645504557321206042154969182557350504982735865633579863348609024) % 2;
+        int b1_43 = (input1 / 1645504557321206042154969182557350504982735865633579863348609024) % 2;
+        (int aX_43, int aY_43, int doAdd_43) = selectPoint(b0_43, b1_43);
+        if (doAdd_43 == 1) {
+            (int ax_43, int ay_43, int az_43) = jacAdd(rX, rY, rZ, aX_43, aY_43, 1);
+            rX = ax_43; rY = ay_43; rZ = az_43;
+        }
+        // iter j=44 (bit 209): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_44, int dy_44, int dz_44) = jacDouble(rX, rY, rZ);
+            rX = dx_44; rY = dy_44; rZ = dz_44;
+        }
+        int b0_44 = (input0 / 822752278660603021077484591278675252491367932816789931674304512) % 2;
+        int b1_44 = (input1 / 822752278660603021077484591278675252491367932816789931674304512) % 2;
+        (int aX_44, int aY_44, int doAdd_44) = selectPoint(b0_44, b1_44);
+        if (doAdd_44 == 1) {
+            (int ax_44, int ay_44, int az_44) = jacAdd(rX, rY, rZ, aX_44, aY_44, 1);
+            rX = ax_44; rY = ay_44; rZ = az_44;
+        }
+        // iter j=45 (bit 208): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_45, int dy_45, int dz_45) = jacDouble(rX, rY, rZ);
+            rX = dx_45; rY = dy_45; rZ = dz_45;
+        }
+        int b0_45 = (input0 / 411376139330301510538742295639337626245683966408394965837152256) % 2;
+        int b1_45 = (input1 / 411376139330301510538742295639337626245683966408394965837152256) % 2;
+        (int aX_45, int aY_45, int doAdd_45) = selectPoint(b0_45, b1_45);
+        if (doAdd_45 == 1) {
+            (int ax_45, int ay_45, int az_45) = jacAdd(rX, rY, rZ, aX_45, aY_45, 1);
+            rX = ax_45; rY = ay_45; rZ = az_45;
+        }
+        // iter j=46 (bit 207): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_46, int dy_46, int dz_46) = jacDouble(rX, rY, rZ);
+            rX = dx_46; rY = dy_46; rZ = dz_46;
+        }
+        int b0_46 = (input0 / 205688069665150755269371147819668813122841983204197482918576128) % 2;
+        int b1_46 = (input1 / 205688069665150755269371147819668813122841983204197482918576128) % 2;
+        (int aX_46, int aY_46, int doAdd_46) = selectPoint(b0_46, b1_46);
+        if (doAdd_46 == 1) {
+            (int ax_46, int ay_46, int az_46) = jacAdd(rX, rY, rZ, aX_46, aY_46, 1);
+            rX = ax_46; rY = ay_46; rZ = az_46;
+        }
+        // iter j=47 (bit 206): double then runtime 2-bit Shamir select+add (INVOKEs)
+        if (rZ != 0) {
+            (int dx_47, int dy_47, int dz_47) = jacDouble(rX, rY, rZ);
+            rX = dx_47; rY = dy_47; rZ = dz_47;
+        }
+        int b0_47 = (input0 / 102844034832575377634685573909834406561420991602098741459288064) % 2;
+        int b1_47 = (input1 / 102844034832575377634685573909834406561420991602098741459288064) % 2;
+        (int aX_47, int aY_47, int doAdd_47) = selectPoint(b0_47, b1_47);
+        if (doAdd_47 == 1) {
+            (int ax_47, int ay_47, int az_47) = jacAdd(rX, rY, rZ, aX_47, aY_47, 1);
+            rX = ax_47; rY = ay_47; rZ = az_47;
+        }
+        require(hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40)) == 0xe90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd);
+    }
+}
