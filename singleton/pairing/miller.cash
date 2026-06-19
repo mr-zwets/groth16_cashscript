@@ -121,11 +121,25 @@ contract Miller() {
         (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(qq_0,qq_1,qq_2,qq_3,qq_4,qq_5, t1_0,t1_1,t1_2,t1_3,t1_4,t1_5);
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
+    // dedicated complex (Karatsuba) Fp12 squaring: a = c0 + c1 w  ->
+    //   c0' = c0^2 + v c1^2 = (c0+c1)(c0 + v c1) - c0 c1 - v(c0 c1);  c1' = 2 c0 c1
+    // Uses 2 fp6Mul (vs 3 in fp12Mul) -> ~1/3 cheaper than fp12Mul(a,a).
     function fp12Sqr(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int C0,int C1,int C2,int C3,int C4,int C5,int C6,int C7,int C8,int C9,int C10,int C11) =
-            fp12Mul(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11, A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+        // t0 = c0 * c1
+        (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) = fp6Mul(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
+        // t1 = (c0 + c1) * (c0 + v*c1)
+        (int s0,int s1,int s2,int s3,int s4,int s5) = fp6Add(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
+        (int vc0,int vc1,int vc2,int vc3,int vc4,int vc5) = fp6MulByV(A6,A7,A8,A9,A10,A11);
+        (int u0,int u1,int u2,int u3,int u4,int u5) = fp6Add(A0,A1,A2,A3,A4,A5, vc0,vc1,vc2,vc3,vc4,vc5);
+        (int t1_0,int t1_1,int t1_2,int t1_3,int t1_4,int t1_5) = fp6Mul(s0,s1,s2,s3,s4,s5, u0,u1,u2,u3,u4,u5);
+        // c1' = 2 t0
+        (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Add(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
+        // c0' = t1 - t0 - v t0
+        (int vt0,int vt1,int vt2,int vt3,int vt4,int vt5) = fp6MulByV(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
+        (int d0,int d1,int d2,int d3,int d4,int d5) = fp6Sub(t1_0,t1_1,t1_2,t1_3,t1_4,t1_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
+        (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Sub(d0,d1,d2,d3,d4,d5, vt0,vt1,vt2,vt3,vt4,vt5);
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
     // sparse line multiply mul034(f, o0, o3, o4)

@@ -21,7 +21,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
 mkdirSync(GEN, { recursive: true });
 const PROBE = join(GEN, `_probe_${process.pid}.cash`);
-const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_000_000);
+const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const BN_X = 4965661367192848881n;
 const X_LEN = 63;

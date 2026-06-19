@@ -32,7 +32,7 @@ const { hexToBin, bigIntToVmNumber, createTestAuthenticationProgramBch, createVi
 const realVm = createVirtualMachineBch2026(false);
 
 const OP_BUDGET = (41 + 10_000) * 800; // 8,032,800
-const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_000_000);
+const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const TARGET_UNLOCK = 10_000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
 

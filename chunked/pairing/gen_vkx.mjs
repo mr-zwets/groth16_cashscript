@@ -20,7 +20,7 @@ mkdirSync(GEN, { recursive: true });
 const PROBE = join(GEN, `_probe_${process.pid}.cash`);
 const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const Pstr = P.toString();
-const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_000_000);
+const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const ITERS = 254;
 
