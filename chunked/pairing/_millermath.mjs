@@ -108,8 +108,15 @@ export const pairsFor = (inputs) => [
 export function fnExtractor(cashPath) {
   const src = readFileSync(cashPath, 'utf8').split('\n');
   return (name) => {
-    const out = []; let p = false;
-    for (const ln of src) { if (!p && ln.startsWith(`    function ${name}(`)) p = true; if (p) { out.push(ln); if (/\}\s*$/.test(ln)) break; } }
+    const out = []; let p = false, depth = 0;
+    for (const ln of src) {
+      if (!p && ln.startsWith(`    function ${name}(`)) p = true;
+      if (p) {
+        out.push(ln);
+        depth += (ln.match(/\{/g) || []).length - (ln.match(/\}/g) || []).length;
+        if (depth === 0 && ln.includes('}')) break; // matched the function's closing brace (inline braces keep depth>0)
+      }
+    }
     return out.join('\n');
   };
 }

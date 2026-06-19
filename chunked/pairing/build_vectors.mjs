@@ -67,6 +67,24 @@ const pairs = pairsFor(vec.publicInputs);
 const steps = [];
 let totalOp = 0, maxOp = 0, maxLock = 0, maxUnlock = 0, allFit = true, allAccept = true, allInvalid = true;
 
+// vk_x chunks (for the full Groth16 chunked verifier — prepended to the pairing).
+// They compute vk_x = IC0+in0*IC1+in1*IC2 on-chain and assert it equals the point
+// the pairing's pair-2 bakes; public inputs are RUNTIME (in the witness/state).
+const vkxSteps = [];
+{
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkx.json'), 'utf8'));
+  for (const ch of man.chunks) {
+    const st = ch.incomingState.map((s) => BigInt(s));
+    const inInts = ch.final ? [...st, BigInt(ch.zInv)] : st; // final chunk also supplies zInv
+    const b = buildChunk(join(GEN, `vkx_${String(ch.idx).padStart(2, '0')}.cash`), inInts);
+    const fits = b.locking.length <= 10000 && b.unlocking.length <= 10000 && b.operationCost <= OP_BUDGET && b.accepted;
+    maxLock = Math.max(maxLock, b.locking.length); maxUnlock = Math.max(maxUnlock, b.unlocking.length);
+    allFit &&= fits; allAccept &&= b.accepted; allInvalid &&= b.invalidRejected;
+    vkxSteps.push({ label: `vk_x [${ch.lo},${ch.hi})${ch.final ? ' +IC0+affine, assert vk_x' : ''}`, locking: binToHex(b.locking), unlocking: binToHex(b.unlocking), invalidUnlocking: binToHex(b.invalidUnlocking), checkpoint: ch.final ? 'vk_x' : undefined, lockingBytes: b.locking.length, unlockingBytes: b.unlocking.length, operationCost: b.operationCost });
+  }
+  console.error(`vk_x: ${man.chunks.length} chunks built`);
+}
+
 for (let pi = 0; pi < 4; pi++) {
   const man = JSON.parse(readFileSync(join(GEN, `manifest_p${pi}.json`), 'utf8'));
   const { states } = pairStates(pairs[pi]);
@@ -91,13 +109,42 @@ for (let pi = 0; pi < 4; pi++) {
   steps.push({ label: 'combine: boundary = f0*f1*f2*f3', locking: binToHex(b.locking), unlocking: binToHex(b.unlocking), invalidUnlocking: binToHex(b.invalidUnlocking), checkpoint: 'miller-boundary', lockingBytes: b.locking.length, unlockingBytes: b.unlocking.length, operationCost: b.operationCost });
   console.error(`combine built`);
 }
+// final-exponentiation chunks (boundary -> verdict) — kept in their OWN array so
+// the pairing entry stays the Miller-boundary milestone; these are appended only
+// to the FULL groth16 chain. First chunk's incoming == the combine's outgoing
+// (boundary hash); last chunk asserts result == Fp12 ONE.
+const finalexpSteps = [];
+{
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_finalexp.json'), 'utf8'));
+  for (const ch of man.chunks) {
+    const inInts = ch.incomingLimbs.map((s) => BigInt(s));
+    const b = buildChunk(join(GEN, `finalexp_${String(ch.idx).padStart(2, '0')}.cash`), inInts);
+    const fits = b.locking.length <= 10000 && b.unlocking.length <= 10000 && b.operationCost <= OP_BUDGET && b.accepted;
+    maxLock = Math.max(maxLock, b.locking.length); maxUnlock = Math.max(maxUnlock, b.unlocking.length);
+    allFit &&= fits; allAccept &&= b.accepted; allInvalid &&= b.invalidRejected;
+    finalexpSteps.push({ label: `finalexp ops[${ch.opLo},${ch.opHi})${ch.final ? ' verdict==1' : ''}`, locking: binToHex(b.locking), unlocking: binToHex(b.unlocking), invalidUnlocking: binToHex(b.invalidUnlocking), checkpoint: ch.final ? 'verify' : undefined, lockingBytes: b.locking.length, unlockingBytes: b.unlocking.length, operationCost: b.operationCost });
+  }
+  console.error(`final-exp: ${man.chunks.length} chunks built`);
+}
 
-console.error(`--- ${steps.length} steps | total op ${totalOp.toLocaleString()} max/step ${maxOp.toLocaleString()} (budget ${OP_BUDGET.toLocaleString()})`);
-console.error(`max lock ${maxLock}B max unlock ${maxUnlock}B | allFit=${allFit} allAccept=${allAccept} allInvalidRejected=${allInvalid}`);
+const sumOp = (arr) => arr.reduce((a, s) => a + s.operationCost, 0);
+const maxOpOf = (arr) => Math.max(...arr.map((s) => s.operationCost));
+// pairing-chunked = Miller boundary milestone (miller + combine) — UNCHANGED.
+// groth16-chunked = full verifier: vk_x -> Miller chains -> combine -> final exp -> verdict.
+const groth16Steps = [...vkxSteps, ...steps, ...finalexpSteps];
+console.error(`--- pairing(boundary) ${steps.length} steps (op ${sumOp(steps).toLocaleString()}); groth16(full) ${groth16Steps.length} steps (op ${sumOp(groth16Steps).toLocaleString()})`);
+console.error(`groth16 max/step ${maxOpOf(groth16Steps).toLocaleString()} (budget ${OP_BUDGET.toLocaleString()}) | max lock ${maxLock}B max unlock ${maxUnlock}B | allFit=${allFit} allAccept=${allAccept} allInvalidRejected=${allInvalid}`);
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-chunked-vectors.json', JSON.stringify({
   description: 'chunked BN254 Groth16 pairing to the Miller boundary (4 single-pair Miller chains + combine), multi-tx, every step fits one BCH input',
-  numSteps: steps.length, budgetPerInput: OP_BUDGET, totalOperationCost: totalOp, maxStepOperationCost: maxOp,
+  numSteps: steps.length, budgetPerInput: OP_BUDGET, totalOperationCost: sumOp(steps), maxStepOperationCost: maxOpOf(steps),
   allFit, allAccept, allInvalidRejected: allInvalid, steps,
 }, null, 2));
 console.error('wrote src/bch/pairing-chunked-vectors.json');
+
+writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-chunked-vectors.json', JSON.stringify({
+  description: 'FULL chunked BN254 Groth16 verifier: vk_x (on-chain from public inputs) -> 4 Miller chains -> combine -> final exponentiation -> assert product==1, multi-tx, every step fits one BCH input',
+  numSteps: groth16Steps.length, budgetPerInput: OP_BUDGET, totalOperationCost: sumOp(groth16Steps), maxStepOperationCost: maxOpOf(groth16Steps),
+  allFit, allAccept, allInvalidRejected: allInvalid, steps: groth16Steps,
+}, null, 2));
+console.error('wrote src/bch/groth16-chunked-vectors.json');

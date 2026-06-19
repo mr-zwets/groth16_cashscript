@@ -24,8 +24,12 @@ const run = (script, args = []) => new Promise((resolve, reject) => {
 
 console.log('[1/3] generating 4 single-pair Miller chains (parallel)...');
 await Promise.all([0, 1, 2, 3].map((i) => run('gen_miller.mjs', [String(i)])));
-console.log('[2/3] generating combine chunk...');
+console.log('[2/4] generating combine chunk...');
 await run('gen_combine.mjs');
-console.log('[3/3] building benchmark vectors...');
+console.log('[3/5] generating final-exponentiation chunks...');
+await run('gen_finalexp.mjs');
+console.log('[4/5] generating vk_x chunks (pairing instance)...');
+await run('gen_vkx.mjs');
+console.log('[5/5] building benchmark vectors (pairing + full groth16)...');
 await run('build_vectors.mjs');
 console.log('done — generated/ populated, verifier vectors written.');
