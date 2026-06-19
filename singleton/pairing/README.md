@@ -33,6 +33,7 @@ twice and would not otherwise compile.
 | **FinalExp** | **`finalexp.cash`** | **`finalexp.mjs`** | **== noble; valid→1, invalid→≠1** | ✅ **cp#3** (~255M, 9.3 KB) |
 
 | **Verdict** | **`verify.cash`** | **`verify.mjs`** | **4 pairs → boundary → finalExp → require==1; valid accepts, invalid rejects** | ✅ **full pairing** (~1.21B, 19.9 KB) |
+| **Verifier** | **`groth16.cash`** | **`groth16.mjs`** | **proof+inputs → vk_x on-chain → pairing → ==1; valid accepts, tampered rejects** | ✅ **COMPLETE & SOUND** (~1.26B, 21.7 KB) |
 
 **The full BN254 Groth16 pairing is implemented + verified in CashScript** (singleton
 oracle): Fp12 tower → Miller boundary (cp#2, byte-for-byte vs golden) → final
@@ -40,12 +41,17 @@ exponentiation (cp#3, verdict matches golden valid/invalid). `verify.cash` ties 
 the single intrinsic verdict `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)==1`. Combined with
 `../vkx.cash` this is a complete Groth16 verifier.
 
-**In the verifier benchmark:** registered as `bch-pairing-singleton` (leaderboard
-"Groth16 pairing (BCH-native) [single-tx]"). Build vectors with
-`node singleton/pairing/build_vectors.mjs` (writes
-`verifier/src/bch/pairing-singleton-vectors.json`); shows up via `pnpm benchmark`:
-`PASS (1/1✗)`, 20,735 B, 1,211,701,878 op-cost, ~151 inputs, BCH-incompatible
-(script-size + op-cost) — the honest baseline that motivates chunking.
+**In the verifier benchmark** (two entries):
+- `bch-groth16-singleton` — the COMPLETE verifier, in the main **Groth16** leaderboard
+  head-to-head with nchain/scrypt. Build:
+  `node singleton/pairing/build_vectors_groth16.mjs` → `verifier/src/bch/groth16-singleton-vectors.json`.
+  `pnpm benchmark`: `PASS (1/1✗)`, 21,933 B, 1,259,938,241 op-cost, ~157 inputs.
+  Same BN254 curve as scrypt-bn256 → **~534× smaller bytecode** (21.9 KB vs 11.7 MB).
+- `bch-pairing-singleton` — the pairing-only milestone (leaderboard "Groth16 pairing
+  (BCH-native)"). Build: `node singleton/pairing/build_vectors.mjs`. 20,735 B, ~1.21B, ~151 inputs.
+
+Both are honest single-tx baselines (BCH-incompatible: script-size + op-cost) that
+motivate chunking.
 
 Remaining: split across transactions for BCH limits (the chunked/ work) — the singleton
 Miller is ~957M and finalExp ~255M op-cost, vs ~8.03M per input.
