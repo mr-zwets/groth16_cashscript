@@ -202,26 +202,41 @@ def prologue():
 SER = ("hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40)"
        " + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40))")
 
-def iter_lines(j):
-    # One MSB-first iteration: double R (guarded rZ != 0, matching py_ecc), then
-    # runtime 2-bit Shamir select + conditional add via INVOKEs. Tuple-target
-    # var names are suffixed _{j} so they don't collide across iterations.
-    # NB: CashScript tuple-assignment targets must be NEWLY-declared vars, so we
-    # invoke into fresh dx/dy/dz (and ax/ay/az) suffixed _{j} then copy into the
-    # running rX/rY/rZ. Names are unique per iteration to avoid scope collisions.
-    i = 253 - j
-    pow2i = 1 << i
-    return f"""        // iter j={j} (bit {i}): double then runtime 2-bit Shamir select+add (INVOKEs)
-        if (rZ != 0) {{
-            (int dx_{j}, int dy_{j}, int dz_{j}) = jacDouble(rX, rY, rZ);
-            rX = dx_{j}; rY = dy_{j}; rZ = dz_{j};
-        }}
-        int b0_{j} = (input0 / {pow2i}) % 2;
-        int b1_{j} = (input1 / {pow2i}) % 2;
-        (int aX_{j}, int aY_{j}, int doAdd_{j}) = selectPoint(b0_{j}, b1_{j});
-        if (doAdd_{j} == 1) {{
-            (int ax_{j}, int ay_{j}, int az_{j}) = jacAdd(rX, rY, rZ, aX_{j}, aY_{j}, 1);
-            rX = ax_{j}; rY = ay_{j}; rZ = az_{j};
+def loop_lines(lo, hi):
+    # BOUNDED LOOP over this chunk's MSB-first bit window [lo,hi). The loop body
+    # is emitted into bytecode exactly ONCE (cashc compiles `for` to a runtime
+    # loop), so the per-chunk locking size is independent of how many iterations
+    # the chunk runs -> chunks become OP-COST-bound, not size-bound.
+    #
+    # Bit-position mapping (matches the run_window reference exactly): reference
+    # iterates j in [lo,hi) with bit i = 253 - j, i.e. MSB-first positions
+    # 253-lo, 253-lo-1, ..., 253-(hi-1). Here we run an ASCENDING index
+    # k = 0..count-1 and compute i = hiBit - k with hiBit = 253 - lo, so
+    # k=0 -> i=253-lo and k=count-1 -> i=253-(hi-1). Identical sequence.
+    #
+    # Bit extraction is at RUNTIME: input0/input1 are loop-invariant carried
+    # state and the per-iteration add is chosen in-script from (input>>i)%2.
+    # CashScript's `>>` works on int (only `&` is bytes-only), so we use
+    # `(input0 >> i) % 2` -- NO 2^i literals, NO `&`.
+    count = hi - lo
+    hiBit = 253 - lo
+    return f"""        // bounded MSB-first loop over bit window [{lo},{hi}) -> bit positions
+        // {hiBit} down to {253 - (hi - 1)} (count {count}); body compiled ONCE.
+        for (int k = 0; k < {count}; k = k + 1) {{
+            int i = {hiBit} - k;
+            // double R (guarded rZ != 0, matching the py_ecc reference)
+            if (rZ != 0) {{
+                (int dx, int dy, int dz) = jacDouble(rX, rY, rZ);
+                rX = dx; rY = dy; rZ = dz;
+            }}
+            // runtime 2-bit Shamir select over VK consts {{IC1,IC2,T}}, then add
+            int b0 = (input0 >> i) % 2;
+            int b1 = (input1 >> i) % 2;
+            (int aX, int aY, int doAdd) = selectPoint(b0, b1);
+            if (doAdd == 1) {{
+                (int ax, int ay, int az) = jacAdd(rX, rY, rZ, aX, aY, 1);
+                rX = ax; rY = ay; rZ = az;
+            }}
         }}"""
 
 def gen_cash(idx, ch, nchunks):
@@ -241,8 +256,7 @@ def gen_cash(idx, ch, nchunks):
     else:
         lines.append("    function spend(int rX, int rY, int rZ, int input0, int input1) {")
     lines.append(f"        require({SER} == 0x{ch['incoming']});")
-    for j in range(ch['lo'], ch['hi']):
-        lines.append(iter_lines(j))
+    lines.append(loop_lines(ch['lo'], ch['hi']))
     if ch['final']:
         # fold IC0 (constant term) UNCONDITIONALLY (no bit test) via jacAdd, then
         # verified inverse-on-stack -> affine -> assert.
@@ -379,34 +393,40 @@ def main():
         rX0, rY0, rZ0, i0, i1 = state
         incoming = commit(state)
         incoming_state = [rX0, rY0, rZ0, i0, i1]
-        # grow hi from lo+1 upward; keep the largest hi that fits.
-        best = None
-        hi = lo + 1
-        while hi <= ITERS:
+        # Binary-search the largest hi in (lo, ITERS] whose window fits the op-cost
+        # target. op-cost is monotonic increasing in hi (each extra iteration only
+        # adds work), so the fitting windows form a prefix -> binary search finds the
+        # SAME optimum as a linear scan, in ~log2(n) measurements instead of n.
+        # The final window (hi==ITERS) carries the IC0-fold + inverse tail.
+        def measure_candidate(hi):
             is_final = (hi == ITERS)
-            # outgoing commitment for a non-final candidate
+            rX, rY, rZ = run_window(lo, hi, rX0, rY0, rZ0)
             if is_final:
-                # compute zInv for the candidate final window (after IC0 fold)
-                rX, rY, rZ = run_window(lo, hi, rX0, rY0, rZ0)
                 rXf, rYf, rZf = jac_add(rX, rY, rZ, ic0[0], ic0[1], 1)
-                zInv = pow(rZf, p - 2, p)
+                zc = pow(rZf, p - 2, p)
                 outgoing = None
-                lb, oc, acc = measure(lo, hi, True, incoming, None, incoming_state, zInv)
+                lb, oc, acc = measure(lo, hi, True, incoming, None, incoming_state, zc)
             else:
-                rX, rY, rZ = run_window(lo, hi, rX0, rY0, rZ0)
                 outgoing = commit((rX, rY, rZ, input0, input1))
+                zc = None
                 lb, oc, acc = measure(lo, hi, False, incoming, outgoing, incoming_state)
             tail = FINAL_TAIL_OP if is_final else 0
             fits = acc and lb <= BYTE_BUDGET and (oc + tail) <= OP_COST_TARGET
-            if not fits:
-                if best is None:
-                    # even one iteration overflows -> accept it alone (shouldn't happen)
-                    best = (hi, is_final, outgoing, lb, oc, acc, zInv if is_final else None)
-                break
-            best = (hi, is_final, outgoing, lb, oc, acc, zInv if is_final else None)
-            if is_final:
-                break
-            hi += 1
+            return fits, (hi, is_final, outgoing, lb, oc, acc, zc)
+
+        best = None
+        loB, hiB = lo + 1, ITERS
+        while loB <= hiB:
+            mid = (loB + hiB) // 2
+            fits, rec = measure_candidate(mid)
+            if fits:
+                best = rec
+                loB = mid + 1
+            else:
+                hiB = mid - 1
+        if best is None:
+            # one iteration overflows the target (shouldn't happen at 7.3M); take it.
+            _, best = measure_candidate(lo + 1)
         bhi, b_is_final, b_outgoing, b_lb, b_oc, b_acc, b_zInv = best
         ch = {
             'lo': lo, 'hi': bhi, 'final': b_is_final,
