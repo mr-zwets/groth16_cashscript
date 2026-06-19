@@ -12,8 +12,14 @@ pragma cashscript ^0.13.0;
 // Graded vs noble bn254.pairing(g1,g2,false) by singleton/pairing/miller.mjs.
 contract Miller() {
 
-    function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    // LAZY ADDITION (option A): addFp does NOT reduce (just x+y). Its result feeds
+    // a mulFp (which reduces its product) or a subFp (which reduces) shortly, so
+    // magnitudes stay bounded (< ~8p). subFp KEEPS the reduction with an 8p bias so
+    // it absorbs lazy operands and subtraction chains never compound. The expensive
+    // OP_MOD is dropped from every addition. Values carried/hashed/asserted are
+    // reduced (% p) at those boundaries (the spend below; the chunk generators).
+    function addFp(int x, int y) returns (int) { return x + y; }
+    function subFp(int x, int y) returns (int) { return (x - y + 175105942974714201777971245962058200709570489258382589301512303157161809668664) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
     function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
 
     // ---- Fp2 ----
@@ -299,7 +305,9 @@ contract Miller() {
         (int j0,int j1,int j2,int j3,int j4,int j5,int j6,int j7,int j8,int j9,int j10,int j11) =
             line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, cc0,cc1,cc2,cc3,cc4,cc5, Px, Py);
 
-        require(j0==M0); require(j1==M1); require(j2==M2); require(j3==M3); require(j4==M4); require(j5==M5);
-        require(j6==M6); require(j7==M7); require(j8==M8); require(j9==M9); require(j10==M10); require(j11==M11);
+        // reduce the lazy f to canonical [0,p) before comparing to noble's reduced limbs
+        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require(j0 % P==M0); require(j1 % P==M1); require(j2 % P==M2); require(j3 % P==M3); require(j4 % P==M4); require(j5 % P==M5);
+        require(j6 % P==M6); require(j7 % P==M7); require(j8 % P==M8); require(j9 % P==M9); require(j10 % P==M10); require(j11 % P==M11);
     }
 }

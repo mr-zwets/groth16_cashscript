@@ -11,8 +11,11 @@ pragma cashscript ^0.13.0;
 // Graded vs noble Fp12.finalExponentiate by singleton/pairing/finalexp.mjs.
 contract FinalExp() {
 
-    function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    // LAZY ADDITION (option A): addFp does not reduce; subFp reduces with an 8p
+    // bias. See miller.cash for the rationale. Values are reduced (% p) where
+    // hashed/asserted (the spend below; the final-exp chunk generator).
+    function addFp(int x, int y) returns (int) { return x + y; }
+    function subFp(int x, int y) returns (int) { return (x - y + 175105942974714201777971245962058200709570489258382589301512303157161809668664) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
     function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
     function inverseFp(int x) returns (int) {
         int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
@@ -337,7 +340,9 @@ contract FinalExp() {
     ) {
         (int o0,int o1,int o2,int o3,int o4,int o5,int o6,int o7,int o8,int o9,int o10,int o11) =
             finalExp(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
-        require(o0==M0); require(o1==M1); require(o2==M2); require(o3==M3); require(o4==M4); require(o5==M5);
-        require(o6==M6); require(o7==M7); require(o8==M8); require(o9==M9); require(o10==M10); require(o11==M11);
+        // reduce the lazy result to canonical [0,p) before comparing to noble
+        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require(o0 % P==M0); require(o1 % P==M1); require(o2 % P==M2); require(o3 % P==M3); require(o4 % P==M4); require(o5 % P==M5);
+        require(o6 % P==M6); require(o7 % P==M7); require(o8 % P==M8); require(o9 % P==M9); require(o10 % P==M10); require(o11 % P==M11);
     }
 }

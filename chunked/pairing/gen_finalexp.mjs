@@ -14,14 +14,14 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp12, Fp2, bn254, vec, fnExtractor, measureChunk, commit, f12limbs, decl, serExpr,
+  Fp12, Fp2, bn254, vec, fnExtractor, measureChunk, planChunk, commit, f12limbs, decl, serExpr,
 } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
 mkdirSync(GEN, { recursive: true });
 const PROBE = join(GEN, `_probe_${process.pid}.cash`);
-const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
+const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_900_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const BN_X = 4965661367192848881n;
 const X_LEN = 63;
@@ -105,12 +105,14 @@ function buildChunkSrc(s, e) {
     L.push(`        (${decl(out)}) = ${OP_FN[o.op]}(${argVars.join(',')});`);
     name.set(o.id, out);
   }
+  // outputs are LAZY (addFp doesn't reduce) -> reduce % P before hashing/asserting
+  L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
   if (isLast) {
     const rv = name.get(result.id);
-    L.push(`        require(${rv[0]} == 1); ` + Array.from({ length: 11 }, (_, j) => `require(${rv[j + 1]} == 0);`).join(' '));
+    L.push(`        require(${rv[0]} % P == 1); ` + Array.from({ length: 11 }, (_, j) => `require(${rv[j + 1]} % P == 0);`).join(' '));
   } else {
     const outgoing = commit(liveOut.flatMap(limbsOf));
-    L.push(`        require(${serExpr(liveOut.flatMap((id) => name.get(id)))} == 0x${outgoing});`);
+    L.push(`        require(hash256(${liveOut.flatMap((id) => name.get(id)).map((n) => `toPaddedBytes(${n} % P, 40)`).join(' + ')}) == 0x${outgoing});`);
   }
   L.push('    }');
   L.push('}');
@@ -122,30 +124,27 @@ if (process.argv[2] === 'probe') {
   const fnOnly = `pragma cashscript ^0.13.0;\ncontract P(){\n${PROLOGUE}\n    function spend(int x){ require(x==x); }\n}\n`;
   writeFileSync(PROBE, fnOnly);
   console.error('function-set size:', execFileSync('node', ['C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js', PROBE, '-s'], { encoding: 'utf8' }).trim());
-  for (const e of [1, 2, 3, 5]) { const c = buildChunkSrc(0, e); const m = measureChunk(c.src, c.inLimbs, PROBE); console.error(`ops[0,${e}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`); }
+  for (const e of [1, 2, 3, 5]) { const c = buildChunkSrc(0, e); const m = measureChunk(c.src, c.inLimbs); console.error(`ops[0,${e}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`); }
   try { execFileSync('rm', [PROBE]); } catch {}
   process.exit(0);
 }
 
-// ---------- plan + emit (greedy linear growth by measured op-cost) ----------
+// ---------- plan + emit (predict-and-adjust by measured op-cost) ----------
 console.error(`planning final-exp chunks  OP_TARGET=${OP_TARGET.toLocaleString()}`);
-const chunks = []; let s = 0;
+const chunks = []; let s = 0; const planState = { perUnit: null };
 while (s < ops.length) {
-  let best = null;
-  for (let e = s + 1; e <= ops.length; e++) {
+  const tryAt = (e) => {
     const c = buildChunkSrc(s, e);
-    const m = measureChunk(c.src, c.inLimbs, PROBE);
-    const fits = m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET;
-    if (fits) best = { e, ...c, m }; else break;
-  }
-  if (!best) { const c = buildChunkSrc(s, s + 1); best = { e: s + 1, ...c, m: measureChunk(c.src, c.inLimbs, PROBE) }; }
+    const m = measureChunk(c.src, c.inLimbs);
+    return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, ...c, m };
+  };
+  const best = planChunk(s, ops.length, OP_TARGET, tryAt, planState);
   const idx = chunks.length;
   writeFileSync(join(GEN, `finalexp_${String(idx).padStart(2, '0')}.cash`), best.src);
-  chunks.push({ idx, opLo: s, opHi: best.e, incoming: best.incoming, final: best.isLast, incomingLimbs: best.inLimbs.map(String), lockingBytes: best.m.lockingBytes, operationCost: best.m.operationCost });
-  console.error(`  chunk ${idx}: ops[${s},${best.e}) lock=${best.m.lockingBytes}B op=${best.m.operationCost.toLocaleString()} final=${best.isLast}`);
-  s = best.e;
+  chunks.push({ idx, opLo: s, opHi: best.hi, incoming: best.incoming, final: best.isLast, incomingLimbs: best.inLimbs.map(String), lockingBytes: best.m.lockingBytes, operationCost: best.m.operationCost });
+  console.error(`  chunk ${idx}: ops[${s},${best.hi}) lock=${best.m.lockingBytes}B op=${best.operationCost.toLocaleString()} final=${best.isLast}`);
+  s = best.hi;
 }
-try { execFileSync('rm', [PROBE]); } catch {}
 console.error(`final-exp: ${chunks.length} chunks, total op=${chunks.reduce((a, c) => a + c.operationCost, 0).toLocaleString()}, max=${Math.max(...chunks.map((c) => c.operationCost)).toLocaleString()}`);
 writeFileSync(join(GEN, 'manifest_finalexp.json'), JSON.stringify({
   numChunks: chunks.length, numOps: ops.length, boundary: f12limbs(boundaryVal).map(String),

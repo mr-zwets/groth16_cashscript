@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp2, Fp12, ATE_NAF, millerStep, postPrecompute, pairsFor, vec,
-  f12limbs, r6limbs, CASHC, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, OP_BUDGET,
+  f12limbs, r6limbs, compileBytecode, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, OP_BUDGET,
 } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -39,8 +39,7 @@ const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3
 
 // build padded vectors for one chunk file given its incoming-state ints (decl order)
 function buildChunk(cashFile, stateInts) {
-  const lockHex = execFileSync('node', [CASHC, cashFile, '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
-  const locking = Uint8Array.from([OP_DROP, ...hexToBin(lockHex)]);
+  const locking = Uint8Array.from([OP_DROP, ...compileBytecode(readFileSync(cashFile, 'utf8'))]);
   const argBytes = Uint8Array.from([...stateInts].reverse().flatMap((c) => [...pushInt(c)]));
   const probe = evalReal(locking, Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]));
   let target = tunedLen(argBytes.length, probe.operationCost);

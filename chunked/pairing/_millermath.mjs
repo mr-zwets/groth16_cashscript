@@ -10,6 +10,15 @@ const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble
 export const { bn254 } = await import(NOBLE);
 export const { Fp, Fp2, Fp6, Fp12 } = bn254.fields;
 
+// IN-PROCESS cashc compile (compileString + asmToBytecode) instead of spawning a
+// `node cashc-cli` subprocess per candidate chunk — the planner compiles hundreds
+// of times, so dropping the spawn + file I/O is a real speedup.
+const CASHC_LIB = pathToFileURL('C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/index.js').href;
+const cashc = await import(CASHC_LIB);
+const asmToBytecode = cashc.utils.asmToBytecode;
+/** compile a .cash source string -> redeem bytecode (Uint8Array); throws on compile error */
+export const compileBytecode = (src) => asmToBytecode(cashc.compileString(src).bytecode);
+
 export const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
 export const OP_BUDGET = (41 + 10_000) * 800;
 export const TARGET_UNLOCK = 10_000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
@@ -132,11 +141,15 @@ const pushInt = (n) => {
   return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]);
 };
 const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, N & 0xff, (N >> 8) & 0xff, ...new Uint8Array(N)]); };
-// compile `src`, run with `stateInts` (declaration order) on the real VM (padded to cap)
-export function measureChunk(src, stateInts, probePath) {
-  writeFileSync(probePath, src);
-  const lockHex = execFileSync('node', [CASHC, probePath, '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
-  const locking = Uint8Array.from([OP_DROP, ...hexToBin(lockHex)]);
+// compile `src` IN-PROCESS, run with `stateInts` (declaration order) on the real
+// VM (padded to cap). Returns op-cost + size + accept; a compile error counts as
+// "doesn't fit" so the planner just shrinks the window. (3rd arg kept for callers
+// that still pass a probe path — ignored.)
+export function measureChunk(src, stateInts) {
+  let raw;
+  try { raw = compileBytecode(src); }
+  catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
+  const locking = Uint8Array.from([OP_DROP, ...raw]);
   const argBytes = Uint8Array.from([...stateInts].reverse().flatMap((c) => [...pushInt(c)]));
   const unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]);
   const st = realVm.evaluate(createTestAuthenticationProgramBch({ lockingBytecode: locking, unlockingBytecode: unlocking, valueSatoshis: 1000n }));
@@ -146,3 +159,26 @@ export function measureChunk(src, stateInts, probePath) {
 }
 export const decl = (names) => names.map((n) => `int ${n}`).join(',');
 export const serExpr = (names) => 'hash256(' + names.map((n) => `toPaddedBytes(${n}, 40)`).join(' + ') + ')';
+
+// Predict-and-adjust greedy window planner. Instead of linear growth (compile
+// every candidate from lo+1 upward — most thrown away), estimate the window from
+// a running op-cost-per-unit average, compile that, then adjust ±1 to the budget
+// boundary. ~2 compiles/chunk vs ~4-10. `state` is a mutable {perUnit:null} that
+// the planner calibrates over successive chunks (first chunk falls back to linear
+// growth to seed it). `tryAt(hi) -> { fits, operationCost, ... }` builds+measures
+// the window [lo,hi); returns the best record (with its `.hi`).
+export function planChunk(lo, max, opTarget, tryAt, state) {
+  let best = null;
+  const consider = (hi) => { const r = tryAt(hi); if (r.fits) best = { hi, ...r }; return r; };
+  if (state.perUnit == null) {
+    consider(lo + 1);
+    for (let hi = lo + 2; hi <= max; hi++) if (!consider(hi).fits) break;
+  } else {
+    const guess = Math.min(max, lo + Math.max(1, Math.floor(opTarget / state.perUnit)));
+    if (consider(guess).fits) { for (let hi = guess + 1; hi <= max; hi++) if (!consider(hi).fits) break; }
+    else { for (let hi = guess - 1; hi > lo; hi--) if (consider(hi).fits) break; }
+    if (!best) consider(lo + 1); // 1 unit always fits in practice
+  }
+  if (best) { const u = best.hi - lo, pu = best.operationCost / u; state.perUnit = state.perUnit == null ? pu : 0.5 * state.perUnit + 0.5 * pu; }
+  return best;
+}

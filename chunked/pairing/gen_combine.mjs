@@ -49,13 +49,15 @@ for (let i = 1; i < 4; i++) {
   L.push(`        (${decl(nv)}) = fp12Mul(${acc.join(',')}, ${aNames(i).join(',')});`);
   acc = nv;
 }
-L.push(`        require(${serExpr(acc)} == 0x${outgoing});`);
+// boundary is lazy (addFp doesn't reduce) -> reduce % P before hashing
+L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
+L.push(`        require(hash256(${acc.map((n) => `toPaddedBytes(${n} % P, 40)`).join(' + ')}) == 0x${outgoing});`);
 L.push('    }');
 L.push('}');
 const src = L.join('\n') + '\n';
 writeFileSync(join(GEN, 'combine.cash'), src);
 
-const m = measureChunk(src, incomingLimbs, join(GEN, `_probe_${process.pid}.cash`));
+const m = measureChunk(src, incomingLimbs);
 try { execFileSync('rm', [join(GEN, `_probe_${process.pid}.cash`)]); } catch {}
 console.log(`combine.cash: lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`);
 console.log(`boundary first limb = ${outLimbs[0]}`);

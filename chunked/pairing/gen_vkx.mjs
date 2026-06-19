@@ -20,7 +20,7 @@ mkdirSync(GEN, { recursive: true });
 const PROBE = join(GEN, `_probe_${process.pid}.cash`);
 const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const Pstr = P.toString();
-const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
+const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_900_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const ITERS = 254;
 
@@ -159,7 +159,7 @@ while (lo < ITERS) {
     else outgoing = commitState([rX, rY, rZ, in0, in1]);
     const src = genCash(lo, hi, final, incoming, outgoing ?? '00');
     const stateInts = final ? [rX0, rY0, rZ0, in0, in1, zInv] : [rX0, rY0, rZ0, in0, in1];
-    const m = measureChunk(src, stateInts, PROBE);
+    const m = measureChunk(src, stateInts);
     return { hi, final, src, m, outgoing, zInv, fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET };
   };
   let best = tryHi(lo + 1);

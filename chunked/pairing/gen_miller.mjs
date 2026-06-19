@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
+import { measureChunk, planChunk } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated'); // git-ignored output dir (reproducible artifacts)
@@ -32,7 +33,7 @@ const { hexToBin, bigIntToVmNumber, createTestAuthenticationProgramBch, createVi
 const realVm = createVirtualMachineBch2026(false);
 
 const OP_BUDGET = (41 + 10_000) * 800; // 8,032,800
-const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
+const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_900_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const TARGET_UNLOCK = 10_000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
 
@@ -144,6 +145,9 @@ function genChunk(pair, lo, hi, final, incoming, outgoing) {
   const fns = [...BASE_FNS, ...(final ? FINAL_FNS : [])].map(extractFn).join('\n');
   const fArgs = Array.from({ length: 12 }, (_, i) => `int f${i}`).join(',');
   const serOf = (f, r) => 'hash256(' + [...f, ...r].map((n) => `toPaddedBytes(${n}, 40)`).join(' + ') + ')';
+  // outgoing limbs are LAZY (addFp doesn't reduce) -> reduce % P before hashing so
+  // the committed state matches noble's reduced reference (incoming args are already reduced).
+  const serOfReduced = (f, r) => 'hash256(' + [...f, ...r].map((n) => `toPaddedBytes(${n} % P, 40)`).join(' + ') + ')';
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR = ['Rxa', 'Rxb', 'Rya', 'Ryb', 'Rza', 'Rzb'];
   const L = [];
@@ -190,34 +194,15 @@ function genChunk(pair, lo, hi, final, incoming, outgoing) {
     const jf = fresh(12);
     L.push(`        (${decl(jf)}) = line(${f.join(',')}, ${cco.join(',')}, ${Px}, ${Py});`); f = jf;
   }
-  L.push(`        require(${serOf(f, r)} == 0x${outgoing});`);
+  L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
+  L.push(`        require(${serOfReduced(f, r)} == 0x${outgoing});`);
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
 }
 
-// ---- real-VM measurement (padded like shamir) ----
-const pushInt = (n) => {
-  const d = bigIntToVmNumber(n);
-  if (d.length === 0) return Uint8Array.from([0x00]);
-  if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
-  if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  if (d.length <= 75) return Uint8Array.from([d.length, ...d]);
-  if (d.length <= 255) return Uint8Array.from([0x4c, d.length, ...d]);
-  return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]);
-};
-const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, N & 0xff, (N >> 8) & 0xff, ...new Uint8Array(N)]); };
-function measure(src, stateInts) {
-  writeFileSync(join(GEN, `_probe_${process.pid}.cash`), src);
-  const lockHex = execFileSync('node', [CASHC, join(GEN, `_probe_${process.pid}.cash`), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
-  const locking = Uint8Array.from([OP_DROP, ...hexToBin(lockHex)]);
-  const argBytes = Uint8Array.from([...stateInts].reverse().flatMap((c) => [...pushInt(c)]));
-  const unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]);
-  const st = realVm.evaluate(createTestAuthenticationProgramBch({ lockingBytecode: locking, unlockingBytecode: unlocking, valueSatoshis: 1000n }));
-  const top = st.stack[st.stack.length - 1];
-  const accepted = st.error === undefined && st.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1;
-  return { lockingBytes: locking.length, operationCost: st.metrics.operationCost, accepted, error: st.error ?? null };
-}
+// ---- real-VM measurement: shared in-process measurer (compile + pad + eval) ----
+const measure = measureChunk;
 
 // ---- plan + emit chunks for one pair (forward pass, binary-search windows) ----
 const pairIdx = Number(process.argv[2] ?? 0);
@@ -249,27 +234,19 @@ if (process.argv[3] === 'probe') {
 }
 
 const chunks = [];
-let lo = 0;
+let lo = 0; const planState = { perUnit: null };
 while (lo < N) {
   const incoming = commit(stateLimbs(states[lo].f, states[lo].R));
-  // binary search largest hi in (lo, N] that fits
   const tryHi = (hi) => {
     const final = hi === N;
     const outLimbs = final ? stateLimbs(finalState.f, finalState.R) : stateLimbs(states[hi].f, states[hi].R);
     const outgoing = commit(outLimbs);
     const src = genChunk(pair, lo, hi, final, incoming, outgoing);
     const m = measure(src, stateLimbs(states[lo].f, states[lo].R));
-    const fits = m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET;
-    return { fits, hi, final, outgoing, src, m };
+    return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final, outgoing, src, m };
   };
-  // linear forward growth: windows are only ~2-3 steps, so grow until one more
-  // step would exceed op-cost/byte budget (far fewer + smaller compiles than a
-  // binary search over giant candidate windows).
-  let best = tryHi(lo + 1); // 1 step always fits (~1.8M)
-  for (let hi = lo + 2; hi <= N; hi++) {
-    const cand = tryHi(hi);
-    if (cand.fits) best = cand; else break;
-  }
+  // predict-and-adjust (estimate window from running op-cost/step, ~2 compiles/chunk)
+  const best = planChunk(lo, N, OP_TARGET, tryHi, planState);
   chunks.push({ idx: chunks.length, lo, hi: best.hi, final: best.final, incoming, outgoing: best.outgoing, opCost: best.m.operationCost, lockingBytes: best.m.lockingBytes });
   writeFileSync(join(GEN, `miller_p${pairIdx}_${String(chunks.length - 1).padStart(2, '0')}.cash`), best.src);
   console.error(`  chunk ${chunks.length - 1}: [${lo},${best.hi}) steps=${best.hi - lo} lock=${best.m.lockingBytes}B op=${best.m.operationCost.toLocaleString()} final=${best.final}`);
