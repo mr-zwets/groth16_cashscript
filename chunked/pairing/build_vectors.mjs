@@ -12,6 +12,7 @@ import { dirname, join } from 'node:path';
 import {
   Fp2, Fp12, ATE_NAF, millerStep, postPrecompute, pairsFor, proofFromLimbs, vec,
   f12limbs, r6limbs, compileBytecode, commitBin, CATEGORY, ptLimbs,
+  vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace,
   TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, OP_BUDGET,
 } from './_millermath.mjs';
 
@@ -54,12 +55,17 @@ function evalCov(locking, unlocking, inCommit, outCommit) {
 // Build one covenant step: pad the unlocking to afford op-cost, attach the token
 // covenant context, and verify it accepts (and that a tampered limb is rejected).
 const compileCache = new Map();
-function buildCovStep(cashFile, inLimbs, outLimbs, label, checkpoint) {
+// `commitLimbs` = the committed carried state (hashed into the NFT commitment, decl
+// order). `allArgs` = everything the unlocking pushes (decl order) — usually ==
+// commitLimbs, but e.g. the vk_x final chunk pushes an extra uncommitted zInv.
+function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArgs) {
+  const inLimbs = commitLimbs;
+  const pushArgs = allArgs ?? commitLimbs;
   let redeem = compileCache.get(cashFile);
   if (!redeem) { redeem = compileBytecode(readFileSync(cashFile, 'utf8')); compileCache.set(cashFile, redeem); }
   const locking = Uint8Array.from([OP_DROP, ...redeem]);
   const inCommit = commitBin(inLimbs.map(BigInt)), outCommit = commitBin(outLimbs.map(BigInt));
-  const argBytes = Uint8Array.from([...inLimbs].reverse().flatMap((c) => [...pushInt(BigInt(c))]));
+  const argBytes = Uint8Array.from([...pushArgs].reverse().flatMap((c) => [...pushInt(BigInt(c))]));
   const probe = evalCov(locking, Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]), inCommit, outCommit);
   let target = tunedLen(argBytes.length, probe.operationCost);
   let unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, target)]);
@@ -138,11 +144,57 @@ function buildPairing(inst) {
   stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
   stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
   steps.push(r.step);
+  return { steps, boundaryVal: boundary };
+}
+
+// ---- vk_x chunks (Shamir/Straus accumulator; public inputs at RUNTIME) ----
+function buildVkx(inst) {
+  const [in0, in1] = inst.inputs;
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkx.json'), 'utf8'));
+  const vkxAff = vkxPoint(inst.inputs).toAffine();
+  const steps = [];
+  for (const ch of man.chunks) {
+    const inAcc = vkxStateAt(in0, in1, ch.lo);
+    const commitLimbs = [...inAcc, in0, in1];
+    let outLimbs, allArgs;
+    if (ch.final) { outLimbs = [vkxAff.x, vkxAff.y]; allArgs = [...commitLimbs, vkxFinalZinv(in0, in1)]; }
+    else { outLimbs = [...vkxStateAt(in0, in1, ch.hi), in0, in1]; allArgs = commitLimbs; }
+    const r = buildCovStep(join(GEN, `vkx_${String(ch.idx).padStart(2, '0')}.cash`), commitLimbs, outLimbs, `vk_x [${ch.lo},${ch.hi})${ch.final ? ' assert vk_x' : ''}`, ch.final ? 'vk_x' : undefined, allArgs);
+    stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
+    stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
+    steps.push(r.step);
+  }
   return steps;
 }
 
-const pairing0 = buildPairing(INSTANCES[0]);
-const pairing1 = buildPairing(INSTANCES[1]);
+// ---- final exponentiation chunks (op-DAG re-evaluated on THIS proof's boundary) ----
+function buildFinalexp(inst, boundaryVal) {
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_finalexp.json'), 'utf8'));
+  const tr = finalexpTrace(boundaryVal);
+  const liveLimbs = (cut) => tr.liveAt(cut).flatMap((id) => tr.limbs12(id));
+  const steps = [];
+  for (const ch of man.chunks) {
+    const inLimbs = liveLimbs(ch.opLo);
+    const outLimbs = ch.final ? [] : liveLimbs(ch.opHi);
+    const r = buildCovStep(join(GEN, `finalexp_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs, `finalexp ops[${ch.opLo},${ch.opHi})${ch.final ? ' verdict==1' : ''}`, ch.final ? 'verify' : undefined);
+    stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
+    stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
+    steps.push(r.step);
+  }
+  return steps;
+}
+
+// ---- the FULL verifier chain: vk_x -> 4 Miller chains -> combine -> final exp ----
+function buildGroth16(inst) {
+  const vkxSteps = buildVkx(inst);
+  const { steps: pairingSteps, boundaryVal } = buildPairing(inst);
+  const feSteps = buildFinalexp(inst, boundaryVal);
+  return { groth16: [...vkxSteps, ...pairingSteps, ...feSteps], pairing: pairingSteps };
+}
+
+const g0 = buildGroth16(INSTANCES[0]);
+const g1 = buildGroth16(INSTANCES[1]);
+const pairing0 = g0.pairing, pairing1 = g1.pairing;
 const sumOp = (a) => a.reduce((x, s) => x + s.operationCost, 0);
 const maxOpOf = (a) => Math.max(...a.map((s) => s.operationCost));
 console.error(`pairing(boundary): ${pairing0.length} steps/proof, op ${sumOp(pairing0).toLocaleString()}; proof#1 also built (${pairing1.length} steps)`);
@@ -156,3 +208,13 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-chunked-vectors.j
   steps: pairing0, extraValidProofs: [pairing1],
 }, null, 2));
 console.error('wrote src/bch/pairing-chunked-vectors.json (proof-agnostic, 2 proofs)');
+
+console.error(`groth16(full): ${g0.groth16.length} steps/proof, op ${sumOp(g0.groth16).toLocaleString()}; proof#1 also built (${g1.groth16.length} steps)`);
+writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-chunked-vectors.json', JSON.stringify({
+  description: 'PROOF-AGNOSTIC full chunked BN254 Groth16 verifier: vk_x (on-chain from public inputs) -> 4 Miller chains -> combine -> final exponentiation -> assert product==1, multi-tx. Generic covenant: state in the token NFT commitment, NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct proof minted under the same VK.',
+  proofBinding: 'runtime', numSteps: g0.groth16.length, budgetPerInput: OP_BUDGET,
+  totalOperationCost: sumOp(g0.groth16), maxStepOperationCost: maxOpOf(g0.groth16),
+  allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
+  steps: g0.groth16, extraValidProofs: [g1.groth16],
+}, null, 2));
+console.error('wrote src/bch/groth16-chunked-vectors.json (proof-agnostic, 2 proofs)');

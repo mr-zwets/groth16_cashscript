@@ -134,6 +134,88 @@ export const ptLimbs = (pairIdx, P, Q) => {
   return o;
 };
 
+// ---- finalExp op-DAG trace (replayable for ANY boundary) -----------------------
+// Same op structure as gen_finalexp (proof-independent); only the values differ.
+// Returns { ops, liveAt(cut), limbs12(id), resultId } so build_vectors can recompute
+// a different proof's per-chunk live state at the SAME chunk windows.
+const X_LEN_FE = 63;
+export function finalexpTrace(boundaryVal) {
+  const ops = []; let nextId = 0;
+  const Vv = (val) => ({ id: nextId++, val });
+  const rec = (op, args, val) => { const v = Vv(val); ops.push({ id: v.id, op, args: args.map((a) => a.id), val }); return v; };
+  const cyc = (a) => rec('cyc', [a], Fp12._cyclotomicSquare(a.val));
+  const mul = (a, b) => rec('mul', [a, b], Fp12.mul(a.val, b.val));
+  const conj = (a) => rec('conj', [a], Fp12.conjugate(a.val));
+  const f1 = (a) => rec('f1', [a], Fp12.frobeniusMap(a.val, 1));
+  const f2 = (a) => rec('f2', [a], Fp12.frobeniusMap(a.val, 2));
+  const f3 = (a) => rec('f3', [a], Fp12.frobeniusMap(a.val, 3));
+  const inv = (a) => rec('inv', [a], Fp12.inv(a.val));
+  const cycExp = (numV) => { let z = numV; for (let i = X_LEN_FE - 2; i >= 0; i--) { z = cyc(z); if ((BN_X >> BigInt(i)) & 1n) z = mul(z, numV); } return z; };
+  const powMinusX = (xV) => conj(cycExp(xV));
+  const fV = Vv(boundaryVal);
+  const r0 = mul(conj(fV), inv(fV));
+  const r = mul(f2(r0), r0);
+  const y1 = cyc(powMinusX(r));
+  const y2 = mul(cyc(y1), y1);
+  const y4 = powMinusX(y2);
+  const y6 = powMinusX(cyc(y4));
+  const y8 = mul(mul(conj(y6), y4), conj(y2));
+  const y9 = mul(y8, y1);
+  const left = f3(mul(conj(r), y9));
+  const right = mul(f2(y8), mul(f1(y9), mul(mul(y8, y4), r)));
+  const result = mul(left, right);
+  const valOf = new Map([[fV.id, boundaryVal]]); for (const o of ops) valOf.set(o.id, o.val);
+  const def = new Map([[fV.id, -1]]); ops.forEach((o, i) => def.set(o.id, i));
+  const lastUse = new Map(); ops.forEach((o, i) => o.args.forEach((a) => lastUse.set(a, i)));
+  lastUse.set(result.id, ops.length);
+  const liveAt = (cut) => [...def.keys()].filter((id) => def.get(id) < cut && (lastUse.get(id) ?? -1) >= cut).sort((a, b) => a - b);
+  const limbs12 = (id) => f12limbs(valOf.get(id));
+  return { ops, liveAt, limbs12, resultId: result.id, result: result.val };
+}
+
+// ---- vk_x Jacobian accumulator trace (replayable for ANY public inputs) ---------
+const PFP = Fp.ORDER;
+const aF = (x, y) => (x + y) % PFP, sF = (x, y) => (x - y + PFP) % PFP, mF = (x, y) => (x * y) % PFP, qF = (x) => (x * x) % PFP;
+function jacDouble(X, Y, Z) {
+  const a = qF(X), b = qF(Y), c = qF(b);
+  const d = mF(2n, sF(sF(qF(aF(X, b)), a), c));
+  const e = mF(3n, a), f = qF(e);
+  const nx = sF(f, mF(2n, d));
+  return [nx, sF(mF(e, sF(d, nx)), mF(8n, c)), mF(2n, mF(Y, Z))];
+}
+function jacAdd(aX, aY, aZ, bX, bY, bZ) {
+  if (aZ === 0n) return [bX, bY, bZ];
+  const z1z1 = qF(aZ), z2z2 = qF(bZ);
+  const u1 = mF(aX, z2z2), u2 = mF(bX, z1z1);
+  const s1 = mF(mF(aY, bZ), z2z2), s2 = mF(mF(bY, aZ), z1z1);
+  if (u1 === u2 && s1 === s2) return jacDouble(aX, aY, aZ);
+  const h = sF(u2, u1), i2 = qF(mF(2n, h)), j = mF(h, i2);
+  const rr = mF(2n, sF(s2, s1)), v = mF(u1, i2);
+  const nx = sF(sF(qF(rr), j), mF(2n, v));
+  return [nx, sF(mF(rr, sF(v, nx)), mF(2n, mF(s1, j))), mF(sF(sF(qF(aF(aZ, bZ)), z1z1), z2z2), h)];
+}
+const _ic1 = vk.ic[1].toAffine(), _ic2 = vk.ic[2].toAffine(), _icT = vk.ic[1].add(vk.ic[2]).toAffine();
+/** Shamir/Straus vk_x accumulator after processing windows [0,upto): [rX,rY,rZ]. */
+export function vkxStateAt(in0, in1, upto) {
+  let X = 0n, Y = 1n, Z = 0n;
+  for (let j = 0; j < upto; j++) {
+    const i = 253 - j;
+    if (Z !== 0n) [X, Y, Z] = jacDouble(X, Y, Z);
+    const b0 = (in0 >> BigInt(i)) & 1n, b1 = (in1 >> BigInt(i)) & 1n;
+    const ap = b0 && b1 ? [_icT.x, _icT.y] : b0 ? [_ic1.x, _ic1.y] : b1 ? [_ic2.x, _ic2.y] : null;
+    if (ap) [X, Y, Z] = jacAdd(X, Y, Z, ap[0], ap[1], 1n);
+  }
+  return [X, Y, Z];
+}
+const _ic0 = vk.ic[0].toAffine();
+const modpowFp = (b, e) => { let r = 1n; b %= PFP; while (e > 0n) { if (e & 1n) r = (r * b) % PFP; b = (b * b) % PFP; e >>= 1n; } return r; };
+/** the final vkx chunk's auxiliary zInv = (Z of (acc + IC0))^-1, supplied in the unlocking. */
+export function vkxFinalZinv(in0, in1) {
+  const acc = vkxStateAt(in0, in1, 254);
+  const [, , fz] = jacAdd(acc[0], acc[1], acc[2], _ic0.x, _ic0.y, 1n);
+  return fz === 0n ? 0n : modpowFp(fz, PFP - 2n);
+}
+
 // ---- extract reusable functions from a singleton .cash (for chunk prologues) ----
 export function fnExtractor(cashPath) {
   const src = readFileSync(cashPath, 'utf8').split('\n');
