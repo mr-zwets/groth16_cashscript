@@ -22,7 +22,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated'); // git-ignored output dir (reproducible artifacts)
 mkdirSync(GEN, { recursive: true });
 const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
-const MILLER_CASH = join(here, '..', '..', 'singleton', 'pairing', 'miller.cash');
+const MILLER_CASH = join(here, '..', '..', 'singleton', 'bn254', 'miller.cash');
 
 const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bn254.js').href;
 const { bn254 } = await import(NOBLE);

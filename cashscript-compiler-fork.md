@@ -26,7 +26,7 @@ This is the central enabler for the whole verifier. The BN254 field tower
 (`Fp2 → Fp6 → Fp12`), the G1/G2 point operations, and the Miller / final-exponentiation
 steps are each **defined once and invoked**, so the loop body (and, in the chunked
 deployment, the per-chunk bytecode) is compiled once rather than inlined N times. The
-real source (`singleton/pairing/*.cash`, `chunked/`) relies on this everywhere; without
+real source (`singleton/bn254/*.cash`, `chunked/`) relies on this everywhere; without
 it the verifier would not fit BCH's bytecode limits.
 
 ## 2. Multi-return functions

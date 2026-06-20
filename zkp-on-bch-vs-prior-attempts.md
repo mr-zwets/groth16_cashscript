@@ -131,7 +131,7 @@ arithmetic" opcodes (`OP_MUL`, `OP_DIV`, `OP_MOD`, the bitwise ops,
 `OP_NUM2BIN`, `OP_BIN2NUM` (re-enabled 2018); `OP_MUL` (2022);
 arbitrary-precision integers (BigInt, 2025); and arithmetic/binary shift opcodes
 plus `OP_INVERT` (CHIP-2025-05 Bitwise, active May 2026, which this repo's
-`>>` scalar-bit tests, e.g. in [`singleton/vkx.cash`](singleton/vkx.cash), compile
+`>>` scalar-bit tests, e.g. in [`singleton/bn254/vkx.cash`](singleton/bn254/vkx.cash), compile
 to). It uses no BSV-exclusive opcode
 and no Taproot construction (BSV and BCH share the pre-2018 Script lineage), so
 with the limits disabled it would essentially run as-is. The limits, not any
@@ -162,7 +162,7 @@ verifier toolchain). Two caveats when comparing to this repo: both are **BSV
 Script**, so shift and introspection/sighash patterns need translation to BCH
 (the field-arithmetic core is opcode-compatible); and the curve only matches for
 sCrypt (**BN256**, the same curve this repo's
-[`singleton/pairing/`](singleton/pairing/README.md) targets), not nChain
+[`singleton/bn254/`](singleton/bn254/README.md) targets), not nChain
 (**BLS12-381** / MNT4-753), so per-opcode counts and field-element sizes line up
 for the former but not the latter.
 

@@ -1,9 +1,9 @@
-# singleton/pairing/ — BN254 optimal-ate pairing (singleton oracle, in progress)
+# singleton/bn254/ — BN254 Groth16 verifier (singleton oracle)
 
-The verifier's remaining ~95%: the field tower (Fp2→Fp6→Fp12), the Miller loop, and
-final exponentiation. Built singleton-first (the correctness oracle), bottom-up,
-grading each layer **directly against `@noble/curves` bn254** on the loosened BCH 2026
-VM — exactly as `../vkx.cash` was the oracle for `../../chunked/`.
+The complete BN254 verifier: on-chain `vk_x` (`vkx.cash`), the field tower
+(Fp2→Fp6→Fp12), the Miller loop, and final exponentiation. Built singleton-first (the
+correctness oracle), bottom-up, grading each layer **directly against `@noble/curves`
+bn254** on the loosened BCH 2026 VM — and `vkx.cash` is the oracle for `../../chunked/`.
 
 Basis is locked to noble's tower so checkpoint #2 (`millerHex`) grades byte-for-byte:
 `u²=−1`, `v³=9+u`, `w²=v`; an Fp12 is 12 ints in toBytes order
@@ -38,17 +38,18 @@ twice and would not otherwise compile.
 **The full BN254 Groth16 pairing is implemented + verified in CashScript** (singleton
 oracle): Fp12 tower → Miller boundary (cp#2, byte-for-byte vs golden) → final
 exponentiation (cp#3, verdict matches golden valid/invalid). `verify.cash` ties it into
-the single intrinsic verdict `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)==1`. Combined with
-`../vkx.cash` this is a complete Groth16 verifier.
+the single intrinsic verdict `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)==1`. `groth16.cash` folds
+in the on-chain `vk_x` (also standalone in `vkx.cash`) for the complete Groth16 verifier.
 
 **In the verifier benchmark** (two entries):
 - `bch-groth16-singleton` — the COMPLETE verifier, in the main **Groth16** leaderboard
   head-to-head with nchain/scrypt. Build:
-  `node singleton/pairing/build_vectors_groth16.mjs` → `verifier/src/bch/groth16-singleton-vectors.json`.
+  `node singleton/bn254/build_vectors_groth16.mjs` → `verifier/src/bch/groth16-singleton-vectors.json`.
   `pnpm benchmark`: `PASS (1/1✗)`, 21,933 B, 1,259,938,241 op-cost, ~157 inputs.
   Same BN254 curve as scrypt-bn256 → **~534× smaller bytecode** (21.9 KB vs 11.7 MB).
 - `bch-pairing-singleton` — the pairing-only milestone (leaderboard "Groth16 pairing
-  (BCH-native)"). Build: `node singleton/pairing/build_vectors.mjs`. 20,735 B, ~1.21B, ~151 inputs.
+  (BCH-native)"). Build: `node singleton/bn254/build_vectors.mjs`. 20,735 B, ~1.21B, ~151 inputs.
+  The standalone `vk_x` baseline (`bch-vkx-singleton`) builds with `node singleton/bn254/build_vectors_vkx.mjs`.
 
 Both are honest single-tx baselines (BCH-incompatible: script-size + op-cost) that
 motivate chunking.
@@ -69,7 +70,7 @@ Op-cost heads-up for chunking: the singleton Miller is ~65 steps × (1 Fp12 sqr 
 order of ~500M op-cost — far past one input's 8.03M budget, so the Miller loop is the
 main thing task #8 must split across transactions.
 
-Run a layer: `node singleton/pairing/fp2.mjs` (or fp6/fp12). Each prints
+Run a layer: `node singleton/bn254/fp2.mjs` (or fp6/fp12). Each prints
 accept count, tamper-reject, and op-cost. `_harness.mjs` is the shared compile+eval loop.
 
 Op-cost notes (loose VM, one spend invocation): Fermat Fp inverse ~2.7M (keep

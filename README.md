@@ -8,7 +8,7 @@ behind Ethereum's pairing precompiles), implemented in CashScript and validated 
   oracles). They compile and run, are checked against the reference libraries, but
   exceed BCH consensus limits per input, so they are not meant to run on-chain. See
   [`singleton/README.md`](singleton/README.md) and
-  [`singleton/pairing/README.md`](singleton/pairing/README.md).
+  [`singleton/bn254/README.md`](singleton/bn254/README.md).
 - **`chunked/`**: the same computation split across a chain of stateful transactions so
   that **every** chunk fits one BCH input (≤10,000 bytes, ≤8,032,800 op-cost), carrying
   state forward in a hash commitment. This is the BCH-limit-viable on-chain form. See
@@ -42,7 +42,7 @@ Tracked upstream in [#369 Add support for reusable function definition / invocat
 
 ### No Library Support
 
-Separately from reusable functions within a file, CashScript has no multi-file library construct: there is no `library` keyword and no `import` to pull definitions from another file with a dependency graph. This matters mainly for code organisation, and for code reuse across contracts when a large implementation is broken up. It is the reason each `.cash` file in `singleton/pairing/` re-declares the slice of the field tower it needs rather than importing a shared `FieldTower → Curve → Pairing → Groth16` module chain:
+Separately from reusable functions within a file, CashScript has no multi-file library construct: there is no `library` keyword and no `import` to pull definitions from another file with a dependency graph. This matters mainly for code organisation, and for code reuse across contracts when a large implementation is broken up. It is the reason each `.cash` file in `singleton/bn254/` re-declares the slice of the field tower it needs rather than importing a shared `FieldTower → Curve → Pairing → Groth16` module chain:
 
 ```solidity
 import { mulFp12 } from "FieldTower.cash";

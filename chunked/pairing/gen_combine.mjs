@@ -15,7 +15,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
 mkdirSync(GEN, { recursive: true });
-const ext = fnExtractor(join(here, '..', '..', 'singleton', 'pairing', 'miller.cash'));
+const ext = fnExtractor(join(here, '..', '..', 'singleton', 'bn254', 'miller.cash'));
 const FNS = ['addFp', 'subFp', 'mulFp', 'fp2Add', 'fp2Sub', 'fp2Mul', 'fp2MulXi', 'fp6Add', 'fp6Sub', 'fp6MulByV', 'fp6Mul', 'fp12Mul'];
 
 // recompute the 4 final (f_i, R_i)

@@ -2,7 +2,7 @@
 
 The BN254 pairing split across transactions so **every step fits one BCH input**
 (op-cost ≤ 8,032,800, locking+unlocking ≤ 10,000 B). This is the BCH-compatible
-counterpart of the `singleton/pairing/` oracle (which is correct but needs ~151
+counterpart of the `singleton/bn254/` oracle (which is correct but needs ~151
 inputs' worth of op-cost in one go).
 
 Two benchmark entries (in the verifier repo) are produced from here:
@@ -90,4 +90,4 @@ Run a single piece directly if needed: `node gen_miller.mjs 2`, `node gen_finale
 | `generated/` | the ~170 `.cash` chunks + manifests (derived) | ❌ git-ignored |
 
 The committed instance lives in the verifier repo
-(`src/checkpoints/pairing-vectors.json`); the singleton oracle is `../../singleton/pairing/`.
+(`src/checkpoints/pairing-vectors.json`); the singleton oracle is `../../singleton/bn254/`.

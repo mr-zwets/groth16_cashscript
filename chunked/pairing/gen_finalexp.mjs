@@ -27,7 +27,7 @@ const BN_X = 4965661367192848881n;
 const X_LEN = 63;
 
 // ---- finalexp primitive functions (prologue) from singleton finalexp.cash ----
-const ext = fnExtractor(join(here, '..', '..', 'singleton', 'pairing', 'finalexp.cash'));
+const ext = fnExtractor(join(here, '..', '..', 'singleton', 'bn254', 'finalexp.cash'));
 const FNS = ['addFp', 'subFp', 'mulFp', 'inverseFp', 'fp2Add', 'fp2Sub', 'fp2Neg', 'fp2Scale', 'fp2Mul', 'fp2Sqr', 'fp2MulXi', 'fp2Conj', 'fp2Inv', 'fp6Add', 'fp6Sub', 'fp6Neg', 'fp6MulByV', 'fp6Mul', 'fp6Inv', 'fp6FrobOdd', 'fp6FrobEven', 'fp6MulByFp2', 'fp12Mul', 'fp12Conj', 'fp12Inv', 'fp12Frob1', 'fp12Frob2', 'fp12Frob3', 'fp4Square', 'cycSqr'];
 const PROLOGUE = FNS.map(ext).join('\n');
 const OP_FN = { cyc: 'cycSqr', mul: 'fp12Mul', conj: 'fp12Conj', f1: 'fp12Frob1', f2: 'fp12Frob2', f3: 'fp12Frob3', inv: 'fp12Inv' };
