@@ -1,0 +1,109 @@
+pragma cashscript ^0.13.0;
+
+// BLS12-381 Fp2 = Fp[u]/(u^2 + 1)  (noble basis: u^2 = -1).
+//
+// An Fp2 element is the pair (c0, c1) meaning c0 + c1*u. These are the bottom of
+// the field tower the pairing needs (Fp2 -> Fp6 -> Fp12). Every op is a reusable
+// multi-return function (returns (int,int)) -> compiled ONCE to OP_DEFINE and
+// invoked per call site, exactly like the BN254 version in ../bn254/fp2.cash.
+//
+// Only two things differ from BN254: the base prime p (381-bit here) and the
+// sextic non-residue xi = 1 + u (BN254 uses 9 + u). The Fp2 multiply/square/
+// inverse/conjugate formulas depend only on u^2 = -1, so they are identical.
+//
+// This contract is a CORRECTNESS HARNESS: spend() takes two operands a,b and the
+// noble-computed expected outputs, recomputes every op in-script, and require()s
+// equality. Graded on the loosened BCH 2026 VM by singleton/bls12-381/fp2.mjs.
+contract Fp2Ops() {
+
+    // ---- base field Fp over the BLS12-381 prime p ----
+    function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    function subFp(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    function sqrFp(int x) returns (int) { return (x * x) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    function negFp(int x) returns (int) { return (4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787 - x) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+
+    // Fermat inverse x^(p-2) mod p over the 381 bits of (p-2).
+    function inverseFp(int x) returns (int) {
+        int p = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
+        int e = p - 2;
+        int result = 1;
+        int current = x % p;
+        for (int i = 0; i < 381; i = i + 1) {
+            if (((e >> i) % 2) == 1) { result = (result * current) % p; }
+            current = (current * current) % p;
+        }
+        return result;
+    }
+
+    // ---- Fp2 arithmetic (noble basis u^2 = -1) ----
+    function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) {
+        return addFp(a0, b0), addFp(a1, b1);
+    }
+    function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) {
+        return subFp(a0, b0), subFp(a1, b1);
+    }
+    function fp2Neg(int a0, int a1) returns (int, int) {
+        return negFp(a0), negFp(a1);
+    }
+    // (a0 + a1 u)(b0 + b1 u) = (a0 b0 - a1 b1) + (a0 b1 + a1 b0) u   [Karatsuba]
+    function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+        int v0 = mulFp(a0, b0);
+        int v1 = mulFp(a1, b1);
+        int c0 = subFp(v0, v1);
+        int c1 = subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
+        return c0, c1;
+    }
+    // (a0 + a1 u)^2 = (a0+a1)(a0-a1) + 2 a0 a1 u
+    function fp2Sqr(int a0, int a1) returns (int, int) {
+        int c0 = mulFp(addFp(a0, a1), subFp(a0, a1));
+        int c1 = mulFp(2, mulFp(a0, a1));
+        return c0, c1;
+    }
+    // multiply by the sextic non-residue xi = 1 + u:
+    // (1 + u)(a0 + a1 u) = (a0 - a1) + (a0 + a1) u
+    function fp2MulXi(int a0, int a1) returns (int, int) {
+        int c0 = subFp(a0, a1);
+        int c1 = addFp(a0, a1);
+        return c0, c1;
+    }
+    // Frobenius a^p = conjugate over Fp2: (a0, -a1)
+    function fp2Conj(int a0, int a1) returns (int, int) {
+        return a0, negFp(a1);
+    }
+    // inverse: 1/(a0 + a1 u) = (a0 - a1 u) / (a0^2 + a1^2)
+    function fp2Inv(int a0, int a1) returns (int, int) {
+        int norm = addFp(sqrFp(a0), sqrFp(a1));
+        int factor = inverseFp(norm);
+        return mulFp(a0, factor), negFp(mulFp(a1, factor));
+    }
+
+    function spend(
+        int a0, int a1, int b0, int b1,
+        int mul0, int mul1,
+        int sqr0, int sqr1,
+        int inv0, int inv1,
+        int xi0, int xi1,
+        int conj0, int conj1
+    ) {
+        (int m0, int m1) = fp2Mul(a0, a1, b0, b1);
+        require(m0 == mul0);
+        require(m1 == mul1);
+
+        (int s0, int s1) = fp2Sqr(a0, a1);
+        require(s0 == sqr0);
+        require(s1 == sqr1);
+
+        (int i0, int i1) = fp2Inv(a0, a1);
+        require(i0 == inv0);
+        require(i1 == inv1);
+
+        (int x0, int x1) = fp2MulXi(a0, a1);
+        require(x0 == xi0);
+        require(x1 == xi1);
+
+        (int j0, int j1) = fp2Conj(a0, a1);
+        require(j0 == conj0);
+        require(j1 == conj1);
+    }
+}

@@ -1,14 +1,22 @@
 # Groth16 in CashScript
 
-A working zk-SNARK **Groth16 verifier over BN254** (a.k.a. BN256 / alt_bn128, the curve
-behind Ethereum's pairing precompiles), implemented in CashScript and validated against
-`py_ecc` / `@noble/curves` on the loosened BCH 2026 VM. It comes in two forms:
+A working zk-SNARK **Groth16 verifier** in CashScript, implemented over two
+pairing-friendly curves and validated against `py_ecc` / `@noble/curves` on the loosened
+BCH 2026 VM:
+
+- **BN254** (a.k.a. BN256 / alt_bn128, the curve behind Ethereum's pairing precompiles)
+  — the full singleton **and** the BCH-limit-viable chunked verifier.
+- **BLS12-381** — the singleton verifier, on the **same curve as the nChain reference**,
+  so the benchmark gets a true apples-to-apples comparison (~21× smaller bytecode).
+
+It comes in two forms:
 
 - **`singleton/`**: full single-transaction reference verifiers (the correctness
   oracles). They compile and run, are checked against the reference libraries, but
-  exceed BCH consensus limits per input, so they are not meant to run on-chain. See
-  [`singleton/README.md`](singleton/README.md) and
-  [`singleton/bn254/README.md`](singleton/bn254/README.md).
+  exceed BCH consensus limits per input, so they are not meant to run on-chain. One
+  self-contained folder per curve. See [`singleton/README.md`](singleton/README.md),
+  [`singleton/bn254/README.md`](singleton/bn254/README.md), and
+  [`singleton/bls12-381/README.md`](singleton/bls12-381/README.md).
 - **`chunked/`**: the same computation split across a chain of stateful transactions so
   that **every** chunk fits one BCH input (≤10,000 bytes, ≤8,032,800 op-cost), carrying
   state forward in a hash commitment. This is the BCH-limit-viable on-chain form. See

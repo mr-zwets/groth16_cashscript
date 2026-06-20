@@ -1,0 +1,103 @@
+pragma cashscript ^0.13.0;
+
+// BLS12-381 sparse Fp12 multiply mul014 (multiplicative-twist line application),
+// matching noble: given f = (c0,c1) in Fp6 and a sparse element with Fp2 parts
+// (o0, o1, 0, 0, o4, 0),
+//   t0 = Fp6.mul01(f.c0, o0, o1)
+//   t1 = Fp6.mul1(f.c1, o4)                 // multiply by o4 at the v coefficient
+//   c0 = v*t1 + t0
+//   c1 = Fp6.mul01(f.c1 + f.c0, o0, o1 + o4) - t0 - t1
+// f carried as 12 ints F0..F11 (c0 = F0..F5, c1 = F6..F11), o* as Fp2 pairs.
+// Graded vs noble Fp12.mul014 by singleton/bls12-381/mul014.mjs.
+contract Mul014() {
+
+    function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    function subFp(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+
+    function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
+    function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
+    function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+        int v0 = mulFp(a0, b0);
+        int v1 = mulFp(a1, b1);
+        return subFp(v0, v1), subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
+    }
+    // multiply by xi = 1 + u: (a0 - a1) + (a0 + a1) u
+    function fp2MulXi(int a0, int a1) returns (int, int) { return subFp(a0, a1), addFp(a0, a1); }
+
+    function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+        (int c0a, int c0b) = fp2Add(a0a, a0b, b0a, b0b);
+        (int c1a, int c1b) = fp2Add(a1a, a1b, b1a, b1b);
+        (int c2a, int c2b) = fp2Add(a2a, a2b, b2a, b2b);
+        return c0a, c0b, c1a, c1b, c2a, c2b;
+    }
+    function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+        (int c0a, int c0b) = fp2Sub(a0a, a0b, b0a, b0b);
+        (int c1a, int c1b) = fp2Sub(a1a, a1b, b1a, b1b);
+        (int c2a, int c2b) = fp2Sub(a2a, a2b, b2a, b2b);
+        return c0a, c0b, c1a, c1b, c2a, c2b;
+    }
+    function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
+        (int n0a, int n0b) = fp2MulXi(a2a, a2b);
+        return n0a, n0b, a0a, a0b, a1a, a1b;
+    }
+    // Fp6 * sparse (b0, b1, 0)
+    function fp6Mul01(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b0a,int b0b,int b1a,int b1b) returns (int,int,int,int,int,int) {
+        (int t0a,int t0b) = fp2Mul(c0a, c0b, b0a, b0b);
+        (int t1a,int t1b) = fp2Mul(c1a, c1b, b1a, b1b);
+        (int s12a,int s12b) = fp2Add(c1a, c1b, c2a, c2b);
+        (int m12a,int m12b) = fp2Mul(s12a, s12b, b1a, b1b);
+        (int u0a,int u0b) = fp2Sub(m12a, m12b, t1a, t1b);
+        (int xu0a,int xu0b) = fp2MulXi(u0a, u0b);
+        (int r0a,int r0b) = fp2Add(xu0a, xu0b, t0a, t0b);
+        (int sba,int sbb) = fp2Add(b0a, b0b, b1a, b1b);
+        (int sca,int scb) = fp2Add(c0a, c0b, c1a, c1b);
+        (int m1a,int m1b) = fp2Mul(sba, sbb, sca, scb);
+        (int u1a,int u1b) = fp2Sub(m1a, m1b, t0a, t0b);
+        (int r1a,int r1b) = fp2Sub(u1a, u1b, t1a, t1b);
+        (int s02a,int s02b) = fp2Add(c0a, c0b, c2a, c2b);
+        (int m2a,int m2b) = fp2Mul(s02a, s02b, b0a, b0b);
+        (int u2a,int u2b) = fp2Sub(m2a, m2b, t0a, t0b);
+        (int r2a,int r2b) = fp2Add(u2a, u2b, t1a, t1b);
+        return r0a, r0b, r1a, r1b, r2a, r2b;
+    }
+    // Fp6 * sparse (0, b1, 0): (c0+c1 v+c2 v^2)*(b1 v) = (xi c2 b1, c0 b1, c1 b1)
+    function fp6Mul1(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b1a,int b1b) returns (int,int,int,int,int,int) {
+        (int m2a,int m2b) = fp2Mul(c2a, c2b, b1a, b1b);
+        (int r0a,int r0b) = fp2MulXi(m2a, m2b);
+        (int r1a,int r1b) = fp2Mul(c0a, c0b, b1a, b1b);
+        (int r2a,int r2b) = fp2Mul(c1a, c1b, b1a, b1b);
+        return r0a, r0b, r1a, r1b, r2a, r2b;
+    }
+
+    function mul014(
+        int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
+        int o0a,int o0b, int o1a,int o1b, int o4a,int o4b
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        // t0 = mul01(f.c0, o0, o1)
+        (int T0,int T1,int T2,int T3,int T4,int T5) = fp6Mul01(F0,F1,F2,F3,F4,F5, o0a,o0b, o1a,o1b);
+        // t1 = mul1(f.c1, o4)
+        (int U0,int U1,int U2,int U3,int U4,int U5) = fp6Mul1(F6,F7,F8,F9,F10,F11, o4a,o4b);
+        // c0 = v*t1 + t0
+        (int V0,int V1,int V2,int V3,int V4,int V5) = fp6MulByV(U0,U1,U2,U3,U4,U5);
+        (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Add(V0,V1,V2,V3,V4,V5, T0,T1,T2,T3,T4,T5);
+        // c1 = mul01(f.c1 + f.c0, o0, o1 + o4) - t0 - t1
+        (int S0,int S1,int S2,int S3,int S4,int S5) = fp6Add(F6,F7,F8,F9,F10,F11, F0,F1,F2,F3,F4,F5);
+        (int qa,int qb) = fp2Add(o1a, o1b, o4a, o4b);
+        (int G0,int G1,int G2,int G3,int G4,int G5) = fp6Mul01(S0,S1,S2,S3,S4,S5, o0a,o0b, qa,qb);
+        (int H0,int H1,int H2,int H3,int H4,int H5) = fp6Sub(G0,G1,G2,G3,G4,G5, T0,T1,T2,T3,T4,T5);
+        (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(H0,H1,H2,H3,H4,H5, U0,U1,U2,U3,U4,U5);
+        return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
+    }
+
+    function spend(
+        int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
+        int o0a,int o0b,int o1a,int o1b,int o4a,int o4b,
+        int R0,int R1,int R2,int R3,int R4,int R5,int R6,int R7,int R8,int R9,int R10,int R11
+    ) {
+        (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7,int r8,int r9,int r10,int r11) =
+            mul014(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, o0a,o0b,o1a,o1b,o4a,o4b);
+        require(r0==R0); require(r1==R1); require(r2==R2); require(r3==R3); require(r4==R4); require(r5==R5);
+        require(r6==R6); require(r7==R7); require(r8==R8); require(r9==R9); require(r10==R10); require(r11==R11);
+    }
+}

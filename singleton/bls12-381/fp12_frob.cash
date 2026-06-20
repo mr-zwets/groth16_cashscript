@@ -1,0 +1,133 @@
+pragma cashscript ^0.13.0;
+
+// BLS12-381 Fp12 Frobenius maps a -> a^(p^k) for k = 1, 2, 3 (noble basis).
+//
+// noble's algorithm (abstract/tower.ts):
+//   Fp2.frobeniusMap(a, k)  = a^(p^k): conjugate (a0, -a1) when k is odd, identity when even.
+//   Fp6.frobeniusMap(a, k)  = ( fp2Frob(c0), fp2Frob(c1)*FP6_C1[k], fp2Frob(c2)*FP6_C2[k] )
+//   Fp12.frobeniusMap(a, k) = ( Fp6.frob(c0,k),  (Fp6.frob(c1,k) scaled by FP12_C1[k]) )
+// where FP6_C1/FP6_C2 (Fp2) and FP12_C1 (Fp2) are precomputed constants (k = 1,2,3),
+// recovered from noble bls12-381 by probing unit basis elements.
+//
+// Carried as 12 ints A0..A11 = (c0 = A0..A5 Fp6, c1 = A6..A11 Fp6). Graded vs
+// noble Fp12.frobeniusMap by singleton/bls12-381/fp12_frob.mjs.
+contract Fp12Frob() {
+
+    function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    function subFp(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+
+    function fp2Conj(int a0, int a1) returns (int, int) { return a0, subFp(0, a1); }
+    function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+        int v0 = mulFp(a0, b0);
+        int v1 = mulFp(a1, b1);
+        int c0 = subFp(v0, v1);
+        int c1 = subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
+        return c0, c1;
+    }
+
+    // Fp6 Frobenius for ODD power: fp2Frob = conjugate. k1/k2 = FP6_C1[k]/FP6_C2[k].
+    function fp6FrobOdd(
+        int x0a,int x0b,int x1a,int x1b,int x2a,int x2b,
+        int k1a,int k1b,int k2a,int k2b
+    ) returns (int,int,int,int,int,int) {
+        (int d0a,int d0b) = fp2Conj(x0a, x0b);
+        (int c1a,int c1b) = fp2Conj(x1a, x1b);
+        (int d1a,int d1b) = fp2Mul(c1a, c1b, k1a, k1b);
+        (int c2a,int c2b) = fp2Conj(x2a, x2b);
+        (int d2a,int d2b) = fp2Mul(c2a, c2b, k2a, k2b);
+        return d0a, d0b, d1a, d1b, d2a, d2b;
+    }
+    // Fp6 Frobenius for EVEN power: fp2Frob = identity.
+    function fp6FrobEven(
+        int x0a,int x0b,int x1a,int x1b,int x2a,int x2b,
+        int k1a,int k1b,int k2a,int k2b
+    ) returns (int,int,int,int,int,int) {
+        (int d1a,int d1b) = fp2Mul(x1a, x1b, k1a, k1b);
+        (int d2a,int d2b) = fp2Mul(x2a, x2b, k2a, k2b);
+        return x0a, x0b, d1a, d1b, d2a, d2b;
+    }
+    // multiply an Fp6 by an Fp2 constant (each Fp2 coord * k).
+    function fp6MulByFp2(
+        int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int ka,int kb
+    ) returns (int,int,int,int,int,int) {
+        (int r0a,int r0b) = fp2Mul(x0a, x0b, ka, kb);
+        (int r1a,int r1b) = fp2Mul(x1a, x1b, ka, kb);
+        (int r2a,int r2b) = fp2Mul(x2a, x2b, ka, kb);
+        return r0a, r0b, r1a, r1b, r2a, r2b;
+    }
+
+    // a^p
+    function fp12Frob1(
+        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(
+            A0,A1,A2,A3,A4,A5,
+            0, 4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436,
+            4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437, 0);
+        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(
+            A6,A7,A8,A9,A10,A11,
+            0, 4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436,
+            4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437, 0);
+        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
+            g0,g1,g2,g3,g4,g5,
+            3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760, 151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
+        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
+    }
+    // a^(p^2)
+    function fp12Frob2(
+        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobEven(
+            A0,A1,A2,A3,A4,A5,
+            793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350, 0,
+            4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436, 0);
+        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobEven(
+            A6,A7,A8,A9,A10,A11,
+            793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350, 0,
+            4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436, 0);
+        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
+            g0,g1,g2,g3,g4,g5,
+            793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620351, 0);
+        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
+    }
+    // a^(p^3)
+    function fp12Frob3(
+        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(
+            A0,A1,A2,A3,A4,A5,
+            0, 1,
+            4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786, 0);
+        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(
+            A6,A7,A8,A9,A10,A11,
+            0, 1,
+            4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786, 0);
+        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
+            g0,g1,g2,g3,g4,g5,
+            2973677408986561043442465346520108879172042883009249989176415018091420807192182638567116318576472649347015917690530, 1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257);
+        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
+    }
+
+    function spend(
+        int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8,int A9,int A10,int A11,
+        int P0,int P1,int P2,int P3,int P4,int P5,int P6,int P7,int P8,int P9,int P10,int P11,
+        int Q0,int Q1,int Q2,int Q3,int Q4,int Q5,int Q6,int Q7,int Q8,int Q9,int Q10,int Q11,
+        int R0,int R1,int R2,int R3,int R4,int R5,int R6,int R7,int R8,int R9,int R10,int R11
+    ) {
+        (int p0,int p1,int p2,int p3,int p4,int p5,int p6,int p7,int p8,int p9,int p10,int p11) =
+            fp12Frob1(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+        require(p0==P0); require(p1==P1); require(p2==P2); require(p3==P3); require(p4==P4); require(p5==P5);
+        require(p6==P6); require(p7==P7); require(p8==P8); require(p9==P9); require(p10==P10); require(p11==P11);
+
+        (int q0,int q1,int q2,int q3,int q4,int q5,int q6,int q7,int q8,int q9,int q10,int q11) =
+            fp12Frob2(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+        require(q0==Q0); require(q1==Q1); require(q2==Q2); require(q3==Q3); require(q4==Q4); require(q5==Q5);
+        require(q6==Q6); require(q7==Q7); require(q8==Q8); require(q9==Q9); require(q10==Q10); require(q11==Q11);
+
+        (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7,int r8,int r9,int r10,int r11) =
+            fp12Frob3(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+        require(r0==R0); require(r1==R1); require(r2==R2); require(r3==R3); require(r4==R4); require(r5==R5);
+        require(r6==R6); require(r7==R7); require(r8==R8); require(r9==R9); require(r10==R10); require(r11==R11);
+    }
+}
