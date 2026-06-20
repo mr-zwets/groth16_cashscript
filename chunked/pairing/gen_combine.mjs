@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp12, singlePairMiller, pairsFor, vec, f12limbs, r6limbs,
-  commit, fnExtractor, measureChunk, decl, serExpr,
+  commit, fnExtractor, measureCovenant, decl, covIn, covOut,
 } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -38,10 +38,10 @@ const L = [];
 L.push('pragma cashscript ^0.13.0;');
 L.push('// Combine chunk: boundary = f0*f1*f2*f3 (pre-final-exp Fp12).');
 L.push('// incoming = 4x (f_i 12 + R_i 6) = 72 ints; outgoing = boundary (12 ints).');
-L.push('contract PairingCombine() {');
+L.push('contract PairingCombineCovenant() {');
 L.push(FNS.map(ext).join('\n'));
 L.push(`    function spend(${decl(allParams)}) {`);
-L.push(`        require(${serExpr(allParams)} == 0x${incoming});`);
+L.push(covIn(allParams)); // incoming state hash == spent token's NFT commitment
 const fresh = (() => { let u = 0; return (n) => Array.from({ length: n }, () => `v${u++}`); })();
 let acc = aNames(0);
 for (let i = 1; i < 4; i++) {
@@ -49,15 +49,14 @@ for (let i = 1; i < 4; i++) {
   L.push(`        (${decl(nv)}) = fp12Mul(${acc.join(',')}, ${aNames(i).join(',')});`);
   acc = nv;
 }
-// boundary is lazy (addFp doesn't reduce) -> reduce % P before hashing
-L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
-L.push(`        require(hash256(${acc.map((n) => `toPaddedBytes(${n} % P, 40)`).join(' + ')}) == 0x${outgoing});`);
+// boundary (lazy) reduced %P, committed to output[0]'s NFT commitment + thread perpetuated
+L.push(covOut(acc));
 L.push('    }');
 L.push('}');
 const src = L.join('\n') + '\n';
 writeFileSync(join(GEN, 'combine.cash'), src);
 
-const m = measureChunk(src, incomingLimbs);
+const m = measureCovenant(src, incomingLimbs, outLimbs);
 try { execFileSync('rm', [join(GEN, `_probe_${process.pid}.cash`)]); } catch {}
 console.log(`combine.cash: lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`);
 console.log(`boundary first limb = ${outLimbs[0]}`);

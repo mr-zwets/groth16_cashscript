@@ -106,12 +106,33 @@ const g2 = (o) => bn254.G2.Point.fromAffine({ x: Fp2.fromBigTuple([BigInt(o.x.c0
 export const vk = { alpha: g1(vec.vk.alpha), beta: g2(vec.vk.beta), gamma: g2(vec.vk.gamma), delta: g2(vec.vk.delta), ic: vec.vk.ic.map(g1) };
 export const proof = { a: g1(vec.proof.a), b: g2(vec.proof.b), c: g1(vec.proof.c) };
 export const vkxPoint = (inputs) => { let x = vk.ic[0]; inputs.map(BigInt).forEach((s, i) => { x = x.add(vk.ic[i + 1].multiply(s)); }); return x; };
-export const pairsFor = (inputs) => [
-  { name: 'negA_B', P: proof.a.negate(), Q: proof.b },
+export const pairsFor = (inputs, pf = proof) => [
+  { name: 'negA_B', P: pf.a.negate(), Q: pf.b },
   { name: 'alpha_beta', P: vk.alpha, Q: vk.beta },
   { name: 'vkx_gamma', P: vkxPoint(inputs), Q: vk.gamma },
-  { name: 'C_delta', P: proof.c, Q: vk.delta },
+  { name: 'C_delta', P: pf.c, Q: vk.delta },
 ];
+// build a proof object {a,b,c} (curve points) from raw limb bigints — used to
+// replay a DIFFERENT proof (proof #1) through the same generic chunk programs.
+export const proofFromLimbs = (Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy) => ({
+  a: bn254.G1.Point.fromAffine({ x: Ax, y: Ay }),
+  b: bn254.G2.Point.fromAffine({ x: Fp2.fromBigTuple([Bxa, Bxb]), y: Fp2.fromBigTuple([Bya, Byb]) }),
+  c: bn254.G1.Point.fromAffine({ x: Cx, y: Cy }),
+});
+
+// Which of P (G1) and Q (G2) are PROOF-derived (runtime) per pair, vs VK (baked).
+// pair0 e(-A,B): both proof.  pair1 e(alpha,beta): both VK.  pair2 e(vk_x,gamma):
+// P=vk_x runtime, Q=gamma VK.  pair3 e(C,delta): P=C runtime, Q=delta VK.
+// Runtime points ride in the carried (committed) state so they are bound; baked
+// VK points stay literals. This is what makes the chunks proof-agnostic.
+export const PT_CFG = [{ P: true, Q: true }, { P: false, Q: false }, { P: true, Q: false }, { P: true, Q: false }];
+/** runtime point limbs (declaration order) for a pair's affine P (G1) and Q (G2). */
+export const ptLimbs = (pairIdx, P, Q) => {
+  const o = [], c = PT_CFG[pairIdx];
+  if (c.P) o.push(P.x, P.y);
+  if (c.Q) o.push(Q.x.c0, Q.x.c1, Q.y.c0, Q.y.c1);
+  return o;
+};
 
 // ---- extract reusable functions from a singleton .cash (for chunk prologues) ----
 export function fnExtractor(cashPath) {
@@ -159,6 +180,52 @@ export function measureChunk(src, stateInts) {
 }
 export const decl = (names) => names.map((n) => `int ${n}`).join(',');
 export const serExpr = (names) => 'hash256(' + names.map((n) => `toPaddedBytes(${n}, 40)`).join(' + ') + ')';
+
+// ---- covenant (token state-threading) helpers ----------------------------------
+// A GENERIC (proof-independent) chunk carries NO baked state: the running-state
+// HASH lives in the spent/created token's NFT commitment. The unlocking script
+// pushes the raw state limbs; the contract checks them against the input token's
+// commitment, recomputes, and re-commits to output[0] under the same token thread.
+// One fixed locking therefore verifies ANY proof (runtime-general).
+export const CATEGORY = new Uint8Array(32).fill(0xcd); // benchmark thread id (32B)
+const sha256d = (b) => sha256(sha256(b));
+/** 32-byte NFT commitment of a state (decl-order limbs), as bytes. */
+export const commitBin = (limbs) => new Uint8Array(sha256d(Buffer.concat(limbs.map(le40))));
+/** require: the spent token commits hash(incoming state) (decl-order `names`). */
+export const covIn = (names) =>
+  `        require(tx.inputs[this.activeInputIndex].nftCommitment == ${serExpr(names)});`;
+/** require: output[0] commits hash(outgoing, reduced) + perpetuates the token thread. */
+export const covOut = (outNames) =>
+  '        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;\n' +
+  `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((n) => `toPaddedBytes(${n} % P, 40)`).join(' + ')}));\n` +
+  '        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);';
+
+/** Real-VM measurer for a COVENANT chunk: drives it through a synthetic token tx
+ * (spent UTXO = hash(incoming), output[0] = hash(outgoing)) so the introspection
+ * resolves. `stateInts`/`outLimbs` are decl-order limbs (outLimbs already reduced). */
+export function measureCovenant(src, stateInts, outLimbs) {
+  let raw;
+  try { raw = compileBytecode(src); }
+  catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
+  const locking = Uint8Array.from([OP_DROP, ...raw]);
+  const argBytes = Uint8Array.from([...stateInts].reverse().flatMap((c) => [...pushInt(c)]));
+  const unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]);
+  const tok = (commitment) => ({ amount: 0n, category: CATEGORY, nft: { capability: 'mutable', commitment } });
+  const program = {
+    inputIndex: 0,
+    sourceOutputs: [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(commitBin(stateInts)) }],
+    transaction: {
+      version: 2,
+      inputs: [{ outpointTransactionHash: new Uint8Array(32), outpointIndex: 0, sequenceNumber: 0, unlockingBytecode: unlocking }],
+      outputs: [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(commitBin(outLimbs)) }],
+      locktime: 0,
+    },
+  };
+  const st = realVm.evaluate(program);
+  const top = st.stack[st.stack.length - 1];
+  const accepted = st.error === undefined && st.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1;
+  return { lockingBytes: locking.length, operationCost: st.metrics.operationCost, accepted, error: st.error ?? null };
+}
 
 // Predict-and-adjust greedy window planner. Instead of linear growth (compile
 // every candidate from lo+1 upward — most thrown away), estimate the window from

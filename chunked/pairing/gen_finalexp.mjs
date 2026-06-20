@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp12, Fp2, bn254, vec, fnExtractor, measureChunk, planChunk, commit, f12limbs, decl, serExpr,
+  Fp12, Fp2, bn254, vec, fnExtractor, measureCovenant, planChunk, commit, f12limbs, decl, covIn, covOut,
 } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -97,7 +97,7 @@ function buildChunkSrc(s, e) {
   L.push('contract FinalExpChunk() {');
   L.push(PROLOGUE);
   L.push(`    function spend(${decl(params)}) {`);
-  L.push(`        require(${serExpr(liveIn.flatMap(vnames))} == 0x${incoming});`);
+  L.push(covIn(liveIn.flatMap(vnames))); // incoming live state == spent token commitment
   for (let i = s; i < e; i++) {
     const o = ops[i];
     const argVars = o.args.flatMap((a) => name.get(a));
@@ -105,18 +105,19 @@ function buildChunkSrc(s, e) {
     L.push(`        (${decl(out)}) = ${OP_FN[o.op]}(${argVars.join(',')});`);
     name.set(o.id, out);
   }
-  // outputs are LAZY (addFp doesn't reduce) -> reduce % P before hashing/asserting
-  L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
   if (isLast) {
+    // terminal verdict: result == Fp12 ONE (no output token; the thread ends here)
     const rv = name.get(result.id);
+    L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
     L.push(`        require(${rv[0]} % P == 1); ` + Array.from({ length: 11 }, (_, j) => `require(${rv[j + 1]} % P == 0);`).join(' '));
   } else {
-    const outgoing = commit(liveOut.flatMap(limbsOf));
-    L.push(`        require(hash256(${liveOut.flatMap((id) => name.get(id)).map((n) => `toPaddedBytes(${n} % P, 40)`).join(' + ')}) == 0x${outgoing});`);
+    // outgoing live state (lazy, reduced %P) committed to output[0]'s NFT commitment
+    L.push(covOut(liveOut.flatMap((id) => name.get(id))));
   }
   L.push('    }');
   L.push('}');
-  return { src: L.join('\n') + '\n', inLimbs, incoming, isLast };
+  const outLimbs = isLast ? [] : liveOut.flatMap(limbsOf).map(BigInt);
+  return { src: L.join('\n') + '\n', inLimbs, outLimbs, incoming, isLast };
 }
 
 // ---------- probe ----------
@@ -124,7 +125,7 @@ if (process.argv[2] === 'probe') {
   const fnOnly = `pragma cashscript ^0.13.0;\ncontract P(){\n${PROLOGUE}\n    function spend(int x){ require(x==x); }\n}\n`;
   writeFileSync(PROBE, fnOnly);
   console.error('function-set size:', execFileSync('node', ['C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js', PROBE, '-s'], { encoding: 'utf8' }).trim());
-  for (const e of [1, 2, 3, 5]) { const c = buildChunkSrc(0, e); const m = measureChunk(c.src, c.inLimbs); console.error(`ops[0,${e}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`); }
+  for (const e of [1, 2, 3, 5]) { const c = buildChunkSrc(0, e); const m = measureCovenant(c.src, c.inLimbs, c.outLimbs); console.error(`ops[0,${e}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`); }
   try { execFileSync('rm', [PROBE]); } catch {}
   process.exit(0);
 }
@@ -135,7 +136,7 @@ const chunks = []; let s = 0; const planState = { perUnit: null };
 while (s < ops.length) {
   const tryAt = (e) => {
     const c = buildChunkSrc(s, e);
-    const m = measureChunk(c.src, c.inLimbs);
+    const m = measureCovenant(c.src, c.inLimbs, c.outLimbs);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, ...c, m };
   };
   const best = planChunk(s, ops.length, OP_TARGET, tryAt, planState);

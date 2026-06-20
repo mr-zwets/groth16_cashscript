@@ -12,7 +12,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { bn254, vec, commit, measureChunk } from './_millermath.mjs';
+import { bn254, vec, commit, measureCovenant, covIn, covOut } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -120,7 +120,7 @@ function genCash(lo, hi, final, incoming, outgoing) {
   L.push('contract VkxChunk() {');
   L.push(prologue());
   L.push(final ? '    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv) {' : '    function spend(int rX, int rY, int rZ, int input0, int input1) {');
-  L.push(`        require(${SER} == 0x${incoming});`);
+  L.push(covIn(['rX', 'rY', 'rZ', 'input0', 'input1'])); // incoming accumulator+inputs == spent token commitment
   L.push(`        for (int k = 0; k < ${count}; k = k + 1) {`);
   L.push(`            int i = ${hiBit} - k;`);
   L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
@@ -134,10 +134,13 @@ function genCash(lo, hi, final, incoming, outgoing) {
     L.push('        rX = icx; rY = icy; rZ = icz;');
     L.push('        require(mulFp(rZ, zInv) == 1);');
     L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
-    L.push(`        require(mulFp(rX, zInv2) == ${EXP[0]});`);
-    L.push(`        require(mulFp(rY, zInv3) == ${EXP[1]});`);
+    L.push('        int vkxX = mulFp(rX, zInv2);');
+    L.push('        int vkxY = mulFp(rY, zInv3);');
+    // commit the computed vk_x to output[0] (consumed by the pairing's pair-2);
+    // NOT compared to a baked point, so this verifies any instance's public inputs.
+    L.push(covOut(['vkxX', 'vkxY']));
   } else {
-    L.push(`        require(${SER} == 0x${outgoing});`);
+    L.push(covOut(['rX', 'rY', 'rZ', 'input0', 'input1']));
   }
   L.push('    }');
   L.push('}');
@@ -154,12 +157,12 @@ while (lo < ITERS) {
   const tryHi = (hi) => {
     const final = hi === ITERS;
     const [rX, rY, rZ] = runWindow(lo, hi, rX0, rY0, rZ0);
-    let outgoing = null, zInv = null;
-    if (final) { const [fx, fy, fz] = jacAdd(rX, rY, rZ, IC0[0], IC0[1], 1n); zInv = (fz === 0n ? 0n : modpow(fz, P - 2n, P)); }
-    else outgoing = commitState([rX, rY, rZ, in0, in1]);
+    let outgoing = null, zInv = null, outLimbs;
+    if (final) { const [fx, fy, fz] = jacAdd(rX, rY, rZ, IC0[0], IC0[1], 1n); zInv = (fz === 0n ? 0n : modpow(fz, P - 2n, P)); outLimbs = EXP; }
+    else { outgoing = commitState([rX, rY, rZ, in0, in1]); outLimbs = [rX, rY, rZ, in0, in1]; }
     const src = genCash(lo, hi, final, incoming, outgoing ?? '00');
     const stateInts = final ? [rX0, rY0, rZ0, in0, in1, zInv] : [rX0, rY0, rZ0, in0, in1];
-    const m = measureChunk(src, stateInts);
+    const m = measureCovenant(src, stateInts, outLimbs);
     return { hi, final, src, m, outgoing, zInv, fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET };
   };
   let best = tryHi(lo + 1);

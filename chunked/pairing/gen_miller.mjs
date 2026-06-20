@@ -16,7 +16,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
-import { measureChunk, planChunk } from './_millermath.mjs';
+import { measureCovenant, planChunk, covIn, covOut, PT_CFG, ptLimbs } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated'); // git-ignored output dir (reproducible artifacts)
@@ -138,71 +138,71 @@ const FINAL_FNS = ['fp2Conj', 'psi'];
 // instead unroll each step with fresh variables (cashc consumes intermediates via
 // OP_ROLL last-use) and BAKE the NAF digit per step (no masks, no branch).
 const decl = (names) => names.map((n) => `int ${n}`).join(',');
-function genChunk(pair, lo, hi, final, incoming, outgoing) {
+// GENERIC covenant chunk: NO baked state/commitments. Proof-derived points (per
+// PT_CFG) ride in the carried state (pushed in the unlocking, bound by the NFT
+// commitment); VK points stay baked. -Qy is computed in-script when Q is runtime.
+function genChunk(pair, lo, hi, final, pairIdx) {
   const Q = pair.Q.toAffine(), P = pair.P.toAffine();
-  const Qxa = Q.x.c0, Qxb = Q.x.c1, Qya = Q.y.c0, Qyb = Q.y.c1, Px = P.x, Py = P.y;
-  const negQ = Fp2.neg(Q.y); // baked -Qy for NAF digit -1
+  const cfg = PT_CFG[pairIdx];
+  const negQ = Fp2.neg(Q.y); // baked -Qy (only used when Q is a VK constant)
+  // point expressions: a param name if runtime, else the baked literal
+  const Pxe = cfg.P ? 'Px' : `${P.x}`, Pye = cfg.P ? 'Py' : `${P.y}`;
+  const Qxae = cfg.Q ? 'Qxa' : `${Q.x.c0}`, Qxbe = cfg.Q ? 'Qxb' : `${Q.x.c1}`;
+  const Qyae = cfg.Q ? 'Qya' : `${Q.y.c0}`, Qybe = cfg.Q ? 'Qyb' : `${Q.y.c1}`;
+  const ptParams = [];
+  if (cfg.P) ptParams.push('Px', 'Py');
+  if (cfg.Q) ptParams.push('Qxa', 'Qxb', 'Qya', 'Qyb');
   const fns = [...BASE_FNS, ...(final ? FINAL_FNS : [])].map(extractFn).join('\n');
-  const fArgs = Array.from({ length: 12 }, (_, i) => `int f${i}`).join(',');
-  const serOf = (f, r) => 'hash256(' + [...f, ...r].map((n) => `toPaddedBytes(${n}, 40)`).join(' + ') + ')';
-  // outgoing limbs are LAZY (addFp doesn't reduce) -> reduce % P before hashing so
-  // the committed state matches noble's reduced reference (incoming args are already reduced).
-  const serOfReduced = (f, r) => 'hash256(' + [...f, ...r].map((n) => `toPaddedBytes(${n} % P, 40)`).join(' + ') + ')';
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR = ['Rxa', 'Rxb', 'Rya', 'Ryb', 'Rza', 'Rzb'];
+  const hasNeg = (() => { for (let k = lo; k < hi; k++) if (ATE_NAF[k] === -1) return true; return false; })();
   const L = [];
   L.push('pragma cashscript ^0.13.0;');
-  L.push(`// single-pair Miller chunk: pair ${pair.name}, NAF steps [${lo},${hi}), final=${final}.`);
-  L.push('// carried state = f (12) + R (6); hash256-committed (40B LE limbs). Steps unrolled,');
-  L.push('// NAF digit baked per step (no runtime loop/masks).');
+  L.push(`// GENERIC single-pair Miller covenant chunk: pair ${pair.name}, NAF [${lo},${hi}), final=${final}.`);
+  L.push('// state = f(12) + R(6) [+ runtime points]; lives in the token NFT commitment.');
   L.push('contract MillerChunk() {');
   L.push(fns);
-  L.push(`    function spend(${fArgs}, int Rxa,int Rxb,int Rya,int Ryb,int Rza,int Rzb) {`);
-  L.push(`        require(${serOf(inF, inR)} == 0x${incoming});`);
+  L.push(`    function spend(${decl([...inF, ...inR, ...ptParams])}) {`);
+  L.push(covIn([...inF, ...inR, ...ptParams])); // incoming state == spent token commitment
+  if (cfg.Q && hasNeg) L.push('        (int nqya,int nqyb) = fp2Neg(Qya, Qyb, 64);'); // -Qy, runtime
+  const negY = cfg.Q ? ['nqya', 'nqyb'] : [`${negQ.c0}`, `${negQ.c1}`];
   let f = inF.slice(), r = inR.slice(), uid = 0;
   const fresh = (n) => Array.from({ length: n }, () => `v${uid++}`);
   for (let k = lo; k < hi; k++) {
-    // f = f^2
     const sf = fresh(12);
     L.push(`        (${decl(sf)}) = fp12Sqr(${f.join(',')});`); f = sf;
-    // double + line
     const dco = fresh(6), dr = fresh(6);
     L.push(`        (${decl([...dco, ...dr])}) = pointDouble(${r.join(',')});`); r = dr;
     const gf = fresh(12);
-    L.push(`        (${decl(gf)}) = line(${f.join(',')}, ${dco.join(',')}, ${Px}, ${Py});`); f = gf;
-    // baked NAF add
+    L.push(`        (${decl(gf)}) = line(${f.join(',')}, ${dco.join(',')}, ${Pxe}, ${Pye});`); f = gf;
     const d = ATE_NAF[k];
     if (d) {
-      const Y = d === -1 ? [negQ.c0, negQ.c1] : [Qya, Qyb];
+      const Y = d === -1 ? negY : [Qyae, Qybe];
       const aco = fresh(6), ar = fresh(6);
-      L.push(`        (${decl([...aco, ...ar])}) = pointAdd(${r.join(',')}, ${Qxa}, ${Qxb}, ${Y[0]}, ${Y[1]});`); r = ar;
+      L.push(`        (${decl([...aco, ...ar])}) = pointAdd(${r.join(',')}, ${Qxae}, ${Qxbe}, ${Y[0]}, ${Y[1]});`); r = ar;
       const hf = fresh(12);
-      L.push(`        (${decl(hf)}) = line(${f.join(',')}, ${aco.join(',')}, ${Px}, ${Py});`); f = hf;
+      L.push(`        (${decl(hf)}) = line(${f.join(',')}, ${aco.join(',')}, ${Pxe}, ${Pye});`); f = hf;
     }
   }
   if (final) {
-    // postPrecompute Q1, Q2 (psi), each an add-line, baked constants
-    L.push(`        (int q1xa,int q1xb,int q1ya,int q1yb) = psi(${Qxa}, ${Qxb}, ${Qya}, ${Qyb});`);
+    L.push(`        (int q1xa,int q1xb,int q1ya,int q1yb) = psi(${Qxae}, ${Qxbe}, ${Qyae}, ${Qybe});`);
     const bco = fresh(6), br = fresh(6);
     L.push(`        (${decl([...bco, ...br])}) = pointAdd(${r.join(',')}, q1xa,q1xb,q1ya,q1yb);`); r = br;
     const iff = fresh(12);
-    L.push(`        (${decl(iff)}) = line(${f.join(',')}, ${bco.join(',')}, ${Px}, ${Py});`); f = iff;
+    L.push(`        (${decl(iff)}) = line(${f.join(',')}, ${bco.join(',')}, ${Pxe}, ${Pye});`); f = iff;
     L.push('        (int q2xa,int q2xb,int q2ya,int q2yb) = psi(q1xa,q1xb,q1ya,q1yb);');
-    L.push('        (int q2nya,int q2nyb) = fp2Neg(q2ya,q2yb);');
+    L.push('        (int q2nya,int q2nyb) = fp2Neg(q2ya,q2yb, 64);');
     const cco = fresh(6), cr = fresh(6);
     L.push(`        (${decl([...cco, ...cr])}) = pointAdd(${r.join(',')}, q2xa,q2xb,q2nya,q2nyb);`); r = cr;
     const jf = fresh(12);
-    L.push(`        (${decl(jf)}) = line(${f.join(',')}, ${cco.join(',')}, ${Px}, ${Py});`); f = jf;
+    L.push(`        (${decl(jf)}) = line(${f.join(',')}, ${cco.join(',')}, ${Pxe}, ${Pye});`); f = jf;
   }
-  L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
-  L.push(`        require(${serOfReduced(f, r)} == 0x${outgoing});`);
+  // outgoing = new (f,R) [+ unchanged points], reduced %P, committed to output[0]
+  L.push(covOut([...f, ...r, ...ptParams]));
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
 }
-
-// ---- real-VM measurement: shared in-process measurer (compile + pad + eval) ----
-const measure = measureChunk;
 
 // ---- plan + emit chunks for one pair (forward pass, binary-search windows) ----
 const pairIdx = Number(process.argv[2] ?? 0);
@@ -220,29 +220,32 @@ const finalState = postPrecompute(states[ATE_NAF.length].f, states[ATE_NAF.lengt
 
 const N = ATE_NAF.length; // 65
 
+const ptL = ptLimbs(pairIdx, Pa, Qa); // runtime point limbs (constant across the pair)
+const withPts = (s) => [...stateLimbs(s.f, s.R), ...ptL];
+
 // QUICK size/op probe for fixed windows (no planner) -- node gen_miller.mjs 0 probe
 if (process.argv[3] === 'probe') {
   for (const [a, b, fin] of [[0, 1, false], [0, 2, false], [0, 3, false], [63, 65, true]]) {
-    const inc = commit(stateLimbs(states[a].f, states[a].R));
-    const outL = fin ? stateLimbs(finalState.f, finalState.R) : stateLimbs(states[b].f, states[b].R);
-    const src = genChunk(pair, a, b, fin, inc, commit(outL));
-    const m = measure(src, stateLimbs(states[a].f, states[a].R));
+    const inL = withPts(states[a]);
+    const outL = fin ? withPts(finalState) : withPts(states[b]);
+    const src = genChunk(pair, a, b, fin, pairIdx);
+    const m = measureCovenant(src, inL, outL);
     console.error(`window [${a},${b}) final=${fin}: lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`);
   }
-  try { execFileSync('rm', [join(GEN, `_probe_${process.pid}.cash`)]); } catch {}
   process.exit(0);
 }
 
 const chunks = [];
 let lo = 0; const planState = { perUnit: null };
 while (lo < N) {
-  const incoming = commit(stateLimbs(states[lo].f, states[lo].R));
+  const inL = withPts(states[lo]);
+  const incoming = commit(inL); // recorded for the manifest + continuity check
   const tryHi = (hi) => {
     const final = hi === N;
-    const outLimbs = final ? stateLimbs(finalState.f, finalState.R) : stateLimbs(states[hi].f, states[hi].R);
-    const outgoing = commit(outLimbs);
-    const src = genChunk(pair, lo, hi, final, incoming, outgoing);
-    const m = measure(src, stateLimbs(states[lo].f, states[lo].R));
+    const outL = final ? withPts(finalState) : withPts(states[hi]);
+    const outgoing = commit(outL);
+    const src = genChunk(pair, lo, hi, final, pairIdx);
+    const m = measureCovenant(src, inL, outL);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final, outgoing, src, m };
   };
   // predict-and-adjust (estimate window from running op-cost/step, ~2 compiles/chunk)
