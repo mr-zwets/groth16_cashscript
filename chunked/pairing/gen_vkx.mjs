@@ -20,7 +20,11 @@ mkdirSync(GEN, { recursive: true });
 const PROBE = join(GEN, `_probe_${process.pid}.cash`);
 const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const Pstr = P.toString();
-const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_900_000);
+// Slightly conservative target (vs 7.9M elsewhere): the worst-case planning value
+// below leaves position 253 un-set, so a real input with bit 253 set turns the
+// accumulator non-zero one step earlier -> at most one extra jacDouble (~150k) in
+// chunk 0. The headroom to the 8,032,800 budget absorbs it.
+const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const ITERS = 254;
 
@@ -30,10 +34,26 @@ const IC = vec.vk.ic.map(g1);
 const ic0 = IC[0].toAffine(), ic1 = IC[1].toAffine(), ic2 = IC[2].toAffine();
 const Ta = IC[1].add(IC[2]).toAffine();
 const IC0 = [ic0.x, ic0.y], IC1 = [ic1.x, ic1.y], IC2 = [ic2.x, ic2.y], T = [Ta.x, Ta.y];
-const [in0, in1] = vec.publicInputs.map(BigInt);
-let vkxP = IC[0]; vec.publicInputs.map(BigInt).forEach((s, i) => { vkxP = vkxP.add(IC[i + 1].multiply(s)); });
-const vkx = vkxP.toAffine();
-const EXP = [vkx.x, vkx.y];
+// WORST-CASE planning inputs: all low bits set, so the planner costs (nearly) every
+// of the 254 positions as a doubling AND an add. Sizing the chunk windows against
+// this makes the deployed covenant aggregate ANY public inputs < r (magnitude-
+// independent, full-width) -- the EVM ecMul-equivalent property, NOT a small-input-
+// only aggregator. The contract bodies are input-agnostic (they read the input bits
+// at runtime), so only the WINDOW BOUNDARIES come from here; build_vectors.mjs
+// rebuilds every step for the real committed/extra instances.
+//
+// Value MUST be < P: the non-final covOut re-commits the pass-through input limbs as
+// `input % P`, so a planning value >= P (e.g. all 254 bits = 2^254-1 > the BN254
+// prime) would mismatch the un-reduced commitment and every chunk would reject. The
+// largest contiguous-low-bits value below P is 2^253-1 (bit 253 clear); the one
+// uncosted high position is handled by the OP_TARGET margin above. (For BLS12-381 the
+// 381-bit field dwarfs the 255-bit scalar, so 2^255-1 < P there and no margin is
+// needed.)
+const [in0, in1] = [(1n << 253n) - 1n, (1n << 253n) - 1n];
+// EXP (the expected affine vk_x for the planning bit-pattern) is computed from the
+// SAME Jacobian double-and-add the contract runs -- NOT noble.multiply, since the
+// all-bits-set planning value is not a valid in-range scalar. Defined after the
+// Jacobian helpers below.
 
 // ---- G1 Jacobian reference math (Fp) ----
 const aF = (x, y) => (x + y) % P, sF = (x, y) => (x - y + P) % P, mF = (x, y) => (x * y) % P, qF = (x) => (x * x) % P;
@@ -147,8 +167,16 @@ function genCash(lo, hi, final, incoming, outgoing) {
   return L.join('\n') + '\n';
 }
 
+// expected vk_x of the worst-case planning bit-pattern (via the contract's own
+// Jacobian math, so the final chunk's committed output matches what it computes).
+const _accF = runWindow(0, ITERS, 0n, 1n, 0n);
+const _foldF = jacAdd(_accF[0], _accF[1], _accF[2], IC0[0], IC0[1], 1n);
+const _zE = _foldF[2] === 0n ? 0n : modpow(_foldF[2], P - 2n, P);
+const _zE2 = (_zE * _zE) % P, _zE3 = (_zE2 * _zE) % P;
+const EXP = [(_foldF[0] * _zE2) % P, (_foldF[1] * _zE3) % P];
+
 // ---- plan + emit (greedy linear growth; small state -> loop body is fine) ----
-console.error(`planning vk_x (pairing instance) chunks  in0=${in0} in1=${in1}  OP_TARGET=${OP_TARGET.toLocaleString()}`);
+console.error(`planning vk_x chunks  WORST-CASE all-bits-set (${ITERS} positions, magnitude-independent)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
 const commitState = (st) => commit(st.map(String)); // st = [rX,rY,rZ,in0,in1]
 const chunks = []; let lo = 0; let state = [0n, 1n, 0n, in0, in1];
 while (lo < ITERS) {
@@ -179,4 +207,4 @@ while (lo < ITERS) {
 function modpow(b, e, m) { let r = 1n; b %= m; while (e > 0n) { if (e & 1n) r = (r * b) % m; b = (b * b) % m; e >>= 1n; } return r; }
 try { execFileSync('rm', [PROBE]); } catch {}
 console.error(`vk_x: ${chunks.length} chunks, total op=${chunks.reduce((a, c) => a + c.operationCost, 0).toLocaleString()}`);
-writeFileSync(join(GEN, 'manifest_vkx.json'), JSON.stringify({ numChunks: chunks.length, in0: in0.toString(), in1: in1.toString(), expected: EXP.map(String), chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, final: c.final, incoming: c.incoming, incomingState: c.incomingState, zInv: c.zInv })) }, null, 2));
+writeFileSync(join(GEN, 'manifest_vkx.json'), JSON.stringify({ numChunks: chunks.length, worstCaseSized: true, iters: ITERS, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, final: c.final, incoming: c.incoming, incomingState: c.incomingState, zInv: c.zInv })) }, null, 2));
