@@ -608,10 +608,101 @@ contract Groth16Verify() {
     // then require the pairing product == 1. VK (alpha,beta,gamma,delta,IC) is
     // hardcoded for the committed instance; proof (A,B,C) and public inputs
     // (in0,in1) are runtime. This is the SOUND singleton verifier.
+    // ---- INPUT VALIDATION (EIP-197 rigor): on-curve + G2 subgroup ----------------
+    // G1 has cofactor 1, so on-curve (y^2 = x^3 + 3) implies prime-order subgroup.
+    // G2 has a cofactor, so membership needs the EIP-197 endomorphism test
+    // [6x^2]B == psi(B). g2Double/g2AddAffine are the Fp2 Jacobian group law (a=0),
+    // mirroring the verified G1 Jacobian; b2 (the twist b) == Fp2B.
+    function fp2Sc(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
+    function g2Double(int Xa,int Xb,int Ya,int Yb,int Za,int Zb) returns (int,int,int,int,int,int) {
+        (int Aa,int Ab) = fp2Sqr(Xa, Xb);
+        (int Bb0,int Bb1) = fp2Sqr(Ya, Yb);
+        (int Ca,int Cb) = fp2Sqr(Bb0, Bb1);
+        (int xpa,int xpb) = fp2Add(Xa, Xb, Bb0, Bb1);
+        (int sqa,int sqb) = fp2Sqr(xpa, xpb);
+        (int t1a,int t1b) = fp2Sub(sqa, sqb, Aa, Ab);
+        (int t2a,int t2b) = fp2Sub(t1a, t1b, Ca, Cb);
+        (int Da,int Db) = fp2Sc(t2a, t2b, 2);
+        (int Ea,int Eb) = fp2Sc(Aa, Ab, 3);
+        (int Fa,int Fb) = fp2Sqr(Ea, Eb);
+        (int twoDa,int twoDb) = fp2Sc(Da, Db, 2);
+        (int nXa,int nXb) = fp2Sub(Fa, Fb, twoDa, twoDb);
+        (int dmxa,int dmxb) = fp2Sub(Da, Db, nXa, nXb);
+        (int ednma,int ednmb) = fp2Mul(Ea, Eb, dmxa, dmxb);
+        (int c8a,int c8b) = fp2Sc(Ca, Cb, 8);
+        (int nYa,int nYb) = fp2Sub(ednma, ednmb, c8a, c8b);
+        (int yza,int yzb) = fp2Mul(Ya, Yb, Za, Zb);
+        (int nZa,int nZb) = fp2Sc(yza, yzb, 2);
+        return nXa,nXb,nYa,nYb,nZa,nZb;
+    }
+    function g2AddAffine(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int bXa,int bXb,int bYa,int bYb) returns (int,int,int,int,int,int) {
+        int rXa = bXa; int rXb = bXb; int rYa = bYa; int rYb = bYb; int rZa = 1; int rZb = 0; // default: accumulator is identity -> result is B
+        if (Za != 0 || Zb != 0) {
+            (int z11a,int z11b) = fp2Sqr(Za, Zb);
+            (int u2a,int u2b) = fp2Mul(bXa, bXb, z11a, z11b);
+            (int z11za,int z11zb) = fp2Mul(z11a, z11b, Za, Zb);
+            (int s2a,int s2b) = fp2Mul(bYa, bYb, z11za, z11zb);
+            if (Xa == u2a && Xb == u2b && Ya == s2a && Yb == s2b) {
+                (int da,int db,int dc,int dd,int de,int df) = g2Double(Xa, Xb, Ya, Yb, Za, Zb);
+                rXa=da; rXb=db; rYa=dc; rYb=dd; rZa=de; rZb=df;
+            } else {
+                (int ha,int hb) = fp2Sub(u2a, u2b, Xa, Xb);
+                (int i2a,int i2b) = fp2Sqr(mulFp(2, ha), mulFp(2, hb));
+                (int ja,int jb) = fp2Mul(ha, hb, i2a, i2b);
+                (int rsa,int rsb) = fp2Sub(s2a, s2b, Ya, Yb);
+                (int rra,int rrb) = fp2Sc(rsa, rsb, 2);
+                (int va,int vb) = fp2Mul(Xa, Xb, i2a, i2b);
+                (int rr2a,int rr2b) = fp2Sqr(rra, rrb);
+                (int rr2ja,int rr2jb) = fp2Sub(rr2a, rr2b, ja, jb);
+                (int v2a,int v2b) = fp2Sc(va, vb, 2);
+                (int nXa,int nXb) = fp2Sub(rr2ja, rr2jb, v2a, v2b);
+                (int vmxa,int vmxb) = fp2Sub(va, vb, nXa, nXb);
+                (int rvma,int rvmb) = fp2Mul(rra, rrb, vmxa, vmxb);
+                (int yja,int yjb) = fp2Mul(Ya, Yb, ja, jb);
+                (int yj2a,int yj2b) = fp2Sc(yja, yjb, 2);
+                (int nYa,int nYb) = fp2Sub(rvma, rvmb, yj2a, yj2b);
+                (int zp1a,int zp1b) = fp2Add(Za, Zb, 1, 0);
+                (int zp1sa,int zp1sb) = fp2Sqr(zp1a, zp1b);
+                (int t3a,int t3b) = fp2Sub(zp1sa, zp1sb, z11a, z11b);
+                (int t4a,int t4b) = fp2Sub(t3a, t3b, 1, 0);
+                (int nZa,int nZb) = fp2Mul(t4a, t4b, ha, hb);
+                rXa=nXa; rXb=nXb; rYa=nYa; rYb=nYb; rZa=nZa; rZb=nZb;
+            }
+        }
+        return rXa, rXb, rYa, rYb, rZa, rZb;
+    }
+
     function spend(
         int Ax, int Ay, int Bxa, int Bxb, int Bya, int Byb, int Cx, int Cy,
         int in0, int in1
     ) {
+        // ---- validate spender-supplied proof points (EIP-197 rigor) ----
+        require(mulFp(Ay, Ay) == addFp(mulFp(mulFp(Ax, Ax), Ax), 3)); // A on G1
+        require(mulFp(Cy, Cy) == addFp(mulFp(mulFp(Cx, Cx), Cx), 3)); // C on G1
+        (int bx2a,int bx2b) = fp2Sqr(Bxa, Bxb);                       // B on G2: y^2 == x^3 + b2
+        (int bx3a,int bx3b) = fp2Mul(bx2a, bx2b, Bxa, Bxb);
+        (int onrhsa,int onrhsb) = fp2Add(bx3a, bx3b,
+            19485874751759354771024239261021720505790618469301721065564631296452457478373,
+            266929791119991161246907387137283842545076965332900288569378510910307636690);
+        (int by2a,int by2b) = fp2Sqr(Bya, Byb);
+        require(by2a == onrhsa); require(by2b == onrhsb);
+        int RXa=0; int RXb=0; int RYa=1; int RYb=0; int RZa=0; int RZb=0; // [6x^2]B (Jacobian)
+        for (int i = 0; i < 128; i = i + 1) {
+            (int da,int db,int dc,int dd,int de,int df) = g2Double(RXa, RXb, RYa, RYb, RZa, RZb);
+            RXa=da; RXb=db; RYa=dc; RYb=dd; RZa=de; RZb=df;
+            if (((147946756881789318990833708069417712966 >> (127 - i)) % 2) == 1) {
+                (int aa,int ab,int ac,int ad,int ae,int af) = g2AddAffine(RXa, RXb, RYa, RYb, RZa, RZb, Bxa, Bxb, Bya, Byb);
+                RXa=aa; RXb=ab; RYa=ac; RYb=ad; RZa=ae; RZb=af;
+            }
+        }
+        (int psxa,int psxb,int psya,int psyb) = psi(Bxa, Bxb, Bya, Byb); // require [6x^2]B == psi(B)
+        (int sz2a,int sz2b) = fp2Sqr(RZa, RZb);
+        (int sz3a,int sz3b) = fp2Mul(sz2a, sz2b, RZa, RZb);
+        (int cx_a,int cx_b) = fp2Mul(psxa, psxb, sz2a, sz2b);
+        (int cy_a,int cy_b) = fp2Mul(psya, psyb, sz3a, sz3b);
+        require(RXa == cx_a); require(RXb == cx_b);
+        require(RYa == cy_a); require(RYb == cy_b);
+
         // vk_x = IC0 + in0*IC1 + in1*IC2
         (int r1x, int r1y, int r1z) = g1ScalarMul(in0,
             9269869340829791644953940526610795845982127221382366381974052273854848284744,

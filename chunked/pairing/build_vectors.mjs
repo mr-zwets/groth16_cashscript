@@ -10,11 +10,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp12, millerBatchOps, pairsFor, proofFromLimbs, vec,
+  Fp12, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileBytecode, commitBin, CATEGORY, ptLimbs,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace,
   TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, OP_BUDGET,
 } from './_millermath.mjs';
+import { g2checkAccAt } from './gen_g2check.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -172,12 +173,35 @@ function buildFinalexp(inst, boundaryVal) {
   return steps;
 }
 
-// ---- the FULL verifier chain: vk_x -> batched 4-pair Miller -> final exp ----
+// ---- G2 input-validation prologue (EIP-197): [6x^2]B == psi(B) + on-curve A,B,C ----
+function buildG2check(inst) {
+  const pf = inst.proof ?? proof;
+  const Ba = pf.b.toAffine(), Aa = pf.a.toAffine(), Ca = pf.c.toAffine();
+  const Bpair = [[Ba.x.c0, Ba.x.c1], [Ba.y.c0, Ba.y.c1]];
+  const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
+  const tail = [Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1, Aa.x, Aa.y, Ca.x, Ca.y]; // B(4)+A(2)+C(2)
+  const sLimbs = (R) => [...rLimbs(R), ...tail];
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
+  const steps = [];
+  for (const ch of man.chunks) {
+    const inLimbs = sLimbs(g2checkAccAt(Bpair, ch.lo));
+    const outLimbs = ch.last ? [] : sLimbs(g2checkAccAt(Bpair, ch.hi));
+    const r = buildCovStep(join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs,
+      `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' [6x^2]B==psi(B)' : ''}`, ch.first ? 'validate-inputs' : undefined);
+    stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
+    stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
+    steps.push(r.step);
+  }
+  return steps;
+}
+
+// ---- the FULL verifier chain: validate -> vk_x -> batched 4-pair Miller -> final exp ----
 function buildGroth16(inst) {
+  const g2Steps = buildG2check(inst);
   const vkxSteps = buildVkx(inst);
   const { steps: pairingSteps, boundaryVal } = buildPairing(inst);
   const feSteps = buildFinalexp(inst, boundaryVal);
-  return { groth16: [...vkxSteps, ...pairingSteps, ...feSteps], pairing: pairingSteps, vkx: vkxSteps };
+  return { groth16: [...g2Steps, ...vkxSteps, ...pairingSteps, ...feSteps], pairing: pairingSteps, vkx: vkxSteps };
 }
 
 const g0 = buildGroth16(INSTANCES[0]);
