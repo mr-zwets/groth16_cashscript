@@ -189,7 +189,7 @@ function buildGroth16(inst) {
   const vkxSteps = buildVkx(inst);
   const { steps: pairingSteps, boundaryVal } = buildPairing(inst);
   const feSteps = buildFinalexp(inst, boundaryVal);
-  return { groth16: [...vkxSteps, ...pairingSteps, ...feSteps], pairing: pairingSteps };
+  return { groth16: [...vkxSteps, ...pairingSteps, ...feSteps], pairing: pairingSteps, vkx: vkxSteps };
 }
 
 const g0 = buildGroth16(INSTANCES[0]);
@@ -218,3 +218,16 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-chunked-vectors.j
   steps: g0.groth16, extraValidProofs: [g1.groth16],
 }, null, 2));
 console.error('wrote src/bch/groth16-chunked-vectors.json (proof-agnostic, 2 proofs)');
+
+// standalone vk_x aggregation entry (the first 3 chunks of the full verifier),
+// PROOF-AGNOSTIC: the public inputs ride in the committed state (NFT commitment),
+// so one fixed set of lockings computes vk_x = IC0+in0*IC1+in1*IC2 for ANY inputs.
+console.error(`vk_x(covenant): ${g0.vkx.length} steps/proof, op ${sumOp(g0.vkx).toLocaleString()}; proof#1 also built (${g1.vkx.length} steps)`);
+writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/vkx-chunked-covenant-vectors.json', JSON.stringify({
+  description: 'PROOF-AGNOSTIC chunked BN254 vk_x = IC0 + in0*IC1 + in1*IC2 (Shamir/Straus), multi-tx. Generic covenant: the accumulator + public inputs live in the token NFT commitment, NO baked instance. One fixed set of lockings aggregates ANY public inputs (runtime-general): proof #0 = committed instance, extraValidProofs = distinct public inputs.',
+  proofBinding: 'runtime', numSteps: g0.vkx.length, budgetPerInput: OP_BUDGET,
+  totalOperationCost: sumOp(g0.vkx), maxStepOperationCost: maxOpOf(g0.vkx),
+  allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
+  steps: g0.vkx, extraValidProofs: [g1.vkx],
+}, null, 2));
+console.error('wrote src/bch/vkx-chunked-covenant-vectors.json (proof-agnostic, 2 proofs)');
