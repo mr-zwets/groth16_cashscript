@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp2, Fp12, ATE_NAF, millerStep, postPrecompute, pairsFor, proofFromLimbs, vec,
+  Fp12, millerBatchOps, pairsFor, proofFromLimbs, vec,
   f12limbs, r6limbs, compileBytecode, commitBin, CATEGORY, ptLimbs,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace,
   TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, OP_BUDGET,
@@ -84,16 +84,8 @@ function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArg
   };
 }
 
-// ---- per-pair Miller state replay (states[k] BEFORE step k) ----
-const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.R)];
-function pairStates(pair) {
-  const Qa = pair.Q.toAffine(), Pa = pair.P.toAffine(), negQy = Fp2.neg(Qa.y);
-  const states = [{ f: Fp12.ONE, R: { x: Qa.x, y: Qa.y, z: Fp2.ONE } }];
-  let cur = states[0];
-  for (let k = 0; k < ATE_NAF.length; k++) { cur = millerStep(cur.f, cur.R, k, Qa.x, Qa.y, negQy, Pa.x, Pa.y); states.push(cur); }
-  const final = postPrecompute(states[ATE_NAF.length].f, states[ATE_NAF.length].R, Qa.x, Qa.y, Pa.x, Pa.y);
-  return { states, final };
-}
+// ---- BATCHED Miller replay (flat op list; folded f IS the boundary, no combine) ----
+const stateLimbs = (s) => [...f12limbs(s.f), ...s.Rs.flatMap(r6limbs)];
 
 // ---- parse a singleton-proof unlocking (pushes, reverse decl order) -> limbs ----
 // decl order: Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1 (pushed reversed, in1 first).
@@ -128,28 +120,18 @@ const WC_INSTANCE = { tag: 'worst-case', proof: proofFromLimbs(wcp.Ax, wcp.Ay, w
 const stats = { maxLock: 0, maxUnlock: 0, allFit: true, allAccept: true, allInvalid: true };
 function buildPairing(inst) {
   const pairs = pairsFor(inst.inputs, inst.proof);
+  const { ops, states, boundary } = millerBatchOps(pairs);
+  const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_miller.json'), 'utf8'));
   const steps = [];
-  for (let pi = 0; pi < 4; pi++) {
-    const man = JSON.parse(readFileSync(join(GEN, `manifest_p${pi}.json`), 'utf8'));
-    const { states, final } = pairStates(pairs[pi]);
-    const ptL = ptLimbs(pi, pairs[pi].P.toAffine(), pairs[pi].Q.toAffine());
-    for (const ch of man.chunks) {
-      const inLimbs = [...stateLimbs(states[ch.lo]), ...ptL];
-      const outLimbs = [...stateLimbs(ch.final ? final : states[ch.hi]), ...ptL];
-      const r = buildCovStep(join(GEN, `miller_p${pi}_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs, `miller p${pi} [${ch.lo},${ch.hi})${ch.final ? ' +postPre' : ''}`);
-      stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
-      stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
-      steps.push(r.step);
-    }
+  for (const ch of man.chunks) {
+    const inLimbs = [...stateLimbs(states[ch.opLo]), ...ptL];
+    const outLimbs = [...stateLimbs(states[ch.opHi]), ...ptL]; // final: states[ops.length].f == boundary (no conjugate)
+    const r = buildCovStep(join(GEN, `miller_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs, `miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' =boundary' : ''}`, ch.final ? 'miller-boundary' : undefined);
+    stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
+    stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
+    steps.push(r.step);
   }
-  // combine
-  const finals = pairs.map((p) => pairStates(p).final);
-  const inLimbs = finals.flatMap(stateLimbs); // 72
-  const boundary = finals.reduce((a, s) => Fp12.mul(a, s.f), Fp12.ONE);
-  const r = buildCovStep(join(GEN, 'combine.cash'), inLimbs, f12limbs(boundary), 'combine: boundary = f0*f1*f2*f3', 'miller-boundary');
-  stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
-  stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
-  steps.push(r.step);
   return { steps, boundaryVal: boundary };
 }
 
@@ -190,7 +172,7 @@ function buildFinalexp(inst, boundaryVal) {
   return steps;
 }
 
-// ---- the FULL verifier chain: vk_x -> 4 Miller chains -> combine -> final exp ----
+// ---- the FULL verifier chain: vk_x -> batched 4-pair Miller -> final exp ----
 function buildGroth16(inst) {
   const vkxSteps = buildVkx(inst);
   const { steps: pairingSteps, boundaryVal } = buildPairing(inst);
@@ -208,7 +190,7 @@ console.error(`pairing(boundary): ${pairing0.length} steps/proof, op ${sumOp(pai
 console.error(`max lock ${stats.maxLock}B max unlock ${stats.maxUnlock}B | allFit=${stats.allFit} allAccept=${stats.allAccept} allInvalidRejected=${stats.allInvalid}`);
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-chunked-vectors.json', JSON.stringify({
-  description: 'PROOF-AGNOSTIC chunked BN254 Groth16 pairing to the Miller boundary (4 Miller chains + combine), multi-tx. Generic covenant: running state in the token NFT commitment, NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct proof under the same VK.',
+  description: 'PROOF-AGNOSTIC chunked BN254 Groth16 pairing to the Miller boundary (ONE batched 4-pair optimal-ate Miller loop with a shared fp12Sqr per step; the folded f IS the boundary, no separate combine), multi-tx. Generic covenant: running state in the token NFT commitment, NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct proof under the same VK.',
   proofBinding: 'runtime', numSteps: pairing0.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(pairing0), maxStepOperationCost: maxOpOf(pairing0),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
@@ -218,7 +200,7 @@ console.error('wrote src/bch/pairing-chunked-vectors.json (proof-agnostic, 2 pro
 
 console.error(`groth16(full): ${g0.groth16.length} steps/proof, op ${sumOp(g0.groth16).toLocaleString()}; proof#1 also built (${g1.groth16.length} steps)`);
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-chunked-vectors.json', JSON.stringify({
-  description: 'PROOF-AGNOSTIC full chunked BN254 Groth16 verifier: vk_x (on-chain from public inputs) -> 4 Miller chains -> combine -> final exponentiation -> assert product==1, multi-tx. Generic covenant: state in the token NFT commitment, NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct proof minted under the same VK.',
+  description: 'PROOF-AGNOSTIC full chunked BN254 Groth16 verifier: vk_x (on-chain from public inputs) -> ONE batched 4-pair Miller loop -> final exponentiation -> assert product==1, multi-tx. Generic covenant: state in the token NFT commitment, NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct proof minted under the same VK.',
   proofBinding: 'runtime', numSteps: g0.groth16.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(g0.groth16), maxStepOperationCost: maxOpOf(g0.groth16),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,

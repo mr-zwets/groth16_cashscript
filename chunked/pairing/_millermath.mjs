@@ -92,6 +92,35 @@ export function singlePairMiller(pair) {
   return postPrecompute(f, R, Qa.x, Qa.y, Pa.x, Pa.y);
 }
 
+// ---- BATCHED multi-pair Miller (one shared fp12Sqr per step) -------------------
+// noble's millerLoopBatch: f squared ONCE per NAF step, each pair's double-line (+
+// add-line) folded into the SHARED f; each pair's R evolves independently; then the
+// Q1/Q2 (psi) postPrecompute per pair. The folded f IS the boundary (no separate
+// combine). One batched step is ~8 mul034 (too coarse for one BCH input), so the loop
+// is exposed as a FLAT op list chunkable at any boundary, carrying (f + 4 R + points).
+// ops[i] = {t:'sqr'} | {t:'dl',j} | {t:'al',j,neg} | {t:'pp',j} (postPrecompute pair j).
+// states[i] = {f,Rs} BEFORE op i; states[ops.length] = final (f == boundary, BN: no conj).
+export function millerBatchOps(pairs) {
+  const pds = pairs.map((p) => { const Qa = p.Q.toAffine(), Pa = p.P.toAffine(); return { Qx: Qa.x, Qy: Qa.y, negQy: Fp2.neg(Qa.y), Px: Pa.x, Py: Pa.y }; });
+  const ops = [];
+  for (let k = 0; k < ATE_NAF.length; k++) {
+    ops.push({ t: 'sqr' });
+    for (let j = 0; j < 4; j++) { ops.push({ t: 'dl', j }); if (ATE_NAF[k]) ops.push({ t: 'al', j, neg: ATE_NAF[k] === -1 }); }
+  }
+  for (let j = 0; j < 4; j++) ops.push({ t: 'pp', j });
+  const states = [];
+  let f = Fp12.ONE; const Rs = pds.map((pd) => ({ x: pd.Qx, y: pd.Qy, z: Fp2.ONE }));
+  for (const op of ops) {
+    states.push({ f, Rs: Rs.slice() });
+    if (op.t === 'sqr') f = Fp12.sqr(f);
+    else if (op.t === 'dl') { const d = pointDouble(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z); Rs[op.j] = d.R; f = lineFn(f, d.coeffs[0], d.coeffs[1], d.coeffs[2], pds[op.j].Px, pds[op.j].Py); }
+    else if (op.t === 'al') { const pd = pds[op.j]; const a = pointAdd(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z, pd.Qx, op.neg ? pd.negQy : pd.Qy); Rs[op.j] = a.R; f = lineFn(f, a.coeffs[0], a.coeffs[1], a.coeffs[2], pd.Px, pd.Py); }
+    else { const pd = pds[op.j]; const res = postPrecompute(f, Rs[op.j], pd.Qx, pd.Qy, pd.Px, pd.Py); f = res.f; Rs[op.j] = res.R; }
+  }
+  states.push({ f, Rs: Rs.slice() });
+  return { ops, states, boundary: f };
+}
+
 // ---- serialization (matches cash hash256(toPaddedBytes(.,40))) ----
 export const f12limbs = (f) => [f.c0.c0.c0, f.c0.c0.c1, f.c0.c1.c0, f.c0.c1.c1, f.c0.c2.c0, f.c0.c2.c1, f.c1.c0.c0, f.c1.c0.c1, f.c1.c1.c0, f.c1.c1.c1, f.c1.c2.c0, f.c1.c2.c1];
 export const r6limbs = (R) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1];
