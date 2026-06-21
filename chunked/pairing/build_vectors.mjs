@@ -117,6 +117,12 @@ const INSTANCES = [
   { tag: 'committed', proof: undefined, inputs: vec.publicInputs.map(BigInt) },
   { tag: 'proof#1', proof: proofFromLimbs(p1.Ax, p1.Ay, p1.Bxa, p1.Bxb, p1.Bya, p1.Byb, p1.Cx, p1.Cy), inputs: [p1.in0, p1.in1] },
 ];
+// WORST-CASE instance: dense public inputs (2^253-1). The chunk WINDOWS are fixed
+// (worst-case sized), so its step graph is identical to the committed run, but the
+// vk_x steps do a double+add at (nearly) every position -> ~5-6x op-cost. Same VK ->
+// same lockings; this run feeds each vector's `worstCaseProof` (benchmarks.worstCase).
+const wcp = parseProofUnlocking(mp.worstCaseProof.unlocking);
+const WC_INSTANCE = { tag: 'worst-case', proof: proofFromLimbs(wcp.Ax, wcp.Ay, wcp.Bxa, wcp.Bxb, wcp.Bya, wcp.Byb, wcp.Cx, wcp.Cy), inputs: [wcp.in0, wcp.in1] };
 
 // ---- build the Miller-boundary (pairing) steps for one instance ----
 const stats = { maxLock: 0, maxUnlock: 0, allFit: true, allAccept: true, allInvalid: true };
@@ -194,6 +200,7 @@ function buildGroth16(inst) {
 
 const g0 = buildGroth16(INSTANCES[0]);
 const g1 = buildGroth16(INSTANCES[1]);
+const gWc = buildGroth16(WC_INSTANCE); // dense inputs -> worst-case op-cost per stage
 const pairing0 = g0.pairing, pairing1 = g1.pairing;
 const sumOp = (a) => a.reduce((x, s) => x + s.operationCost, 0);
 const maxOpOf = (a) => Math.max(...a.map((s) => s.operationCost));
@@ -205,9 +212,9 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-chunked-vectors.j
   proofBinding: 'runtime', numSteps: pairing0.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(pairing0), maxStepOperationCost: maxOpOf(pairing0),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
-  steps: pairing0, extraValidProofs: [pairing1],
+  steps: pairing0, extraValidProofs: [pairing1], worstCaseProof: gWc.pairing,
 }, null, 2));
-console.error('wrote src/bch/pairing-chunked-vectors.json (proof-agnostic, 2 proofs)');
+console.error('wrote src/bch/pairing-chunked-vectors.json (proof-agnostic, 2 proofs + worst-case)');
 
 console.error(`groth16(full): ${g0.groth16.length} steps/proof, op ${sumOp(g0.groth16).toLocaleString()}; proof#1 also built (${g1.groth16.length} steps)`);
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-chunked-vectors.json', JSON.stringify({
@@ -215,9 +222,9 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-chunked-vectors.j
   proofBinding: 'runtime', numSteps: g0.groth16.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(g0.groth16), maxStepOperationCost: maxOpOf(g0.groth16),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
-  steps: g0.groth16, extraValidProofs: [g1.groth16],
+  steps: g0.groth16, extraValidProofs: [g1.groth16], worstCaseProof: gWc.groth16,
 }, null, 2));
-console.error('wrote src/bch/groth16-chunked-vectors.json (proof-agnostic, 2 proofs)');
+console.error('wrote src/bch/groth16-chunked-vectors.json (proof-agnostic, 2 proofs + worst-case)');
 
 // standalone vk_x aggregation entry (the first 3 chunks of the full verifier),
 // PROOF-AGNOSTIC: the public inputs ride in the committed state (NFT commitment),
@@ -228,6 +235,6 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/vkx-chunked-covenant-vect
   proofBinding: 'runtime', numSteps: g0.vkx.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(g0.vkx), maxStepOperationCost: maxOpOf(g0.vkx),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
-  steps: g0.vkx, extraValidProofs: [g1.vkx],
+  steps: g0.vkx, extraValidProofs: [g1.vkx], worstCaseProof: gWc.vkx,
 }, null, 2));
-console.error('wrote src/bch/vkx-chunked-covenant-vectors.json (proof-agnostic, 2 proofs)');
+console.error('wrote src/bch/vkx-chunked-covenant-vectors.json (proof-agnostic, 2 proofs + worst-case)');
