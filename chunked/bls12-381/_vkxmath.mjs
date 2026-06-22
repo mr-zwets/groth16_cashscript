@@ -31,11 +31,11 @@ export const OP_BUDGET = (41 + 10_000) * 800; // 8,032,800 op-cost per standard 
 export const TARGET_UNLOCK = 10_000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
 
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { bigIntToVmNumber, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } = await import(LIBAUTH);
+const { bigIntToVmNumber, encodeDataPush, bigIntToBinUintLE, binToFixedLength, numberToBinUint16LE, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } = await import(LIBAUTH);
 const realVm = createVirtualMachineBch2026(false);
 
 // ---- state serialization (matches cash hash256(toPaddedBytes(., 48))) ----
-export const le48 = (n) => { const b = Buffer.alloc(48); let x = ((BigInt(n) % P) + P) % P; for (let i = 0; i < 48; i++) { b[i] = Number(x & 0xffn); x >>= 8n; } return b; };
+export const le48 = (n) => binToFixedLength(bigIntToBinUintLE(((BigInt(n) % P) + P) % P), 48);
 const sha256 = (b) => createHash('sha256').update(b).digest();
 const sha256d = (b) => sha256(sha256(b));
 export const commit = (limbs) => sha256d(Buffer.concat(limbs.map(le48))).toString('hex');
@@ -60,16 +60,8 @@ export const covOut = (outNames) =>
   '        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);';
 
 // ---- real-VM measurement (padded to buy op-cost budget) ----
-const pushInt = (n) => {
-  const d = bigIntToVmNumber(n);
-  if (d.length === 0) return Uint8Array.from([0x00]);
-  if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
-  if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  if (d.length <= 75) return Uint8Array.from([d.length, ...d]);
-  if (d.length <= 255) return Uint8Array.from([0x4c, d.length, ...d]);
-  return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]);
-};
-const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, N & 0xff, (N >> 8) & 0xff, ...new Uint8Array(N)]); };
+const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
+const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); };
 export const tok = (commitment) => ({ amount: 0n, category: CATEGORY, nft: { capability: 'mutable', commitment } });
 
 /** Real-VM measurer for a COVENANT chunk: drives it through a synthetic token tx

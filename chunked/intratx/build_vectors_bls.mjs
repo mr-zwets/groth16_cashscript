@@ -36,13 +36,7 @@ const p2shSpk = (redeem) => encodeLockingBytecodeP2sh20(hash160(redeem));
 
 // libauth encodeDataPush does the minimal length-prefix; pushInt keeps the numeric-opcode
 // minimal forms (OP_0/OP_1..16/OP_1NEGATE) that encodeDataPush omits.
-const pushInt = (n) => {
-  const d = bigIntToVmNumber(BigInt(n));
-  if (d.length === 0) return Uint8Array.from([0x00]);
-  if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
-  if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  return encodeDataPush(d);
-};
+const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
 const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le48(((BigInt(l) % P) + P) % P)]));
 // trailing all-zero pad (libauth-minimal push); 1-byte boundary rounding absorbed by the

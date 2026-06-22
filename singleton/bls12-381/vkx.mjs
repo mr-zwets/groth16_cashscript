@@ -11,7 +11,7 @@ import { vkx as vkxPoint, PUBLIC_INPUTS } from './bls_instance.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
 const {
-  hexToBin, bigIntToVmNumber, createVirtualMachine, createInstructionSetBch2026,
+  hexToBin, bigIntToVmNumber, encodeDataPush, createVirtualMachine, createInstructionSetBch2026,
   createTestAuthenticationProgramBch, ConsensusBch2025, ripemd160, secp256k1, sha1, sha256,
 } = await import(LIBAUTH);
 const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
@@ -24,15 +24,7 @@ const loose = { ...ConsensusBch2025, baseInstructionCost: 100, maximumFunctionId
   maximumBytecodeLength: HUGE, maximumOperationCount: HUGE };
 const vm = createVirtualMachine(createInstructionSetBch2026(false, { consensus: loose, ripemd160, secp256k1, sha1, sha256 }));
 
-const pushInt = (n) => {
-  const d = bigIntToVmNumber(n);
-  if (d.length === 0) return Uint8Array.from([0x00]);
-  if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
-  if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  if (d.length <= 75) return Uint8Array.from([d.length, ...d]);
-  if (d.length <= 255) return Uint8Array.from([0x4c, d.length, ...d]);
-  return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]);
-};
+const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 
 const template = hexToBin(execFileSync('node', [CASHC, join(here, 'vkx.cash'), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
 const va = vkxPoint.toAffine();

@@ -24,7 +24,7 @@ export const OP_BUDGET = (41 + 10_000) * 800;
 export const TARGET_UNLOCK = 10_000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
 
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { hexToBin, bigIntToVmNumber, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } = await import(LIBAUTH);
+const { hexToBin, bigIntToVmNumber, encodeDataPush, bigIntToBinUintLE, binToFixedLength, numberToBinUint16LE, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } = await import(LIBAUTH);
 const realVm = createVirtualMachineBch2026(false);
 
 // ---- constants ----
@@ -124,7 +124,7 @@ export function millerBatchOps(pairs) {
 // ---- serialization (matches cash hash256(toPaddedBytes(.,40))) ----
 export const f12limbs = (f) => [f.c0.c0.c0, f.c0.c0.c1, f.c0.c1.c0, f.c0.c1.c1, f.c0.c2.c0, f.c0.c2.c1, f.c1.c0.c0, f.c1.c0.c1, f.c1.c1.c0, f.c1.c1.c1, f.c1.c2.c0, f.c1.c2.c1];
 export const r6limbs = (R) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1];
-export const le40 = (n) => { const b = Buffer.alloc(40); let x = BigInt(n); for (let i = 0; i < 40; i++) { b[i] = Number(x & 0xffn); x >>= 8n; } return b; };
+export const le40 = (n) => binToFixedLength(bigIntToBinUintLE(BigInt(n)), 40);
 const sha256 = (b) => createHash('sha256').update(b).digest();
 export const commit = (limbs) => sha256(sha256(Buffer.concat(limbs.map(le40)))).toString('hex');
 
@@ -263,16 +263,8 @@ export function fnExtractor(cashPath) {
 }
 
 // ---- real-VM measurement (padded like shamir) ----
-const pushInt = (n) => {
-  const d = bigIntToVmNumber(n);
-  if (d.length === 0) return Uint8Array.from([0x00]);
-  if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
-  if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  if (d.length <= 75) return Uint8Array.from([d.length, ...d]);
-  if (d.length <= 255) return Uint8Array.from([0x4c, d.length, ...d]);
-  return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]);
-};
-const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, N & 0xff, (N >> 8) & 0xff, ...new Uint8Array(N)]); };
+const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
+const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); };
 // compile `src` IN-PROCESS, run with `stateInts` (declaration order) on the real
 // VM (padded to cap). Returns op-cost + size + accept; a compile error counts as
 // "doesn't fit" so the planner just shrinks the window. (3rd arg kept for callers

@@ -24,19 +24,11 @@ import { vkxStateAt, vkxFinalZinv, computeVkx } from './_vkxmath.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { binToHex, bigIntToVmNumber, hash160, encodeLockingBytecodeP2sh20, encodeDataPush, createVirtualMachineBch2026 } = await import(LIBAUTH);
+const { binToHex, bigIntToVmNumber, hash160, encodeLockingBytecodeP2sh20, encodeDataPush, numberToBinUint16LE, createVirtualMachineBch2026 } = await import(LIBAUTH);
 const realVm = createVirtualMachineBch2026(false);
 
-const pushInt = (n) => {
-  const d = bigIntToVmNumber(n);
-  if (d.length === 0) return Uint8Array.from([0x00]);
-  if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
-  if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  if (d.length <= 75) return Uint8Array.from([d.length, ...d]);
-  if (d.length <= 255) return Uint8Array.from([0x4c, d.length, ...d]);
-  return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]);
-};
-const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, N & 0xff, (N >> 8) & 0xff, ...new Uint8Array(N)]); };
+const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
+const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); };
 const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
 
 // P2SH deployment: the redeem ([OP_DROP, contract]) lives in the scriptSig where it COUNTS

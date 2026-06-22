@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url';
 
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
 const {
-  hexToBin, bigIntToVmNumber,
+  hexToBin, bigIntToVmNumber, encodeDataPush,
   createVirtualMachine, createInstructionSetBch2026,
   createTestAuthenticationProgramBch, ConsensusBch2025,
   ripemd160, secp256k1, sha1, sha256,
@@ -34,15 +34,7 @@ const looseVm = createVirtualMachine(createInstructionSetBch2026(false, {
 }));
 
 // minimal VM-number push (OP_0 / OP_1NEGATE / OP_1..16 / data push)
-const pushInt = (n) => {
-  const d = bigIntToVmNumber(n);
-  if (d.length === 0) return Uint8Array.from([0x00]);
-  if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
-  if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  if (d.length <= 75) return Uint8Array.from([d.length, ...d]);
-  if (d.length <= 255) return Uint8Array.from([0x4c, d.length, ...d]);
-  return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]);
-};
+const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 
 export const compileTemplate = (file) =>
   hexToBin(execFileSync('node', [CASHC, file, '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());

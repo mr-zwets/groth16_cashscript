@@ -29,7 +29,7 @@ import { dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
 const {
-  hexToBin, binToHex, bigIntToVmNumber,
+  hexToBin, binToHex, bigIntToVmNumber, encodeDataPush, numberToBinUint16LE,
   createVirtualMachine, createInstructionSetBch2026, createVirtualMachineBch2026,
   createTestAuthenticationProgramBch, ConsensusBch2025,
   ripemd160, secp256k1, sha1, sha256,
@@ -67,15 +67,7 @@ const evalPair = (vm, locking, unlocking) => {
 };
 
 // MINIMAL VM-number push: OP_0 / OP_1NEGATE / OP_1..OP_16 / data push.
-const pushInt = (n) => {
-  const d = bigIntToVmNumber(n);
-  if (d.length === 0) return Uint8Array.from([0x00]);                  // OP_0
-  if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]); // OP_1..OP_16
-  if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]); // OP_1NEGATE
-  if (d.length <= 75) return Uint8Array.from([d.length, ...d]);
-  if (d.length <= 255) return Uint8Array.from([0x4c, d.length, ...d]); // OP_PUSHDATA1
-  return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]); // OP_PUSHDATA2
-};
+const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 
 // One big zero-push that brings argLen up to `target` total unlocking bytes.
 // `target` is TUNED per chunk to the minimum that affords the chunk's op-cost
@@ -84,7 +76,7 @@ const padPush = (argLen, target) => {
   const overhead = 3; // OP_PUSHDATA2 + 2-byte length
   const N = target - argLen - overhead;
   if (N < 0) throw new Error(`arg pushes (${argLen}B) already exceed target ${target}`);
-  return Uint8Array.from([OP_PUSHDATA2, N & 0xff, (N >> 8) & 0xff, ...new Uint8Array(N)]);
+  return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]);
 };
 
 // Minimal unlocking length that affords `opCost` op-cost: budget=(41+len)*800 >= opCost.

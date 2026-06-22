@@ -45,13 +45,7 @@ const p2shSpk = (redeem) => encodeLockingBytecodeP2sh20(hash160(redeem)); // OP_
 
 // ---- push helpers (libauth encodeDataPush does the minimal length-prefix; we keep the
 // numeric-opcode minimal forms — OP_0/OP_1..16/OP_1NEGATE — which encodeDataPush omits) ----
-const pushInt = (n) => {
-  const d = bigIntToVmNumber(BigInt(n));
-  if (d.length === 0) return Uint8Array.from([0x00]);
-  if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
-  if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  return encodeDataPush(d);
-};
+const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
 const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le40(((BigInt(l) % P) + P) % P)]));
 // trailing all-zero pad that buys op-cost budget (libauth-minimal push; the consensus VM

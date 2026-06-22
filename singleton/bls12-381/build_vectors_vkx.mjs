@@ -20,7 +20,7 @@ import { vkx as vkxPoint, PUBLIC_INPUTS } from './bls_instance.mjs';
 
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
 const {
-  hexToBin, binToHex, bigIntToVmNumber,
+  hexToBin, binToHex, bigIntToVmNumber, encodeDataPush, numberToBinUint16LE,
   createVirtualMachine, createInstructionSetBch2026, createVirtualMachineBch2026,
   createTestAuthenticationProgramBch, ConsensusBch2025, ripemd160, secp256k1, sha1, sha256,
 } = await import(LIBAUTH);
@@ -57,19 +57,11 @@ const evalPair = (vm, locking, unlocking) => {
   const accepted = state.error === undefined && state.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1;
   return { accepted, error: state.error, operationCost: state.metrics.operationCost };
 };
-const pushInt = (n) => {
-  const d = bigIntToVmNumber(n);
-  if (d.length === 0) return Uint8Array.from([0x00]);
-  if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
-  if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  if (d.length <= 75) return Uint8Array.from([d.length, ...d]);
-  if (d.length <= 255) return Uint8Array.from([0x4c, d.length, ...d]);
-  return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]);
-};
+const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const padPush = (argLen, target) => {
   const N = target - argLen - 3;
   if (N < 0) throw new Error(`arg pushes (${argLen}B) already exceed target ${target}`);
-  return Uint8Array.from([OP_PUSHDATA2, N & 0xff, (N >> 8) & 0xff, ...new Uint8Array(N)]);
+  return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]);
 };
 
 const template = hexToBin(execFileSync('node', [CASHC, join(here, 'vkx.cash'), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());

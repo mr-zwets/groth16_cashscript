@@ -21,7 +21,7 @@ import { dirname, join } from 'node:path';
 
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
 const {
-  hexToBin, binToHex, bigIntToVmNumber,
+  hexToBin, binToHex, bigIntToVmNumber, encodeDataPush,
   createVirtualMachine, createInstructionSetBch2026, createVirtualMachineBch2026,
   createTestAuthenticationProgramBch, ConsensusBch2025, ripemd160, secp256k1, sha1, sha256,
 } = await import(LIBAUTH);
@@ -52,15 +52,7 @@ const evalPair = (vm, locking, unlocking) => {
   return { accepted, error: state.error, operationCost: state.metrics.operationCost };
 };
 
-const pushInt = (n) => {
-  const d = bigIntToVmNumber(n);
-  if (d.length === 0) return Uint8Array.from([0x00]);
-  if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
-  if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  if (d.length <= 75) return Uint8Array.from([d.length, ...d]);
-  if (d.length <= 255) return Uint8Array.from([0x4c, d.length, ...d]);
-  return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]);
-};
+const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 // unlocking = spend args pushed in REVERSE declaration order (cashc convention)
 const unlockingFor = (args) => Uint8Array.from(args.slice().reverse().flatMap((a) => [...pushInt(a)]));
 
