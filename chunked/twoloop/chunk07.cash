@@ -1,10 +1,10 @@
 pragma cashscript ^0.13.0;
 // vk_x chunk 7: term 0, iterations [224,254), fold=True, reset_to_ic2=True, final=False.
 contract VkxChunk07() {
-    function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function sqrFp(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function sqrFp(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
     function spend(int accX, int accY, int accZ, int bX, int bY, int bZ, int rX, int rY, int rZ) {
         require(hash256(toPaddedBytes(accX, 40) + toPaddedBytes(accY, 40) + toPaddedBytes(accZ, 40) + toPaddedBytes(bX, 40) + toPaddedBytes(bY, 40) + toPaddedBytes(bZ, 40) + toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40)) == 0xec552e762ec3a1003fb914428014db9e8e60804158c8cb6525d0be749d1a4d2d);
         int input = 123456789;

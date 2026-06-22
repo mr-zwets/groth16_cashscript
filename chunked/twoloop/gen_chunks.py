@@ -139,12 +139,12 @@ print(f"py_ecc match OK, {len(chunks)} chunks, K={K}, continuity OK", file=sys.s
 # ---- emit .cash contracts ----
 P = "21888242871839275222246405745257275088696311157297823662689037894645226208583"
 
-FP_FUNCS = f"""    function addFp(int x, int y) returns (int) {{ return (x + y) % {P}; }}
-    function subFp(int x, int y) returns (int) {{ return (x - y + {P}) % {P}; }}
-    function mulFp(int x, int y) returns (int) {{ return (x * y) % {P}; }}
-    function sqrFp(int x) returns (int) {{ return (x * x) % {P}; }}"""
+FP_FUNCS = f"""    internal function addFp(int x, int y) returns (int) {{ return (x + y) % {P}; }}
+    internal function subFp(int x, int y) returns (int) {{ return (x - y + {P}) % {P}; }}
+    internal function mulFp(int x, int y) returns (int) {{ return (x * y) % {P}; }}
+    internal function sqrFp(int x) returns (int) {{ return (x * x) % {P}; }}"""
 
-INVERSE_FUNC = f"""    function inverseFp(int x) returns (int) {{
+INVERSE_FUNC = f"""    internal function inverseFp(int x) returns (int) {{
         int e = {P} - 2;
         int result = 1;
         int current = x % {P};

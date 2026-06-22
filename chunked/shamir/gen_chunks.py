@@ -119,16 +119,16 @@ P = "218882428718392752222464057452572750886963111572978236626890378946452262085
 # The reusable function prologue (OP_DEFINE bodies) -- emitted ONCE per chunk.
 # ---------------------------------------------------------------------------
 def fp_funcs():
-    return f"""    function addFp(int x, int y) returns (int) {{ return (x + y) % {P}; }}
-    function subFp(int x, int y) returns (int) {{ return (x - y + {P}) % {P}; }}
-    function mulFp(int x, int y) returns (int) {{ return (x * y) % {P}; }}
-    function sqrFp(int x) returns (int) {{ return (x * x) % {P}; }}"""
+    return f"""    internal function addFp(int x, int y) returns (int) {{ return (x + y) % {P}; }}
+    internal function subFp(int x, int y) returns (int) {{ return (x - y + {P}) % {P}; }}
+    internal function mulFp(int x, int y) returns (int) {{ return (x * y) % {P}; }}
+    internal function sqrFp(int x) returns (int) {{ return (x * x) % {P}; }}"""
 
 def jac_double_fn():
     # dbl-2009-l. When z==0 the formula yields nz = 2*Y*Z = 0, so an infinity
     # point stays infinity (nx,ny are garbage but Z=0 marks infinity). The call
     # site only invokes jacDouble when rZ != 0, matching the Python reference.
-    return """    function jacDouble(int x, int y, int z) returns (int, int, int) {
+    return """    internal function jacDouble(int x, int y, int z) returns (int, int, int) {
         int a = sqrFp(x);
         int b = sqrFp(y);
         int c = sqrFp(b);
@@ -145,7 +145,7 @@ def jac_add_fn():
     # add-2007-bl with the u1==u2&&s1==s2 doubling subcase and the aZ==0 (R is
     # infinity -> return b) case, ALL in single-trailing-return style: result
     # vars rx/ry/rz are assigned in branches and returned once at the end.
-    return """    function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
+    return """    internal function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
         int rx = bX;
         int ry = bY;
         int rz = bZ;
@@ -185,7 +185,7 @@ def jac_add_fn():
 def select_point_fn():
     # 2-bit Shamir select over the hardcoded VK constants {IC1, IC2, T=IC1+IC2}.
     # Returns (aX, aY, doAdd); single trailing return.
-    return f"""    function selectPoint(int b0, int b1) returns (int, int, int) {{
+    return f"""    internal function selectPoint(int b0, int b1) returns (int, int, int) {{
         int aX = 0;
         int aY = 0;
         int doAdd = 0;

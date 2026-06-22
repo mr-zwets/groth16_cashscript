@@ -5,11 +5,11 @@ pragma cashscript ^0.13.0;
 // EC ops jacDouble/jacAdd/selectPoint are reusable functions (OP_DEFINE/
 // OP_INVOKE) defined ONCE here and invoked per iteration, not inlined.
 contract VkxChunk02() {
-    function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function sqrFp(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function jacDouble(int x, int y, int z) returns (int, int, int) {
+    internal function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function sqrFp(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function jacDouble(int x, int y, int z) returns (int, int, int) {
         int a = sqrFp(x);
         int b = sqrFp(y);
         int c = sqrFp(b);
@@ -21,7 +21,7 @@ contract VkxChunk02() {
         int nz = mulFp(2, mulFp(y, z));
         return nx, ny, nz;
     }
-    function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
+    internal function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
         int rx = bX;
         int ry = bY;
         int rz = bZ;
@@ -57,7 +57,7 @@ contract VkxChunk02() {
         }
         return rx, ry, rz;
     }
-    function selectPoint(int b0, int b1) returns (int, int, int) {
+    internal function selectPoint(int b0, int b1) returns (int, int, int) {
         int aX = 0;
         int aY = 0;
         int doAdd = 0;
