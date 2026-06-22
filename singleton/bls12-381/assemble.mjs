@@ -8,13 +8,13 @@ import { dirname, join } from 'node:path';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
-// extract a top-level `    function NAME(...) {...}` block (brace-matched)
+// extract a top-level `    internal function NAME(...) {...}` block (brace-matched)
 function extractor(path) {
   const src = readFileSync(path, 'utf8').split('\n');
   return (name) => {
     const out = []; let p = false, depth = 0;
     for (const ln of src) {
-      if (!p && ln.startsWith(`    function ${name}(`)) p = true;
+      if (!p && ln.startsWith(`    internal function ${name}(`)) p = true;
       if (p) {
         out.push(ln);
         depth += (ln.match(/\{/g) || []).length - (ln.match(/\}/g) || []).length;
@@ -203,8 +203,8 @@ ${loopAcc(in1)}
         int affY = mulFp(accY, zInv3);`;
 
 // reducing fp helpers needed by the G1 block (negFp/sqrFp not in the pairing block)
-const FP_EXTRA = `    function negFp(int x) returns (int) { return (${PB} - x) % ${PB}; }
-    function sqrFp(int x) returns (int) { return (x * x) % ${PB}; }`;
+const FP_EXTRA = `    internal function negFp(int x) returns (int) { return (${PB} - x) % ${PB}; }
+    internal function sqrFp(int x) returns (int) { return (x * x) % ${PB}; }`;
 
 // ---- vkx.cash: standalone vk_x checkpoint (bakes IC + expected affine point) ----
 const vkxFns = ['addFp', 'subFp', 'mulFp', 'inverseFp'].map(fe).join('\n\n');

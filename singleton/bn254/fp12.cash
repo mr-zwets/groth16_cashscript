@@ -13,49 +13,49 @@ pragma cashscript ^0.13.0;
 // Frobenius maps and inverse are added in a follow-up. Graded by fp12.mjs.
 contract Fp12Ops() {
 
-    function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
 
     // ---- Fp2 ----
-    function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
-    function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
-    function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
-    function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+    internal function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
+    internal function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
+    internal function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
+    internal function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
         int v0 = mulFp(a0, b0);
         int v1 = mulFp(a1, b1);
         int c0 = subFp(v0, v1);
         int c1 = subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
         return c0, c1;
     }
-    function fp2MulXi(int a0, int a1) returns (int, int) {
+    internal function fp2MulXi(int a0, int a1) returns (int, int) {
         return subFp(mulFp(9, a0), a1), addFp(mulFp(9, a1), a0);
     }
 
     // ---- Fp6 ----
-    function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    internal function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
         (int c0a, int c0b) = fp2Add(a0a, a0b, b0a, b0b);
         (int c1a, int c1b) = fp2Add(a1a, a1b, b1a, b1b);
         (int c2a, int c2b) = fp2Add(a2a, a2b, b2a, b2b);
         return c0a, c0b, c1a, c1b, c2a, c2b;
     }
-    function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    internal function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
         (int c0a, int c0b) = fp2Sub(a0a, a0b, b0a, b0b);
         (int c1a, int c1b) = fp2Sub(a1a, a1b, b1a, b1b);
         (int c2a, int c2b) = fp2Sub(a2a, a2b, b2a, b2b);
         return c0a, c0b, c1a, c1b, c2a, c2b;
     }
-    function fp6Neg(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
+    internal function fp6Neg(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
         (int c0a, int c0b) = fp2Neg(a0a, a0b);
         (int c1a, int c1b) = fp2Neg(a1a, a1b);
         (int c2a, int c2b) = fp2Neg(a2a, a2b);
         return c0a, c0b, c1a, c1b, c2a, c2b;
     }
-    function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
+    internal function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
         (int n0a, int n0b) = fp2MulXi(a2a, a2b);
         return n0a, n0b, a0a, a0b, a1a, a1b;
     }
-    function fp6Mul(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    internal function fp6Mul(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
         (int t0a, int t0b) = fp2Mul(a0a, a0b, b0a, b0b);
         (int t1a, int t1b) = fp2Mul(a1a, a1b, b1a, b1b);
         (int t2a, int t2b) = fp2Mul(a2a, a2b, b2a, b2b);
@@ -84,7 +84,7 @@ contract Fp12Ops() {
 
     // ---- Fp12 (each Fp6 part is 6 ints) ----
     // (a0 + a1 w)(b0 + b1 w) = (a0 b0 + v a1 b1) + ((a0+a1)(b0+b1) - a0 b0 - a1 b1) w
-    function fp12Mul(
+    internal function fp12Mul(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11,
         int B0,int B1,int B2,int B3,int B4,int B5, int B6,int B7,int B8,int B9,int B10,int B11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
@@ -113,7 +113,7 @@ contract Fp12Ops() {
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
 
-    function fp12Sqr(
+    internal function fp12Sqr(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int C0,int C1,int C2,int C3,int C4,int C5,int C6,int C7,int C8,int C9,int C10,int C11) =
@@ -122,7 +122,7 @@ contract Fp12Ops() {
     }
 
     // conjugate over Fp12: (c0, -c1)
-    function fp12Conj(
+    internal function fp12Conj(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int N6,int N7,int N8,int N9,int N10,int N11) = fp6Neg(A6,A7,A8,A9,A10,A11);

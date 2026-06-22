@@ -251,7 +251,7 @@ export function fnExtractor(cashPath) {
   return (name) => {
     const out = []; let p = false, depth = 0;
     for (const ln of src) {
-      if (!p && ln.startsWith(`    function ${name}(`)) p = true;
+      if (!p && ln.startsWith(`    internal function ${name}(`)) p = true;
       if (p) {
         out.push(ln);
         depth += (ln.match(/\{/g) || []).length - (ln.match(/\}/g) || []).length;

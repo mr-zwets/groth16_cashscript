@@ -7,36 +7,36 @@ pragma cashscript ^0.13.0;
 // (and the prime) differ. Graded vs the proven JS formulas by g2lines.mjs.
 contract G2Lines() {
 
-    function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
-    function subFp(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
-    function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    internal function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    internal function subFp(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    internal function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
 
-    function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
-    function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
-    function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
-    function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+    internal function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
+    internal function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
+    internal function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
+    internal function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
         int v0 = mulFp(a0, b0);
         int v1 = mulFp(a1, b1);
         return subFp(v0, v1), subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
     }
-    function fp2Sqr(int a0, int a1) returns (int, int) {
+    internal function fp2Sqr(int a0, int a1) returns (int, int) {
         return mulFp(addFp(a0, a1), subFp(a0, a1)), mulFp(2, mulFp(a0, a1));
     }
-    function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
+    internal function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
     // multiply by the M-twist b' = 4*(1+u): (4 c0 - 4 c1) + (4 c0 + 4 c1) u
-    function fp2MulByB(int a0, int a1) returns (int, int) {
+    internal function fp2MulByB(int a0, int a1) returns (int, int) {
         int f0 = mulFp(a0, 4);
         int f1 = mulFp(a1, 4);
         return subFp(f0, f1), addFp(f0, f1);
     }
     // multiply by 1/2 (INV2 = ((p+1)/2, 0)) -> scalar
-    function fp2Half(int a0, int a1) returns (int, int) {
+    internal function fp2Half(int a0, int a1) returns (int, int) {
         return mulFp(a0, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894),
                mulFp(a1, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894);
     }
 
     // pointDouble: returns [c0,c1,c2, newR]
-    function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
+    internal function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
         returns (int,int,int,int,int,int, int,int,int,int,int,int) {
         (int t0a,int t0b) = fp2Sqr(Ya, Yb);
         (int t1a,int t1b) = fp2Sqr(Za, Zb);
@@ -69,7 +69,7 @@ contract G2Lines() {
     }
 
     // pointAdd: R + Q (Q affine), returns [c0,c1,c2, newR]
-    function pointAdd(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int Qxa,int Qxb,int Qya,int Qyb)
+    internal function pointAdd(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int Qxa,int Qxb,int Qya,int Qyb)
         returns (int,int,int,int,int,int, int,int,int,int,int,int) {
         (int qyz_a,int qyz_b) = fp2Mul(Qya, Qyb, Za, Zb);
         (int t0a,int t0b) = fp2Sub(Ya, Yb, qyz_a, qyz_b);

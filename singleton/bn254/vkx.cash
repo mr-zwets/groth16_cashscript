@@ -23,29 +23,29 @@ pragma cashscript ^0.13.0;
 contract VkX(int expectedX, int expectedY) {
 
     // ---- scalar field Fp arithmetic over the BN254 base prime p ----
-    function addFp(int x, int y) returns (int) {
+    internal function addFp(int x, int y) returns (int) {
         return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     }
 
-    function subFp(int x, int y) returns (int) {
+    internal function subFp(int x, int y) returns (int) {
         return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     }
 
-    function mulFp(int x, int y) returns (int) {
+    internal function mulFp(int x, int y) returns (int) {
         return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     }
 
-    function negFp(int x) returns (int) {
+    internal function negFp(int x) returns (int) {
         return (21888242871839275222246405745257275088696311157297823662689037894645226208583 - x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     }
 
-    function sqrFp(int x) returns (int) {
+    internal function sqrFp(int x) returns (int) {
         return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
     }
 
     // Modular inverse via Fermat's little theorem: x^(p-2) mod p, square-and-multiply
     // over the 254 bits of (p-2).
-    function inverseFp(int x) returns (int) {
+    internal function inverseFp(int x) returns (int) {
         int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
         int e = p - 2;
         int result = 1;

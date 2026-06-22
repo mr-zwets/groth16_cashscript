@@ -12,12 +12,12 @@ pragma cashscript ^0.13.0;
 // noble Fp12.frobeniusMap by singleton/pairing/fp12_frob.mjs.
 contract Fp12Frob() {
 
-    function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
 
-    function fp2Conj(int a0, int a1) returns (int, int) { return a0, subFp(0, a1); }
-    function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+    internal function fp2Conj(int a0, int a1) returns (int, int) { return a0, subFp(0, a1); }
+    internal function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
         int v0 = mulFp(a0, b0);
         int v1 = mulFp(a1, b1);
         int c0 = subFp(v0, v1);
@@ -26,7 +26,7 @@ contract Fp12Frob() {
     }
 
     // Fp6 Frobenius for ODD power: fp2Frob = conjugate. k1/k2 = FP6_C1[k]/FP6_C2[k].
-    function fp6FrobOdd(
+    internal function fp6FrobOdd(
         int x0a,int x0b,int x1a,int x1b,int x2a,int x2b,
         int k1a,int k1b,int k2a,int k2b
     ) returns (int,int,int,int,int,int) {
@@ -38,7 +38,7 @@ contract Fp12Frob() {
         return d0a, d0b, d1a, d1b, d2a, d2b;
     }
     // Fp6 Frobenius for EVEN power: fp2Frob = identity.
-    function fp6FrobEven(
+    internal function fp6FrobEven(
         int x0a,int x0b,int x1a,int x1b,int x2a,int x2b,
         int k1a,int k1b,int k2a,int k2b
     ) returns (int,int,int,int,int,int) {
@@ -47,7 +47,7 @@ contract Fp12Frob() {
         return x0a, x0b, d1a, d1b, d2a, d2b;
     }
     // multiply an Fp6 by an Fp2 constant (each Fp2 coord * k).
-    function fp6MulByFp2(
+    internal function fp6MulByFp2(
         int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int ka,int kb
     ) returns (int,int,int,int,int,int) {
         (int r0a,int r0b) = fp2Mul(x0a, x0b, ka, kb);
@@ -57,7 +57,7 @@ contract Fp12Frob() {
     }
 
     // a^p
-    function fp12Frob1(
+    internal function fp12Frob1(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(
@@ -74,7 +74,7 @@ contract Fp12Frob() {
         return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
     }
     // a^(p^2)
-    function fp12Frob2(
+    internal function fp12Frob2(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobEven(
@@ -91,7 +91,7 @@ contract Fp12Frob() {
         return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
     }
     // a^(p^3)
-    function fp12Frob3(
+    internal function fp12Frob3(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(

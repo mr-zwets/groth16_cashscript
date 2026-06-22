@@ -41,11 +41,11 @@ const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const PLAN = (1n << BigInt(ITERS)) - 1n;
 
 // ---- contract template (loop-based, runtime-input committed state) ----
-const prologue = () => `    function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
-    function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
-    function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
-    function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
-    function jacDouble(int x, int y, int z) returns (int, int, int) {
+const prologue = () => `    internal function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
+    internal function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
+    internal function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
+    internal function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
+    internal function jacDouble(int x, int y, int z) returns (int, int, int) {
         int a = sqrFp(x); int b = sqrFp(y); int c = sqrFp(b);
         int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
         int e = mulFp(3, a); int f = sqrFp(e);
@@ -54,7 +54,7 @@ const prologue = () => `    function addFp(int x, int y) returns (int) { return 
         int nz = mulFp(2, mulFp(y, z));
         return nx, ny, nz;
     }
-    function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
+    internal function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
         int rx = bX; int ry = bY; int rz = bZ;
         if (aZ != 0) {
             int z1z1 = sqrFp(aZ); int z2z2 = sqrFp(bZ);
@@ -79,7 +79,7 @@ const prologue = () => `    function addFp(int x, int y) returns (int) { return 
         }
         return rx, ry, rz;
     }
-    function selectPoint(int b0, int b1) returns (int, int, int) {
+    internal function selectPoint(int b0, int b1) returns (int, int, int) {
         int aX = 0; int aY = 0; int doAdd = 0;
         if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; doAdd = 1; }
         else { if (b0 == 1) { aX = ${IC1[0]}; aY = ${IC1[1]}; doAdd = 1; }

@@ -12,54 +12,54 @@ pragma cashscript ^0.13.0;
 // Graded vs noble bn254.pairing(g1,g2,false) by singleton/pairing/miller.mjs.
 contract Miller() {
 
-    function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+    internal function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
 
     // ---- Fp2 ----
-    function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
-    function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
-    function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
-    function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+    internal function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
+    internal function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
+    internal function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
+    internal function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
         int v0 = mulFp(a0, b0);
         int v1 = mulFp(a1, b1);
         return subFp(v0, v1), subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
     }
-    function fp2Sqr(int a0, int a1) returns (int, int) {
+    internal function fp2Sqr(int a0, int a1) returns (int, int) {
         return mulFp(addFp(a0, a1), subFp(a0, a1)), mulFp(2, mulFp(a0, a1));
     }
-    function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
-    function fp2MulXi(int a0, int a1) returns (int, int) { return subFp(mulFp(9, a0), a1), addFp(mulFp(9, a1), a0); }
-    function fp2Conj(int a0, int a1) returns (int, int) { return a0, subFp(0, a1); }
-    function fp2MulByB(int a0, int a1) returns (int, int) {
+    internal function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
+    internal function fp2MulXi(int a0, int a1) returns (int, int) { return subFp(mulFp(9, a0), a1), addFp(mulFp(9, a1), a0); }
+    internal function fp2Conj(int a0, int a1) returns (int, int) { return a0, subFp(0, a1); }
+    internal function fp2MulByB(int a0, int a1) returns (int, int) {
         (int r0, int r1) = fp2Mul(a0, a1,
             19485874751759354771024239261021720505790618469301721065564631296452457478373,
             266929791119991161246907387137283842545076965332900288569378510910307636690);
         return r0, r1;
     }
-    function fp2Half(int a0, int a1) returns (int, int) {
+    internal function fp2Half(int a0, int a1) returns (int, int) {
         return mulFp(a0, 10944121435919637611123202872628637544348155578648911831344518947322613104292),
                mulFp(a1, 10944121435919637611123202872628637544348155578648911831344518947322613104292);
     }
 
     // ---- Fp6 ----
-    function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    internal function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
         (int c0a, int c0b) = fp2Add(a0a, a0b, b0a, b0b);
         (int c1a, int c1b) = fp2Add(a1a, a1b, b1a, b1b);
         (int c2a, int c2b) = fp2Add(a2a, a2b, b2a, b2b);
         return c0a, c0b, c1a, c1b, c2a, c2b;
     }
-    function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    internal function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
         (int c0a, int c0b) = fp2Sub(a0a, a0b, b0a, b0b);
         (int c1a, int c1b) = fp2Sub(a1a, a1b, b1a, b1b);
         (int c2a, int c2b) = fp2Sub(a2a, a2b, b2a, b2b);
         return c0a, c0b, c1a, c1b, c2a, c2b;
     }
-    function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
+    internal function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
         (int n0a, int n0b) = fp2MulXi(a2a, a2b);
         return n0a, n0b, a0a, a0b, a1a, a1b;
     }
-    function fp6Mul(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    internal function fp6Mul(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
         (int t0a, int t0b) = fp2Mul(a0a, a0b, b0a, b0b);
         (int t1a, int t1b) = fp2Mul(a1a, a1b, b1a, b1b);
         (int t2a, int t2b) = fp2Mul(a2a, a2b, b2a, b2b);
@@ -85,7 +85,7 @@ contract Miller() {
         (int c2a, int c2b) = fp2Add(d6a, d6b, t1a, t1b);
         return c0a, c0b, c1a, c1b, c2a, c2b;
     }
-    function fp6Mul01(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b0a,int b0b,int b1a,int b1b) returns (int,int,int,int,int,int) {
+    internal function fp6Mul01(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b0a,int b0b,int b1a,int b1b) returns (int,int,int,int,int,int) {
         (int t0a,int t0b) = fp2Mul(c0a, c0b, b0a, b0b);
         (int t1a,int t1b) = fp2Mul(c1a, c1b, b1a, b1b);
         (int s12a,int s12b) = fp2Add(c1a, c1b, c2a, c2b);
@@ -106,7 +106,7 @@ contract Miller() {
     }
 
     // ---- Fp12 ----
-    function fp12Mul(
+    internal function fp12Mul(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11,
         int B0,int B1,int B2,int B3,int B4,int B5, int B6,int B7,int B8,int B9,int B10,int B11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
@@ -121,7 +121,7 @@ contract Miller() {
         (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(qq_0,qq_1,qq_2,qq_3,qq_4,qq_5, t1_0,t1_1,t1_2,t1_3,t1_4,t1_5);
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
-    function fp12Sqr(
+    internal function fp12Sqr(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int C0,int C1,int C2,int C3,int C4,int C5,int C6,int C7,int C8,int C9,int C10,int C11) =
@@ -129,7 +129,7 @@ contract Miller() {
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
     // sparse line multiply mul034(f, o0, o3, o4)
-    function mul034(
+    internal function mul034(
         int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
         int o0a,int o0b, int o3a,int o3b, int o4a,int o4b
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
@@ -147,7 +147,7 @@ contract Miller() {
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
     // line application (divisive twist): f = mul034(f, c2*Py, c1*Px, c0)
-    function line(
+    internal function line(
         int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
         int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int Px, int Py
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
@@ -161,7 +161,7 @@ contract Miller() {
     }
 
     // ---- G2 line steps ----
-    function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
+    internal function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
         returns (int,int,int,int,int,int, int,int,int,int,int,int) {
         (int t0a,int t0b) = fp2Sqr(Ya, Yb);
         (int t1a,int t1b) = fp2Sqr(Za, Zb);
@@ -189,7 +189,7 @@ contract Miller() {
         (int nza,int nzb) = fp2Mul(t0a, t0b, t4a, t4b);
         return c0a,c0b,c1a,c1b,c2a,c2b, nxa,nxb,nya,nyb,nza,nzb;
     }
-    function pointAdd(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int Qxa,int Qxb,int Qya,int Qyb)
+    internal function pointAdd(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int Qxa,int Qxb,int Qya,int Qyb)
         returns (int,int,int,int,int,int, int,int,int,int,int,int) {
         (int qyz_a,int qyz_b) = fp2Mul(Qya, Qyb, Za, Zb);
         (int t0a,int t0b) = fp2Sub(Ya, Yb, qyz_a, qyz_b);
@@ -218,7 +218,7 @@ contract Miller() {
         return c0a,c0b,c1a,c1b,c2a,c2b, nxa,nxb,nya,nyb,nza,nzb;
     }
     // psi (untwist-Frobenius-twist): x' = conj(x)*PSI_X, y' = conj(y)*PSI_Y
-    function psi(int xa,int xb,int ya,int yb) returns (int,int,int,int) {
+    internal function psi(int xa,int xb,int ya,int yb) returns (int,int,int,int) {
         (int cxa,int cxb) = fp2Conj(xa, xb);
         (int pxa,int pxb) = fp2Mul(cxa, cxb,
             21575463638280843010398324269430826099269044274347216827212613867836435027261,
@@ -231,7 +231,7 @@ contract Miller() {
     }
 
     // one optimal-ate Miller loop e(P in G1, Q in G2) -> Fp12 (12 ints)
-    function millerSingle(int Qxa,int Qxb,int Qya,int Qyb, int Px, int Py)
+    internal function millerSingle(int Qxa,int Qxb,int Qya,int Qyb, int Px, int Py)
         returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         // f = ONE
         int F0=1; int F1=0; int F2=0; int F3=0; int F4=0; int F5=0;

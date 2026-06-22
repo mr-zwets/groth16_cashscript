@@ -8,13 +8,13 @@ pragma cashscript ^0.13.0;
 // graded finalexp.cash + miller4.cash + the G1 block. Graded by groth16.mjs.
 contract Groth16Verify() {
 
-    function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    internal function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
 
-    function subFp(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    internal function subFp(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
 
-    function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    internal function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
 
-    function inverseFp(int x) returns (int) {
+    internal function inverseFp(int x) returns (int) {
         int p = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
         int q = p - 2;
         int result = 1;
@@ -26,58 +26,58 @@ contract Groth16Verify() {
         return result;
     }
 
-    function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
+    internal function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
 
-    function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
+    internal function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
 
-    function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
+    internal function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
 
-    function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+    internal function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
         int v0 = mulFp(a0, b0);
         int v1 = mulFp(a1, b1);
         return subFp(v0, v1), subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
     }
 
-    function fp2Sqr(int a0, int a1) returns (int, int) {
+    internal function fp2Sqr(int a0, int a1) returns (int, int) {
         return mulFp(addFp(a0, a1), subFp(a0, a1)), mulFp(2, mulFp(a0, a1));
     }
 
-    function fp2MulXi(int a0, int a1) returns (int, int) { return subFp(a0, a1), addFp(a0, a1); }
+    internal function fp2MulXi(int a0, int a1) returns (int, int) { return subFp(a0, a1), addFp(a0, a1); }
 
-    function fp2Conj(int a0, int a1) returns (int, int) { return a0, subFp(0, a1); }
+    internal function fp2Conj(int a0, int a1) returns (int, int) { return a0, subFp(0, a1); }
 
-    function fp2Inv(int a0, int a1) returns (int, int) {
+    internal function fp2Inv(int a0, int a1) returns (int, int) {
         int factor = inverseFp(addFp(mulFp(a0, a0), mulFp(a1, a1)));
         return mulFp(a0, factor), subFp(0, mulFp(a1, factor));
     }
 
-    function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    internal function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
         (int c0a, int c0b) = fp2Add(a0a, a0b, b0a, b0b);
         (int c1a, int c1b) = fp2Add(a1a, a1b, b1a, b1b);
         (int c2a, int c2b) = fp2Add(a2a, a2b, b2a, b2b);
         return c0a, c0b, c1a, c1b, c2a, c2b;
     }
 
-    function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    internal function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
         (int c0a, int c0b) = fp2Sub(a0a, a0b, b0a, b0b);
         (int c1a, int c1b) = fp2Sub(a1a, a1b, b1a, b1b);
         (int c2a, int c2b) = fp2Sub(a2a, a2b, b2a, b2b);
         return c0a, c0b, c1a, c1b, c2a, c2b;
     }
 
-    function fp6Neg(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
+    internal function fp6Neg(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
         (int c0a, int c0b) = fp2Neg(a0a, a0b);
         (int c1a, int c1b) = fp2Neg(a1a, a1b);
         (int c2a, int c2b) = fp2Neg(a2a, a2b);
         return c0a, c0b, c1a, c1b, c2a, c2b;
     }
 
-    function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
+    internal function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
         (int n0a, int n0b) = fp2MulXi(a2a, a2b);
         return n0a, n0b, a0a, a0b, a1a, a1b;
     }
 
-    function fp6Mul(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    internal function fp6Mul(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
         (int t0a, int t0b) = fp2Mul(a0a, a0b, b0a, b0b);
         (int t1a, int t1b) = fp2Mul(a1a, a1b, b1a, b1b);
         (int t2a, int t2b) = fp2Mul(a2a, a2b, b2a, b2b);
@@ -104,7 +104,7 @@ contract Groth16Verify() {
         return c0a, c0b, c1a, c1b, c2a, c2b;
     }
 
-    function fp6Inv(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b) returns (int,int,int,int,int,int) {
+    internal function fp6Inv(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b) returns (int,int,int,int,int,int) {
         (int sq0a,int sq0b) = fp2Sqr(c0a, c0b);
         (int m21a,int m21b) = fp2Mul(c2a, c2b, c1a, c1b);
         (int xm21a,int xm21b) = fp2MulXi(m21a, m21b);
@@ -129,7 +129,7 @@ contract Groth16Verify() {
         return r0a, r0b, r1a, r1b, r2a, r2b;
     }
 
-    function fp6FrobOdd(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int k1a,int k1b,int k2a,int k2b) returns (int,int,int,int,int,int) {
+    internal function fp6FrobOdd(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int k1a,int k1b,int k2a,int k2b) returns (int,int,int,int,int,int) {
         (int d0a,int d0b) = fp2Conj(x0a, x0b);
         (int c1a,int c1b) = fp2Conj(x1a, x1b);
         (int d1a,int d1b) = fp2Mul(c1a, c1b, k1a, k1b);
@@ -138,20 +138,20 @@ contract Groth16Verify() {
         return d0a, d0b, d1a, d1b, d2a, d2b;
     }
 
-    function fp6FrobEven(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int k1a,int k1b,int k2a,int k2b) returns (int,int,int,int,int,int) {
+    internal function fp6FrobEven(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int k1a,int k1b,int k2a,int k2b) returns (int,int,int,int,int,int) {
         (int d1a,int d1b) = fp2Mul(x1a, x1b, k1a, k1b);
         (int d2a,int d2b) = fp2Mul(x2a, x2b, k2a, k2b);
         return x0a, x0b, d1a, d1b, d2a, d2b;
     }
 
-    function fp6MulByFp2(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int ka,int kb) returns (int,int,int,int,int,int) {
+    internal function fp6MulByFp2(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int ka,int kb) returns (int,int,int,int,int,int) {
         (int r0a,int r0b) = fp2Mul(x0a, x0b, ka, kb);
         (int r1a,int r1b) = fp2Mul(x1a, x1b, ka, kb);
         (int r2a,int r2b) = fp2Mul(x2a, x2b, ka, kb);
         return r0a, r0b, r1a, r1b, r2a, r2b;
     }
 
-    function fp12Mul(
+    internal function fp12Mul(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11,
         int B0,int B1,int B2,int B3,int B4,int B5, int B6,int B7,int B8,int B9,int B10,int B11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
@@ -167,13 +167,13 @@ contract Groth16Verify() {
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
 
-    function fp12Conj(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    internal function fp12Conj(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
         returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int N6,int N7,int N8,int N9,int N10,int N11) = fp6Neg(A6,A7,A8,A9,A10,A11);
         return A0,A1,A2,A3,A4,A5,N6,N7,N8,N9,N10,N11;
     }
 
-    function fp12Inv(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    internal function fp12Inv(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
         returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int sc0_0,int sc0_1,int sc0_2,int sc0_3,int sc0_4,int sc0_5) = fp6Mul(A0,A1,A2,A3,A4,A5, A0,A1,A2,A3,A4,A5);
         (int sc1_0,int sc1_1,int sc1_2,int sc1_3,int sc1_4,int sc1_5) = fp6Mul(A6,A7,A8,A9,A10,A11, A6,A7,A8,A9,A10,A11);
@@ -186,7 +186,7 @@ contract Groth16Verify() {
         return n0,n1,n2,n3,n4,n5,w0,w1,w2,w3,w4,w5;
     }
 
-    function fp12Frob1(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    internal function fp12Frob1(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
         returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(A0,A1,A2,A3,A4,A5,
             0, 4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436,
@@ -199,7 +199,7 @@ contract Groth16Verify() {
         return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
     }
 
-    function fp12Frob2(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    internal function fp12Frob2(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
         returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobEven(A0,A1,A2,A3,A4,A5,
             793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350, 0,
@@ -212,7 +212,7 @@ contract Groth16Verify() {
         return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
     }
 
-    function fp12Frob3(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    internal function fp12Frob3(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
         returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(A0,A1,A2,A3,A4,A5,
             0, 1,
@@ -225,7 +225,7 @@ contract Groth16Verify() {
         return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
     }
 
-    function fp4Square(int a0,int a1,int b0,int b1) returns (int,int,int,int) {
+    internal function fp4Square(int a0,int a1,int b0,int b1) returns (int,int,int,int) {
         (int a2a,int a2b) = fp2Sqr(a0, a1);
         (int b2a,int b2b) = fp2Sqr(b0, b1);
         (int xbi0,int xbi1) = fp2MulXi(b2a, b2b);
@@ -237,7 +237,7 @@ contract Groth16Verify() {
         return f0, f1, s0, s1;
     }
 
-    function cycSqr(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    internal function cycSqr(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
         returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int t3a,int t3b,int t4a,int t4b) = fp4Square(A0,A1, A8,A9);
         (int t5a,int t5b,int t6a,int t6b) = fp4Square(A6,A7, A4,A5);
@@ -252,7 +252,7 @@ contract Groth16Verify() {
         return o0a,o0b,o1a,o1b,o2a,o2b,o3a,o3b,o4a,o4b,o5a,o5b;
     }
 
-    function cycExpX(int N0,int N1,int N2,int N3,int N4,int N5,int N6,int N7,int N8,int N9,int N10,int N11)
+    internal function cycExpX(int N0,int N1,int N2,int N3,int N4,int N5,int N6,int N7,int N8,int N9,int N10,int N11)
         returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         int Z0=1; int Z1=0; int Z2=0; int Z3=0; int Z4=0; int Z5=0; int Z6=0; int Z7=0; int Z8=0; int Z9=0; int Z10=0; int Z11=0;
         for (int k = 0; k < 64; k = k + 1) {
@@ -269,7 +269,7 @@ contract Groth16Verify() {
         return Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11;
     }
 
-    function powMinusX(int N0,int N1,int N2,int N3,int N4,int N5,int N6,int N7,int N8,int N9,int N10,int N11)
+    internal function powMinusX(int N0,int N1,int N2,int N3,int N4,int N5,int N6,int N7,int N8,int N9,int N10,int N11)
         returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int p0,int p1,int p2,int p3,int p4,int p5,int p6,int p7,int p8,int p9,int p10,int p11) =
             cycExpX(N0,N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11);
@@ -278,7 +278,7 @@ contract Groth16Verify() {
         return c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11;
     }
 
-    function finalExp(int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8,int A9,int A10,int A11)
+    internal function finalExp(int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8,int A9,int A10,int A11)
         returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         // easy part: t0 = conj(f) * inv(f)
         (int cn0,int cn1,int cn2,int cn3,int cn4,int cn5,int cn6,int cn7,int cn8,int cn9,int cn10,int cn11) =
@@ -355,23 +355,23 @@ contract Groth16Verify() {
         return O0,O1,O2,O3,O4,O5,O6,O7,O8,O9,O10,O11;
     }
 
-    function negFp(int x) returns (int) { return (4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787 - x) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
-    function sqrFp(int x) returns (int) { return (x * x) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    internal function negFp(int x) returns (int) { return (4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787 - x) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+    internal function sqrFp(int x) returns (int) { return (x * x) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
 
-    function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
+    internal function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
 
-    function fp2MulByB(int a0, int a1) returns (int, int) {
+    internal function fp2MulByB(int a0, int a1) returns (int, int) {
         int f0 = mulFp(a0, 4);
         int f1 = mulFp(a1, 4);
         return subFp(f0, f1), addFp(f0, f1);
     }
 
-    function fp2Half(int a0, int a1) returns (int, int) {
+    internal function fp2Half(int a0, int a1) returns (int, int) {
         return mulFp(a0, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894),
                mulFp(a1, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894);
     }
 
-    function fp6Mul01(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b0a,int b0b,int b1a,int b1b) returns (int,int,int,int,int,int) {
+    internal function fp6Mul01(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b0a,int b0b,int b1a,int b1b) returns (int,int,int,int,int,int) {
         (int t0a,int t0b) = fp2Mul(c0a, c0b, b0a, b0b);
         (int t1a,int t1b) = fp2Mul(c1a, c1b, b1a, b1b);
         (int s12a,int s12b) = fp2Add(c1a, c1b, c2a, c2b);
@@ -391,7 +391,7 @@ contract Groth16Verify() {
         return r0a, r0b, r1a, r1b, r2a, r2b;
     }
 
-    function fp6Mul1(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b1a,int b1b) returns (int,int,int,int,int,int) {
+    internal function fp6Mul1(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b1a,int b1b) returns (int,int,int,int,int,int) {
         (int m2a,int m2b) = fp2Mul(c2a, c2b, b1a, b1b);
         (int r0a,int r0b) = fp2MulXi(m2a, m2b);
         (int r1a,int r1b) = fp2Mul(c0a, c0b, b1a, b1b);
@@ -399,7 +399,7 @@ contract Groth16Verify() {
         return r0a, r0b, r1a, r1b, r2a, r2b;
     }
 
-    function fp12Sqr(
+    internal function fp12Sqr(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) = fp6Mul(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
@@ -414,7 +414,7 @@ contract Groth16Verify() {
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
 
-    function mul014(
+    internal function mul014(
         int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
         int o0a,int o0b, int o1a,int o1b, int o4a,int o4b
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
@@ -430,7 +430,7 @@ contract Groth16Verify() {
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
 
-    function line(
+    internal function line(
         int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
         int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int Px, int Py
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
@@ -443,7 +443,7 @@ contract Groth16Verify() {
         return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
     }
 
-    function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
+    internal function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
         returns (int,int,int,int,int,int, int,int,int,int,int,int) {
         (int t0a,int t0b) = fp2Sqr(Ya, Yb);
         (int t1a,int t1b) = fp2Sqr(Za, Zb);
@@ -472,7 +472,7 @@ contract Groth16Verify() {
         return c0a,c0b,c1a,c1b,c2a,c2b, nxa,nxb,nya,nyb,nza,nzb;
     }
 
-    function pointAdd(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int Qxa,int Qxb,int Qya,int Qyb)
+    internal function pointAdd(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int Qxa,int Qxb,int Qya,int Qyb)
         returns (int,int,int,int,int,int, int,int,int,int,int,int) {
         (int qyz_a,int qyz_b) = fp2Mul(Qya, Qyb, Za, Zb);
         (int t0a,int t0b) = fp2Sub(Ya, Yb, qyz_a, qyz_b);
@@ -501,7 +501,7 @@ contract Groth16Verify() {
         return c0a,c0b,c1a,c1b,c2a,c2b, nxa,nxb,nya,nyb,nza,nzb;
     }
 
-    function millerSingle(int Qxa,int Qxb,int Qya,int Qyb, int Px, int Py)
+    internal function millerSingle(int Qxa,int Qxb,int Qya,int Qyb, int Px, int Py)
         returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         int F0=1; int F1=0; int F2=0; int F3=0; int F4=0; int F5=0;
         int F6=0; int F7=0; int F8=0; int F9=0; int F10=0; int F11=0;
