@@ -20,9 +20,23 @@ import { g2checkAccAt } from './gen_g2check.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { hexToBin, binToHex, bigIntToVmNumber, vmNumberToBigInt } = await import(LIBAUTH);
+const { hexToBin, binToHex, bigIntToVmNumber, vmNumberToBigInt, hash160, encodeLockingBytecodeP2sh20, encodeDataPush } = await import(LIBAUTH);
 const { createVirtualMachineBch2026 } = await import(LIBAUTH);
 const realVm = createVirtualMachineBch2026(false);
+
+// Deploy each covenant chunk as P2SH: the ~4-5 KB redeem ([OP_DROP, contract]) lives in
+// the scriptSig, where it COUNTS toward the op-cost budget ((41+unlockingLen)*800) — so
+// it does double duty (code AND budget) instead of sitting in the locking (which the
+// budget ignores) next to an equal-sized dead pad. ~30% smaller on-chain; the SAME trick
+// the intra-tx build uses. Unlike intra-tx, the covenant introspects the TOKEN
+// (nftCommitment/tokenCategory), not sibling bytecode, so there are no scriptSig offsets
+// to preserve — P2SH is a pure win here. INTRATX-style bare model via CHUNKED_BARE=1.
+const P2SH = process.env.CHUNKED_BARE !== '1';
+const p2shSpk = (redeem) => encodeLockingBytecodeP2sh20(hash160(redeem)); // OP_HASH160 <h> OP_EQUAL (23 B)
+// all-zero pad whose TOTAL push length (libauth minimal header + data) == `total`; the
+// consensus VM rejects a non-minimal push, and with P2SH the redeem offsets the budget so
+// light chunks need a pad < 256 B (where PUSHDATA2 would be non-minimal).
+const padBytes = (total) => { const b = Math.max(2, total); const n = b <= 76 ? b - 1 : b <= 257 ? b - 2 : b - 3; return encodeDataPush(new Uint8Array(n)); };
 
 const pushInt = (n) => {
   const d = bigIntToVmNumber(n);
@@ -62,16 +76,22 @@ const compileCache = new Map();
 function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArgs) {
   const inLimbs = commitLimbs;
   const pushArgs = allArgs ?? commitLimbs;
-  let redeem = compileCache.get(cashFile);
-  if (!redeem) { redeem = compileBytecode(readFileSync(cashFile, 'utf8')); compileCache.set(cashFile, redeem); }
-  const locking = Uint8Array.from([OP_DROP, ...redeem]);
+  let contract = compileCache.get(cashFile);
+  if (!contract) { contract = compileBytecode(readFileSync(cashFile, 'utf8')); compileCache.set(cashFile, contract); }
+  const redeem = Uint8Array.from([OP_DROP, ...contract]); // re-executed redeem; OP_DROP discards the pad
+  const rpush = encodeDataPush(redeem);                   // pushed LAST in the scriptSig (P2SH convention)
+  const locking = P2SH ? p2shSpk(redeem) : redeem;        // P2SH scriptPubKey (23 B) or bare [OP_DROP,contract]
+  const tail = P2SH ? rpush.length : 0;                   // redeem in the scriptSig counts toward the budget
   const inCommit = commitBin(inLimbs.map(BigInt)), outCommit = commitBin(outLimbs.map(BigInt));
   const argBytes = Uint8Array.from([...pushArgs].reverse().flatMap((c) => [...pushInt(BigInt(c))]));
-  const probe = evalCov(locking, Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]), inCommit, outCommit);
-  let target = tunedLen(argBytes.length, probe.operationCost);
-  let unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, target)]);
+  // unlocking front is always [args...] (so the tampered-byte test + any introspection
+  // stay put); the pad fills to `target`, and the redeem push (P2SH) trails it.
+  const mkUnlock = (target) => { const pad = padBytes(target - argBytes.length - tail); return P2SH ? Uint8Array.from([...argBytes, ...pad, ...rpush]) : Uint8Array.from([...argBytes, ...pad]); };
+  const probe = evalCov(locking, mkUnlock(TARGET_UNLOCK), inCommit, outCommit);
+  let target = tunedLen(argBytes.length + tail, probe.operationCost);
+  let unlocking = mkUnlock(target);
   let real = evalCov(locking, unlocking, inCommit, outCommit);
-  while (!real.accepted && target < TARGET_UNLOCK) { target = Math.min(TARGET_UNLOCK, target + 256); unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, target)]); real = evalCov(locking, unlocking, inCommit, outCommit); }
+  while (!real.accepted && target < TARGET_UNLOCK) { target = Math.min(TARGET_UNLOCK, target + 256); unlocking = mkUnlock(target); real = evalCov(locking, unlocking, inCommit, outCommit); }
   const invalid = Uint8Array.from(unlocking); invalid[1] ^= 0x01; // perturb a state limb -> commitment mismatch
   const invReal = evalCov(locking, invalid, inCommit, outCommit);
   return {

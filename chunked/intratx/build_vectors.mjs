@@ -30,37 +30,39 @@ const PRIME = '21888242871839275222246405745257275088696311157297823662689037894
 const P = BigInt(PRIME);
 const W = 40; // BN254 limb width (bytes)
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, createVirtualMachineBch2026 } = await import(LIBAUTH);
+const { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash160, encodeLockingBytecodeP2sh20, encodeDataPush, createVirtualMachineBch2026 } = await import(LIBAUTH);
 const realVm = createVirtualMachineBch2026(false);
 
-// ---- push helpers (minimal encoding; the consensus VM enforces it) ----
+// Deploy each chunk as P2SH: the ~4-5 KB redeem script (the field-tower prologue +
+// chunk body) lives in the scriptSig, where it COUNTS toward the op-cost budget
+// ((41 + unlockingLen) * 800) — so it does double duty (code AND budget) instead of
+// sitting in the locking (which contributes nothing to the budget) alongside an
+// equal-sized dead pad. Measured ~30% smaller on-chain than the bare-script model.
+// P2SH is compatible with the forward-check: the inBlob stays the FIRST push of the
+// scriptSig (siblings read it at a fixed front offset); the redeem is the LAST push.
+const P2SH = process.env.INTRATX_BARE !== '1';
+const p2shSpk = (redeem) => encodeLockingBytecodeP2sh20(hash160(redeem)); // OP_HASH160 <h> OP_EQUAL
+
+// ---- push helpers (libauth encodeDataPush does the minimal length-prefix; we keep the
+// numeric-opcode minimal forms — OP_0/OP_1..16/OP_1NEGATE — which encodeDataPush omits) ----
 const pushInt = (n) => {
   const d = bigIntToVmNumber(BigInt(n));
   if (d.length === 0) return Uint8Array.from([0x00]);
   if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
   if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  if (d.length <= 75) return Uint8Array.from([d.length, ...d]);
-  if (d.length <= 255) return Uint8Array.from([0x4c, d.length, ...d]);
-  return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]);
+  return encodeDataPush(d);
 };
-const pd = (data) => {
-  const L = data.length;
-  if (L <= 75) return Uint8Array.from([L, ...data]);
-  if (L <= 255) return Uint8Array.from([0x4c, L, ...data]);
-  return Uint8Array.from([0x4d, L & 0xff, (L >> 8) & 0xff, ...data]);
-};
+const pd = encodeDataPush;
 const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le40(((BigInt(l) % P) + P) % P)]));
-// trailing all-zero pad that buys op-cost budget; MINIMAL push header (the consensus
-// VM rejects a non-minimal push, so a light chunk that needs <256 pad bytes must not
-// use PUSHDATA2). Pad sits at the END of the unlocking, so its size never shifts the
-// front inBlob a sibling's forward-check reads.
+// trailing all-zero pad that buys op-cost budget (libauth-minimal push; the consensus VM
+// rejects a non-minimal push, so a light chunk needing <256 pad bytes must not use
+// PUSHDATA2). The pad sits at the END of the unlocking, so its size never shifts the front
+// inBlob a sibling's forward-check reads; any 1-byte rounding at a push-size boundary is
+// absorbed by the +96 op-cost margin in tunedLen.
 const padPush = (argLen, target) => {
-  let budget = Math.max(2, target - argLen); // header + data bytes for the pad push
-  let N, hdr;
-  if (budget <= 76) { N = budget - 1; hdr = [N]; }
-  else if (budget <= 257) { N = budget - 2; hdr = [0x4c, N]; }
-  else { N = budget - 3; hdr = [OP_PUSHDATA2, N & 0xff, (N >> 8) & 0xff]; }
-  return Uint8Array.from([...hdr, ...new Uint8Array(N)]);
+  const budget = Math.max(2, target - argLen);
+  const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
+  return encodeDataPush(new Uint8Array(N));
 };
 const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
 
@@ -196,7 +198,7 @@ function compileSpec(s) {
     redeem = compileBytecode(t.src);
     compileCache.set(key, redeem);
   }
-  return Uint8Array.from([OP_DROP, ...redeem]);
+  return Uint8Array.from([OP_DROP, ...redeem]); // [OP_DROP, contract] — OP_DROP discards the pad
 }
 function argBytesOf(s) {
   // inBlob is the LAST declared param (so it is pushed FIRST -> the front of the
@@ -208,19 +210,33 @@ function argBytesOf(s) {
   return Uint8Array.from(parts.flatMap((p) => [...p]));
 }
 // Build the full input set for a run; tune each input's pad against its measured
-// op-cost (pad is appended last and never shifts the front inBlob, so it cannot
-// disturb any sibling's forward-check). Returns { inputs, meta, fits, accepted }.
+// op-cost. The pad is the trailing all-zero push that buys op-cost budget; it never
+// shifts the FRONT inBlob, so it cannot disturb any sibling's forward-check.
+//
+// P2SH (default): locking = OP_HASH160 <h> OP_EQUAL (23 B); unlocking = [inBlob,
+//   extras, pad, push(redeem)] — the redeem ([OP_DROP, contract]) is the last push,
+//   and it counts toward the budget, so the pad shrinks by ~the redeem length.
+// bare (INTRATX_BARE=1): locking = redeem; unlocking = [inBlob, extras, pad] — the
+//   redeem does not count toward the budget, so the pad must buy the whole budget.
+// Both: the front of the unlocking is [inBlob, extras...], identical, so the
+// forward-check offsets are the same in either model.
 function assemble(specs) {
-  const lockings = specs.map(compileSpec);
-  const argB = specs.map(argBytesOf);
-  // pass 1: full pad -> max budget so the real VM accepts and reports true op-cost
-  let inputs = specs.map((s, i) => ({ locking: lockings[i], unlocking: Uint8Array.from([...argB[i], ...padPush(argB[i].length, TARGET_UNLOCK)]) }));
+  const redeems = specs.map(compileSpec); // [OP_DROP, contract]
+  const argB = specs.map(argBytesOf);     // [inBlob, extras...]
+  const rpush = redeems.map((r) => encodeDataPush(r));
+  const lockingOf = (i) => (P2SH ? p2shSpk(redeems[i]) : redeems[i]);
+  // total unlocking length given a pad-push of `padTotal` bytes
+  const tailLen = (i) => (P2SH ? rpush[i].length : 0);
+  const mkUnlock = (i, target) => {
+    const fixed = argB[i].length + tailLen(i);
+    const pad = padPush(0, Math.max(2, target - fixed)); // pad sized to fill `target`
+    return P2SH ? Uint8Array.from([...argB[i], ...pad, ...rpush[i]]) : Uint8Array.from([...argB[i], ...pad]);
+  };
+  // pass 1: full unlocking -> max budget so the real VM accepts and reports true op-cost
+  let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
-  // pass 2: shrink each pad to just cover its op-cost
-  inputs = specs.map((s, i) => {
-    const target = tunedLen(argB[i].length, op1[i].operationCost);
-    return { locking: lockings[i], unlocking: Uint8Array.from([...argB[i], ...padPush(argB[i].length, target)]) };
-  });
+  // pass 2: shrink the pad so the unlocking just covers its op-cost
+  inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, tunedLen(argB[i].length + tailLen(i), op1[i].operationCost)) }));
   const op2 = specs.map((_, i) => evalInput(inputs, i));
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
@@ -279,7 +295,7 @@ console.error(`  pairing invalid runs rejected: ${pairInvalid.map((r) => r.rejec
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-intratx-vectors.json', JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED BN254 Groth16 pairing to the Miller boundary. The batched 4-pair Miller chunks are the INPUTS of ONE transaction; each chunk takes its incoming Fp12+G2 state as a raw byte blob in its witness and FORWARD-checks its successor (require next input\'s blob == its recomputed output, read via OP_INPUTBYTECODE). No NFT-commitment hand-off, no hashing, no 128-byte limit. Reuses the same validated chunk math as bch-pairing-chunked.',
-  method: 'intra-tx-linked', numInputs: pair0.inputs.length, budgetPerInput: OP_BUDGET,
+  method: 'intra-tx-linked', deployment: 'P2SH', numInputs: pair0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(pair0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(pair0.meta, (m) => m.operationCost),
   maxStepOperationCost: Math.max(...pair0.meta.map((m) => m.operationCost)),
@@ -300,7 +316,7 @@ console.error(`  groth16 invalid runs rejected: ${fullInvalid.map((r) => r.rejec
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-vectors.json', JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED full BN254 Groth16 verifier in ONE transaction: validate G2 inputs -> vk_x -> batched 4-pair Miller -> final exponentiation -> assert product==1, as the inputs of a single tx. State is passed as raw byte blobs through sibling-input introspection (OP_INPUTBYTECODE forward-checks), not NFT commitments — no hashing, arbitrary intermediate size. Cross-stage soundness links are bound where layouts allow: vk_x final binds the vk_x point into the Miller genesis input, and the Miller boundary is bound into the final-exponentiation genesis input. Reuses the same validated chunk math as bch-groth16-chunked.',
-  method: 'intra-tx-linked', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
+  method: 'intra-tx-linked', deployment: 'P2SH', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
   maxStepOperationCost: Math.max(...full0.meta.map((m) => m.operationCost)),

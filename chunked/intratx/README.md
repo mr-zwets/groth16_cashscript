@@ -5,19 +5,12 @@ NFT-commitment covenant in [`../pairing`](../pairing) and [`../bls12-381`](../bl
 
 ## The idea
 
-The covenant method spreads the computation over a **chain of transactions** and hands
-state forward through a token NFT commitment: each step stores `hash256(state)` in the
-commitment (32 bytes), re-provides the full state in the next transaction's witness,
-re-hashes it, runs one chunk, and commits `hash256(newState)` to its output. State is
-capped at 128 bytes (hence the hash), and the steps are strictly sequential
-(one block-or-mempool hop each).
-
-This method instead lays the **whole computation out as the inputs of ONE transaction**.
-Inputs of a transaction are validated independently and in parallel, but a script can
-*read its siblings' witnesses* by introspection (`OP_INPUTBYTECODE` =
-`tx.inputs[i].unlockingBytecode`). So a chunk can pass its result to the next chunk by
-having the next chunk **read it** — no state token, no hashing, and intermediate values
-can be any size:
+Where the covenant method (`../pairing`, `../bls12-381`) hands state forward through a
+token NFT commitment across a chain of transactions, this lays the **whole computation
+out as the inputs of ONE transaction**. A script can read its siblings' witnesses by
+introspection (`OP_INPUTBYTECODE` = `tx.inputs[i].unlockingBytecode`), so a chunk passes
+its result to the next by having the next chunk read it — no state token, no hashing,
+intermediate values any size:
 
 ```
 chunk i:   take inBlob (incoming state) in the witness
@@ -26,18 +19,25 @@ chunk i:   take inBlob (incoming state) in the witness
 chunk i+1: take inBlob (== chunk i's outgoing) in the witness, ...
 ```
 
-That `require` is exactly the "verify `arg01 == arg10`" from the design discussion: a
-chunk binds the chain by checking that its successor's argument equals its own output,
-as a raw byte comparison. The first chunk of a stage is genesis (no predecessor binds
-it); the last chunk asserts the verdict (`finalExp == 1`). Cross-stage soundness links
-are bound where the byte layouts line up: the **vk_x** point is bound into the Miller
-genesis input, and the **Miller boundary** into the final-exponentiation genesis input.
+That `require` is the "verify `arg01 == arg10`" from the design discussion. The first
+chunk of a stage is genesis (nothing binds its input); the last asserts the verdict
+(`finalExp == 1`). Cross-stage links are bound where byte layouts line up: **vk_x** into
+the Miller genesis input, the **Miller boundary** into the final-exp genesis input.
 
-Each input still has to fit one BCH input's budget (op-cost ≤ 8,032,800, script
-≤ 10,000 B), so the *chunking* is identical to the covenant version — these scripts
-reuse the exact same validated chunk math. What changes is the packaging: ~60–84 inputs
-in a single **non-standard (< 1 MB) transaction** instead of ~60–84 sequential standard
-transactions, with no per-step hashing and no 128-byte state limit.
+Each input still fits one BCH budget (op-cost ≤ 8,032,800, script ≤ 10,000 B), so the
+chunking — and the chunk math, reused verbatim — is identical to the covenant version.
+What changes is packaging: ~60–84 inputs in one **non-standard (< 1 MB) transaction**
+instead of that many sequential transactions, with no per-step hashing and no 128-byte
+state cap.
+
+### P2SH deployment
+
+The op-cost budget counts only the unlocking: `(41 + scriptSig length) × 800`. Deploying
+each chunk as **P2SH** (the default; `INTRATX_BARE=1` for bare) puts the ~4–5 KB redeem in
+the scriptSig, where it counts toward that budget instead of needing an equal-sized pad on
+top — ~27–30% fewer on-chain bytes, and the forward-check is unaffected (`inBlob` is still
+the first scriptSig push). This is a general lever, so the covenant chunks would shrink the
+same amount.
 
 ## Files
 

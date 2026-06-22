@@ -26,26 +26,31 @@ const GEN = join(here, '..', 'bls12-381', 'generated');
 const W = 48; // BLS12-381 limb width
 const PRIME = P.toString();
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { binToHex, bigIntToVmNumber, createVirtualMachineBch2026 } = await import(LIBAUTH);
+const { binToHex, bigIntToVmNumber, hash160, encodeLockingBytecodeP2sh20, encodeDataPush, createVirtualMachineBch2026 } = await import(LIBAUTH);
 const realVm = createVirtualMachineBch2026(false);
 
+// Deploy as P2SH so the ~4-5 KB redeem (in the scriptSig) counts toward the op-cost
+// budget and offsets the pad (~30% smaller on-chain than bare). See build_vectors.mjs.
+const P2SH = process.env.INTRATX_BARE !== '1';
+const p2shSpk = (redeem) => encodeLockingBytecodeP2sh20(hash160(redeem));
+
+// libauth encodeDataPush does the minimal length-prefix; pushInt keeps the numeric-opcode
+// minimal forms (OP_0/OP_1..16/OP_1NEGATE) that encodeDataPush omits.
 const pushInt = (n) => {
   const d = bigIntToVmNumber(BigInt(n));
   if (d.length === 0) return Uint8Array.from([0x00]);
   if (d.length === 1 && d[0] >= 1 && d[0] <= 16) return Uint8Array.from([0x50 + d[0]]);
   if (d.length === 1 && d[0] === 0x81) return Uint8Array.from([0x4f]);
-  if (d.length <= 75) return Uint8Array.from([d.length, ...d]);
-  if (d.length <= 255) return Uint8Array.from([0x4c, d.length, ...d]);
-  return Uint8Array.from([0x4d, d.length & 0xff, (d.length >> 8) & 0xff, ...d]);
+  return encodeDataPush(d);
 };
-const pd = (data) => { const L = data.length; if (L <= 75) return Uint8Array.from([L, ...data]); if (L <= 255) return Uint8Array.from([0x4c, L, ...data]); return Uint8Array.from([0x4d, L & 0xff, (L >> 8) & 0xff, ...data]); };
+const pd = encodeDataPush;
 const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le48(((BigInt(l) % P) + P) % P)]));
+// trailing all-zero pad (libauth-minimal push); 1-byte boundary rounding absorbed by the
+// +96 op-cost margin in tunedLen. Pad sits at the END, never shifting the front inBlob.
 const padPush = (argLen, target) => {
-  let budget = Math.max(2, target - argLen); let N, hdr;
-  if (budget <= 76) { N = budget - 1; hdr = [N]; }
-  else if (budget <= 257) { N = budget - 2; hdr = [0x4c, N]; }
-  else { N = budget - 3; hdr = [OP_PUSHDATA2, N & 0xff, (N >> 8) & 0xff]; }
-  return Uint8Array.from([...hdr, ...new Uint8Array(N)]);
+  const budget = Math.max(2, target - argLen);
+  const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
+  return encodeDataPush(new Uint8Array(N));
 };
 const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
 
@@ -149,11 +154,15 @@ function argBytesOf(s) {
   return Uint8Array.from(parts.flatMap((p) => [...p]));
 }
 function assemble(specs) {
-  const lockings = specs.map(compileSpec);
-  const argB = specs.map(argBytesOf);
-  let inputs = specs.map((s, i) => ({ locking: lockings[i], unlocking: Uint8Array.from([...argB[i], ...padPush(argB[i].length, TARGET_UNLOCK)]) }));
+  const redeems = specs.map(compileSpec); // [OP_DROP, contract]
+  const argB = specs.map(argBytesOf);     // [inBlob, extras...]
+  const rpush = redeems.map((r) => encodeDataPush(r));
+  const lockingOf = (i) => (P2SH ? p2shSpk(redeems[i]) : redeems[i]);
+  const tailLen = (i) => (P2SH ? rpush[i].length : 0);
+  const mkUnlock = (i, target) => { const pad = padPush(0, Math.max(2, target - (argB[i].length + tailLen(i)))); return P2SH ? Uint8Array.from([...argB[i], ...pad, ...rpush[i]]) : Uint8Array.from([...argB[i], ...pad]); };
+  let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
-  inputs = specs.map((s, i) => { const target = tunedLen(argB[i].length, op1[i].operationCost); return { locking: lockings[i], unlocking: Uint8Array.from([...argB[i], ...padPush(argB[i].length, target)]) }; });
+  inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, tunedLen(argB[i].length + tailLen(i), op1[i].operationCost)) }));
   const op2 = specs.map((_, i) => evalInput(inputs, i));
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
@@ -175,7 +184,7 @@ const report = (tag, asm) => {
   console.error(`${tag}: ${asm.meta.length} inputs accepted=${asm.accepted} fits=${asm.fits} | totalBytes=${sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes).toLocaleString()} totalOp=${sum(asm.meta, (m) => m.operationCost).toLocaleString()} maxOp=${Math.max(...asm.meta.map((m) => m.operationCost)).toLocaleString()}`);
   if (bad) console.error(`  !! first non-accepting: ${bad.label} :: ${bad.error}`);
 };
-const meta = (asm) => ({ method: 'intra-tx-linked', curve: 'BLS12-381', numInputs: asm.inputs.length, budgetPerInput: OP_BUDGET, totalBytes: sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes), totalOperationCost: sum(asm.meta, (m) => m.operationCost), maxStepOperationCost: Math.max(...asm.meta.map((m) => m.operationCost)), allFit: asm.fits, allAccept: asm.accepted });
+const meta = (asm) => ({ method: 'intra-tx-linked', deployment: 'P2SH', curve: 'BLS12-381', numInputs: asm.inputs.length, budgetPerInput: OP_BUDGET, totalBytes: sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes), totalOperationCost: sum(asm.meta, (m) => m.operationCost), maxStepOperationCost: Math.max(...asm.meta.map((m) => m.operationCost)), allFit: asm.fits, allAccept: asm.accepted });
 
 const OUT = 'C:/Users/mathi/Desktop/verifier/src/bch';
 // pairing (miller + final exp -> verdict) single tx
