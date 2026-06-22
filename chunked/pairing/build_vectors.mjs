@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp12, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
+  Fp12, Fp2, bn254, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileBytecode, commitBin, CATEGORY, ptLimbs,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace,
   TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, OP_BUDGET,
@@ -174,12 +174,16 @@ function buildFinalexp(inst, boundaryVal) {
 }
 
 // ---- G2 input-validation prologue (EIP-197): [6x^2]B == psi(B) + on-curve A,B,C ----
-function buildG2check(inst) {
+// `bad` (optional) overrides the point limbs {Bpair,B,A,C} with adversarial values
+// (off-curve / off-subgroup) and disables stats tracking — for an invalidInputs run.
+function buildG2check(inst, bad) {
   const pf = inst.proof ?? proof;
   const Ba = pf.b.toAffine(), Aa = pf.a.toAffine(), Ca = pf.c.toAffine();
-  const Bpair = [[Ba.x.c0, Ba.x.c1], [Ba.y.c0, Ba.y.c1]];
+  const Bpair = bad?.Bpair ?? [[Ba.x.c0, Ba.x.c1], [Ba.y.c0, Ba.y.c1]];
+  const B4 = bad?.B ?? [Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1];
+  const A2 = bad?.A ?? [Aa.x, Aa.y], C2 = bad?.C ?? [Ca.x, Ca.y];
   const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
-  const tail = [Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1, Aa.x, Aa.y, Ca.x, Ca.y]; // B(4)+A(2)+C(2)
+  const tail = [...B4, ...A2, ...C2]; // B(4)+A(2)+C(2)
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
   const steps = [];
@@ -188,8 +192,7 @@ function buildG2check(inst) {
     const outLimbs = ch.last ? [] : sLimbs(g2checkAccAt(Bpair, ch.hi));
     const r = buildCovStep(join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs,
       `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' [6x^2]B==psi(B)' : ''}`, ch.first ? 'validate-inputs' : undefined);
-    stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
-    stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
+    if (!bad) { stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes); stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected; }
     steps.push(r.step);
   }
   return steps;
@@ -207,6 +210,21 @@ function buildGroth16(inst) {
 const g0 = buildGroth16(INSTANCES[0]);
 const g1 = buildGroth16(INSTANCES[1]);
 const gWc = buildGroth16(WC_INSTANCE); // dense inputs -> worst-case op-cost per stage
+
+// adversarial input: an on-curve but OFF-SUBGROUP G2 point B. The validation prologue
+// must REJECT it (the [6x^2]B == psi(B) check fails) -> populates inputValidation.
+const b2c = Fp2.div(Fp2.fromBigTuple([3n, 0n]), Fp2.fromBigTuple([9n, 1n]));
+let offSub = null;
+for (let i = 1n; i < 400n && !offSub; i++) {
+  const x = Fp2.fromBigTuple([i, 0n]); const rhs = Fp2.add(Fp2.mul(Fp2.sqr(x), x), b2c);
+  let y; try { y = Fp2.sqrt(rhs); } catch { continue; }
+  if (!Fp2.eql(Fp2.sqr(y), rhs)) continue;
+  try { bn254.G2.Point.fromAffine({ x, y }).assertValidity(); } catch { offSub = { x, y }; } // on-curve, not torsion-free
+}
+const offSubRun = offSub
+  ? buildG2check(INSTANCES[0], { Bpair: [[offSub.x.c0, offSub.x.c1], [offSub.y.c0, offSub.y.c1]], B: [offSub.x.c0, offSub.x.c1, offSub.y.c0, offSub.y.c1] })
+  : null;
+console.error(`adversarial off-subgroup B run: ${offSubRun ? offSubRun.length + ' steps (must reject)' : 'NONE'}`);
 const pairing0 = g0.pairing, pairing1 = g1.pairing;
 const sumOp = (a) => a.reduce((x, s) => x + s.operationCost, 0);
 const maxOpOf = (a) => Math.max(...a.map((s) => s.operationCost));
@@ -229,8 +247,9 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-chunked-vectors.j
   totalOperationCost: sumOp(g0.groth16), maxStepOperationCost: maxOpOf(g0.groth16),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
   steps: g0.groth16, extraValidProofs: [g1.groth16], worstCaseProof: gWc.groth16,
+  invalidInputs: offSubRun ? [[...offSubRun]] : undefined, // off-subgroup B -> validation must reject
 }, null, 2));
-console.error('wrote src/bch/groth16-chunked-vectors.json (proof-agnostic, 2 proofs + worst-case)');
+console.error('wrote src/bch/groth16-chunked-vectors.json (proof-agnostic, 2 proofs + worst-case + adversarial input)');
 
 // standalone vk_x aggregation entry (the first 3 chunks of the full verifier),
 // PROOF-AGNOSTIC: the public inputs ride in the committed state (NFT commitment),
