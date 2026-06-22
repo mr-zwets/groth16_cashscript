@@ -1,0 +1,172 @@
+// Transform a GENERIC covenant chunk (chunked/{pairing,bls12-381}/generated/*.cash)
+// into an INTRA-TRANSACTION LINKED chunk for the new verification method.
+//
+// Old method (covenant, multi-tx): each chunk is its own transaction; the running
+// state is hash256-committed into a token NFT commitment, re-provided and re-hashed
+// every step, and handed to the next transaction's input.
+//
+// New method (this module, single-tx): the WHOLE chunked computation is the inputs
+// of ONE transaction. A chunk takes its incoming state as a raw byte blob `inBlob`
+// in its own witness, and binds the chain by FORWARD-checking its successor: it
+// recomputes the outgoing state and `require`s that the NEXT input's `inBlob`
+// (read via tx.inputs[idx+1].unlockingBytecode introspection) equals it — exactly
+// Richard's `verify arg01 == arg10`, done by byte equality. No hashing, no NFT
+// commitment, and intermediate values can be ANY size (no 128-byte token limit).
+//
+// The arithmetic body between the old covIn/covOut is reused VERBATIM — only the
+// prologue (covIn -> split inBlob into int limbs) and the epilogue (covOut ->
+// rebuild outBlob + forward-check) are rewritten. So all the validated field math
+// is preserved bit-for-bit.
+
+/** minimal push header size (bytes) for a data push of `len` bytes. */
+export const headerSize = (len) => (len <= 75 ? 1 : len <= 255 ? 2 : 3);
+
+// Some committed generated chunks predate the `internal function` migration and use
+// plain `function helper() returns (...)`, which the current cashc fork rejects as a
+// reusable. Normalize defensively: prefix `internal ` to any function with a `returns`
+// clause (spend() has none, so it is left as the top-level spending function). Same
+// rule as chunked/add_internal.mjs; idempotent.
+const fnRe = /(\binternal\s+)?\bfunction\s+\w+\s*\(/g;
+function normalizeInternal(src) {
+  let out = '', cursor = 0, m;
+  fnRe.lastIndex = 0;
+  while ((m = fnRe.exec(src)) !== null) {
+    const alreadyInternal = !!m[1];
+    let depth = 1, j = fnRe.lastIndex;
+    while (j < src.length && depth > 0) { const c = src[j]; if (c === '(') depth++; else if (c === ')') depth--; j++; }
+    let k = j; while (k < src.length && /\s/.test(src[k])) k++;
+    const hasReturns = src.startsWith('returns', k);
+    out += src.slice(cursor, m.index);
+    if (hasReturns && !alreadyInternal) out += 'internal ';
+    out += src.slice(m.index, fnRe.lastIndex);
+    cursor = fnRe.lastIndex;
+  }
+  return out + src.slice(cursor);
+}
+
+const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** parse `int a,int b, bytes c` -> [{type,name}] (single-line signature). */
+function parseParams(sig) {
+  const inner = sig.slice(sig.indexOf('(') + 1, sig.lastIndexOf(')'));
+  return inner.split(',').map((p) => p.trim()).filter(Boolean).map((p) => {
+    const m = p.match(/^(\w+)\s+(\w+)$/);
+    return { type: m[1], name: m[2] };
+  });
+}
+
+/**
+ * Transform one covenant chunk source into a linked chunk.
+ *   cfg.W            limb width in bytes (40 BN254, 48 BLS12-381)
+ *   cfg.prime        the field prime literal (string)
+ *   cfg.forward      null  -> no forward check (stage-final / terminal); for a covOut
+ *                            chunk we then emit a tautological length check so the
+ *                            recomputed out-limbs are still consumed (no unused vars).
+ *                    object-> { cmpExpr, nextFullInLen, skip, cmpLen }
+ *                      cmpExpr      bytes expr to compare (default 'outBlob')
+ *                      nextFullInLen byte length of the successor input's FULL inBlob
+ *                      skip          byte offset of the bound region inside that inBlob
+ *                      cmpLen        byte length of the compared region
+ * Returns { src, inNames, outNames|null, extras, isTerminal, inLen, outLen }.
+ */
+export function transformChunk(src, cfg) {
+  const W = cfg.W;
+  const lines = normalizeInternal(src).split('\n');
+  const sigIdx = lines.findIndex((l) => /^\s*function spend\(/.test(l));
+  if (sigIdx < 0) throw new Error('no spend()');
+  const params = parseParams(lines[sigIdx]);
+
+  // covIn: the single line binding incoming state to the spent NFT commitment.
+  const ciIdx = lines.findIndex((l) => l.includes('activeInputIndex].nftCommitment'));
+  if (ciIdx < 0) throw new Error('no covIn');
+  const inNames = [...lines[ciIdx].matchAll(/toPaddedBytes\((\w+),\s*\d+\)/g)].map((m) => m[1]);
+  const inSet = new Set(inNames);
+  const extras = params.filter((p) => !inSet.has(p.name)); // e.g. vk_x's zInv
+
+  // locate the spend function's closing brace (track depth from the signature line).
+  let depth = 0, closeIdx = -1;
+  for (let i = sigIdx; i < lines.length; i++) {
+    depth += (lines[i].match(/\{/g) || []).length - (lines[i].match(/\}/g) || []).length;
+    if (i > sigIdx && depth === 0) { closeIdx = i; break; }
+  }
+  if (closeIdx < 0) throw new Error('no spend close');
+
+  // covOut: the line committing outgoing state to output[0] (absent on terminal chunks).
+  const coIdx = lines.findIndex((l, i) => i > ciIdx && i < closeIdx && l.includes('tx.outputs[0].nftCommitment'));
+  const isTerminal = coIdx < 0;
+
+  const header = lines.slice(0, sigIdx);
+  const tail = lines.slice(closeIdx + 1); // contract closing brace etc.
+
+  // new signature: extras first (pushed last), inBlob last (pushed FIRST -> front of
+  // the unlocking bytecode, so a sibling's forward-check reads it at a fixed offset).
+  const newSig = `    function spend(${[...extras.map((e) => `${e.type} ${e.name}`), 'bytes inBlob'].join(', ')}) {`;
+
+  let outNames = null;
+  let body, epilogue;
+  if (isTerminal) {
+    // keep the math + terminal asserts (e.g. finalExp result == ONE) verbatim.
+    body = lines.slice(ciIdx + 1, closeIdx);
+    epilogue = [];
+  } else {
+    const hasIntP = lines[coIdx - 1].trim().startsWith('int P =');
+    body = lines.slice(ciIdx + 1, hasIntP ? coIdx - 1 : coIdx);
+    outNames = [...lines[coIdx].matchAll(/toPaddedBytes\((\w+) % P,\s*\d+\)/g)].map((m) => m[1]);
+    const outLen = outNames.length * W;
+    epilogue = [
+      `        int P = ${cfg.prime};`,
+      `        bytes outBlob = ${outNames.map((n) => `toPaddedBytes(${n} % P, ${W})`).join(' + ')};`,
+    ];
+    if (cfg.forward) {
+      const f = cfg.forward;
+      const cmp = f.cmpExpr ?? 'outBlob';
+      const off = headerSize(f.nextFullInLen) + f.skip;
+      epilogue.push(
+        `        require(${cmp} == tx.inputs[this.activeInputIndex + 1].unlockingBytecode.split(${off})[1].split(${f.cmpLen})[0]);`,
+      );
+    } else {
+      // stage-final: no successor with a matching layout. Consume outBlob (the boundary
+      // / vk_x result) with an always-true size check so the recomputation still runs.
+      epilogue.push(`        require(outBlob.length == ${outLen});`);
+    }
+  }
+
+  // prologue: peel the incoming limbs out of inBlob and cast to int. Only names
+  // actually referenced downstream are bound (some chunks carry state they don't
+  // read, e.g. g2check's A,C in the final chunk — declaring those would be an
+  // unused-var error). The peel is SEQUENTIAL (one OP_SPLIT per limb on a shrinking
+  // tail) rather than a fresh full-blob split per limb, which roughly thirds the
+  // OP_SPLIT op-cost on the wide final-exponentiation chunks. Unread limbs before the
+  // last read one are still split past (to advance the cursor); trailing unread limbs
+  // are simply not peeled.
+  const usedText = [...body, ...epilogue].join('\n');
+  const used = inNames.map((nm) => new RegExp(`\\b${nm}\\b`).test(usedText));
+  let maxUsed = -1;
+  used.forEach((u, p) => { if (u) maxUsed = p; });
+  const prologue = [];
+  let cur = 'inBlob';
+  for (let p = 0; p <= maxUsed; p++) {
+    const nm = inNames[p];
+    if (p === maxUsed) {
+      // last limb to read: if it's the very last in the blob, `cur` IS that limb.
+      prologue.push(p === inNames.length - 1 ? `        int ${nm} = int(${cur});` : `        int ${nm} = int(${cur}.split(${W})[0]);`);
+    } else if (used[p]) {
+      prologue.push(`        bytes hh${p}, bytes rr${p} = ${cur}.split(${W}); int ${nm} = int(hh${p});`);
+      cur = `rr${p}`;
+    } else {
+      prologue.push(`        bytes rr${p} = ${cur}.split(${W})[1];`);
+      cur = `rr${p}`;
+    }
+  }
+
+  const out = [...header, newSig, ...prologue, ...body, ...epilogue, '    }', ...tail].join('\n');
+  return {
+    src: out,
+    inNames,
+    outNames,
+    extras: extras.map((e) => e.name),
+    isTerminal,
+    inLen: inNames.length * W,
+    outLen: outNames ? outNames.length * W : 0,
+  };
+}

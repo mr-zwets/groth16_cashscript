@@ -2,11 +2,22 @@
 
 A full Groth16 verifier (or any heavy computation) will not fit within a single input's op-cost budget or the 10,000-byte unlocking bytecode limit (see [BCH Shortcomings](README.md#bch-shortcomings)). The work has to be split into smaller pieces. There are two axes to consider: across the inputs of one transaction, and across a sequence of transactions.
 
-## Across inputs of one transaction (not viable for shared computation)
+## Across inputs of one transaction (the linked-input method)
 
-Each input is validated independently, and its script runs in isolation. Introspection lets an input inspect other inputs' and outputs' fields (value, locking bytecode, token category, NFT commitment, and so on), but there is no mechanism to pass arbitrary intermediate computation results (the VM stack of one input) into another input's execution.
+Each input is validated independently, and its script runs in isolation: there is no shared VM stack, so an input cannot read another input's *stack*. But introspection lets an input read another input's **unlocking bytecode** (`OP_INPUTBYTECODE` = `tx.inputs[i].unlockingBytecode`), which is its pushed arguments. So intermediate results *can* be passed between sibling inputs — not through the stack, but by putting each chunk's output in its witness as an argument and having the next chunk read and check it.
 
-This means you cannot shard one computation's running state across sibling inputs and recombine the partial results. Each input must be a self-contained check. Independent checks can run in parallel inputs (each gets its own op-cost budget), but they cannot cooperate on a single running value.
+Concretely, for `y = f1(f0(x))`:
+
+```
+input i:    <inBlob = x>            redeem: out = f0(x); require( out == tx.inputs[i+1].unlockingBytecode[arg slice] )
+input i+1:  <inBlob = f0(x)>        redeem: out = f1(f0(x)); ... (verdict)
+```
+
+Input `i` recomputes its chunk and `require`s that input `i+1`'s incoming argument equals that output — a raw byte-equality check across sibling inputs (the "verify `arg01 == arg10`" pattern). This shards one running computation across the inputs of a single transaction and binds it end-to-end, with the verdict asserted by the last input.
+
+Compared with the across-transactions covenant below, this needs **no NFT-commitment hand-off and no hashing**, the intermediate state is **not limited to 128 bytes** (it is just a pushed argument, any size), and the whole computation is **one transaction** instead of a chain of them — so no per-step block/mempool hop. Each input still gets its own op-cost budget and 10,000-byte script cap, so the chunking is the same; the whole verifier (~60–84 inputs) is packed into one **non-standard transaction under 1 MB**. This is implemented in [`chunked/intratx`](chunked/intratx) and benchmarked as the `bch-{pairing,groth16}-intratx` (and `-bls12381-`) entries.
+
+> Earlier revisions of this document claimed intra-transaction sharing was "not viable" because inputs cannot pass state. That was wrong: they cannot share a stack, but they can read each other's arguments by introspection, which is enough.
 
 ## Across transactions (the viable pattern)
 
