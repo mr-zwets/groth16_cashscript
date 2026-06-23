@@ -1,0 +1,136 @@
+pragma cashscript ^0.13.0;
+
+// BLS12-381 FinalExp library (reduced arithmetic). See lib/README.md.
+import "./Fp12.cash";
+
+library FinalExp {
+    function fp4Square(int a0,int a1,int b0,int b1) returns (int,int,int,int) {
+            (int a2a,int a2b) = fp2Sqr(a0, a1);
+            (int b2a,int b2b) = fp2Sqr(b0, b1);
+            (int xbi0,int xbi1) = fp2MulXi(b2a, b2b);
+            (int f0,int f1) = fp2Add(xbi0, xbi1, a2a, a2b);
+            (int aba,int abb) = fp2Add(a0, a1, b0, b1);
+            (int absqa,int absqb) = fp2Sqr(aba, abb);
+            (int sub1a,int sub1b) = fp2Sub(absqa, absqb, a2a, a2b);
+            (int s0,int s1) = fp2Sub(sub1a, sub1b, b2a, b2b);
+            return f0, f1, s0, s1;
+        }
+
+    function cycSqr(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+            returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+            (int t3a,int t3b,int t4a,int t4b) = fp4Square(A0,A1, A8,A9);
+            (int t5a,int t5b,int t6a,int t6b) = fp4Square(A6,A7, A4,A5);
+            (int t7a,int t7b,int t8a,int t8b) = fp4Square(A2,A3, A10,A11);
+            (int t9a,int t9b) = fp2MulXi(t8a, t8b);
+            (int z0a,int z0b) = fp2Sub(t3a, t3b, A0, A1);   (int o0a,int o0b) = fp2Add(mulFp(z0a,2), mulFp(z0b,2), t3a, t3b);
+            (int z1a,int z1b) = fp2Sub(t5a, t5b, A2, A3);   (int o1a,int o1b) = fp2Add(mulFp(z1a,2), mulFp(z1b,2), t5a, t5b);
+            (int z2a,int z2b) = fp2Sub(t7a, t7b, A4, A5);   (int o2a,int o2b) = fp2Add(mulFp(z2a,2), mulFp(z2b,2), t7a, t7b);
+            (int z3a,int z3b) = fp2Add(t9a, t9b, A6, A7);   (int o3a,int o3b) = fp2Add(mulFp(z3a,2), mulFp(z3b,2), t9a, t9b);
+            (int z4a,int z4b) = fp2Add(t4a, t4b, A8, A9);   (int o4a,int o4b) = fp2Add(mulFp(z4a,2), mulFp(z4b,2), t4a, t4b);
+            (int z5a,int z5b) = fp2Add(t6a, t6b, A10, A11); (int o5a,int o5b) = fp2Add(mulFp(z5a,2), mulFp(z5b,2), t6a, t6b);
+            return o0a,o0b,o1a,o1b,o2a,o2b,o3a,o3b,o4a,o4b,o5a,o5b;
+        }
+
+    function cycExpX(int N0,int N1,int N2,int N3,int N4,int N5,int N6,int N7,int N8,int N9,int N10,int N11)
+            returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+            int Z0=1; int Z1=0; int Z2=0; int Z3=0; int Z4=0; int Z5=0; int Z6=0; int Z7=0; int Z8=0; int Z9=0; int Z10=0; int Z11=0;
+            for (int k = 0; k < 64; k = k + 1) {
+                int i = 63 - k;
+                (int s0,int s1,int s2,int s3,int s4,int s5,int s6,int s7,int s8,int s9,int s10,int s11) =
+                    cycSqr(Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11);
+                Z0=s0; Z1=s1; Z2=s2; Z3=s3; Z4=s4; Z5=s5; Z6=s6; Z7=s7; Z8=s8; Z9=s9; Z10=s10; Z11=s11;
+                if (((15132376222941642752 >> i) % 2) == 1) {
+                    (int m0,int m1,int m2,int m3,int m4,int m5,int m6,int m7,int m8,int m9,int m10,int m11) =
+                        fp12Mul(Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11, N0,N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11);
+                    Z0=m0; Z1=m1; Z2=m2; Z3=m3; Z4=m4; Z5=m5; Z6=m6; Z7=m7; Z8=m8; Z9=m9; Z10=m10; Z11=m11;
+                }
+            }
+            return Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11;
+        }
+
+    function powMinusX(int N0,int N1,int N2,int N3,int N4,int N5,int N6,int N7,int N8,int N9,int N10,int N11)
+            returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+            (int p0,int p1,int p2,int p3,int p4,int p5,int p6,int p7,int p8,int p9,int p10,int p11) =
+                cycExpX(N0,N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11);
+            (int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11) =
+                fp12Conj(p0,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11);
+            return c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11;
+        }
+
+    function finalExp(int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8,int A9,int A10,int A11)
+            returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+            // easy part: t0 = conj(f) * inv(f)
+            (int cn0,int cn1,int cn2,int cn3,int cn4,int cn5,int cn6,int cn7,int cn8,int cn9,int cn10,int cn11) =
+                fp12Conj(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+            (int iv0,int iv1,int iv2,int iv3,int iv4,int iv5,int iv6,int iv7,int iv8,int iv9,int iv10,int iv11) =
+                fp12Inv(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+            (int ez0,int ez1,int ez2,int ez3,int ez4,int ez5,int ez6,int ez7,int ez8,int ez9,int ez10,int ez11) =
+                fp12Mul(cn0,cn1,cn2,cn3,cn4,cn5,cn6,cn7,cn8,cn9,cn10,cn11, iv0,iv1,iv2,iv3,iv4,iv5,iv6,iv7,iv8,iv9,iv10,iv11);
+            // t1 = frob2(t0) * t0
+            (int fe0,int fe1,int fe2,int fe3,int fe4,int fe5,int fe6,int fe7,int fe8,int fe9,int fe10,int fe11) =
+                fp12Frob2(ez0,ez1,ez2,ez3,ez4,ez5,ez6,ez7,ez8,ez9,ez10,ez11);
+            (int T10,int T11,int T12,int T13,int T14,int T15,int T16,int T17,int T18,int T19,int T1a,int T1b) =
+                fp12Mul(fe0,fe1,fe2,fe3,fe4,fe5,fe6,fe7,fe8,fe9,fe10,fe11, ez0,ez1,ez2,ez3,ez4,ez5,ez6,ez7,ez8,ez9,ez10,ez11);
+    
+            // t2 = powMinusX(t1)
+            (int T20,int T21,int T22,int T23,int T24,int T25,int T26,int T27,int T28,int T29,int T2a,int T2b) =
+                powMinusX(T10,T11,T12,T13,T14,T15,T16,T17,T18,T19,T1a,T1b);
+            // t3 = conj(cycSqr(t1)) * t2
+            (int cs10,int cs11,int cs12,int cs13,int cs14,int cs15,int cs16,int cs17,int cs18,int cs19,int cs1a,int cs1b) =
+                cycSqr(T10,T11,T12,T13,T14,T15,T16,T17,T18,T19,T1a,T1b);
+            (int ccs0,int ccs1,int ccs2,int ccs3,int ccs4,int ccs5,int ccs6,int ccs7,int ccs8,int ccs9,int ccsa,int ccsb) =
+                fp12Conj(cs10,cs11,cs12,cs13,cs14,cs15,cs16,cs17,cs18,cs19,cs1a,cs1b);
+            (int T30,int T31,int T32,int T33,int T34,int T35,int T36,int T37,int T38,int T39,int T3a,int T3b) =
+                fp12Mul(ccs0,ccs1,ccs2,ccs3,ccs4,ccs5,ccs6,ccs7,ccs8,ccs9,ccsa,ccsb, T20,T21,T22,T23,T24,T25,T26,T27,T28,T29,T2a,T2b);
+            // t4 = powMinusX(t3)
+            (int T40,int T41,int T42,int T43,int T44,int T45,int T46,int T47,int T48,int T49,int T4a,int T4b) =
+                powMinusX(T30,T31,T32,T33,T34,T35,T36,T37,T38,T39,T3a,T3b);
+            // t5 = powMinusX(t4)
+            (int T50,int T51,int T52,int T53,int T54,int T55,int T56,int T57,int T58,int T59,int T5a,int T5b) =
+                powMinusX(T40,T41,T42,T43,T44,T45,T46,T47,T48,T49,T4a,T4b);
+            // t6 = powMinusX(t5) * cycSqr(t2)
+            (int pmx50,int pmx51,int pmx52,int pmx53,int pmx54,int pmx55,int pmx56,int pmx57,int pmx58,int pmx59,int pmx5a,int pmx5b) =
+                powMinusX(T50,T51,T52,T53,T54,T55,T56,T57,T58,T59,T5a,T5b);
+            (int cs20,int cs21,int cs22,int cs23,int cs24,int cs25,int cs26,int cs27,int cs28,int cs29,int cs2a,int cs2b) =
+                cycSqr(T20,T21,T22,T23,T24,T25,T26,T27,T28,T29,T2a,T2b);
+            (int T60,int T61,int T62,int T63,int T64,int T65,int T66,int T67,int T68,int T69,int T6a,int T6b) =
+                fp12Mul(pmx50,pmx51,pmx52,pmx53,pmx54,pmx55,pmx56,pmx57,pmx58,pmx59,pmx5a,pmx5b, cs20,cs21,cs22,cs23,cs24,cs25,cs26,cs27,cs28,cs29,cs2a,cs2b);
+            // t7 = powMinusX(t6)
+            (int T70,int T71,int T72,int T73,int T74,int T75,int T76,int T77,int T78,int T79,int T7a,int T7b) =
+                powMinusX(T60,T61,T62,T63,T64,T65,T66,T67,T68,T69,T6a,T6b);
+    
+            // A = frob2(t2 * t5)
+            (int t2t50,int t2t51,int t2t52,int t2t53,int t2t54,int t2t55,int t2t56,int t2t57,int t2t58,int t2t59,int t2t5a,int t2t5b) =
+                fp12Mul(T20,T21,T22,T23,T24,T25,T26,T27,T28,T29,T2a,T2b, T50,T51,T52,T53,T54,T55,T56,T57,T58,T59,T5a,T5b);
+            (int PA0,int PA1,int PA2,int PA3,int PA4,int PA5,int PA6,int PA7,int PA8,int PA9,int PAa,int PAb) =
+                fp12Frob2(t2t50,t2t51,t2t52,t2t53,t2t54,t2t55,t2t56,t2t57,t2t58,t2t59,t2t5a,t2t5b);
+            // B = frob3(t4 * t1)
+            (int t4t10,int t4t11,int t4t12,int t4t13,int t4t14,int t4t15,int t4t16,int t4t17,int t4t18,int t4t19,int t4t1a,int t4t1b) =
+                fp12Mul(T40,T41,T42,T43,T44,T45,T46,T47,T48,T49,T4a,T4b, T10,T11,T12,T13,T14,T15,T16,T17,T18,T19,T1a,T1b);
+            (int PB0,int PB1,int PB2,int PB3,int PB4,int PB5,int PB6,int PB7,int PB8,int PB9,int PBa,int PBb) =
+                fp12Frob3(t4t10,t4t11,t4t12,t4t13,t4t14,t4t15,t4t16,t4t17,t4t18,t4t19,t4t1a,t4t1b);
+            // C = frob1(t6 * conj(t1))
+            (int ct10,int ct11,int ct12,int ct13,int ct14,int ct15,int ct16,int ct17,int ct18,int ct19,int ct1a,int ct1b) =
+                fp12Conj(T10,T11,T12,T13,T14,T15,T16,T17,T18,T19,T1a,T1b);
+            (int t6c10,int t6c11,int t6c12,int t6c13,int t6c14,int t6c15,int t6c16,int t6c17,int t6c18,int t6c19,int t6c1a,int t6c1b) =
+                fp12Mul(T60,T61,T62,T63,T64,T65,T66,T67,T68,T69,T6a,T6b, ct10,ct11,ct12,ct13,ct14,ct15,ct16,ct17,ct18,ct19,ct1a,ct1b);
+            (int PC0,int PC1,int PC2,int PC3,int PC4,int PC5,int PC6,int PC7,int PC8,int PC9,int PCa,int PCb) =
+                fp12Frob1(t6c10,t6c11,t6c12,t6c13,t6c14,t6c15,t6c16,t6c17,t6c18,t6c19,t6c1a,t6c1b);
+            // D = (t7 * conj(t3)) * t1
+            (int ct30,int ct31,int ct32,int ct33,int ct34,int ct35,int ct36,int ct37,int ct38,int ct39,int ct3a,int ct3b) =
+                fp12Conj(T30,T31,T32,T33,T34,T35,T36,T37,T38,T39,T3a,T3b);
+            (int t7c30,int t7c31,int t7c32,int t7c33,int t7c34,int t7c35,int t7c36,int t7c37,int t7c38,int t7c39,int t7c3a,int t7c3b) =
+                fp12Mul(T70,T71,T72,T73,T74,T75,T76,T77,T78,T79,T7a,T7b, ct30,ct31,ct32,ct33,ct34,ct35,ct36,ct37,ct38,ct39,ct3a,ct3b);
+            (int PD0,int PD1,int PD2,int PD3,int PD4,int PD5,int PD6,int PD7,int PD8,int PD9,int PDa,int PDb) =
+                fp12Mul(t7c30,t7c31,t7c32,t7c33,t7c34,t7c35,t7c36,t7c37,t7c38,t7c39,t7c3a,t7c3b, T10,T11,T12,T13,T14,T15,T16,T17,T18,T19,T1a,T1b);
+    
+            // result = A * B * C * D
+            (int ab0,int ab1,int ab2,int ab3,int ab4,int ab5,int ab6,int ab7,int ab8,int ab9,int aba,int abb) =
+                fp12Mul(PA0,PA1,PA2,PA3,PA4,PA5,PA6,PA7,PA8,PA9,PAa,PAb, PB0,PB1,PB2,PB3,PB4,PB5,PB6,PB7,PB8,PB9,PBa,PBb);
+            (int abc0,int abc1,int abc2,int abc3,int abc4,int abc5,int abc6,int abc7,int abc8,int abc9,int abca,int abcb) =
+                fp12Mul(ab0,ab1,ab2,ab3,ab4,ab5,ab6,ab7,ab8,ab9,aba,abb, PC0,PC1,PC2,PC3,PC4,PC5,PC6,PC7,PC8,PC9,PCa,PCb);
+            (int O0,int O1,int O2,int O3,int O4,int O5,int O6,int O7,int O8,int O9,int O10,int O11) =
+                fp12Mul(abc0,abc1,abc2,abc3,abc4,abc5,abc6,abc7,abc8,abc9,abca,abcb, PD0,PD1,PD2,PD3,PD4,PD5,PD6,PD7,PD8,PD9,PDa,PDb);
+            return O0,O1,O2,O3,O4,O5,O6,O7,O8,O9,O10,O11;
+        }
+}

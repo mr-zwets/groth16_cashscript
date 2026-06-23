@@ -2,21 +2,26 @@
 
 Shared CashScript libraries for the BN254 Groth16 verifier, consumed by the contracts in the parent
 directory (`../*.cash`). These rely on the custom cashc fork's `library` / `import` / global-`constant`
-support (branch `feat/reusable-functions`).
+support (branch `feat/library-support`).
 
-## `library` vs `contract` — the important distinction
+## Why a `contract` per layer
 
-There are two kinds of `.cash` file, told apart by the **keyword inside**:
+The full verifier is `../groth16.cash`. The other parent-directory contracts (`fp2`, `fp6`, `fp12`,
+`fp12_inv`, `fp12_frob`, `mul034`, `g2lines`, `miller`, `miller4`, `finalexp`, `verify`, `vkx`,
+`vkx_jacadd`) are **per-layer test harnesses**: each is a small `contract` whose `spend()` exercises
+only that one layer's operations and is graded against the reference implementation (`@noble/curves`)
+by its `.mjs`.
 
-| Keyword | Where | Has `spend()`? | Deployed / graded? | Purpose |
-|---|---|---|---|---|
-| `library Name { … }` | here, in `lib/` | no | no | reusable functions + constants, only ever `import`ed |
-| `contract Name { … }` | parent dir, e.g. `../groth16.cash` | yes | yes | the actual top-level contract; imports libraries |
+Keeping one gradable contract per layer buys:
 
-So `../groth16.cash` is a **`contract`** (the full verifier, with `spend()`) that `import`s three
-libraries. Each parent-directory `*.cash` is now the library-based contract (the older inline versions
-that re-declared the whole field tower have been replaced). Libraries live in this folder and use the
-`library` keyword; they have no `spend()` and are never deployed alone.
+- **Pinpointed failures** — verifying bottom-up (Fp2 → Fp6 → Fp12 → Miller → FinalExp → full verifier),
+  a break surfaces in the smallest failing layer instead of only at the ~20 KB / ~M-opcode end product.
+- **Fast, isolated tests** — check an Fp2 multiply without running the whole pairing.
+- **Per-layer size / op-cost** — each compiles on its own, so a layer's cost is measurable in isolation.
+
+The libraries are what make this cheap: every harness *and* the full verifier share one implementation
+from `lib/`, so a layer is written (or fixed) once and all of them pick it up. Files in `lib/` use the
+`library` keyword (no `spend()`, never deployed); the parent-directory files use `contract`.
 
 ## The two arithmetic schemes
 

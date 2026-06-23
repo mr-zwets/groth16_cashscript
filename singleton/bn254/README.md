@@ -10,7 +10,7 @@ Basis is locked to noble's tower so checkpoint #2 (`millerHex`) grades byte-for-
 `c0.c0.c0 … c1.c2.c1`. See `../../../verifier/docs/pairing-checker.md`.
 
 Every tower op is a reusable multi-return function (`OP_DEFINE`/`OP_INVOKE`), so the
-body is compiled once and shared. This needs the local cashc `feat/reusable-functions`
+body is compiled once and shared. This needs the local cashc `feat/library-support`
 build **with the repeated-call-argument fix** (see
 `../../../cashscript/COMPILER_FIX_NOTE.md`) — `fpNSqr(a) = fpNMul(a,a)` passes operands
 twice and would not otherwise compile.

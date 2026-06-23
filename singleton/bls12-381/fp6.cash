@@ -1,128 +1,32 @@
 pragma cashscript ^0.13.0;
 
-// BLS12-381 Fp6 = Fp2[v]/(v^3 - xi),  xi = 1 + u  (noble basis).
-//
-// An Fp6 element is (c0, c1, c2) with each ci an Fp2 pair, i.e. 6 ints carried as
-// (c0a,c0b, c1a,c1b, c2a,c2b) meaning c0 + c1*v + c2*v^2. Fp6 ops are reusable
-// multi-return functions built on the Fp2 functions (functions calling functions,
-// no recursion). Identical to ../bn254/fp6.cash except the prime p and xi = 1 + u.
-// Graded against noble Fp6 by singleton/bls12-381/fp6.mjs.
+// BLS12-381 singleton harness `fp6` — arithmetic from the shared lib/ libraries (see lib/README.md).
+import "./lib/Fp6.cash";
+
 contract Fp6Ops() {
-
-    internal function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
-    internal function subFp(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
-    internal function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
-
-    // ---- Fp2 ----
-    internal function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
-    internal function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
-    internal function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
-    internal function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
-        int v0 = mulFp(a0, b0);
-        int v1 = mulFp(a1, b1);
-        int c0 = subFp(v0, v1);
-        int c1 = subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
-        return c0, c1;
-    }
-    internal function fp2Sqr(int a0, int a1) returns (int, int) {
-        int c0 = mulFp(addFp(a0, a1), subFp(a0, a1));
-        int c1 = mulFp(2, mulFp(a0, a1));
-        return c0, c1;
-    }
-    // multiply by the sextic non-residue xi = 1 + u: (a0 - a1) + (a0 + a1) u
-    internal function fp2MulXi(int a0, int a1) returns (int, int) {
-        int c0 = subFp(a0, a1);
-        int c1 = addFp(a0, a1);
-        return c0, c1;
-    }
-
-    // ---- Fp6 ----
-    internal function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
-        (int c0a, int c0b) = fp2Add(a0a, a0b, b0a, b0b);
-        (int c1a, int c1b) = fp2Add(a1a, a1b, b1a, b1b);
-        (int c2a, int c2b) = fp2Add(a2a, a2b, b2a, b2b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
-    internal function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
-        (int c0a, int c0b) = fp2Sub(a0a, a0b, b0a, b0b);
-        (int c1a, int c1b) = fp2Sub(a1a, a1b, b1a, b1b);
-        (int c2a, int c2b) = fp2Sub(a2a, a2b, b2a, b2b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
-    internal function fp6Neg(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
-        (int c0a, int c0b) = fp2Neg(a0a, a0b);
-        (int c1a, int c1b) = fp2Neg(a1a, a1b);
-        (int c2a, int c2b) = fp2Neg(a2a, a2b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
-    // multiply by v: v*(c0 + c1 v + c2 v^2) = xi*c2 + c0 v + c1 v^2
-    internal function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
-        (int n0a, int n0b) = fp2MulXi(a2a, a2b);
-        return n0a, n0b, a0a, a0b, a1a, a1b;
-    }
-    // full Fp6 multiply (Karatsuba over Fp2 with v^3 = xi reduction)
-    internal function fp6Mul(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
-        (int t0a, int t0b) = fp2Mul(a0a, a0b, b0a, b0b);
-        (int t1a, int t1b) = fp2Mul(a1a, a1b, b1a, b1b);
-        (int t2a, int t2b) = fp2Mul(a2a, a2b, b2a, b2b);
-
-        // c0 = t0 + xi*((a1+a2)(b1+b2) - t1 - t2)
-        (int s1a, int s1b) = fp2Add(a1a, a1b, a2a, a2b);
-        (int s2a, int s2b) = fp2Add(b1a, b1b, b2a, b2b);
-        (int p1a, int p1b) = fp2Mul(s1a, s1b, s2a, s2b);
-        (int d1a, int d1b) = fp2Sub(p1a, p1b, t1a, t1b);
-        (int d2a, int d2b) = fp2Sub(d1a, d1b, t2a, t2b);
-        (int x1a, int x1b) = fp2MulXi(d2a, d2b);
-        (int c0a, int c0b) = fp2Add(t0a, t0b, x1a, x1b);
-
-        // c1 = (a0+a1)(b0+b1) - t0 - t1 + xi*t2
-        (int s3a, int s3b) = fp2Add(a0a, a0b, a1a, a1b);
-        (int s4a, int s4b) = fp2Add(b0a, b0b, b1a, b1b);
-        (int p2a, int p2b) = fp2Mul(s3a, s3b, s4a, s4b);
-        (int d3a, int d3b) = fp2Sub(p2a, p2b, t0a, t0b);
-        (int d4a, int d4b) = fp2Sub(d3a, d3b, t1a, t1b);
-        (int x2a, int x2b) = fp2MulXi(t2a, t2b);
-        (int c1a, int c1b) = fp2Add(d4a, d4b, x2a, x2b);
-
-        // c2 = (a0+a2)(b0+b2) - t0 - t2 + t1
-        (int s5a, int s5b) = fp2Add(a0a, a0b, a2a, a2b);
-        (int s6a, int s6b) = fp2Add(b0a, b0b, b2a, b2b);
-        (int p3a, int p3b) = fp2Mul(s5a, s5b, s6a, s6b);
-        (int d5a, int d5b) = fp2Sub(p3a, p3b, t0a, t0b);
-        (int d6a, int d6b) = fp2Sub(d5a, d5b, t2a, t2b);
-        (int c2a, int c2b) = fp2Add(d6a, d6b, t1a, t1b);
-
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
-    internal function fp6Sqr(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
-        (int c0a,int c0b,int c1a,int c1b,int c2a,int c2b) =
-            fp6Mul(a0a, a0b, a1a, a1b, a2a, a2b, a0a, a0b, a1a, a1b, a2a, a2b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
-
     function spend(
-        int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,
-        int b0a,int b0b,int b1a,int b1b,int b2a,int b2b,
-        int m0a,int m0b,int m1a,int m1b,int m2a,int m2b,
-        int s0a,int s0b,int s1a,int s1b,int s2a,int s2b,
-        int v0a,int v0b,int v1a,int v1b,int v2a,int v2b
-    ) {
-        (int M0a,int M0b,int M1a,int M1b,int M2a,int M2b) =
-            fp6Mul(a0a,a0b,a1a,a1b,a2a,a2b, b0a,b0b,b1a,b1b,b2a,b2b);
-        require(M0a == m0a); require(M0b == m0b);
-        require(M1a == m1a); require(M1b == m1b);
-        require(M2a == m2a); require(M2b == m2b);
-
-        (int S0a,int S0b,int S1a,int S1b,int S2a,int S2b) =
-            fp6Sqr(a0a,a0b,a1a,a1b,a2a,a2b);
-        require(S0a == s0a); require(S0b == s0b);
-        require(S1a == s1a); require(S1b == s1b);
-        require(S2a == s2a); require(S2b == s2b);
-
-        (int V0a,int V0b,int V1a,int V1b,int V2a,int V2b) =
-            fp6MulByV(a0a,a0b,a1a,a1b,a2a,a2b);
-        require(V0a == v0a); require(V0b == v0b);
-        require(V1a == v1a); require(V1b == v1b);
-        require(V2a == v2a); require(V2b == v2b);
-    }
+            int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,
+            int b0a,int b0b,int b1a,int b1b,int b2a,int b2b,
+            int m0a,int m0b,int m1a,int m1b,int m2a,int m2b,
+            int s0a,int s0b,int s1a,int s1b,int s2a,int s2b,
+            int v0a,int v0b,int v1a,int v1b,int v2a,int v2b
+        ) {
+            (int M0a,int M0b,int M1a,int M1b,int M2a,int M2b) =
+                fp6Mul(a0a,a0b,a1a,a1b,a2a,a2b, b0a,b0b,b1a,b1b,b2a,b2b);
+            require(M0a == m0a); require(M0b == m0b);
+            require(M1a == m1a); require(M1b == m1b);
+            require(M2a == m2a); require(M2b == m2b);
+    
+            (int S0a,int S0b,int S1a,int S1b,int S2a,int S2b) =
+                fp6Sqr(a0a,a0b,a1a,a1b,a2a,a2b);
+            require(S0a == s0a); require(S0b == s0b);
+            require(S1a == s1a); require(S1b == s1b);
+            require(S2a == s2a); require(S2b == s2b);
+    
+            (int V0a,int V0b,int V1a,int V1b,int V2a,int V2b) =
+                fp6MulByV(a0a,a0b,a1a,a1b,a2a,a2b);
+            require(V0a == v0a); require(V0b == v0b);
+            require(V1a == v1a); require(V1b == v1b);
+            require(V2a == v2a); require(V2b == v2b);
+        }
 }

@@ -1,152 +1,16 @@
 pragma cashscript ^0.13.0;
 
-// BLS12-381 Fp12 inverse chain: fp2Inv -> fp6Inv -> fp12Inv, matching noble exactly.
-//   Fp2.inv(a,b):   f = 1/(a^2+b^2);  (a*f, -b*f)
-//   Fp6.inv(c0,c1,c2):  t0 = c0^2 - xi(c2 c1); t1 = xi(c2^2) - c0 c1; t2 = c1^2 - c0 c2;
-//                       f = 1/( xi(c2 t1 + c1 t2) + c0 t0 );  (f t0, f t1, f t2)
-//   Fp12.inv(c0,c1): t = Fp6.inv(c0^2 - v c1^2);  (c0 t, -(c1 t))
-// Identical to ../bn254/fp12_inv.cash except the prime p, the 381-bit Fermat loop,
-// and xi = 1 + u. Graded vs noble Fp2/Fp6/Fp12.inv by singleton/bls12-381/fp12_inv.mjs.
+// BLS12-381 singleton harness `fp12_inv` — arithmetic from the shared lib/ libraries (see lib/README.md).
+import "./lib/Fp12.cash";
+
 contract Fp12Inv() {
-
-    internal function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
-    internal function subFp(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
-    internal function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
-    internal function inverseFp(int x) returns (int) {
-        int p = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
-        int q = p - 2;
-        int result = 1;
-        int current = x % p;
-        for (int i = 0; i < 381; i = i + 1) {
-            if (((q >> i) % 2) == 1) { result = (result * current) % p; }
-            current = (current * current) % p;
-        }
-        return result;
-    }
-
-    // ---- Fp2 ----
-    internal function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
-    internal function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
-    internal function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
-    internal function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
-        int v0 = mulFp(a0, b0);
-        int v1 = mulFp(a1, b1);
-        return subFp(v0, v1), subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
-    }
-    internal function fp2Sqr(int a0, int a1) returns (int, int) {
-        return mulFp(addFp(a0, a1), subFp(a0, a1)), mulFp(2, mulFp(a0, a1));
-    }
-    internal function fp2MulXi(int a0, int a1) returns (int, int) {
-        return subFp(a0, a1), addFp(a0, a1);
-    }
-    internal function fp2Inv(int a0, int a1) returns (int, int) {
-        int factor = inverseFp(addFp(mulFp(a0, a0), mulFp(a1, a1)));
-        return mulFp(a0, factor), subFp(0, mulFp(a1, factor));
-    }
-
-    // ---- Fp6 ----
-    internal function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
-        (int c0a, int c0b) = fp2Sub(a0a, a0b, b0a, b0b);
-        (int c1a, int c1b) = fp2Sub(a1a, a1b, b1a, b1b);
-        (int c2a, int c2b) = fp2Sub(a2a, a2b, b2a, b2b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
-    internal function fp6Neg(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
-        (int c0a, int c0b) = fp2Neg(a0a, a0b);
-        (int c1a, int c1b) = fp2Neg(a1a, a1b);
-        (int c2a, int c2b) = fp2Neg(a2a, a2b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
-    internal function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
-        (int n0a, int n0b) = fp2MulXi(a2a, a2b);
-        return n0a, n0b, a0a, a0b, a1a, a1b;
-    }
-    internal function fp6Mul(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
-        (int t0a, int t0b) = fp2Mul(a0a, a0b, b0a, b0b);
-        (int t1a, int t1b) = fp2Mul(a1a, a1b, b1a, b1b);
-        (int t2a, int t2b) = fp2Mul(a2a, a2b, b2a, b2b);
-        (int s1a, int s1b) = fp2Add(a1a, a1b, a2a, a2b);
-        (int s2a, int s2b) = fp2Add(b1a, b1b, b2a, b2b);
-        (int p1a, int p1b) = fp2Mul(s1a, s1b, s2a, s2b);
-        (int d1a, int d1b) = fp2Sub(p1a, p1b, t1a, t1b);
-        (int d2a, int d2b) = fp2Sub(d1a, d1b, t2a, t2b);
-        (int x1a, int x1b) = fp2MulXi(d2a, d2b);
-        (int c0a, int c0b) = fp2Add(t0a, t0b, x1a, x1b);
-        (int s3a, int s3b) = fp2Add(a0a, a0b, a1a, a1b);
-        (int s4a, int s4b) = fp2Add(b0a, b0b, b1a, b1b);
-        (int p2a, int p2b) = fp2Mul(s3a, s3b, s4a, s4b);
-        (int d3a, int d3b) = fp2Sub(p2a, p2b, t0a, t0b);
-        (int d4a, int d4b) = fp2Sub(d3a, d3b, t1a, t1b);
-        (int x2a, int x2b) = fp2MulXi(t2a, t2b);
-        (int c1a, int c1b) = fp2Add(d4a, d4b, x2a, x2b);
-        (int s5a, int s5b) = fp2Add(a0a, a0b, a2a, a2b);
-        (int s6a, int s6b) = fp2Add(b0a, b0b, b2a, b2b);
-        (int p3a, int p3b) = fp2Mul(s5a, s5b, s6a, s6b);
-        (int d5a, int d5b) = fp2Sub(p3a, p3b, t0a, t0b);
-        (int d6a, int d6b) = fp2Sub(d5a, d5b, t2a, t2b);
-        (int c2a, int c2b) = fp2Add(d6a, d6b, t1a, t1b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
-    internal function fp6Sqr(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
-        (int r0a,int r0b,int r1a,int r1b,int r2a,int r2b) =
-            fp6Mul(a0a,a0b,a1a,a1b,a2a,a2b, a0a,a0b,a1a,a1b,a2a,a2b);
-        return r0a, r0b, r1a, r1b, r2a, r2b;
-    }
-    internal function fp6Inv(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b) returns (int,int,int,int,int,int) {
-        // t0 = c0^2 - xi(c2 c1)
-        (int sq0a,int sq0b) = fp2Sqr(c0a, c0b);
-        (int m21a,int m21b) = fp2Mul(c2a, c2b, c1a, c1b);
-        (int xm21a,int xm21b) = fp2MulXi(m21a, m21b);
-        (int t0a,int t0b) = fp2Sub(sq0a, sq0b, xm21a, xm21b);
-        // t1 = xi(c2^2) - c0 c1
-        (int sq2a,int sq2b) = fp2Sqr(c2a, c2b);
-        (int xsq2a,int xsq2b) = fp2MulXi(sq2a, sq2b);
-        (int m01a,int m01b) = fp2Mul(c0a, c0b, c1a, c1b);
-        (int t1a,int t1b) = fp2Sub(xsq2a, xsq2b, m01a, m01b);
-        // t2 = c1^2 - c0 c2
-        (int sq1a,int sq1b) = fp2Sqr(c1a, c1b);
-        (int m02a,int m02b) = fp2Mul(c0a, c0b, c2a, c2b);
-        (int t2a,int t2b) = fp2Sub(sq1a, sq1b, m02a, m02b);
-        // norm = xi(c2 t1 + c1 t2) + c0 t0
-        (int ct1a,int ct1b) = fp2Mul(c2a, c2b, t1a, t1b);
-        (int ct2a,int ct2b) = fp2Mul(c1a, c1b, t2a, t2b);
-        (int suma,int sumb) = fp2Add(ct1a, ct1b, ct2a, ct2b);
-        (int xa,int xb) = fp2MulXi(suma, sumb);
-        (int c0t0a,int c0t0b) = fp2Mul(c0a, c0b, t0a, t0b);
-        (int na,int nb) = fp2Add(xa, xb, c0t0a, c0t0b);
-        (int fa,int fb) = fp2Inv(na, nb);
-        (int r0a,int r0b) = fp2Mul(fa, fb, t0a, t0b);
-        (int r1a,int r1b) = fp2Mul(fa, fb, t1a, t1b);
-        (int r2a,int r2b) = fp2Mul(fa, fb, t2a, t2b);
-        return r0a, r0b, r1a, r1b, r2a, r2b;
-    }
-
-    internal function fp12Inv(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        // den = c0^2 - v*c1^2
-        (int sc0_0,int sc0_1,int sc0_2,int sc0_3,int sc0_4,int sc0_5) = fp6Sqr(A0,A1,A2,A3,A4,A5);
-        (int sc1_0,int sc1_1,int sc1_2,int sc1_3,int sc1_4,int sc1_5) = fp6Sqr(A6,A7,A8,A9,A10,A11);
-        (int vc_0,int vc_1,int vc_2,int vc_3,int vc_4,int vc_5) = fp6MulByV(sc1_0,sc1_1,sc1_2,sc1_3,sc1_4,sc1_5);
-        (int dn_0,int dn_1,int dn_2,int dn_3,int dn_4,int dn_5) =
-            fp6Sub(sc0_0,sc0_1,sc0_2,sc0_3,sc0_4,sc0_5, vc_0,vc_1,vc_2,vc_3,vc_4,vc_5);
-        (int t_0,int t_1,int t_2,int t_3,int t_4,int t_5) = fp6Inv(dn_0,dn_1,dn_2,dn_3,dn_4,dn_5);
-        // c0' = c0 * t ; c1' = -(c1 * t)
-        (int n0,int n1,int n2,int n3,int n4,int n5) =
-            fp6Mul(A0,A1,A2,A3,A4,A5, t_0,t_1,t_2,t_3,t_4,t_5);
-        (int p0,int p1,int p2,int p3,int p4,int p5) =
-            fp6Mul(A6,A7,A8,A9,A10,A11, t_0,t_1,t_2,t_3,t_4,t_5);
-        (int w0,int w1,int w2,int w3,int w4,int w5) = fp6Neg(p0,p1,p2,p3,p4,p5);
-        return n0,n1,n2,n3,n4,n5,w0,w1,w2,w3,w4,w5;
-    }
-
     function spend(
-        int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8,int A9,int A10,int A11,
-        int I0,int I1,int I2,int I3,int I4,int I5,int I6,int I7,int I8,int I9,int I10,int I11
-    ) {
-        (int i0,int i1,int i2,int i3,int i4,int i5,int i6,int i7,int i8,int i9,int i10,int i11) =
-            fp12Inv(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
-        require(i0==I0); require(i1==I1); require(i2==I2); require(i3==I3); require(i4==I4); require(i5==I5);
-        require(i6==I6); require(i7==I7); require(i8==I8); require(i9==I9); require(i10==I10); require(i11==I11);
-    }
+            int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8,int A9,int A10,int A11,
+            int I0,int I1,int I2,int I3,int I4,int I5,int I6,int I7,int I8,int I9,int I10,int I11
+        ) {
+            (int i0,int i1,int i2,int i3,int i4,int i5,int i6,int i7,int i8,int i9,int i10,int i11) =
+                fp12Inv(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+            require(i0==I0); require(i1==I1); require(i2==I2); require(i3==I3); require(i4==I4); require(i5==I5);
+            require(i6==I6); require(i7==I7); require(i8==I8); require(i9==I9); require(i10==I10); require(i11==I11);
+        }
 }

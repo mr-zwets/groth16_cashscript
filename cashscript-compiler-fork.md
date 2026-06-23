@@ -9,7 +9,7 @@ generated pairing chunks need in order to build in reasonable time.
 This is the feature the README used to list as the *"No Reusable Functions"*
 CashScript shortcoming. It is no longer a shortcoming for this project: we built it.
 
-- **Fork:** `C:\Users\mathi\Desktop\cashscript`, branch `feat/reusable-functions`
+- **Fork:** `C:\Users\mathi\Desktop\cashscript`, branch `feat/library-support`
   (forked from CashScript v0.13.1).
 - **CLI used by the graders and `_harness.mjs`:** `packages/cashc/dist/cashc-cli.js`,
   rebuilt with `yarn build` in `packages/cashc` after any compiler edit.
