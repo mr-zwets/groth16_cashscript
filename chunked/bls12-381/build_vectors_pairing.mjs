@@ -19,7 +19,8 @@ import {
   compileBytecode, commitBin, CATEGORY, tok, covIn, P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2,
 } from './_pairingmath.mjs';
 import { PUBLIC_INPUTS, vk, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
-import { vkxStateAt, vkxFinalZinv, computeVkx } from './_vkxmath.mjs';
+import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode } from './_vkxmath.mjs';
+import { g2checkAccAt } from './gen_g2check.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -63,10 +64,12 @@ const stats = { maxLock: 0, maxUnlock: 0, allFit: true, allAccept: true, allInva
 // commitLimbs = committed carried state (NFT commitment, decl order). allArgs = everything
 // the unlocking pushes (== commitLimbs except final-exp inv chunks append f^-1 witnesses).
 // terminal = the verdict chunk (asserts ==ONE, produces no output token).
-function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArgs, terminal) {
+function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArgs, terminal, noStats) {
   const pushArgs = allArgs ?? commitLimbs;
   let contract = compileCache.get(cashFile);
-  if (!contract) { contract = compileBytecode(readFileSync(cashFile, 'utf8')); compileCache.set(cashFile, contract); }
+  // compileFile (not compileString) so the g2check chunks' relative library `import` resolves;
+  // it compiles the inlined vkx/miller/finalexp chunks identically.
+  if (!contract) { contract = compileFileBytecode(cashFile); compileCache.set(cashFile, contract); }
   const redeem = Uint8Array.from([OP_DROP, ...contract]); // re-executed redeem; OP_DROP discards the pad
   const rpush = encodeDataPush(redeem);                   // pushed LAST in the scriptSig (P2SH)
   const locking = P2SH ? p2shSpk(redeem) : redeem;        // P2SH scriptPubKey (35 B) or bare [OP_DROP,contract]
@@ -90,8 +93,10 @@ function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArg
     accepted: real.accepted, invalidRejected: !invReal.accepted,
     fits: locking.length <= 10000 && unlocking.length <= 10000 && real.operationCost <= OP_BUDGET && real.accepted,
   };
-  stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
-  stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
+  if (!noStats) {
+    stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
+    stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
+  }
   return r.step;
 }
 
@@ -164,37 +169,71 @@ function buildVkx(inst) {
   return steps;
 }
 
-function buildAll(inst) {
-  const vkx = buildVkx(inst);
-  const { steps: pairing, boundaryVal } = buildPairing(inst);
-  const fe = buildFinalexp(inst, boundaryVal);
-  return { pairing: [...pairing, ...fe], groth16: [...vkx, ...pairing, ...fe] };
+// ---- G2 input-validation prologue (EIP-197): on-curve A/B/C + psi(B) == [-x]B ----
+// `bad` (optional) overrides the points with adversarial values (off-curve / off-subgroup)
+// and suppresses stats — for an invalidInputs run that MUST reject.
+const F2b = bls12_381.fields.Fp2;
+const g2sLimbs = (R, Bx, By, Ax, Ay, Cx, Cy) =>
+  [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1, Bx.c0, Bx.c1, By.c0, By.c1, Ax, Ay, Cx, Cy];
+function buildG2check(inst, bad) {
+  const pf = inst.proof ?? proof;
+  const Ba = pf.b.toAffine(), Aa = pf.a.toAffine(), Ca = pf.c.toAffine();
+  const Bx = bad?.Bx ?? Ba.x, By = bad?.By ?? Ba.y;
+  const Ax = Aa.x, Ay = bad?.Ay ?? Aa.y; // off-curve A bumps Ay off the G1 curve
+  const Cx = Ca.x, Cy = Ca.y;
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
+  const steps = [];
+  for (const ch of man.chunks) {
+    const inLimbs = g2sLimbs(g2checkAccAt(Bx, By, ch.lo), Bx, By, Ax, Ay, Cx, Cy);
+    const outLimbs = ch.last ? [] : g2sLimbs(g2checkAccAt(Bx, By, ch.hi), Bx, By, Ax, Ay, Cx, Cy);
+    steps.push(buildCovStep(join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs,
+      `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' psi(B)==[-x]B' : ''}`, ch.first ? 'validate-inputs' : undefined, undefined, ch.last, bad !== undefined));
+  }
+  return steps;
 }
 
-const a0 = buildAll(INSTANCES[0]);
-const a1 = buildAll(INSTANCES[1]);
+// Prepend the validated g2check prologue to the COMMITTED baseline groth16 chunks. The
+// baseline vkx/miller/finalexp steps are kept verbatim — regenerating the miller here would
+// lose its lazy-arithmetic optimization (the shared lib reduces every add). buildG2check uses
+// the same proof instances, so the prologue validates exactly the points the pairing uses.
+const OUT = 'C:/Users/mathi/Desktop/verifier/src/bch';
+const baseline = JSON.parse(readFileSync(`${OUT}/groth16-bls12381-chunked-vectors.json`, 'utf8'));
+if (baseline.steps[0]?.label?.includes('g2check')) { console.error('!! baseline already has a g2check prologue — refusing to double-prepend'); process.exit(1); }
+const g2_0 = buildG2check(INSTANCES[0]);
+const g2_1 = buildG2check(INSTANCES[1]);
+const steps = [...g2_0, ...baseline.steps];
+const extraValidProofs = [[...g2_1, ...(baseline.extraValidProofs?.[0] ?? [])]];
 const sumOp = (a) => a.reduce((x, s) => x + s.operationCost, 0);
 const maxOpOf = (a) => Math.max(...a.map((s) => s.operationCost));
-console.error(`pairing(batched miller+finalexp): ${a0.pairing.length} steps/proof, op ${sumOp(a0.pairing).toLocaleString()}; proof#1 also built (${a1.pairing.length})`);
-console.error(`groth16(full): ${a0.groth16.length} steps/proof, op ${sumOp(a0.groth16).toLocaleString()}`);
-console.error(`max lock ${stats.maxLock}B max unlock ${stats.maxUnlock}B | allFit=${stats.allFit} allAccept=${stats.allAccept} allInvalidRejected=${stats.allInvalid}`);
-if (!stats.allFit || !stats.allAccept || !stats.allInvalid) { console.error('!! a step did not fit/accept/reject -- NOT writing vectors'); process.exit(1); }
+console.error(`g2check prologue: ${g2_0.length} steps -> full groth16 now ${steps.length} steps`);
+console.error(`g2check valid run: allFit=${stats.allFit} allAccept=${stats.allAccept} allInvalidRejected=${stats.allInvalid}`);
+if (!stats.allFit || !stats.allAccept || !stats.allInvalid) { console.error('!! a g2check step did not fit/accept/reject -- NOT writing vectors'); process.exit(1); }
 
-const OUT = 'C:/Users/mathi/Desktop/verifier/src/bch';
-writeFileSync(`${OUT}/pairing-bls12381-chunked-vectors.json`, JSON.stringify({
-  description: 'PROOF-AGNOSTIC chunked BLS12-381 Groth16 pairing: a BATCHED 4-pair optimal-ate Miller loop (one shared fp12Sqr per step) -> Miller boundary (the conjugated f; no separate combine), then final exponentiation -> verdict (== Fp12 ONE), multi-tx. Generic covenant: Miller f + 4 R / live final-exp values + proof-derived points ride in the token NFT commitment (48-byte limbs), NO baked proof. Lazy field reduction (addFp deferred). One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct instance under the same VK. The 381-iter Fermat inverse in the easy part is supplied as an unlocking witness and verified by fp12Mul(f, f^-1)==ONE (it would alone exceed one input op-cost budget).',
-  proofBinding: 'runtime', curve: 'BLS12-381', numSteps: a0.pairing.length, budgetPerInput: OP_BUDGET,
-  totalOperationCost: sumOp(a0.pairing), maxStepOperationCost: maxOpOf(a0.pairing),
-  allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
-  steps: a0.pairing, extraValidProofs: [a1.pairing],
-}, null, 2));
-console.error('wrote src/bch/pairing-bls12381-chunked-vectors.json');
+// ---- adversarial INPUT runs (must REJECT) for the harness's input-validation grading ----
+// off-curve A: bump A.y so y^2 != x^3+4 -> the first g2check chunk's G1 cubic require fails.
+const Aa = proof.a.toAffine();
+const offCurveARun = buildG2check(INSTANCES[0], { Ay: (Aa.y + 1n) % P });
+// on-curve but OFF-SUBGROUP B: a point on the twist y^2=x^3+(4+4u) outside the order-r
+// subgroup -> psi(B) == [-x]B fails at the last g2check chunk. Search small x.
+const b2 = F2b.create({ c0: 4n, c1: 4n });
+let offSub = null;
+for (let i = 1n; i < 800n && !offSub; i++) {
+  const x = F2b.create({ c0: i, c1: 0n });
+  const rhs = F2b.add(F2b.mul(F2b.sqr(x), x), b2);
+  let y; try { y = F2b.sqrt(rhs); } catch { continue; }
+  if (!F2b.eql(F2b.sqr(y), rhs)) continue;
+  try { bls12_381.G2.Point.fromAffine({ x, y }).assertValidity(); } catch { offSub = { x, y }; } // on-curve, not torsion-free
+}
+const offSubRun = offSub ? buildG2check(INSTANCES[0], { Bx: offSub.x, By: offSub.y }) : null;
+console.error(`adversarial: off-curve A (${offCurveARun.length} steps), off-subgroup B (${offSubRun ? offSubRun.length + ' steps' : 'NONE'})`);
+const invalidInputs = [offCurveARun, ...(offSubRun ? [offSubRun] : [])];
 
 writeFileSync(`${OUT}/groth16-bls12381-chunked-vectors.json`, JSON.stringify({
-  description: 'PROOF-AGNOSTIC full chunked BLS12-381 Groth16 verifier: vk_x (on-chain from public inputs) -> a BATCHED 4-pair Miller loop -> final exponentiation -> assert verdict == Fp12 ONE, multi-tx. Generic covenant: all state + proof-derived points in the token NFT commitment (48-byte limbs), NO baked proof. Lazy field reduction. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct instance under the same VK.',
-  proofBinding: 'runtime', curve: 'BLS12-381', numSteps: a0.groth16.length, budgetPerInput: OP_BUDGET,
-  totalOperationCost: sumOp(a0.groth16), maxStepOperationCost: maxOpOf(a0.groth16),
-  allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
-  steps: a0.groth16, extraValidProofs: [a1.groth16],
+  description: 'PROOF-AGNOSTIC full chunked BLS12-381 Groth16 verifier with EIP-197 input validation: a G2 prologue (on-curve A/B/C + the prime-order-subgroup test psi(B) == [-x]B) -> vk_x (on-chain from public inputs) -> a BATCHED 4-pair Miller loop -> final exponentiation -> assert verdict == Fp12 ONE, multi-tx. Generic covenant: all state + proof-derived points in the token NFT commitment (48-byte limbs), NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct instance under the same VK. invalidInputs (off-curve A, off-subgroup B) must each REJECT.',
+  proofBinding: 'runtime', curve: 'BLS12-381', numSteps: steps.length, budgetPerInput: OP_BUDGET,
+  totalOperationCost: sumOp(steps), maxStepOperationCost: maxOpOf(steps),
+  allFit: baseline.allFit && stats.allFit, allAccept: baseline.allAccept && stats.allAccept, allInvalidRejected: baseline.allInvalidRejected && stats.allInvalid,
+  steps, extraValidProofs,
+  invalidInputs, // off-curve A + off-subgroup B; the harness requires each REJECTS (input validation)
 }, null, 2));
 console.error('wrote src/bch/groth16-bls12381-chunked-vectors.json');

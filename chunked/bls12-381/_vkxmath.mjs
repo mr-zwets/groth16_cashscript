@@ -9,6 +9,7 @@
 // 255 bit positions, MSB-first base 254), and the BLS IC points. The Jacobian G1
 // formulas are b-independent, so they are identical to BN254.
 import { execFileSync } from 'node:child_process';
+import { writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { pathToFileURL } from 'node:url';
 import { vk, PUBLIC_INPUTS, computeVkx, Fp, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
@@ -26,6 +27,9 @@ const cashc = await import(CASHC_LIB);
 const asmToBytecode = cashc.utils.asmToBytecode;
 /** compile a .cash source string -> redeem bytecode (Uint8Array); throws on compile error */
 export const compileBytecode = (src) => asmToBytecode(cashc.compileString(src).bytecode);
+/** compile a .cash FILE -> redeem bytecode. compileFile resolves relative `import`s (it has a
+ * base path), so chunks can import the shared singleton library instead of inlining it. */
+export const compileFileBytecode = (path) => asmToBytecode(cashc.compileFile(path).bytecode);
 
 export const OP_BUDGET = (41 + 10_000) * 800; // 8,032,800 op-cost per standard input
 export const TARGET_UNLOCK = 10_000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
@@ -72,6 +76,17 @@ export function measureCovenant(src, stateInts, commitInts, outLimbs) {
   let raw;
   try { raw = compileBytecode(src); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
+  return measureCovenantRaw(raw, stateInts, commitInts, outLimbs);
+}
+/** Like measureCovenant, but compiles `src` from a FILE (written to `probePath`) so a relative
+ * library `import` resolves — used by the import-based g2check generator. */
+export function measureCovenantFile(src, stateInts, commitInts, outLimbs, probePath) {
+  let raw;
+  try { writeFileSync(probePath, src); raw = compileFileBytecode(probePath); }
+  catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
+  return measureCovenantRaw(raw, stateInts, commitInts, outLimbs);
+}
+function measureCovenantRaw(raw, stateInts, commitInts, outLimbs) {
   const locking = Uint8Array.from([OP_DROP, ...raw]);
   const argBytes = Uint8Array.from([...stateInts].reverse().flatMap((c) => [...pushInt(c)]));
   const unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]);

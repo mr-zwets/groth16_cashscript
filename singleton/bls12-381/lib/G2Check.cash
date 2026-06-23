@@ -1,0 +1,74 @@
+pragma cashscript ^0.13.0;
+
+// BLS12-381 G2 input-validation primitives (EIP-197 rigor): on-curve via the caller, and
+// the prime-order-subgroup test psi(B) == [-x]B. The G2 Jacobian double/add are the a=0
+// short-Weierstrass formulas (b-independent, so identical in shape to BN254's), over the
+// BLS Fp2. psi is the GLV endomorphism psi(x,y) = (PSI_X*conj(x), PSI_Y*conj(y)); the
+// PSI_X/PSI_Y constants and the relation psi(B) == [-x]B (x = 0xd201000000010000) are
+// verified against @noble/curves (bls12_381 G2 isTorsionFree). All field ops reduce mod p.
+import "./Fp2.cash";
+
+library Bls12381G2Check {
+    // a=0 G2 Jacobian point doubling: (X,Y,Z) -> 2*(X,Y,Z). b-independent.
+    function g2Double(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
+            returns (int,int,int,int,int,int) {
+        (int Aa,int Ab) = fp2Sqr(Xa,Xb);
+        (int Ba,int Bb) = fp2Sqr(Ya,Yb);
+        (int Ca,int Cb) = fp2Sqr(Ba,Bb);
+        (int t1a,int t1b) = fp2Add(Xa,Xb,Ba,Bb);
+        (int t2a,int t2b) = fp2Sqr(t1a,t1b);
+        (int t3a,int t3b) = fp2Sub(t2a,t2b,Aa,Ab);
+        (int t4a,int t4b) = fp2Sub(t3a,t3b,Ca,Cb);
+        (int Da,int Db) = fp2Scale(t4a,t4b,2);
+        (int Ea,int Eb) = fp2Scale(Aa,Ab,3);
+        (int Fa,int Fb) = fp2Sqr(Ea,Eb);
+        (int d2a,int d2b) = fp2Scale(Da,Db,2);
+        (int nXa,int nXb) = fp2Sub(Fa,Fb,d2a,d2b);
+        (int g1a,int g1b) = fp2Sub(Da,Db,nXa,nXb);
+        (int g2a,int g2b) = fp2Mul(Ea,Eb,g1a,g1b);
+        (int c8a,int c8b) = fp2Scale(Ca,Cb,8);
+        (int nYa,int nYb) = fp2Sub(g2a,g2b,c8a,c8b);
+        (int yza,int yzb) = fp2Mul(Ya,Yb,Za,Zb);
+        (int nZa,int nZb) = fp2Scale(yza,yzb,2);
+        return nXa,nXb,nYa,nYb,nZa,nZb;
+    }
+
+    // Add the AFFINE point (Qx,Qy) to the Jacobian (X,Y,Z). Caller guarantees the accumulator
+    // is never the point at infinity and never equals +-Q (true for the [x]B ladder started at
+    // R=B with the MSB skipped), so the infinity / doubling special cases are not emitted.
+    function g2AddAffine(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int Qxa,int Qxb,int Qya,int Qyb)
+            returns (int,int,int,int,int,int) {
+        (int z11a,int z11b) = fp2Sqr(Za,Zb);
+        (int u2a,int u2b) = fp2Mul(Qxa,Qxb,z11a,z11b);
+        (int s2a,int s2b) = fp2Mul(Qya,Qyb,Za,Zb);
+        (int s2a2,int s2b2) = fp2Mul(s2a,s2b,z11a,z11b);
+        (int ha,int hb) = fp2Sub(u2a,u2b,Xa,Xb);
+        (int h2a,int h2b) = fp2Scale(ha,hb,2);
+        (int i2a,int i2b) = fp2Sqr(h2a,h2b);
+        (int ja,int jb) = fp2Mul(ha,hb,i2a,i2b);
+        (int rd0a,int rd0b) = fp2Sub(s2a2,s2b2,Ya,Yb);
+        (int rra,int rrb) = fp2Scale(rd0a,rd0b,2);
+        (int va,int vb) = fp2Mul(Xa,Xb,i2a,i2b);
+        (int rr2a,int rr2b) = fp2Sqr(rra,rrb);
+        (int v2a,int v2b) = fp2Scale(va,vb,2);
+        (int nx0a,int nx0b) = fp2Sub(rr2a,rr2b,ja,jb);
+        (int nXa,int nXb) = fp2Sub(nx0a,nx0b,v2a,v2b);
+        (int vnxa,int vnxb) = fp2Sub(va,vb,nXa,nXb);
+        (int ny0a,int ny0b) = fp2Mul(rra,rrb,vnxa,vnxb);
+        (int yja,int yjb) = fp2Mul(Ya,Yb,ja,jb);
+        (int yj2a,int yj2b) = fp2Scale(yja,yjb,2);
+        (int nYa,int nYb) = fp2Sub(ny0a,ny0b,yj2a,yj2b);
+        (int zha,int zhb) = fp2Mul(Za,Zb,ha,hb);        // Z3 = 2*Z1*H  (madd-2007-bl)
+        (int nZa,int nZb) = fp2Scale(zha,zhb,2);
+        return nXa,nXb,nYa,nYb,nZa,nZb;
+    }
+
+    // psi(x,y) = (PSI_X * conj(x), PSI_Y * conj(y)), conj = Frobenius on Fp2 (negate c1).
+    function g2psi(int xa,int xb,int ya,int yb) returns (int,int,int,int) {
+        (int cxa,int cxb) = fp2Conj(xa,xb);
+        (int cya,int cyb) = fp2Conj(ya,yb);
+        (int pxa,int pxb) = fp2Mul(0, 4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437, cxa, cxb);
+        (int pya,int pyb) = fp2Mul(2973677408986561043442465346520108879172042883009249989176415018091420807192182638567116318576472649347015917690530, 1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257, cya, cyb);
+        return pxa,pxb,pya,pyb;
+    }
+}
