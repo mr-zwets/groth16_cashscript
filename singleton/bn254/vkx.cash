@@ -1,64 +1,11 @@
 pragma cashscript ^0.13.0;
 
-// VkX: Groth16 public-input aggregation (verifier checkpoint #1).
-//
-//   vk_x = IC0 + input0*IC1 + input1*IC2   (all G1 points on BN254/alt_bn128)
-//
-// The scalar field-arithmetic primitives (addFp, subFp, mulFp, negFp, sqrFp,
-// inverseFp) are user-defined functions -> compiled to OP_DEFINE/OP_INVOKE and
-// shared by every call site. The point doubling / addition / double-and-add
-// scalar multiply are INLINED in the spending function: point values are 3
-// Jacobian coords (X,Y,Z) and CashScript user functions cannot (yet) return
-// tuples, so they cannot be factored out as functions.
-//
-// Coordinate system: Jacobian projective (X:Y:Z) with affine x=X/Z^2, y=Y/Z^3.
-// Point at infinity is encoded as Z=0. Using projective coords means the
-// double-and-add inner loop does NO modular inverse; we convert back to affine
-// with a SINGLE Fermat inverse at the very end.
-//
-// VK points IC0/IC1/IC2 are hardcoded (affine int coords from the trusted
-// setup). input0/input1 and the claimed expected affine point (xX,yX) are
-// supplied by the spender; the contract recomputes vk_x and require()s equality.
+// BN254 singleton harness `vkx` — the field/pairing arithmetic comes from the shared lib/
+// libraries (imported below). See lib/README.md for the structure and how to grade.
+
+import "./lib/Fp.cash";
 
 contract VkX(int expectedX, int expectedY) {
-
-    // ---- scalar field Fp arithmetic over the BN254 base prime p ----
-    internal function addFp(int x, int y) returns (int) {
-        return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-    }
-
-    internal function subFp(int x, int y) returns (int) {
-        return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-    }
-
-    internal function mulFp(int x, int y) returns (int) {
-        return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-    }
-
-    internal function negFp(int x) returns (int) {
-        return (21888242871839275222246405745257275088696311157297823662689037894645226208583 - x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-    }
-
-    internal function sqrFp(int x) returns (int) {
-        return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-    }
-
-    // Modular inverse via Fermat's little theorem: x^(p-2) mod p, square-and-multiply
-    // over the 254 bits of (p-2).
-    internal function inverseFp(int x) returns (int) {
-        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-        int e = p - 2;
-        int result = 1;
-        int current = x % p;
-        for (int i = 0; i < 254; i++) {
-            if (((e >> i) % 2) == 1) {
-                result = (result * current) % p;
-            }
-            current = (current * current) % p;
-        }
-        return result;
-    }
-
     function spend(int input0, int input1) {
         // Hardcoded VK IC points (affine).
         int ic0X = 10744596414106452074759370245733544594153395043370666422502510773307029471145;

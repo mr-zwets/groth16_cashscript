@@ -1,79 +1,11 @@
 pragma cashscript ^0.13.0;
 
-// BN254 Fp2 = Fp[u]/(u^2 + 1)  (noble basis: u^2 = -1).
-//
-// An Fp2 element is the pair (c0, c1) meaning c0 + c1*u. These are the bottom of
-// the field tower the pairing needs (Fp2 -> Fp6 -> Fp12). Every op is a reusable
-// multi-return function (returns (int,int)) -> compiled ONCE to OP_DEFINE and
-// invoked per call site, exactly like the EC ops in chunked/shamir.
-//
-// This contract is a CORRECTNESS HARNESS: spend() takes two operands a,b and the
-// noble-computed expected outputs, recomputes every op in-script, and require()s
-// equality. Graded on the loosened BCH 2026 VM by singleton/pairing/fp2.mjs.
+// BN254 singleton harness `fp2` — the field/pairing arithmetic comes from the shared lib/
+// libraries (imported below). See lib/README.md for the structure and how to grade.
+
+import "./lib/Fp2.cash";
+
 contract Fp2Ops() {
-
-    // ---- base field Fp over the BN254 prime p ----
-    internal function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function sqrFp(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function negFp(int x) returns (int) { return (21888242871839275222246405745257275088696311157297823662689037894645226208583 - x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-
-    // Fermat inverse x^(p-2) mod p over the 254 bits of (p-2).
-    internal function inverseFp(int x) returns (int) {
-        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-        int e = p - 2;
-        int result = 1;
-        int current = x % p;
-        for (int i = 0; i < 254; i = i + 1) {
-            if (((e >> i) % 2) == 1) { result = (result * current) % p; }
-            current = (current * current) % p;
-        }
-        return result;
-    }
-
-    // ---- Fp2 arithmetic (noble basis u^2 = -1) ----
-    internal function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) {
-        return addFp(a0, b0), addFp(a1, b1);
-    }
-    internal function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) {
-        return subFp(a0, b0), subFp(a1, b1);
-    }
-    internal function fp2Neg(int a0, int a1) returns (int, int) {
-        return negFp(a0), negFp(a1);
-    }
-    // (a0 + a1 u)(b0 + b1 u) = (a0 b0 - a1 b1) + (a0 b1 + a1 b0) u   [Karatsuba]
-    internal function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
-        int v0 = mulFp(a0, b0);
-        int v1 = mulFp(a1, b1);
-        int c0 = subFp(v0, v1);
-        int c1 = subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
-        return c0, c1;
-    }
-    // (a0 + a1 u)^2 = (a0+a1)(a0-a1) + 2 a0 a1 u
-    internal function fp2Sqr(int a0, int a1) returns (int, int) {
-        int c0 = mulFp(addFp(a0, a1), subFp(a0, a1));
-        int c1 = mulFp(2, mulFp(a0, a1));
-        return c0, c1;
-    }
-    // multiply by the sextic non-residue xi = 9 + u:
-    // (9 + u)(a0 + a1 u) = (9 a0 - a1) + (9 a1 + a0) u
-    internal function fp2MulXi(int a0, int a1) returns (int, int) {
-        int c0 = subFp(mulFp(9, a0), a1);
-        int c1 = addFp(mulFp(9, a1), a0);
-        return c0, c1;
-    }
-    // Frobenius a^p = conjugate over Fp2: (a0, -a1)
-    internal function fp2Conj(int a0, int a1) returns (int, int) {
-        return a0, negFp(a1);
-    }
-    // inverse: 1/(a0 + a1 u) = (a0 - a1 u) / (a0^2 + a1^2)
-    internal function fp2Inv(int a0, int a1) returns (int, int) {
-        int norm = addFp(sqrFp(a0), sqrFp(a1));
-        int factor = inverseFp(norm);
-        return mulFp(a0, factor), negFp(mulFp(a1, factor));
-    }
-
     function spend(
         int a0, int a1, int b0, int b1,
         int mul0, int mul1,

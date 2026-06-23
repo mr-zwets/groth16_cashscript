@@ -1,22 +1,22 @@
 # BN254 singleton libraries
 
-Shared CashScript libraries for the BN254 Groth16 verifier, consumed by the `*.lib.cash` contracts in
-the parent directory. These rely on the custom cashc fork's `library` / `import` / global-`constant`
+Shared CashScript libraries for the BN254 Groth16 verifier, consumed by the contracts in the parent
+directory (`../*.cash`). These rely on the custom cashc fork's `library` / `import` / global-`constant`
 support (branch `feat/reusable-functions`).
 
 ## `library` vs `contract` — the important distinction
 
-There are two kinds of `.cash` file, told apart by the **keyword inside**, not the filename:
+There are two kinds of `.cash` file, told apart by the **keyword inside**:
 
 | Keyword | Where | Has `spend()`? | Deployed / graded? | Purpose |
 |---|---|---|---|---|
 | `library Name { … }` | here, in `lib/` | no | no | reusable functions + constants, only ever `import`ed |
-| `contract Name { … }` | parent dir, `*.lib.cash` | yes | yes | the actual top-level contract; imports libraries |
+| `contract Name { … }` | parent dir, e.g. `../groth16.cash` | yes | yes | the actual top-level contract; imports libraries |
 
-So a file like `../groth16.lib.cash` is a **`contract`** (the full verifier, with `spend()`), even
-though its name ends in `.lib.cash`. The `.lib.cash` suffix is only a convention meaning "the
-library-based rewrite of the original `groth16.cash` harness" (which inlined everything). It does *not*
-mean the file is a library. Libraries live in this folder and use the `library` keyword.
+So `../groth16.cash` is a **`contract`** (the full verifier, with `spend()`) that `import`s three
+libraries. Each parent-directory `*.cash` is now the library-based contract (the older inline versions
+that re-declared the whole field tower have been replaced). Libraries live in this folder and use the
+`library` keyword; they have no `spend()` and are never deployed alone.
 
 ## The two arithmetic schemes
 
@@ -50,7 +50,7 @@ a big tower costs only the bytecode actually used.
 
 ## What each consumer imports
 
-| Contract (`../*.lib.cash`) | Imports | What it exercises |
+| Contract (`../*.cash`) | Imports | What it exercises |
 |---|---|---|
 | `fp2` | `Fp2` | Fp2 mul/sqr/inv/mulXi/conj |
 | `fp6` | `Fp6` | Fp6 mul/sqr/mulByV |
@@ -73,10 +73,10 @@ import "./lib/Fp12.cash";
 contract Foo() { function spend(...) { ... fp12Mul(...) ... } }
 ```
 
-Grade any `X.lib.cash` against its existing harness by swapping the filename:
+Grade any contract against its reference vectors with its harness:
 
 ```sh
-sed 's/X\.cash/X.lib.cash/g' X.mjs > _tmp.mjs && node _tmp.mjs && rm _tmp.mjs
+node ../X.mjs          # e.g. node ../groth16.mjs   -> prints PASS/FAIL
 ```
 
 (`vkx` is graded by `build_vectors_vkx.mjs` with constructor binding; set `OUT=/tmp/…` so it doesn't
@@ -85,8 +85,8 @@ overwrite the verifier repo's vectors.)
 Compile to bytecode/size with the fork's CLI:
 
 ```sh
-node <cashscript>/packages/cashc/dist/cashc-cli.js ../groth16.lib.cash -h   # hex
-node <cashscript>/packages/cashc/dist/cashc-cli.js ../groth16.lib.cash -s   # bytesize
+node <cashscript>/packages/cashc/dist/cashc-cli.js ../groth16.cash -h   # hex
+node <cashscript>/packages/cashc/dist/cashc-cli.js ../groth16.cash -s   # bytesize
 ```
 
 ## Why this is a win

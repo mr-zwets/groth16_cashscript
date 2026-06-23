@@ -1,91 +1,11 @@
 pragma cashscript ^0.13.0;
 
-// BN254 sparse Fp12 multiply mul034 (divisive-twist line application), matching
-// noble: given f = (c0,c1) in Fp6 and a sparse element (o0, 0, 0, o3, o4, 0),
-//   A = f.c0 scaled coordinate-wise by o0
-//   B = Fp6.mul01(f.c1, o3, o4)
-//   E = Fp6.mul01(f.c0 + f.c1, o0 + o3, o4)
-//   result = ( v*B + A ,  E - (A + B) )
-// f carried as 12 ints F0..F11 (c0 = F0..F5, c1 = F6..F11), o* as Fp2 pairs.
-// Graded vs noble Fp12.mul034 by singleton/pairing/mul034.mjs.
+// BN254 singleton harness `mul034` — the field/pairing arithmetic comes from the shared lib/
+// libraries (imported below). See lib/README.md for the structure and how to grade.
+
+import "./lib/Fp12.cash";
+
 contract Mul034() {
-
-    internal function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-
-    internal function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
-    internal function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
-    internal function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
-        int v0 = mulFp(a0, b0);
-        int v1 = mulFp(a1, b1);
-        return subFp(v0, v1), subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
-    }
-    internal function fp2MulXi(int a0, int a1) returns (int, int) { return subFp(mulFp(9, a0), a1), addFp(mulFp(9, a1), a0); }
-
-    internal function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
-        (int c0a, int c0b) = fp2Add(a0a, a0b, b0a, b0b);
-        (int c1a, int c1b) = fp2Add(a1a, a1b, b1a, b1b);
-        (int c2a, int c2b) = fp2Add(a2a, a2b, b2a, b2b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
-    internal function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
-        (int c0a, int c0b) = fp2Sub(a0a, a0b, b0a, b0b);
-        (int c1a, int c1b) = fp2Sub(a1a, a1b, b1a, b1b);
-        (int c2a, int c2b) = fp2Sub(a2a, a2b, b2a, b2b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
-    internal function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
-        (int n0a, int n0b) = fp2MulXi(a2a, a2b);
-        return n0a, n0b, a0a, a0b, a1a, a1b;
-    }
-    // Fp6 * sparse (b0, b1, 0)
-    internal function fp6Mul01(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b0a,int b0b,int b1a,int b1b) returns (int,int,int,int,int,int) {
-        (int t0a,int t0b) = fp2Mul(c0a, c0b, b0a, b0b);
-        (int t1a,int t1b) = fp2Mul(c1a, c1b, b1a, b1b);
-        // r0 = xi*((c1+c2)*b1 - t1) + t0
-        (int s12a,int s12b) = fp2Add(c1a, c1b, c2a, c2b);
-        (int m12a,int m12b) = fp2Mul(s12a, s12b, b1a, b1b);
-        (int u0a,int u0b) = fp2Sub(m12a, m12b, t1a, t1b);
-        (int xu0a,int xu0b) = fp2MulXi(u0a, u0b);
-        (int r0a,int r0b) = fp2Add(xu0a, xu0b, t0a, t0b);
-        // r1 = (b0+b1)*(c0+c1) - t0 - t1
-        (int sba,int sbb) = fp2Add(b0a, b0b, b1a, b1b);
-        (int sca,int scb) = fp2Add(c0a, c0b, c1a, c1b);
-        (int m1a,int m1b) = fp2Mul(sba, sbb, sca, scb);
-        (int u1a,int u1b) = fp2Sub(m1a, m1b, t0a, t0b);
-        (int r1a,int r1b) = fp2Sub(u1a, u1b, t1a, t1b);
-        // r2 = (c0+c2)*b0 - t0 + t1
-        (int s02a,int s02b) = fp2Add(c0a, c0b, c2a, c2b);
-        (int m2a,int m2b) = fp2Mul(s02a, s02b, b0a, b0b);
-        (int u2a,int u2b) = fp2Sub(m2a, m2b, t0a, t0b);
-        (int r2a,int r2b) = fp2Add(u2a, u2b, t1a, t1b);
-        return r0a, r0b, r1a, r1b, r2a, r2b;
-    }
-
-    internal function mul034(
-        int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
-        int o0a,int o0b, int o3a,int o3b, int o4a,int o4b
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        // A = f.c0 scaled by o0
-        (int A0,int A1) = fp2Mul(F0, F1, o0a, o0b);
-        (int A2,int A3) = fp2Mul(F2, F3, o0a, o0b);
-        (int A4,int A5) = fp2Mul(F4, F5, o0a, o0b);
-        // B = mul01(f.c1, o3, o4)
-        (int B0,int B1,int B2,int B3,int B4,int B5) = fp6Mul01(F6,F7,F8,F9,F10,F11, o3a,o3b, o4a,o4b);
-        // E = mul01(f.c0 + f.c1, o0 + o3, o4)
-        (int S0,int S1,int S2,int S3,int S4,int S5) = fp6Add(F0,F1,F2,F3,F4,F5, F6,F7,F8,F9,F10,F11);
-        (int qa,int qb) = fp2Add(o0a, o0b, o3a, o3b);
-        (int G0,int G1,int G2,int G3,int G4,int G5) = fp6Mul01(S0,S1,S2,S3,S4,S5, qa,qb, o4a,o4b);
-        // c0 = v*B + A
-        (int VB0,int VB1,int VB2,int VB3,int VB4,int VB5) = fp6MulByV(B0,B1,B2,B3,B4,B5);
-        (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Add(VB0,VB1,VB2,VB3,VB4,VB5, A0,A1,A2,A3,A4,A5);
-        // c1 = E - (A + B)
-        (int AB0,int AB1,int AB2,int AB3,int AB4,int AB5) = fp6Add(A0,A1,A2,A3,A4,A5, B0,B1,B2,B3,B4,B5);
-        (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(G0,G1,G2,G3,G4,G5, AB0,AB1,AB2,AB3,AB4,AB5);
-        return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
-    }
-
     function spend(
         int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
         int o0a,int o0b,int o3a,int o3b,int o4a,int o4b,

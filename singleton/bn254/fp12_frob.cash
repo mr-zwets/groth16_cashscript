@@ -1,113 +1,11 @@
 pragma cashscript ^0.13.0;
 
-// BN254 Fp12 Frobenius maps a -> a^(p^k) for k = 1, 2, 3 (noble basis).
-//
-// noble's algorithm (abstract/tower.ts):
-//   Fp2.frobeniusMap(a, k)  = a^(p^k): conjugate (a0, -a1) when k is odd, identity when even.
-//   Fp6.frobeniusMap(a, k)  = ( fp2Frob(c0), fp2Frob(c1)*FP6_C1[k], fp2Frob(c2)*FP6_C2[k] )
-//   Fp12.frobeniusMap(a, k) = ( Fp6.frob(c0,k),  (Fp6.frob(c1,k) scaled by FP12_C1[k]) )
-// where FP6_C1/FP6_C2 (Fp2) and FP12_C1 (Fp2) are precomputed constants (k = 1,2,3).
-//
-// Carried as 12 ints A0..A11 = (c0 = A0..A5 Fp6, c1 = A6..A11 Fp6). Graded vs
-// noble Fp12.frobeniusMap by singleton/pairing/fp12_frob.mjs.
+// BN254 singleton harness `fp12_frob` — the field/pairing arithmetic comes from the shared lib/
+// libraries (imported below). See lib/README.md for the structure and how to grade.
+
+import "./lib/Fp12.cash";
+
 contract Fp12Frob() {
-
-    internal function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-
-    internal function fp2Conj(int a0, int a1) returns (int, int) { return a0, subFp(0, a1); }
-    internal function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
-        int v0 = mulFp(a0, b0);
-        int v1 = mulFp(a1, b1);
-        int c0 = subFp(v0, v1);
-        int c1 = subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
-        return c0, c1;
-    }
-
-    // Fp6 Frobenius for ODD power: fp2Frob = conjugate. k1/k2 = FP6_C1[k]/FP6_C2[k].
-    internal function fp6FrobOdd(
-        int x0a,int x0b,int x1a,int x1b,int x2a,int x2b,
-        int k1a,int k1b,int k2a,int k2b
-    ) returns (int,int,int,int,int,int) {
-        (int d0a,int d0b) = fp2Conj(x0a, x0b);
-        (int c1a,int c1b) = fp2Conj(x1a, x1b);
-        (int d1a,int d1b) = fp2Mul(c1a, c1b, k1a, k1b);
-        (int c2a,int c2b) = fp2Conj(x2a, x2b);
-        (int d2a,int d2b) = fp2Mul(c2a, c2b, k2a, k2b);
-        return d0a, d0b, d1a, d1b, d2a, d2b;
-    }
-    // Fp6 Frobenius for EVEN power: fp2Frob = identity.
-    internal function fp6FrobEven(
-        int x0a,int x0b,int x1a,int x1b,int x2a,int x2b,
-        int k1a,int k1b,int k2a,int k2b
-    ) returns (int,int,int,int,int,int) {
-        (int d1a,int d1b) = fp2Mul(x1a, x1b, k1a, k1b);
-        (int d2a,int d2b) = fp2Mul(x2a, x2b, k2a, k2b);
-        return x0a, x0b, d1a, d1b, d2a, d2b;
-    }
-    // multiply an Fp6 by an Fp2 constant (each Fp2 coord * k).
-    internal function fp6MulByFp2(
-        int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int ka,int kb
-    ) returns (int,int,int,int,int,int) {
-        (int r0a,int r0b) = fp2Mul(x0a, x0b, ka, kb);
-        (int r1a,int r1b) = fp2Mul(x1a, x1b, ka, kb);
-        (int r2a,int r2b) = fp2Mul(x2a, x2b, ka, kb);
-        return r0a, r0b, r1a, r1b, r2a, r2b;
-    }
-
-    // a^p
-    internal function fp12Frob1(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(
-            A0,A1,A2,A3,A4,A5,
-            21575463638280843010398324269430826099269044274347216827212613867836435027261, 10307601595873709700152284273816112264069230130616436755625194854815875713954,
-            2581911344467009335267311115468803099551665605076196740867805258568234346338, 19937756971775647987995932169929341994314640652964949448313374472400716661030);
-        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(
-            A6,A7,A8,A9,A10,A11,
-            21575463638280843010398324269430826099269044274347216827212613867836435027261, 10307601595873709700152284273816112264069230130616436755625194854815875713954,
-            2581911344467009335267311115468803099551665605076196740867805258568234346338, 19937756971775647987995932169929341994314640652964949448313374472400716661030);
-        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
-            g0,g1,g2,g3,g4,g5,
-            8376118865763821496583973867626364092589906065868298776909617916018768340080, 16469823323077808223889137241176536799009286646108169935659301613961712198316);
-        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
-    }
-    // a^(p^2)
-    internal function fp12Frob2(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobEven(
-            A0,A1,A2,A3,A4,A5,
-            21888242871839275220042445260109153167277707414472061641714758635765020556616, 0,
-            2203960485148121921418603742825762020974279258880205651966, 0);
-        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobEven(
-            A6,A7,A8,A9,A10,A11,
-            21888242871839275220042445260109153167277707414472061641714758635765020556616, 0,
-            2203960485148121921418603742825762020974279258880205651966, 0);
-        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
-            g0,g1,g2,g3,g4,g5,
-            21888242871839275220042445260109153167277707414472061641714758635765020556617, 0);
-        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
-    }
-    // a^(p^3)
-    internal function fp12Frob3(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(
-            A0,A1,A2,A3,A4,A5,
-            3772000881919853776433695186713858239009073593817195771773381919316419345261, 2236595495967245188281701248203181795121068902605861227855261137820944008926,
-            5324479202449903542726783395506214481928257762400643279780343368557297135718, 16208900380737693084919495127334387981393726419856888799917914180988844123039);
-        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(
-            A6,A7,A8,A9,A10,A11,
-            3772000881919853776433695186713858239009073593817195771773381919316419345261, 2236595495967245188281701248203181795121068902605861227855261137820944008926,
-            5324479202449903542726783395506214481928257762400643279780343368557297135718, 16208900380737693084919495127334387981393726419856888799917914180988844123039);
-        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
-            g0,g1,g2,g3,g4,g5,
-            11697423496358154304825782922584725312912383441159505038794027105778954184319, 303847389135065887422783454877609941456349188919719272345083954437860409601);
-        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
-    }
-
     function spend(
         int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8,int A9,int A10,int A11,
         int P0,int P1,int P2,int P3,int P4,int P5,int P6,int P7,int P8,int P9,int P10,int P11,
