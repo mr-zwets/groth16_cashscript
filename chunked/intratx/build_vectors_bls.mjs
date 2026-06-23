@@ -26,13 +26,13 @@ const GEN = join(here, '..', 'bls12-381', 'generated');
 const W = 48; // BLS12-381 limb width
 const PRIME = P.toString();
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { binToHex, bigIntToVmNumber, hash160, encodeLockingBytecodeP2sh20, encodeDataPush, createVirtualMachineBch2026 } = await import(LIBAUTH);
+const { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } = await import(LIBAUTH);
 const realVm = createVirtualMachineBch2026(false);
 
 // Deploy as P2SH so the ~4-5 KB redeem (in the scriptSig) counts toward the op-cost
 // budget and offsets the pad (~30% smaller on-chain than bare). See build_vectors.mjs.
 const P2SH = process.env.INTRATX_BARE !== '1';
-const p2shSpk = (redeem) => encodeLockingBytecodeP2sh20(hash160(redeem));
+const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem));
 
 // libauth encodeDataPush does the minimal length-prefix; pushInt keeps the numeric-opcode
 // minimal forms (OP_0/OP_1..16/OP_1NEGATE) that encodeDataPush omits.
@@ -178,7 +178,7 @@ const report = (tag, asm) => {
   console.error(`${tag}: ${asm.meta.length} inputs accepted=${asm.accepted} fits=${asm.fits} | totalBytes=${sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes).toLocaleString()} totalOp=${sum(asm.meta, (m) => m.operationCost).toLocaleString()} maxOp=${Math.max(...asm.meta.map((m) => m.operationCost)).toLocaleString()}`);
   if (bad) console.error(`  !! first non-accepting: ${bad.label} :: ${bad.error}`);
 };
-const meta = (asm) => ({ method: 'intra-tx-linked', deployment: 'P2SH', curve: 'BLS12-381', numInputs: asm.inputs.length, budgetPerInput: OP_BUDGET, totalBytes: sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes), totalOperationCost: sum(asm.meta, (m) => m.operationCost), maxStepOperationCost: Math.max(...asm.meta.map((m) => m.operationCost)), allFit: asm.fits, allAccept: asm.accepted });
+const meta = (asm) => ({ method: 'intra-tx-linked', deployment: 'P2SH32', curve: 'BLS12-381', numInputs: asm.inputs.length, budgetPerInput: OP_BUDGET, totalBytes: sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes), totalOperationCost: sum(asm.meta, (m) => m.operationCost), maxStepOperationCost: Math.max(...asm.meta.map((m) => m.operationCost)), allFit: asm.fits, allAccept: asm.accepted });
 
 const OUT = 'C:/Users/mathi/Desktop/verifier/src/bch';
 // pairing (miller + final exp -> verdict) single tx

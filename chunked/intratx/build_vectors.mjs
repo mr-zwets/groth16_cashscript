@@ -30,7 +30,7 @@ const PRIME = '21888242871839275222246405745257275088696311157297823662689037894
 const P = BigInt(PRIME);
 const W = 40; // BN254 limb width (bytes)
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash160, encodeLockingBytecodeP2sh20, encodeDataPush, createVirtualMachineBch2026 } = await import(LIBAUTH);
+const { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } = await import(LIBAUTH);
 const realVm = createVirtualMachineBch2026(false);
 
 // Deploy each chunk as P2SH: the ~4-5 KB redeem script (the field-tower prologue +
@@ -41,7 +41,7 @@ const realVm = createVirtualMachineBch2026(false);
 // P2SH is compatible with the forward-check: the inBlob stays the FIRST push of the
 // scriptSig (siblings read it at a fixed front offset); the redeem is the LAST push.
 const P2SH = process.env.INTRATX_BARE !== '1';
-const p2shSpk = (redeem) => encodeLockingBytecodeP2sh20(hash160(redeem)); // OP_HASH160 <h> OP_EQUAL
+const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)); // OP_HASH256 <h> OP_EQUAL
 
 // ---- push helpers (libauth encodeDataPush does the minimal length-prefix; we keep the
 // numeric-opcode minimal forms — OP_0/OP_1..16/OP_1NEGATE — which encodeDataPush omits) ----
@@ -207,7 +207,7 @@ function argBytesOf(s) {
 // op-cost. The pad is the trailing all-zero push that buys op-cost budget; it never
 // shifts the FRONT inBlob, so it cannot disturb any sibling's forward-check.
 //
-// P2SH (default): locking = OP_HASH160 <h> OP_EQUAL (23 B); unlocking = [inBlob,
+// P2SH (default): locking = OP_HASH256 <h> OP_EQUAL (35 B); unlocking = [inBlob,
 //   extras, pad, push(redeem)] — the redeem ([OP_DROP, contract]) is the last push,
 //   and it counts toward the budget, so the pad shrinks by ~the redeem length.
 // bare (INTRATX_BARE=1): locking = redeem; unlocking = [inBlob, extras, pad] — the
@@ -289,7 +289,7 @@ console.error(`  pairing invalid runs rejected: ${pairInvalid.map((r) => r.rejec
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-intratx-vectors.json', JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED BN254 Groth16 pairing to the Miller boundary. The batched 4-pair Miller chunks are the INPUTS of ONE transaction; each chunk takes its incoming Fp12+G2 state as a raw byte blob in its witness and FORWARD-checks its successor (require next input\'s blob == its recomputed output, read via OP_INPUTBYTECODE). No NFT-commitment hand-off, no hashing, no 128-byte limit. Reuses the same validated chunk math as bch-pairing-chunked.',
-  method: 'intra-tx-linked', deployment: 'P2SH', numInputs: pair0.inputs.length, budgetPerInput: OP_BUDGET,
+  method: 'intra-tx-linked', deployment: 'P2SH32', numInputs: pair0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(pair0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(pair0.meta, (m) => m.operationCost),
   maxStepOperationCost: Math.max(...pair0.meta.map((m) => m.operationCost)),
@@ -310,7 +310,7 @@ console.error(`  groth16 invalid runs rejected: ${fullInvalid.map((r) => r.rejec
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-vectors.json', JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED full BN254 Groth16 verifier in ONE transaction: validate G2 inputs -> vk_x -> batched 4-pair Miller -> final exponentiation -> assert product==1, as the inputs of a single tx. State is passed as raw byte blobs through sibling-input introspection (OP_INPUTBYTECODE forward-checks), not NFT commitments — no hashing, arbitrary intermediate size. Cross-stage soundness links are bound where layouts allow: vk_x final binds the vk_x point into the Miller genesis input, and the Miller boundary is bound into the final-exponentiation genesis input. Reuses the same validated chunk math as bch-groth16-chunked.',
-  method: 'intra-tx-linked', deployment: 'P2SH', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
+  method: 'intra-tx-linked', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
   maxStepOperationCost: Math.max(...full0.meta.map((m) => m.operationCost)),

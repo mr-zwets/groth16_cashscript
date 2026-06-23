@@ -24,7 +24,7 @@ import { vkxStateAt, vkxFinalZinv, computeVkx } from './_vkxmath.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
 const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { binToHex, bigIntToVmNumber, hash160, encodeLockingBytecodeP2sh20, encodeDataPush, numberToBinUint16LE, createVirtualMachineBch2026 } = await import(LIBAUTH);
+const { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, numberToBinUint16LE, createVirtualMachineBch2026 } = await import(LIBAUTH);
 const realVm = createVirtualMachineBch2026(false);
 
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
@@ -37,7 +37,7 @@ const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3
 // covenant introspects the TOKEN, not bytecode, so P2SH is a pure win (no offsets to keep).
 // Bare model via CHUNKED_BARE=1.
 const P2SH = process.env.CHUNKED_BARE !== '1';
-const p2shSpk = (redeem) => encodeLockingBytecodeP2sh20(hash160(redeem)); // OP_HASH160 <h> OP_EQUAL (23 B)
+const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)); // OP_HASH256 <h> OP_EQUAL (35 B)
 const padBytes = (total) => { const b = Math.max(2, total); const n = b <= 76 ? b - 1 : b <= 257 ? b - 2 : b - 3; return encodeDataPush(new Uint8Array(n)); };
 
 function evalCov(locking, unlocking, inCommit, outCommit, terminal) {
@@ -69,7 +69,7 @@ function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArg
   if (!contract) { contract = compileBytecode(readFileSync(cashFile, 'utf8')); compileCache.set(cashFile, contract); }
   const redeem = Uint8Array.from([OP_DROP, ...contract]); // re-executed redeem; OP_DROP discards the pad
   const rpush = encodeDataPush(redeem);                   // pushed LAST in the scriptSig (P2SH)
-  const locking = P2SH ? p2shSpk(redeem) : redeem;        // P2SH scriptPubKey (23 B) or bare [OP_DROP,contract]
+  const locking = P2SH ? p2shSpk(redeem) : redeem;        // P2SH scriptPubKey (35 B) or bare [OP_DROP,contract]
   const tail = P2SH ? rpush.length : 0;                   // redeem in the scriptSig counts toward the budget
   const inCommit = commitBin(commitLimbs.map(BigInt)), outCommit = terminal ? new Uint8Array(32) : commitBin(outLimbs.map(BigInt));
   const argBytes = Uint8Array.from([...pushArgs].reverse().flatMap((c) => [...pushInt(BigInt(c))]));
