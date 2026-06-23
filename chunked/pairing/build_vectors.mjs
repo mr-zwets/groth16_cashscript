@@ -11,7 +11,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp12, Fp2, bn254, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
-  f12limbs, r6limbs, compileBytecode, commitBin, CATEGORY, ptLimbs,
+  f12limbs, r6limbs, compileBytecode, compileFileBytecode, commitBin, CATEGORY, ptLimbs,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace,
   TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, OP_BUDGET,
 } from './_millermath.mjs';
@@ -69,7 +69,9 @@ function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArg
   const inLimbs = commitLimbs;
   const pushArgs = allArgs ?? commitLimbs;
   let contract = compileCache.get(cashFile);
-  if (!contract) { contract = compileBytecode(readFileSync(cashFile, 'utf8')); compileCache.set(cashFile, contract); }
+  // compileFile (not compileString) so the Miller chunks' relative library `import` resolves;
+  // it compiles the inlined g2check/vkx/finalexp chunks identically.
+  if (!contract) { contract = compileFileBytecode(cashFile); compileCache.set(cashFile, contract); }
   const redeem = Uint8Array.from([OP_DROP, ...contract]); // re-executed redeem; OP_DROP discards the pad
   const rpush = encodeDataPush(redeem);                   // pushed LAST in the scriptSig (P2SH convention)
   const locking = P2SH ? p2shSpk(redeem) : redeem;        // P2SH scriptPubKey (35 B) or bare [OP_DROP,contract]
@@ -98,7 +100,9 @@ function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArg
 }
 
 // ---- BATCHED Miller replay (flat op list; folded f IS the boundary, no combine) ----
-const stateLimbs = (s) => [...f12limbs(s.f), ...s.Rs.flatMap(r6limbs)];
+// Prepared-VK: only the runtime pair's R0 is carried (fixed-VK pairs use baked line coeffs),
+// matching gen_miller.mjs's stateLimbs — must stay in lockstep with it.
+const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0])];
 
 // ---- parse a singleton-proof unlocking (pushes, reverse decl order) -> limbs ----
 // decl order: Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1 (pushed reversed, in1 first).

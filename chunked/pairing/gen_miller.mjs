@@ -18,19 +18,18 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp2, ATE_NAF, millerBatchOps, f12limbs, r6limbs, pairsFor, vec, commit,
-  measureCovenant, planChunk, covIn, covOut, PT_CFG, ptLimbs, fnExtractor, decl,
+  measureCovenantFile, planChunk, covIn, covOut, PT_CFG, ptLimbs, decl,
 } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
 mkdirSync(GEN, { recursive: true });
-const MILLER_CASH = join(here, '..', '..', 'singleton', 'bn254', 'miller.cash');
+// The tower/pairing functions live in the shared singleton library; each chunk imports it
+// (resolved by compileFile) instead of inlining the bodies. Path is relative to GEN/.
+const LIB_IMPORT = '../../../singleton/bn254/lib/lazy/Bn254Lazy.cash';
+const PROBE = join(GEN, '_probe.cash'); // planner writes candidate chunks here to compile-from-file
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
-
-const ext = fnExtractor(MILLER_CASH);
-const BASE_FNS = ['addFp', 'subFp', 'mulFp', 'fp2Add', 'fp2Sub', 'fp2Neg', 'fp2Mul', 'fp2Sqr', 'fp2Scale', 'fp2MulXi', 'fp2MulByB', 'fp2Half', 'fp6Add', 'fp6Sub', 'fp6MulByV', 'fp6Mul', 'fp6Mul01', 'fp12Sqr', 'mul034', 'line', 'pointDouble', 'pointAdd'];
-const PP_FNS = ['fp2Conj', 'psi']; // only needed by chunks containing a postPrecompute op
 
 const PAIRS = pairsFor(vec.publicInputs);
 const PINFO = PAIRS.map((pair, j) => {
@@ -47,59 +46,73 @@ PINFO.forEach((pi, j) => { if (pi.cfg.P) ptParams.push(`Px${j}`, `Py${j}`); if (
 const ptL = PAIRS.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
 
 const { ops, states, boundary } = millerBatchOps(PAIRS);
-const stateLimbs = (s) => [...f12limbs(s.f), ...s.Rs.flatMap(r6limbs)];
+// Prepared-VK state: only the RUNTIME pair's accumulator R0 (= e(-A,B), PT_CFG[0]) is carried;
+// the three fixed-VK pairs (alpha/beta, vk_x/gamma, C/delta) use baked line coeffs, so their R
+// is never needed on-chain and never enters the committed state. f(12) + R0(6) [+ runtime points].
+const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0])];
 const withPts = (limbs) => [...limbs, ...ptL];
 const inState = (i) => withPts(stateLimbs(states[i]));
 const outState = (i) => withPts(stateLimbs(states[i]));
 
+// limbs of a baked line-coeff triple [c0,c1,c2] (each Fp2) in the order `line` expects:
+// c0a,c0b,c1a,c1b,c2a,c2b. Reduced (canonical) reps; the lazy line()/mul034 accept any
+// representative mod p, and covOut reduces the final f, so baking the reduced value is exact.
+const bakedCoeffs = (triple) => triple.flatMap((c) => [`${c.c0}`, `${c.c1}`]);
 function genChunk(opLo, opHi) {
-  const hasPP = ops.slice(opLo, opHi).some((o) => o.t === 'pp');
-  const fns = [...BASE_FNS, ...(hasPP ? PP_FNS : [])].map(ext).join('\n');
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
-  const inR = [0, 1, 2, 3].map((j) => [`R${j}xa`, `R${j}xb`, `R${j}ya`, `R${j}yb`, `R${j}za`, `R${j}zb`]);
+  const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb']; // only the runtime pair's R
   const L = [];
   L.push('pragma cashscript ^0.13.0;');
-  L.push(`// GENERIC batched BN254 Miller covenant chunk: ops [${opLo},${opHi}).`);
-  L.push('// state = f(12) + R0..R3(24) [+ runtime points]; lives in the token NFT commitment.');
+  L.push(`import "${LIB_IMPORT}";`);
+  L.push(`// Prepared-VK batched BN254 Miller chunk: ops [${opLo},${opHi}).`);
+  L.push('// state = f(12) + R0(6) [+ runtime points]; lives in the token NFT commitment. The runtime');
+  L.push('// pair e(-A,B) keeps on-chain G2 (pointDouble/pointAdd); the fixed-VK pairs (alpha/beta,');
+  L.push('// vk_x/gamma, C/delta) fold BAKED line coeffs in — no on-chain G2, no carried R.');
   L.push('contract MillerBatchChunk() {');
-  L.push(fns);
-  L.push(`    function spend(${decl([...inF, ...inR.flat(), ...ptParams])}) {`);
-  L.push(covIn([...inF, ...inR.flat(), ...ptParams]));
-  // -Qy (bias 64) for any runtime-Q pair doing an add-line with digit -1 in this window
+  L.push(`    function spend(${decl([...inF, ...inR0, ...ptParams])}) {`);
+  L.push(covIn([...inF, ...inR0, ...ptParams]));
+  // -Qy (bias 64) for the runtime pair's add-line with digit -1 in this window (fixed pairs
+  // never do an on-chain add, so only PT_CFG[*].Q===true [pair 0] can need this).
   const negY = PINFO.map((pi) => {
     if (!pi.cfg.Q) return [`${pi.negQ.c0}`, `${pi.negQ.c1}`];
     const needs = ops.slice(opLo, opHi).some((o) => o.t === 'al' && o.neg && o.j === pi.j);
     if (needs) { L.push(`        (int nq${pi.j}a,int nq${pi.j}b) = fp2Neg(${pi.Qyae}, ${pi.Qybe}, 64);`); return [`nq${pi.j}a`, `nq${pi.j}b`]; }
     return [pi.Qyae, pi.Qybe];
   });
-  let f = inF.slice(); const r = inR.map((a) => a.slice()); let uid = 0;
+  let f = inF.slice(); let r0 = inR0.slice(); let uid = 0;
   const fresh = (n) => Array.from({ length: n }, () => `v${uid++}`);
+  // fold one line(f, coeffs, Px, Py) into f; `coeffs` is a 6-name/literal array.
+  const emitLine = (coeffs, pi) => { const g = fresh(12); L.push(`        (${decl(g)}) = line(${f.join(',')}, ${coeffs.join(',')}, ${pi.Pxe}, ${pi.Pye});`); f = g; };
   for (let i = opLo; i < opHi; i++) {
     const op = ops[i], pi = op.j !== undefined ? PINFO[op.j] : null;
+    const fixed = pi !== null && !pi.cfg.Q; // fixed VK G2 point -> bake the line coeffs
     if (op.t === 'sqr') { const sf = fresh(12); L.push(`        (${decl(sf)}) = fp12Sqr(${f.join(',')});`); f = sf; }
     else if (op.t === 'dl') {
+      if (fixed) { emitLine(bakedCoeffs(op.coeffs), pi); continue; }
       const dco = fresh(6), dr = fresh(6);
-      L.push(`        (${decl([...dco, ...dr])}) = pointDouble(${r[op.j].join(',')});`); r[op.j] = dr;
-      const gf = fresh(12); L.push(`        (${decl(gf)}) = line(${f.join(',')}, ${dco.join(',')}, ${pi.Pxe}, ${pi.Pye});`); f = gf;
+      L.push(`        (${decl([...dco, ...dr])}) = pointDouble(${r0.join(',')});`); r0 = dr;
+      emitLine(dco, pi);
     } else if (op.t === 'al') {
+      if (fixed) { emitLine(bakedCoeffs(op.coeffs), pi); continue; }
       const Y = op.neg ? negY[op.j] : [pi.Qyae, pi.Qybe];
       const aco = fresh(6), ar = fresh(6);
-      L.push(`        (${decl([...aco, ...ar])}) = pointAdd(${r[op.j].join(',')}, ${pi.Qxae}, ${pi.Qxbe}, ${Y[0]}, ${Y[1]});`); r[op.j] = ar;
-      const hf = fresh(12); L.push(`        (${decl(hf)}) = line(${f.join(',')}, ${aco.join(',')}, ${pi.Pxe}, ${pi.Pye});`); f = hf;
-    } else { // pp: Q1/Q2 postPrecompute for pair j (2 psi add-lines)
+      L.push(`        (${decl([...aco, ...ar])}) = pointAdd(${r0.join(',')}, ${pi.Qxae}, ${pi.Qxbe}, ${Y[0]}, ${Y[1]});`); r0 = ar;
+      emitLine(aco, pi);
+    } else { // pp: Q1/Q2 postPrecompute (2 psi add-lines) for pair j
+      if (fixed) { emitLine(bakedCoeffs(op.coeffs[0]), pi); emitLine(bakedCoeffs(op.coeffs[1]), pi); continue; }
       const q1 = fresh(4);
       L.push(`        (${decl(q1)}) = psi(${pi.Qxae}, ${pi.Qxbe}, ${pi.Qyae}, ${pi.Qybe});`);
       const bco = fresh(6), br = fresh(6);
-      L.push(`        (${decl([...bco, ...br])}) = pointAdd(${r[op.j].join(',')}, ${q1.join(',')});`); r[op.j] = br;
-      const iff = fresh(12); L.push(`        (${decl(iff)}) = line(${f.join(',')}, ${bco.join(',')}, ${pi.Pxe}, ${pi.Pye});`); f = iff;
+      L.push(`        (${decl([...bco, ...br])}) = pointAdd(${r0.join(',')}, ${q1.join(',')});`); r0 = br;
+      emitLine(bco, pi);
       const q2 = fresh(4); L.push(`        (${decl(q2)}) = psi(${q1.join(',')});`);
       const q2ny = fresh(2); L.push(`        (${decl(q2ny)}) = fp2Neg(${q2[2]}, ${q2[3]}, 64);`);
       const cco = fresh(6), cr = fresh(6);
-      L.push(`        (${decl([...cco, ...cr])}) = pointAdd(${r[op.j].join(',')}, ${q2[0]}, ${q2[1]}, ${q2ny[0]}, ${q2ny[1]});`); r[op.j] = cr;
-      const jf = fresh(12); L.push(`        (${decl(jf)}) = line(${f.join(',')}, ${cco.join(',')}, ${pi.Pxe}, ${pi.Pye});`); f = jf;
+      L.push(`        (${decl([...cco, ...cr])}) = pointAdd(${r0.join(',')}, ${q2[0]}, ${q2[1]}, ${q2ny[0]}, ${q2ny[1]});`); r0 = cr;
+      emitLine(cco, pi);
     }
   }
-  L.push(covOut([...f, ...r.flat(), ...ptParams]));
+  L.push(covOut([...f, ...r0, ...ptParams]));
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
@@ -108,7 +121,7 @@ function genChunk(opLo, opHi) {
 // ---- probe ----
 if (process.argv[2] === 'probe') {
   for (const [a, b] of [[0, 4], [0, 8], [ops.length - 4, ops.length]]) {
-    const m = measureCovenant(genChunk(a, b), inState(a), outState(b));
+    const m = measureCovenantFile(genChunk(a, b), inState(a), outState(b), PROBE);
     console.error(`ops [${a},${b}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`);
   }
   process.exit(0);
@@ -122,7 +135,7 @@ while (lo < ops.length) {
   const tryHi = (hi) => {
     const outL = outState(hi);
     const src = genChunk(lo, hi);
-    const m = measureCovenant(src, inL, outL);
+    const m = measureCovenantFile(src, inL, outL, PROBE);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final: hi === ops.length, outgoing: commit(outL), src, m };
   };
   const best = planChunk(lo, ops.length, OP_TARGET, tryHi, planState);

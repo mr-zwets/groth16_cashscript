@@ -18,6 +18,10 @@ const cashc = await import(CASHC_LIB);
 const asmToBytecode = cashc.utils.asmToBytecode;
 /** compile a .cash source string -> redeem bytecode (Uint8Array); throws on compile error */
 export const compileBytecode = (src) => asmToBytecode(cashc.compileString(src).bytecode);
+/** compile a .cash FILE -> redeem bytecode. Unlike compileString, compileFile resolves
+ * relative `import` statements (it has a base path), so chunks can import the shared
+ * singleton library instead of inlining the tower functions. */
+export const compileFileBytecode = (path) => asmToBytecode(cashc.compileFile(path).bytecode);
 
 export const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
 export const OP_BUDGET = (41 + 10_000) * 800;
@@ -82,7 +86,7 @@ export function postPrecompute(f, R, Qx, Qy, Px, Py) {
   let a1 = pointAdd(R.x, R.y, R.z, q1[0], q1[1]); R = a1.R; f = lineFn(f, a1.coeffs[0], a1.coeffs[1], a1.coeffs[2], Px, Py);
   const q2 = psi(q1[0], q1[1]);
   let a2 = pointAdd(R.x, R.y, R.z, q2[0], Fp2.neg(q2[1])); R = a2.R; f = lineFn(f, a2.coeffs[0], a2.coeffs[1], a2.coeffs[2], Px, Py);
-  return { f, R };
+  return { f, R, coeffs: [a1.coeffs, a2.coeffs] };
 }
 // full single-pair miller -> { f (Fp12), R (final) }
 export function singlePairMiller(pair) {
@@ -110,12 +114,18 @@ export function millerBatchOps(pairs) {
   for (let j = 0; j < 4; j++) ops.push({ t: 'pp', j });
   const states = [];
   let f = Fp12.ONE; const Rs = pds.map((pd) => ({ x: pd.Qx, y: pd.Qy, z: Fp2.ONE }));
+  // Each non-sqr op also records its line-function coeffs (`op.coeffs`). For a pair with a
+  // FIXED VK G2 point (PT_CFG[j].Q === false) the whole R trajectory is proof-independent, so
+  // these coeffs are constants the generator can BAKE — the chunk then only evaluates the line
+  // at the runtime G1 point, skipping all on-chain G2 (pointDouble/pointAdd) work and dropping
+  // that pair's R from the carried state. `op.coeffs` is a triple of Fp2 (dl/al) or a pair of
+  // such triples (pp's two psi add-lines).
   for (const op of ops) {
     states.push({ f, Rs: Rs.slice() });
     if (op.t === 'sqr') f = Fp12.sqr(f);
-    else if (op.t === 'dl') { const d = pointDouble(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z); Rs[op.j] = d.R; f = lineFn(f, d.coeffs[0], d.coeffs[1], d.coeffs[2], pds[op.j].Px, pds[op.j].Py); }
-    else if (op.t === 'al') { const pd = pds[op.j]; const a = pointAdd(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z, pd.Qx, op.neg ? pd.negQy : pd.Qy); Rs[op.j] = a.R; f = lineFn(f, a.coeffs[0], a.coeffs[1], a.coeffs[2], pd.Px, pd.Py); }
-    else { const pd = pds[op.j]; const res = postPrecompute(f, Rs[op.j], pd.Qx, pd.Qy, pd.Px, pd.Py); f = res.f; Rs[op.j] = res.R; }
+    else if (op.t === 'dl') { const d = pointDouble(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z); Rs[op.j] = d.R; op.coeffs = d.coeffs; f = lineFn(f, d.coeffs[0], d.coeffs[1], d.coeffs[2], pds[op.j].Px, pds[op.j].Py); }
+    else if (op.t === 'al') { const pd = pds[op.j]; const a = pointAdd(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z, pd.Qx, op.neg ? pd.negQy : pd.Qy); Rs[op.j] = a.R; op.coeffs = a.coeffs; f = lineFn(f, a.coeffs[0], a.coeffs[1], a.coeffs[2], pd.Px, pd.Py); }
+    else { const pd = pds[op.j]; const res = postPrecompute(f, Rs[op.j], pd.Qx, pd.Qy, pd.Px, pd.Py); f = res.f; Rs[op.j] = res.R; op.coeffs = res.coeffs; }
   }
   states.push({ f, Rs: Rs.slice() });
   return { ops, states, boundary: f };
@@ -310,6 +320,18 @@ export function measureCovenant(src, stateInts, outLimbs) {
   let raw;
   try { raw = compileBytecode(src); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
+  return measureCovenantRaw(raw, stateInts, outLimbs);
+}
+/** Like measureCovenant, but compiles `src` from a FILE (written to `probePath`) so its
+ * relative library `import` resolves. Used by the prepared-VK Miller planner, whose chunks
+ * import the shared singleton library instead of inlining the tower functions. */
+export function measureCovenantFile(src, stateInts, outLimbs, probePath) {
+  let raw;
+  try { writeFileSync(probePath, src); raw = compileFileBytecode(probePath); }
+  catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
+  return measureCovenantRaw(raw, stateInts, outLimbs);
+}
+function measureCovenantRaw(raw, stateInts, outLimbs) {
   const locking = Uint8Array.from([OP_DROP, ...raw]);
   const argBytes = Uint8Array.from([...stateInts].reverse().flatMap((c) => [...pushInt(c)]));
   const unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]);
