@@ -1,0 +1,66 @@
+pragma cashscript ^0.13.0;
+
+// BN254 Fp2 = Fp[u]/(u^2 + 1) (noble basis: u^2 = -1). LIBRARY TARGET.
+// An Fp2 element is the pair (c0, c1) meaning c0 + c1*u. This library imports
+// the base field library and builds the next tower level on top of it -- the
+// library-imports-library (dependency graph) case.
+import "./Fp.cash";
+
+library Fp2 {
+    function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) {
+        return addFp(a0, b0), addFp(a1, b1);
+    }
+    function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) {
+        return subFp(a0, b0), subFp(a1, b1);
+    }
+    function fp2Neg(int a0, int a1) returns (int, int) {
+        return subFp(0, a0), subFp(0, a1);
+    }
+    // (a0 + a1 u)(b0 + b1 u) = (a0 b0 - a1 b1) + (a0 b1 + a1 b0) u   [Karatsuba]
+    function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+        int v0 = mulFp(a0, b0);
+        int v1 = mulFp(a1, b1);
+        int c0 = subFp(v0, v1);
+        int c1 = subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
+        return c0, c1;
+    }
+    // (a0 + a1 u)^2 = (a0+a1)(a0-a1) + 2 a0 a1 u
+    function fp2Sqr(int a0, int a1) returns (int, int) {
+        int c0 = mulFp(addFp(a0, a1), subFp(a0, a1));
+        int c1 = mulFp(2, mulFp(a0, a1));
+        return c0, c1;
+    }
+    // multiply by the sextic non-residue xi = 9 + u:
+    // (9 + u)(a0 + a1 u) = (9 a0 - a1) + (9 a1 + a0) u
+    function fp2MulXi(int a0, int a1) returns (int, int) {
+        int c0 = subFp(mulFp(9, a0), a1);
+        int c1 = addFp(mulFp(9, a1), a0);
+        return c0, c1;
+    }
+    // Frobenius a^p = conjugate over Fp2: (a0, -a1)
+    function fp2Conj(int a0, int a1) returns (int, int) {
+        return a0, negFp(a1);
+    }
+    // inverse: 1/(a0 + a1 u) = (a0 - a1 u) / (a0^2 + a1^2)
+    function fp2Inv(int a0, int a1) returns (int, int) {
+        int norm = addFp(sqrFp(a0), sqrFp(a1));
+        int factor = inverseFp(norm);
+        return mulFp(a0, factor), negFp(mulFp(a1, factor));
+    }
+    // scale each coordinate by an Fp scalar k
+    function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
+    // alias of fp2Scale used by the G2-subgroup Jacobian group law
+    function fp2Sc(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
+    // multiply by the divisive twist b = Fp2B (BN254 G2 b-coefficient)
+    function fp2MulByB(int a0, int a1) returns (int, int) {
+        (int r0, int r1) = fp2Mul(a0, a1,
+            19485874751759354771024239261021720505790618469301721065564631296452457478373,
+            266929791119991161246907387137283842545076965332900288569378510910307636690);
+        return r0, r1;
+    }
+    // multiply by 1/2 (INV2 = (p+1)/2 as an Fp scalar)
+    function fp2Half(int a0, int a1) returns (int, int) {
+        return mulFp(a0, 10944121435919637611123202872628637544348155578648911831344518947322613104292),
+               mulFp(a1, 10944121435919637611123202872628637544348155578648911831344518947322613104292);
+    }
+}

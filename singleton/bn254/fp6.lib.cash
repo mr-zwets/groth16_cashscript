@@ -1,0 +1,35 @@
+pragma cashscript ^0.13.0;
+
+// LIBRARY-SYSTEM DEMONSTRATOR for the Fp6 layer: identical correctness harness to fp6.cash, but the
+// whole Fp/Fp2/Fp6 tower comes from imports. Importing Fp6 transitively pulls Fp2 -> Fp. Tree-shaking
+// drops the Fp6/Fp2 ops spend() never calls (fp6Add/fp6Sub/fp6Neg/fp2Neg/...), so the output matches
+// the hand-written fp6.cash. Graded the same way by singleton/pairing/fp6.mjs.
+import "./lib/Fp6.cash";
+
+contract Fp6Ops() {
+    function spend(
+        int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,
+        int b0a,int b0b,int b1a,int b1b,int b2a,int b2b,
+        int m0a,int m0b,int m1a,int m1b,int m2a,int m2b,
+        int s0a,int s0b,int s1a,int s1b,int s2a,int s2b,
+        int v0a,int v0b,int v1a,int v1b,int v2a,int v2b
+    ) {
+        (int M0a,int M0b,int M1a,int M1b,int M2a,int M2b) =
+            fp6Mul(a0a,a0b,a1a,a1b,a2a,a2b, b0a,b0b,b1a,b1b,b2a,b2b);
+        require(M0a == m0a); require(M0b == m0b);
+        require(M1a == m1a); require(M1b == m1b);
+        require(M2a == m2a); require(M2b == m2b);
+
+        (int S0a,int S0b,int S1a,int S1b,int S2a,int S2b) =
+            fp6Sqr(a0a,a0b,a1a,a1b,a2a,a2b);
+        require(S0a == s0a); require(S0b == s0b);
+        require(S1a == s1a); require(S1b == s1b);
+        require(S2a == s2a); require(S2b == s2b);
+
+        (int V0a,int V0b,int V1a,int V1b,int V2a,int V2b) =
+            fp6MulByV(a0a,a0b,a1a,a1b,a2a,a2b);
+        require(V0a == v0a); require(V0b == v0b);
+        require(V1a == v1a); require(V1b == v1b);
+        require(V2a == v2a); require(V2b == v2b);
+    }
+}

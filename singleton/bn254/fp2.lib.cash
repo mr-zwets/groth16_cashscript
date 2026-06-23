@@ -1,0 +1,42 @@
+pragma cashscript ^0.13.0;
+
+// LIBRARY-SYSTEM DEMONSTRATOR: identical correctness harness to fp2.cash, but
+// the entire Fp/Fp2 tower is pulled in from libraries instead of being
+// re-declared inline. The contract body is now ONLY the spend() check -- every
+// reusable function and the field prime constant come from the imports.
+//
+// Importing Fp2.cash transitively pulls in Fp.cash (Fp2 -> Fp). The compiler
+// must dedupe the diamond and order definitions so callees are defined before
+// callers. Graded the same way as fp2.cash by singleton/pairing/fp2.mjs.
+import "./lib/Fp2.cash";
+
+contract Fp2Ops() {
+    function spend(
+        int a0, int a1, int b0, int b1,
+        int mul0, int mul1,
+        int sqr0, int sqr1,
+        int inv0, int inv1,
+        int xi0, int xi1,
+        int conj0, int conj1
+    ) {
+        (int m0, int m1) = fp2Mul(a0, a1, b0, b1);
+        require(m0 == mul0);
+        require(m1 == mul1);
+
+        (int s0, int s1) = fp2Sqr(a0, a1);
+        require(s0 == sqr0);
+        require(s1 == sqr1);
+
+        (int i0, int i1) = fp2Inv(a0, a1);
+        require(i0 == inv0);
+        require(i1 == inv1);
+
+        (int x0, int x1) = fp2MulXi(a0, a1);
+        require(x0 == xi0);
+        require(x1 == xi1);
+
+        (int j0, int j1) = fp2Conj(a0, a1);
+        require(j0 == conj0);
+        require(j1 == conj1);
+    }
+}

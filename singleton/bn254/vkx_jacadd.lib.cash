@@ -1,0 +1,78 @@
+pragma cashscript ^0.13.0;
+
+// LIBRARY-SYSTEM DEMONSTRATOR: G1 arithmetic is inlined in spend(); only the Fp base field is
+// imported. Graded the same way as vkx_jacadd.cash.
+import "./lib/Fp.cash";
+
+contract VkXJacAdd(int probe) {
+    function spend(int input1) {
+        int ic2X = 19033251874843656108471242320417533909414939332036131356573128480367742634479;
+        int ic2Y = 20792135454608030201903199625673964159744755218442260092768620403349374102584;
+        // hardcoded term-1 acc (Jacobian, Z != 1)
+        int accX = 6658854766393081772996491483672685084577556313489922771895150113991592758993;
+        int accY = 2468672094802929104226026488986983711667664315007804078500783463370694582801;
+        int accZ = 686184655061461263619834153307432782664270110630155350259885499745283178934;
+        int rX = 0; int rY = 1; int rZ = 0;
+        int bX = ic2X; int bY = ic2Y; int bZ = 1;
+        for (int i = 0; i < 254; i++) {
+            if (((input1 >> i) % 2) == 1) {
+                if (rZ == 0) { rX = bX; rY = bY; rZ = bZ; }
+                else {
+                    int z1z1 = sqrFp(rZ); int z2z2 = sqrFp(bZ);
+                    int u1 = mulFp(rX, z2z2); int u2 = mulFp(bX, z1z1);
+                    int s1 = mulFp(mulFp(rY, bZ), z2z2); int s2 = mulFp(mulFp(bY, rZ), z1z1);
+                    if (u1 == u2 && s1 == s2) {
+                        int a = sqrFp(rX); int b = sqrFp(rY); int c = sqrFp(b);
+                        int d = mulFp(2, subFp(subFp(sqrFp(addFp(rX, b)), a), c));
+                        int e = mulFp(3, a); int f = sqrFp(e);
+                        int nx = subFp(f, mulFp(2, d));
+                        int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
+                        int nz = mulFp(2, mulFp(rY, rZ));
+                        rX = nx; rY = ny; rZ = nz;
+                    } else {
+                        int h = subFp(u2, u1); int i2 = sqrFp(mulFp(2, h)); int j = mulFp(h, i2);
+                        int rr = mulFp(2, subFp(s2, s1)); int v = mulFp(u1, i2);
+                        int nx = subFp(subFp(sqrFp(rr), j), mulFp(2, v));
+                        int ny = subFp(mulFp(rr, subFp(v, nx)), mulFp(2, mulFp(s1, j)));
+                        int nz = mulFp(subFp(subFp(sqrFp(addFp(rZ, bZ)), z1z1), z2z2), h);
+                        rX = nx; rY = ny; rZ = nz;
+                    }
+                }
+            }
+            if (bZ != 0 && bY != 0) {
+                int a = sqrFp(bX); int b = sqrFp(bY); int c = sqrFp(b);
+                int d = mulFp(2, subFp(subFp(sqrFp(addFp(bX, b)), a), c));
+                int e = mulFp(3, a); int f = sqrFp(e);
+                int nx = subFp(f, mulFp(2, d));
+                int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
+                int nz = mulFp(2, mulFp(bY, bZ));
+                bX = nx; bY = ny; bZ = nz;
+            }
+        }
+        if (rZ != 0) {
+            int z1z1 = sqrFp(accZ); int z2z2 = sqrFp(rZ);
+            int u1 = mulFp(accX, z2z2); int u2 = mulFp(rX, z1z1);
+            int s1 = mulFp(mulFp(accY, rZ), z2z2); int s2 = mulFp(mulFp(rY, accZ), z1z1);
+            if (u1 == u2 && s1 == s2) {
+                int a = sqrFp(accX); int b = sqrFp(accY); int c = sqrFp(b);
+                int d = mulFp(2, subFp(subFp(sqrFp(addFp(accX, b)), a), c));
+                int e = mulFp(3, a); int f = sqrFp(e);
+                int nx = subFp(f, mulFp(2, d));
+                int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
+                int nz = mulFp(2, mulFp(accY, accZ));
+                accX = nx; accY = ny; accZ = nz;
+            } else {
+                int h = subFp(u2, u1); int i2 = sqrFp(mulFp(2, h)); int j = mulFp(h, i2);
+                int rr = mulFp(2, subFp(s2, s1)); int v = mulFp(u1, i2);
+                int nx = subFp(subFp(sqrFp(rr), j), mulFp(2, v));
+                int ny = subFp(mulFp(rr, subFp(v, nx)), mulFp(2, mulFp(s1, j)));
+                int nz = mulFp(subFp(subFp(sqrFp(addFp(accZ, rZ)), z1z1), z2z2), h);
+                accX = nx; accY = ny; accZ = nz;
+            }
+        }
+        int zInv = inverseFp(accZ);
+        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);
+        require(mulFp(accY, zInv3) == mulFp(accY, zInv3));
+        require(mulFp(accX, zInv2) == probe);
+    }
+}

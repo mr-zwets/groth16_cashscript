@@ -1,0 +1,34 @@
+pragma cashscript ^0.13.0;
+
+// LIBRARY-SYSTEM DEMONSTRATOR for the 4-pair Miller product (Groth16 boundary, pre-final-exp).
+// millerSingle + fp12Mul come from the libraries. Graded by miller4.mjs.
+import "./lib/Miller.cash";
+
+contract Miller4() {
+    function spend(
+        int Q1xa,int Q1xb,int Q1ya,int Q1yb,int P1x,int P1y,
+        int Q2xa,int Q2xb,int Q2ya,int Q2yb,int P2x,int P2y,
+        int Q3xa,int Q3xb,int Q3ya,int Q3yb,int P3x,int P3y,
+        int Q4xa,int Q4xb,int Q4ya,int Q4yb,int P4x,int P4y,
+        int M0,int M1,int M2,int M3,int M4,int M5,int M6,int M7,int M8,int M9,int M10,int M11
+    ) {
+        (int a0,int a1,int a2,int a3,int a4,int a5,int a6,int a7,int a8,int a9,int a10,int a11) =
+            millerSingle(Q1xa,Q1xb,Q1ya,Q1yb,P1x,P1y);
+        (int b0,int b1,int b2,int b3,int b4,int b5,int b6,int b7,int b8,int b9,int b10,int b11) =
+            millerSingle(Q2xa,Q2xb,Q2ya,Q2yb,P2x,P2y);
+        (int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11) =
+            millerSingle(Q3xa,Q3xb,Q3ya,Q3yb,P3x,P3y);
+        (int d0,int d1,int d2,int d3,int d4,int d5,int d6,int d7,int d8,int d9,int d10,int d11) =
+            millerSingle(Q4xa,Q4xb,Q4ya,Q4yb,P4x,P4y);
+
+        (int ab0,int ab1,int ab2,int ab3,int ab4,int ab5,int ab6,int ab7,int ab8,int ab9,int ab10,int ab11) =
+            fp12Mul(a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11, b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11);
+        (int abc0,int abc1,int abc2,int abc3,int abc4,int abc5,int abc6,int abc7,int abc8,int abc9,int abc10,int abc11) =
+            fp12Mul(ab0,ab1,ab2,ab3,ab4,ab5,ab6,ab7,ab8,ab9,ab10,ab11, c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11);
+        (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7,int r8,int r9,int r10,int r11) =
+            fp12Mul(abc0,abc1,abc2,abc3,abc4,abc5,abc6,abc7,abc8,abc9,abc10,abc11, d0,d1,d2,d3,d4,d5,d6,d7,d8,d9,d10,d11);
+
+        require(r0==M0); require(r1==M1); require(r2==M2); require(r3==M3); require(r4==M4); require(r5==M5);
+        require(r6==M6); require(r7==M7); require(r8==M8); require(r9==M9); require(r10==M10); require(r11==M11);
+    }
+}

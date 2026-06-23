@@ -1,0 +1,34 @@
+pragma cashscript ^0.13.0;
+
+// BN254 base field Fp over the prime p. LIBRARY TARGET (library-system WIP):
+// a `library` is a file-level bag of reusable functions + constants. Every
+// member function is implicitly `internal` (reusable -> OP_DEFINE/OP_INVOKE),
+// since a library has no spending function. `P` is a global `constant`, inlined
+// at compile time at each use site -> single source of truth for the prime.
+//
+// Consumed via `import "./lib/Fp.cash";` which brings these names into the
+// importing contract/library scope unqualified (addFp, mulFp, ...).
+library Fp {
+    int constant P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+
+    function addFp(int x, int y) returns (int) { return (x + y) % P; }
+    function subFp(int x, int y) returns (int) { return (x - y + P) % P; }
+    function mulFp(int x, int y) returns (int) { return (x * y) % P; }
+    function sqrFp(int x) returns (int) { return (x * x) % P; }
+    function negFp(int x) returns (int) { return (P - x) % P; }
+
+    // Fermat inverse x^(p-2) mod p over the 254 bits of (p-2). The prime is bound to a local `p` (as
+    // in the hand-written sources) so the 254-iteration loop reuses one stack slot rather than
+    // re-pushing the 32-byte literal each iteration.
+    function inverseFp(int x) returns (int) {
+        int p = P;
+        int e = p - 2;
+        int result = 1;
+        int current = x % p;
+        for (int i = 0; i < 254; i = i + 1) {
+            if (((e >> i) % 2) == 1) { result = (result * current) % p; }
+            current = (current * current) % p;
+        }
+        return result;
+    }
+}

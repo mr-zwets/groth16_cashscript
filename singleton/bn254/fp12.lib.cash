@@ -1,0 +1,30 @@
+pragma cashscript ^0.13.0;
+
+// LIBRARY-SYSTEM DEMONSTRATOR for the Fp12 layer (mul / sqr / conjugate): same correctness harness as
+// fp12.cash, with the whole Fp/Fp2/Fp6/Fp12 tower pulled from imports. Graded by singleton/pairing/fp12.mjs.
+import "./lib/Fp12.cash";
+
+contract Fp12Ops() {
+    function spend(
+        int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8,int A9,int A10,int A11,
+        int B0,int B1,int B2,int B3,int B4,int B5,int B6,int B7,int B8,int B9,int B10,int B11,
+        int M0,int M1,int M2,int M3,int M4,int M5,int M6,int M7,int M8,int M9,int M10,int M11,
+        int S0,int S1,int S2,int S3,int S4,int S5,int S6,int S7,int S8,int S9,int S10,int S11,
+        int J0,int J1,int J2,int J3,int J4,int J5,int J6,int J7,int J8,int J9,int J10,int J11
+    ) {
+        (int m0,int m1,int m2,int m3,int m4,int m5,int m6,int m7,int m8,int m9,int m10,int m11) =
+            fp12Mul(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11, B0,B1,B2,B3,B4,B5,B6,B7,B8,B9,B10,B11);
+        require(m0==M0); require(m1==M1); require(m2==M2); require(m3==M3); require(m4==M4); require(m5==M5);
+        require(m6==M6); require(m7==M7); require(m8==M8); require(m9==M9); require(m10==M10); require(m11==M11);
+
+        (int s0,int s1,int s2,int s3,int s4,int s5,int s6,int s7,int s8,int s9,int s10,int s11) =
+            fp12Sqr(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+        require(s0==S0); require(s1==S1); require(s2==S2); require(s3==S3); require(s4==S4); require(s5==S5);
+        require(s6==S6); require(s7==S7); require(s8==S8); require(s9==S9); require(s10==S10); require(s11==S11);
+
+        (int j0,int j1,int j2,int j3,int j4,int j5,int j6,int j7,int j8,int j9,int j10,int j11) =
+            fp12Conj(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+        require(j0==J0); require(j1==J1); require(j2==J2); require(j3==J3); require(j4==J4); require(j5==J5);
+        require(j6==J6); require(j7==J7); require(j8==J8); require(j9==J9); require(j10==J10); require(j11==J11);
+    }
+}
