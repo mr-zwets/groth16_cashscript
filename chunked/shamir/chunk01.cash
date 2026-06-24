@@ -11,7 +11,7 @@ contract VkxChunk01() {
         // 34 down to 0 (count 35); body compiled ONCE.
         for (int k = 0; k < 35; k = k + 1) {
             int i = 34 - k;
-            // double R (guarded rZ != 0, matching the py_ecc reference)
+            // double R (guarded rZ != 0, matching the reference)
             if (rZ != 0) {
                 (int dx, int dy, int dz) = jacDouble(rX, rY, rZ);
                 rX = dx; rY = dy; rZ = dz;
