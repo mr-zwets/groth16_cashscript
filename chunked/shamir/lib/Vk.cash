@@ -1,0 +1,18 @@
+pragma cashscript ^0.13.0;
+
+// VK-specific layer: the 2-bit Shamir point select over the verifying-key
+// constants {IC1, IC2, T=IC1+IC2}. GENERATED from the VK vectors. A chunk that
+// imports this transitively pulls in the whole tower (Vk -> G1 -> Fp).
+import "./G1.cash";
+
+library Vk {
+    function selectPoint(int b0, int b1) returns (int, int, int) {
+        int aX = 0;
+        int aY = 0;
+        int doAdd = 0;
+        if (b0 == 1 && b1 == 1) { aX = 20687098839691105097230132006705975099432129393118730698937199498853576759031; aY = 2784555085364475896955849729890301289648525422842103121195101376751786827234; doAdd = 1; }
+        else { if (b0 == 1) { aX = 10415861484417082502655338383609494480414113902179649885744799961447382638712; aY = 10196215078179488638353184030336251401353352596818396260819493263908881608606; doAdd = 1; }
+               else { if (b1 == 1) { aX = 19033251874843656108471242320417533909414939332036131356573128480367742634479; aY = 20792135454608030201903199625673964159744755218442260092768620403349374102584; doAdd = 1; } } }
+        return aX, aY, doAdd;
+    }
+}

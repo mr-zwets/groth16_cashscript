@@ -1,0 +1,13 @@
+pragma cashscript ^0.13.0;
+
+// BN254 base field Fp. Shared by every shamir vk_x chunk (these ops used to
+// be replicated as `internal function`s inside each chunk). `P` is a global
+// constant, inlined at each use site -> single source of truth for the prime.
+library Fp {
+    int constant P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+
+    function addFp(int x, int y) returns (int) { return (x + y) % P; }
+    function subFp(int x, int y) returns (int) { return (x - y + P) % P; }
+    function mulFp(int x, int y) returns (int) { return (x * y) % P; }
+    function sqrFp(int x) returns (int) { return (x * x) % P; }
+}

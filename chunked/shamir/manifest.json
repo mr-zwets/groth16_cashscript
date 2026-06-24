@@ -2,7 +2,7 @@
   "K": 9700,
   "byteBudget": 9700,
   "opCostTarget": 7300000,
-  "numChunks": 3,
+  "numChunks": 2,
   "algorithm": "shamir-straus-runtime-inputs-reusable-fns",
   "input0": 123456789,
   "input1": 987654321,
@@ -20,7 +20,7 @@
       "idx": 0,
       "file": "chunk00.cash",
       "lo": 0,
-      "hi": 208,
+      "hi": 219,
       "final": false,
       "incoming": "e90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd",
       "outgoing": "e90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd",
@@ -32,17 +32,17 @@
         "987654321"
       ],
       "zInv": null,
-      "plannedLockingBytes": 1547,
-      "plannedOperationCost": 7279372
+      "plannedLockingBytes": 1456,
+      "plannedOperationCost": 7286638
     },
     {
       "idx": 1,
       "file": "chunk01.cash",
-      "lo": 208,
-      "hi": 253,
-      "final": false,
+      "lo": 219,
+      "hi": 254,
+      "final": true,
       "incoming": "e90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd",
-      "outgoing": "45314649a5f6c453523bcf7faa141d97f2b4a76877c84bcd5cf5781043ecaa62",
+      "outgoing": null,
       "incoming_state": [
         "0",
         "1",
@@ -50,28 +50,9 @@
         "123456789",
         "987654321"
       ],
-      "zInv": null,
-      "plannedLockingBytes": 1545,
-      "plannedOperationCost": 6549653
-    },
-    {
-      "idx": 2,
-      "file": "chunk02.cash",
-      "lo": 253,
-      "hi": 254,
-      "final": true,
-      "incoming": "45314649a5f6c453523bcf7faa141d97f2b4a76877c84bcd5cf5781043ecaa62",
-      "outgoing": null,
-      "incoming_state": [
-        "2132916547079936348919070588167842765533888408305742556648978655352805743022",
-        "16749705053218384097814482737108703340268344211487483281485073647898351391444",
-        "21077393759784978055856766144084175539185910121083784994289147994700039981489",
-        "123456789",
-        "987654321"
-      ],
       "zInv": "17104758268568751835279770885039215413611002676915597857860141648195334148345",
-      "plannedLockingBytes": 1656,
-      "plannedOperationCost": 452215
+      "plannedLockingBytes": 1566,
+      "plannedOperationCost": 5856840
     }
   ]
 }

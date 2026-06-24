@@ -1,77 +1,16 @@
 pragma cashscript ^0.13.0;
-// vk_x chunk 1: Shamir window [208,253) (MSB-first bit positions 45..1), final=False.
+// vk_x chunk 1: Shamir window [219,254) (MSB-first bit positions 34..0), final=True.
 // Public inputs taken at RUNTIME: carried state = (rX,rY,rZ,input0,input1);
 // per-bit add chosen in-script via 2-bit Shamir select over VK consts.
-// EC ops jacDouble/jacAdd/selectPoint are reusable functions (OP_DEFINE/
-// OP_INVOKE) defined ONCE here and invoked per iteration, not inlined.
+// EC/field ops come from the shared lib/ tower (Fp -> G1 -> Vk).
+import "./lib/Vk.cash";
 contract VkxChunk01() {
-    internal function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function sqrFp(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    internal function jacDouble(int x, int y, int z) returns (int, int, int) {
-        int a = sqrFp(x);
-        int b = sqrFp(y);
-        int c = sqrFp(b);
-        int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
-        int e = mulFp(3, a);
-        int f = sqrFp(e);
-        int nx = subFp(f, mulFp(2, d));
-        int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
-        int nz = mulFp(2, mulFp(y, z));
-        return nx, ny, nz;
-    }
-    internal function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
-        int rx = bX;
-        int ry = bY;
-        int rz = bZ;
-        if (aZ != 0) {
-            int z1z1 = sqrFp(aZ);
-            int z2z2 = sqrFp(bZ);
-            int u1 = mulFp(aX, z2z2);
-            int u2 = mulFp(bX, z1z1);
-            int s1 = mulFp(mulFp(aY, bZ), z2z2);
-            int s2 = mulFp(mulFp(bY, aZ), z1z1);
-            if (u1 == u2 && s1 == s2) {
-                int da = sqrFp(aX);
-                int db = sqrFp(aY);
-                int dc = sqrFp(db);
-                int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
-                int de = mulFp(3, da);
-                int df = sqrFp(de);
-                int dnx = subFp(df, mulFp(2, dd));
-                int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
-                int dnz = mulFp(2, mulFp(aY, aZ));
-                rx = dnx; ry = dny; rz = dnz;
-            } else {
-                int h = subFp(u2, u1);
-                int i2 = sqrFp(mulFp(2, h));
-                int jj = mulFp(h, i2);
-                int rr = mulFp(2, subFp(s2, s1));
-                int vv = mulFp(u1, i2);
-                int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
-                int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
-                int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
-                rx = anx; ry = any; rz = anz;
-            }
-        }
-        return rx, ry, rz;
-    }
-    internal function selectPoint(int b0, int b1) returns (int, int, int) {
-        int aX = 0;
-        int aY = 0;
-        int doAdd = 0;
-        if (b0 == 1 && b1 == 1) { aX = 20687098839691105097230132006705975099432129393118730698937199498853576759031; aY = 2784555085364475896955849729890301289648525422842103121195101376751786827234; doAdd = 1; }
-        else { if (b0 == 1) { aX = 10415861484417082502655338383609494480414113902179649885744799961447382638712; aY = 10196215078179488638353184030336251401353352596818396260819493263908881608606; doAdd = 1; }
-               else { if (b1 == 1) { aX = 19033251874843656108471242320417533909414939332036131356573128480367742634479; aY = 20792135454608030201903199625673964159744755218442260092768620403349374102584; doAdd = 1; } } }
-        return aX, aY, doAdd;
-    }
-    function spend(int rX, int rY, int rZ, int input0, int input1, bytes unused zeroPadding) {
+    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv, bytes unused zeroPadding) {
         require(hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40)) == 0xe90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd);
-        // bounded MSB-first loop over bit window [208,253) -> bit positions
-        // 45 down to 1 (count 45); body compiled ONCE.
-        for (int k = 0; k < 45; k = k + 1) {
-            int i = 45 - k;
+        // bounded MSB-first loop over bit window [219,254) -> bit positions
+        // 34 down to 0 (count 35); body compiled ONCE.
+        for (int k = 0; k < 35; k = k + 1) {
+            int i = 34 - k;
             // double R (guarded rZ != 0, matching the py_ecc reference)
             if (rZ != 0) {
                 (int dx, int dy, int dz) = jacDouble(rX, rY, rZ);
@@ -86,6 +25,14 @@ contract VkxChunk01() {
                 rX = ax; rY = ay; rZ = az;
             }
         }
-        require(hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40)) == 0x45314649a5f6c453523bcf7faa141d97f2b4a76877c84bcd5cf5781043ecaa62);
+        // fold IC0 (constant term) -- unconditional add of hardcoded VK const
+        (int icx, int icy, int icz) = jacAdd(rX, rY, rZ, 10744596414106452074759370245733544594153395043370666422502510773307029471145, 848677436511517736191562425154572367705380862894644942948681172815252343932, 1);
+        rX = icx; rY = icy; rZ = icz;
+        // verified inverse-on-stack: zInv supplied, require rZ*zInv == 1
+        require(mulFp(rZ, zInv) == 1);
+        int zInv2 = sqrFp(zInv);
+        int zInv3 = mulFp(zInv2, zInv);
+        require(mulFp(rX, zInv2) == 9749522656125667161218610527789566824082547561737311503154242585977001677528);
+        require(mulFp(rY, zInv3) == 11261491184979604396731387498248109768593573743752840655503305098314920652045);
     }
 }

@@ -32,12 +32,18 @@ A whole iteration becomes a handful of OP_INVOKEs (tens of bytes) instead of
 is emitted once per chunk; with tiny per-iteration cost OP-COST binds again
 (not size), so we pack many more iterations per chunk -> far fewer chunks.
 
+Those bodies live ONCE in a shared lib/ tower (Fp -> G1 -> Vk, see emit_libs());
+each chunk just `import "./lib/Vk.cash";`. Same deps-first order as the old inline
+prologue + tree-shaking -> byte-identical compiled chunks, de-duplicated source.
+
 The Jacobian->affine inverse is done with a VERIFIED inverse-on-stack: the final
 chunk's witness supplies zInv = R.Z^(p-2) mod p; the contract require()s
 mulFp(R.Z, zInv) == 1 (so a forged zInv is rejected) then x = X*zInv^2,
 y = Y*zInv^3, asserting equality with the py_ecc vk_x. No Fermat loop in-script.
 
 Emits:
+  - chunked/lib/{Fp,G1,Vk}.cash : the shared field/curve/VK library tower the
+                            chunks import (written once, before planning).
   - chunked/chunkNN.cash  : one CashScript contract per chunk, self-verifying its
                             committed incoming state via hash256, running its
                             window of MSB-first iterations (runtime bit tests),
@@ -116,13 +122,22 @@ ITERS = 254
 P = "21888242871839275222246405745257275088696311157297823662689037894645226208583"
 
 # ---------------------------------------------------------------------------
-# The reusable function prologue (OP_DEFINE bodies) -- emitted ONCE per chunk.
+# The reusable EC/field functions. Previously emitted as `internal function`
+# bodies INLINE in every chunk (replicated N times). They now live in a shared
+# lib/ tower (Fp -> G1 -> Vk) that each chunk `import`s; the bodies below are
+# emitted ONCE into the library files by emit_libs(). Import resolution merges
+# the libraries deps-first (Fp, then G1, then Vk), which is the SAME order the
+# old inline prologue used, and tree-shaking keeps exactly the reachable set --
+# so each chunk's compiled bytecode is unchanged, just de-duplicated in source.
 # ---------------------------------------------------------------------------
-def fp_funcs():
-    return f"""    internal function addFp(int x, int y) returns (int) {{ return (x + y) % {P}; }}
-    internal function subFp(int x, int y) returns (int) {{ return (x - y + {P}) % {P}; }}
-    internal function mulFp(int x, int y) returns (int) {{ return (x * y) % {P}; }}
-    internal function sqrFp(int x) returns (int) {{ return (x * x) % {P}; }}"""
+def fp_lib_funcs():
+    # Library form of the base-field ops: `function` (implicitly internal in a
+    # library) and `% P` referencing the global constant, which inlines to the
+    # same literal the old `% <prime>` bodies used.
+    return ("    function addFp(int x, int y) returns (int) { return (x + y) % P; }\n"
+            "    function subFp(int x, int y) returns (int) { return (x - y + P) % P; }\n"
+            "    function mulFp(int x, int y) returns (int) { return (x * y) % P; }\n"
+            "    function sqrFp(int x) returns (int) { return (x * x) % P; }")
 
 def jac_double_fn():
     # dbl-2009-l. When z==0 the formula yields nz = 2*Y*Z = 0, so an infinity
@@ -195,8 +210,63 @@ def select_point_fn():
         return aX, aY, doAdd;
     }}"""
 
-def prologue():
-    return "\n".join([fp_funcs(), jac_double_fn(), jac_add_fn(), select_point_fn()])
+def _to_lib_fn(s):
+    # The jac_*/select_point bodies are written as `    internal function ...`;
+    # inside a `library` they are plain `function` (implicitly internal).
+    return s.replace("internal function", "function")
+
+def emit_libs():
+    """Write the shared lib/ tower (Fp -> G1 -> Vk) imported by every chunk.
+
+    Must run BEFORE the planner: the op-cost oracle compiles candidate chunks
+    that `import "./lib/Vk.cash"`, so the library files have to exist on disk.
+    """
+    libdir = os.path.abspath('lib')
+    os.makedirs(libdir, exist_ok=True)
+
+    fp = "\n".join([
+        "pragma cashscript ^0.13.0;",
+        "",
+        "// BN254 base field Fp. Shared by every shamir vk_x chunk (these ops used to",
+        "// be replicated as `internal function`s inside each chunk). `P` is a global",
+        "// constant, inlined at each use site -> single source of truth for the prime.",
+        "library Fp {",
+        f"    int constant P = {P};",
+        "",
+        fp_lib_funcs(),
+        "}",
+        "",
+    ])
+    g1 = "\n".join([
+        "pragma cashscript ^0.13.0;",
+        "",
+        "// BN254 G1 Jacobian group law (double / add) over Fp, used by the Shamir",
+        "// double-and-add loop. Builds on the base field library.",
+        'import "./Fp.cash";',
+        "",
+        "library G1 {",
+        _to_lib_fn(jac_double_fn()),
+        _to_lib_fn(jac_add_fn()),
+        "}",
+        "",
+    ])
+    vk = "\n".join([
+        "pragma cashscript ^0.13.0;",
+        "",
+        "// VK-specific layer: the 2-bit Shamir point select over the verifying-key",
+        "// constants {IC1, IC2, T=IC1+IC2}. GENERATED from the VK vectors. A chunk that",
+        "// imports this transitively pulls in the whole tower (Vk -> G1 -> Fp).",
+        'import "./G1.cash";',
+        "",
+        "library Vk {",
+        _to_lib_fn(select_point_fn()),
+        "}",
+        "",
+    ])
+    with open(os.path.join(libdir, 'Fp.cash'), 'w') as f: f.write(fp)
+    with open(os.path.join(libdir, 'G1.cash'), 'w') as f: f.write(g1)
+    with open(os.path.join(libdir, 'Vk.cash'), 'w') as f: f.write(vk)
+    print("wrote lib/Fp.cash, lib/G1.cash, lib/Vk.cash", file=sys.stderr)
 
 # SER includes the carried public inputs.
 SER = ("hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40)"
@@ -247,10 +317,9 @@ def gen_cash(idx, ch, nchunks):
                  f" positions {253 - ch['lo']}..{253 - (ch['hi'] - 1)}), final={ch['final']}.")
     lines.append("// Public inputs taken at RUNTIME: carried state = (rX,rY,rZ,input0,input1);")
     lines.append("// per-bit add chosen in-script via 2-bit Shamir select over VK consts.")
-    lines.append("// EC ops jacDouble/jacAdd/selectPoint are reusable functions (OP_DEFINE/")
-    lines.append("// OP_INVOKE) defined ONCE here and invoked per iteration, not inlined.")
+    lines.append("// EC/field ops come from the shared lib/ tower (Fp -> G1 -> Vk).")
+    lines.append('import "./lib/Vk.cash";')
     lines.append(f"contract {name}() {{")
-    lines.append(prologue())
     if ch['final']:
         lines.append("    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv, bytes unused zeroPadding) {")
     else:
@@ -455,6 +524,9 @@ def main():
     return chunks
 
 def build_all():
+    # Emit the shared lib/ tower FIRST: the planner's op-cost oracle compiles
+    # candidate chunks that import lib/Vk.cash, so it must already exist.
+    emit_libs()
     chunks = main()
 
     # sanity vs py_ecc
