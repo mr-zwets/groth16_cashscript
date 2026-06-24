@@ -46,12 +46,14 @@ function normalizeInternal(src) {
 
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-/** parse `int a,int b, bytes c` -> [{type,name}] (single-line signature). */
+/** parse `int a,int b, bytes c` -> [{type,name,unused}] (single-line signature).
+ * Handles the cashc fork's `type unused name` budget-pad modifier (a 3-token param the
+ * compiler drops during stack cleanup); the transform strips it (we supply our own pad). */
 function parseParams(sig) {
   const inner = sig.slice(sig.indexOf('(') + 1, sig.lastIndexOf(')'));
   return inner.split(',').map((p) => p.trim()).filter(Boolean).map((p) => {
-    const m = p.match(/^(\w+)\s+(\w+)$/);
-    return { type: m[1], name: m[2] };
+    const m = p.match(/^(\w+)\s+(?:unused\s+)?(\w+)$/);
+    return { type: m[1], name: m[2], unused: /^\w+\s+unused\s+\w+$/.test(p) };
   });
 }
 
@@ -67,6 +69,17 @@ function parseParams(sig) {
  *                      nextFullInLen byte length of the successor input's FULL inBlob
  *                      skip          byte offset of the bound region inside that inBlob
  *                      cmpLen        byte length of the compared region
+ *   cfg.covInHash    (GROUPED only) when true, prepend a covenant-IN check binding the
+ *                    incoming blob to the spent token: require(tx.inputs[0].nftCommitment
+ *                    == hash256(inBlob)). Used on the FIRST chunk of a non-genesis group,
+ *                    where the previous group handed state forward through an NFT commitment
+ *                    (= hash256 of the same full state blob) instead of a sibling witness.
+ *   cfg.epilogueMode (GROUPED only) 'covout' -> instead of a forward-check, commit the
+ *                    recomputed outgoing blob to the created token: require(tx.outputs[0]
+ *                    .nftCommitment == hash256(outBlob)) + category continuity. Used on the
+ *                    LAST chunk of a non-terminal group (it has no in-tx successor to
+ *                    forward-check; it hands state to the NEXT group's tx via a token).
+ *                    Undefined => legacy behavior (forward-check / terminal).
  * Returns { src, inNames, outNames|null, extras, isTerminal, inLen, outLen }.
  */
 export function transformChunk(src, cfg) {
@@ -81,7 +94,9 @@ export function transformChunk(src, cfg) {
   if (ciIdx < 0) throw new Error('no covIn');
   const inNames = [...lines[ciIdx].matchAll(/toPaddedBytes\((\w+),\s*\d+\)/g)].map((m) => m[1]);
   const inSet = new Set(inNames);
-  const extras = params.filter((p) => !inSet.has(p.name)); // e.g. vk_x's zInv
+  // extras = real spend params that are neither incoming-state limbs nor the dropped budget
+  // pad (e.g. vk_x's zInv). The `unused` budget pad is stripped — we supply our own pad.
+  const extras = params.filter((p) => !inSet.has(p.name) && !p.unused);
 
   // locate the spend function's closing brace (track depth from the signature line).
   let depth = 0, closeIdx = -1;
@@ -109,15 +124,29 @@ export function transformChunk(src, cfg) {
     body = lines.slice(ciIdx + 1, closeIdx);
     epilogue = [];
   } else {
-    const hasIntP = lines[coIdx - 1].trim().startsWith('int P =');
+    // the reducing modulus is declared locally as `int P =` or (lazy-lib chunks) `int Pmod =`
+    // on the line before covOut; either way drop that line and the covOut from the body.
+    const hasIntP = /^int P(mod)? =/.test(lines[coIdx - 1].trim());
     body = lines.slice(ciIdx + 1, hasIntP ? coIdx - 1 : coIdx);
-    outNames = [...lines[coIdx].matchAll(/toPaddedBytes\((\w+) % P,\s*\d+\)/g)].map((m) => m[1]);
+    outNames = [...lines[coIdx].matchAll(/toPaddedBytes\((\w+)\s*%\s*P(?:mod)?,\s*\d+\)/g)].map((m) => m[1]);
     const outLen = outNames.length * W;
+    // local name `Pmod` (not `P`): chunks that import the shared singleton library inherit a
+    // global `constant P`, and `int P` would collide with it (same reason the lazy-lib covOut
+    // uses Pmod). Non-importing chunks have no global P either way, so Pmod is always safe.
     epilogue = [
-      `        int P = ${cfg.prime};`,
-      `        bytes outBlob = ${outNames.map((n) => `toPaddedBytes(${n} % P, ${W})`).join(' + ')};`,
+      `        int Pmod = ${cfg.prime};`,
+      `        bytes outBlob = ${outNames.map((n) => `toPaddedBytes(${n} % Pmod, ${W})`).join(' + ')};`,
     ];
-    if (cfg.forward) {
+    if (cfg.epilogueMode === 'covout') {
+      // GROUPED: this is the LAST chunk of a non-terminal group. There is no in-tx
+      // successor to forward-check; commit the outgoing state to the created token, which
+      // the NEXT group's first chunk binds via covInHash. Category continuity keeps the
+      // thread on the same token (the token rides input[0] of this group's tx).
+      epilogue.push(
+        `        require(tx.outputs[0].nftCommitment == hash256(outBlob));`,
+        `        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);`,
+      );
+    } else if (cfg.forward) {
       const f = cfg.forward;
       const cmp = f.cmpExpr ?? 'outBlob';
       const off = headerSize(f.nextFullInLen) + f.skip;
@@ -144,6 +173,9 @@ export function transformChunk(src, cfg) {
   let maxUsed = -1;
   used.forEach((u, p) => { if (u) maxUsed = p; });
   const prologue = [];
+  // GROUPED: a non-genesis group's first chunk binds its incoming blob to the spent token's
+  // NFT commitment (= hash256 of the same full state the previous group committed via covout).
+  if (cfg.covInHash) prologue.push(`        require(tx.inputs[0].nftCommitment == hash256(inBlob));`);
   let cur = 'inBlob';
   for (let p = 0; p <= maxUsed; p++) {
     const nm = inNames[p];
