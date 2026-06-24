@@ -28,11 +28,12 @@ const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 
 const template = hexToBin(execFileSync('node', [CASHC, join(here, 'vkx.cash'), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
 const va = vkxPoint.toAffine();
-// locking = push(expectedY) || push(expectedX) || template  (reverse decl order; no
-// OP_DROP since the unlocking carries no zero-pad here)
+// locking = push(expectedY) || push(expectedX) || template  (reverse decl order; no OP_DROP)
 const locking = (eX, eY) => Uint8Array.from([...pushInt(eY), ...pushInt(eX), ...template]);
-// unlocking = push(input1) || push(input0)  (cashc reverses spend args)
-const unlocking = (i0, i1) => Uint8Array.from([...pushInt(i1), ...pushInt(i0)]);
+// unlocking = push(input1) || push(input0) || push(zeroPadding)  (cashc reverses spend args;
+// the `unused` zeroPadding param is pushed last). Empty pad — the grader uses the loose VM.
+const PAD = encodeDataPush(new Uint8Array(0));
+const unlocking = (i0, i1) => Uint8Array.from([...pushInt(i1), ...pushInt(i0), ...PAD]);
 
 const run = (lock, unlock) => {
   const st = vm.evaluate(createTestAuthenticationProgramBch({ lockingBytecode: lock, unlockingBytecode: unlock, valueSatoshis: 1000n }));

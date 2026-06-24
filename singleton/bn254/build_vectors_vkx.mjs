@@ -17,18 +17,15 @@
 // pushes in REVERSE declaration order. VkX(expectedX, expectedY) => prepend
 // push(expectedY) then push(expectedX) ahead of the template.
 //
-// PADDING MECHANISM (mirrors chunked/shamir/build_vectors.mjs): a P2SH unlocking
-// must be PUSH-ONLY, so OP_DROP cannot live in the unlocking. We (a) PREPEND one
-// OP_DROP (0x75) to the locking/redeem bytecode and (b) APPEND one big zero-PUSH
-// as the LAST item of the unlocking. The pad lands on top of the stack and is
-// dropped first, before the contract runs. We pad to the 10,000-byte cap to buy
-// the maximum per-input op-cost budget ((41+10000)*800 = 8,032,800) -- but the
-// singleton needs ~76M op-cost, so even max padding cannot fit one input. That
-// is the CORRECT, honest result (this is the multi-input monolithic baseline).
+// PADDING MECHANISM (`unused` modifier): vkx.cash declares spend(bytes unused
+// zeroPadding, ...). The never-referenced `zeroPadding` arg is the pad -- `unused` lets
+// the compiler drop it during stack cleanup (no hand-built OP_DROP). We pad the unlocking
+// to the 10,000-byte cap to buy the max per-input op-cost budget ((41+10000)*800 =
+// 8,032,800); the singleton still needs ~76M op-cost, so even max padding cannot fit one
+// input -- the CORRECT, honest multi-input baseline.
 //
-// Unlocking layout:  <push(input1)> <push(input0)> <OP_PUSHDATA2 N 0x00*N>
-//   spend(input0, input1) -> cashc reverses -> push input1 then input0.
-// Locking layout:    OP_DROP (0x75) || push(expectedY) || push(expectedX) || template.
+// Unlocking:  push(input1) || push(input0) || <pad>  (cashc reverses; pad = zeroPadding, on top)
+// Locking:    push(expectedY) || push(expectedX) || template
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -53,7 +50,6 @@ const EXPECTED_X = 9749522656125667161218610527789566824082547561737311503154242
 const EXPECTED_Y = 11261491184979604396731387498248109768593573743752840655503305098314920652045n;
 
 const TARGET_UNLOCK = 10_000;      // pad the unlocking to the standard cap
-const OP_DROP = 0x75;
 const OP_PUSHDATA2 = 0x4d;
 const STANDARD_BUDGET = (41 + 10_000) * 800; // 8,032,800
 
@@ -94,8 +90,8 @@ const padPush = (argLen, target) => {
 const templateHex = execFileSync('node', [CASHC, join(here, 'vkx.cash'), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
 const template = hexToBin(templateHex);
 
+// No OP_DROP prefix: the pad is vkx.cash's leading `bytes unused zeroPadding` param now.
 const buildLocking = (expX, expY) => Uint8Array.from([
-  OP_DROP,
   ...pushInt(expY), // reverse declaration order: expectedY first
   ...pushInt(expX),
   ...template,
@@ -104,7 +100,7 @@ const buildLocking = (expX, expY) => Uint8Array.from([
 const lockingOK = buildLocking(EXPECTED_X, EXPECTED_Y);
 const lockingBAD = buildLocking(EXPECTED_X, EXPECTED_Y + 1n); // tampered expected -> must reject
 
-// --- unlocking: spend(input0,input1) -> push reversed (input1, input0) + zero pad ---
+// --- unlocking: spend(zeroPadding,input0,input1) -> push reversed (input1, input0) + zero pad ---
 const argBytes = Uint8Array.from([...pushInt(INPUT1), ...pushInt(INPUT0)]);
 const unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]);
 
@@ -138,7 +134,7 @@ const out = {
   description: 'full vk_x = IC0 + input0*IC1 + input1*IC2 in ONE contract (monolithic baseline)',
   input0: Number(INPUT0), input1: Number(INPUT1),
   expected: [EXPECTED_X.toString(), EXPECTED_Y.toString()],
-  padding: { maxUnlockBytes: TARGET_UNLOCK, opDropPrefix: true, padOpcode: 'OP_PUSHDATA2(0x4d)' },
+  padding: { maxUnlockBytes: TARGET_UNLOCK, mechanism: 'unused-modifier', padParam: 'zeroPadding', padOpcode: 'OP_PUSHDATA2(0x4d)' },
   budgetPerInput: STANDARD_BUDGET,
   lockingOK: binToHex(lockingOK),
   lockingBAD: binToHex(lockingBAD),

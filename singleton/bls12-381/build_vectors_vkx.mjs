@@ -6,12 +6,10 @@
 //
 //   vk_x = IC0 + input0*IC1 + input1*IC2   (G1 points on BLS12-381, b=4)
 //
-// Honesty model + constructor binding + padding mechanism are identical to the
-// BN254 builder (../bn254/build_vectors_vkx.mjs): public inputs at RUNTIME, only
-// the expected vk_x affine baked (constructor args expectedX/expectedY); locking =
-// OP_DROP || push(expY) || push(expX) || template, unlocking = push(in1) ||
-// push(in0) || zero-pad to the 10,000-byte cap (the pad lands on top and the
-// OP_DROP removes it before the contract runs).
+// Honesty model + constructor binding + padding mechanism are identical to the BN254
+// builder (../bn254/build_vectors_vkx.mjs): public inputs at RUNTIME, only the expected
+// vk_x affine baked (expectedX/expectedY); the pad is vkx.cash's leading `bytes unused
+// zeroPadding` spend arg (no hand-built OP_DROP).
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -35,7 +33,6 @@ const EXPECTED_X = va.x;
 const EXPECTED_Y = va.y;
 
 const TARGET_UNLOCK = 10_000;
-const OP_DROP = 0x75;
 const OP_PUSHDATA2 = 0x4d;
 const STANDARD_BUDGET = (41 + 10_000) * 800; // 8,032,800
 
@@ -65,7 +62,8 @@ const padPush = (argLen, target) => {
 };
 
 const template = hexToBin(execFileSync('node', [CASHC, join(here, 'vkx.cash'), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
-const buildLocking = (expX, expY) => Uint8Array.from([OP_DROP, ...pushInt(expY), ...pushInt(expX), ...template]);
+// No OP_DROP prefix: the pad is vkx.cash's leading `bytes unused zeroPadding` param now.
+const buildLocking = (expX, expY) => Uint8Array.from([...pushInt(expY), ...pushInt(expX), ...template]);
 
 const lockingOK = buildLocking(EXPECTED_X, EXPECTED_Y);
 const lockingBAD = buildLocking(EXPECTED_X, EXPECTED_Y + 1n);
@@ -97,7 +95,7 @@ const out = {
   description: 'full BLS12-381 vk_x = IC0 + input0*IC1 + input1*IC2 in ONE contract (monolithic baseline)',
   input0: Number(INPUT0), input1: Number(INPUT1),
   expected: [EXPECTED_X.toString(), EXPECTED_Y.toString()],
-  padding: { maxUnlockBytes: TARGET_UNLOCK, opDropPrefix: true, padOpcode: 'OP_PUSHDATA2(0x4d)' },
+  padding: { maxUnlockBytes: TARGET_UNLOCK, mechanism: 'unused-modifier', padParam: 'zeroPadding', padOpcode: 'OP_PUSHDATA2(0x4d)' },
   budgetPerInput: STANDARD_BUDGET,
   lockingOK: binToHex(lockingOK),
   lockingBAD: binToHex(lockingBAD),

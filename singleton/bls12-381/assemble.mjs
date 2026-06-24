@@ -223,7 +223,7 @@ ${vkxFns}
 
 ${FP_EXTRA}
 
-    function spend(int input0, int input1) {
+    function spend(bytes unused zeroPadding, int input0, int input1) {
 ${vkxCompute('input0', 'input1')}
         require(affX == expectedX);
         require(affY == expectedY);

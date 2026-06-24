@@ -6,7 +6,8 @@ pragma cashscript ^0.13.0;
 import "./lib/Fp.cash";
 
 contract VkX(int expectedX, int expectedY) {
-    function spend(int input0, int input1) {
+    // `zeroPadding`: unused arg the unlocker fills with zero bytes to buy op-cost budget.
+    function spend(bytes unused zeroPadding, int input0, int input1) {
         // Hardcoded VK IC points (affine).
         int ic0X = 10744596414106452074759370245733544594153395043370666422502510773307029471145;
         int ic0Y = 848677436511517736191562425154572367705380862894644942948681172815252343932;
