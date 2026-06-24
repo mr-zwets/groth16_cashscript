@@ -70,19 +70,21 @@ function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArg
   // compileFile (not compileString) so the g2check chunks' relative library `import` resolves;
   // it compiles the inlined vkx/miller/finalexp chunks identically.
   if (!contract) { contract = compileFileBytecode(cashFile); compileCache.set(cashFile, contract); }
-  const redeem = Uint8Array.from([OP_DROP, ...contract]); // re-executed redeem; OP_DROP discards the pad
+  const redeem = Uint8Array.from([...contract]); // trailing `bytes unused zeroPadding` param absorbs the pad (no OP_DROP)
   const rpush = encodeDataPush(redeem);                   // pushed LAST in the scriptSig (P2SH)
-  const locking = P2SH ? p2shSpk(redeem) : redeem;        // P2SH scriptPubKey (35 B) or bare [OP_DROP,contract]
+  const locking = P2SH ? p2shSpk(redeem) : redeem;        // P2SH scriptPubKey (35 B) or bare contract
   const tail = P2SH ? rpush.length : 0;                   // redeem in the scriptSig counts toward the budget
   const inCommit = commitBin(commitLimbs.map(BigInt)), outCommit = terminal ? new Uint8Array(32) : commitBin(outLimbs.map(BigInt));
   const argBytes = Uint8Array.from([...pushArgs].reverse().flatMap((c) => [...pushInt(BigInt(c))]));
-  const mkUnlock = (target) => { const pad = padBytes(target - argBytes.length - tail); return P2SH ? Uint8Array.from([...argBytes, ...pad, ...rpush]) : Uint8Array.from([...argBytes, ...pad]); };
+  // `zeroPadding` is the LAST spend param -> pushed FIRST -> pad leads: [pad][args][redeem push (P2SH)].
+  const mkUnlock = (target) => { const pad = padBytes(target - argBytes.length - tail); return P2SH ? Uint8Array.from([...pad, ...argBytes, ...rpush]) : Uint8Array.from([...pad, ...argBytes]); };
   const probe = evalCov(locking, mkUnlock(TARGET_UNLOCK), inCommit, outCommit, terminal);
   let target = tunedLen(argBytes.length + tail, probe.operationCost);
   let unlocking = mkUnlock(target);
   let real = evalCov(locking, unlocking, inCommit, outCommit, terminal);
   while (!real.accepted && target < TARGET_UNLOCK) { target = Math.min(TARGET_UNLOCK, target + 256); unlocking = mkUnlock(target); real = evalCov(locking, unlocking, inCommit, outCommit, terminal); }
-  const invalid = Uint8Array.from(unlocking); invalid[1] ^= 0x01;
+  // tamper a state limb: args follow the leading pad, so the first arg push payload is at padLen + 1.
+  const invalid = Uint8Array.from(unlocking); const padLen = unlocking.length - argBytes.length - tail; invalid[padLen + 1] ^= 0x01;
   const invReal = evalCov(locking, invalid, inCommit, outCommit, terminal);
   const r = {
     step: {
@@ -192,22 +194,25 @@ function buildG2check(inst, bad) {
   return steps;
 }
 
-// Prepend the validated g2check prologue to the COMMITTED baseline groth16 chunks. The
-// baseline vkx/miller/finalexp steps are kept verbatim — regenerating the miller here would
-// lose its lazy-arithmetic optimization (the shared lib reduces every add). buildG2check uses
-// the same proof instances, so the prologue validates exactly the points the pairing uses.
+// Build the FULL groth16 verifier FRESH, in spend order: g2check (EIP-197 input validation) ->
+// vk_x -> batched Miller -> final exp. (Previously this reused the COMMITTED baseline to keep the
+// miller's lazy-arithmetic optimization; now the miller imports the lazy LIBRARY Bls12381Lazy.cash,
+// so a fresh rebuild preserves it — no stale baseline to read.)
 const OUT = 'C:/Users/mathi/Desktop/verifier/src/bch';
-const baseline = JSON.parse(readFileSync(`${OUT}/groth16-bls12381-chunked-vectors.json`, 'utf8'));
-if (baseline.steps[0]?.label?.includes('g2check')) { console.error('!! baseline already has a g2check prologue — refusing to double-prepend'); process.exit(1); }
-const g2_0 = buildG2check(INSTANCES[0]);
-const g2_1 = buildG2check(INSTANCES[1]);
-const steps = [...g2_0, ...baseline.steps];
-const extraValidProofs = [[...g2_1, ...(baseline.extraValidProofs?.[0] ?? [])]];
+const buildGroth16 = (inst) => {
+  const g2 = buildG2check(inst);
+  const vkx = buildVkx(inst);
+  const { steps: pair, boundaryVal } = buildPairing(inst);
+  const fe = buildFinalexp(inst, boundaryVal);
+  return [...g2, ...vkx, ...pair, ...fe];
+};
+const steps = buildGroth16(INSTANCES[0]);
+const extraValidProofs = [buildGroth16(INSTANCES[1])];
 const sumOp = (a) => a.reduce((x, s) => x + s.operationCost, 0);
 const maxOpOf = (a) => Math.max(...a.map((s) => s.operationCost));
-console.error(`g2check prologue: ${g2_0.length} steps -> full groth16 now ${steps.length} steps`);
-console.error(`g2check valid run: allFit=${stats.allFit} allAccept=${stats.allAccept} allInvalidRejected=${stats.allInvalid}`);
-if (!stats.allFit || !stats.allAccept || !stats.allInvalid) { console.error('!! a g2check step did not fit/accept/reject -- NOT writing vectors'); process.exit(1); }
+console.error(`full groth16: ${steps.length} steps (g2check + vk_x + miller + finalexp)`);
+console.error(`valid run: allFit=${stats.allFit} allAccept=${stats.allAccept} allInvalidRejected=${stats.allInvalid}`);
+if (!stats.allFit || !stats.allAccept || !stats.allInvalid) { console.error('!! a step did not fit/accept/reject -- NOT writing vectors'); process.exit(1); }
 
 // ---- adversarial INPUT runs (must REJECT) for the harness's input-validation grading ----
 // off-curve A: bump A.y so y^2 != x^3+4 -> the first g2check chunk's G1 cubic require fails.
@@ -232,7 +237,7 @@ writeFileSync(`${OUT}/groth16-bls12381-chunked-vectors.json`, JSON.stringify({
   description: 'PROOF-AGNOSTIC full chunked BLS12-381 Groth16 verifier with EIP-197 input validation: a G2 prologue (on-curve A/B/C + the prime-order-subgroup test psi(B) == [-x]B) -> vk_x (on-chain from public inputs) -> a BATCHED 4-pair Miller loop -> final exponentiation -> assert verdict == Fp12 ONE, multi-tx. Generic covenant: all state + proof-derived points in the token NFT commitment (48-byte limbs), NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct instance under the same VK. invalidInputs (off-curve A, off-subgroup B) must each REJECT.',
   proofBinding: 'runtime', curve: 'BLS12-381', numSteps: steps.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(steps), maxStepOperationCost: maxOpOf(steps),
-  allFit: baseline.allFit && stats.allFit, allAccept: baseline.allAccept && stats.allAccept, allInvalidRejected: baseline.allInvalidRejected && stats.allInvalid,
+  allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
   steps, extraValidProofs,
   invalidInputs, // off-curve A + off-subgroup B; the harness requires each REJECTS (input validation)
 }, null, 2));

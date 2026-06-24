@@ -69,7 +69,7 @@ function genChunk(opLo, opHi) {
   L.push('// pair e(-A,B) keeps on-chain G2 (pointDouble/pointAdd); the fixed-VK pairs (alpha/beta,');
   L.push('// vk_x/gamma, C/delta) fold BAKED line coeffs in — no on-chain G2, no carried R.');
   L.push('contract MillerBatchChunk() {');
-  L.push(`    function spend(${decl([...inF, ...inR0, ...ptParams])}) {`);
+  L.push(`    function spend(${decl([...inF, ...inR0, ...ptParams])}, bytes unused zeroPadding) {`);
   L.push(covIn([...inF, ...inR0, ...ptParams]));
   // -Qy (bias 64) for the runtime pair's add-line with digit -1 in this window (fixed pairs
   // never do an on-chain add, so only PT_CFG[*].Q===true [pair 0] can need this).

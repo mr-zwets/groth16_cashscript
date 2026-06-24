@@ -55,15 +55,17 @@ function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArg
   const pushArgs = allArgs ?? commitLimbs;
   let redeem = compileCache.get(cashFile);
   if (!redeem) { redeem = compileBytecode(readFileSync(cashFile, 'utf8')); compileCache.set(cashFile, redeem); }
-  const locking = Uint8Array.from([OP_DROP, ...redeem]);
+  const locking = Uint8Array.from([...redeem]); // no OP_DROP: trailing `bytes unused zeroPadding` param
   const inCommit = commitBin(commitLimbs.map(BigInt)), outCommit = commitBin(outLimbs.map(BigInt));
   const argBytes = Uint8Array.from([...pushArgs].reverse().flatMap((c) => [...pushInt(BigInt(c))]));
-  const probe = evalCov(locking, Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]), inCommit, outCommit);
+  // `zeroPadding` is the LAST spend param -> pushed FIRST -> the pad leads the unlocking ([pad][args]).
+  const probe = evalCov(locking, Uint8Array.from([...padPush(argBytes.length, TARGET_UNLOCK), ...argBytes]), inCommit, outCommit);
   let target = tunedLen(argBytes.length, probe.operationCost);
-  let unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, target)]);
+  let unlocking = Uint8Array.from([...padPush(argBytes.length, target), ...argBytes]);
   let real = evalCov(locking, unlocking, inCommit, outCommit);
-  while (!real.accepted && target < TARGET_UNLOCK) { target = Math.min(TARGET_UNLOCK, target + 256); unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, target)]); real = evalCov(locking, unlocking, inCommit, outCommit); }
-  const invalid = Uint8Array.from(unlocking); invalid[1] ^= 0x01; // perturb a state limb -> commitment mismatch
+  while (!real.accepted && target < TARGET_UNLOCK) { target = Math.min(TARGET_UNLOCK, target + 256); unlocking = Uint8Array.from([...padPush(argBytes.length, target), ...argBytes]); real = evalCov(locking, unlocking, inCommit, outCommit); }
+  // tamper a state limb: args follow the leading pad, so the first arg push payload is at padLen + 1.
+  const invalid = Uint8Array.from(unlocking); const padLen = unlocking.length - argBytes.length; invalid[padLen + 1] ^= 0x01;
   const invReal = evalCov(locking, invalid, inCommit, outCommit);
   return {
     step: {

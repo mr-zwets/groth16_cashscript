@@ -12,23 +12,23 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  P, finalexpTrace, boundaryFor, pairsFor, fnExtractor, measureCov4, planChunk,
-  commit, f12limbs, decl, covIn, covOut, lazyArith,
+  P, finalexpTrace, boundaryFor, pairsFor, planChunk,
+  commit, f12limbs, decl, covIn, covOut,
 } from './_pairingmath.mjs';
+import { measureCovenantFile } from './_vkxmath.mjs';
 import { PUBLIC_INPUTS } from '../../singleton/bls12-381/bls_instance.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
 mkdirSync(GEN, { recursive: true });
+const PROBE = join(GEN, `_probe_finalexp_${process.pid}.cash`); // compile candidates from file so the lib import resolves
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 
-const ext = fnExtractor(join(here, '..', '..', 'singleton', 'bls12-381', 'finalexp.cash'));
-// addFp/subFp emitted LAZY (lazyArith). The inverse fns (inverseFp/fp2Inv/fp6Inv/fp12Inv)
-// are DROPPED: the one finalExp inverse is supplied as a verified unlocking witness, so
-// fp12Inv is never called — extracting it only bloated the prologue.
-const FNS = ['mulFp', 'fp2Add', 'fp2Sub', 'fp2Neg', 'fp2Mul', 'fp2Sqr', 'fp2MulXi', 'fp2Conj', 'fp6Add', 'fp6Sub', 'fp6Neg', 'fp6MulByV', 'fp6Mul', 'fp6FrobOdd', 'fp6FrobEven', 'fp6MulByFp2', 'fp12Mul', 'fp12Conj', 'fp12Frob1', 'fp12Frob2', 'fp12Frob3', 'fp4Square', 'cycSqr'];
-const PROLOGUE = lazyArith() + '\n' + FNS.map(ext).join('\n');
+// The lazy tower comes from the shared lazy library (imported per chunk; cashc tree-shakes the
+// unused inverse fns). Replaces the old fnExtractor-from-singleton + lazyArith, which broke when
+// the singleton migrated those functions into its (non-lazy) library layout.
+const LIB_IMPORT = '../../../singleton/bls12-381/lib/lazy/Bls12381Lazy.cash';
 const OP_FN = { cyc: 'cycSqr', mul: 'fp12Mul', conj: 'fp12Conj', f1: 'fp12Frob1', f2: 'fp12Frob2', f3: 'fp12Frob3', inv: 'fp12Inv' };
 
 // boundary (combine output) = noble pre-final-exp product
@@ -78,10 +78,10 @@ function buildChunkSrc(s, e) {
   }
   const L = [];
   L.push('pragma cashscript ^0.13.0;');
+  L.push(`import "${LIB_IMPORT}";`);
   L.push(`// BLS12-381 final-exp chunk ops [${s},${e})  final=${isLast}`);
   L.push('contract FinalExpBlsChunk() {');
-  L.push(PROLOGUE);
-  L.push(`    function spend(${decl([...committedParams, ...witnessParams])}) {`);
+  L.push(`    function spend(${decl([...committedParams, ...witnessParams])}, bytes unused zeroPadding) {`);
   L.push(covIn(committedParams)); // ONLY the committed live state is in the NFT commitment
   L.push(...body);
   if (isLast) {
@@ -97,7 +97,7 @@ function buildChunkSrc(s, e) {
   return { src: L.join('\n') + '\n', inLimbs, witnessLimbs, outLimbs, incoming: commit(liveIn.flatMap(limbsOf)), isLast };
 }
 
-const measureChunk = (c) => measureCov4(c.src, [...c.inLimbs, ...c.witnessLimbs], c.inLimbs, c.outLimbs);
+const measureChunk = (c) => measureCovenantFile(c.src, [...c.inLimbs, ...c.witnessLimbs], c.inLimbs, c.outLimbs, PROBE);
 
 // ---- probe ----
 if (process.argv[2] === 'probe') {

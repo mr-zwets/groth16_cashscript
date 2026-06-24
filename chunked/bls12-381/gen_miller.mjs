@@ -17,20 +17,22 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp2, ATE_NAF, millerBatchOps, f12limbs, r6limbs, pairsFor, commit,
-  measureCovenant, planChunk, covIn, covOut, PT_CFG, ptLimbs, fnExtractor, decl, lazyArith,
+  planChunk, covIn, covOut, PT_CFG, ptLimbs, decl,
 } from './_pairingmath.mjs';
+import { measureCovenantFile } from './_vkxmath.mjs';
 import { PUBLIC_INPUTS } from '../../singleton/bls12-381/bls_instance.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
 mkdirSync(GEN, { recursive: true });
-const MILLER_CASH = join(here, '..', '..', 'singleton', 'bls12-381', 'miller.cash');
+const PROBE = join(GEN, `_probe_miller_${process.pid}.cash`); // compile candidates from file so the lib import resolves
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 
-const ext = fnExtractor(MILLER_CASH);
-// addFp/subFp are emitted LAZY (lazyArith) instead of extracted; mulFp + the rest reduce.
-const BASE_FNS = ['mulFp', 'fp2Add', 'fp2Sub', 'fp2Neg', 'fp2Mul', 'fp2Sqr', 'fp2Scale', 'fp2MulXi', 'fp2MulByB', 'fp2Half', 'fp6Add', 'fp6Sub', 'fp6MulByV', 'fp6Mul', 'fp6Mul01', 'fp6Mul1', 'fp12Sqr', 'mul014', 'line', 'pointDouble', 'pointAdd'];
+// The lazy tower (lazy addFp/subFp + reducing mulFp and the rest) lives in the shared lazy library;
+// each chunk imports it (cashc tree-shakes). Replaces the old fnExtractor-from-singleton + lazyArith,
+// which broke when the singleton migrated those functions into its (non-lazy) library layout.
+const LIB_IMPORT = '../../../singleton/bls12-381/lib/lazy/Bls12381Lazy.cash';
 
 const PAIRS = pairsFor(PUBLIC_INPUTS);
 const PINFO = PAIRS.map((pair, j) => {
@@ -55,16 +57,15 @@ const finalLimbs = withPts([...f12limbs(finalF), ...states[ops.length].Rs.flatMa
 const outState = (i, final) => final ? finalLimbs : withPts(stateLimbs(states[i]));
 
 function genChunk(opLo, opHi, final) {
-  const fns = lazyArith() + '\n' + BASE_FNS.map(ext).join('\n');
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR = [0, 1, 2, 3].map((j) => [`R${j}xa`, `R${j}xb`, `R${j}ya`, `R${j}yb`, `R${j}za`, `R${j}zb`]);
   const L = [];
   L.push('pragma cashscript ^0.13.0;');
+  L.push(`import "${LIB_IMPORT}";`);
   L.push(`// GENERIC batched BLS12-381 Miller covenant chunk: ops [${opLo},${opHi}), final=${final}.`);
   L.push('// state = f(12) + R0..R3(24) [+ runtime points]; lives in the token NFT commitment.');
   L.push('contract MillerBatchBlsChunk() {');
-  L.push(fns);
-  L.push(`    function spend(${decl([...inF, ...inR.flat(), ...ptParams])}) {`);
+  L.push(`    function spend(${decl([...inF, ...inR.flat(), ...ptParams])}, bytes unused zeroPadding) {`);
   L.push(covIn([...inF, ...inR.flat(), ...ptParams]));
   // -Qy for any runtime-Q pair that does an add-line with digit -1 in this window
   const negY = PINFO.map((pi) => [pi.Qyae, pi.Qybe]);
@@ -101,7 +102,7 @@ function genChunk(opLo, opHi, final) {
 // ---- probe ----
 if (process.argv[2] === 'probe') {
   for (const [a, b, fin] of [[0, 4, false], [0, 8, false], [ops.length - 4, ops.length, true]]) {
-    const m = measureCovenant(genChunk(a, b, fin), inState(a), outState(b, fin));
+    const m = measureCovenantFile(genChunk(a, b, fin), inState(a), inState(a), outState(b, fin), PROBE);
     console.error(`ops [${a},${b}) final=${fin}: lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`);
   }
   process.exit(0);
@@ -116,7 +117,7 @@ while (lo < ops.length) {
     const final = hi === ops.length;
     const outL = outState(hi, final);
     const src = genChunk(lo, hi, final);
-    const m = measureCovenant(src, inL, outL);
+    const m = measureCovenantFile(src, inL, inL, outL, PROBE);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final, outgoing: commit(outL), src, m };
   };
   const best = planChunk(lo, ops.length, OP_TARGET, tryHi, planState);

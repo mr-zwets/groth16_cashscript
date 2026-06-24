@@ -8,10 +8,11 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { fnExtractor, measureCovenant, planChunk, covIn, covOut, decl, proof } from './_millermath.mjs';
+import { measureCovenantFile, planChunk, covIn, covOut, decl, proof } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
+const PROBE = join(GEN, `_probe_g2check_${process.pid}.cash`); // planner compiles candidates from file so the lib import resolves
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_900_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
@@ -64,19 +65,21 @@ const stateLimbs = (R) => [...rLimbs(R), ...Blimbs, ...AClimbs]; // R(6)+B(4)+A(
 const B2 = [19485874751759354771024239261021720505790618469301721065564631296452457478373n,
             266929791119991161246907387137283842545076965332900288569378510910307636690n]; // twist b2
 
-// ---- contract emitter (reuses verified groth16.cash functions) ----
-const ext = fnExtractor(join(here, '..', '..', 'singleton', 'bn254', 'groth16.cash'));
-const PROLOGUE = ['addFp', 'subFp', 'mulFp', 'sqrFp', 'fp2Add', 'fp2Sub', 'fp2Mul', 'fp2Sqr', 'fp2Sc', 'fp2Conj', 'g2Double', 'g2AddAffine', 'psi'].map(ext).join('\n');
+// ---- contract emitter (reuses verified groth16 tower via the shared singleton library) ----
+// Miller.cash transitively pulls in the whole non-lazy field tower (Fp12->...->Fp2->Fp) plus
+// psi/g2Double/g2AddAffine; cashc tree-shakes the unused functions. Tracks the singleton's library
+// migration, which moved these out of groth16.cash (so fnExtractor-inlining no longer resolves).
+const LIB_IMPORT = '../../../singleton/bn254/lib/Miller.cash';
 const RN = ['RXa', 'RXb', 'RYa', 'RYb', 'RZa', 'RZb'], BN = ['Bxa', 'Bxb', 'Bya', 'Byb'], ACN = ['Ax', 'Ay', 'Cx', 'Cy'];
 const ALL = [...RN, ...BN, ...ACN];
 
 function genChunk(lo, hi, isFirst, isLast) {
   const L = [];
   L.push('pragma cashscript ^0.13.0;');
+  L.push(`import "${LIB_IMPORT}";`);
   L.push(`// G2 input-validation chunk: [6x^2]B double-and-add bits [${lo},${hi}); first=${isFirst} last=${isLast}.`);
   L.push('contract G2Check() {');
-  L.push(PROLOGUE);
-  L.push(`    function spend(${decl(ALL)}) {`);
+  L.push(`    function spend(${decl(ALL)}, bytes unused zeroPadding) {`);
   L.push(covIn(ALL)); // incoming (R,B,A,C) == spent token commitment
   if (isFirst) {
     L.push('        require(mulFp(Ay, Ay) == addFp(mulFp(mulFp(Ax, Ax), Ax), 3));'); // A on G1
@@ -120,7 +123,7 @@ while (lo < NBITS) {
     const last = hi === NBITS;
     const outLimbs = last ? [] : stateLimbs(g2checkAccAt(B, hi));
     const src = genChunk(lo, hi, lo === 0, last);
-    const m = measureCovenant(src, inLimbs, outLimbs);
+    const m = measureCovenantFile(src, inLimbs, outLimbs, PROBE);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, last, src, m };
   };
   const best = planChunk(lo, NBITS, OP_TARGET, tryHi, planState);

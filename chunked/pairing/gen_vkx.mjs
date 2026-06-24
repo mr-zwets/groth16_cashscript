@@ -139,7 +139,7 @@ function genCash(lo, hi, final, incoming, outgoing) {
   L.push(`// vk_x (pairing instance) chunk: Shamir window [${lo},${hi}), final=${final}.`);
   L.push('contract VkxChunk() {');
   L.push(prologue());
-  L.push(final ? '    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv) {' : '    function spend(int rX, int rY, int rZ, int input0, int input1) {');
+  L.push(final ? '    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv, bytes unused zeroPadding) {' : '    function spend(int rX, int rY, int rZ, int input0, int input1, bytes unused zeroPadding) {');
   L.push(covIn(['rX', 'rY', 'rZ', 'input0', 'input1'])); // incoming accumulator+inputs == spent token commitment
   L.push(`        for (int k = 0; k < ${count}; k = k + 1) {`);
   L.push(`            int i = ${hiBit} - k;`);

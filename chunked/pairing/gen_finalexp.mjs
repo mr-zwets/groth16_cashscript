@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp12, Fp2, bn254, vec, fnExtractor, measureCovenant, planChunk, commit, f12limbs, decl, covIn, covOut,
+  Fp12, Fp2, bn254, vec, measureCovenantFile, planChunk, commit, f12limbs, decl, covIn, covOut,
 } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -26,10 +26,10 @@ const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const BN_X = 4965661367192848881n;
 const X_LEN = 63;
 
-// ---- finalexp primitive functions (prologue) from singleton finalexp.cash ----
-const ext = fnExtractor(join(here, '..', '..', 'singleton', 'bn254', 'finalexp.cash'));
-const FNS = ['addFp', 'subFp', 'mulFp', 'inverseFp', 'fp2Add', 'fp2Sub', 'fp2Neg', 'fp2Scale', 'fp2Mul', 'fp2Sqr', 'fp2MulXi', 'fp2Conj', 'fp2Inv', 'fp6Add', 'fp6Sub', 'fp6Neg', 'fp6MulByV', 'fp6Mul', 'fp6Inv', 'fp6FrobOdd', 'fp6FrobEven', 'fp6MulByFp2', 'fp12Mul', 'fp12Conj', 'fp12Inv', 'fp12Frob1', 'fp12Frob2', 'fp12Frob3', 'fp4Square', 'cycSqr'];
-const PROLOGUE = FNS.map(ext).join('\n');
+// Tower/pairing functions come from the shared singleton library; each chunk imports it (cashc
+// tree-shakes the unused half). Matches gen_miller.mjs — and tracks the singleton's library
+// migration, which moved these out of finalexp.cash (so fnExtractor-inlining no longer resolves).
+const LIB_IMPORT = '../../../singleton/bn254/lib/lazy/Bn254Lazy.cash';
 const OP_FN = { cyc: 'cycSqr', mul: 'fp12Mul', conj: 'fp12Conj', f1: 'fp12Frob1', f2: 'fp12Frob2', f3: 'fp12Frob3', inv: 'fp12Inv' };
 
 // ---- trace finalExp as an op list (values computed with noble) ----
@@ -93,10 +93,10 @@ function buildChunkSrc(s, e) {
   let uid = 0; const fresh = () => Array.from({ length: 12 }, () => `t${uid++}`);
   const L = [];
   L.push('pragma cashscript ^0.13.0;');
+  L.push(`import "${LIB_IMPORT}";`);
   L.push(`// final-exp chunk ops [${s},${e})  final=${isLast}`);
   L.push('contract FinalExpChunk() {');
-  L.push(PROLOGUE);
-  L.push(`    function spend(${decl(params)}) {`);
+  L.push(`    function spend(${decl(params)}, bytes unused zeroPadding) {`);
   L.push(covIn(liveIn.flatMap(vnames))); // incoming live state == spent token commitment
   for (let i = s; i < e; i++) {
     const o = ops[i];
@@ -122,10 +122,10 @@ function buildChunkSrc(s, e) {
 
 // ---------- probe ----------
 if (process.argv[2] === 'probe') {
-  const fnOnly = `pragma cashscript ^0.13.0;\ncontract P(){\n${PROLOGUE}\n    function spend(int x){ require(x==x); }\n}\n`;
+  const fnOnly = `pragma cashscript ^0.13.0;\nimport "${LIB_IMPORT}";\ncontract P(){\n    function spend(int x){ require(x==x); }\n}\n`;
   writeFileSync(PROBE, fnOnly);
   console.error('function-set size:', execFileSync('node', ['C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js', PROBE, '-s'], { encoding: 'utf8' }).trim());
-  for (const e of [1, 2, 3, 5]) { const c = buildChunkSrc(0, e); const m = measureCovenant(c.src, c.inLimbs, c.outLimbs); console.error(`ops[0,${e}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`); }
+  for (const e of [1, 2, 3, 5]) { const c = buildChunkSrc(0, e); const m = measureCovenantFile(c.src, c.inLimbs, c.outLimbs, PROBE); console.error(`ops[0,${e}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`); }
   try { execFileSync('rm', [PROBE]); } catch {}
   process.exit(0);
 }
@@ -136,7 +136,7 @@ const chunks = []; let s = 0; const planState = { perUnit: null };
 while (s < ops.length) {
   const tryAt = (e) => {
     const c = buildChunkSrc(s, e);
-    const m = measureCovenant(c.src, c.inLimbs, c.outLimbs);
+    const m = measureCovenantFile(c.src, c.inLimbs, c.outLimbs, PROBE);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, ...c, m };
   };
   const best = planChunk(s, ops.length, OP_TARGET, tryAt, planState);

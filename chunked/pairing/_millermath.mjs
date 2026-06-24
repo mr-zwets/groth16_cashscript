@@ -283,9 +283,9 @@ export function measureChunk(src, stateInts) {
   let raw;
   try { raw = compileBytecode(src); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
-  const locking = Uint8Array.from([OP_DROP, ...raw]);
+  const locking = Uint8Array.from([...raw]); // no OP_DROP: trailing `bytes unused zeroPadding` param
   const argBytes = Uint8Array.from([...stateInts].reverse().flatMap((c) => [...pushInt(c)]));
-  const unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]);
+  const unlocking = Uint8Array.from([...padPush(argBytes.length, TARGET_UNLOCK), ...argBytes]); // pad first (pushed first)
   const st = realVm.evaluate(createTestAuthenticationProgramBch({ lockingBytecode: locking, unlockingBytecode: unlocking, valueSatoshis: 1000n }));
   const top = st.stack[st.stack.length - 1];
   const accepted = st.error === undefined && st.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1;
@@ -309,8 +309,10 @@ export const covIn = (names) =>
   `        require(tx.inputs[this.activeInputIndex].nftCommitment == ${serExpr(names)});`;
 /** require: output[0] commits hash(outgoing, reduced) + perpetuates the token thread. */
 export const covOut = (outNames) =>
-  '        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;\n' +
-  `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((n) => `toPaddedBytes(${n} % P, 40)`).join(' + ')}));\n` +
+  // local name `Pmod` (not `P`) avoids colliding with the global `constant P` that the non-lazy
+  // library exports (g2check imports it); the lazy-lib consumers have no global P either way.
+  '        int Pmod = 21888242871839275222246405745257275088696311157297823662689037894645226208583;\n' +
+  `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((n) => `toPaddedBytes(${n} % Pmod, 40)`).join(' + ')}));\n` +
   '        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);';
 
 /** Real-VM measurer for a COVENANT chunk: drives it through a synthetic token tx
@@ -332,9 +334,9 @@ export function measureCovenantFile(src, stateInts, outLimbs, probePath) {
   return measureCovenantRaw(raw, stateInts, outLimbs);
 }
 function measureCovenantRaw(raw, stateInts, outLimbs) {
-  const locking = Uint8Array.from([OP_DROP, ...raw]);
+  const locking = Uint8Array.from([...raw]); // no OP_DROP: trailing `bytes unused zeroPadding` param
   const argBytes = Uint8Array.from([...stateInts].reverse().flatMap((c) => [...pushInt(c)]));
-  const unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]);
+  const unlocking = Uint8Array.from([...padPush(argBytes.length, TARGET_UNLOCK), ...argBytes]); // pad first (pushed first)
   const tok = (commitment) => ({ amount: 0n, category: CATEGORY, nft: { capability: 'mutable', commitment } });
   const program = {
     inputIndex: 0,

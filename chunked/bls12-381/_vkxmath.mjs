@@ -87,9 +87,9 @@ export function measureCovenantFile(src, stateInts, commitInts, outLimbs, probeP
   return measureCovenantRaw(raw, stateInts, commitInts, outLimbs);
 }
 function measureCovenantRaw(raw, stateInts, commitInts, outLimbs) {
-  const locking = Uint8Array.from([OP_DROP, ...raw]);
+  const locking = Uint8Array.from([...raw]); // no OP_DROP: trailing `bytes unused zeroPadding` param
   const argBytes = Uint8Array.from([...stateInts].reverse().flatMap((c) => [...pushInt(c)]));
-  const unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)]);
+  const unlocking = Uint8Array.from([...padPush(argBytes.length, TARGET_UNLOCK), ...argBytes]); // pad first (pushed first)
   const program = {
     inputIndex: 0,
     sourceOutputs: [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(commitBin(commitInts)) }],

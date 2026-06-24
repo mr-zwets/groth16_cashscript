@@ -74,7 +74,7 @@ function genChunk(lo, hi, isFirst, isLast) {
   L.push(`import "${LIB}/G2Check.cash";`);
   L.push(`// BLS12-381 G2 input-validation chunk: [x]B double-and-add bits [${lo},${hi}); first=${isFirst} last=${isLast}.`);
   L.push('contract G2CheckBls() {');
-  L.push(`    function spend(${decl(ALL)}) {`);
+  L.push(`    function spend(${decl(ALL)}, bytes unused zeroPadding) {`);
   L.push(covIn(ALL));
   if (isFirst) {
     L.push('        require(mulFp(Ay, Ay) == addFp(mulFp(mulFp(Ax, Ax), Ax), 4));'); // A on G1 (b=4)
