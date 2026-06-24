@@ -3,22 +3,22 @@
 // Writes src/bch/vkx-chunked-vectors.json into the verifier repo for the
 // bch-vkx-chunked benchmark entry.
 //
-// PADDING MECHANISM (the key to fitting one BCH input):
-//   A P2SH unlocking must be PUSH-ONLY, so OP_DROP cannot live in the unlocking.
-//   Instead we (a) PREPEND one OP_DROP (0x75) to the locking/redeem bytecode and
-//   (b) APPEND one big zero-PUSH as the LAST item of the unlocking. The pad push
-//   lands on top of the stack and is dropped first, before the contract runs.
-//   Padding the unlocking to ~10,000 bytes buys the real-VM op-cost budget
-//   (41 + 10000) * 800 = 8,032,800 for that input.
+// PADDING MECHANISM (`unused` modifier): each chunk's spend() ends with a trailing
+//   `bytes unused zeroPadding` arg the unlocker fills with zero bytes to buy the real-VM
+//   op-cost budget ((41 + 10000) * 800 = 8,032,800). `unused` exempts it from the
+//   unused-variable check and the compiler drops it during stack cleanup, so no OP_DROP
+//   prefix is needed. As the LAST param it is pushed FIRST -> it sits at the bottom of
+//   the stack (the coords keep their positions, so the bytecode is unchanged but for one
+//   cleanup OP_NIP -- cost-neutral, unlike a leading pad which deepens every coord access).
 //
 // Unlocking layout:
-//   <arg pushes, REVERSE declaration order> <OP_PUSHDATA2 N 0x00*N>
-//   spend() declares (accX,accY,accZ,bX,bY,bZ,rX,rY,rZ) so the spender pushes
-//   rZ,rY,rX,bZ,bY,bX,accZ,accY,accX (cashc reverses ctor/function args).
-//   Arg ints are pushed with MINIMAL encoding (OP_0 for 0, OP_1..OP_16 for
-//   1..16, else a data push) -- libauth's real VM rejects non-minimal pushes.
+//   <OP_PUSHDATA2 N 0x00*N> <arg pushes, REVERSE declaration order>
+//   spend() declares (accX,accY,accZ,bX,bY,bZ,rX,rY,rZ,zeroPadding) so the spender pushes
+//   the zeroPadding pad first, then rZ..accX (cashc reverses args). Arg ints use MINIMAL
+//   encoding (OP_0 for 0, OP_1..OP_16 for 1..16, else a data push) -- libauth's real VM
+//   rejects non-minimal pushes.
 //
-// Locking layout:  OP_DROP (0x75) || compiled chunk redeem bytecode.
+// Locking layout:  compiled chunk redeem bytecode (no OP_DROP prefix).
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -36,10 +36,11 @@ const {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
-const manifest = JSON.parse(readFileSync(join(here, 'manifest.json'), 'utf8'));
+// Chunk contracts + manifest are generated (gitignored); run `python gen_chunks.py` first.
+const GEN = join(here, 'generated');
+const manifest = JSON.parse(readFileSync(join(GEN, 'manifest.json'), 'utf8'));
 
 const TARGET_UNLOCK = 10_000;      // pad each unlocking up to this many bytes
-const OP_DROP = 0x75;
 const OP_PUSHDATA2 = 0x4d;         // 0x4d = PUSHDATA2 (2-byte LE length)
 const STANDARD_BUDGET = (41 + 10_000) * 800; // 8,032,800
 
@@ -79,7 +80,7 @@ const padPush = (argLen) => {
 const out = {
   K: manifest.K, numChunks: manifest.numChunks, input0: manifest.input0,
   input1: manifest.input1, expected: manifest.expected,
-  padding: { targetUnlockBytes: TARGET_UNLOCK, opDropPrefix: true, padOpcode: 'OP_PUSHDATA2(0x4d)' },
+  padding: { targetUnlockBytes: TARGET_UNLOCK, mechanism: 'unused-modifier', padParam: 'zeroPadding', padOpcode: 'OP_PUSHDATA2(0x4d)' },
   budgetPerInput: STANDARD_BUDGET,
   chunks: [],
 };
@@ -87,17 +88,18 @@ let totalOp = 0, maxOp = 0, maxLock = 0, maxUnlock = 0;
 let allFit = true, allAccept = true, allReal = true;
 
 for (const ch of manifest.chunks) {
-  const lockHex = execFileSync('node', [CASHC, join(here, ch.file), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
+  const lockHex = execFileSync('node', [CASHC, join(GEN, ch.file), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
   const rawLock = hexToBin(lockHex);
-  // PREPEND OP_DROP to consume the padding push that lands on top of the stack.
-  const locking = Uint8Array.from([OP_DROP, ...rawLock]);
+  // No OP_DROP: the pad is the chunk's leading `bytes unused zeroPadding` param now.
+  const locking = Uint8Array.from([...rawLock]);
 
-  // unlocking: 9 coords reverse declaration order, MINIMAL pushes, then big zero pad.
+  // unlocking: big zero pad first (trailing `zeroPadding` param -> pushed first), then
+  // the 9 coords in reverse declaration order with MINIMAL pushes.
   const coords = ch.incoming_state.map((s) => BigInt(s)); // [accX..rZ]
   const reversed = [...coords].reverse();                 // rZ..accX
   const argBytes = Uint8Array.from(reversed.flatMap((c) => [...pushInt(c)]));
   const pad = padPush(argBytes.length);
-  const unlocking = Uint8Array.from([...argBytes, ...pad]);
+  const unlocking = Uint8Array.from([...pad, ...argBytes]);
 
   const loose = evalPair(looseVm, locking, unlocking);
   const real = evalPair(realVm, locking, unlocking);

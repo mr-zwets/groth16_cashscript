@@ -3,23 +3,22 @@
 // Writes src/bch/vkx-chunked-shamir-vectors.json into the verifier repo for the
 // bch-vkx-chunked benchmark entry.
 //
-// PADDING MECHANISM (the key to fitting one BCH input):
-//   A P2SH unlocking must be PUSH-ONLY, so OP_DROP cannot live in the unlocking.
-//   Instead we (a) PREPEND one OP_DROP (0x75) to the locking/redeem bytecode and
-//   (b) APPEND one big zero-PUSH as the LAST item of the unlocking. The pad push
-//   lands on top of the stack and is dropped first, before the contract runs.
-//   Padding the unlocking to ~10,000 bytes buys the real-VM op-cost budget
-//   (41 + 10000) * 800 = 8,032,800 for that input.
+// PADDING MECHANISM (`unused` modifier): each chunk's spend() ends with a trailing
+//   `bytes unused zeroPadding` arg the unlocker fills with zero bytes to buy the real-VM
+//   op-cost budget ((41 + 10000) * 800 = 8,032,800). `unused` exempts it from the
+//   unused-variable check and the compiler drops it during stack cleanup, so no OP_DROP
+//   prefix is needed. As the LAST param it is pushed FIRST -> bottom of the stack, so the
+//   other params keep their positions and the bytecode is unchanged but for one cleanup
+//   OP_NIP (cost-neutral, unlike a leading pad which deepens every coord access).
 //
 // Unlocking layout:
-//   <arg pushes, REVERSE declaration order> <OP_PUSHDATA2 N 0x00*N>
-//   Non-final spend() declares (rX,rY,rZ,input0,input1) so the spender pushes
-//   input1,input0,rZ,rY,rX; the final chunk also appends zInv (pushed first).
-//   cashc reverses ctor/function args. Arg ints are pushed with MINIMAL encoding
-//   (OP_0 for 0, OP_1..OP_16 for 1..16, else a data push) -- libauth's real VM
-//   rejects non-minimal pushes.
+//   <OP_PUSHDATA2 N 0x00*N> <arg pushes, REVERSE declaration order>
+//   Non-final spend() declares (rX,rY,rZ,input0,input1,zeroPadding) so the spender pushes
+//   the pad first, then input1,input0,rZ,rY,rX; the final chunk inserts zInv before the
+//   pad. cashc reverses args. Arg ints use MINIMAL encoding (OP_0 for 0, OP_1..OP_16 for
+//   1..16, else a data push) -- libauth's real VM rejects non-minimal pushes.
 //
-// Locking layout:  OP_DROP (0x75) || compiled chunk redeem bytecode.
+// Locking layout:  compiled chunk redeem bytecode (no OP_DROP prefix).
 import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -40,7 +39,6 @@ const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.j
 const manifest = JSON.parse(readFileSync(join(here, 'manifest.json'), 'utf8'));
 
 const TARGET_UNLOCK = 10_000;      // pad each unlocking up to this many bytes
-const OP_DROP = 0x75;
 const OP_PUSHDATA2 = 0x4d;         // 0x4d = PUSHDATA2 (2-byte LE length)
 const STANDARD_BUDGET = (41 + 10_000) * 800; // 8,032,800
 
@@ -93,7 +91,7 @@ const out = {
   K: manifest.K, byteBudget: manifest.byteBudget, algorithm: manifest.algorithm,
   numChunks: manifest.numChunks, input0: manifest.input0,
   input1: manifest.input1, T: manifest.T, expected: manifest.expected,
-  padding: { mode: 'tuned-per-chunk (min unlock to afford op-cost)', maxUnlockBytes: TARGET_UNLOCK, opDropPrefix: true, padOpcode: 'OP_PUSHDATA2(0x4d)' },
+  padding: { mode: 'tuned-per-chunk (min unlock to afford op-cost)', maxUnlockBytes: TARGET_UNLOCK, mechanism: 'unused-modifier', padParam: 'zeroPadding', padOpcode: 'OP_PUSHDATA2(0x4d)' },
   budgetPerInput: STANDARD_BUDGET,
   chunks: [],
 };
@@ -114,22 +112,23 @@ const argListFor = (ch) => {
 for (const ch of manifest.chunks) {
   const lockHex = execFileSync('node', [CASHC, join(here, ch.file), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
   const rawLock = hexToBin(lockHex);
-  // PREPEND OP_DROP to consume the padding push that lands on top of the stack.
-  const locking = Uint8Array.from([OP_DROP, ...rawLock]);
+  // No OP_DROP: the pad is the chunk's trailing `bytes unused zeroPadding` param now.
+  const locking = Uint8Array.from([...rawLock]);
 
-  // unlocking: args reverse declaration order, MINIMAL pushes, then a TUNED zero pad.
+  // unlocking: a TUNED zero pad first (trailing `zeroPadding` param -> pushed first), then
+  // the args in reverse declaration order with MINIMAL pushes.
   const reversed = argListFor(ch);
   const argBytes = Uint8Array.from(reversed.flatMap((c) => [...pushInt(c)]));
   // Probe op-cost at full pad (its padding cost only over-estimates, so the tuned
   // pad is conservatively safe), then size the pad to the minimum that affords it.
-  const probeOp = evalPair(looseVm, locking, Uint8Array.from([...argBytes, ...padPush(argBytes.length, TARGET_UNLOCK)])).operationCost;
+  const probeOp = evalPair(looseVm, locking, Uint8Array.from([...padPush(argBytes.length, TARGET_UNLOCK), ...argBytes])).operationCost;
   let target = tunedUnlockLen(argBytes.length, probeOp);
-  let unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, target)]);
+  let unlocking = Uint8Array.from([...padPush(argBytes.length, target), ...argBytes]);
   let real = evalPair(realVm, locking, unlocking);
   // safety net: if the real VM still rejects (op-cost > tuned budget), bump and retry.
   while (!real.accepted && target < TARGET_UNLOCK) {
     target = Math.min(TARGET_UNLOCK, target + 256);
-    unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length, target)]);
+    unlocking = Uint8Array.from([...padPush(argBytes.length, target), ...argBytes]);
     real = evalPair(realVm, locking, unlocking);
   }
   const loose = evalPair(looseVm, locking, unlocking);
@@ -149,10 +148,12 @@ for (const ch of manifest.chunks) {
     const badZInv = BigInt(ch.zInv) ^ 1n; // forge the supplied inverse
     const rev = [...args, badZInv].reverse();
     const ab = Uint8Array.from(rev.flatMap((c) => [...pushInt(c)]));
-    invalidUnlocking = Uint8Array.from([...ab, ...padPush(ab.length, target)]);
+    invalidUnlocking = Uint8Array.from([...padPush(ab.length, target), ...ab]);
   } else {
     invalidUnlocking = Uint8Array.from(unlocking);
-    invalidUnlocking[1] = invalidUnlocking[1] ^ 0x01; // perturb first coord push payload
+    // args follow the leading pad, so the first coord push payload is at padLen + 1.
+    const padLen = unlocking.length - argBytes.length;
+    invalidUnlocking[padLen + 1] = invalidUnlocking[padLen + 1] ^ 0x01;
   }
   const invalidReal = evalPair(realVm, locking, invalidUnlocking);
 

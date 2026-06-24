@@ -66,7 +66,7 @@ contract VkxChunk02() {
                else { if (b1 == 1) { aX = 19033251874843656108471242320417533909414939332036131356573128480367742634479; aY = 20792135454608030201903199625673964159744755218442260092768620403349374102584; doAdd = 1; } } }
         return aX, aY, doAdd;
     }
-    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv) {
+    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv, bytes unused zeroPadding) {
         require(hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40)) == 0x45314649a5f6c453523bcf7faa141d97f2b4a76877c84bcd5cf5781043ecaa62);
         // bounded MSB-first loop over bit window [253,254) -> bit positions
         // 0 down to 0 (count 1); body compiled ONCE.

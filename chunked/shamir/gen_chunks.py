@@ -252,9 +252,9 @@ def gen_cash(idx, ch, nchunks):
     lines.append(f"contract {name}() {{")
     lines.append(prologue())
     if ch['final']:
-        lines.append("    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv) {")
+        lines.append("    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv, bytes unused zeroPadding) {")
     else:
-        lines.append("    function spend(int rX, int rY, int rZ, int input0, int input1) {")
+        lines.append("    function spend(int rX, int rY, int rZ, int input0, int input1, bytes unused zeroPadding) {")
     lines.append(f"        require({SER} == 0x{ch['incoming']});")
     lines.append(loop_lines(ch['lo'], ch['hi']))
     if ch['final']:
@@ -329,7 +329,7 @@ const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bit
   const la = await import(LIBAUTH);
   const { hexToBin, bigIntToVmNumber, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } = la;
   const realVm = createVirtualMachineBch2026(false);
-  const TARGET_UNLOCK = 10000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
+  const TARGET_UNLOCK = 10000, OP_PUSHDATA2 = 0x4d;
   const pushInt = (n) => {
     const d = bigIntToVmNumber(n);
     if (d.length === 0) return Uint8Array.from([0x00]);
@@ -346,10 +346,10 @@ const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bit
   const coords = argv.slice(2).map((s) => BigInt(s)); // declaration order incl zInv for final
   const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
   const lockHex = execFileSync('node', [CASHC, cashFile, '-h'], { encoding: 'utf8', maxBuffer: 64*1024*1024 }).trim();
-  const locking = Uint8Array.from([OP_DROP, ...hexToBin(lockHex)]);
+  const locking = Uint8Array.from([...hexToBin(lockHex)]); // no OP_DROP: trailing unused pad param
   const reversed = [...coords].reverse();
   const argBytes = Uint8Array.from(reversed.flatMap((c) => [...pushInt(c)]));
-  const unlocking = Uint8Array.from([...argBytes, ...padPush(argBytes.length)]);
+  const unlocking = Uint8Array.from([...padPush(argBytes.length), ...argBytes]); // pad first (pushed first)
   const program = createTestAuthenticationProgramBch({ lockingBytecode: locking, unlockingBytecode: unlocking, valueSatoshis: 1000n });
   const state = realVm.evaluate(program);
   const top = state.stack[state.stack.length - 1];

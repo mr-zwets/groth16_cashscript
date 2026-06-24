@@ -65,7 +65,12 @@ input0 = v['input0']; input1 = v['input1']
 expected = v['expected']
 
 ITERS = 254
-K = int(os.environ.get('K', '40'))  # iterations per chunk (tunable)
+K = int(os.environ.get('K', '32'))  # iterations per chunk (32 -> the committed 16-chunk plan)
+
+# Derived chunk contracts + manifest land in generated/ (gitignored); committing the
+# generator + .gitignore is enough.
+OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'generated')
+os.makedirs(OUT_DIR, exist_ok=True)
 
 # ---- build chunk boundary plan ----
 # A chunk is a contiguous range of double-and-add iterations within ONE term.
@@ -214,7 +219,7 @@ def gen_cash(idx, ch):
     lines.append(FP_FUNCS)
     if needs_inverse:
         lines.append(INVERSE_FUNC)
-    lines.append("    function spend(int accX, int accY, int accZ, int bX, int bY, int bZ, int rX, int rY, int rZ) {")
+    lines.append("    function spend(int accX, int accY, int accZ, int bX, int bY, int bZ, int rX, int rY, int rZ, bytes unused zeroPadding) {")
     lines.append(f"        require({SER} == 0x{ch['incoming']});")
     # iteration loop: bake the bits of k for [lo,hi) as a constant scalar window.
     # We shift by the absolute index i, so reuse the singleton's per-bit test.
@@ -252,7 +257,7 @@ def gen_cash(idx, ch):
 
 for idx, ch in enumerate(chunks):
     src = gen_cash(idx, ch)
-    with open(f"chunk{idx:02d}.cash", "w") as f:
+    with open(os.path.join(OUT_DIR, f"chunk{idx:02d}.cash"), "w") as f:
         f.write(src)
 
 manifest = {
@@ -274,6 +279,6 @@ manifest = {
         for i, ch in enumerate(chunks)
     ],
 }
-with open('manifest.json', 'w') as f:
+with open(os.path.join(OUT_DIR, 'manifest.json'), 'w') as f:
     json.dump(manifest, f, indent=2)
-print(f"wrote {len(chunks)} chunk .cash files + manifest.json", file=sys.stderr)
+print(f"wrote {len(chunks)} chunk .cash files + manifest.json to generated/", file=sys.stderr)
