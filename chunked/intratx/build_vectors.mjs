@@ -17,7 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp2, bn254, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
-  f12limbs, r6limbs, compileBytecode, ptLimbs, PT_CFG,
+  f12limbs, r6limbs, compileFileBytecode, ptLimbs, PT_CFG,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace, le40,
   OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET,
 } from '../pairing/_millermath.mjs';
@@ -26,6 +26,7 @@ import { transformChunk, headerSize } from './transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
+const PROBE = join(GEN, '_intratx_probe.cash'); // transformed import-chunks compiled from here
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);
 const W = 40; // BN254 limb width (bytes)
@@ -98,15 +99,15 @@ const INSTANCES = {
   worst: { proof: proofFromLimbs(wcp.Ax, wcp.Ay, wcp.Bxa, wcp.Bxb, wcp.Bya, wcp.Byb, wcp.Cx, wcp.Cy), inputs: [wcp.in0, wcp.in1] },
 };
 
-// vk_x position inside the miller genesis inBlob (stateLimbs=36, then ptL; pair2's P
-// is at ptL offset = lengths of pairs 0+1). Computed, not hardcoded.
-const MILLER_STATE_LIMBS = 12 + 4 * 6; // f(12) + 4 R(6 each)
+// vk_x position inside the miller genesis inBlob (computed, not hardcoded). Prepared-VK
+// Miller carries only the runtime pair's R0, so the state is f(12)+R0(6), NOT four R's.
+const MILLER_STATE_LIMBS = 12 + 6; // f(12) + ONE running R(6)
 const dummy = pairsFor([1n, 1n]);
 const VKX_LIMB_OFFSET = MILLER_STATE_LIMBS + ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(1, dummy[1].P.toAffine(), dummy[1].Q.toAffine()).length;
 const MILLER_IN_LIMBS = MILLER_STATE_LIMBS + dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())).length;
 
 // ---- per-stage chunk specs (inLimbs/outLimbs/extras/role) for one instance ----
-const stateLimbs = (s) => [...f12limbs(s.f), ...s.Rs.flatMap(r6limbs)];
+const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0])]; // prepared-VK: only the runtime pair's R0
 
 function specsG2check(inst) {
   const pf = inst.proof ?? proof;
@@ -187,8 +188,9 @@ function compileSpec(s) {
   const key = `${s.file}|${s.role}|${JSON.stringify(forward)}`;
   let redeem = compileCache.get(key);
   if (!redeem) {
-    const t = transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward });
-    redeem = compileBytecode(t.src);
+    // compile from a file (probe in generated/) so the chunk's relative library import resolves
+    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward }).src);
+    redeem = compileFileBytecode(PROBE);
     compileCache.set(key, redeem);
   }
   return Uint8Array.from([OP_DROP, ...redeem]); // [OP_DROP, contract] — OP_DROP discards the pad

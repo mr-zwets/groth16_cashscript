@@ -15,14 +15,15 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp12, millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs, finalexpTrace,
-  compileBytecode, le48, P, OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET,
+  le48, P, OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, vk, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
-import { vkxStateAt, vkxFinalZinv, computeVkx } from '../bls12-381/_vkxmath.mjs';
+import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode } from '../bls12-381/_vkxmath.mjs';
 import { transformChunk } from './transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'bls12-381', 'generated');
+const PROBE = join(GEN, '_intratx_probe.cash'); // transformed import-chunks compiled from here
 const W = 48; // BLS12-381 limb width
 const PRIME = P.toString();
 import { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
@@ -138,7 +139,12 @@ function compileSpec(s) {
   else if (s.role === 'cross') forward = s.cmp;
   const key = `${s.file}|${s.role}|${JSON.stringify(forward)}`;
   let redeem = compileCache.get(key);
-  if (!redeem) { redeem = compileBytecode(transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward }).src); compileCache.set(key, redeem); }
+  if (!redeem) {
+    // compile from a file (probe in generated/) so the chunk's relative library import resolves
+    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward }).src);
+    redeem = compileFileBytecode(PROBE);
+    compileCache.set(key, redeem);
+  }
   return Uint8Array.from([OP_DROP, ...redeem]);
 }
 function argBytesOf(s) {
