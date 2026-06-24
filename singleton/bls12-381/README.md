@@ -50,11 +50,11 @@ squaring are identical; the tower/G1 layers are near-mechanical re-parameterizat
 
 `bls_instance.mjs` constructs a deterministic **valid** Groth16 instance (with
 `B = 1·G2` and `A = a·b + vx·g + c·d` so the product is exactly Fp12 ONE; tampering
-a public input changes `vk_x` and the verdict ≠ 1). `assemble.mjs` then **emits**
-`verify.cash`, `vkx.cash`, and `groth16.cash` by brace-extracting the already-graded
-function bodies from `finalexp.cash` + `miller4.cash` and adding a baked G1 block
-(constants in `_baked.json`) — so the capstones reuse validated code rather than
-hand-transcription.
+a public input changes `vk_x` and the verdict ≠ 1). `verify.cash`, `vkx.cash`, and
+`groth16.cash` are thin consumers that `import` the shared field/pairing tower from
+[`lib/`](lib/README.md) rather than re-declaring it, so they reuse the already-graded
+function bodies. (Earlier these capstones were brace-assembled by an `assemble.mjs`
+script; the library system replaced it.)
 
 ## Run
 
@@ -70,7 +70,6 @@ node singleton/bls12-381/vkx.mjs          # vk_x G1 checkpoint
 node singleton/bls12-381/verify.mjs       # pairing verdict (very slow)
 node singleton/bls12-381/groth16.mjs      # full verifier (very slow)
 
-node singleton/bls12-381/assemble.mjs           # regenerate verify/vkx/groth16.cash
 node singleton/bls12-381/build_vectors.mjs        # -> pairing-bls12381-singleton-vectors.json
 node singleton/bls12-381/build_vectors_groth16.mjs# -> groth16-bls12381-singleton-vectors.json
 ```

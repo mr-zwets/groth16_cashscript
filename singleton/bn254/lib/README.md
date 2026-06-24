@@ -7,8 +7,8 @@ support (branch `feat/library-support`).
 ## Why a `contract` per layer
 
 The full verifier is `../groth16.cash`. The other parent-directory contracts (`fp2`, `fp6`, `fp12`,
-`fp12_inv`, `fp12_frob`, `mul034`, `g2lines`, `miller`, `miller4`, `finalexp`, `verify`, `vkx`,
-`vkx_jacadd`) are **per-layer test harnesses**: each is a small `contract` whose `spend()` exercises
+`fp12_inv`, `fp12_frob`, `mul034`, `g2lines`, `miller`, `miller4`, `finalexp`, `verify`,
+`vkx`) are **per-layer test harnesses**: each is a small `contract` whose `spend()` exercises
 only that one layer's operations and is graded against the reference implementation (`@noble/curves`)
 by its `.mjs`.
 
@@ -65,7 +65,7 @@ a big tower costs only the bytecode actually used.
 | `miller4` | `Miller` | 4-pair Miller product |
 | `verify` | `Miller`, `FinalExp` | 4-pair pairing == 1 |
 | `groth16` | `Miller`, `FinalExp`, `G1` | **full Groth16 verifier** |
-| `vkx`, `vkx_jacadd` | `Fp` | G1 arithmetic (inlined in spend) |
+| `vkx` | `Fp` | G1 arithmetic (inlined in spend) |
 | `miller`, `finalexp` | `lazy/Bn254Lazy` | lazy-scheme Miller loop / final exponentiation |
 
 ## Adding / verifying a consumer

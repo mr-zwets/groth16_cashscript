@@ -73,10 +73,3 @@ contract is graded accept-valid / reject-invalid against its `.mjs` harness.
 node ../X.mjs    # e.g. node ../groth16.mjs   -> PASS/FAIL  (vkx: build_vectors_vkx.mjs)
 node <cashscript>/packages/cashc/dist/cashc-cli.js ../groth16.cash -s   # bytesize
 ```
-
-## Obsolete: `assemble.mjs`
-
-`../assemble.mjs` used to *generate* `verify.cash` / `vkx.cash` / `groth16.cash` by extracting and
-concatenating `internal function` bodies from `finalexp.cash` + `miller4.cash` — a manual stand-in for
-the library system. Those source files are now thin consumers (their functions live in `lib/`), so
-`assemble.mjs` no longer works and is superseded by this folder. It can be deleted.
