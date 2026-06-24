@@ -12,7 +12,7 @@
 //   groth16-bls12381-chunked-vectors.json  — the FULL verifier: vk_x (the chunks from
 //     gen_vkx) prepended to the pairing, i.e. the complete BCH-native BLS Groth16.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp12, millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs, finalexpTrace, boundaryFor,
@@ -24,8 +24,7 @@ import { g2checkAccAt } from './gen_g2check.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, numberToBinUint16LE, createVirtualMachineBch2026 } = await import(LIBAUTH);
+import { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, numberToBinUint16LE, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));

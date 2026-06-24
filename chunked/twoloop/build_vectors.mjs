@@ -26,16 +26,15 @@ import { dirname, join } from 'node:path';
 // Resolve libauth from the verifier repo's node_modules (this generator lives in
 // the groth16_contract repo, which has no node_modules of its own).
 import { pathToFileURL } from 'node:url';
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const {
+import {
   hexToBin, binToHex, bigIntToVmNumber, encodeDataPush, numberToBinUint16LE,
   createVirtualMachine, createInstructionSetBch2026, createVirtualMachineBch2026,
   createTestAuthenticationProgramBch, ConsensusBch2025,
   ripemd160, secp256k1, sha1, sha256,
-} = await import(LIBAUTH);
+} from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
+const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 // Chunk contracts + manifest are generated (gitignored); run `python gen_chunks.py` first.
 const GEN = join(here, 'generated');
 const manifest = JSON.parse(readFileSync(join(GEN, 'manifest.json'), 'utf8'));

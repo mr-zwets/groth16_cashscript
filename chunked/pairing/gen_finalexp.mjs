@@ -14,7 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp12, Fp2, bn254, vec, measureCovenantFile, planChunk, commit, f12limbs, decl, covIn, covOut,
+  Fp12, Fp2, bn254, vec, measureCovenantFile, planChunk, commit, f12limbs, decl, covIn, covOut, compileFileBytecode,
 } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -124,7 +124,7 @@ function buildChunkSrc(s, e) {
 if (process.argv[2] === 'probe') {
   const fnOnly = `pragma cashscript ^0.13.0;\nimport "${LIB_IMPORT}";\ncontract P(){\n    function spend(int x){ require(x==x); }\n}\n`;
   writeFileSync(PROBE, fnOnly);
-  console.error('function-set size:', execFileSync('node', ['C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js', PROBE, '-s'], { encoding: 'utf8' }).trim());
+  console.error('function-set size:', compileFileBytecode(PROBE).length);
   for (const e of [1, 2, 3, 5]) { const c = buildChunkSrc(0, e); const m = measureCovenantFile(c.src, c.inLimbs, c.outLimbs, PROBE); console.error(`ops[0,${e}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`); }
   try { execFileSync('rm', [PROBE]); } catch {}
   process.exit(0);

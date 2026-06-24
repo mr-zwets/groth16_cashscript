@@ -1,12 +1,11 @@
 // Grade singleton/pairing/miller.cash (single-pair Miller loop) against noble
 // bn254.pairing(g1,g2,false) on the loosened BCH 2026 VM. Heavy (~hundreds of M
 // op-cost) so few vectors. Run: node singleton/pairing/miller.mjs
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileTemplate, runVectors } from './_harness.mjs';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bn254.js').href;
-const { bn254 } = await import(NOBLE);
+import { bn254 } from '@noble/curves/bn254.js';
 const { Fp12 } = bn254.fields;
 const f12 = (x) => [
   x.c0.c0.c0, x.c0.c0.c1, x.c0.c1.c0, x.c0.c1.c1, x.c0.c2.c0, x.c0.c2.c1,

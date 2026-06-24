@@ -11,7 +11,7 @@
 //
 //   node build_vectors_bls.mjs -> verifier/src/bch/{pairing,groth16}-bls12381-intratx-vectors.json
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp12, millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs, finalexpTrace,
@@ -25,8 +25,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'bls12-381', 'generated');
 const W = 48; // BLS12-381 limb width
 const PRIME = P.toString();
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } = await import(LIBAUTH);
+import { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 
 // Deploy as P2SH so the ~4-5 KB redeem (in the scriptSig) counts toward the op-cost

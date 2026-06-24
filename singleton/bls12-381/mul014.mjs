@@ -1,11 +1,10 @@
 // Grade singleton/bls12-381/mul014.cash against noble Fp12.mul014 on the loosened
 // BCH 2026 VM. Run: node singleton/bls12-381/mul014.mjs
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileTemplate, runVectors, splitmix64, randFp } from './_harness.mjs';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bls12-381.js').href;
-const { bls12_381 } = await import(NOBLE);
+import { bls12_381 } from '@noble/curves/bls12-381.js';
 const { Fp2, Fp12 } = bls12_381.fields;
 
 const here = dirname(fileURLToPath(import.meta.url));

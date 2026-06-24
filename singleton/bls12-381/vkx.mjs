@@ -4,17 +4,16 @@
 // OP_DROP. Valid input -> ACCEPT; tampered input -> recomputed vk_x != expected ->
 // REJECT. Run: node singleton/bls12-381/vkx.mjs
 import { execFileSync } from 'node:child_process';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { vkx as vkxPoint, PUBLIC_INPUTS } from './bls_instance.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const {
+import {
   hexToBin, bigIntToVmNumber, encodeDataPush, createVirtualMachine, createInstructionSetBch2026,
   createTestAuthenticationProgramBch, ConsensusBch2025, ripemd160, secp256k1, sha1, sha256,
-} = await import(LIBAUTH);
-const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
+} from '@bitauth/libauth';
+const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 
 const HUGE = Number.MAX_SAFE_INTEGER;
 const loose = { ...ConsensusBch2025, baseInstructionCost: 100, maximumFunctionIdentifierLength: 7,

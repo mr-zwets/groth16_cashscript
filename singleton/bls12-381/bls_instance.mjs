@@ -5,10 +5,9 @@
 // generators (B = 1*G2), the product is e(g1,g2)^(-A + a*b + vx*g + c*d); choosing
 // A = a*b + vx*g + c*d (mod r) makes the exponent 0, so the product is ONE and
 // finalExp == 1. Tampering any public input changes vx -> verdict != 1.
-import { pathToFileURL } from 'node:url';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bls12-381.js').href;
-export const { bls12_381 } = await import(NOBLE);
+import { bls12_381 } from '@noble/curves/bls12-381.js';
+export { bls12_381 };
 export const { Fp, Fp2, Fp12 } = bls12_381.fields;
 const G1 = bls12_381.G1.Point, G2 = bls12_381.G2.Point;
 

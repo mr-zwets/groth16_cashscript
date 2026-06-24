@@ -1,11 +1,10 @@
 // Grade singleton/pairing/fp12.cash against @noble/curves bn254 Fp12 on the
 // loosened BCH 2026 VM. Run: node singleton/pairing/fp12.mjs
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileTemplate, runVectors, splitmix64, randFp } from './_harness.mjs';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bn254.js').href;
-const { bn254 } = await import(NOBLE);
+import { bn254 } from '@noble/curves/bn254.js';
 const Fp12 = bn254.fields.Fp12;
 
 const here = dirname(fileURLToPath(import.meta.url));

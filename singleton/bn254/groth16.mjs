@@ -4,7 +4,7 @@
 // tampered public input (in1+1) must REJECT (different vk_x -> product != 1).
 // Run: node singleton/pairing/groth16.mjs
 import { readFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileTemplate, evalArgs } from './_harness.mjs';
 

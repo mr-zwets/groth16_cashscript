@@ -3,12 +3,11 @@
 // VALID Groth16 Miller boundary (-> Fp12.ONE, i.e. proof verifies), and the
 // INVALID boundary (-> != ONE). Run: node singleton/pairing/finalexp.mjs
 import { readFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileTemplate, runVectors, splitmix64, randFp } from './_harness.mjs';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bn254.js').href;
-const { bn254 } = await import(NOBLE);
+import { bn254 } from '@noble/curves/bn254.js';
 const { Fp2, Fp12 } = bn254.fields;
 const here = dirname(fileURLToPath(import.meta.url));
 const f12 = (x) => [

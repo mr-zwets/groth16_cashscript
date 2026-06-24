@@ -2,12 +2,11 @@
 // boundary) against golden millerHex from pairing-vectors.json, on the loosened
 // BCH 2026 VM. Heavy (~950M op-cost). Run: node singleton/pairing/miller4.mjs
 import { readFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileTemplate, runVectors } from './_harness.mjs';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bn254.js').href;
-const { bn254 } = await import(NOBLE);
+import { bn254 } from '@noble/curves/bn254.js';
 const { Fp2 } = bn254.fields;
 const here = dirname(fileURLToPath(import.meta.url));
 

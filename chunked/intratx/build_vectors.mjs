@@ -13,7 +13,7 @@
 //
 //   node build_vectors.mjs        -> verifier/src/bch/{pairing,groth16}-intratx-vectors.json
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp2, bn254, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
@@ -29,8 +29,7 @@ const GEN = join(here, '..', 'pairing', 'generated');
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);
 const W = 40; // BN254 limb width (bytes)
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } = await import(LIBAUTH);
+import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 
 // Deploy each chunk as P2SH: the ~4-5 KB redeem script (the field-tower prologue +

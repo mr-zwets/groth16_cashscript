@@ -5,17 +5,16 @@
 // args, so locking = redeem template; unlocking = spend args pushed in REVERSE
 // declaration order (cashc reverses so the first param ends on top of stack).
 import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const {
+import {
   hexToBin, bigIntToVmNumber, encodeDataPush,
   createVirtualMachine, createInstructionSetBch2026,
   createTestAuthenticationProgramBch, ConsensusBch2025,
   ripemd160, secp256k1, sha1, sha256,
-} = await import(LIBAUTH);
+} from '@bitauth/libauth';
 
-export const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
+export const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 export const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 
 const HUGE = Number.MAX_SAFE_INTEGER;

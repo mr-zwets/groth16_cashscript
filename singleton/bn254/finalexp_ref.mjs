@@ -5,10 +5,8 @@
 //
 // Run: node singleton/pairing/finalexp_ref.mjs
 import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bn254.js').href;
-const { bn254 } = await import(NOBLE);
+import { bn254 } from '@noble/curves/bn254.js';
 const { Fp2, Fp12 } = bn254.fields;
 
 const BN_X = 4965661367192848881n;

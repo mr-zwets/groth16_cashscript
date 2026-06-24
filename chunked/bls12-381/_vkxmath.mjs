@@ -8,10 +8,8 @@
 // the 40 used for BN254's 254-bit field), the 255-bit scalar field (so the MSM tiles
 // 255 bit positions, MSB-first base 254), and the BLS IC points. The Jacobian G1
 // formulas are b-independent, so they are identical to BN254.
-import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
 import { vk, PUBLIC_INPUTS, computeVkx, Fp, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 
 export { vk, PUBLIC_INPUTS, computeVkx, bls12_381 };
@@ -22,20 +20,18 @@ export const ITERS = 255;  // scalar-field bit width (group order r < 2^255)
 export const MSBASE = ITERS - 1; // MSB-first: window position j -> bit index MSBASE - j
 
 // ---- in-process cashc compile (compileString + asmToBytecode); no subprocess ----
-const CASHC_LIB = pathToFileURL('C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/index.js').href;
-const cashc = await import(CASHC_LIB);
-const asmToBytecode = cashc.utils.asmToBytecode;
+import { compileString, compileFile, utils } from 'cashc';
+const { asmToBytecode } = utils;
 /** compile a .cash source string -> redeem bytecode (Uint8Array); throws on compile error */
-export const compileBytecode = (src) => asmToBytecode(cashc.compileString(src).bytecode);
+export const compileBytecode = (src) => asmToBytecode(compileString(src).bytecode);
 /** compile a .cash FILE -> redeem bytecode. compileFile resolves relative `import`s (it has a
  * base path), so chunks can import the shared singleton library instead of inlining it. */
-export const compileFileBytecode = (path) => asmToBytecode(cashc.compileFile(path).bytecode);
+export const compileFileBytecode = (path) => asmToBytecode(compileFile(path).bytecode);
 
 export const OP_BUDGET = (41 + 10_000) * 800; // 8,032,800 op-cost per standard input
 export const TARGET_UNLOCK = 10_000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
 
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { bigIntToVmNumber, encodeDataPush, bigIntToBinUintLE, binToFixedLength, numberToBinUint16LE, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } = await import(LIBAUTH);
+import { bigIntToVmNumber, encodeDataPush, bigIntToBinUintLE, binToFixedLength, numberToBinUint16LE, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 
 // ---- state serialization (matches cash hash256(toPaddedBytes(., 48))) ----

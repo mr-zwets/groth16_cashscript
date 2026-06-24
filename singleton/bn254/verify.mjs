@@ -3,12 +3,11 @@
 // Valid instance must ACCEPT; invalid (tampered public input) must REJECT.
 // Run: node singleton/pairing/verify.mjs
 import { readFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileTemplate, evalArgs } from './_harness.mjs';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bn254.js').href;
-const { bn254 } = await import(NOBLE);
+import { bn254 } from '@noble/curves/bn254.js';
 const { Fp2 } = bn254.fields;
 const here = dirname(fileURLToPath(import.meta.url));
 

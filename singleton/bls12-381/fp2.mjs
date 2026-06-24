@@ -1,12 +1,11 @@
 // Grade singleton/bls12-381/fp2.cash against @noble/curves bls12-381 Fp2 on the
 // loosened BCH 2026 VM. Each vector = (operand a, operand b) + noble's expected
 // outputs for mul/sqr/inv/mulXi/conj. Run: node singleton/bls12-381/fp2.mjs
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileTemplate, runVectors, splitmix64, randFp } from './_harness.mjs';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bls12-381.js').href;
-const { bls12_381 } = await import(NOBLE);
+import { bls12_381 } from '@noble/curves/bls12-381.js';
 const Fp2 = bls12_381.fields.Fp2;
 const XI = Fp2.fromBigTuple([1n, 1n]); // BLS12-381 sextic non-residue 1 + u
 

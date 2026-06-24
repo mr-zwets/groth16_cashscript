@@ -12,7 +12,7 @@
 // Writes verifier/src/bch/vkx-bls12381-chunked-covenant-vectors.json for the
 // bch-vkx-bls12381-chunked-covenant milestone entry.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   P, PUBLIC_INPUTS, computeVkx, compileBytecode, commitBin, CATEGORY, tok,
@@ -21,8 +21,7 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { binToHex, bigIntToVmNumber, encodeDataPush, numberToBinUint16LE, createVirtualMachineBch2026 } = await import(LIBAUTH);
+import { binToHex, bigIntToVmNumber, encodeDataPush, numberToBinUint16LE, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));

@@ -6,17 +6,16 @@
 // the consensus wall. Contracts here have NO constructor args, so locking = redeem
 // template; unlocking = spend args pushed in REVERSE declaration order.
 import { execFileSync } from 'node:child_process';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const {
+import {
   hexToBin, bigIntToVmNumber, encodeDataPush,
   createVirtualMachine, createInstructionSetBch2026,
   createTestAuthenticationProgramBch, ConsensusBch2025,
   ripemd160, secp256k1, sha1, sha256,
-} = await import(LIBAUTH);
+} from '@bitauth/libauth';
 
-export const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
+export const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 // BLS12-381 base field prime p (381-bit, 48 bytes).
 export const P = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787n;
 

@@ -1,11 +1,10 @@
 // Grade singleton/pairing/g2lines.cash (pointDouble / pointAdd) against the proven
 // JS formulas (which match noble). Run: node singleton/pairing/g2lines.mjs
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileTemplate, runVectors, splitmix64, randFp } from './_harness.mjs';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bn254.js').href;
-const { bn254 } = await import(NOBLE);
+import { bn254 } from '@noble/curves/bn254.js';
 const { Fp2 } = bn254.fields;
 const Fp2B = Fp2.fromBigTuple([
   19485874751759354771024239261021720505790618469301721065564631296452457478373n,

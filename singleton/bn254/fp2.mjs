@@ -1,12 +1,11 @@
 // Grade singleton/pairing/fp2.cash against @noble/curves bn254 Fp2 on the
 // loosened BCH 2026 VM. Each vector = (operand a, operand b) + noble's expected
 // outputs for mul/sqr/inv/mulXi/conj. Run: node singleton/pairing/fp2.mjs
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileTemplate, runVectors, splitmix64, randFp } from './_harness.mjs';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bn254.js').href;
-const { bn254 } = await import(NOBLE);
+import { bn254 } from '@noble/curves/bn254.js';
 const Fp2 = bn254.fields.Fp2;
 const XI = Fp2.fromBigTuple([9n, 1n]);
 

@@ -28,19 +28,18 @@
 // Locking:    push(expectedY) || push(expectedX) || template
 import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const {
+import {
   hexToBin, binToHex, bigIntToVmNumber, encodeDataPush, numberToBinUint16LE,
   createVirtualMachine, createInstructionSetBch2026, createVirtualMachineBch2026,
   createTestAuthenticationProgramBch, ConsensusBch2025,
   ripemd160, secp256k1, sha1, sha256,
-} = await import(LIBAUTH);
+} from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
+const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 
 // --- vk_x parameters (consistent with bn254-vkx/vkx_vectors.json) ---
 const INPUT0 = 123456789n;

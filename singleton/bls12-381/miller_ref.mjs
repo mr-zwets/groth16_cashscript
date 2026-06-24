@@ -13,10 +13,8 @@
 //   * x is NEGATIVE -> the Miller result is conjugated at the very end
 //
 // Run: node singleton/bls12-381/miller_ref.mjs
-import { pathToFileURL } from 'node:url';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bls12-381.js').href;
-const { bls12_381 } = await import(NOBLE);
+import { bls12_381 } from '@noble/curves/bls12-381.js';
 const { Fp, Fp2, Fp6, Fp12 } = bls12_381.fields;
 
 // ---- constants ----

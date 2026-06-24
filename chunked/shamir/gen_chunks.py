@@ -374,7 +374,6 @@ def run_window(lo, hi, rX, rY, rZ):
 # over OP_COST_TARGET or locking over BYTE_BUDGET. The fixed OP_DEFINE prologue
 # (function bodies) is included in every measurement.
 # ---------------------------------------------------------------------------
-CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js'
 # Real-VM per-input op-cost budget at the 10,000-byte standard unlocking cap:
 #   (41 + 10000) * 800 = 8,032,800. Keep a margin under it.
 OP_BUDGET = (41 + 10000) * 800
@@ -392,11 +391,8 @@ FINAL_TAIL_OP = int(os.environ.get('FINAL_TAIL_OP', '900000'))
 _NODE_ORACLE = r'''
 const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
-const { pathToFileURL } = require('node:url');
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
 (async () => {
-  const la = await import(LIBAUTH);
-  const { hexToBin, bigIntToVmNumber, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } = la;
+  const { hexToBin, bigIntToVmNumber, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } = await import('@bitauth/libauth');
   const realVm = createVirtualMachineBch2026(false);
   const TARGET_UNLOCK = 10000, OP_PUSHDATA2 = 0x4d;
   const pushInt = (n) => {
@@ -413,7 +409,7 @@ const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bit
   const cashFile = argv[0];
   const isFinal = argv[1] === '1';
   const coords = argv.slice(2).map((s) => BigInt(s)); // declaration order incl zInv for final
-  const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
+  const CASHC = require.resolve('cashc/dist/cashc-cli.js');
   const lockHex = execFileSync('node', [CASHC, cashFile, '-h'], { encoding: 'utf8', maxBuffer: 64*1024*1024 }).trim();
   const locking = Uint8Array.from([...hexToBin(lockHex)]); // no OP_DROP: trailing unused pad param
   const reversed = [...coords].reverse();

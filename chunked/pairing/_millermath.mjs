@@ -1,34 +1,29 @@
 // Shared reference math + helpers for the chunked-pairing generators (noble
 // Fp2/Fp6/Fp12, matching our CashScript ops bit-for-bit), plus the committed
 // instance's 4 Groth16 pairs, state serialization, and a real-VM measurer.
-import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { pathToFileURL } from 'node:url';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bn254.js').href;
-export const { bn254 } = await import(NOBLE);
+import { bn254 } from '@noble/curves/bn254.js';
+export { bn254 };
 export const { Fp, Fp2, Fp6, Fp12 } = bn254.fields;
 
 // IN-PROCESS cashc compile (compileString + asmToBytecode) instead of spawning a
 // `node cashc-cli` subprocess per candidate chunk — the planner compiles hundreds
 // of times, so dropping the spawn + file I/O is a real speedup.
-const CASHC_LIB = pathToFileURL('C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/index.js').href;
-const cashc = await import(CASHC_LIB);
-const asmToBytecode = cashc.utils.asmToBytecode;
+import { compileString, compileFile, utils } from 'cashc';
+const { asmToBytecode } = utils;
 /** compile a .cash source string -> redeem bytecode (Uint8Array); throws on compile error */
-export const compileBytecode = (src) => asmToBytecode(cashc.compileString(src).bytecode);
+export const compileBytecode = (src) => asmToBytecode(compileString(src).bytecode);
 /** compile a .cash FILE -> redeem bytecode. Unlike compileString, compileFile resolves
  * relative `import` statements (it has a base path), so chunks can import the shared
  * singleton library instead of inlining the tower functions. */
-export const compileFileBytecode = (path) => asmToBytecode(cashc.compileFile(path).bytecode);
+export const compileFileBytecode = (path) => asmToBytecode(compileFile(path).bytecode);
 
-export const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
 export const OP_BUDGET = (41 + 10_000) * 800;
 export const TARGET_UNLOCK = 10_000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
 
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { hexToBin, bigIntToVmNumber, encodeDataPush, bigIntToBinUintLE, binToFixedLength, numberToBinUint16LE, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } = await import(LIBAUTH);
+import { hexToBin, bigIntToVmNumber, encodeDataPush, bigIntToBinUintLE, binToFixedLength, numberToBinUint16LE, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 
 // ---- constants ----

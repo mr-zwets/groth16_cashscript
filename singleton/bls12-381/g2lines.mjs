@@ -1,11 +1,10 @@
 // Grade singleton/bls12-381/g2lines.cash (pointDouble / pointAdd) against the proven
 // JS formulas (which match noble bls12-381). Run: node singleton/bls12-381/g2lines.mjs
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileTemplate, runVectors, splitmix64, randFp } from './_harness.mjs';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bls12-381.js').href;
-const { bls12_381 } = await import(NOBLE);
+import { bls12_381 } from '@noble/curves/bls12-381.js';
 const { Fp, Fp2 } = bls12_381.fields;
 const INV2 = Fp2.div(Fp2.ONE, Fp2.fromBigTuple([2n, 0n]));
 // M-twist b' = 4*(1+u): (4 c0 - 4 c1) + (4 c0 + 4 c1) u

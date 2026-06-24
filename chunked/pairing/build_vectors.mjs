@@ -7,7 +7,7 @@
 // committed instance) and proof #1 (minted under the same VK, from the singleton
 // multiproof vectors) through identical lockings -> extraValidProofs.
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp12, Fp2, bn254, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
@@ -19,9 +19,8 @@ import { g2checkAccAt } from './gen_g2check.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
-const LIBAUTH = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@bitauth/libauth/build/index.js').href;
-const { hexToBin, binToHex, bigIntToVmNumber, vmNumberToBigInt, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, numberToBinUint16LE } = await import(LIBAUTH);
-const { createVirtualMachineBch2026 } = await import(LIBAUTH);
+import { hexToBin, binToHex, bigIntToVmNumber, vmNumberToBigInt, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, numberToBinUint16LE } from '@bitauth/libauth';
+import { createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 
 // Deploy each covenant chunk as P2SH: the ~4-5 KB redeem (the bare contract) lives in

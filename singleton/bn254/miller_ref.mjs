@@ -7,10 +7,8 @@
 //
 // Run: node singleton/pairing/miller_ref.mjs
 import { readFileSync } from 'node:fs';
-import { pathToFileURL } from 'node:url';
 
-const NOBLE = pathToFileURL('C:/Users/mathi/Desktop/verifier/node_modules/@noble/curves/bn254.js').href;
-const { bn254 } = await import(NOBLE);
+import { bn254 } from '@noble/curves/bn254.js';
 const { Fp, Fp2, Fp6, Fp12 } = bn254.fields;
 
 // ---- constants (extracted from noble) ----
