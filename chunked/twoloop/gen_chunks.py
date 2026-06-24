@@ -59,7 +59,7 @@ def hash256(b):
 def commit(state):
     return hash256(serialize(state)).hex()
 
-v = json.load(open('../../vkx_vectors.json'))
+v = json.load(open('../../bn254-vkx/vkx_vectors.json'))
 ic0 = v['ic0']; ic1 = v['ic1']; ic2 = v['ic2']
 input0 = v['input0']; input1 = v['input1']
 expected = v['expected']

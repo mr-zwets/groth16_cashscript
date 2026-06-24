@@ -6,7 +6,10 @@ Emits the chosen IC points, public inputs, the correct expected vk_x and a
 deliberately-wrong point, as JSON for the CashScript/libauth harness to consume.
 """
 import json
+import os
 from py_ecc.bn128 import G1, multiply, add, curve_order, field_modulus
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
 
 def normalize(P):
     # bn128 G1 points are affine (FQ, FQ) already.
@@ -50,5 +53,5 @@ out = {
 }
 
 print(json.dumps(out, indent=2))
-with open("vkx_vectors.json", "w") as f:
+with open(os.path.join(_HERE, "vkx_vectors.json"), "w") as f:
     json.dump(out, f, indent=2)

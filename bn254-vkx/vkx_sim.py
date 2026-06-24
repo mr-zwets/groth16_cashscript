@@ -57,8 +57,9 @@ def scalar_mult_acc(accX, accY, accZ, baseX, baseY, k):
         accX, accY, accZ = jac_add(accX, accY, accZ, rX, rY, rZ)
     return accX, accY, accZ
 
-import json
-v = json.load(open('vkx_vectors.json'))
+import json, os
+_HERE = os.path.dirname(os.path.abspath(__file__))
+v = json.load(open(os.path.join(_HERE, 'vkx_vectors.json')))
 ic0 = v['ic0']; ic1 = v['ic1']; ic2 = v['ic2']
 input0 = v['input0']; input1 = v['input1']
 

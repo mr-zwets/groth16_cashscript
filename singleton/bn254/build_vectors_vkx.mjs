@@ -42,10 +42,10 @@ const {
 const here = dirname(fileURLToPath(import.meta.url));
 const CASHC = 'C:/Users/mathi/Desktop/cashscript/packages/cashc/dist/cashc-cli.js';
 
-// --- vk_x parameters (consistent with groth16_contract/vkx_vectors.json) ---
+// --- vk_x parameters (consistent with bn254-vkx/vkx_vectors.json) ---
 const INPUT0 = 123456789n;
 const INPUT1 = 987654321n;
-// expected vk_x = IC0 + input0*IC1 + input1*IC2 (py_ecc.bn128; see vkx_vectors.json)
+// expected vk_x = IC0 + input0*IC1 + input1*IC2 (py_ecc.bn128; see bn254-vkx/vkx_vectors.json)
 const EXPECTED_X = 9749522656125667161218610527789566824082547561737311503154242585977001677528n;
 const EXPECTED_Y = 11261491184979604396731387498248109768593573743752840655503305098314920652045n;
 

@@ -1,13 +1,21 @@
 # The CashScript Compiler Fork
 
 The verifiers in this repo are compiled with a **local fork of `cashc`**, not the
-released compiler. The fork adds the one language feature the Groth16 field tower
-could not be written without, **reusable (user-defined) functions**, plus a
-multi-return extension, a codegen bug fix, and a compile-speed optimisation that the
-generated pairing chunks need in order to build in reasonable time.
+released compiler. The fork adds the language features the Groth16 field tower could
+not be written (or organised) without:
 
-This is the feature the README used to list as the *"No Reusable Functions"*
-CashScript shortcoming. It is no longer a shortcoming for this project: we built it.
+- **reusable (user-defined) functions** — the central enabler (§1),
+- **multi-return functions** (§2),
+- a multi-file **library / import** system with **global constants** and
+  **tree-shaking** (§3),
+- an **`unused` declaration modifier** for op-cost padding (§4),
+
+plus a codegen bug fix (§5) and a compile-speed optimisation (§6) that the generated
+pairing chunks need in order to build in reasonable time.
+
+These are the features the README used to list as the *"No Reusable Functions"*,
+*"No Library Support"* and *"No Global Variable Support"* CashScript shortcomings.
+They are no longer shortcomings for this project: we built them.
 
 - **Fork:** `C:\Users\mathi\Desktop\cashscript`, branch `feat/library-support`
   (forked from CashScript v0.13.1).
@@ -39,7 +47,72 @@ is carried as separate ints: an `Fp2` value is 2 ints, `Fp6` is 6, `Fp12` is 12.
 tower operation therefore takes and returns its components as a flat list of ints, which
 is only expressible with multi-return functions.
 
-## 3. Codegen fix: repeated variable in a call's argument list
+## 3. Libraries, imports, and global constants (issues [#153](https://github.com/CashScript/cashscript/issues/153), [#264](https://github.com/CashScript/cashscript/issues/264))
+
+Stock CashScript has no multi-file construct: no `library`, no `import`, and no
+top-level `constant`. Every `.cash` file had to re-declare the slice of the field
+tower it used, with the field prime and other constants pasted in by hand. The fork
+adds all three:
+
+- **`library Name { ... }`** — a file-level bag of reusable functions and
+  `constant`s. A library has no spending function, so its member functions are
+  implicitly `internal`, compiled to the same `OP_DEFINE` / `OP_INVOKE` backend as the
+  reusable functions of §1.
+- **`import "./Rel.cash";`** — pulls another file's libraries and constants into scope
+  **unqualified** (call `addFp(...)` directly, not `Fp.addFp`). Imports form a
+  dependency graph: `lib/Fp2.cash` imports `lib/Fp.cash`, a consumer imports
+  `lib/Fp2.cash`, and the resulting diamond is de-duplicated; import cycles are
+  rejected.
+- **`int constant P = <const-expr>;`** — a global constant, valid at file top level or
+  inside a library. It is folded to a literal and **inlined at every use site** (no
+  stack slot), so the BN254 prime has a single source of truth instead of being
+  copy-pasted as a 32-byte literal into every function.
+
+**Resolution runs *before* any AST-visitor pass.** `resolveDependencies` merges the
+imported libraries (in dependency order) and inlines the constants, producing a plain
+single-contract AST — so the symbol-table, type-check and codegen stages are unchanged.
+The whole library system is a front-end addition.
+
+**Tree-shaking.** Codegen only `OP_DEFINE`s functions transitively reachable from a
+spending function (a BFS over the call graph), so importing a large shared library costs
+nothing for the functions a given consumer never calls. This is what lets one shared
+tower back many different consumers and still compile each to minimal bytecode:
+`singleton/bn254/fp2.cash` is a three-line consumer that `import`s `lib/Fp2.cash`
+(→ `lib/Fp.cash`) yet compiles **byte-identical** to the old hand-inlined `fp2.cash`,
+because the unreachable tower functions are shaken out.
+
+Both the BN254 and BLS12-381 singletons were migrated to this layout: a shared
+`singleton/<curve>/lib/` tower (`Fp → Fp2 → Fp6 → Fp12`, plus `Miller`, `FinalExp`,
+and for BN254 `G1`), with every `*.cash` reduced to a thin `import` + `spend()`
+consumer (see each `lib/README.md`). 27 singleton contracts use `import` today.
+
+Not yet supported (so still divergent from the upstream proposals): selective
+`import { x } from "..."`, qualified `Lib.fn(...)` calls, and constants declared
+*inside* a `contract` (top-level and in-`library` only).
+
+## 4. The `unused` declaration modifier (issues [#125](https://github.com/CashScript/cashscript/issues/125), [#412](https://github.com/CashScript/cashscript/issues/412))
+
+Syntax: `bytes unused zeroPadding` on a parameter, or `int unused x = ...` on a local.
+It exempts that symbol from the compiler's `UnusedVariableError` while leaving it a real
+stack item (pushed by the unlocker, dropped at end-of-scope cleanup) — so it still
+appears in the artifact ABI and is otherwise size/cost-neutral.
+
+The use here is **op-cost budgeting**. A BCH input often needs a longer unlocking script
+to buy compute budget (op-cost scales with unlocking-script length). Previously that
+meant a hand-built `[OP_DROP, ...contract]` redeem prefix plus a separately pushed pad;
+now the contract simply declares a non-functional `bytes unused zeroPadding` argument
+that the unlocker fills with zero bytes — the language expresses the intent directly,
+with no manual `OP_DROP`.
+
+Pad **position** matters for cost. A *trailing* pad param (pushed first → bottom of the
+stack) leaves every other argument at its original depth and adds only a single
+`OP_NIP`, whereas a *leading* pad deepens every other access by one. So the tight-budget
+chunked families use a trailing pad, while the singleton vk_x contracts use a leading
+pad (it sits under the constructor args, stays byte-identical, and keeps the tamper test
+valid). In the source today it appears in `singleton/{bn254,bls12-381}/vkx.cash`,
+`singleton/bn254/miller.cash`, and the chunked generators.
+
+## 5. Codegen fix: repeated variable in a call's argument list
 
 Calling a user function with the same variable in more than one argument position
 (e.g. `fp6Mul(a, a)`, `add2(z, z)`) threw `Expected variable 'z' does not exist on the
@@ -53,7 +126,7 @@ This pattern is unavoidable here: every tower squaring is `fpNSqr(a) = fpNMul(a,
 which passes all of `a`'s limbs twice. Full write-up in `COMPILER_FIX_NOTE.md` in the
 fork (`packages/cashc/src/generation/GenerateTargetTraversal.ts`).
 
-## 4. Compile-speed optimisation in the bytecode optimiser
+## 6. Compile-speed optimisation in the bytecode optimiser
 
 `optimiseBytecode` (`packages/utils/src/script.ts`) was `O(n²)` in script length: it
 stringified the whole script to ASM and regex-scanned a growing prefix to recover each
@@ -69,9 +142,11 @@ root: `profile-compile.mjs` (per-phase breakdown on a heavy Miller chunk),
 
 ## What is still a genuine CashScript gap
 
-The fork adds reusable functions; it does **not** add multi-file libraries/imports
-([#153](https://github.com/CashScript/cashscript/issues/153)), global constants
-([#264](https://github.com/CashScript/cashscript/issues/264)), or array/struct types
-([#266](https://github.com/CashScript/cashscript/issues/266)). Those remain real
-limitations (see [README.md](README.md#cashscript-shortcomings)) and shape the source
-layout (each `.cash` re-declares the field tower it needs, with constants inlined).
+The fork now covers reusable functions, multi-file libraries/imports
+([#153](https://github.com/CashScript/cashscript/issues/153)) and global constants
+([#264](https://github.com/CashScript/cashscript/issues/264)). The remaining genuine
+CashScript gap is **array/struct types**
+([#266](https://github.com/CashScript/cashscript/issues/266)): there is still no
+aggregate type, which is why every field-tower element is carried as a flat list of
+ints and threaded through the multi-return functions of §2 (see
+[README.md](README.md#cashscript-shortcomings) and [arrays.md](arrays.md)).
