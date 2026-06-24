@@ -1,3 +1,0 @@
-# Reproducible generator output — regenerate with `python gen_chunks.py`
-# (committing gen_chunks.py + build_vectors.mjs + this .gitignore is enough).
-generated/

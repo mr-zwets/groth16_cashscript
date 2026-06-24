@@ -6,31 +6,31 @@ chunked BN254 verifiers, which is why it lives at the repo root rather than insi
 either method's folder.
 
 ```
-vkx_ref.py  ──writes──▶  vkx_vectors.json  ──read by──▶  vkx_sim.py
+vkx_ref.mjs  ──writes──▶  vkx_vectors.json  ──read by──▶  vkx_sim.mjs
 ```
 
-- **`vkx_ref.py`** — producer. Picks the IC points (fixed multiples of G1) and the
-  public inputs, computes the authoritative `vk_x` via `py_ecc.bn128`, and writes
+- **`vkx_ref.mjs`** — producer. Picks the IC points (fixed multiples of G1) and the
+  public inputs, computes the authoritative `vk_x` via `@noble/curves` bn254, and writes
   `vkx_vectors.json`. This is the provenance of the magic numbers in the vectors.
 - **`vkx_vectors.json`** — the data: `p`, `r`, `ic0..ic2`, `input0/1`, the expected
   `vk_x`, and a deliberately-wrong point for reject tests.
-- **`vkx_sim.py`** — dev cross-check (not part of any build). A Python port of the
-  `vkx.cash` Jacobian double-and-add loop, run against `py_ecc` to prove the contract
-  algorithm matches. Handy as an executable spec when debugging the singleton vk_x.
+- **`vkx_sim.mjs`** — dev cross-check (not part of any build). A JS port of the
+  `vkx.cash` Jacobian double-and-add loop, run against the reference `vk_x` to prove the
+  contract algorithm matches. Handy as an executable spec when debugging the singleton vk_x.
 
 ## Consumers
 
-- `chunked/twoloop/gen_chunks.py` — loads `../../bn254-vkx/vkx_vectors.json`
-- `chunked/shamir/gen_chunks.py` — loads `../../bn254-vkx/vkx_vectors.json`
+- `chunked/twoloop/gen_chunks.mjs` — loads `../../bn254-vkx/vkx_vectors.json`
+- `chunked/shamir/gen_chunks.mjs` — loads `../../bn254-vkx/vkx_vectors.json`
 - `singleton/bn254/build_vectors_vkx.mjs` — hardcodes the same params (kept consistent by hand)
 
 ## Regenerating
 
 ```sh
-python bn254-vkx/vkx_ref.py    # rewrites vkx_vectors.json
-python bn254-vkx/vkx_sim.py    # prints MATCH: True if the contract algorithm agrees
+node bn254-vkx/vkx_ref.mjs    # rewrites vkx_vectors.json   (npm run gen:vectors)
+node bn254-vkx/vkx_sim.mjs    # prints MATCH: true if the contract algorithm agrees (npm run check:vectors)
 ```
 
 Both scripts anchor to this folder, so they can be run from any working directory.
 If you change the IC points or inputs, regenerate the JSON and re-run the two
-`gen_chunks.py` generators (and update `build_vectors_vkx.mjs` to match).
+`gen_chunks.mjs` generators (and update `build_vectors_vkx.mjs` to match).

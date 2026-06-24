@@ -35,7 +35,7 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
-// Chunk contracts + manifest are generated (gitignored); run `python gen_chunks.py` first.
+// Chunk contracts + manifest are generated (gitignored); run `node gen_chunks.mjs` first.
 const GEN = join(here, 'generated');
 const manifest = JSON.parse(readFileSync(join(GEN, 'manifest.json'), 'utf8'));
 

@@ -1,4 +1,0 @@
-# Reproducible generator output — regenerate with `node generate.mjs`
-# (committing the generators + this .gitignore is enough; the 133 chunk
-# contracts + manifests + the per-process probe scratch are all derived).
-generated/

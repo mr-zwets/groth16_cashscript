@@ -1,12 +1,30 @@
 {
   "name": "groth16_contract",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Groth16 zk-SNARK verifier in CashScript over BN254 and BLS12-381, with singleton and BCH-limit-viable chunked forms.",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "npm run test:bn254 && npm run test:bls && npm run check:vectors",
+    "test:bn254": "node singleton/bn254/verify.mjs",
+    "test:bls": "node singleton/bls12-381/verify.mjs",
+    "gen:vectors": "node bn254-vkx/vkx_ref.mjs",
+    "check:vectors": "node bn254-vkx/vkx_sim.mjs",
+    "gen:twoloop": "node chunked/twoloop/gen_chunks.mjs",
+    "gen:shamir": "node chunked/shamir/gen_chunks.mjs",
+    "gen:chunked:bls": "node chunked/bls12-381/generate.mjs",
+    "gen:chunked:pairing": "node chunked/pairing/generate.mjs",
+    "vectors:twoloop": "node chunked/twoloop/gen_chunks.mjs && node chunked/twoloop/build_vectors.mjs",
+    "vectors:shamir": "node chunked/shamir/build_vectors.mjs"
   },
-  "keywords": [],
+  "keywords": [
+    "groth16",
+    "zk-snark",
+    "cashscript",
+    "bch",
+    "bn254",
+    "bls12-381"
+  ],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.12.2",
