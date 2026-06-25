@@ -99,14 +99,19 @@ export function singlePairMiller(pair) {
 // is exposed as a FLAT op list chunkable at any boundary, carrying (f + 4 R + points).
 // ops[i] = {t:'sqr'} | {t:'dl',j} | {t:'al',j,neg} | {t:'pp',j} (postPrecompute pair j).
 // states[i] = {f,Rs} BEFORE op i; states[ops.length] = final (f == boundary, BN: no conj).
-export function millerBatchOps(pairs) {
+export function millerBatchOps(pairs, opts = {}) {
+  // opts.skipPairs (Set of pair indices): omit those pairs' line-folds entirely. Used by the
+  // residue build to drop the fully-constant pair e(alpha,beta) from the loop (its single-pair
+  // Miller value f_{alpha,beta} is baked and multiplied in once instead). Default = skip none,
+  // so every other consumer is unaffected. f then = product over the NON-skipped pairs.
+  const skip = opts.skipPairs ?? new Set();
   const pds = pairs.map((p) => { const Qa = p.Q.toAffine(), Pa = p.P.toAffine(); return { Qx: Qa.x, Qy: Qa.y, negQy: Fp2.neg(Qa.y), Px: Pa.x, Py: Pa.y }; });
   const ops = [];
   for (let k = 0; k < ATE_NAF.length; k++) {
     ops.push({ t: 'sqr' });
-    for (let j = 0; j < 4; j++) { ops.push({ t: 'dl', j }); if (ATE_NAF[k]) ops.push({ t: 'al', j, neg: ATE_NAF[k] === -1 }); }
+    for (let j = 0; j < 4; j++) { if (skip.has(j)) continue; ops.push({ t: 'dl', j }); if (ATE_NAF[k]) ops.push({ t: 'al', j, neg: ATE_NAF[k] === -1 }); }
   }
-  for (let j = 0; j < 4; j++) ops.push({ t: 'pp', j });
+  for (let j = 0; j < 4; j++) { if (skip.has(j)) continue; ops.push({ t: 'pp', j }); }
   const states = [];
   let f = Fp12.ONE; const Rs = pds.map((pd) => ({ x: pd.Qx, y: pd.Qy, z: Fp2.ONE }));
   // Each non-sqr op also records its line-function coeffs (`op.coeffs`). For a pair with a
