@@ -36,6 +36,7 @@ import {
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
+import { glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
 import { transformChunk, headerSize } from '../intratx/transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -154,26 +155,31 @@ function specsG2check(inst) {
     checkpoint: ch.first ? 'validate-inputs' : undefined,
   }));
 }
+// GLV vk_x: 4-scalar Straus over {IC1, phiIC1, IC2, phiIC2}; state = R(3)+in0+in1+k10,k20,k11,k21
+// (9 limbs). The genesis chunk binds the GLV witnesses to the public inputs (k1+k2*lambda==in).
 function specsVkx(inst, crossToMiller) {
-  const [in0, in1] = inst.inputs;
+  const [in0, in1] = inst.inputs.map(BigInt);
+  const [k10, k20] = glvDecompose(in0), [k11, k21] = glvDecompose(in1);
   const vkxAff = vkxPoint(inst.inputs).toAffine();
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkx.json'), 'utf8'));
+  const st = (X, Y, Z) => [X, Y, Z, in0, in1, k10, k20, k11, k21];
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglv.json'), 'utf8'));
   return man.chunks.map((ch) => {
-    const inAcc = vkxStateAt(in0, in1, ch.lo);
-    const inLimbs = [...inAcc, in0, in1];
+    const [X0, Y0, Z0] = vkxGlvStateAt(k10, k20, k11, k21, ch.lo);
+    const inLimbs = st(X0, Y0, Z0);
     if (ch.final) {
       return {
-        file: join(GEN, `vkx_${String(ch.idx).padStart(2, '0')}.cash`),
-        inLimbs, outLimbs: [vkxAff.x, vkxAff.y], extras: [vkxFinalZinv(in0, in1)],
+        file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`),
+        inLimbs, outLimbs: [vkxAff.x, vkxAff.y], extras: [vkxGlvZinv(k10, k20, k11, k21)],
         role: crossToMiller ? 'cross' : 'stage-final',
         cmp: crossToMiller ? { cmpExpr: 'outBlob', nextFullInLen: MILLER_IN_LIMBS * W, skip: VKX_LIMB_OFFSET * W, cmpLen: 2 * W } : null,
-        label: 'vk_x final -> assert vk_x', checkpoint: 'vk_x',
+        label: 'GLV vk_x final -> assert vk_x', checkpoint: 'vk_x',
       };
     }
+    const [X1, Y1, Z1] = vkxGlvStateAt(k10, k20, k11, k21, ch.hi);
     return {
-      file: join(GEN, `vkx_${String(ch.idx).padStart(2, '0')}.cash`),
-      inLimbs, outLimbs: [...vkxStateAt(in0, in1, ch.hi), in0, in1], extras: [], role: 'within',
-      label: `vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined,
+      file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`),
+      inLimbs, outLimbs: st(X1, Y1, Z1), extras: [], role: 'within',
+      label: `GLV vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined,
     };
   });
 }
@@ -385,7 +391,7 @@ const report = (tag, asm) => {
 // ===================== build =====================
 // Compute the group partition ONCE from the WORST-CASE instance (largest pads) so every
 // instance fits and all instances share the SAME lockings (group roles are identical).
-const TARGET_GROUP_BYTES = 90000;
+const TARGET_GROUP_BYTES = 99000; // GLV-shrunk verifier packs into 3 standard txs (<100KB each)
 const wcSpecs = buildSpecs(INSTANCES.worst);
 // size estimate for packing: assemble worst-case in a single trivial partition to size pads,
 // then pack. We size with a conservative per-chunk ceiling first to avoid the chicken/egg of
