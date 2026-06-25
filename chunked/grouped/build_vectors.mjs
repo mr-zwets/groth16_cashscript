@@ -34,7 +34,7 @@ import {
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace, le40, CATEGORY, commitBin,
   OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET,
 } from '../pairing/_millermath.mjs';
-import { g2checkAccAt } from '../pairing/gen_g2check.mjs';
+import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { transformChunk, headerSize } from '../intratx/transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -139,12 +139,13 @@ function specsG2check(inst) {
   const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
+  const zinv = g2checkFastZinv(Bpair); // [zinvA, zinvB] witnessed inverse of [x0]B.Z (last chunk only)
   return man.chunks.map((ch) => ({
     file: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`),
     inLimbs: sLimbs(g2checkAccAt(Bpair, ch.lo)),
     outLimbs: ch.last ? [] : sLimbs(g2checkAccAt(Bpair, ch.hi)),
-    extras: [], role: ch.last ? 'terminal' : 'within',
-    label: `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' [6x^2]B==psi(B)' : ''}`,
+    extras: ch.last ? zinv : [], role: ch.last ? 'terminal' : 'within',
+    label: `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' [x0]B-endo==psi(B)' : ''}`,
     checkpoint: ch.first ? 'validate-inputs' : undefined,
   }));
 }

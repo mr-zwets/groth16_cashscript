@@ -15,7 +15,7 @@ import {
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace,
   TARGET_UNLOCK, OP_PUSHDATA2, OP_BUDGET,
 } from './_millermath.mjs';
-import { g2checkAccAt } from './gen_g2check.mjs';
+import { g2checkAccAt, g2checkFastZinv } from './gen_g2check.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -204,12 +204,14 @@ function buildG2check(inst, bad) {
   const tail = [...B4, ...A2, ...C2]; // B(4)+A(2)+C(2)
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
+  const zinv = g2checkFastZinv(Bpair); // [zinvA, zinvB] for the fast-endo final chunk (uncommitted witness)
   const steps = [];
   for (const ch of man.chunks) {
     const inLimbs = sLimbs(g2checkAccAt(Bpair, ch.lo));
     const outLimbs = ch.last ? [] : sLimbs(g2checkAccAt(Bpair, ch.hi));
     const r = buildCovStep(join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs,
-      `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' [6x^2]B==psi(B)' : ''}`, ch.first ? 'validate-inputs' : undefined);
+      `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' [x0]B-endo==psi(B)' : ''}`, ch.first ? 'validate-inputs' : undefined,
+      ch.last ? [...inLimbs, ...zinv] : undefined);
     if (!bad) { stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes); stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected; }
     steps.push(r.step);
   }
