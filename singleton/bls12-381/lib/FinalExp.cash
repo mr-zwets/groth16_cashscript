@@ -36,13 +36,11 @@ library FinalExp {
             int Z0=1; int Z1=0; int Z2=0; int Z3=0; int Z4=0; int Z5=0; int Z6=0; int Z7=0; int Z8=0; int Z9=0; int Z10=0; int Z11=0;
             for (int k = 0; k < 64; k = k + 1) {
                 int i = 63 - k;
-                (int s0,int s1,int s2,int s3,int s4,int s5,int s6,int s7,int s8,int s9,int s10,int s11) =
+                (Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11) =
                     cycSqr(Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11);
-                Z0=s0; Z1=s1; Z2=s2; Z3=s3; Z4=s4; Z5=s5; Z6=s6; Z7=s7; Z8=s8; Z9=s9; Z10=s10; Z11=s11;
                 if (((15132376222941642752 >> i) % 2) == 1) {
-                    (int m0,int m1,int m2,int m3,int m4,int m5,int m6,int m7,int m8,int m9,int m10,int m11) =
+                    (Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11) =
                         fp12Mul(Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11, N0,N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11);
-                    Z0=m0; Z1=m1; Z2=m2; Z3=m3; Z4=m4; Z5=m5; Z6=m6; Z7=m7; Z8=m8; Z9=m9; Z10=m10; Z11=m11;
                 }
             }
             return Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11;

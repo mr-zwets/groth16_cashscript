@@ -59,12 +59,10 @@ library G1 {
         int cX = bx; int cY = by; int cZ = 1;
         for (int i = 0; i < 254; i = i + 1) {
             if (((scalar >> i) % 2) == 1) {
-                (int ax, int ay, int az) = jacAddG1(rX, rY, rZ, cX, cY, cZ);
-                rX = ax; rY = ay; rZ = az;
+                (rX,rY,rZ) = jacAddG1(rX, rY, rZ, cX, cY, cZ);
             }
             if (cZ != 0 && cY != 0) {
-                (int dx, int dy, int dz) = jacDoubleG1(cX, cY, cZ);
-                cX = dx; cY = dy; cZ = dz;
+                (cX,cY,cZ) = jacDoubleG1(cX, cY, cZ);
             }
         }
         return rX, rY, rZ;

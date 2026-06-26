@@ -9,6 +9,7 @@ not be written (or organised) without:
 - a multi-file **library / import** system with **global constants** and
   **tree-shaking** (§3),
 - an **`unused` declaration modifier** for op-cost padding (§4),
+- **tuple-destructuring into existing variables** (§7),
 
 plus a codegen bug fix (§5) and a compile-speed optimisation (§6) that the generated
 pairing chunks need in order to build in reasonable time.
@@ -140,12 +141,87 @@ for the fixed-point check). Profiling scripts used to measure this live in the f
 root: `profile-compile.mjs` (per-phase breakdown on a heavy Miller chunk),
 `bench-compile.mjs`, and `opt-scaling.mjs`.
 
+## 7. Tuple-destructuring into existing variables (issue [#136](https://github.com/CashScript/cashscript/issues/136))
+
+Stock CashScript requires every destructuring target to be a *fresh declaration*:
+`(int x, int y) = f();`. You cannot destructure into already-declared variables, so to
+update existing variables from a tuple you must declare throwaway temps and copy them
+back one by one:
+
+```solidity
+(int s0, int s1, ..., int s11) = cycSqr(Z0, Z1, ..., Z11);
+Z0 = s0; Z1 = s1; ...; Z11 = s11;        // 12 scalar reassignments
+```
+
+The fork lets a target omit its type to mean "reassign this existing variable":
+
+```solidity
+(Z0, Z1, ..., Z11) = cycSqr(Z0, Z1, ..., Z11);   // reassign in place
+```
+
+Mixed forms are allowed at the top level (`(int c, a) = f();` declares `c`, reassigns
+`a`). A bare-identifier target that names no existing variable is an
+`UndefinedReferenceError`.
+
+**Why it matters here.** Issue [#136](https://github.com/CashScript/cashscript/issues/136)
+framed this for the built-in `.split()` (a 2-value tuple), but it becomes far more
+relevant with the multi-return user functions of §2: the field tower threads **12-wide**
+`Fp12` accumulators through loops (`cycExpX`'s square-and-multiply ladder in
+`lib/FinalExp.cash`, and the lazy tower's copy). There the old workaround is 12–24 scalar
+reassignments *per loop iteration*.
+
+**Codegen — why the win is in loops.** At the top level a reassignment is a pure stack
+**rename** (the result block on top simply takes the target names; the old slot becomes
+dead and is cleared by end-of-scope cleanup — exactly like a scalar `x = expr`), so it is
+already cheap with or without this feature. The real gain is *inside loops and branches*,
+where the stack layout must be identical at entry and exit, so the variable must be
+updated **in place** (a `<depth> OP_ROLL OP_DROP` rotate, the same lowering CashScript
+already uses for a scalar `x = expr` in a scope). The old workaround paid that in-place
+cost **and** kept the 12 throwaway temps live on the stack, which *doubled the depth*
+every one of those rotates had to travel. Destructuring straight into the loop variables
+removes the temps, halving the rotate depth — and a `<depth> OP_ROLL` also costs op-cost
+proportional to `depth`, so both deployed size and execution cost drop.
+
+**Applied across both curves' singletons** — every *pure* loop-carried rebind (`cycExpX`'s
+12-wide `Z`, the `millerSingle` miller-loop's 12-wide `F`, the BN254 `g1ScalarMul` 3-wide
+ladder). *Mixed* rebinds are left as the workaround: `pointDouble`/`pointAdd` return the
+line coefficients **and** the new point in one tuple, but only the point rebinds `R`, so
+the destructure mixes fresh declarations (`int dc0..dc5`) with reassignments — which the
+code generator rejects inside a scope (it would break the top-down "value-on-top"
+invariant). Those stay 6-wide scalar rebinds.
+
+| contract | before | after | Δ bytes | Δ op-cost |
+| --- | --- | --- | --- | --- |
+| BN254 `finalexp.cash` (isolates `cycExpX`) | 6,437 B | 5,417 B | **−15.9 %** | 141.1 M → 120.7 M (**−14.5 %**) |
+| BN254 `groth16.cash` (full verifier) | 19,884 B | **15,595 B** | **−21.6 %** | 995 M → 889 M (**−10.7 %**) |
+| BN254 pairing-singleton (Miller + final-exp) | — | 11,982 B | — | 872 M → 793 M (**−9.1 %**) |
+| BLS12-381 pairing-singleton | — | 11,717 B | — | 1.209 B → 1.096 B (**−9.4 %**) |
+
+All graders still pass (accept valid / reject invalid against the noble oracle), both
+curves. `inputsNeeded` for the BN254 singleton dropped 124 → 111.
+
+**Only the singletons benefit.** Every chunked / grouped / intra-tx build is fully-unrolled
+SSA — each chunk binds results to *fresh* SSA temps and never rebinds (no generated chunk
+contains the workaround pattern at all), and the loop-drivers (`cycExpX` / `millerSingle` /
+`g1ScalarMul`) are tree-shaken out. So the **grouped-residue flagship is unchanged**
+(264,157 / 3 tx; `millerres`/`finalexpres` chunks byte-identical), and no chunked vectors
+needed rebuilding. The remaining win for the *deployable* chunks is the straight-line stack
+scheduler, not this.
+
+Implementation: the grammar gains a `tupleTarget : typeName Identifier | Identifier` rule;
+`SymbolTableTraversal` resolves a typeless target to the existing symbol (adopting its
+type) instead of declaring a new one; `GenerateTargetTraversal.visitTupleAssignment` picks
+the rename vs in-place path by scope depth (and rejects mixed decl+reassign in a scope).
+Tests: `test/valid-contract-files/tuple_reassignment.cash` and the relocated
+`UndefinedReferenceError/tuple_reassign_undefined.cash`.
+
 ## What is still a genuine CashScript gap
 
 The fork now covers reusable functions, multi-file libraries/imports
-([#153](https://github.com/CashScript/cashscript/issues/153)) and global constants
-([#264](https://github.com/CashScript/cashscript/issues/264)). The remaining genuine
-CashScript gap is **array/struct types**
+([#153](https://github.com/CashScript/cashscript/issues/153)), global constants
+([#264](https://github.com/CashScript/cashscript/issues/264)) and tuple-destructuring
+into existing variables ([#136](https://github.com/CashScript/cashscript/issues/136)).
+The remaining genuine CashScript gap is **array/struct types**
 ([#266](https://github.com/CashScript/cashscript/issues/266)): there is still no
 aggregate type, which is why every field-tower element is carried as a flat list of
 ints and threaded through the multi-return functions of §2 (see

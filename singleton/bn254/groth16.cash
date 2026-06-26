@@ -24,11 +24,9 @@ contract Groth16Verify() {
         require(by2a == onrhsa); require(by2b == onrhsb);
         int RXa=0; int RXb=0; int RYa=1; int RYb=0; int RZa=0; int RZb=0; // [6x^2]B (Jacobian)
         for (int i = 0; i < 128; i = i + 1) {
-            (int da,int db,int dc,int dd,int de,int df) = g2Double(RXa, RXb, RYa, RYb, RZa, RZb);
-            RXa=da; RXb=db; RYa=dc; RYb=dd; RZa=de; RZb=df;
+            (RXa,RXb,RYa,RYb,RZa,RZb) = g2Double(RXa, RXb, RYa, RYb, RZa, RZb);
             if (((147946756881789318990833708069417712966 >> (127 - i)) % 2) == 1) {
-                (int aa,int ab,int ac,int ad,int ae,int af) = g2AddAffine(RXa, RXb, RYa, RYb, RZa, RZb, Bxa, Bxb, Bya, Byb);
-                RXa=aa; RXb=ab; RYa=ac; RYb=ad; RZa=ae; RZb=af;
+                (RXa,RXb,RYa,RYb,RZa,RZb) = g2AddAffine(RXa, RXb, RYa, RYb, RZa, RZb, Bxa, Bxb, Bya, Byb);
             }
         }
         (int psxa,int psxb,int psya,int psyb) = psi(Bxa, Bxb, Bya, Byb); // require [6x^2]B == psi(B)
