@@ -61,6 +61,13 @@ The consequence: for the hot tower arithmetic (F_p12 multiply, square, Frobenius
 
 The one place the index is genuinely the natural loop variable is the public-input / IC aggregation, `X = IC[0] + sum_i input_i * IC[i]`. A `for` loop there reads cleanly. But the input count is small and fixed, so unrolling it (as the current code does) is also fine and cheaper.
 
+> **Caveat — runtime-indexed *table* lookups are the opposite case.** The pessimism above is about
+> *compile-time-indexed* tower arithmetic, where named locals at fixed stack positions beat a
+> byte-string. When the index is a genuine runtime value and the alternative is a deep `if/else`
+> cascade (e.g. the GLV `select16` 16-entry subset-sum table), a packed-blob slice is ~74% cheaper,
+> because branch dispatch — not data movement — dominates. See
+> [`chunked/pairing/select16-blob-table.md`](chunked/pairing/select16-blob-table.md).
+
 ## Takeaway
 
 - Fixed-size arrays would be an ergonomic improvement (no 24-argument signatures, cleaner input loops), but because they compile to byte-string split/concat for big elements, the op-cost win is small to negative in the hot path.

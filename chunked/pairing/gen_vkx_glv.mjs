@@ -64,6 +64,13 @@ for (let idx = 1; idx < 16; idx++) {
   for (let i = 0; i < 4; i++) if (idx & (1 << i)) acc = acc.add(BP[i]);
   const a = acc.toAffine(); TABLE[idx] = [a.x, a.y];
 }
+// Encode the 15-entry table as a single 960-byte blob: entry (idx-1) = x(LE32) || y(LE32).
+// A runtime `split` reads entry idx in O(1) (one indexed slice) — ~74% cheaper op-cost than the
+// 15-deep if/else dispatch, which costs ~3.5M op in branch comparisons over the 128-iter Straus.
+// 32-byte LE is safe (field elements < P < 2^255 -> sign bit clear -> int() recovers them positive).
+// Full rationale, measurements, and correctness argument: ./select16-blob-table.md
+const le32 = (v) => { v = ((v % P) + P) % P; let s = ''; for (let b = 0; b < 32; b++) s += Number((v >> BigInt(8 * b)) & 0xffn).toString(16).padStart(2, '0'); return s; };
+const TABLE_HEX = '0x' + Array.from({ length: 15 }, (_, k) => le32(TABLE[k + 1][0]) + le32(TABLE[k + 1][1])).join('');
 
 // ---- contract template ----
 const SER = 'hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(in0, 40) + toPaddedBytes(in1, 40) + toPaddedBytes(k10, 40) + toPaddedBytes(k20, 40) + toPaddedBytes(k11, 40) + toPaddedBytes(k21, 40))';
@@ -108,8 +115,13 @@ const prologue = () => `    internal function addFp(int x, int y) returns (int) 
     }
     internal function select16(int idx) returns (int, int, int) {
         int aX = 0; int aY = 0; int doAdd = 0;
-${Array.from({ length: 15 }, (_, k) => { const idx = k + 1; const indent = '        ' + '    '.repeat(k); return `${indent}if (idx == ${idx}) { aX = ${TABLE[idx][0]}; aY = ${TABLE[idx][1]}; doAdd = 1; }${k < 14 ? ' else {' : ''}`; }).join('\n')}
-${Array.from({ length: 14 }, (_, k) => '        ' + '    '.repeat(13 - k) + '}').join('\n')}
+        if (idx != 0) {
+            bytes table = ${TABLE_HEX};
+            bytes ent = table.split((idx - 1) * 64)[1].split(64)[0];
+            aX = int(ent.split(32)[0]);
+            aY = int(ent.split(32)[1]);
+            doAdd = 1;
+        }
         return aX, aY, doAdd;
     }`;
 
