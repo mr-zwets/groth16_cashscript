@@ -46,6 +46,23 @@ function normalizeInternal(src) {
 
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** Collect every variable name ASSIGNED in a block of source: scalar / fresh-definition targets
+ * (`x =`, `int x =`) and tuple-destructure targets (`(a, int b, ...) =`). Used by the carried-suffix
+ * splice to tell a genuinely carried covOut limb from one that merely REUSES an input-param name after
+ * being reassigned in the body (e.g. vk_x's `rX = dx`), which is not carried. `(?!=)` skips `==`. */
+function collectAssignedNames(source) {
+  const names = new Set();
+  for (const [, name] of source.matchAll(/\b(\w+)\s*=(?!=)/g)) {
+    names.add(name);
+  }
+  for (const [, targetList] of source.matchAll(/\(([^)]*)\)\s*=(?!=)/g)) {
+    for (const target of targetList.split(',')) {
+      names.add(target.trim().replace(/^int\s+/, ''));
+    }
+  }
+  return names;
+}
+
 /** parse `int a,int b, bytes c` -> [{type,name,unused}] (single-line signature).
  * Handles the cashc fork's `type unused name` budget-pad modifier (a 3-token param the
  * compiler drops during stack cleanup); the transform strips it (we supply our own pad). */
@@ -133,9 +150,29 @@ export function transformChunk(src, cfg) {
     // local name `Pmod` (not `P`): chunks that import the shared singleton library inherit a
     // global `constant P`, and `int P` would collide with it (same reason the lazy-lib covOut
     // uses Pmod). Non-importing chunks have no global P either way, so Pmod is always safe.
+    //
+    // CARRIED-SUFFIX SPLICE: a trailing run of output limbs that are the SAME variables at the SAME
+    // offsets as the incoming limbs is, by definition, passed through unchanged — and already sits in
+    // inBlob, byte-identical and reduced (the previous covOut wrote it with % Pmod; the genesis build
+    // provides reduced state; arithmetic is mod P so a downstream consumer is value-invariant). Splice
+    // that suffix straight from inBlob instead of re-serialising each limb with toPaddedBytes, and (via
+    // the `used` scan below, which now no longer sees those names) skip materialising any of them the
+    // body never reads. Requires equal in/out lengths so the inBlob byte offset lines up with outBlob.
+    // A covOut limb whose name is also an input param but is ASSIGNED anywhere in the body is NOT
+    // carried — its value changed, so it must be re-serialised, not spliced (e.g. vk_x's `rX = dx`).
+    const assigned = collectAssignedNames(body.join('\n'));
+    let carry = outNames.length;
+    if (inNames.length === outNames.length) {
+      while (carry > 0 && inNames[carry - 1] === outNames[carry - 1] && !assigned.has(outNames[carry - 1])) carry -= 1;
+    }
+    const headExpr = outNames.slice(0, carry).map((n) => `toPaddedBytes(${n} % Pmod, ${W})`).join(' + ');
+    const tailExpr = carry < outNames.length ? `inBlob.split(${carry * W})[1]` : '';
+    const outBlobExpr = [headExpr, tailExpr].filter(Boolean).join(' + ');
     epilogue = [
-      `        int Pmod = ${cfg.prime};`,
-      `        bytes outBlob = ${outNames.map((n) => `toPaddedBytes(${n} % Pmod, ${W})`).join(' + ')};`,
+      // Pmod is only referenced by the head's `% Pmod` reductions; if the whole suffix is spliced
+      // (carry === 0) it would be an unused variable, so only declare it when the head is non-empty.
+      ...(carry > 0 ? [`        int Pmod = ${cfg.prime};`] : []),
+      `        bytes outBlob = ${outBlobExpr};`,
     ];
     if (cfg.epilogueMode === 'covout') {
       // GROUPED: this is the LAST chunk of a non-terminal group. There is no in-tx
