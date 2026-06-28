@@ -41,18 +41,29 @@ exponentiation (cp#3, verdict matches golden valid/invalid). `verify.cash` ties 
 the single intrinsic verdict `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)==1`. `groth16.cash` folds
 in the on-chain `vk_x` (also standalone in `vkx.cash`) for the complete Groth16 verifier.
 
-**In the verifier benchmark** (two entries):
-- `bch-groth16-singleton` — the COMPLETE verifier, in the main **Groth16** leaderboard
-  head-to-head with nchain/scrypt. Build:
+**In the verifier benchmark:**
+- `bch-groth16-singleton` — the COMPLETE verifier (byte reference), in the main **Groth16**
+  leaderboard head-to-head with nchain/scrypt. Build:
   `node singleton/bn254/build_vectors_groth16.mjs` → `verifier/src/bch/groth16-singleton-vectors.json`.
-  `pnpm benchmark`: `PASS (1/1✗)`, 21,933 B, 1,259,938,241 op-cost, ~157 inputs.
-  Same BN254 curve as scrypt-bn256 → **~534× smaller bytecode** (21.9 KB vs 11.7 MB).
+  `pnpm benchmark`: `PASS`, 15,867 B scored, 888,690,550 op-cost, ~111 inputs.
+  Same BN254 curve as scrypt-bn256 → **~734× smaller bytecode** (15.9 KB vs 11.7 MB).
+- `bch-groth16-singleton-minop` — the **op-optimized** variant: an unrolled batched
+  c^-(6x+2)-fused Miller (lazy tower, fixed-VK line coeffs baked so only `(-A,B)` runs on-chain
+  G2 arithmetic), witnessed-residue final-exp (2024/640), fast-endo 63-bit G2 check (2022/348),
+  GLV `vk_x` — all extra inputs gated witnesses. Build: `node singleton/bn254/gen_singletons.mjs`,
+  then `build_vectors_groth16_minop.mjs` + `VARIANT=minop node gen_multiproof_opt.mjs`.
+  `pnpm benchmark`: `PASS`, **191,574,525 op-cost (−78%)**, ~24 inputs, 67,632 B — matches the
+  chunked verifier's op-cost in ONE tx; beats scrypt on both bytes and op. The unroll (needed to
+  bake coeffs as literals; runtime blob indexing is ~100 op/byte for OP_SPLIT) makes the script
+  large and needs the cashc fork's large-contract compile fix (`COMPILER_FIX_NOTE.md` Fix 2).
 - `bch-pairing-singleton` — the pairing-only milestone (leaderboard "Groth16 pairing
   (BCH-native)"). Build: `node singleton/bn254/build_vectors.mjs`. 20,735 B, ~1.21B, ~151 inputs.
   The standalone `vk_x` baseline (`bch-vkx-singleton`) builds with `node singleton/bn254/build_vectors_vkx.mjs`.
 
-Both are honest single-tx baselines (BCH-incompatible: script-size + op-cost) that
-motivate chunking.
+No separate byte-optimized singleton: for a sound verifier the field tower is a ~15.8 KB floor and
+every optimization either moves bytes into witness unlocking or adds locking, so the baseline is
+already byte-optimal. The win is op-cost (`-minop`). All are honest single-tx baselines
+(BCH-incompatible on script-size + op-cost) that motivate chunking.
 
 Remaining: split across transactions for BCH limits (the chunked/ work) — the singleton
 Miller is ~957M and finalExp ~255M op-cost, vs ~8.03M per input.

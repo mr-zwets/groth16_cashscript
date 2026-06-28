@@ -194,6 +194,7 @@ export function vkxGlvZinv(k10, k20, k11, k21) {
   return fz === 0n ? 0n : modinvP(fz);
 }
 export { ITERS as VKXGLV_ITERS };
+export const GLV_TABLE_HEX = TABLE_HEX, GLV_IC0 = IC0;
 
 // ---- plan + emit (worst-case-ish planning scalars: dense ~127-bit) ----
 if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
