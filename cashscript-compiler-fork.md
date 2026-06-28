@@ -159,8 +159,11 @@ The fork lets a target omit its type to mean "reassign this existing variable":
 (Z0, Z1, ..., Z11) = cycSqr(Z0, Z1, ..., Z11);   // reassign in place
 ```
 
-Mixed forms are allowed at the top level (`(int c, a) = f();` declares `c`, reassigns
-`a`). A bare-identifier target that names no existing variable is an
+Mixed forms — some targets declared, others reassigned — are allowed both at the top level
+(`(int c, a) = f();` declares `c`, reassigns `a`) **and inside loops/branches**, provided
+the reassignment targets all trail the declaration targets (the declarations form a
+contiguous block at the front, matching a function that returns fresh values followed by the
+updated accumulator). A bare-identifier target that names no existing variable is an
 `UndefinedReferenceError`.
 
 **Why it matters here.** Issue [#136](https://github.com/CashScript/cashscript/issues/136)
@@ -184,21 +187,26 @@ proportional to `depth`, so both deployed size and execution cost drop.
 
 **Applied across both curves' singletons** — every *pure* loop-carried rebind (`cycExpX`'s
 12-wide `Z`, the `millerSingle` miller-loop's 12-wide `F`, the BN254 `g1ScalarMul` 3-wide
-ladder). *Mixed* rebinds are left as the workaround: `pointDouble`/`pointAdd` return the
-line coefficients **and** the new point in one tuple, but only the point rebinds `R`, so
-the destructure mixes fresh declarations (`int dc0..dc5`) with reassignments — which the
-code generator rejects inside a scope (it would break the top-down "value-on-top"
-invariant). Those stay 6-wide scalar rebinds.
+ladder) **and, since the mixed form was added, the `pointDouble`/`pointAdd` rebinds**:
+those return the line coefficients **and** the new point in one tuple, with only the point
+rebinding `R`. The natural ordering puts the fresh line coefficients first and the
+accumulator last (`(int dc0,..,int dc5, Rxa,Rxb,Rya,Ryb,Rza,Rzb) = pointDouble(..)`), which
+satisfies the "reassignments trail declarations" rule, so the 6 line-coeff temps and 6
+scalar `R`-rebinds per call are eliminated. All six `millerSingle` sites across the two
+curves (loop double + conditional add, plus the two BN254 tail adds) are converted.
 
 | contract | before | after | Δ bytes | Δ op-cost |
 | --- | --- | --- | --- | --- |
 | BN254 `finalexp.cash` (isolates `cycExpX`) | 6,437 B | 5,417 B | **−15.9 %** | 141.1 M → 120.7 M (**−14.5 %**) |
-| BN254 `groth16.cash` (full verifier) | 19,884 B | **15,595 B** | **−21.6 %** | 995 M → 889 M (**−10.7 %**) |
-| BN254 pairing-singleton (Miller + final-exp) | — | 11,982 B | — | 872 M → 793 M (**−9.1 %**) |
-| BLS12-381 pairing-singleton | — | 11,717 B | — | 1.209 B → 1.096 B (**−9.4 %**) |
+| BN254 `groth16.cash` (full verifier) | 15,595 B | **14,641 B** | **−6.1 %** | 888.7 M → 862.7 M (**−2.9 %**) |
+| BN254 pairing-singleton (Miller + final-exp) | 11,982 B | **11,028 B** | **−8.0 %** | 792.9 M → 766.9 M (**−3.3 %**) |
+| BLS12-381 `groth16.cash` (full verifier) | 15,851 B | **14,915 B** | **−5.9 %** | 1.193 B → 1.168 B (**−2.2 %**) |
+| BLS12-381 pairing-singleton | 11,717 B | **10,781 B** | **−8.0 %** | 1.096 B → 1.071 B (**−2.3 %**) |
 
-All graders still pass (accept valid / reject invalid against the noble oracle), both
-curves. `inputsNeeded` for the BN254 singleton dropped 124 → 111.
+(The `groth16.cash` before-numbers are the post-pure-reassign state from the previous row's
+work; the mixed `pointDouble`/`pointAdd` conversion is the increment shown here.) All graders
+still pass (accept valid / reject invalid against the noble oracle), both curves.
+`inputsNeeded` for the full BN254 verifier dropped 111 → 108, and BLS 149 → 146.
 
 **Only the singletons benefit.** Every chunked / grouped / intra-tx build is fully-unrolled
 SSA — each chunk binds results to *fresh* SSA temps and never rebinds (no generated chunk
@@ -211,8 +219,12 @@ scheduler, not this.
 Implementation: the grammar gains a `tupleTarget : typeName Identifier | Identifier` rule;
 `SymbolTableTraversal` resolves a typeless target to the existing symbol (adopting its
 type) instead of declaring a new one; `GenerateTargetTraversal.visitTupleAssignment` picks
-the rename vs in-place path by scope depth (and rejects mixed decl+reassign in a scope).
-Tests: `test/valid-contract-files/tuple_reassignment.cash` and the relocated
+the rename vs in-place path by scope depth. For a scoped mixed destructure it folds the
+trailing reassignment block into the existing slots in place and renames the leading
+declaration slots with no extra opcodes; an interleaving where a declaration is *shallower*
+than a reassignment (which would break the top-down "value-on-top" invariant) is rejected
+with a clear error. Tests: `test/valid-contract-files/tuple_reassignment.cash` (now covers
+the mixed-in-loop case) and the relocated
 `UndefinedReferenceError/tuple_reassign_undefined.cash`.
 
 ## What is still a genuine CashScript gap

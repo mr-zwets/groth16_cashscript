@@ -103,9 +103,8 @@ library Miller {
         for (int k = 0; k < 65; k = k + 1) {
             (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
                 fp12Sqr(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11);
-            (int dc0,int dc1,int dc2,int dc3,int dc4,int dc5, int dx0,int dx1,int dx2,int dx3,int dx4,int dx5) =
+            (int dc0,int dc1,int dc2,int dc3,int dc4,int dc5, Rxa,Rxb,Rya,Ryb,Rza,Rzb) =
                 pointDouble(Rxa,Rxb,Rya,Ryb,Rza,Rzb);
-            Rxa=dx0; Rxb=dx1; Rya=dx2; Ryb=dx3; Rza=dx4; Rzb=dx5;
             (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
                 line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, dc0,dc1,dc2,dc3,dc4,dc5, Px, Py);
             int nz = (3045737938581365386 >> k) % 2;
@@ -114,26 +113,23 @@ library Miller {
                 int uya = Qya;
                 int uyb = Qyb;
                 if (neg == 1) { (uya,uyb) = fp2Neg(Qya, Qyb);}
-                (int ac0,int ac1,int ac2,int ac3,int ac4,int ac5, int ax0,int ax1,int ax2,int ax3,int ax4,int ax5) =
+                (int ac0,int ac1,int ac2,int ac3,int ac4,int ac5, Rxa,Rxb,Rya,Ryb,Rza,Rzb) =
                     pointAdd(Rxa,Rxb,Rya,Ryb,Rza,Rzb, Qxa,Qxb,uya,uyb);
-                Rxa=ax0; Rxb=ax1; Rya=ax2; Ryb=ax3; Rza=ax4; Rzb=ax5;
                 (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
                     line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, ac0,ac1,ac2,ac3,ac4,ac5, Px, Py);
             }
         }
 
         (int q1xa,int q1xb,int q1ya,int q1yb) = psi(Qxa,Qxb,Qya,Qyb);
-        (int bc0,int bc1,int bc2,int bc3,int bc4,int bc5, int bx0,int bx1,int bx2,int bx3,int bx4,int bx5) =
+        (int bc0,int bc1,int bc2,int bc3,int bc4,int bc5, Rxa,Rxb,Rya,Ryb,Rza,Rzb) =
             pointAdd(Rxa,Rxb,Rya,Ryb,Rza,Rzb, q1xa,q1xb,q1ya,q1yb);
-        Rxa=bx0; Rxb=bx1; Rya=bx2; Ryb=bx3; Rza=bx4; Rzb=bx5;
         (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
             line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, bc0,bc1,bc2,bc3,bc4,bc5, Px, Py);
 
         (int q2xa,int q2xb,int q2ya,int q2yb) = psi(q1xa,q1xb,q1ya,q1yb);
         (int q2nya,int q2nyb) = fp2Neg(q2ya, q2yb);
-        (int cc0,int cc1,int cc2,int cc3,int cc4,int cc5, int cx0,int cx1,int cx2,int cx3,int cx4,int cx5) =
+        (int cc0,int cc1,int cc2,int cc3,int cc4,int cc5, Rxa,Rxb,Rya,Ryb,Rza,Rzb) =
             pointAdd(Rxa,Rxb,Rya,Ryb,Rza,Rzb, q2xa,q2xb,q2nya,q2nyb);
-        Rxa=cx0; Rxb=cx1; Rya=cx2; Ryb=cx3; Rza=cx4; Rzb=cx5;
         (int j0,int j1,int j2,int j3,int j4,int j5,int j6,int j7,int j8,int j9,int j10,int j11) =
             line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, cc0,cc1,cc2,cc3,cc4,cc5, Px, Py);
 
