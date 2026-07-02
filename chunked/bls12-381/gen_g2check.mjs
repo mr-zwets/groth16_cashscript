@@ -6,7 +6,6 @@
 // in the token NFT commitment, so one fixed set of lockings validates ANY proof. The G2
 // math comes from the shared lib (lib/G2Check.cash + lib/Fp2.cash), so the chunks IMPORT it.
 //   node gen_g2check.mjs   plan + emit generated/g2check_NN.cash + manifest_g2check.json
-import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -107,7 +106,7 @@ function genChunk(lo, hi, isFirst, isLast) {
   }
   L.push('    }');
   L.push('}');
-  return hoistSpendConstants(L.join('\n') + '\n');
+  return L.join('\n') + '\n';
 }
 
 // ---- plan windows by measured op-cost (only when run as the main script) ----

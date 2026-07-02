@@ -60,7 +60,7 @@ const padPush = (argLen, target) => {
   return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]);
 };
 
-const template = hexToBin(execFileSync('node', [CASHC, join(here, 'vkx.cash'), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+const template = hexToBin(execFileSync('node', [CASHC, join(here, 'vkx.cash'), '-h', '--hoist-repeated-constants'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
 // No OP_DROP prefix: the pad is vkx.cash's leading `bytes unused zeroPadding` param now.
 const buildLocking = (expX, expY) => Uint8Array.from([...pushInt(expY), ...pushInt(expX), ...template]);
 

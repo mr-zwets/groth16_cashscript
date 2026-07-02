@@ -37,7 +37,6 @@
 // State serialization (matches the .cash byte-for-byte):
 //   state = LE(rX,W)||LE(rY,W)||LE(rZ,W)||LE(input0,W)||LE(input1,W),  W = 40.
 //   commitment = sha256(sha256(state)).
-import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { bn254 } from '@noble/curves/bn254.js';
 import { compileFile, utils } from 'cashc';
 import {
@@ -120,7 +119,7 @@ if (_vkx.x !== expected[0] || _vkx.y !== expected[1]) throw new Error('noble vs 
 // ---------------------------------------------------------------------------
 const fpLibFuncs = () =>
   `function addFp(int x, int y) returns (int) { return (x + y) % ${P}; }\n` +
-  `function subFp(int x, int y) returns (int) { int p = ${P}; return (x - y + p) % p; }\n` +
+  `function subFp(int x, int y) returns (int) { return (x - y + ${P}) % ${P}; }\n` +
   `function mulFp(int x, int y) returns (int) { return (x * y) % ${P}; }\n` +
   `function sqrFp(int x) returns (int) { return (x * x) % ${P}; }`;
 
@@ -288,7 +287,7 @@ function genCash(idx, ch) {
   }
   lines.push('    }');
   lines.push('}');
-  return hoistSpendConstants(lines.join('\n') + '\n');
+  return lines.join('\n') + '\n';
 }
 
 // ---- reference execution ----

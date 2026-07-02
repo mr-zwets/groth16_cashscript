@@ -8,7 +8,6 @@
 // (carried, hash256-committed state = rX,rY,rZ,in0,in1). EC ops are reusable
 // functions; the per-chunk loop body compiles once (op-cost binds). Windows are
 // sized by measured real-VM op-cost.  node gen_vkx.mjs
-import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -89,7 +88,7 @@ function runWindow(lo, hi, rX, rY, rZ) {
 // ---- contract template (shamir, loop-based, 5-var runtime-input state) ----
 const SER = 'hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40))';
 const prologue = () => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
-function subFp(int x, int y) returns (int) { int p = ${Pstr}; return (x - y + p) % p; }
+function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
 function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
 function jacDouble(int x, int y, int z) returns (int, int, int) {
@@ -165,7 +164,7 @@ function genCash(lo, hi, final, incoming, outgoing) {
   }
   L.push('    }');
   L.push('}');
-  return hoistSpendConstants(L.join('\n') + '\n');
+  return L.join('\n') + '\n';
 }
 
 // expected vk_x of the worst-case planning bit-pattern (via the contract's own

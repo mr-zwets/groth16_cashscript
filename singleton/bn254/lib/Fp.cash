@@ -5,20 +5,22 @@ pragma cashscript ^0.14.0;
 // Consumed via `import "./lib/Fp.cash";` which brings these top-level functions
 // into the importing file's scope unqualified (addFp, mulFp, ...).
 //
-// Functions that use the prime TWICE bind it to a local first (`int p = P;`): the
-// second use is then a stack pick instead of a second 32-byte literal push, saving
-// ~30 bytes per body at no op-cost (picking a 32-byte item costs the same as pushing it).
+// Bodies are written in the op-cheapest form (each use pushes the folded literal);
+// size-scored builds pass the compiler's `hoistRepeatedConstants` option, which binds
+// a repeated literal to a local so later uses become stack picks (~-30 B per duplicate,
+// ~+2 ops per call) — the byte/op trade is chosen per build, not in the source.
 
 int constant P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
 
 function addFp(int x, int y) returns (int) { return (x + y) % P; }
-function subFp(int x, int y) returns (int) { int p = P; return (x - y + p) % p; }
+function subFp(int x, int y) returns (int) { return (x - y + P) % P; }
 function mulFp(int x, int y) returns (int) { return (x * y) % P; }
 function sqrFp(int x) returns (int) { return (x * x) % P; }
-function negFp(int x) returns (int) { int p = P; return (p - x) % p; }
+function negFp(int x) returns (int) { return (P - x) % P; }
 
-// Fermat inverse x^(p-2) mod p over the 254 bits of (p-2). The local `p` also keeps the
-// 254-iteration loop reusing one stack slot rather than re-pushing the literal each iteration.
+// Fermat inverse x^(p-2) mod p over the 254 bits of (p-2). The prime is bound to a local
+// `p` so the 254-iteration loop reuses one stack slot rather than re-pushing the 32-byte
+// literal each iteration (op-relevant here, unlike the straight-line bodies above).
 function inverseFp(int x) returns (int) {
     int p = P;
     int e = p - 2;

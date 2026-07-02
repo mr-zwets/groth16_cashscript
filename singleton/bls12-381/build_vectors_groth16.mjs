@@ -46,7 +46,7 @@ const proofArgs = (inputs) => [
   A.x, A.y, B.x.c0, B.x.c1, B.y.c0, B.y.c1, C.x, C.y, ...inputs,
 ];
 
-const template = hexToBin(execFileSync('node', [CASHC, join(here, 'groth16.cash'), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+const template = hexToBin(execFileSync('node', [CASHC, join(here, 'groth16.cash'), '-h', '--hoist-repeated-constants'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
 const unlocking = unlockingFor(proofArgs(PUBLIC_INPUTS));
 const invalidUnlocking = unlockingFor(proofArgs([PUBLIC_INPUTS[0] + 1n, PUBLIC_INPUTS[1]]));
 

@@ -1,21 +1,21 @@
 pragma cashscript ^0.14.0;
 
 // BLS12-381 Fp shared functions (reduced arithmetic). See lib/README.md.
-// P is a top-level constant (folded to a literal at each use site). Functions using
-// the prime twice bind it to a local first, so the second use is a stack pick instead
-// of a second 49-byte literal push (~46 bytes saved per body, op-cost-neutral).
+// P is a top-level constant (folded to a literal at each use site). Bodies are written
+// in the op-cheapest form; size-scored builds pass the compiler's `hoistRepeatedConstants`
+// option to bind repeated literals to locals (~-46 B per duplicate of the 49-byte prime).
 
 int constant P = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
 
 function addFp(int x, int y) returns (int) { return (x + y) % P; }
 
-function subFp(int x, int y) returns (int) { int p = P; return (x - y + p) % p; }
+function subFp(int x, int y) returns (int) { return (x - y + P) % P; }
 
 function mulFp(int x, int y) returns (int) { return (x * y) % P; }
 
 function sqrFp(int x) returns (int) { return (x * x) % P; }
 
-function negFp(int x) returns (int) { int p = P; return (p - x) % p; }
+function negFp(int x) returns (int) { return (P - x) % P; }
 
 function inverseFp(int x) returns (int) {
     int p = P;

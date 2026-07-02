@@ -86,7 +86,7 @@ const padPush = (argLen, target) => {
 };
 
 // --- compile the redeem template, bind constructor args (reverse order) ---
-const templateHex = execFileSync('node', [CASHC, join(here, 'vkx.cash'), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
+const templateHex = execFileSync('node', [CASHC, join(here, 'vkx.cash'), '-h', '--hoist-repeated-constants'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
 const template = hexToBin(templateHex);
 
 // No OP_DROP prefix: the pad is vkx.cash's leading `bytes unused zeroPadding` param now.

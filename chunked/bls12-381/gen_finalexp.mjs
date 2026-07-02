@@ -8,7 +8,6 @@
 //
 //   node gen_finalexp.mjs          plan + emit -> generated/finalexp_NN.cash + manifest
 //   node gen_finalexp.mjs probe    feasibility probe (function-set + a few op-costs)
-import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -95,7 +94,7 @@ function buildChunkSrc(s, e) {
   L.push('    }');
   L.push('}');
   const outLimbs = isLast ? [] : liveOut.flatMap(limbsOf).map(BigInt);
-  return { src: hoistSpendConstants(L.join('\n') + '\n'), inLimbs, witnessLimbs, outLimbs, incoming: commit(liveIn.flatMap(limbsOf)), isLast };
+  return { src: L.join('\n') + '\n', inLimbs, witnessLimbs, outLimbs, incoming: commit(liveIn.flatMap(limbsOf)), isLast };
 }
 
 const measureChunk = (c) => measureCovenantFile(c.src, [...c.inLimbs, ...c.witnessLimbs], c.inLimbs, c.outLimbs, PROBE);

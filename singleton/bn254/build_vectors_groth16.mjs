@@ -55,7 +55,7 @@ const proofArgs = (inputs) => {
   ];
 };
 
-const template = hexToBin(execFileSync('node', [CASHC, join(here, 'groth16.cash'), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+const template = hexToBin(execFileSync('node', [CASHC, join(here, 'groth16.cash'), '-h', '--hoist-repeated-constants'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
 const unlocking = unlockingFor(proofArgs(vec.publicInputs));
 const invalidUnlocking = unlockingFor(proofArgs(vec.invalid.publicInputs));
 

@@ -12,7 +12,6 @@
 //
 //   node gen_miller.mjs            plan + emit miller_NN.cash + manifest_miller.json
 //   node gen_miller.mjs probe      fast fixed-window op-cost probe
-import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -97,7 +96,7 @@ function genChunk(opLo, opHi, final) {
   L.push(covOut([...outF, ...r.flat(), ...ptParams]));
   L.push('    }');
   L.push('}');
-  return hoistSpendConstants(L.join('\n') + '\n');
+  return L.join('\n') + '\n';
 }
 
 // ---- probe ----

@@ -32,8 +32,8 @@
         "987654321"
       ],
       "zInv": null,
-      "plannedLockingBytes": 1379,
-      "plannedOperationCost": 7271279
+      "plannedLockingBytes": 1408,
+      "plannedOperationCost": 7255708
     },
     {
       "idx": 1,
@@ -51,8 +51,8 @@
         "987654321"
       ],
       "zInv": "17104758268568751835279770885039215413611002676915597857860141648195334148345",
-      "plannedLockingBytes": 1485,
-      "plannedOperationCost": 4675272
+      "plannedLockingBytes": 1514,
+      "plannedOperationCost": 4589801
     }
   ]
 }

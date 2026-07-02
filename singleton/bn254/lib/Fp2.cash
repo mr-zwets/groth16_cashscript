@@ -57,9 +57,8 @@ function fp2MulByB(int a0, int a1) returns (int, int) {
         266929791119991161246907387137283842545076965332900288569378510910307636690);
     return r0, r1;
 }
-// multiply by 1/2 (INV2 = (p+1)/2 as an Fp scalar; bound to a local so the second
-// coordinate picks it instead of re-pushing the 32-byte literal)
+// multiply by 1/2 (INV2 = (p+1)/2 as an Fp scalar)
 function fp2Half(int a0, int a1) returns (int, int) {
-    int inv2 = 10944121435919637611123202872628637544348155578648911831344518947322613104292;
-    return mulFp(a0, inv2), mulFp(a1, inv2);
+    return mulFp(a0, 10944121435919637611123202872628637544348155578648911831344518947322613104292),
+           mulFp(a1, 10944121435919637611123202872628637544348155578648911831344518947322613104292);
 }

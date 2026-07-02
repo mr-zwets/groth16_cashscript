@@ -7,7 +7,6 @@
 // (k1 + k2*lambda == in mod r); phi(IC1),phi(IC2) and the table are baked (proof-independent).
 // State (committed, 9 limbs): rX,rY,rZ, in0,in1, k10,k20,k11,k21.
 //   node gen_vkx_glv.mjs    plan + emit vkxglv_NN.cash + manifest_vkxglv.json
-import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -77,7 +76,7 @@ const TABLE_HEX = '0x' + Array.from({ length: 15 }, (_, k) => le32(TABLE[k + 1][
 const SER = 'hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(in0, 40) + toPaddedBytes(in1, 40) + toPaddedBytes(k10, 40) + toPaddedBytes(k20, 40) + toPaddedBytes(k11, 40) + toPaddedBytes(k21, 40))';
 const STATE = ['rX', 'rY', 'rZ', 'in0', 'in1', 'k10', 'k20', 'k11', 'k21'];
 const prologue = () => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
-function subFp(int x, int y) returns (int) { int p = ${Pstr}; return (x - y + p) % p; }
+function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
 function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
 function jacDouble(int x, int y, int z) returns (int, int, int) {
@@ -167,7 +166,7 @@ function genCash(lo, hi, first, final) {
   }
   L.push('    }');
   L.push('}');
-  return hoistSpendConstants(L.join('\n') + '\n');
+  return (L.join('\n') + '\n');
 }
 
 // ---- JS reference: Jacobian MSM matching the contract (for planning + build) ----

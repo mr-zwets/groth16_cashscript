@@ -24,7 +24,7 @@ const realVm = createVirtualMachineBch2026(false);
 
 // 1. compile the singleton -> baseline locking bytecode
 console.log('compiling ../groth16.cash ...');
-const baselineHex = execFileSync('node', [CASHC, join(here, '../groth16.cash'), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
+const baselineHex = execFileSync('node', [CASHC, join(here, '../groth16.cash'), '-h', '--hoist-repeated-constants'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
 const baseline = hexToBin(baselineHex);
 
 // 2. recompile

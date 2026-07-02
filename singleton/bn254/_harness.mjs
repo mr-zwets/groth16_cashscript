@@ -34,7 +34,7 @@ const looseVm = createVirtualMachine(createInstructionSetBch2026(false, {
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 
 export const compileTemplate = (file) =>
-  hexToBin(execFileSync('node', [CASHC, file, '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+  hexToBin(execFileSync('node', [CASHC, file, '-h', '--hoist-repeated-constants'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
 
 // args: bigint[] in DECLARATION order. Pushed reversed so first param ends on top.
 export const evalArgs = (template, args) => {
