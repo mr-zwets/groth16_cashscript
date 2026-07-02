@@ -19,6 +19,7 @@
 // All field/curve arithmetic comes from the verified lazy lib (lib/lazy/Bn254LazyG.cash, which
 // imports Bn254Lazy.cash); this generator only bakes the instance constants and stitches calls.
 //   node gen_singletons.mjs   [MODE=staged emits the fast-G2-only / lazy-only comparisons too]
+import { hoistSpendConstants } from '../../chunked/_hoistconsts.mjs';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -268,7 +269,7 @@ function emitMinOp({ fastG2, glv }) {
   for (const ln of emitMillerTailLazy()) L.push(ln);
   L.push('    }');
   L.push('}');
-  return L.join('\n') + '\n';
+  return hoistSpendConstants(L.join('\n') + '\n');
 }
 
 // ---- write ----

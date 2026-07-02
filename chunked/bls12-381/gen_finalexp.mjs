@@ -8,6 +8,7 @@
 //
 //   node gen_finalexp.mjs          plan + emit -> generated/finalexp_NN.cash + manifest
 //   node gen_finalexp.mjs probe    feasibility probe (function-set + a few op-costs)
+import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -58,7 +59,7 @@ function buildChunkSrc(s, e) {
   const body = [];
   const hasInv = (() => { for (let i = s; i < e; i++) if (ops[i].op === 'inv') return true; return false; })();
   // lazy add leaves fp12Mul outputs unreduced, so equality vs ONE must compare mod the
-  // prime. Named iP (not P) to avoid colliding with covOut's own `int P` declaration.
+  // prime. Named iP (not Pmod) to avoid colliding with covOut's own declaration.
   if (hasInv) body.push(`        int iP = ${P};`);
   for (let i = s; i < e; i++) {
     const o = ops[i];
@@ -86,15 +87,15 @@ function buildChunkSrc(s, e) {
   L.push(...body);
   if (isLast) {
     const rv = name.get(resultId);
-    L.push(`        int P = ${P};`);
-    L.push(`        require(${rv[0]} % P == 1); ` + Array.from({ length: 11 }, (_, j) => `require(${rv[j + 1]} % P == 0);`).join(' '));
+    L.push(`        int Pmod = ${P};`);
+    L.push(`        require(${rv[0]} % Pmod == 1); ` + Array.from({ length: 11 }, (_, j) => `require(${rv[j + 1]} % Pmod == 0);`).join(' '));
   } else {
     L.push(covOut(liveOut.flatMap((id) => name.get(id))));
   }
   L.push('    }');
   L.push('}');
   const outLimbs = isLast ? [] : liveOut.flatMap(limbsOf).map(BigInt);
-  return { src: L.join('\n') + '\n', inLimbs, witnessLimbs, outLimbs, incoming: commit(liveIn.flatMap(limbsOf)), isLast };
+  return { src: hoistSpendConstants(L.join('\n') + '\n'), inLimbs, witnessLimbs, outLimbs, incoming: commit(liveIn.flatMap(limbsOf)), isLast };
 }
 
 const measureChunk = (c) => measureCovenantFile(c.src, [...c.inLimbs, ...c.witnessLimbs], c.inLimbs, c.outLimbs, PROBE);

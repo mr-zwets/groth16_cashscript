@@ -9,6 +9,7 @@
 //
 //   node gen_finalexp.mjs          full plan + emit -> generated/finalexp_NN.cash + manifest_finalexp.json
 //   node gen_finalexp.mjs probe    feasibility: function-set size + a few op-costs
+import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -117,7 +118,7 @@ function buildChunkSrc(s, e) {
   L.push('    }');
   L.push('}');
   const outLimbs = isLast ? [] : liveOut.flatMap(limbsOf).map(BigInt);
-  return { src: L.join('\n') + '\n', inLimbs, outLimbs, incoming, isLast };
+  return { src: hoistSpendConstants(L.join('\n') + '\n'), inLimbs, outLimbs, incoming, isLast };
 }
 
 // ---------- probe ----------

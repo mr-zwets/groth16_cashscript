@@ -18,6 +18,7 @@
 // final chunk additionally consumes the per-proof witness zinv (2 limbs) from the
 // unlocking — supplied by build_vectors via the chunk `extras`.
 //   node gen_g2check.mjs        plan + emit generated/g2check_NN.cash + manifest_g2check.json
+import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -161,7 +162,7 @@ function genChunk(lo, hi, isFirst, isLast) {
   }
   L.push('    }');
   L.push('}');
-  return L.join('\n') + '\n';
+  return hoistSpendConstants(L.join('\n') + '\n');
 }
 
 // ---- correct real-VM measurement for the FINAL (endo) chunk: the spent token commits

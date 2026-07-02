@@ -7,6 +7,7 @@
 // beats a cInv-only binary fold (37 folds) — measured 27 chunks / 194.9M op vs 28 / 201.1M.
 // One fixed locking per chunk verifies ANY proof (c,cInv are runtime state, like the rest).
 //   node gen_miller_residue.mjs        plan + emit millerres_NN.cash + manifest_millerres.json
+import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -121,7 +122,7 @@ function genChunk(opLo, opHi, isFinal) {
   L.push(isFinal ? covOut([...f, ...cNames, ...ciNames]) : covOut([...f, ...r0, ...ptParams, ...cNames, ...ciNames]));
   L.push('    }');
   L.push('}');
-  return L.join('\n') + '\n';
+  return hoistSpendConstants(L.join('\n') + '\n');
 }
 
 if (process.argv[2] === 'probe') {

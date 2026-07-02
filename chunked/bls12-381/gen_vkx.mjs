@@ -14,6 +14,7 @@
 //
 //   node gen_vkx.mjs           # plan + emit (measures real-VM op-cost per window)
 //   node gen_vkx.mjs probe     # fast fixed-window probe (no planner)
+import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -42,7 +43,7 @@ const PLAN = (1n << BigInt(ITERS)) - 1n;
 
 // ---- contract template (loop-based, runtime-input committed state) ----
 const prologue = () => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
-function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
+function subFp(int x, int y) returns (int) { int p = ${Pstr}; return (x - y + p) % p; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
 function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
 function jacDouble(int x, int y, int z) returns (int, int, int) {
@@ -119,7 +120,7 @@ function genCash(lo, hi, final) {
   }
   L.push('    }');
   L.push('}');
-  return (L.join('\n') + '\n');
+  return hoistSpendConstants(L.join('\n') + '\n');
 }
 
 // ---- fast probe (no planner): one fixed window, report op-cost ----

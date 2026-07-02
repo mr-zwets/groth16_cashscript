@@ -11,6 +11,7 @@
 //   - w in the cubic-coset {1, ROOT27, ROOT27^2}      [3-way 12-limb match; tight per 2024/640]
 //   - verdict fF*w*c^q2 == c^q*c^q3                    [3 Frobenius + 3 fp12Mul + 12 requires]
 //   node gen_finalexp_residue.mjs   emit finalexpres_00.cash + manifest_finalexpres.json
+import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -62,7 +63,7 @@ function genTail() {
   L.push('        ' + Array.from({ length: 12 }, (_, i) => `require(lhs${i} % P == rhs${i} % P);`).join(' '));
   L.push('    }');
   L.push('}');
-  return L.join('\n') + '\n';
+  return hoistSpendConstants(L.join('\n') + '\n');
 }
 
 // ---- real-VM measurement: commit 36 state limbs, push 36 + 12 (w) ----

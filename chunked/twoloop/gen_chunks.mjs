@@ -22,6 +22,7 @@
 // Serialization (matches the .cash contract byte-for-byte):
 //   state = LE(accX,W) || LE(accY,W) || ... || LE(rZ,W),  W = 40 (little-endian).
 //   commitment = sha256(sha256(state)).
+import { hoistSpendConstants } from '../_hoistconsts.mjs';
 import {
   binToHex, bigIntToBinUintLE, binToFixedLength, hash256,
 } from '@bitauth/libauth';
@@ -169,17 +170,18 @@ const P = '218882428718392752222464057452572750886963111572978236626890378946452
 
 // top-level (global) functions, emitted above the contract
 const FP_FUNCS = `function addFp(int x, int y) returns (int) { return (x + y) % ${P}; }
-function subFp(int x, int y) returns (int) { return (x - y + ${P}) % ${P}; }
+function subFp(int x, int y) returns (int) { int p = ${P}; return (x - y + p) % p; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${P}; }
 function sqrFp(int x) returns (int) { return (x * x) % ${P}; }`;
 
 const INVERSE_FUNC = `function inverseFp(int x) returns (int) {
-    int e = ${P} - 2;
+    int p = ${P};
+    int e = p - 2;
     int result = 1;
-    int current = x % ${P};
+    int current = x % p;
     for (int i = 0; i < 254; i++) {
-        if (((e >> i) % 2) == 1) { result = (result * current) % ${P}; }
-        current = (current * current) % ${P};
+        if (((e >> i) % 2) == 1) { result = (result * current) % p; }
+        current = (current * current) % p;
     }
     return result;
 }`;
@@ -278,7 +280,7 @@ function genCash(idx, ch) {
   }
   lines.push('    }');
   lines.push('}');
-  return lines.join('\n') + '\n';
+  return hoistSpendConstants(lines.join('\n') + '\n');
 }
 
 chunks.forEach((ch, idx) => writeFileSync(join(OUT_DIR, `chunk${String(idx).padStart(2, '0')}.cash`), genCash(idx, ch)));

@@ -1,21 +1,26 @@
 pragma cashscript ^0.14.0;
 
-// BN254 base field Fp over the prime p (written out literally at each use site --
-// the compiler folds it, and top-level constants are not part of the language).
+// BN254 base field Fp over the prime P (a top-level constant, folded to a literal at
+// each use site by the compiler — single source of truth for the prime).
 // Consumed via `import "./lib/Fp.cash";` which brings these top-level functions
 // into the importing file's scope unqualified (addFp, mulFp, ...).
+//
+// Functions that use the prime TWICE bind it to a local first (`int p = P;`): the
+// second use is then a stack pick instead of a second 32-byte literal push, saving
+// ~30 bytes per body at no op-cost (picking a 32-byte item costs the same as pushing it).
 
-function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-function sqrFp(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-function negFp(int x) returns (int) { return (21888242871839275222246405745257275088696311157297823662689037894645226208583 - x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+int constant P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
 
-// Fermat inverse x^(p-2) mod p over the 254 bits of (p-2). The prime is bound to a local `p` (as
-// in the hand-written sources) so the 254-iteration loop reuses one stack slot rather than
-// re-pushing the 32-byte literal each iteration.
+function addFp(int x, int y) returns (int) { return (x + y) % P; }
+function subFp(int x, int y) returns (int) { int p = P; return (x - y + p) % p; }
+function mulFp(int x, int y) returns (int) { return (x * y) % P; }
+function sqrFp(int x) returns (int) { return (x * x) % P; }
+function negFp(int x) returns (int) { int p = P; return (p - x) % p; }
+
+// Fermat inverse x^(p-2) mod p over the 254 bits of (p-2). The local `p` also keeps the
+// 254-iteration loop reusing one stack slot rather than re-pushing the literal each iteration.
 function inverseFp(int x) returns (int) {
-    int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    int p = P;
     int e = p - 2;
     int result = 1;
     int current = x % p;

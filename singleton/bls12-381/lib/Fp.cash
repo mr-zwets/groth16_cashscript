@@ -1,25 +1,30 @@
 pragma cashscript ^0.14.0;
 
 // BLS12-381 Fp shared functions (reduced arithmetic). See lib/README.md.
+// P is a top-level constant (folded to a literal at each use site). Functions using
+// the prime twice bind it to a local first, so the second use is a stack pick instead
+// of a second 49-byte literal push (~46 bytes saved per body, op-cost-neutral).
 
-function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+int constant P = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
 
-function subFp(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+function addFp(int x, int y) returns (int) { return (x + y) % P; }
 
-function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+function subFp(int x, int y) returns (int) { int p = P; return (x - y + p) % p; }
 
-function sqrFp(int x) returns (int) { return (x * x) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+function mulFp(int x, int y) returns (int) { return (x * y) % P; }
 
-function negFp(int x) returns (int) { return (4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787 - x) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+function sqrFp(int x) returns (int) { return (x * x) % P; }
+
+function negFp(int x) returns (int) { int p = P; return (p - x) % p; }
 
 function inverseFp(int x) returns (int) {
-        int p = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
-        int e = p - 2;
-        int result = 1;
-        int current = x % p;
-        for (int i = 0; i < 381; i = i + 1) {
-            if (((e >> i) % 2) == 1) { result = (result * current) % p; }
-            current = (current * current) % p;
-        }
-        return result;
+    int p = P;
+    int e = p - 2;
+    int result = 1;
+    int current = x % p;
+    for (int i = 0; i < 381; i = i + 1) {
+        if (((e >> i) % 2) == 1) { result = (result * current) % p; }
+        current = (current * current) % p;
     }
+    return result;
+}

@@ -53,10 +53,12 @@ export const serExpr = (names) => 'hash256(' + names.map((n) => `toPaddedBytes($
 /** require: the spent token commits hash(incoming state) (decl-order `names`). */
 export const covIn = (names) =>
   `        require(tx.inputs[this.activeInputIndex].nftCommitment == ${serExpr(names)});`;
-/** require: output[0] commits hash(outgoing, reduced) + perpetuates the token thread. */
+/** require: output[0] commits hash(outgoing, reduced) + perpetuates the token thread.
+ * Local is named `Pmod` (matching the BN254 covOut): chunks that import lib/Fp.cash inherit
+ * its global `constant P`, and a local `int P` would be a ConstantNameCollisionError. */
 export const covOut = (outNames) =>
-  `        int P = ${P};\n` +
-  `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((n) => `toPaddedBytes(${n} % P, 48)`).join(' + ')}));\n` +
+  `        int Pmod = ${P};\n` +
+  `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((n) => `toPaddedBytes(${n} % Pmod, 48)`).join(' + ')}));\n` +
   '        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);';
 
 // ---- real-VM measurement (padded to buy op-cost budget) ----
