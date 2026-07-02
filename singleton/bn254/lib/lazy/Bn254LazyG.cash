@@ -1,4 +1,4 @@
-pragma cashscript ^0.13.0;
+pragma cashscript ^0.14.0;
 
 // Lazy-tower companion: the pieces the lazy miller harness lacks but the full verifier needs
 // — the G2 subgroup group law (Jacobian over Fp2), the G1 group law + scalar-mult for vk_x,
@@ -9,212 +9,210 @@ pragma cashscript ^0.13.0;
 // so reducing eagerly costs the same op as the reduced tower while staying bias-free and safe.
 import "./Bn254Lazy.cash";
 
-library Bn254LazyG {
-    // ---- canonical Fp / Fp2 helpers (everything stays in [0,P)) ----
-    function redFp(int x) returns (int) { return x % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function mAdd(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function mSub(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
-    function mSqr(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+// ---- canonical Fp / Fp2 helpers (everything stays in [0,P)) ----
+function redFp(int x) returns (int) { return x % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+function mAdd(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+function mSub(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+function mSqr(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
 
-    function r2Add(int a0, int a1, int b0, int b1) returns (int, int) { return mAdd(a0, b0), mAdd(a1, b1); }
-    function r2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return mSub(a0, b0), mSub(a1, b1); }
-    function r2Neg(int a0, int a1) returns (int, int) { return mSub(0, a0), mSub(0, a1); }
-    function r2Sc(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
-    // canonical Fp2 multiply (reduce both lazy components)
-    function r2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
-        (int m0, int m1) = fp2Mul(a0, a1, b0, b1);
-        return redFp(m0), redFp(m1);
-    }
-    function r2Sqr(int a0, int a1) returns (int, int) {
-        (int m0, int m1) = fp2Sqr(a0, a1);   // lazy fp2Sqr is already canonical, but reduce to be safe
-        return redFp(m0), redFp(m1);
-    }
-    // ---- G2 subgroup membership: Jacobian group law over Fp2 (a=0), for [6x^2]B / fast-endo ----
-    function g2Double(int Xa,int Xb,int Ya,int Yb,int Za,int Zb) returns (int,int,int,int,int,int) {
-        (int Aa,int Ab) = r2Sqr(Xa, Xb);
-        (int Bb0,int Bb1) = r2Sqr(Ya, Yb);
-        (int Ca,int Cb) = r2Sqr(Bb0, Bb1);
-        (int xpa,int xpb) = r2Add(Xa, Xb, Bb0, Bb1);
-        (int sqa,int sqb) = r2Sqr(xpa, xpb);
-        (int t1a,int t1b) = r2Sub(sqa, sqb, Aa, Ab);
-        (int t2a,int t2b) = r2Sub(t1a, t1b, Ca, Cb);
-        (int Da,int Db) = r2Sc(t2a, t2b, 2);
-        (int Ea,int Eb) = r2Sc(Aa, Ab, 3);
-        (int Fa,int Fb) = r2Sqr(Ea, Eb);
-        (int twoDa,int twoDb) = r2Sc(Da, Db, 2);
-        (int nXa,int nXb) = r2Sub(Fa, Fb, twoDa, twoDb);
-        (int dmxa,int dmxb) = r2Sub(Da, Db, nXa, nXb);
-        (int ednma,int ednmb) = r2Mul(Ea, Eb, dmxa, dmxb);
-        (int c8a,int c8b) = r2Sc(Ca, Cb, 8);
-        (int nYa,int nYb) = r2Sub(ednma, ednmb, c8a, c8b);
-        (int yza,int yzb) = r2Mul(Ya, Yb, Za, Zb);
-        (int nZa,int nZb) = r2Sc(yza, yzb, 2);
-        return nXa,nXb,nYa,nYb,nZa,nZb;
-    }
-    function g2AddAffine(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int bXa,int bXb,int bYa,int bYb) returns (int,int,int,int,int,int) {
-        int rXa = bXa; int rXb = bXb; int rYa = bYa; int rYb = bYb; int rZa = 1; int rZb = 0;
-        if (Za != 0 || Zb != 0) {
-            (int z11a,int z11b) = r2Sqr(Za, Zb);
-            (int u2a,int u2b) = r2Mul(bXa, bXb, z11a, z11b);
-            (int z11za,int z11zb) = r2Mul(z11a, z11b, Za, Zb);
-            (int s2a,int s2b) = r2Mul(bYa, bYb, z11za, z11zb);
-            if (Xa == u2a && Xb == u2b && Ya == s2a && Yb == s2b) {
-                (rXa,rXb,rYa,rYb,rZa,rZb) = g2Double(Xa, Xb, Ya, Yb, Za, Zb);
-            } else {
-                (int ha,int hb) = r2Sub(u2a, u2b, Xa, Xb);
-                (int i2a,int i2b) = r2Sqr(mulFp(2, ha), mulFp(2, hb));
-                (int ja,int jb) = r2Mul(ha, hb, i2a, i2b);
-                (int rsa,int rsb) = r2Sub(s2a, s2b, Ya, Yb);
-                (int rra,int rrb) = r2Sc(rsa, rsb, 2);
-                (int va,int vb) = r2Mul(Xa, Xb, i2a, i2b);
-                (int rr2a,int rr2b) = r2Sqr(rra, rrb);
-                (int rr2ja,int rr2jb) = r2Sub(rr2a, rr2b, ja, jb);
-                (int v2a,int v2b) = r2Sc(va, vb, 2);
-                (int nXa,int nXb) = r2Sub(rr2ja, rr2jb, v2a, v2b);
-                (int vmxa,int vmxb) = r2Sub(va, vb, nXa, nXb);
-                (int rvma,int rvmb) = r2Mul(rra, rrb, vmxa, vmxb);
-                (int yja,int yjb) = r2Mul(Ya, Yb, ja, jb);
-                (int yj2a,int yj2b) = r2Sc(yja, yjb, 2);
-                (int nYa,int nYb) = r2Sub(rvma, rvmb, yj2a, yj2b);
-                (int zp1a,int zp1b) = r2Add(Za, Zb, 1, 0);
-                (int zp1sa,int zp1sb) = r2Sqr(zp1a, zp1b);
-                (int t3a,int t3b) = r2Sub(zp1sa, zp1sb, z11a, z11b);
-                (int t4a,int t4b) = r2Sub(t3a, t3b, 1, 0);
-                (int nZa,int nZb) = r2Mul(t4a, t4b, ha, hb);
-                rXa=nXa; rXb=nXb; rYa=nYa; rYb=nYb; rZa=nZa; rZb=nZb;
-            }
+function r2Add(int a0, int a1, int b0, int b1) returns (int, int) { return mAdd(a0, b0), mAdd(a1, b1); }
+function r2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return mSub(a0, b0), mSub(a1, b1); }
+function r2Neg(int a0, int a1) returns (int, int) { return mSub(0, a0), mSub(0, a1); }
+function r2Sc(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
+// canonical Fp2 multiply (reduce both lazy components)
+function r2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+    (int m0, int m1) = fp2Mul(a0, a1, b0, b1);
+    return redFp(m0), redFp(m1);
+}
+function r2Sqr(int a0, int a1) returns (int, int) {
+    (int m0, int m1) = fp2Sqr(a0, a1);   // lazy fp2Sqr is already canonical, but reduce to be safe
+    return redFp(m0), redFp(m1);
+}
+// ---- G2 subgroup membership: Jacobian group law over Fp2 (a=0), for [6x^2]B / fast-endo ----
+function g2Double(int Xa,int Xb,int Ya,int Yb,int Za,int Zb) returns (int,int,int,int,int,int) {
+    (int Aa,int Ab) = r2Sqr(Xa, Xb);
+    (int Bb0,int Bb1) = r2Sqr(Ya, Yb);
+    (int Ca,int Cb) = r2Sqr(Bb0, Bb1);
+    (int xpa,int xpb) = r2Add(Xa, Xb, Bb0, Bb1);
+    (int sqa,int sqb) = r2Sqr(xpa, xpb);
+    (int t1a,int t1b) = r2Sub(sqa, sqb, Aa, Ab);
+    (int t2a,int t2b) = r2Sub(t1a, t1b, Ca, Cb);
+    (int Da,int Db) = r2Sc(t2a, t2b, 2);
+    (int Ea,int Eb) = r2Sc(Aa, Ab, 3);
+    (int Fa,int Fb) = r2Sqr(Ea, Eb);
+    (int twoDa,int twoDb) = r2Sc(Da, Db, 2);
+    (int nXa,int nXb) = r2Sub(Fa, Fb, twoDa, twoDb);
+    (int dmxa,int dmxb) = r2Sub(Da, Db, nXa, nXb);
+    (int ednma,int ednmb) = r2Mul(Ea, Eb, dmxa, dmxb);
+    (int c8a,int c8b) = r2Sc(Ca, Cb, 8);
+    (int nYa,int nYb) = r2Sub(ednma, ednmb, c8a, c8b);
+    (int yza,int yzb) = r2Mul(Ya, Yb, Za, Zb);
+    (int nZa,int nZb) = r2Sc(yza, yzb, 2);
+    return nXa,nXb,nYa,nYb,nZa,nZb;
+}
+function g2AddAffine(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int bXa,int bXb,int bYa,int bYb) returns (int,int,int,int,int,int) {
+    int rXa = bXa; int rXb = bXb; int rYa = bYa; int rYb = bYb; int rZa = 1; int rZb = 0;
+    if (Za != 0 || Zb != 0) {
+        (int z11a,int z11b) = r2Sqr(Za, Zb);
+        (int u2a,int u2b) = r2Mul(bXa, bXb, z11a, z11b);
+        (int z11za,int z11zb) = r2Mul(z11a, z11b, Za, Zb);
+        (int s2a,int s2b) = r2Mul(bYa, bYb, z11za, z11zb);
+        if (Xa == u2a && Xb == u2b && Ya == s2a && Yb == s2b) {
+            (rXa,rXb,rYa,rYb,rZa,rZb) = g2Double(Xa, Xb, Ya, Yb, Za, Zb);
+        } else {
+            (int ha,int hb) = r2Sub(u2a, u2b, Xa, Xb);
+            (int i2a,int i2b) = r2Sqr(mulFp(2, ha), mulFp(2, hb));
+            (int ja,int jb) = r2Mul(ha, hb, i2a, i2b);
+            (int rsa,int rsb) = r2Sub(s2a, s2b, Ya, Yb);
+            (int rra,int rrb) = r2Sc(rsa, rsb, 2);
+            (int va,int vb) = r2Mul(Xa, Xb, i2a, i2b);
+            (int rr2a,int rr2b) = r2Sqr(rra, rrb);
+            (int rr2ja,int rr2jb) = r2Sub(rr2a, rr2b, ja, jb);
+            (int v2a,int v2b) = r2Sc(va, vb, 2);
+            (int nXa,int nXb) = r2Sub(rr2ja, rr2jb, v2a, v2b);
+            (int vmxa,int vmxb) = r2Sub(va, vb, nXa, nXb);
+            (int rvma,int rvmb) = r2Mul(rra, rrb, vmxa, vmxb);
+            (int yja,int yjb) = r2Mul(Ya, Yb, ja, jb);
+            (int yj2a,int yj2b) = r2Sc(yja, yjb, 2);
+            (int nYa,int nYb) = r2Sub(rvma, rvmb, yj2a, yj2b);
+            (int zp1a,int zp1b) = r2Add(Za, Zb, 1, 0);
+            (int zp1sa,int zp1sb) = r2Sqr(zp1a, zp1b);
+            (int t3a,int t3b) = r2Sub(zp1sa, zp1sb, z11a, z11b);
+            (int t4a,int t4b) = r2Sub(t3a, t3b, 1, 0);
+            (int nZa,int nZb) = r2Mul(t4a, t4b, ha, hb);
+            rXa=nXa; rXb=nXb; rYa=nYa; rYb=nYb; rZa=nZa; rZb=nZb;
         }
-        return rXa, rXb, rYa, rYb, rZa, rZb;
     }
+    return rXa, rXb, rYa, rYb, rZa, rZb;
+}
 
-    // ---- G1 (Fp) Jacobian group law + scalar mult, for vk_x ----
-    function jacDoubleG1(int x, int y, int z) returns (int, int, int) {
-        int a = mSqr(x); int b = mSqr(y); int c = mSqr(b);
-        int d = mulFp(2, mSub(mSub(mSqr(mAdd(x, b)), a), c));
-        int e = mulFp(3, a); int f = mSqr(e);
-        int nx = mSub(f, mulFp(2, d));
-        int ny = mSub(mulFp(e, mSub(d, nx)), mulFp(8, c));
-        int nz = mulFp(2, mulFp(y, z));
-        return nx, ny, nz;
-    }
-    function jacAddG1(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
-        int rx = bX; int ry = bY; int rz = bZ;
-        if (aZ != 0) {
-            int z1z1 = mSqr(aZ); int z2z2 = mSqr(bZ);
-            int u1 = mulFp(aX, z2z2); int u2 = mulFp(bX, z1z1);
-            int s1 = mulFp(mulFp(aY, bZ), z2z2); int s2 = mulFp(mulFp(bY, aZ), z1z1);
-            if (u1 == u2 && s1 == s2) {
-                int da = mSqr(aX); int db = mSqr(aY); int dc = mSqr(db);
-                int dd = mulFp(2, mSub(mSub(mSqr(mAdd(aX, db)), da), dc));
-                int de = mulFp(3, da); int df = mSqr(de);
-                int dnx = mSub(df, mulFp(2, dd));
-                int dny = mSub(mulFp(de, mSub(dd, dnx)), mulFp(8, dc));
-                int dnz = mulFp(2, mulFp(aY, aZ));
-                rx = dnx; ry = dny; rz = dnz;
-            } else {
-                int h = mSub(u2, u1); int i2 = mSqr(mulFp(2, h)); int jj = mulFp(h, i2);
-                int rr = mulFp(2, mSub(s2, s1)); int vv = mulFp(u1, i2);
-                int anx = mSub(mSub(mSqr(rr), jj), mulFp(2, vv));
-                int any = mSub(mulFp(rr, mSub(vv, anx)), mulFp(2, mulFp(s1, jj)));
-                int anz = mulFp(mSub(mSub(mSqr(mAdd(aZ, bZ)), z1z1), z2z2), h);
-                rx = anx; ry = any; rz = anz;
-            }
+// ---- G1 (Fp) Jacobian group law + scalar mult, for vk_x ----
+function jacDoubleG1(int x, int y, int z) returns (int, int, int) {
+    int a = mSqr(x); int b = mSqr(y); int c = mSqr(b);
+    int d = mulFp(2, mSub(mSub(mSqr(mAdd(x, b)), a), c));
+    int e = mulFp(3, a); int f = mSqr(e);
+    int nx = mSub(f, mulFp(2, d));
+    int ny = mSub(mulFp(e, mSub(d, nx)), mulFp(8, c));
+    int nz = mulFp(2, mulFp(y, z));
+    return nx, ny, nz;
+}
+function jacAddG1(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
+    int rx = bX; int ry = bY; int rz = bZ;
+    if (aZ != 0) {
+        int z1z1 = mSqr(aZ); int z2z2 = mSqr(bZ);
+        int u1 = mulFp(aX, z2z2); int u2 = mulFp(bX, z1z1);
+        int s1 = mulFp(mulFp(aY, bZ), z2z2); int s2 = mulFp(mulFp(bY, aZ), z1z1);
+        if (u1 == u2 && s1 == s2) {
+            int da = mSqr(aX); int db = mSqr(aY); int dc = mSqr(db);
+            int dd = mulFp(2, mSub(mSub(mSqr(mAdd(aX, db)), da), dc));
+            int de = mulFp(3, da); int df = mSqr(de);
+            int dnx = mSub(df, mulFp(2, dd));
+            int dny = mSub(mulFp(de, mSub(dd, dnx)), mulFp(8, dc));
+            int dnz = mulFp(2, mulFp(aY, aZ));
+            rx = dnx; ry = dny; rz = dnz;
+        } else {
+            int h = mSub(u2, u1); int i2 = mSqr(mulFp(2, h)); int jj = mulFp(h, i2);
+            int rr = mulFp(2, mSub(s2, s1)); int vv = mulFp(u1, i2);
+            int anx = mSub(mSub(mSqr(rr), jj), mulFp(2, vv));
+            int any = mSub(mulFp(rr, mSub(vv, anx)), mulFp(2, mulFp(s1, jj)));
+            int anz = mulFp(mSub(mSub(mSqr(mAdd(aZ, bZ)), z1z1), z2z2), h);
+            rx = anx; ry = any; rz = anz;
         }
-        return rx, ry, rz;
     }
-    function g1ScalarMul(int scalar, int bx, int by) returns (int, int, int) {
-        int rX = 0; int rY = 1; int rZ = 0;
-        int cX = bx; int cY = by; int cZ = 1;
-        for (int i = 0; i < 254; i = i + 1) {
-            if (((scalar >> i) % 2) == 1) { (rX,rY,rZ) = jacAddG1(rX, rY, rZ, cX, cY, cZ); }
-            if (cZ != 0 && cY != 0) { (cX,cY,cZ) = jacDoubleG1(cX, cY, cZ); }
-        }
-        return rX, rY, rZ;
+    return rx, ry, rz;
+}
+function g1ScalarMul(int scalar, int bx, int by) returns (int, int, int) {
+    int rX = 0; int rY = 1; int rZ = 0;
+    int cX = bx; int cY = by; int cZ = 1;
+    for (int i = 0; i < 254; i = i + 1) {
+        if (((scalar >> i) % 2) == 1) { (rX,rY,rZ) = jacAddG1(rX, rY, rZ, cX, cY, cZ); }
+        if (cZ != 0 && cY != 0) { (cX,cY,cZ) = jacDoubleG1(cX, cY, cZ); }
     }
-    function jacToAffine(int x, int y, int z) returns (int, int) {
-        int zInv = inverseFp(z);
-        int zInv2 = mSqr(zInv);
-        int zInv3 = mulFp(zInv2, zInv);
-        return mulFp(x, zInv2), mulFp(y, zInv3);
-    }
+    return rX, rY, rZ;
+}
+function jacToAffine(int x, int y, int z) returns (int, int) {
+    int zInv = inverseFp(z);
+    int zInv2 = mSqr(zInv);
+    int zInv3 = mulFp(zInv2, zInv);
+    return mulFp(x, zInv2), mulFp(y, zInv3);
+}
 
-    // ---- single-pair Miller (lazy hot path) -> Fp12 (UNREDUCED lazy representative) ----
-    function millerSingle(int Qxa,int Qxb,int Qya,int Qyb, int Px, int Py)
-        returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        int F0=1; int F1=0; int F2=0; int F3=0; int F4=0; int F5=0;
-        int F6=0; int F7=0; int F8=0; int F9=0; int F10=0; int F11=0;
-        int Rxa=Qxa; int Rxb=Qxb; int Rya=Qya; int Ryb=Qyb; int Rza=1; int Rzb=0;
-        for (int k = 0; k < 65; k = k + 1) {
-            (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) = fp12Sqr(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11);
-            (int dc0,int dc1,int dc2,int dc3,int dc4,int dc5, int dx0,int dx1,int dx2,int dx3,int dx4,int dx5) =
-                pointDouble(Rxa,Rxb,Rya,Ryb,Rza,Rzb);
-            Rxa=dx0; Rxb=dx1; Rya=dx2; Ryb=dx3; Rza=dx4; Rzb=dx5;
-            (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
-                line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, dc0,dc1,dc2,dc3,dc4,dc5, Px, Py);
-            int nz = (3045737938581365386 >> k) % 2;
-            if (nz == 1) {
-                int neg = (162306075919524482 >> k) % 2;
-                int uya = Qya; int uyb = Qyb;
-                if (neg == 1) { (uya,uyb) = fp2Neg(Qya, Qyb, 64); }
-                (int ac0,int ac1,int ac2,int ac3,int ac4,int ac5, int ax0,int ax1,int ax2,int ax3,int ax4,int ax5) =
-                    pointAdd(Rxa,Rxb,Rya,Ryb,Rza,Rzb, Qxa,Qxb,uya,uyb);
-                Rxa=ax0; Rxb=ax1; Rya=ax2; Ryb=ax3; Rza=ax4; Rzb=ax5;
-                (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
-                    line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, ac0,ac1,ac2,ac3,ac4,ac5, Px, Py);
-            }
-        }
-        (int q1xa,int q1xb,int q1ya,int q1yb) = psi(Qxa,Qxb,Qya,Qyb);
-        (int bc0,int bc1,int bc2,int bc3,int bc4,int bc5, int bx0,int bx1,int bx2,int bx3,int bx4,int bx5) =
-            pointAdd(Rxa,Rxb,Rya,Ryb,Rza,Rzb, q1xa,q1xb,q1ya,q1yb);
-        Rxa=bx0; Rxb=bx1; Rya=bx2; Ryb=bx3; Rza=bx4; Rzb=bx5;
+// ---- single-pair Miller (lazy hot path) -> Fp12 (UNREDUCED lazy representative) ----
+function millerSingle(int Qxa,int Qxb,int Qya,int Qyb, int Px, int Py)
+    returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    int F0=1; int F1=0; int F2=0; int F3=0; int F4=0; int F5=0;
+    int F6=0; int F7=0; int F8=0; int F9=0; int F10=0; int F11=0;
+    int Rxa=Qxa; int Rxb=Qxb; int Rya=Qya; int Ryb=Qyb; int Rza=1; int Rzb=0;
+    for (int k = 0; k < 65; k = k + 1) {
+        (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) = fp12Sqr(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11);
+        (int dc0,int dc1,int dc2,int dc3,int dc4,int dc5, int dx0,int dx1,int dx2,int dx3,int dx4,int dx5) =
+            pointDouble(Rxa,Rxb,Rya,Ryb,Rza,Rzb);
+        Rxa=dx0; Rxb=dx1; Rya=dx2; Ryb=dx3; Rza=dx4; Rzb=dx5;
         (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
-            line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, bc0,bc1,bc2,bc3,bc4,bc5, Px, Py);
-        (int q2xa,int q2xb,int q2ya,int q2yb) = psi(q1xa,q1xb,q1ya,q1yb);
-        (int q2nya,int q2nyb) = fp2Neg(q2ya, q2yb, 64);
-        (int cc0,int cc1,int cc2,int cc3,int cc4,int cc5, int cx0,int cx1,int cx2,int cx3,int cx4,int cx5) =
-            pointAdd(Rxa,Rxb,Rya,Ryb,Rza,Rzb, q2xa,q2xb,q2nya,q2nyb);
-        Rxa=cx0; Rxb=cx1; Rya=cx2; Ryb=cx3; Rza=cx4; Rzb=cx5;
-        (int j0,int j1,int j2,int j3,int j4,int j5,int j6,int j7,int j8,int j9,int j10,int j11) =
-            line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, cc0,cc1,cc2,cc3,cc4,cc5, Px, Py);
-        return j0,j1,j2,j3,j4,j5,j6,j7,j8,j9,j10,j11;
+            line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, dc0,dc1,dc2,dc3,dc4,dc5, Px, Py);
+        int nz = (3045737938581365386 >> k) % 2;
+        if (nz == 1) {
+            int neg = (162306075919524482 >> k) % 2;
+            int uya = Qya; int uyb = Qyb;
+            if (neg == 1) { (uya,uyb) = fp2Neg(Qya, Qyb, 64); }
+            (int ac0,int ac1,int ac2,int ac3,int ac4,int ac5, int ax0,int ax1,int ax2,int ax3,int ax4,int ax5) =
+                pointAdd(Rxa,Rxb,Rya,Ryb,Rza,Rzb, Qxa,Qxb,uya,uyb);
+            Rxa=ax0; Rxb=ax1; Rya=ax2; Ryb=ax3; Rza=ax4; Rzb=ax5;
+            (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
+                line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, ac0,ac1,ac2,ac3,ac4,ac5, Px, Py);
+        }
     }
+    (int q1xa,int q1xb,int q1ya,int q1yb) = psi(Qxa,Qxb,Qya,Qyb);
+    (int bc0,int bc1,int bc2,int bc3,int bc4,int bc5, int bx0,int bx1,int bx2,int bx3,int bx4,int bx5) =
+        pointAdd(Rxa,Rxb,Rya,Ryb,Rza,Rzb, q1xa,q1xb,q1ya,q1yb);
+    Rxa=bx0; Rxb=bx1; Rya=bx2; Ryb=bx3; Rza=bx4; Rzb=bx5;
+    (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
+        line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, bc0,bc1,bc2,bc3,bc4,bc5, Px, Py);
+    (int q2xa,int q2xb,int q2ya,int q2yb) = psi(q1xa,q1xb,q1ya,q1yb);
+    (int q2nya,int q2nyb) = fp2Neg(q2ya, q2yb, 64);
+    (int cc0,int cc1,int cc2,int cc3,int cc4,int cc5, int cx0,int cx1,int cx2,int cx3,int cx4,int cx5) =
+        pointAdd(Rxa,Rxb,Rya,Ryb,Rza,Rzb, q2xa,q2xb,q2nya,q2nyb);
+    Rxa=cx0; Rxb=cx1; Rya=cx2; Ryb=cx3; Rza=cx4; Rzb=cx5;
+    (int j0,int j1,int j2,int j3,int j4,int j5,int j6,int j7,int j8,int j9,int j10,int j11) =
+        line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, cc0,cc1,cc2,cc3,cc4,cc5, Px, Py);
+    return j0,j1,j2,j3,j4,j5,j6,j7,j8,j9,j10,j11;
+}
 
-    // ---- witnessed-residue final-exp verdict (ePrint 2024/640), lazy: compare mod P ----
-    // fF is the lazy (unreduced) product fRaw*c^-(6x+2); c,cInv,w are gated witnesses.
-    function residueVerdict(
-        int fF0,int fF1,int fF2,int fF3,int fF4,int fF5,int fF6,int fF7,int fF8,int fF9,int fF10,int fF11,
-        int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11,
-        int ci0,int ci1,int ci2,int ci3,int ci4,int ci5,int ci6,int ci7,int ci8,int ci9,int ci10,int ci11,
-        int w0,int w1,int w2,int w3,int w4,int w5,int w6,int w7,int w8,int w9,int w10,int w11
-    ) returns (bool) {
-        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-        require(c0 < P); require(c1 < P); require(c2 < P); require(c3 < P); require(c4 < P); require(c5 < P);
-        require(c6 < P); require(c7 < P); require(c8 < P); require(c9 < P); require(c10 < P); require(c11 < P);
-        // c * cInv == ONE
-        (int p0,int p1,int p2,int p3,int p4,int p5,int p6,int p7,int p8,int p9,int p10,int p11) =
-            fp12Mul(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11, ci0,ci1,ci2,ci3,ci4,ci5,ci6,ci7,ci8,ci9,ci10,ci11);
-        require(p0 % P == 1); require(p1 % P == 0); require(p2 % P == 0); require(p3 % P == 0); require(p4 % P == 0); require(p5 % P == 0);
-        require(p6 % P == 0); require(p7 % P == 0); require(p8 % P == 0); require(p9 % P == 0); require(p10 % P == 0); require(p11 % P == 0);
-        // w in {1, ROOT27, ROOT27^2}
-        require(
-            (w0==1 && w1==0 && w2==0 && w3==0 && w4==0 && w5==0 && w6==0 && w7==0 && w8==0 && w9==0 && w10==0 && w11==0) ||
-            (w0==0 && w1==0 && w2==0 && w3==0 && w4==18017241959182010774688792132341824651274886350515952296967734324480226243499 && w5==8310587989442958350646884634893221121607168288938349542082022013494928077472 && w6==0 && w7==0 && w8==0 && w9==0 && w10==0 && w11==0) ||
-            (w0==0 && w1==0 && w2==11338001438479956798774934917208773767173747287567736129812394786879783479299 && w3==9783115122450100638512690547982431507792126166079612669952755732980124836560 && w4==0 && w5==0 && w6==0 && w7==0 && w8==0 && w9==0 && w10==0 && w11==0)
-        );
-        (int cq0,int cq1,int cq2,int cq3,int cq4,int cq5,int cq6,int cq7,int cq8,int cq9,int cq10,int cq11) =
-            fp12Frob1(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11);
-        (int cqq0,int cqq1,int cqq2,int cqq3,int cqq4,int cqq5,int cqq6,int cqq7,int cqq8,int cqq9,int cqq10,int cqq11) =
-            fp12Frob2(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11);
-        (int cr0,int cr1,int cr2,int cr3,int cr4,int cr5,int cr6,int cr7,int cr8,int cr9,int cr10,int cr11) =
-            fp12Frob3(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11);
-        (int t0,int t1,int t2,int t3,int t4,int t5,int t6,int t7,int t8,int t9,int t10,int t11) =
-            fp12Mul(fF0,fF1,fF2,fF3,fF4,fF5,fF6,fF7,fF8,fF9,fF10,fF11, w0,w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11);
-        (int lhs0,int lhs1,int lhs2,int lhs3,int lhs4,int lhs5,int lhs6,int lhs7,int lhs8,int lhs9,int lhs10,int lhs11) =
-            fp12Mul(t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11, cqq0,cqq1,cqq2,cqq3,cqq4,cqq5,cqq6,cqq7,cqq8,cqq9,cqq10,cqq11);
-        (int rhs0,int rhs1,int rhs2,int rhs3,int rhs4,int rhs5,int rhs6,int rhs7,int rhs8,int rhs9,int rhs10,int rhs11) =
-            fp12Mul(cq0,cq1,cq2,cq3,cq4,cq5,cq6,cq7,cq8,cq9,cq10,cq11, cr0,cr1,cr2,cr3,cr4,cr5,cr6,cr7,cr8,cr9,cr10,cr11);
-        return lhs0 % P == rhs0 % P && lhs1 % P == rhs1 % P && lhs2 % P == rhs2 % P && lhs3 % P == rhs3 % P
-            && lhs4 % P == rhs4 % P && lhs5 % P == rhs5 % P && lhs6 % P == rhs6 % P && lhs7 % P == rhs7 % P
-            && lhs8 % P == rhs8 % P && lhs9 % P == rhs9 % P && lhs10 % P == rhs10 % P && lhs11 % P == rhs11 % P;
-    }
+// ---- witnessed-residue final-exp verdict (ePrint 2024/640), lazy: compare mod P ----
+// fF is the lazy (unreduced) product fRaw*c^-(6x+2); c,cInv,w are gated witnesses.
+function residueVerdict(
+    int fF0,int fF1,int fF2,int fF3,int fF4,int fF5,int fF6,int fF7,int fF8,int fF9,int fF10,int fF11,
+    int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11,
+    int ci0,int ci1,int ci2,int ci3,int ci4,int ci5,int ci6,int ci7,int ci8,int ci9,int ci10,int ci11,
+    int w0,int w1,int w2,int w3,int w4,int w5,int w6,int w7,int w8,int w9,int w10,int w11
+) returns (bool) {
+    int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    require(c0 < P); require(c1 < P); require(c2 < P); require(c3 < P); require(c4 < P); require(c5 < P);
+    require(c6 < P); require(c7 < P); require(c8 < P); require(c9 < P); require(c10 < P); require(c11 < P);
+    // c * cInv == ONE
+    (int p0,int p1,int p2,int p3,int p4,int p5,int p6,int p7,int p8,int p9,int p10,int p11) =
+        fp12Mul(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11, ci0,ci1,ci2,ci3,ci4,ci5,ci6,ci7,ci8,ci9,ci10,ci11);
+    require(p0 % P == 1); require(p1 % P == 0); require(p2 % P == 0); require(p3 % P == 0); require(p4 % P == 0); require(p5 % P == 0);
+    require(p6 % P == 0); require(p7 % P == 0); require(p8 % P == 0); require(p9 % P == 0); require(p10 % P == 0); require(p11 % P == 0);
+    // w in {1, ROOT27, ROOT27^2}
+    require(
+        (w0==1 && w1==0 && w2==0 && w3==0 && w4==0 && w5==0 && w6==0 && w7==0 && w8==0 && w9==0 && w10==0 && w11==0) ||
+        (w0==0 && w1==0 && w2==0 && w3==0 && w4==18017241959182010774688792132341824651274886350515952296967734324480226243499 && w5==8310587989442958350646884634893221121607168288938349542082022013494928077472 && w6==0 && w7==0 && w8==0 && w9==0 && w10==0 && w11==0) ||
+        (w0==0 && w1==0 && w2==11338001438479956798774934917208773767173747287567736129812394786879783479299 && w3==9783115122450100638512690547982431507792126166079612669952755732980124836560 && w4==0 && w5==0 && w6==0 && w7==0 && w8==0 && w9==0 && w10==0 && w11==0)
+    );
+    (int cq0,int cq1,int cq2,int cq3,int cq4,int cq5,int cq6,int cq7,int cq8,int cq9,int cq10,int cq11) =
+        fp12Frob1(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11);
+    (int cqq0,int cqq1,int cqq2,int cqq3,int cqq4,int cqq5,int cqq6,int cqq7,int cqq8,int cqq9,int cqq10,int cqq11) =
+        fp12Frob2(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11);
+    (int cr0,int cr1,int cr2,int cr3,int cr4,int cr5,int cr6,int cr7,int cr8,int cr9,int cr10,int cr11) =
+        fp12Frob3(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11);
+    (int t0,int t1,int t2,int t3,int t4,int t5,int t6,int t7,int t8,int t9,int t10,int t11) =
+        fp12Mul(fF0,fF1,fF2,fF3,fF4,fF5,fF6,fF7,fF8,fF9,fF10,fF11, w0,w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11);
+    (int lhs0,int lhs1,int lhs2,int lhs3,int lhs4,int lhs5,int lhs6,int lhs7,int lhs8,int lhs9,int lhs10,int lhs11) =
+        fp12Mul(t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11, cqq0,cqq1,cqq2,cqq3,cqq4,cqq5,cqq6,cqq7,cqq8,cqq9,cqq10,cqq11);
+    (int rhs0,int rhs1,int rhs2,int rhs3,int rhs4,int rhs5,int rhs6,int rhs7,int rhs8,int rhs9,int rhs10,int rhs11) =
+        fp12Mul(cq0,cq1,cq2,cq3,cq4,cq5,cq6,cq7,cq8,cq9,cq10,cq11, cr0,cr1,cr2,cr3,cr4,cr5,cr6,cr7,cr8,cr9,cr10,cr11);
+    return lhs0 % P == rhs0 % P && lhs1 % P == rhs1 % P && lhs2 % P == rhs2 % P && lhs3 % P == rhs3 % P
+        && lhs4 % P == rhs4 % P && lhs5 % P == rhs5 % P && lhs6 % P == rhs6 % P && lhs7 % P == rhs7 % P
+        && lhs8 % P == rhs8 % P && lhs9 % P == rhs9 % P && lhs10 % P == rhs10 % P && lhs11 % P == rhs11 % P;
 }

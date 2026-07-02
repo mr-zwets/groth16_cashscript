@@ -1,76 +1,74 @@
-pragma cashscript ^0.13.0;
+pragma cashscript ^0.14.0;
 
 // BN254 G1 (Fp) Jacobian group law + scalar multiplication, used to compute vk_x on-chain
 // (vk_x = IC0 + in0*IC1 + in1*IC2). Builds on the base field library.
 import "./Fp.cash";
 
-library G1 {
-    function jacDoubleG1(int x, int y, int z) returns (int, int, int) {
-        int a = sqrFp(x);
-        int b = sqrFp(y);
-        int c = sqrFp(b);
-        int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
-        int e = mulFp(3, a);
-        int f = sqrFp(e);
-        int nx = subFp(f, mulFp(2, d));
-        int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
-        int nz = mulFp(2, mulFp(y, z));
-        return nx, ny, nz;
-    }
-    function jacAddG1(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
-        int rx = bX;
-        int ry = bY;
-        int rz = bZ;
-        if (aZ != 0) {
-            int z1z1 = sqrFp(aZ);
-            int z2z2 = sqrFp(bZ);
-            int u1 = mulFp(aX, z2z2);
-            int u2 = mulFp(bX, z1z1);
-            int s1 = mulFp(mulFp(aY, bZ), z2z2);
-            int s2 = mulFp(mulFp(bY, aZ), z1z1);
-            if (u1 == u2 && s1 == s2) {
-                int da = sqrFp(aX);
-                int db = sqrFp(aY);
-                int dc = sqrFp(db);
-                int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
-                int de = mulFp(3, da);
-                int df = sqrFp(de);
-                int dnx = subFp(df, mulFp(2, dd));
-                int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
-                int dnz = mulFp(2, mulFp(aY, aZ));
-                rx = dnx; ry = dny; rz = dnz;
-            } else {
-                int h = subFp(u2, u1);
-                int i2 = sqrFp(mulFp(2, h));
-                int jj = mulFp(h, i2);
-                int rr = mulFp(2, subFp(s2, s1));
-                int vv = mulFp(u1, i2);
-                int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
-                int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
-                int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
-                rx = anx; ry = any; rz = anz;
-            }
+function jacDoubleG1(int x, int y, int z) returns (int, int, int) {
+    int a = sqrFp(x);
+    int b = sqrFp(y);
+    int c = sqrFp(b);
+    int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
+    int e = mulFp(3, a);
+    int f = sqrFp(e);
+    int nx = subFp(f, mulFp(2, d));
+    int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
+    int nz = mulFp(2, mulFp(y, z));
+    return nx, ny, nz;
+}
+function jacAddG1(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
+    int rx = bX;
+    int ry = bY;
+    int rz = bZ;
+    if (aZ != 0) {
+        int z1z1 = sqrFp(aZ);
+        int z2z2 = sqrFp(bZ);
+        int u1 = mulFp(aX, z2z2);
+        int u2 = mulFp(bX, z1z1);
+        int s1 = mulFp(mulFp(aY, bZ), z2z2);
+        int s2 = mulFp(mulFp(bY, aZ), z1z1);
+        if (u1 == u2 && s1 == s2) {
+            int da = sqrFp(aX);
+            int db = sqrFp(aY);
+            int dc = sqrFp(db);
+            int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
+            int de = mulFp(3, da);
+            int df = sqrFp(de);
+            int dnx = subFp(df, mulFp(2, dd));
+            int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
+            int dnz = mulFp(2, mulFp(aY, aZ));
+            rx = dnx; ry = dny; rz = dnz;
+        } else {
+            int h = subFp(u2, u1);
+            int i2 = sqrFp(mulFp(2, h));
+            int jj = mulFp(h, i2);
+            int rr = mulFp(2, subFp(s2, s1));
+            int vv = mulFp(u1, i2);
+            int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
+            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
+            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
+            rx = anx; ry = any; rz = anz;
         }
-        return rx, ry, rz;
     }
-    // scalar * (bx,by affine) -> Jacobian (LSB-first double-and-add, base doubling)
-    function g1ScalarMul(int scalar, int bx, int by) returns (int, int, int) {
-        int rX = 0; int rY = 1; int rZ = 0;
-        int cX = bx; int cY = by; int cZ = 1;
-        for (int i = 0; i < 254; i = i + 1) {
-            if (((scalar >> i) % 2) == 1) {
-                (rX,rY,rZ) = jacAddG1(rX, rY, rZ, cX, cY, cZ);
-            }
-            if (cZ != 0 && cY != 0) {
-                (cX,cY,cZ) = jacDoubleG1(cX, cY, cZ);
-            }
+    return rx, ry, rz;
+}
+// scalar * (bx,by affine) -> Jacobian (LSB-first double-and-add, base doubling)
+function g1ScalarMul(int scalar, int bx, int by) returns (int, int, int) {
+    int rX = 0; int rY = 1; int rZ = 0;
+    int cX = bx; int cY = by; int cZ = 1;
+    for (int i = 0; i < 254; i = i + 1) {
+        if (((scalar >> i) % 2) == 1) {
+            (rX,rY,rZ) = jacAddG1(rX, rY, rZ, cX, cY, cZ);
         }
-        return rX, rY, rZ;
+        if (cZ != 0 && cY != 0) {
+            (cX,cY,cZ) = jacDoubleG1(cX, cY, cZ);
+        }
     }
-    function jacToAffine(int x, int y, int z) returns (int, int) {
-        int zInv = inverseFp(z);
-        int zInv2 = sqrFp(zInv);
-        int zInv3 = mulFp(zInv2, zInv);
-        return mulFp(x, zInv2), mulFp(y, zInv3);
-    }
+    return rX, rY, rZ;
+}
+function jacToAffine(int x, int y, int z) returns (int, int) {
+    int zInv = inverseFp(z);
+    int zInv2 = sqrFp(zInv);
+    int zInv3 = mulFp(zInv2, zInv);
+    return mulFp(x, zInv2), mulFp(y, zInv3);
 }

@@ -1,8 +1,9 @@
 # BLS12-381 singleton libraries
 
-Shared CashScript libraries for the BLS12-381 Groth16 verifier, consumed by the contracts in the
-parent directory (`../*.cash`). They rely on the custom cashc fork's `library` / `import` support
-(branch `feat/library-support`). Mirrors the bn254 singleton (`../../bn254/lib/`).
+Shared CashScript function files for the BLS12-381 Groth16 verifier, consumed by the contracts in the
+parent directory (`../*.cash`). They rely on the custom cashc fork's top-level (global) functions +
+`import` support (branch `feat/multi-returns`): a library file is just plain top-level `function`s
+(no `library` wrapper, no `internal` keyword). Mirrors the bn254 singleton (`../../bn254/lib/`).
 
 ## Why a `contract` per layer
 
@@ -19,8 +20,8 @@ Keeping one gradable contract per layer buys:
 - **Per-layer size / op-cost** — each compiles on its own, so a layer's cost is measurable in isolation.
 
 The libraries are what make this cheap: every harness *and* the full verifier share one implementation
-from `lib/`, so a layer is written (or fixed) once and all of them pick it up. Files in `lib/` use the
-`library` keyword (no `spend()`, never deployed); the parent-directory files use `contract`.
+from `lib/`, so a layer is written (or fixed) once and all of them pick it up. Files in `lib/` contain
+only top-level functions (no `contract`, never deployed); the parent-directory files use `contract`.
 
 ## Differences from bn254
 
@@ -45,8 +46,9 @@ Fp.cash        base field Fp (6 fns: add/sub/mul/sqr/neg/inverse)
              └─ FinalExp.cash  fp4Square, cycSqr, cycExpX, powMinusX, finalExp  (5 fns)
 ```
 
-`import` is transitive and de-duplicated; **tree-shaking** drops every library function a contract
-never calls, so importing a tower costs only the bytecode actually used.
+`import` is transitive and de-duplicated; **dead-code elimination** drops every imported function a
+contract never calls, so importing a tower costs only the bytecode actually used, and the compiler
+inlines any function where that is cheaper by byte accounting than OP_DEFINE/OP_INVOKE.
 
 ## What each consumer imports
 

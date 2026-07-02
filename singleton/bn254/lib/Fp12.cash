@@ -1,137 +1,135 @@
-pragma cashscript ^0.13.0;
+pragma cashscript ^0.14.0;
 
-// BN254 Fp12 = Fp6[w]/(w^2 - v), gamma = v = Fp6 non-residue (noble basis). LIBRARY TARGET.
+// BN254 Fp12 = Fp6[w]/(w^2 - v), gamma = v = Fp6 non-residue (noble basis).
 // An Fp12 element is (c0, c1) with each ci an Fp6 (= 6 ints) -> 12 ints in noble serialization order.
 // This library covers mul / sqr / conjugate; Frobenius maps + inverse are appended for the higher
 // layers (final exponentiation). Builds on the Fp6 library.
 import "./Fp6.cash";
 
-library Fp12 {
-    // sparse Fp12 multiply f * (o0, 0, 0, o3, o4, 0) — the Miller-loop line application (mul034).
-    function mul034(
-        int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
-        int o0a,int o0b, int o3a,int o3b, int o4a,int o4b
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int A0,int A1) = fp2Mul(F0, F1, o0a, o0b);
-        (int A2,int A3) = fp2Mul(F2, F3, o0a, o0b);
-        (int A4,int A5) = fp2Mul(F4, F5, o0a, o0b);
-        (int B0,int B1,int B2,int B3,int B4,int B5) = fp6Mul01(F6,F7,F8,F9,F10,F11, o3a,o3b, o4a,o4b);
-        (int S0,int S1,int S2,int S3,int S4,int S5) = fp6Add(F0,F1,F2,F3,F4,F5, F6,F7,F8,F9,F10,F11);
-        (int qa,int qb) = fp2Add(o0a, o0b, o3a, o3b);
-        (int G0,int G1,int G2,int G3,int G4,int G5) = fp6Mul01(S0,S1,S2,S3,S4,S5, qa,qb, o4a,o4b);
-        (int VB0,int VB1,int VB2,int VB3,int VB4,int VB5) = fp6MulByV(B0,B1,B2,B3,B4,B5);
-        (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Add(VB0,VB1,VB2,VB3,VB4,VB5, A0,A1,A2,A3,A4,A5);
-        (int AB0,int AB1,int AB2,int AB3,int AB4,int AB5) = fp6Add(A0,A1,A2,A3,A4,A5, B0,B1,B2,B3,B4,B5);
-        (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(G0,G1,G2,G3,G4,G5, AB0,AB1,AB2,AB3,AB4,AB5);
-        return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
-    }
-    // (a0 + a1 w)(b0 + b1 w) = (a0 b0 + v a1 b1) + ((a0+a1)(b0+b1) - a0 b0 - a1 b1) w
-    function fp12Mul(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11,
-        int B0,int B1,int B2,int B3,int B4,int B5, int B6,int B7,int B8,int B9,int B10,int B11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) =
-            fp6Mul(A0,A1,A2,A3,A4,A5, B0,B1,B2,B3,B4,B5);
-        (int t1_0,int t1_1,int t1_2,int t1_3,int t1_4,int t1_5) =
-            fp6Mul(A6,A7,A8,A9,A10,A11, B6,B7,B8,B9,B10,B11);
-        (int vt_0,int vt_1,int vt_2,int vt_3,int vt_4,int vt_5) =
-            fp6MulByV(t1_0,t1_1,t1_2,t1_3,t1_4,t1_5);
-        (int C0,int C1,int C2,int C3,int C4,int C5) =
-            fp6Add(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, vt_0,vt_1,vt_2,vt_3,vt_4,vt_5);
-        (int sa_0,int sa_1,int sa_2,int sa_3,int sa_4,int sa_5) =
-            fp6Add(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
-        (int sb_0,int sb_1,int sb_2,int sb_3,int sb_4,int sb_5) =
-            fp6Add(B0,B1,B2,B3,B4,B5, B6,B7,B8,B9,B10,B11);
-        (int pr_0,int pr_1,int pr_2,int pr_3,int pr_4,int pr_5) =
-            fp6Mul(sa_0,sa_1,sa_2,sa_3,sa_4,sa_5, sb_0,sb_1,sb_2,sb_3,sb_4,sb_5);
-        (int q_0,int q_1,int q_2,int q_3,int q_4,int q_5) =
-            fp6Sub(pr_0,pr_1,pr_2,pr_3,pr_4,pr_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
-        (int C6,int C7,int C8,int C9,int C10,int C11) =
-            fp6Sub(q_0,q_1,q_2,q_3,q_4,q_5, t1_0,t1_1,t1_2,t1_3,t1_4,t1_5);
-        return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
-    }
+// sparse Fp12 multiply f * (o0, 0, 0, o3, o4, 0) — the Miller-loop line application (mul034).
+function mul034(
+    int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
+    int o0a,int o0b, int o3a,int o3b, int o4a,int o4b
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int A0,int A1) = fp2Mul(F0, F1, o0a, o0b);
+    (int A2,int A3) = fp2Mul(F2, F3, o0a, o0b);
+    (int A4,int A5) = fp2Mul(F4, F5, o0a, o0b);
+    (int B0,int B1,int B2,int B3,int B4,int B5) = fp6Mul01(F6,F7,F8,F9,F10,F11, o3a,o3b, o4a,o4b);
+    (int S0,int S1,int S2,int S3,int S4,int S5) = fp6Add(F0,F1,F2,F3,F4,F5, F6,F7,F8,F9,F10,F11);
+    (int qa,int qb) = fp2Add(o0a, o0b, o3a, o3b);
+    (int G0,int G1,int G2,int G3,int G4,int G5) = fp6Mul01(S0,S1,S2,S3,S4,S5, qa,qb, o4a,o4b);
+    (int VB0,int VB1,int VB2,int VB3,int VB4,int VB5) = fp6MulByV(B0,B1,B2,B3,B4,B5);
+    (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Add(VB0,VB1,VB2,VB3,VB4,VB5, A0,A1,A2,A3,A4,A5);
+    (int AB0,int AB1,int AB2,int AB3,int AB4,int AB5) = fp6Add(A0,A1,A2,A3,A4,A5, B0,B1,B2,B3,B4,B5);
+    (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(G0,G1,G2,G3,G4,G5, AB0,AB1,AB2,AB3,AB4,AB5);
+    return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
+}
+// (a0 + a1 w)(b0 + b1 w) = (a0 b0 + v a1 b1) + ((a0+a1)(b0+b1) - a0 b0 - a1 b1) w
+function fp12Mul(
+    int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11,
+    int B0,int B1,int B2,int B3,int B4,int B5, int B6,int B7,int B8,int B9,int B10,int B11
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) =
+        fp6Mul(A0,A1,A2,A3,A4,A5, B0,B1,B2,B3,B4,B5);
+    (int t1_0,int t1_1,int t1_2,int t1_3,int t1_4,int t1_5) =
+        fp6Mul(A6,A7,A8,A9,A10,A11, B6,B7,B8,B9,B10,B11);
+    (int vt_0,int vt_1,int vt_2,int vt_3,int vt_4,int vt_5) =
+        fp6MulByV(t1_0,t1_1,t1_2,t1_3,t1_4,t1_5);
+    (int C0,int C1,int C2,int C3,int C4,int C5) =
+        fp6Add(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, vt_0,vt_1,vt_2,vt_3,vt_4,vt_5);
+    (int sa_0,int sa_1,int sa_2,int sa_3,int sa_4,int sa_5) =
+        fp6Add(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
+    (int sb_0,int sb_1,int sb_2,int sb_3,int sb_4,int sb_5) =
+        fp6Add(B0,B1,B2,B3,B4,B5, B6,B7,B8,B9,B10,B11);
+    (int pr_0,int pr_1,int pr_2,int pr_3,int pr_4,int pr_5) =
+        fp6Mul(sa_0,sa_1,sa_2,sa_3,sa_4,sa_5, sb_0,sb_1,sb_2,sb_3,sb_4,sb_5);
+    (int q_0,int q_1,int q_2,int q_3,int q_4,int q_5) =
+        fp6Sub(pr_0,pr_1,pr_2,pr_3,pr_4,pr_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
+    (int C6,int C7,int C8,int C9,int C10,int C11) =
+        fp6Sub(q_0,q_1,q_2,q_3,q_4,q_5, t1_0,t1_1,t1_2,t1_3,t1_4,t1_5);
+    return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
+}
 
-    function fp12Sqr(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int C0,int C1,int C2,int C3,int C4,int C5,int C6,int C7,int C8,int C9,int C10,int C11) =
-            fp12Mul(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11, A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
-        return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
-    }
+function fp12Sqr(
+    int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int C0,int C1,int C2,int C3,int C4,int C5,int C6,int C7,int C8,int C9,int C10,int C11) =
+        fp12Mul(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11, A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+    return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
+}
 
-    // conjugate over Fp12: (c0, -c1)
-    function fp12Conj(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int N6,int N7,int N8,int N9,int N10,int N11) = fp6Neg(A6,A7,A8,A9,A10,A11);
-        return A0,A1,A2,A3,A4,A5,N6,N7,N8,N9,N10,N11;
-    }
+// conjugate over Fp12: (c0, -c1)
+function fp12Conj(
+    int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int N6,int N7,int N8,int N9,int N10,int N11) = fp6Neg(A6,A7,A8,A9,A10,A11);
+    return A0,A1,A2,A3,A4,A5,N6,N7,N8,N9,N10,N11;
+}
 
-    // inverse: den = c0^2 - v*c1^2;  t = fp6Inv(den);  (c0 t, -(c1 t))
-    function fp12Inv(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int sc0_0,int sc0_1,int sc0_2,int sc0_3,int sc0_4,int sc0_5) = fp6Sqr(A0,A1,A2,A3,A4,A5);
-        (int sc1_0,int sc1_1,int sc1_2,int sc1_3,int sc1_4,int sc1_5) = fp6Sqr(A6,A7,A8,A9,A10,A11);
-        (int vc_0,int vc_1,int vc_2,int vc_3,int vc_4,int vc_5) = fp6MulByV(sc1_0,sc1_1,sc1_2,sc1_3,sc1_4,sc1_5);
-        (int dn_0,int dn_1,int dn_2,int dn_3,int dn_4,int dn_5) =
-            fp6Sub(sc0_0,sc0_1,sc0_2,sc0_3,sc0_4,sc0_5, vc_0,vc_1,vc_2,vc_3,vc_4,vc_5);
-        (int t_0,int t_1,int t_2,int t_3,int t_4,int t_5) = fp6Inv(dn_0,dn_1,dn_2,dn_3,dn_4,dn_5);
-        (int n0,int n1,int n2,int n3,int n4,int n5) =
-            fp6Mul(A0,A1,A2,A3,A4,A5, t_0,t_1,t_2,t_3,t_4,t_5);
-        (int p0,int p1,int p2,int p3,int p4,int p5) =
-            fp6Mul(A6,A7,A8,A9,A10,A11, t_0,t_1,t_2,t_3,t_4,t_5);
-        (int w0,int w1,int w2,int w3,int w4,int w5) = fp6Neg(p0,p1,p2,p3,p4,p5);
-        return n0,n1,n2,n3,n4,n5,w0,w1,w2,w3,w4,w5;
-    }
+// inverse: den = c0^2 - v*c1^2;  t = fp6Inv(den);  (c0 t, -(c1 t))
+function fp12Inv(
+    int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int sc0_0,int sc0_1,int sc0_2,int sc0_3,int sc0_4,int sc0_5) = fp6Sqr(A0,A1,A2,A3,A4,A5);
+    (int sc1_0,int sc1_1,int sc1_2,int sc1_3,int sc1_4,int sc1_5) = fp6Sqr(A6,A7,A8,A9,A10,A11);
+    (int vc_0,int vc_1,int vc_2,int vc_3,int vc_4,int vc_5) = fp6MulByV(sc1_0,sc1_1,sc1_2,sc1_3,sc1_4,sc1_5);
+    (int dn_0,int dn_1,int dn_2,int dn_3,int dn_4,int dn_5) =
+        fp6Sub(sc0_0,sc0_1,sc0_2,sc0_3,sc0_4,sc0_5, vc_0,vc_1,vc_2,vc_3,vc_4,vc_5);
+    (int t_0,int t_1,int t_2,int t_3,int t_4,int t_5) = fp6Inv(dn_0,dn_1,dn_2,dn_3,dn_4,dn_5);
+    (int n0,int n1,int n2,int n3,int n4,int n5) =
+        fp6Mul(A0,A1,A2,A3,A4,A5, t_0,t_1,t_2,t_3,t_4,t_5);
+    (int p0,int p1,int p2,int p3,int p4,int p5) =
+        fp6Mul(A6,A7,A8,A9,A10,A11, t_0,t_1,t_2,t_3,t_4,t_5);
+    (int w0,int w1,int w2,int w3,int w4,int w5) = fp6Neg(p0,p1,p2,p3,p4,p5);
+    return n0,n1,n2,n3,n4,n5,w0,w1,w2,w3,w4,w5;
+}
 
-    // Frobenius a -> a^(p^k), k = 1,2,3. FP6_C1/FP6_C2 and FP12_C1 are precomputed Fp2 constants.
-    function fp12Frob1(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(
-            A0,A1,A2,A3,A4,A5,
-            21575463638280843010398324269430826099269044274347216827212613867836435027261, 10307601595873709700152284273816112264069230130616436755625194854815875713954,
-            2581911344467009335267311115468803099551665605076196740867805258568234346338, 19937756971775647987995932169929341994314640652964949448313374472400716661030);
-        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(
-            A6,A7,A8,A9,A10,A11,
-            21575463638280843010398324269430826099269044274347216827212613867836435027261, 10307601595873709700152284273816112264069230130616436755625194854815875713954,
-            2581911344467009335267311115468803099551665605076196740867805258568234346338, 19937756971775647987995932169929341994314640652964949448313374472400716661030);
-        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
-            g0,g1,g2,g3,g4,g5,
-            8376118865763821496583973867626364092589906065868298776909617916018768340080, 16469823323077808223889137241176536799009286646108169935659301613961712198316);
-        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
-    }
-    function fp12Frob2(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobEven(
-            A0,A1,A2,A3,A4,A5,
-            21888242871839275220042445260109153167277707414472061641714758635765020556616, 0,
-            2203960485148121921418603742825762020974279258880205651966, 0);
-        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobEven(
-            A6,A7,A8,A9,A10,A11,
-            21888242871839275220042445260109153167277707414472061641714758635765020556616, 0,
-            2203960485148121921418603742825762020974279258880205651966, 0);
-        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
-            g0,g1,g2,g3,g4,g5,
-            21888242871839275220042445260109153167277707414472061641714758635765020556617, 0);
-        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
-    }
-    function fp12Frob3(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(
-            A0,A1,A2,A3,A4,A5,
-            3772000881919853776433695186713858239009073593817195771773381919316419345261, 2236595495967245188281701248203181795121068902605861227855261137820944008926,
-            5324479202449903542726783395506214481928257762400643279780343368557297135718, 16208900380737693084919495127334387981393726419856888799917914180988844123039);
-        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(
-            A6,A7,A8,A9,A10,A11,
-            3772000881919853776433695186713858239009073593817195771773381919316419345261, 2236595495967245188281701248203181795121068902605861227855261137820944008926,
-            5324479202449903542726783395506214481928257762400643279780343368557297135718, 16208900380737693084919495127334387981393726419856888799917914180988844123039);
-        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
-            g0,g1,g2,g3,g4,g5,
-            11697423496358154304825782922584725312912383441159505038794027105778954184319, 303847389135065887422783454877609941456349188919719272345083954437860409601);
-        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
-    }
+// Frobenius a -> a^(p^k), k = 1,2,3. FP6_C1/FP6_C2 and FP12_C1 are precomputed Fp2 constants.
+function fp12Frob1(
+    int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(
+        A0,A1,A2,A3,A4,A5,
+        21575463638280843010398324269430826099269044274347216827212613867836435027261, 10307601595873709700152284273816112264069230130616436755625194854815875713954,
+        2581911344467009335267311115468803099551665605076196740867805258568234346338, 19937756971775647987995932169929341994314640652964949448313374472400716661030);
+    (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(
+        A6,A7,A8,A9,A10,A11,
+        21575463638280843010398324269430826099269044274347216827212613867836435027261, 10307601595873709700152284273816112264069230130616436755625194854815875713954,
+        2581911344467009335267311115468803099551665605076196740867805258568234346338, 19937756971775647987995932169929341994314640652964949448313374472400716661030);
+    (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
+        g0,g1,g2,g3,g4,g5,
+        8376118865763821496583973867626364092589906065868298776909617916018768340080, 16469823323077808223889137241176536799009286646108169935659301613961712198316);
+    return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
+}
+function fp12Frob2(
+    int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobEven(
+        A0,A1,A2,A3,A4,A5,
+        21888242871839275220042445260109153167277707414472061641714758635765020556616, 0,
+        2203960485148121921418603742825762020974279258880205651966, 0);
+    (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobEven(
+        A6,A7,A8,A9,A10,A11,
+        21888242871839275220042445260109153167277707414472061641714758635765020556616, 0,
+        2203960485148121921418603742825762020974279258880205651966, 0);
+    (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
+        g0,g1,g2,g3,g4,g5,
+        21888242871839275220042445260109153167277707414472061641714758635765020556617, 0);
+    return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
+}
+function fp12Frob3(
+    int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(
+        A0,A1,A2,A3,A4,A5,
+        3772000881919853776433695186713858239009073593817195771773381919316419345261, 2236595495967245188281701248203181795121068902605861227855261137820944008926,
+        5324479202449903542726783395506214481928257762400643279780343368557297135718, 16208900380737693084919495127334387981393726419856888799917914180988844123039);
+    (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(
+        A6,A7,A8,A9,A10,A11,
+        3772000881919853776433695186713858239009073593817195771773381919316419345261, 2236595495967245188281701248203181795121068902605861227855261137820944008926,
+        5324479202449903542726783395506214481928257762400643279780343368557297135718, 16208900380737693084919495127334387981393726419856888799917914180988844123039);
+    (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(
+        g0,g1,g2,g3,g4,g5,
+        11697423496358154304825782922584725312912383441159505038794027105778954184319, 303847389135065887422783454877609941456349188919719272345083954437860409601);
+    return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
 }
