@@ -3,7 +3,7 @@ pragma cashscript ^0.14.0;
 // BN254 final exponentiation f^((p^12-1)/r) (reduced-arithmetic scheme). Easy part:
 // r0 = conj(f)*inv(f); r = frob2(r0)*r0. Hard part: fixed sequence of cyclotomic squarings,
 // powMinusX = conj(cyclotomicExp(.,X)) (X = BN seed, 63 bits), conjugations and Frobenius maps.
-// Builds on the Fp12 library (mul/conj/frob2/frob3).
+// Builds on Fp12.cash (mul/conj/frob2/frob3).
 import "./Fp12.cash";
 
 // cyclotomic squaring helper (noble _cyclotomicSquare via Fp4Square)

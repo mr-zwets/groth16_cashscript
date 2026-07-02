@@ -2,7 +2,7 @@ pragma cashscript ^0.14.0;
 
 // BN254 Miller-loop machinery (divisive twist): G2 projective point ops (pointDouble / pointAdd) that
 // return the 3 line coefficients + new R, the line application, the psi (untwist-Frobenius) map, and
-// the full single-pair Miller loop. Builds on the Fp12 library (which carries the whole field tower).
+// the full single-pair Miller loop. Builds on Fp12.cash (which carries the whole field tower).
 import "./Fp12.cash";
 
 // pointDouble: returns [c0,c1,c2 (line), newR] = 12 ints

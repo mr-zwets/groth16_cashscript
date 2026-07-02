@@ -41,59 +41,59 @@ const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const PLAN = (1n << BigInt(ITERS)) - 1n;
 
 // ---- contract template (loop-based, runtime-input committed state) ----
-const prologue = () => `    internal function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
-    internal function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
-    internal function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
-    internal function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
-    internal function jacDouble(int x, int y, int z) returns (int, int, int) {
-        int a = sqrFp(x); int b = sqrFp(y); int c = sqrFp(b);
-        int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
-        int e = mulFp(3, a); int f = sqrFp(e);
-        int nx = subFp(f, mulFp(2, d));
-        int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
-        int nz = mulFp(2, mulFp(y, z));
-        return nx, ny, nz;
-    }
-    internal function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
-        int rx = bX; int ry = bY; int rz = bZ;
-        if (aZ != 0) {
-            int z1z1 = sqrFp(aZ); int z2z2 = sqrFp(bZ);
-            int u1 = mulFp(aX, z2z2); int u2 = mulFp(bX, z1z1);
-            int s1 = mulFp(mulFp(aY, bZ), z2z2); int s2 = mulFp(mulFp(bY, aZ), z1z1);
-            if (u1 == u2 && s1 == s2) {
-                int da = sqrFp(aX); int db = sqrFp(aY); int dc = sqrFp(db);
-                int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
-                int de = mulFp(3, da); int df = sqrFp(de);
-                int dnx = subFp(df, mulFp(2, dd));
-                int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
-                int dnz = mulFp(2, mulFp(aY, aZ));
-                rx = dnx; ry = dny; rz = dnz;
-            } else {
-                int h = subFp(u2, u1); int i2 = sqrFp(mulFp(2, h)); int jj = mulFp(h, i2);
-                int rr = mulFp(2, subFp(s2, s1)); int vv = mulFp(u1, i2);
-                int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
-                int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
-                int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
-                rx = anx; ry = any; rz = anz;
-            }
+const prologue = () => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
+function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
+function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
+function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
+function jacDouble(int x, int y, int z) returns (int, int, int) {
+    int a = sqrFp(x); int b = sqrFp(y); int c = sqrFp(b);
+    int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
+    int e = mulFp(3, a); int f = sqrFp(e);
+    int nx = subFp(f, mulFp(2, d));
+    int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
+    int nz = mulFp(2, mulFp(y, z));
+    return nx, ny, nz;
+}
+function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
+    int rx = bX; int ry = bY; int rz = bZ;
+    if (aZ != 0) {
+        int z1z1 = sqrFp(aZ); int z2z2 = sqrFp(bZ);
+        int u1 = mulFp(aX, z2z2); int u2 = mulFp(bX, z1z1);
+        int s1 = mulFp(mulFp(aY, bZ), z2z2); int s2 = mulFp(mulFp(bY, aZ), z1z1);
+        if (u1 == u2 && s1 == s2) {
+            int da = sqrFp(aX); int db = sqrFp(aY); int dc = sqrFp(db);
+            int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
+            int de = mulFp(3, da); int df = sqrFp(de);
+            int dnx = subFp(df, mulFp(2, dd));
+            int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
+            int dnz = mulFp(2, mulFp(aY, aZ));
+            rx = dnx; ry = dny; rz = dnz;
+        } else {
+            int h = subFp(u2, u1); int i2 = sqrFp(mulFp(2, h)); int jj = mulFp(h, i2);
+            int rr = mulFp(2, subFp(s2, s1)); int vv = mulFp(u1, i2);
+            int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
+            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
+            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
+            rx = anx; ry = any; rz = anz;
         }
-        return rx, ry, rz;
     }
-    internal function selectPoint(int b0, int b1) returns (int, int, int) {
-        int aX = 0; int aY = 0; int doAdd = 0;
-        if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; doAdd = 1; }
-        else { if (b0 == 1) { aX = ${IC1[0]}; aY = ${IC1[1]}; doAdd = 1; }
-               else { if (b1 == 1) { aX = ${IC2[0]}; aY = ${IC2[1]}; doAdd = 1; } } }
-        return aX, aY, doAdd;
-    }`;
+    return rx, ry, rz;
+}
+function selectPoint(int b0, int b1) returns (int, int, int) {
+    int aX = 0; int aY = 0; int doAdd = 0;
+    if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; doAdd = 1; }
+    else { if (b0 == 1) { aX = ${IC1[0]}; aY = ${IC1[1]}; doAdd = 1; }
+           else { if (b1 == 1) { aX = ${IC2[0]}; aY = ${IC2[1]}; doAdd = 1; } } }
+    return aX, aY, doAdd;
+}`;
 
 function genCash(lo, hi, final) {
   const count = hi - lo, hiBit = MSBASE - lo;
   const L = [];
-  L.push('pragma cashscript ^0.13.0;');
+  L.push('pragma cashscript ^0.14.0;');
   L.push(`// BLS12-381 vk_x chunk: Shamir window [${lo},${hi}), final=${final}.`);
-  L.push('contract VkxBlsChunk() {');
   L.push(prologue());
+  L.push('contract VkxBlsChunk() {');
   L.push(final ? '    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv, bytes unused zeroPadding) {' : '    function spend(int rX, int rY, int rZ, int input0, int input1, bytes unused zeroPadding) {');
   L.push(covIn(['rX', 'rY', 'rZ', 'input0', 'input1'])); // incoming accumulator+inputs == spent token commitment
   L.push(`        for (int k = 0; k < ${count}; k = k + 1) {`);
@@ -119,7 +119,7 @@ function genCash(lo, hi, final) {
   }
   L.push('    }');
   L.push('}');
-  return L.join('\n') + '\n';
+  return (L.join('\n') + '\n');
 }
 
 // ---- fast probe (no planner): one fixed window, report op-cost ----

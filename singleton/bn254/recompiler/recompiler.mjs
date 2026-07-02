@@ -1,7 +1,7 @@
 // Opcode-optimizing recompiler for the BN254 Groth16 singleton.
 //
 // cashc emits the verifier as a flat list of OP_DEFINE subroutine bodies + a main
-// routine. This library takes that compiled locking bytecode, splits each subroutine
+// routine. This module takes that compiled locking bytecode, splits each subroutine
 // into a value-DAG (decompile.mjs), reschedules the stack operations (schedule.mjs) to
 // eliminate cashc's altstack park/restore and minimize ROLL/PICK addressing, and
 // recompiles -- keeping, per subroutine, whichever of {cashc original, topo schedule,

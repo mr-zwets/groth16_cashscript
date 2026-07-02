@@ -60,7 +60,7 @@ function genChunk(opLo, opHi, final) {
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR = [0, 1, 2, 3].map((j) => [`R${j}xa`, `R${j}xb`, `R${j}ya`, `R${j}yb`, `R${j}za`, `R${j}zb`]);
   const L = [];
-  L.push('pragma cashscript ^0.13.0;');
+  L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
   L.push(`// GENERIC batched BLS12-381 Miller covenant chunk: ops [${opLo},${opHi}), final=${final}.`);
   L.push('// state = f(12) + R0..R3(24) [+ runtime points]; lives in the token NFT commitment.');

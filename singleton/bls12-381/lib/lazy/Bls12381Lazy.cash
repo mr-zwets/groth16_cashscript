@@ -1,9 +1,9 @@
 pragma cashscript ^0.14.0;
 
-// BLS12-381 LAZY-arithmetic library: addFp does NOT reduce; subFp carries a fixed 64*p bias; only
+// BLS12-381 LAZY-arithmetic shared functions: addFp does NOT reduce; subFp carries a fixed 64*p bias; only
 // mulFp reduces. Mirrors bn254's Bn254Lazy.cash. Holds the union the chunked miller + final-exp
 // generators need (cashc tree-shakes per consumer). Tower functions recovered verbatim from the
-// pre-library-migration singleton (commit 43dd254); only addFp/subFp are swapped to the lazy form.
+// pre-import-migration singleton (commit 43dd254); only addFp/subFp are swapped to the lazy form.
 function addFp(int x, int y) returns (int) { return x + y; }
 
 function subFp(int x, int y) returns (int) { return (x - y + 256154211534186713178738548847097866019640500476096504661251720711938025631413623324332008264257002498425233443826368) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }

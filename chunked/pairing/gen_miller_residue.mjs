@@ -65,7 +65,7 @@ function genChunk(opLo, opHi, isFinal) {
   const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
   const allParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames];
   const L = [];
-  L.push('pragma cashscript ^0.13.0;');
+  L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
   L.push(`// c^-(6x+2)-fused prepared-VK batched BN254 Miller chunk: ops [${opLo},${opHi}).`);
   L.push('// state = f(12) + R0(6) [+ runtime points] + c(12) + cInv(12); c,cInv are constant');

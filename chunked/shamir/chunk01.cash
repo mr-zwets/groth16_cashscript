@@ -1,33 +1,30 @@
-pragma cashscript ^0.13.0;
-// vk_x chunk 1: Shamir window [219,254) (MSB-first bit positions 34..0), final=True.
+pragma cashscript ^0.14.0;
+// vk_x chunk 1: Shamir window [229,254) (MSB-first bit positions 24..0), final=True.
 // Public inputs taken at RUNTIME: carried state = (rX,rY,rZ,input0,input1);
 // per-bit add chosen in-script via 2-bit Shamir select over VK consts.
 // EC/field ops come from the shared lib/ tower (Fp -> G1 -> Vk).
 import "./lib/Vk.cash";
 contract VkxChunk01() {
     function spend(int rX, int rY, int rZ, int input0, int input1, int zInv, bytes unused zeroPadding) {
-        require(hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40)) == 0xe90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd);
-        // bounded MSB-first loop over bit window [219,254) -> bit positions
-        // 34 down to 0 (count 35); body compiled ONCE.
-        for (int k = 0; k < 35; k = k + 1) {
-            int i = 34 - k;
+        require(hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40)) == 0x024bdf4469d19df90b54c772e8de38fed4d73f6e2bcc2485b9ede5359ba0cc57);
+        // bounded MSB-first loop over bit window [229,254) -> bit positions
+        // 24 down to 0 (count 25); body compiled ONCE.
+        for (int k = 0; k < 25; k = k + 1) {
+            int i = 24 - k;
             // double R (guarded rZ != 0, matching the reference)
             if (rZ != 0) {
-                (int dx, int dy, int dz) = jacDouble(rX, rY, rZ);
-                rX = dx; rY = dy; rZ = dz;
+                (rX, rY, rZ) = jacDouble(rX, rY, rZ);
             }
             // runtime 2-bit Shamir select over VK consts {IC1,IC2,T}, then add
             int b0 = (input0 >> i) % 2;
             int b1 = (input1 >> i) % 2;
             (int aX, int aY, int doAdd) = selectPoint(b0, b1);
             if (doAdd == 1) {
-                (int ax, int ay, int az) = jacAdd(rX, rY, rZ, aX, aY, 1);
-                rX = ax; rY = ay; rZ = az;
+                (rX, rY, rZ) = jacAdd(rX, rY, rZ, aX, aY, 1);
             }
         }
         // fold IC0 (constant term) -- unconditional add of hardcoded VK const
-        (int icx, int icy, int icz) = jacAdd(rX, rY, rZ, 10744596414106452074759370245733544594153395043370666422502510773307029471145, 848677436511517736191562425154572367705380862894644942948681172815252343932, 1);
-        rX = icx; rY = icy; rZ = icz;
+        (rX, rY, rZ) = jacAdd(rX, rY, rZ, 10744596414106452074759370245733544594153395043370666422502510773307029471145, 848677436511517736191562425154572367705380862894644942948681172815252343932, 1);
         // verified inverse-on-stack: zInv supplied, require rZ*zInv == 1
         require(mulFp(rZ, zInv) == 1);
         int zInv2 = sqrFp(zInv);

@@ -75,63 +75,63 @@ const TABLE_HEX = '0x' + Array.from({ length: 15 }, (_, k) => le32(TABLE[k + 1][
 // ---- contract template ----
 const SER = 'hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(in0, 40) + toPaddedBytes(in1, 40) + toPaddedBytes(k10, 40) + toPaddedBytes(k20, 40) + toPaddedBytes(k11, 40) + toPaddedBytes(k21, 40))';
 const STATE = ['rX', 'rY', 'rZ', 'in0', 'in1', 'k10', 'k20', 'k11', 'k21'];
-const prologue = () => `    internal function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
-    internal function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
-    internal function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
-    internal function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
-    internal function jacDouble(int x, int y, int z) returns (int, int, int) {
-        int a = sqrFp(x); int b = sqrFp(y); int c = sqrFp(b);
-        int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
-        int e = mulFp(3, a); int f = sqrFp(e);
-        int nx = subFp(f, mulFp(2, d));
-        int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
-        int nz = mulFp(2, mulFp(y, z));
-        return nx, ny, nz;
-    }
-    internal function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
-        int rx = bX; int ry = bY; int rz = bZ;
-        if (aZ != 0) {
-            int z1z1 = sqrFp(aZ); int z2z2 = sqrFp(bZ);
-            int u1 = mulFp(aX, z2z2); int u2 = mulFp(bX, z1z1);
-            int s1 = mulFp(mulFp(aY, bZ), z2z2); int s2 = mulFp(mulFp(bY, aZ), z1z1);
-            if (u1 == u2 && s1 == s2) {
-                int da = sqrFp(aX); int db = sqrFp(aY); int dc = sqrFp(db);
-                int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
-                int de = mulFp(3, da); int df = sqrFp(de);
-                int dnx = subFp(df, mulFp(2, dd));
-                int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
-                int dnz = mulFp(2, mulFp(aY, aZ));
-                rx = dnx; ry = dny; rz = dnz;
-            } else {
-                int h = subFp(u2, u1); int i2 = sqrFp(mulFp(2, h)); int jj = mulFp(h, i2);
-                int rr = mulFp(2, subFp(s2, s1)); int vv = mulFp(u1, i2);
-                int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
-                int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
-                int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
-                rx = anx; ry = any; rz = anz;
-            }
+const prologue = () => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
+function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
+function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
+function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
+function jacDouble(int x, int y, int z) returns (int, int, int) {
+    int a = sqrFp(x); int b = sqrFp(y); int c = sqrFp(b);
+    int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
+    int e = mulFp(3, a); int f = sqrFp(e);
+    int nx = subFp(f, mulFp(2, d));
+    int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
+    int nz = mulFp(2, mulFp(y, z));
+    return nx, ny, nz;
+}
+function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
+    int rx = bX; int ry = bY; int rz = bZ;
+    if (aZ != 0) {
+        int z1z1 = sqrFp(aZ); int z2z2 = sqrFp(bZ);
+        int u1 = mulFp(aX, z2z2); int u2 = mulFp(bX, z1z1);
+        int s1 = mulFp(mulFp(aY, bZ), z2z2); int s2 = mulFp(mulFp(bY, aZ), z1z1);
+        if (u1 == u2 && s1 == s2) {
+            int da = sqrFp(aX); int db = sqrFp(aY); int dc = sqrFp(db);
+            int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
+            int de = mulFp(3, da); int df = sqrFp(de);
+            int dnx = subFp(df, mulFp(2, dd));
+            int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
+            int dnz = mulFp(2, mulFp(aY, aZ));
+            rx = dnx; ry = dny; rz = dnz;
+        } else {
+            int h = subFp(u2, u1); int i2 = sqrFp(mulFp(2, h)); int jj = mulFp(h, i2);
+            int rr = mulFp(2, subFp(s2, s1)); int vv = mulFp(u1, i2);
+            int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
+            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
+            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
+            rx = anx; ry = any; rz = anz;
         }
-        return rx, ry, rz;
     }
-    internal function select16(int idx) returns (int, int, int) {
-        int aX = 0; int aY = 0; int doAdd = 0;
-        if (idx != 0) {
-            bytes table = ${TABLE_HEX};
-            bytes ent = table.split((idx - 1) * 64)[1].split(64)[0];
-            aX = int(ent.split(32)[0]);
-            aY = int(ent.split(32)[1]);
-            doAdd = 1;
-        }
-        return aX, aY, doAdd;
-    }`;
+    return rx, ry, rz;
+}
+function select16(int idx) returns (int, int, int) {
+    int aX = 0; int aY = 0; int doAdd = 0;
+    if (idx != 0) {
+        bytes table = ${TABLE_HEX};
+        bytes ent = table.split((idx - 1) * 64)[1].split(64)[0];
+        aX = int(ent.split(32)[0]);
+        aY = int(ent.split(32)[1]);
+        doAdd = 1;
+    }
+    return aX, aY, doAdd;
+}`;
 
 function genCash(lo, hi, first, final) {
   const count = hi - lo, hiBit = (ITERS - 1) - lo;
   const L = [];
-  L.push('pragma cashscript ^0.13.0;');
+  L.push('pragma cashscript ^0.14.0;');
   L.push(`// GLV vk_x chunk: 4-scalar Straus window [${lo},${hi}), first=${first} final=${final}.`);
-  L.push('contract VkxGlvChunk() {');
   L.push(prologue());
+  L.push('contract VkxGlvChunk() {');
   L.push(final
     ? `    function spend(${STATE.map((s) => `int ${s}`).join(', ')}, int zInv, bytes unused zeroPadding) {`
     : `    function spend(${STATE.map((s) => `int ${s}`).join(', ')}, bytes unused zeroPadding) {`);
@@ -166,7 +166,7 @@ function genCash(lo, hi, first, final) {
   }
   L.push('    }');
   L.push('}');
-  return L.join('\n') + '\n';
+  return (L.join('\n') + '\n');
 }
 
 // ---- JS reference: Jacobian MSM matching the contract (for planning + build) ----

@@ -167,21 +167,22 @@ console.error(`noble match OK, ${chunks.length} chunks, K=${K}, continuity OK`);
 // ---- emit .cash contracts ----
 const P = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 
-const FP_FUNCS = `    internal function addFp(int x, int y) returns (int) { return (x + y) % ${P}; }
-    internal function subFp(int x, int y) returns (int) { return (x - y + ${P}) % ${P}; }
-    internal function mulFp(int x, int y) returns (int) { return (x * y) % ${P}; }
-    internal function sqrFp(int x) returns (int) { return (x * x) % ${P}; }`;
+// top-level (global) functions, emitted above the contract
+const FP_FUNCS = `function addFp(int x, int y) returns (int) { return (x + y) % ${P}; }
+function subFp(int x, int y) returns (int) { return (x - y + ${P}) % ${P}; }
+function mulFp(int x, int y) returns (int) { return (x * y) % ${P}; }
+function sqrFp(int x) returns (int) { return (x * x) % ${P}; }`;
 
-const INVERSE_FUNC = `    internal function inverseFp(int x) returns (int) {
-        int e = ${P} - 2;
-        int result = 1;
-        int current = x % ${P};
-        for (int i = 0; i < 254; i++) {
-            if (((e >> i) % 2) == 1) { result = (result * current) % ${P}; }
-            current = (current * current) % ${P};
-        }
-        return result;
-    }`;
+const INVERSE_FUNC = `function inverseFp(int x) returns (int) {
+    int e = ${P} - 2;
+    int result = 1;
+    int current = x % ${P};
+    for (int i = 0; i < 254; i++) {
+        if (((e >> i) % 2) == 1) { result = (result * current) % ${P}; }
+        current = (current * current) % ${P};
+    }
+    return result;
+}`;
 
 // Jacobian add of (varPfx) += (basePfx); inlined, mirrors the singleton.
 const addBlock = (varPfx, basePfx) => `            int z1z1 = sqrFp(${varPfx}Z);
@@ -233,13 +234,13 @@ function genCash(idx, ch) {
   const name = `VkxChunk${String(idx).padStart(2, '0')}`;
   const needsInverse = ch.final;
   const lines = [];
-  lines.push('pragma cashscript ^0.13.0;');
+  lines.push('pragma cashscript ^0.14.0;');
   lines.push(`// vk_x chunk ${idx}: term ${ch.term}, iterations [${ch.lo},${ch.hi}),`
     + ` fold=${ch.fold ? 'True' : 'False'}, reset_to_ic2=${ch.resetToIc2 ? 'True' : 'False'},`
     + ` final=${ch.final ? 'True' : 'False'}.`);
-  lines.push(`contract ${name}() {`);
   lines.push(FP_FUNCS);
   if (needsInverse) lines.push(INVERSE_FUNC);
+  lines.push(`contract ${name}() {`);
   lines.push('    function spend(int accX, int accY, int accZ, int bX, int bY, int bZ, int rX, int rY, int rZ, bytes unused zeroPadding) {');
   lines.push(`        require(${SER} == 0x${ch.incoming});`);
   // iteration loop: bake the bits of k for [lo,hi) as a constant scalar window.

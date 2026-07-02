@@ -204,13 +204,14 @@ export function finalexpTrace(boundaryVal) {
   return { ops, liveAt, limbs12, resultId: result.id, result: result.val, boundaryId: fV.id };
 }
 
-// ---- extract reusable functions from a singleton .cash (brace-counted) ----
+// ---- extract reusable functions from a singleton lib .cash (brace-counted) ----
+// The singleton libs are top-level `function`s at column 0 (feat/multi-returns syntax).
 export function fnExtractor(cashPath) {
   const src = readFileSync(cashPath, 'utf8').split('\n');
   return (name) => {
     const out = []; let p = false, depth = 0;
     for (const ln of src) {
-      if (!p && ln.startsWith(`    internal function ${name}(`)) p = true;
+      if (!p && ln.startsWith(`function ${name}(`)) p = true;
       if (p) {
         out.push(ln);
         depth += (ln.match(/\{/g) || []).length - (ln.match(/\}/g) || []).length;
@@ -231,8 +232,8 @@ export const measureCovenant = (src, inLimbs, outLimbs) => _measureCov(src, inLi
 // these instead of extracting the reducing versions. K=64 is well above the deepest
 // add-chain bound in the tower (validated by build_vectors accepting on the real VM).
 export const lazyArith = (K = 64) =>
-  '    internal function addFp(int x, int y) returns (int) { return x + y; }\n' +
-  `    internal function subFp(int x, int y) returns (int) { return (x - y + ${(BigInt(K) * P).toString()}) % ${P}; }`;
+  'function addFp(int x, int y) returns (int) { return x + y; }\n' +
+  `function subFp(int x, int y) returns (int) { return (x - y + ${(BigInt(K) * P).toString()}) % ${P}; }`;
 // 4-arg form for chunks that push UNCOMMITTED witness args (pushed = stateInts,
 // committed = commitInts), e.g. the final-exp chunk that supplies f^-1 as a witness.
 export const measureCov4 = _measureCov;

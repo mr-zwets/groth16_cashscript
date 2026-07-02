@@ -1,6 +1,6 @@
 pragma cashscript ^0.14.0;
 
-// BLS12-381 Fp library (reduced arithmetic). See lib/README.md.
+// BLS12-381 Fp shared functions (reduced arithmetic). See lib/README.md.
 
 function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
 

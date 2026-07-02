@@ -20,10 +20,10 @@
       "idx": 0,
       "file": "chunk00.cash",
       "lo": 0,
-      "hi": 219,
+      "hi": 229,
       "final": false,
       "incoming": "e90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd",
-      "outgoing": "e90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd",
+      "outgoing": "024bdf4469d19df90b54c772e8de38fed4d73f6e2bcc2485b9ede5359ba0cc57",
       "incoming_state": [
         "0",
         "1",
@@ -32,27 +32,27 @@
         "987654321"
       ],
       "zInv": null,
-      "plannedLockingBytes": 1456,
-      "plannedOperationCost": 7286638
+      "plannedLockingBytes": 1408,
+      "plannedOperationCost": 7255708
     },
     {
       "idx": 1,
       "file": "chunk01.cash",
-      "lo": 219,
+      "lo": 229,
       "hi": 254,
       "final": true,
-      "incoming": "e90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd",
+      "incoming": "024bdf4469d19df90b54c772e8de38fed4d73f6e2bcc2485b9ede5359ba0cc57",
       "outgoing": null,
       "incoming_state": [
-        "0",
-        "1",
-        "0",
+        "8826633190318180923655170922249535492402062995106438352411491997457209208113",
+        "2065160756567544347970486716233662047980412134536378327107725886626140784903",
+        "12585383243250727901010644257836960647606487100430242098003025582077178919482",
         "123456789",
         "987654321"
       ],
       "zInv": "17104758268568751835279770885039215413611002676915597857860141648195334148345",
-      "plannedLockingBytes": 1566,
-      "plannedOperationCost": 5856840
+      "plannedLockingBytes": 1514,
+      "plannedOperationCost": 4589801
     }
   ]
 }

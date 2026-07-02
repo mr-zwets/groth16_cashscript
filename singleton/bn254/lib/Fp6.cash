@@ -2,7 +2,7 @@ pragma cashscript ^0.14.0;
 
 // BN254 Fp6 = Fp2[v]/(v^3 - xi), xi = 9 + u (noble basis).
 // An Fp6 element is (c0, c1, c2) with each ci an Fp2 pair -> 6 ints carried as
-// (c0a,c0b, c1a,c1b, c2a,c2b) meaning c0 + c1*v + c2*v^2. Builds on the Fp2 library.
+// (c0a,c0b, c1a,c1b, c2a,c2b) meaning c0 + c1*v + c2*v^2. Builds on Fp2.cash.
 import "./Fp2.cash";
 
 function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {

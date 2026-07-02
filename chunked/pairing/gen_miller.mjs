@@ -62,7 +62,7 @@ function genChunk(opLo, opHi) {
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb']; // only the runtime pair's R
   const L = [];
-  L.push('pragma cashscript ^0.13.0;');
+  L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
   L.push(`// Prepared-VK batched BN254 Miller chunk: ops [${opLo},${opHi}).`);
   L.push('// state = f(12) + R0(6) [+ runtime points]; lives in the token NFT commitment. The runtime');

@@ -255,13 +255,14 @@ export function vkxFinalZinv(in0, in1) {
   return fz === 0n ? 0n : modpowFp(fz, PFP - 2n);
 }
 
-// ---- extract reusable functions from a singleton .cash (for chunk prologues) ----
+// ---- extract reusable functions from a singleton lib .cash (for chunk prologues) ----
+// The singleton libs are top-level `function`s at column 0 (feat/multi-returns syntax).
 export function fnExtractor(cashPath) {
   const src = readFileSync(cashPath, 'utf8').split('\n');
   return (name) => {
     const out = []; let p = false, depth = 0;
     for (const ln of src) {
-      if (!p && ln.startsWith(`    internal function ${name}(`)) p = true;
+      if (!p && ln.startsWith(`function ${name}(`)) p = true;
       if (p) {
         out.push(ln);
         depth += (ln.match(/\{/g) || []).length - (ln.match(/\}/g) || []).length;

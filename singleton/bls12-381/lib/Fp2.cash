@@ -1,6 +1,6 @@
 pragma cashscript ^0.14.0;
 
-// BLS12-381 Fp2 library (reduced arithmetic). See lib/README.md.
+// BLS12-381 Fp2 shared functions (reduced arithmetic). See lib/README.md.
 import "./Fp.cash";
 
 function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) {

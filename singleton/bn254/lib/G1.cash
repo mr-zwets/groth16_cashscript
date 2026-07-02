@@ -1,7 +1,7 @@
 pragma cashscript ^0.14.0;
 
 // BN254 G1 (Fp) Jacobian group law + scalar multiplication, used to compute vk_x on-chain
-// (vk_x = IC0 + in0*IC1 + in1*IC2). Builds on the base field library.
+// (vk_x = IC0 + in0*IC1 + in1*IC2). Builds on Fp.cash.
 import "./Fp.cash";
 
 function jacDoubleG1(int x, int y, int z) returns (int, int, int) {

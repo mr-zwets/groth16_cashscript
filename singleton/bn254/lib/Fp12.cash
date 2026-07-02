@@ -2,8 +2,8 @@ pragma cashscript ^0.14.0;
 
 // BN254 Fp12 = Fp6[w]/(w^2 - v), gamma = v = Fp6 non-residue (noble basis).
 // An Fp12 element is (c0, c1) with each ci an Fp6 (= 6 ints) -> 12 ints in noble serialization order.
-// This library covers mul / sqr / conjugate; Frobenius maps + inverse are appended for the higher
-// layers (final exponentiation). Builds on the Fp6 library.
+// This file covers mul / sqr / conjugate; Frobenius maps + inverse are appended for the higher
+// layers (final exponentiation). Builds on Fp6.cash.
 import "./Fp6.cash";
 
 // sparse Fp12 multiply f * (o0, 0, 0, o3, o4, 0) — the Miller-loop line application (mul034).

@@ -68,7 +68,7 @@ const decl = (names) => names.map((n) => `int ${n}`).join(',');
 
 function genChunk(lo, hi, isFirst, isLast) {
   const L = [];
-  L.push('pragma cashscript ^0.13.0;');
+  L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB}/Fp.cash";`);
   L.push(`import "${LIB}/Fp2.cash";`);
   L.push(`import "${LIB}/G2Check.cash";`);

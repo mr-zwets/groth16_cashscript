@@ -1,8 +1,8 @@
 pragma cashscript ^0.14.0;
 
-// BN254 LAZY-arithmetic library (option B: addFp/subFp do NOT reduce; subFp carries a per-call-site
+// BN254 LAZY-arithmetic shared functions (option B: addFp/subFp do NOT reduce; subFp carries a per-call-site
 // k*p bias; only mulFp reduces). Serves the two lazy-scheme harnesses miller.cash and finalexp.cash.
-// One library holds the union of both; tree-shaking drops the half a given consumer does not call.
+// One file holds the union of both; dead-code elimination drops the half a given consumer does not call.
 function addFp(int x, int y) returns (int) { return x + y; }
 
 function subFp(int x, int y, int k) returns (int) { return x - y + k * 21888242871839275222246405745257275088696311157297823662689037894645226208583; }

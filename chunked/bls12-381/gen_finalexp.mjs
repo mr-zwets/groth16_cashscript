@@ -77,7 +77,7 @@ function buildChunkSrc(s, e) {
     }
   }
   const L = [];
-  L.push('pragma cashscript ^0.13.0;');
+  L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
   L.push(`// BLS12-381 final-exp chunk ops [${s},${e})  final=${isLast}`);
   L.push('contract FinalExpBlsChunk() {');

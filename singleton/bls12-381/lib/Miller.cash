@@ -1,6 +1,6 @@
 pragma cashscript ^0.14.0;
 
-// BLS12-381 Miller library (reduced arithmetic). See lib/README.md.
+// BLS12-381 Miller shared functions (reduced arithmetic). See lib/README.md.
 import "./Fp12.cash";
 
 function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)

@@ -1,6 +1,6 @@
 pragma cashscript ^0.14.0;
 
-// BLS12-381 Fp12 library (reduced arithmetic). See lib/README.md.
+// BLS12-381 Fp12 shared functions (reduced arithmetic). See lib/README.md.
 import "./Fp6.cash";
 
 function fp12Mul(
