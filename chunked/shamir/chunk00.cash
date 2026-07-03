@@ -1,5 +1,5 @@
-pragma cashscript ^0.13.0;
-// vk_x chunk 0: Shamir window [0,219) (MSB-first bit positions 253..35), final=False.
+pragma cashscript ^0.14.0;
+// vk_x chunk 0: Shamir window [0,229) (MSB-first bit positions 253..25), final=False.
 // Public inputs taken at RUNTIME: carried state = (rX,rY,rZ,input0,input1);
 // per-bit add chosen in-script via 2-bit Shamir select over VK consts.
 // EC/field ops come from the shared lib/ tower (Fp -> G1 -> Vk).
@@ -7,24 +7,22 @@ import "./lib/Vk.cash";
 contract VkxChunk00() {
     function spend(int rX, int rY, int rZ, int input0, int input1, bytes unused zeroPadding) {
         require(hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40)) == 0xe90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd);
-        // bounded MSB-first loop over bit window [0,219) -> bit positions
-        // 253 down to 35 (count 219); body compiled ONCE.
-        for (int k = 0; k < 219; k = k + 1) {
+        // bounded MSB-first loop over bit window [0,229) -> bit positions
+        // 253 down to 25 (count 229); body compiled ONCE.
+        for (int k = 0; k < 229; k = k + 1) {
             int i = 253 - k;
             // double R (guarded rZ != 0, matching the reference)
             if (rZ != 0) {
-                (int dx, int dy, int dz) = jacDouble(rX, rY, rZ);
-                rX = dx; rY = dy; rZ = dz;
+                (rX, rY, rZ) = jacDouble(rX, rY, rZ);
             }
             // runtime 2-bit Shamir select over VK consts {IC1,IC2,T}, then add
             int b0 = (input0 >> i) % 2;
             int b1 = (input1 >> i) % 2;
             (int aX, int aY, int doAdd) = selectPoint(b0, b1);
             if (doAdd == 1) {
-                (int ax, int ay, int az) = jacAdd(rX, rY, rZ, aX, aY, 1);
-                rX = ax; rY = ay; rZ = az;
+                (rX, rY, rZ) = jacAdd(rX, rY, rZ, aX, aY, 1);
             }
         }
-        require(hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40)) == 0xe90f4c327b64c557b9c893d7467af3861f3af2697ad8c163c509e9cc8d7a12bd);
+        require(hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(input0, 40) + toPaddedBytes(input1, 40)) == 0x024bdf4469d19df90b54c772e8de38fed4d73f6e2bcc2485b9ede5359ba0cc57);
     }
 }

@@ -1,339 +1,337 @@
-pragma cashscript ^0.13.0;
+pragma cashscript ^0.14.0;
 
-// BLS12-381 LAZY-arithmetic library: addFp does NOT reduce; subFp carries a fixed 64*p bias; only
+// BLS12-381 LAZY-arithmetic shared functions: addFp does NOT reduce; subFp carries a fixed 64*p bias; only
 // mulFp reduces. Mirrors bn254's Bn254Lazy.cash. Holds the union the chunked miller + final-exp
 // generators need (cashc tree-shakes per consumer). Tower functions recovered verbatim from the
-// pre-library-migration singleton (commit 43dd254); only addFp/subFp are swapped to the lazy form.
-library Bls12381Lazy {
-    function addFp(int x, int y) returns (int) { return x + y; }
+// pre-import-migration singleton (commit 43dd254); only addFp/subFp are swapped to the lazy form.
+function addFp(int x, int y) returns (int) { return x + y; }
 
-    function subFp(int x, int y) returns (int) { return (x - y + 256154211534186713178738548847097866019640500476096504661251720711938025631413623324332008264257002498425233443826368) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+function subFp(int x, int y) returns (int) { return (x - y + 256154211534186713178738548847097866019640500476096504661251720711938025631413623324332008264257002498425233443826368) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
 
-    function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
 
-    function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
+function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) { return addFp(a0, b0), addFp(a1, b1); }
 
-    function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
+function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return subFp(a0, b0), subFp(a1, b1); }
 
-    function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
+function fp2Neg(int a0, int a1) returns (int, int) { return subFp(0, a0), subFp(0, a1); }
 
-    function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
-        int v0 = mulFp(a0, b0);
-        int v1 = mulFp(a1, b1);
-        return subFp(v0, v1), subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
-    }
+function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+    int v0 = mulFp(a0, b0);
+    int v1 = mulFp(a1, b1);
+    return subFp(v0, v1), subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
+}
 
-    function fp2Sqr(int a0, int a1) returns (int, int) {
-        return mulFp(addFp(a0, a1), subFp(a0, a1)), mulFp(2, mulFp(a0, a1));
-    }
+function fp2Sqr(int a0, int a1) returns (int, int) {
+    return mulFp(addFp(a0, a1), subFp(a0, a1)), mulFp(2, mulFp(a0, a1));
+}
 
-    function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
+function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
 
-    function fp2MulXi(int a0, int a1) returns (int, int) { return subFp(a0, a1), addFp(a0, a1); }
+function fp2MulXi(int a0, int a1) returns (int, int) { return subFp(a0, a1), addFp(a0, a1); }
 
-    function fp2MulByB(int a0, int a1) returns (int, int) {
-        int f0 = mulFp(a0, 4);
-        int f1 = mulFp(a1, 4);
-        return subFp(f0, f1), addFp(f0, f1);
-    }
+function fp2MulByB(int a0, int a1) returns (int, int) {
+    int f0 = mulFp(a0, 4);
+    int f1 = mulFp(a1, 4);
+    return subFp(f0, f1), addFp(f0, f1);
+}
 
-    function fp2Half(int a0, int a1) returns (int, int) {
-        return mulFp(a0, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894),
-               mulFp(a1, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894);
-    }
+function fp2Half(int a0, int a1) returns (int, int) {
+    return mulFp(a0, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894),
+           mulFp(a1, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894);
+}
 
-    function fp2Conj(int a0, int a1) returns (int, int) { return a0, subFp(0, a1); }
+function fp2Conj(int a0, int a1) returns (int, int) { return a0, subFp(0, a1); }
 
-    function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
-        (int c0a, int c0b) = fp2Add(a0a, a0b, b0a, b0b);
-        (int c1a, int c1b) = fp2Add(a1a, a1b, b1a, b1b);
-        (int c2a, int c2b) = fp2Add(a2a, a2b, b2a, b2b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
+function fp6Add(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    (int c0a, int c0b) = fp2Add(a0a, a0b, b0a, b0b);
+    (int c1a, int c1b) = fp2Add(a1a, a1b, b1a, b1b);
+    (int c2a, int c2b) = fp2Add(a2a, a2b, b2a, b2b);
+    return c0a, c0b, c1a, c1b, c2a, c2b;
+}
 
-    function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
-        (int c0a, int c0b) = fp2Sub(a0a, a0b, b0a, b0b);
-        (int c1a, int c1b) = fp2Sub(a1a, a1b, b1a, b1b);
-        (int c2a, int c2b) = fp2Sub(a2a, a2b, b2a, b2b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
+function fp6Sub(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    (int c0a, int c0b) = fp2Sub(a0a, a0b, b0a, b0b);
+    (int c1a, int c1b) = fp2Sub(a1a, a1b, b1a, b1b);
+    (int c2a, int c2b) = fp2Sub(a2a, a2b, b2a, b2b);
+    return c0a, c0b, c1a, c1b, c2a, c2b;
+}
 
-    function fp6Neg(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
-        (int c0a, int c0b) = fp2Neg(a0a, a0b);
-        (int c1a, int c1b) = fp2Neg(a1a, a1b);
-        (int c2a, int c2b) = fp2Neg(a2a, a2b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
+function fp6Neg(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
+    (int c0a, int c0b) = fp2Neg(a0a, a0b);
+    (int c1a, int c1b) = fp2Neg(a1a, a1b);
+    (int c2a, int c2b) = fp2Neg(a2a, a2b);
+    return c0a, c0b, c1a, c1b, c2a, c2b;
+}
 
-    function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
-        (int n0a, int n0b) = fp2MulXi(a2a, a2b);
-        return n0a, n0b, a0a, a0b, a1a, a1b;
-    }
+function fp6MulByV(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b) returns (int,int,int,int,int,int) {
+    (int n0a, int n0b) = fp2MulXi(a2a, a2b);
+    return n0a, n0b, a0a, a0b, a1a, a1b;
+}
 
-    function fp6Mul(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
-        (int t0a, int t0b) = fp2Mul(a0a, a0b, b0a, b0b);
-        (int t1a, int t1b) = fp2Mul(a1a, a1b, b1a, b1b);
-        (int t2a, int t2b) = fp2Mul(a2a, a2b, b2a, b2b);
-        (int s1a, int s1b) = fp2Add(a1a, a1b, a2a, a2b);
-        (int s2a, int s2b) = fp2Add(b1a, b1b, b2a, b2b);
-        (int p1a, int p1b) = fp2Mul(s1a, s1b, s2a, s2b);
-        (int d1a, int d1b) = fp2Sub(p1a, p1b, t1a, t1b);
-        (int d2a, int d2b) = fp2Sub(d1a, d1b, t2a, t2b);
-        (int x1a, int x1b) = fp2MulXi(d2a, d2b);
-        (int c0a, int c0b) = fp2Add(t0a, t0b, x1a, x1b);
-        (int s3a, int s3b) = fp2Add(a0a, a0b, a1a, a1b);
-        (int s4a, int s4b) = fp2Add(b0a, b0b, b1a, b1b);
-        (int p2a, int p2b) = fp2Mul(s3a, s3b, s4a, s4b);
-        (int d3a, int d3b) = fp2Sub(p2a, p2b, t0a, t0b);
-        (int d4a, int d4b) = fp2Sub(d3a, d3b, t1a, t1b);
-        (int x2a, int x2b) = fp2MulXi(t2a, t2b);
-        (int c1a, int c1b) = fp2Add(d4a, d4b, x2a, x2b);
-        (int s5a, int s5b) = fp2Add(a0a, a0b, a2a, a2b);
-        (int s6a, int s6b) = fp2Add(b0a, b0b, b2a, b2b);
-        (int p3a, int p3b) = fp2Mul(s5a, s5b, s6a, s6b);
-        (int d5a, int d5b) = fp2Sub(p3a, p3b, t0a, t0b);
-        (int d6a, int d6b) = fp2Sub(d5a, d5b, t2a, t2b);
-        (int c2a, int c2b) = fp2Add(d6a, d6b, t1a, t1b);
-        return c0a, c0b, c1a, c1b, c2a, c2b;
-    }
+function fp6Mul(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+    (int t0a, int t0b) = fp2Mul(a0a, a0b, b0a, b0b);
+    (int t1a, int t1b) = fp2Mul(a1a, a1b, b1a, b1b);
+    (int t2a, int t2b) = fp2Mul(a2a, a2b, b2a, b2b);
+    (int s1a, int s1b) = fp2Add(a1a, a1b, a2a, a2b);
+    (int s2a, int s2b) = fp2Add(b1a, b1b, b2a, b2b);
+    (int p1a, int p1b) = fp2Mul(s1a, s1b, s2a, s2b);
+    (int d1a, int d1b) = fp2Sub(p1a, p1b, t1a, t1b);
+    (int d2a, int d2b) = fp2Sub(d1a, d1b, t2a, t2b);
+    (int x1a, int x1b) = fp2MulXi(d2a, d2b);
+    (int c0a, int c0b) = fp2Add(t0a, t0b, x1a, x1b);
+    (int s3a, int s3b) = fp2Add(a0a, a0b, a1a, a1b);
+    (int s4a, int s4b) = fp2Add(b0a, b0b, b1a, b1b);
+    (int p2a, int p2b) = fp2Mul(s3a, s3b, s4a, s4b);
+    (int d3a, int d3b) = fp2Sub(p2a, p2b, t0a, t0b);
+    (int d4a, int d4b) = fp2Sub(d3a, d3b, t1a, t1b);
+    (int x2a, int x2b) = fp2MulXi(t2a, t2b);
+    (int c1a, int c1b) = fp2Add(d4a, d4b, x2a, x2b);
+    (int s5a, int s5b) = fp2Add(a0a, a0b, a2a, a2b);
+    (int s6a, int s6b) = fp2Add(b0a, b0b, b2a, b2b);
+    (int p3a, int p3b) = fp2Mul(s5a, s5b, s6a, s6b);
+    (int d5a, int d5b) = fp2Sub(p3a, p3b, t0a, t0b);
+    (int d6a, int d6b) = fp2Sub(d5a, d5b, t2a, t2b);
+    (int c2a, int c2b) = fp2Add(d6a, d6b, t1a, t1b);
+    return c0a, c0b, c1a, c1b, c2a, c2b;
+}
 
-    function fp6Mul01(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b0a,int b0b,int b1a,int b1b) returns (int,int,int,int,int,int) {
-        (int t0a,int t0b) = fp2Mul(c0a, c0b, b0a, b0b);
-        (int t1a,int t1b) = fp2Mul(c1a, c1b, b1a, b1b);
-        (int s12a,int s12b) = fp2Add(c1a, c1b, c2a, c2b);
-        (int m12a,int m12b) = fp2Mul(s12a, s12b, b1a, b1b);
-        (int u0a,int u0b) = fp2Sub(m12a, m12b, t1a, t1b);
-        (int xu0a,int xu0b) = fp2MulXi(u0a, u0b);
-        (int r0a,int r0b) = fp2Add(xu0a, xu0b, t0a, t0b);
-        (int sba,int sbb) = fp2Add(b0a, b0b, b1a, b1b);
-        (int sca,int scb) = fp2Add(c0a, c0b, c1a, c1b);
-        (int m1a,int m1b) = fp2Mul(sba, sbb, sca, scb);
-        (int u1a,int u1b) = fp2Sub(m1a, m1b, t0a, t0b);
-        (int r1a,int r1b) = fp2Sub(u1a, u1b, t1a, t1b);
-        (int s02a,int s02b) = fp2Add(c0a, c0b, c2a, c2b);
-        (int m2a,int m2b) = fp2Mul(s02a, s02b, b0a, b0b);
-        (int u2a,int u2b) = fp2Sub(m2a, m2b, t0a, t0b);
-        (int r2a,int r2b) = fp2Add(u2a, u2b, t1a, t1b);
-        return r0a, r0b, r1a, r1b, r2a, r2b;
-    }
+function fp6Mul01(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b0a,int b0b,int b1a,int b1b) returns (int,int,int,int,int,int) {
+    (int t0a,int t0b) = fp2Mul(c0a, c0b, b0a, b0b);
+    (int t1a,int t1b) = fp2Mul(c1a, c1b, b1a, b1b);
+    (int s12a,int s12b) = fp2Add(c1a, c1b, c2a, c2b);
+    (int m12a,int m12b) = fp2Mul(s12a, s12b, b1a, b1b);
+    (int u0a,int u0b) = fp2Sub(m12a, m12b, t1a, t1b);
+    (int xu0a,int xu0b) = fp2MulXi(u0a, u0b);
+    (int r0a,int r0b) = fp2Add(xu0a, xu0b, t0a, t0b);
+    (int sba,int sbb) = fp2Add(b0a, b0b, b1a, b1b);
+    (int sca,int scb) = fp2Add(c0a, c0b, c1a, c1b);
+    (int m1a,int m1b) = fp2Mul(sba, sbb, sca, scb);
+    (int u1a,int u1b) = fp2Sub(m1a, m1b, t0a, t0b);
+    (int r1a,int r1b) = fp2Sub(u1a, u1b, t1a, t1b);
+    (int s02a,int s02b) = fp2Add(c0a, c0b, c2a, c2b);
+    (int m2a,int m2b) = fp2Mul(s02a, s02b, b0a, b0b);
+    (int u2a,int u2b) = fp2Sub(m2a, m2b, t0a, t0b);
+    (int r2a,int r2b) = fp2Add(u2a, u2b, t1a, t1b);
+    return r0a, r0b, r1a, r1b, r2a, r2b;
+}
 
-    function fp6Mul1(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b1a,int b1b) returns (int,int,int,int,int,int) {
-        (int m2a,int m2b) = fp2Mul(c2a, c2b, b1a, b1b);
-        (int r0a,int r0b) = fp2MulXi(m2a, m2b);
-        (int r1a,int r1b) = fp2Mul(c0a, c0b, b1a, b1b);
-        (int r2a,int r2b) = fp2Mul(c1a, c1b, b1a, b1b);
-        return r0a, r0b, r1a, r1b, r2a, r2b;
-    }
+function fp6Mul1(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b1a,int b1b) returns (int,int,int,int,int,int) {
+    (int m2a,int m2b) = fp2Mul(c2a, c2b, b1a, b1b);
+    (int r0a,int r0b) = fp2MulXi(m2a, m2b);
+    (int r1a,int r1b) = fp2Mul(c0a, c0b, b1a, b1b);
+    (int r2a,int r2b) = fp2Mul(c1a, c1b, b1a, b1b);
+    return r0a, r0b, r1a, r1b, r2a, r2b;
+}
 
-    function fp6FrobOdd(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int k1a,int k1b,int k2a,int k2b) returns (int,int,int,int,int,int) {
-        (int d0a,int d0b) = fp2Conj(x0a, x0b);
-        (int c1a,int c1b) = fp2Conj(x1a, x1b);
-        (int d1a,int d1b) = fp2Mul(c1a, c1b, k1a, k1b);
-        (int c2a,int c2b) = fp2Conj(x2a, x2b);
-        (int d2a,int d2b) = fp2Mul(c2a, c2b, k2a, k2b);
-        return d0a, d0b, d1a, d1b, d2a, d2b;
-    }
+function fp6FrobOdd(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int k1a,int k1b,int k2a,int k2b) returns (int,int,int,int,int,int) {
+    (int d0a,int d0b) = fp2Conj(x0a, x0b);
+    (int c1a,int c1b) = fp2Conj(x1a, x1b);
+    (int d1a,int d1b) = fp2Mul(c1a, c1b, k1a, k1b);
+    (int c2a,int c2b) = fp2Conj(x2a, x2b);
+    (int d2a,int d2b) = fp2Mul(c2a, c2b, k2a, k2b);
+    return d0a, d0b, d1a, d1b, d2a, d2b;
+}
 
-    function fp6FrobEven(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int k1a,int k1b,int k2a,int k2b) returns (int,int,int,int,int,int) {
-        (int d1a,int d1b) = fp2Mul(x1a, x1b, k1a, k1b);
-        (int d2a,int d2b) = fp2Mul(x2a, x2b, k2a, k2b);
-        return x0a, x0b, d1a, d1b, d2a, d2b;
-    }
+function fp6FrobEven(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int k1a,int k1b,int k2a,int k2b) returns (int,int,int,int,int,int) {
+    (int d1a,int d1b) = fp2Mul(x1a, x1b, k1a, k1b);
+    (int d2a,int d2b) = fp2Mul(x2a, x2b, k2a, k2b);
+    return x0a, x0b, d1a, d1b, d2a, d2b;
+}
 
-    function fp6MulByFp2(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int ka,int kb) returns (int,int,int,int,int,int) {
-        (int r0a,int r0b) = fp2Mul(x0a, x0b, ka, kb);
-        (int r1a,int r1b) = fp2Mul(x1a, x1b, ka, kb);
-        (int r2a,int r2b) = fp2Mul(x2a, x2b, ka, kb);
-        return r0a, r0b, r1a, r1b, r2a, r2b;
-    }
+function fp6MulByFp2(int x0a,int x0b,int x1a,int x1b,int x2a,int x2b, int ka,int kb) returns (int,int,int,int,int,int) {
+    (int r0a,int r0b) = fp2Mul(x0a, x0b, ka, kb);
+    (int r1a,int r1b) = fp2Mul(x1a, x1b, ka, kb);
+    (int r2a,int r2b) = fp2Mul(x2a, x2b, ka, kb);
+    return r0a, r0b, r1a, r1b, r2a, r2b;
+}
 
-    function fp12Sqr(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) = fp6Mul(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
-        (int s0,int s1,int s2,int s3,int s4,int s5) = fp6Add(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
-        (int vc0,int vc1,int vc2,int vc3,int vc4,int vc5) = fp6MulByV(A6,A7,A8,A9,A10,A11);
-        (int u0,int u1,int u2,int u3,int u4,int u5) = fp6Add(A0,A1,A2,A3,A4,A5, vc0,vc1,vc2,vc3,vc4,vc5);
-        (int t1_0,int t1_1,int t1_2,int t1_3,int t1_4,int t1_5) = fp6Mul(s0,s1,s2,s3,s4,s5, u0,u1,u2,u3,u4,u5);
-        (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Add(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
-        (int vt0,int vt1,int vt2,int vt3,int vt4,int vt5) = fp6MulByV(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
-        (int d0,int d1,int d2,int d3,int d4,int d5) = fp6Sub(t1_0,t1_1,t1_2,t1_3,t1_4,t1_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
-        (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Sub(d0,d1,d2,d3,d4,d5, vt0,vt1,vt2,vt3,vt4,vt5);
-        return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
-    }
+function fp12Sqr(
+    int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) = fp6Mul(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
+    (int s0,int s1,int s2,int s3,int s4,int s5) = fp6Add(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
+    (int vc0,int vc1,int vc2,int vc3,int vc4,int vc5) = fp6MulByV(A6,A7,A8,A9,A10,A11);
+    (int u0,int u1,int u2,int u3,int u4,int u5) = fp6Add(A0,A1,A2,A3,A4,A5, vc0,vc1,vc2,vc3,vc4,vc5);
+    (int t1_0,int t1_1,int t1_2,int t1_3,int t1_4,int t1_5) = fp6Mul(s0,s1,s2,s3,s4,s5, u0,u1,u2,u3,u4,u5);
+    (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Add(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
+    (int vt0,int vt1,int vt2,int vt3,int vt4,int vt5) = fp6MulByV(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
+    (int d0,int d1,int d2,int d3,int d4,int d5) = fp6Sub(t1_0,t1_1,t1_2,t1_3,t1_4,t1_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
+    (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Sub(d0,d1,d2,d3,d4,d5, vt0,vt1,vt2,vt3,vt4,vt5);
+    return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
+}
 
-    function fp12Mul(
-        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11,
-        int B0,int B1,int B2,int B3,int B4,int B5, int B6,int B7,int B8,int B9,int B10,int B11
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) = fp6Mul(A0,A1,A2,A3,A4,A5, B0,B1,B2,B3,B4,B5);
-        (int t1_0,int t1_1,int t1_2,int t1_3,int t1_4,int t1_5) = fp6Mul(A6,A7,A8,A9,A10,A11, B6,B7,B8,B9,B10,B11);
-        (int vt_0,int vt_1,int vt_2,int vt_3,int vt_4,int vt_5) = fp6MulByV(t1_0,t1_1,t1_2,t1_3,t1_4,t1_5);
-        (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Add(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, vt_0,vt_1,vt_2,vt_3,vt_4,vt_5);
-        (int sa_0,int sa_1,int sa_2,int sa_3,int sa_4,int sa_5) = fp6Add(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
-        (int sb_0,int sb_1,int sb_2,int sb_3,int sb_4,int sb_5) = fp6Add(B0,B1,B2,B3,B4,B5, B6,B7,B8,B9,B10,B11);
-        (int pr_0,int pr_1,int pr_2,int pr_3,int pr_4,int pr_5) = fp6Mul(sa_0,sa_1,sa_2,sa_3,sa_4,sa_5, sb_0,sb_1,sb_2,sb_3,sb_4,sb_5);
-        (int qq_0,int qq_1,int qq_2,int qq_3,int qq_4,int qq_5) = fp6Sub(pr_0,pr_1,pr_2,pr_3,pr_4,pr_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
-        (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(qq_0,qq_1,qq_2,qq_3,qq_4,qq_5, t1_0,t1_1,t1_2,t1_3,t1_4,t1_5);
-        return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
-    }
+function fp12Mul(
+    int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11,
+    int B0,int B1,int B2,int B3,int B4,int B5, int B6,int B7,int B8,int B9,int B10,int B11
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) = fp6Mul(A0,A1,A2,A3,A4,A5, B0,B1,B2,B3,B4,B5);
+    (int t1_0,int t1_1,int t1_2,int t1_3,int t1_4,int t1_5) = fp6Mul(A6,A7,A8,A9,A10,A11, B6,B7,B8,B9,B10,B11);
+    (int vt_0,int vt_1,int vt_2,int vt_3,int vt_4,int vt_5) = fp6MulByV(t1_0,t1_1,t1_2,t1_3,t1_4,t1_5);
+    (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Add(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, vt_0,vt_1,vt_2,vt_3,vt_4,vt_5);
+    (int sa_0,int sa_1,int sa_2,int sa_3,int sa_4,int sa_5) = fp6Add(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
+    (int sb_0,int sb_1,int sb_2,int sb_3,int sb_4,int sb_5) = fp6Add(B0,B1,B2,B3,B4,B5, B6,B7,B8,B9,B10,B11);
+    (int pr_0,int pr_1,int pr_2,int pr_3,int pr_4,int pr_5) = fp6Mul(sa_0,sa_1,sa_2,sa_3,sa_4,sa_5, sb_0,sb_1,sb_2,sb_3,sb_4,sb_5);
+    (int qq_0,int qq_1,int qq_2,int qq_3,int qq_4,int qq_5) = fp6Sub(pr_0,pr_1,pr_2,pr_3,pr_4,pr_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
+    (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(qq_0,qq_1,qq_2,qq_3,qq_4,qq_5, t1_0,t1_1,t1_2,t1_3,t1_4,t1_5);
+    return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
+}
 
-    function fp12Conj(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
-        returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int N6,int N7,int N8,int N9,int N10,int N11) = fp6Neg(A6,A7,A8,A9,A10,A11);
-        return A0,A1,A2,A3,A4,A5,N6,N7,N8,N9,N10,N11;
-    }
+function fp12Conj(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int N6,int N7,int N8,int N9,int N10,int N11) = fp6Neg(A6,A7,A8,A9,A10,A11);
+    return A0,A1,A2,A3,A4,A5,N6,N7,N8,N9,N10,N11;
+}
 
-    function fp12Frob1(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
-        returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(A0,A1,A2,A3,A4,A5,
-            0, 4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436,
-            4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437, 0);
-        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(A6,A7,A8,A9,A10,A11,
-            0, 4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436,
-            4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437, 0);
-        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(g0,g1,g2,g3,g4,g5,
-            3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760, 151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
-        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
-    }
+function fp12Frob1(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(A0,A1,A2,A3,A4,A5,
+        0, 4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436,
+        4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437, 0);
+    (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(A6,A7,A8,A9,A10,A11,
+        0, 4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436,
+        4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437, 0);
+    (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(g0,g1,g2,g3,g4,g5,
+        3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760, 151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
+    return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
+}
 
-    function fp12Frob2(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
-        returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobEven(A0,A1,A2,A3,A4,A5,
-            793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350, 0,
-            4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436, 0);
-        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobEven(A6,A7,A8,A9,A10,A11,
-            793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350, 0,
-            4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436, 0);
-        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(g0,g1,g2,g3,g4,g5,
-            793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620351, 0);
-        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
-    }
+function fp12Frob2(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobEven(A0,A1,A2,A3,A4,A5,
+        793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350, 0,
+        4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436, 0);
+    (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobEven(A6,A7,A8,A9,A10,A11,
+        793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620350, 0,
+        4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436, 0);
+    (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(g0,g1,g2,g3,g4,g5,
+        793479390729215512621379701633421447060886740281060493010456487427281649075476305620758731620351, 0);
+    return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
+}
 
-    function fp12Frob3(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
-        returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(A0,A1,A2,A3,A4,A5,
-            0, 1,
-            4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786, 0);
-        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(A6,A7,A8,A9,A10,A11,
-            0, 1,
-            4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786, 0);
-        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(g0,g1,g2,g3,g4,g5,
-            2973677408986561043442465346520108879172042883009249989176415018091420807192182638567116318576472649347015917690530, 1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257);
-        return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
-    }
+function fp12Frob3(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int c0,int c1,int c2,int c3,int c4,int c5) = fp6FrobOdd(A0,A1,A2,A3,A4,A5,
+        0, 1,
+        4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786, 0);
+    (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(A6,A7,A8,A9,A10,A11,
+        0, 1,
+        4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559786, 0);
+    (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(g0,g1,g2,g3,g4,g5,
+        2973677408986561043442465346520108879172042883009249989176415018091420807192182638567116318576472649347015917690530, 1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257);
+    return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
+}
 
-    function fp4Square(int a0,int a1,int b0,int b1) returns (int,int,int,int) {
-        (int a2a,int a2b) = fp2Sqr(a0, a1);
-        (int b2a,int b2b) = fp2Sqr(b0, b1);
-        (int xbi0,int xbi1) = fp2MulXi(b2a, b2b);
-        (int f0,int f1) = fp2Add(xbi0, xbi1, a2a, a2b);
-        (int aba,int abb) = fp2Add(a0, a1, b0, b1);
-        (int absqa,int absqb) = fp2Sqr(aba, abb);
-        (int sub1a,int sub1b) = fp2Sub(absqa, absqb, a2a, a2b);
-        (int s0,int s1) = fp2Sub(sub1a, sub1b, b2a, b2b);
-        return f0, f1, s0, s1;
-    }
+function fp4Square(int a0,int a1,int b0,int b1) returns (int,int,int,int) {
+    (int a2a,int a2b) = fp2Sqr(a0, a1);
+    (int b2a,int b2b) = fp2Sqr(b0, b1);
+    (int xbi0,int xbi1) = fp2MulXi(b2a, b2b);
+    (int f0,int f1) = fp2Add(xbi0, xbi1, a2a, a2b);
+    (int aba,int abb) = fp2Add(a0, a1, b0, b1);
+    (int absqa,int absqb) = fp2Sqr(aba, abb);
+    (int sub1a,int sub1b) = fp2Sub(absqa, absqb, a2a, a2b);
+    (int s0,int s1) = fp2Sub(sub1a, sub1b, b2a, b2b);
+    return f0, f1, s0, s1;
+}
 
-    function cycSqr(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
-        returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int t3a,int t3b,int t4a,int t4b) = fp4Square(A0,A1, A8,A9);
-        (int t5a,int t5b,int t6a,int t6b) = fp4Square(A6,A7, A4,A5);
-        (int t7a,int t7b,int t8a,int t8b) = fp4Square(A2,A3, A10,A11);
-        (int t9a,int t9b) = fp2MulXi(t8a, t8b);
-        (int z0a,int z0b) = fp2Sub(t3a, t3b, A0, A1);   (int o0a,int o0b) = fp2Add(mulFp(z0a,2), mulFp(z0b,2), t3a, t3b);
-        (int z1a,int z1b) = fp2Sub(t5a, t5b, A2, A3);   (int o1a,int o1b) = fp2Add(mulFp(z1a,2), mulFp(z1b,2), t5a, t5b);
-        (int z2a,int z2b) = fp2Sub(t7a, t7b, A4, A5);   (int o2a,int o2b) = fp2Add(mulFp(z2a,2), mulFp(z2b,2), t7a, t7b);
-        (int z3a,int z3b) = fp2Add(t9a, t9b, A6, A7);   (int o3a,int o3b) = fp2Add(mulFp(z3a,2), mulFp(z3b,2), t9a, t9b);
-        (int z4a,int z4b) = fp2Add(t4a, t4b, A8, A9);   (int o4a,int o4b) = fp2Add(mulFp(z4a,2), mulFp(z4b,2), t4a, t4b);
-        (int z5a,int z5b) = fp2Add(t6a, t6b, A10, A11); (int o5a,int o5b) = fp2Add(mulFp(z5a,2), mulFp(z5b,2), t6a, t6b);
-        return o0a,o0b,o1a,o1b,o2a,o2b,o3a,o3b,o4a,o4b,o5a,o5b;
-    }
+function cycSqr(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int t3a,int t3b,int t4a,int t4b) = fp4Square(A0,A1, A8,A9);
+    (int t5a,int t5b,int t6a,int t6b) = fp4Square(A6,A7, A4,A5);
+    (int t7a,int t7b,int t8a,int t8b) = fp4Square(A2,A3, A10,A11);
+    (int t9a,int t9b) = fp2MulXi(t8a, t8b);
+    (int z0a,int z0b) = fp2Sub(t3a, t3b, A0, A1);   (int o0a,int o0b) = fp2Add(mulFp(z0a,2), mulFp(z0b,2), t3a, t3b);
+    (int z1a,int z1b) = fp2Sub(t5a, t5b, A2, A3);   (int o1a,int o1b) = fp2Add(mulFp(z1a,2), mulFp(z1b,2), t5a, t5b);
+    (int z2a,int z2b) = fp2Sub(t7a, t7b, A4, A5);   (int o2a,int o2b) = fp2Add(mulFp(z2a,2), mulFp(z2b,2), t7a, t7b);
+    (int z3a,int z3b) = fp2Add(t9a, t9b, A6, A7);   (int o3a,int o3b) = fp2Add(mulFp(z3a,2), mulFp(z3b,2), t9a, t9b);
+    (int z4a,int z4b) = fp2Add(t4a, t4b, A8, A9);   (int o4a,int o4b) = fp2Add(mulFp(z4a,2), mulFp(z4b,2), t4a, t4b);
+    (int z5a,int z5b) = fp2Add(t6a, t6b, A10, A11); (int o5a,int o5b) = fp2Add(mulFp(z5a,2), mulFp(z5b,2), t6a, t6b);
+    return o0a,o0b,o1a,o1b,o2a,o2b,o3a,o3b,o4a,o4b,o5a,o5b;
+}
 
-    function mul014(
-        int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
-        int o0a,int o0b, int o1a,int o1b, int o4a,int o4b
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int T0,int T1,int T2,int T3,int T4,int T5) = fp6Mul01(F0,F1,F2,F3,F4,F5, o0a,o0b, o1a,o1b);
-        (int U0,int U1,int U2,int U3,int U4,int U5) = fp6Mul1(F6,F7,F8,F9,F10,F11, o4a,o4b);
-        (int V0,int V1,int V2,int V3,int V4,int V5) = fp6MulByV(U0,U1,U2,U3,U4,U5);
-        (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Add(V0,V1,V2,V3,V4,V5, T0,T1,T2,T3,T4,T5);
-        (int S0,int S1,int S2,int S3,int S4,int S5) = fp6Add(F6,F7,F8,F9,F10,F11, F0,F1,F2,F3,F4,F5);
-        (int qa,int qb) = fp2Add(o1a, o1b, o4a, o4b);
-        (int G0,int G1,int G2,int G3,int G4,int G5) = fp6Mul01(S0,S1,S2,S3,S4,S5, o0a,o0b, qa,qb);
-        (int H0,int H1,int H2,int H3,int H4,int H5) = fp6Sub(G0,G1,G2,G3,G4,G5, T0,T1,T2,T3,T4,T5);
-        (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(H0,H1,H2,H3,H4,H5, U0,U1,U2,U3,U4,U5);
-        return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
-    }
+function mul014(
+    int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
+    int o0a,int o0b, int o1a,int o1b, int o4a,int o4b
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int T0,int T1,int T2,int T3,int T4,int T5) = fp6Mul01(F0,F1,F2,F3,F4,F5, o0a,o0b, o1a,o1b);
+    (int U0,int U1,int U2,int U3,int U4,int U5) = fp6Mul1(F6,F7,F8,F9,F10,F11, o4a,o4b);
+    (int V0,int V1,int V2,int V3,int V4,int V5) = fp6MulByV(U0,U1,U2,U3,U4,U5);
+    (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Add(V0,V1,V2,V3,V4,V5, T0,T1,T2,T3,T4,T5);
+    (int S0,int S1,int S2,int S3,int S4,int S5) = fp6Add(F6,F7,F8,F9,F10,F11, F0,F1,F2,F3,F4,F5);
+    (int qa,int qb) = fp2Add(o1a, o1b, o4a, o4b);
+    (int G0,int G1,int G2,int G3,int G4,int G5) = fp6Mul01(S0,S1,S2,S3,S4,S5, o0a,o0b, qa,qb);
+    (int H0,int H1,int H2,int H3,int H4,int H5) = fp6Sub(G0,G1,G2,G3,G4,G5, T0,T1,T2,T3,T4,T5);
+    (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(H0,H1,H2,H3,H4,H5, U0,U1,U2,U3,U4,U5);
+    return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
+}
 
-    function line(
-        int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
-        int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int Px, int Py
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        int o1a = mulFp(c1a, Px);
-        int o1b = mulFp(c1b, Px);
-        int o4a = mulFp(c2a, Py);
-        int o4b = mulFp(c2b, Py);
-        (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7,int r8,int r9,int r10,int r11) =
-            mul014(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, c0a,c0b, o1a,o1b, o4a,o4b);
-        return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
-    }
+function line(
+    int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
+    int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int Px, int Py
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    int o1a = mulFp(c1a, Px);
+    int o1b = mulFp(c1b, Px);
+    int o4a = mulFp(c2a, Py);
+    int o4b = mulFp(c2b, Py);
+    (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7,int r8,int r9,int r10,int r11) =
+        mul014(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, c0a,c0b, o1a,o1b, o4a,o4b);
+    return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
+}
 
-    function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
-        returns (int,int,int,int,int,int, int,int,int,int,int,int) {
-        (int t0a,int t0b) = fp2Sqr(Ya, Yb);
-        (int t1a,int t1b) = fp2Sqr(Za, Zb);
-        (int s1a,int s1b) = fp2Scale(t1a, t1b, 3);
-        (int t2a,int t2b) = fp2MulByB(s1a, s1b);
-        (int t3a,int t3b) = fp2Scale(t2a, t2b, 3);
-        (int yza,int yzb) = fp2Add(Ya, Yb, Za, Zb);
-        (int sq_a,int sq_b) = fp2Sqr(yza, yzb);
-        (int u4a,int u4b) = fp2Sub(sq_a, sq_b, t1a, t1b);
-        (int t4a,int t4b) = fp2Sub(u4a, u4b, t0a, t0b);
-        (int c0a,int c0b) = fp2Sub(t2a, t2b, t0a, t0b);
-        (int rxq_a,int rxq_b) = fp2Sqr(Xa, Xb);
-        (int c1a,int c1b) = fp2Scale(rxq_a, rxq_b, 3);
-        (int c2a,int c2b) = fp2Neg(t4a, t4b);
-        (int da,int db) = fp2Sub(t0a, t0b, t3a, t3b);
-        (int dxa,int dxb) = fp2Mul(da, db, Xa, Xb);
-        (int dxya,int dxyb) = fp2Mul(dxa, dxb, Ya, Yb);
-        (int nxa,int nxb) = fp2Half(dxya, dxyb);
-        (int sa,int sb) = fp2Add(t0a, t0b, t3a, t3b);
-        (int sha,int shb) = fp2Half(sa, sb);
-        (int sh2a,int sh2b) = fp2Sqr(sha, shb);
-        (int t2sa,int t2sb) = fp2Sqr(t2a, t2b);
-        (int t2s3a,int t2s3b) = fp2Scale(t2sa, t2sb, 3);
-        (int nya,int nyb) = fp2Sub(sh2a, sh2b, t2s3a, t2s3b);
-        (int nza,int nzb) = fp2Mul(t0a, t0b, t4a, t4b);
-        return c0a,c0b,c1a,c1b,c2a,c2b, nxa,nxb,nya,nyb,nza,nzb;
-    }
+function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
+    returns (int,int,int,int,int,int, int,int,int,int,int,int) {
+    (int t0a,int t0b) = fp2Sqr(Ya, Yb);
+    (int t1a,int t1b) = fp2Sqr(Za, Zb);
+    (int s1a,int s1b) = fp2Scale(t1a, t1b, 3);
+    (int t2a,int t2b) = fp2MulByB(s1a, s1b);
+    (int t3a,int t3b) = fp2Scale(t2a, t2b, 3);
+    (int yza,int yzb) = fp2Add(Ya, Yb, Za, Zb);
+    (int sq_a,int sq_b) = fp2Sqr(yza, yzb);
+    (int u4a,int u4b) = fp2Sub(sq_a, sq_b, t1a, t1b);
+    (int t4a,int t4b) = fp2Sub(u4a, u4b, t0a, t0b);
+    (int c0a,int c0b) = fp2Sub(t2a, t2b, t0a, t0b);
+    (int rxq_a,int rxq_b) = fp2Sqr(Xa, Xb);
+    (int c1a,int c1b) = fp2Scale(rxq_a, rxq_b, 3);
+    (int c2a,int c2b) = fp2Neg(t4a, t4b);
+    (int da,int db) = fp2Sub(t0a, t0b, t3a, t3b);
+    (int dxa,int dxb) = fp2Mul(da, db, Xa, Xb);
+    (int dxya,int dxyb) = fp2Mul(dxa, dxb, Ya, Yb);
+    (int nxa,int nxb) = fp2Half(dxya, dxyb);
+    (int sa,int sb) = fp2Add(t0a, t0b, t3a, t3b);
+    (int sha,int shb) = fp2Half(sa, sb);
+    (int sh2a,int sh2b) = fp2Sqr(sha, shb);
+    (int t2sa,int t2sb) = fp2Sqr(t2a, t2b);
+    (int t2s3a,int t2s3b) = fp2Scale(t2sa, t2sb, 3);
+    (int nya,int nyb) = fp2Sub(sh2a, sh2b, t2s3a, t2s3b);
+    (int nza,int nzb) = fp2Mul(t0a, t0b, t4a, t4b);
+    return c0a,c0b,c1a,c1b,c2a,c2b, nxa,nxb,nya,nyb,nza,nzb;
+}
 
-    function pointAdd(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int Qxa,int Qxb,int Qya,int Qyb)
-        returns (int,int,int,int,int,int, int,int,int,int,int,int) {
-        (int qyz_a,int qyz_b) = fp2Mul(Qya, Qyb, Za, Zb);
-        (int t0a,int t0b) = fp2Sub(Ya, Yb, qyz_a, qyz_b);
-        (int qxz_a,int qxz_b) = fp2Mul(Qxa, Qxb, Za, Zb);
-        (int t1a,int t1b) = fp2Sub(Xa, Xb, qxz_a, qxz_b);
-        (int t0qx_a,int t0qx_b) = fp2Mul(t0a, t0b, Qxa, Qxb);
-        (int t1qy_a,int t1qy_b) = fp2Mul(t1a, t1b, Qya, Qyb);
-        (int c0a,int c0b) = fp2Sub(t0qx_a, t0qx_b, t1qy_a, t1qy_b);
-        (int c1a,int c1b) = fp2Neg(t0a, t0b);
-        int c2a = t1a;
-        int c2b = t1b;
-        (int t2a,int t2b) = fp2Sqr(t1a, t1b);
-        (int t3a,int t3b) = fp2Mul(t2a, t2b, t1a, t1b);
-        (int t4a,int t4b) = fp2Mul(t2a, t2b, Xa, Xb);
-        (int t42a,int t42b) = fp2Scale(t4a, t4b, 2);
-        (int d35a,int d35b) = fp2Sub(t3a, t3b, t42a, t42b);
-        (int t0sa,int t0sb) = fp2Sqr(t0a, t0b);
-        (int t0sza,int t0szb) = fp2Mul(t0sa, t0sb, Za, Zb);
-        (int t5a,int t5b) = fp2Add(d35a, d35b, t0sza, t0szb);
-        (int nxa,int nxb) = fp2Mul(t1a, t1b, t5a, t5b);
-        (int d45a,int d45b) = fp2Sub(t4a, t4b, t5a, t5b);
-        (int d45t0a,int d45t0b) = fp2Mul(d45a, d45b, t0a, t0b);
-        (int t3rya,int t3ryb) = fp2Mul(t3a, t3b, Ya, Yb);
-        (int nya,int nyb) = fp2Sub(d45t0a, d45t0b, t3rya, t3ryb);
-        (int nza,int nzb) = fp2Mul(Za, Zb, t3a, t3b);
-        return c0a,c0b,c1a,c1b,c2a,c2b, nxa,nxb,nya,nyb,nza,nzb;
-    }
+function pointAdd(int Xa,int Xb,int Ya,int Yb,int Za,int Zb, int Qxa,int Qxb,int Qya,int Qyb)
+    returns (int,int,int,int,int,int, int,int,int,int,int,int) {
+    (int qyz_a,int qyz_b) = fp2Mul(Qya, Qyb, Za, Zb);
+    (int t0a,int t0b) = fp2Sub(Ya, Yb, qyz_a, qyz_b);
+    (int qxz_a,int qxz_b) = fp2Mul(Qxa, Qxb, Za, Zb);
+    (int t1a,int t1b) = fp2Sub(Xa, Xb, qxz_a, qxz_b);
+    (int t0qx_a,int t0qx_b) = fp2Mul(t0a, t0b, Qxa, Qxb);
+    (int t1qy_a,int t1qy_b) = fp2Mul(t1a, t1b, Qya, Qyb);
+    (int c0a,int c0b) = fp2Sub(t0qx_a, t0qx_b, t1qy_a, t1qy_b);
+    (int c1a,int c1b) = fp2Neg(t0a, t0b);
+    int c2a = t1a;
+    int c2b = t1b;
+    (int t2a,int t2b) = fp2Sqr(t1a, t1b);
+    (int t3a,int t3b) = fp2Mul(t2a, t2b, t1a, t1b);
+    (int t4a,int t4b) = fp2Mul(t2a, t2b, Xa, Xb);
+    (int t42a,int t42b) = fp2Scale(t4a, t4b, 2);
+    (int d35a,int d35b) = fp2Sub(t3a, t3b, t42a, t42b);
+    (int t0sa,int t0sb) = fp2Sqr(t0a, t0b);
+    (int t0sza,int t0szb) = fp2Mul(t0sa, t0sb, Za, Zb);
+    (int t5a,int t5b) = fp2Add(d35a, d35b, t0sza, t0szb);
+    (int nxa,int nxb) = fp2Mul(t1a, t1b, t5a, t5b);
+    (int d45a,int d45b) = fp2Sub(t4a, t4b, t5a, t5b);
+    (int d45t0a,int d45t0b) = fp2Mul(d45a, d45b, t0a, t0b);
+    (int t3rya,int t3ryb) = fp2Mul(t3a, t3b, Ya, Yb);
+    (int nya,int nyb) = fp2Sub(d45t0a, d45t0b, t3rya, t3ryb);
+    (int nza,int nzb) = fp2Mul(Za, Zb, t3a, t3b);
+    return c0a,c0b,c1a,c1b,c2a,c2b, nxa,nxb,nya,nyb,nza,nzb;
 }

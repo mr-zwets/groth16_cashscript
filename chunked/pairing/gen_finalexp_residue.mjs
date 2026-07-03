@@ -37,7 +37,7 @@ const ONE_L = ['1', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'];
 
 function genTail() {
   const L = [];
-  L.push('pragma cashscript ^0.13.0;');
+  L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
   L.push('// Witnessed-residue final-exp TAIL (ePrint 2024/640): verdict fF*w*c^q2 == c^q*c^q3.');
   L.push('contract ResidueTail() {');

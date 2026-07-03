@@ -103,7 +103,7 @@ const ALL = [...RN, ...BN, ...ACN];
 
 function genChunk(lo, hi, isFirst, isLast) {
   const L = [];
-  L.push('pragma cashscript ^0.13.0;');
+  L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
   L.push(`// G2 input-validation chunk: fast-endo [x0]B double-and-add bits [${lo},${hi}); first=${isFirst} last=${isLast}.`);
   L.push('contract G2Check() {');

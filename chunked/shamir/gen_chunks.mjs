@@ -114,119 +114,110 @@ const _vkx = g1(ic0).add(g1(ic1).multiply(input0)).add(g1(ic2).multiply(input1))
 if (_vkx.x !== expected[0] || _vkx.y !== expected[1]) throw new Error('noble vs vector mismatch');
 
 // ---------------------------------------------------------------------------
-// The reusable EC/field function BODIES, emitted ONCE into the lib/ tower by emitLibs().
-// Written with `internal function` (toLibFn strips `internal` -> plain library `function`).
+// The reusable EC/field function BODIES, emitted ONCE into the lib/ tower by emitLibs()
+// as plain top-level (global) functions.
 // ---------------------------------------------------------------------------
 const fpLibFuncs = () =>
-  '    function addFp(int x, int y) returns (int) { return (x + y) % P; }\n' +
-  '    function subFp(int x, int y) returns (int) { return (x - y + P) % P; }\n' +
-  '    function mulFp(int x, int y) returns (int) { return (x * y) % P; }\n' +
-  '    function sqrFp(int x) returns (int) { return (x * x) % P; }';
+  `function addFp(int x, int y) returns (int) { return (x + y) % ${P}; }\n` +
+  `function subFp(int x, int y) returns (int) { return (x - y + ${P}) % ${P}; }\n` +
+  `function mulFp(int x, int y) returns (int) { return (x * y) % ${P}; }\n` +
+  `function sqrFp(int x) returns (int) { return (x * x) % ${P}; }`;
 
-const jacDoubleFn = () => `    internal function jacDouble(int x, int y, int z) returns (int, int, int) {
-        int a = sqrFp(x);
-        int b = sqrFp(y);
-        int c = sqrFp(b);
-        int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
-        int e = mulFp(3, a);
-        int f = sqrFp(e);
-        int nx = subFp(f, mulFp(2, d));
-        int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
-        int nz = mulFp(2, mulFp(y, z));
-        return nx, ny, nz;
-    }`;
+const jacDoubleFn = () => `function jacDouble(int x, int y, int z) returns (int, int, int) {
+    int a = sqrFp(x);
+    int b = sqrFp(y);
+    int c = sqrFp(b);
+    int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
+    int e = mulFp(3, a);
+    int f = sqrFp(e);
+    int nx = subFp(f, mulFp(2, d));
+    int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
+    int nz = mulFp(2, mulFp(y, z));
+    return nx, ny, nz;
+}`;
 
-const jacAddFn = () => `    internal function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
-        int rx = bX;
-        int ry = bY;
-        int rz = bZ;
-        if (aZ != 0) {
-            int z1z1 = sqrFp(aZ);
-            int z2z2 = sqrFp(bZ);
-            int u1 = mulFp(aX, z2z2);
-            int u2 = mulFp(bX, z1z1);
-            int s1 = mulFp(mulFp(aY, bZ), z2z2);
-            int s2 = mulFp(mulFp(bY, aZ), z1z1);
-            if (u1 == u2 && s1 == s2) {
-                int da = sqrFp(aX);
-                int db = sqrFp(aY);
-                int dc = sqrFp(db);
-                int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
-                int de = mulFp(3, da);
-                int df = sqrFp(de);
-                int dnx = subFp(df, mulFp(2, dd));
-                int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
-                int dnz = mulFp(2, mulFp(aY, aZ));
-                rx = dnx; ry = dny; rz = dnz;
-            } else {
-                int h = subFp(u2, u1);
-                int i2 = sqrFp(mulFp(2, h));
-                int jj = mulFp(h, i2);
-                int rr = mulFp(2, subFp(s2, s1));
-                int vv = mulFp(u1, i2);
-                int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
-                int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
-                int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
-                rx = anx; ry = any; rz = anz;
-            }
+const jacAddFn = () => `function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
+    int rx = bX;
+    int ry = bY;
+    int rz = bZ;
+    if (aZ != 0) {
+        int z1z1 = sqrFp(aZ);
+        int z2z2 = sqrFp(bZ);
+        int u1 = mulFp(aX, z2z2);
+        int u2 = mulFp(bX, z1z1);
+        int s1 = mulFp(mulFp(aY, bZ), z2z2);
+        int s2 = mulFp(mulFp(bY, aZ), z1z1);
+        if (u1 == u2 && s1 == s2) {
+            int da = sqrFp(aX);
+            int db = sqrFp(aY);
+            int dc = sqrFp(db);
+            int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
+            int de = mulFp(3, da);
+            int df = sqrFp(de);
+            int dnx = subFp(df, mulFp(2, dd));
+            int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
+            int dnz = mulFp(2, mulFp(aY, aZ));
+            rx = dnx; ry = dny; rz = dnz;
+        } else {
+            int h = subFp(u2, u1);
+            int i2 = sqrFp(mulFp(2, h));
+            int jj = mulFp(h, i2);
+            int rr = mulFp(2, subFp(s2, s1));
+            int vv = mulFp(u1, i2);
+            int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
+            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
+            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
+            rx = anx; ry = any; rz = anz;
         }
-        return rx, ry, rz;
-    }`;
+    }
+    return rx, ry, rz;
+}`;
 
 // 2-bit Shamir select over the hardcoded VK constants {IC1, IC2, T=IC1+IC2}.
-const selectPointFn = () => `    internal function selectPoint(int b0, int b1) returns (int, int, int) {
-        int aX = 0;
-        int aY = 0;
-        int doAdd = 0;
-        if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; doAdd = 1; }
-        else { if (b0 == 1) { aX = ${ic1[0]}; aY = ${ic1[1]}; doAdd = 1; }
-               else { if (b1 == 1) { aX = ${ic2[0]}; aY = ${ic2[1]}; doAdd = 1; } } }
-        return aX, aY, doAdd;
-    }`;
-
-const toLibFn = (s) => s.replaceAll('internal function', 'function');
+const selectPointFn = () => `function selectPoint(int b0, int b1) returns (int, int, int) {
+    int aX = 0;
+    int aY = 0;
+    int doAdd = 0;
+    if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; doAdd = 1; }
+    else { if (b0 == 1) { aX = ${ic1[0]}; aY = ${ic1[1]}; doAdd = 1; }
+           else { if (b1 == 1) { aX = ${ic2[0]}; aY = ${ic2[1]}; doAdd = 1; } } }
+    return aX, aY, doAdd;
+}`;
 
 function emitLibs() {
   const libdir = join(here, 'lib');
   mkdirSync(libdir, { recursive: true });
 
   const fp = [
-    'pragma cashscript ^0.13.0;',
+    'pragma cashscript ^0.14.0;',
     '',
     '// BN254 base field Fp. Shared by every shamir vk_x chunk (these ops used to',
-    '// be replicated as `internal function`s inside each chunk). `P` is a global',
-    '// constant, inlined at each use site -> single source of truth for the prime.',
-    'library Fp {',
-    `    int constant P = ${P};`,
+    '// be replicated inside each chunk). The prime is written as a literal at each',
+    '// use site (the compiler folds it; the language has no top-level constants).',
     '',
     fpLibFuncs(),
-    '}',
     '',
   ].join('\n');
   const g1lib = [
-    'pragma cashscript ^0.13.0;',
+    'pragma cashscript ^0.14.0;',
     '',
     '// BN254 G1 Jacobian group law (double / add) over Fp, used by the Shamir',
-    '// double-and-add loop. Builds on the base field library.',
+    '// double-and-add loop. Builds on the base field functions.',
     'import "./Fp.cash";',
     '',
-    'library G1 {',
-    toLibFn(jacDoubleFn()),
-    toLibFn(jacAddFn()),
-    '}',
+    jacDoubleFn(),
+    jacAddFn(),
     '',
   ].join('\n');
   const vk = [
-    'pragma cashscript ^0.13.0;',
+    'pragma cashscript ^0.14.0;',
     '',
     '// VK-specific layer: the 2-bit Shamir point select over the verifying-key',
     '// constants {IC1, IC2, T=IC1+IC2}. GENERATED from the VK vectors. A chunk that',
     '// imports this transitively pulls in the whole tower (Vk -> G1 -> Fp).',
     'import "./G1.cash";',
     '',
-    'library Vk {',
-    toLibFn(selectPointFn()),
-    '}',
+    selectPointFn(),
     '',
   ].join('\n');
   writeFileSync(join(libdir, 'Fp.cash'), fp);
@@ -252,16 +243,14 @@ function loopLines(lo, hi) {
             int i = ${hiBit} - k;
             // double R (guarded rZ != 0, matching the reference)
             if (rZ != 0) {
-                (int dx, int dy, int dz) = jacDouble(rX, rY, rZ);
-                rX = dx; rY = dy; rZ = dz;
+                (rX, rY, rZ) = jacDouble(rX, rY, rZ);
             }
             // runtime 2-bit Shamir select over VK consts {IC1,IC2,T}, then add
             int b0 = (input0 >> i) % 2;
             int b1 = (input1 >> i) % 2;
             (int aX, int aY, int doAdd) = selectPoint(b0, b1);
             if (doAdd == 1) {
-                (int ax, int ay, int az) = jacAdd(rX, rY, rZ, aX, aY, 1);
-                rX = ax; rY = ay; rZ = az;
+                (rX, rY, rZ) = jacAdd(rX, rY, rZ, aX, aY, 1);
             }
         }`;
 }
@@ -269,7 +258,7 @@ function loopLines(lo, hi) {
 function genCash(idx, ch) {
   const name = `VkxChunk${String(idx).padStart(2, '0')}`;
   const lines = [];
-  lines.push('pragma cashscript ^0.13.0;');
+  lines.push('pragma cashscript ^0.14.0;');
   lines.push(`// vk_x chunk ${idx}: Shamir window [${ch.lo},${ch.hi}) (MSB-first bit`
     + ` positions ${253 - ch.lo}..${253 - (ch.hi - 1)}), final=${ch.final ? 'True' : 'False'}.`);
   lines.push('// Public inputs taken at RUNTIME: carried state = (rX,rY,rZ,input0,input1);');
@@ -286,8 +275,7 @@ function genCash(idx, ch) {
   lines.push(loopLines(ch.lo, ch.hi));
   if (ch.final) {
     lines.push('        // fold IC0 (constant term) -- unconditional add of hardcoded VK const');
-    lines.push(`        (int icx, int icy, int icz) = jacAdd(rX, rY, rZ, ${ic0[0]}, ${ic0[1]}, 1);`);
-    lines.push('        rX = icx; rY = icy; rZ = icz;');
+    lines.push(`        (rX, rY, rZ) = jacAdd(rX, rY, rZ, ${ic0[0]}, ${ic0[1]}, 1);`);
     lines.push('        // verified inverse-on-stack: zInv supplied, require rZ*zInv == 1');
     lines.push('        require(mulFp(rZ, zInv) == 1);');
     lines.push('        int zInv2 = sqrFp(zInv);');

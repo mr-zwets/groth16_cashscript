@@ -92,7 +92,7 @@ function buildChunkSrc(s, e) {
   const name = new Map(); liveIn.forEach((id) => name.set(id, vnames(id)));
   let uid = 0; const fresh = () => Array.from({ length: 12 }, () => `t${uid++}`);
   const L = [];
-  L.push('pragma cashscript ^0.13.0;');
+  L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
   L.push(`// final-exp chunk ops [${s},${e})  final=${isLast}`);
   L.push('contract FinalExpChunk() {');
@@ -122,7 +122,7 @@ function buildChunkSrc(s, e) {
 
 // ---------- probe ----------
 if (process.argv[2] === 'probe') {
-  const fnOnly = `pragma cashscript ^0.13.0;\nimport "${LIB_IMPORT}";\ncontract P(){\n    function spend(int x){ require(x==x); }\n}\n`;
+  const fnOnly = `pragma cashscript ^0.14.0;\nimport "${LIB_IMPORT}";\ncontract P(){\n    function spend(int x){ require(x==x); }\n}\n`;
   writeFileSync(PROBE, fnOnly);
   console.error('function-set size:', compileFileBytecode(PROBE).length);
   for (const e of [1, 2, 3, 5]) { const c = buildChunkSrc(0, e); const m = measureCovenantFile(c.src, c.inLimbs, c.outLimbs, PROBE); console.error(`ops[0,${e}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`); }

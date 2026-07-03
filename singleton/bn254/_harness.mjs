@@ -1,5 +1,5 @@
 // Shared dev harness for the singleton pairing layers. Compiles a .cash with the
-// local cashc `feat/reusable-functions` build, then evaluates spend() on the
+// local cashc `feat/multi-returns` build, then evaluates spend() on the
 // LOOSENED BCH 2026 VM (all resource ceilings lifted) so we measure correctness
 // and op-cost without the consensus wall. Contracts here have NO constructor
 // args, so locking = redeem template; unlocking = spend args pushed in REVERSE
@@ -34,7 +34,7 @@ const looseVm = createVirtualMachine(createInstructionSetBch2026(false, {
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 
 export const compileTemplate = (file) =>
-  hexToBin(execFileSync('node', [CASHC, file, '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+  hexToBin(execFileSync('node', [CASHC, file, '-h', '--optimize-for', 'size'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
 
 // args: bigint[] in DECLARATION order. Pushed reversed so first param ends on top.
 export const evalArgs = (template, args) => {

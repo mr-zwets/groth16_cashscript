@@ -43,7 +43,7 @@ const unlockingFor = (args) => Uint8Array.from(args.slice().reverse().flatMap((a
 const validArgs = grothPairs(vkx).flatMap(pairRow);
 const invalidArgs = grothPairs(computeVkx([PUBLIC_INPUTS[0] + 1n, PUBLIC_INPUTS[1]])).flatMap(pairRow);
 
-const template = hexToBin(execFileSync('node', [CASHC, join(here, 'verify.cash'), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+const template = hexToBin(execFileSync('node', [CASHC, join(here, 'verify.cash'), '-h', '--optimize-for', 'size'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
 const unlocking = unlockingFor(validArgs);
 const invalidUnlocking = unlockingFor(invalidArgs);
 

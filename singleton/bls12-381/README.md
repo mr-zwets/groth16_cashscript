@@ -54,7 +54,7 @@ a public input changes `vk_x` and the verdict ≠ 1). `verify.cash`, `vkx.cash`,
 `groth16.cash` are thin consumers that `import` the shared field/pairing tower from
 [`lib/`](lib/README.md) rather than re-declaring it, so they reuse the already-graded
 function bodies. (Earlier these capstones were brace-assembled by an `assemble.mjs`
-script; the library system replaced it.)
+script; the shared import system replaced it.)
 
 ## Run
 

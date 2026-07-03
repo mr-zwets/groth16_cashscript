@@ -1,4 +1,4 @@
-pragma cashscript ^0.13.0;
+pragma cashscript ^0.14.0;
 
 // BLS12-381 singleton harness `fp2` — arithmetic from the shared lib/ libraries (see lib/README.md).
 import "./lib/Fp2.cash";

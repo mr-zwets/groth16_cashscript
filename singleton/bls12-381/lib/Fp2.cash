@@ -1,61 +1,59 @@
-pragma cashscript ^0.13.0;
+pragma cashscript ^0.14.0;
 
-// BLS12-381 Fp2 library (reduced arithmetic). See lib/README.md.
+// BLS12-381 Fp2 shared functions (reduced arithmetic). See lib/README.md.
 import "./Fp.cash";
 
-library Fp2 {
-    function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) {
-            return addFp(a0, b0), addFp(a1, b1);
-        }
+function fp2Add(int a0, int a1, int b0, int b1) returns (int, int) {
+        return addFp(a0, b0), addFp(a1, b1);
+    }
 
-    function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) {
-            return subFp(a0, b0), subFp(a1, b1);
-        }
+function fp2Sub(int a0, int a1, int b0, int b1) returns (int, int) {
+        return subFp(a0, b0), subFp(a1, b1);
+    }
 
-    function fp2Neg(int a0, int a1) returns (int, int) {
-            return negFp(a0), negFp(a1);
-        }
+function fp2Neg(int a0, int a1) returns (int, int) {
+        return negFp(a0), negFp(a1);
+    }
 
-    function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
-            int v0 = mulFp(a0, b0);
-            int v1 = mulFp(a1, b1);
-            int c0 = subFp(v0, v1);
-            int c1 = subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
-            return c0, c1;
-        }
+function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
+        int v0 = mulFp(a0, b0);
+        int v1 = mulFp(a1, b1);
+        int c0 = subFp(v0, v1);
+        int c1 = subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1));
+        return c0, c1;
+    }
 
-    function fp2Sqr(int a0, int a1) returns (int, int) {
-            int c0 = mulFp(addFp(a0, a1), subFp(a0, a1));
-            int c1 = mulFp(2, mulFp(a0, a1));
-            return c0, c1;
-        }
+function fp2Sqr(int a0, int a1) returns (int, int) {
+        int c0 = mulFp(addFp(a0, a1), subFp(a0, a1));
+        int c1 = mulFp(2, mulFp(a0, a1));
+        return c0, c1;
+    }
 
-    function fp2MulXi(int a0, int a1) returns (int, int) {
-            int c0 = subFp(a0, a1);
-            int c1 = addFp(a0, a1);
-            return c0, c1;
-        }
+function fp2MulXi(int a0, int a1) returns (int, int) {
+        int c0 = subFp(a0, a1);
+        int c1 = addFp(a0, a1);
+        return c0, c1;
+    }
 
-    function fp2Conj(int a0, int a1) returns (int, int) {
-            return a0, negFp(a1);
-        }
+function fp2Conj(int a0, int a1) returns (int, int) {
+        return a0, negFp(a1);
+    }
 
-    function fp2Inv(int a0, int a1) returns (int, int) {
-            int norm = addFp(sqrFp(a0), sqrFp(a1));
-            int factor = inverseFp(norm);
-            return mulFp(a0, factor), negFp(mulFp(a1, factor));
-        }
+function fp2Inv(int a0, int a1) returns (int, int) {
+        int norm = addFp(sqrFp(a0), sqrFp(a1));
+        int factor = inverseFp(norm);
+        return mulFp(a0, factor), negFp(mulFp(a1, factor));
+    }
 
-    function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
+function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
 
-    function fp2MulByB(int a0, int a1) returns (int, int) {
-            int f0 = mulFp(a0, 4);
-            int f1 = mulFp(a1, 4);
-            return subFp(f0, f1), addFp(f0, f1);
-        }
+function fp2MulByB(int a0, int a1) returns (int, int) {
+        int f0 = mulFp(a0, 4);
+        int f1 = mulFp(a1, 4);
+        return subFp(f0, f1), addFp(f0, f1);
+    }
 
-    function fp2Half(int a0, int a1) returns (int, int) {
-            return mulFp(a0, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894),
-                   mulFp(a1, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894);
-        }
-}
+function fp2Half(int a0, int a1) returns (int, int) {
+        return mulFp(a0, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894),
+               mulFp(a1, 2001204777610833696708894912867952078278441409969503942666029068062015825245418932221343814564507832018947136279894);
+    }

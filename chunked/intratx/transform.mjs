@@ -21,27 +21,12 @@
 /** minimal push header size (bytes) for a data push of `len` bytes. */
 export const headerSize = (len) => (len <= 75 ? 1 : len <= 255 ? 2 : 3);
 
-// Some committed generated chunks predate the `internal function` migration and use
-// plain `function helper() returns (...)`, which the current cashc fork rejects as a
-// reusable. Normalize defensively: prefix `internal ` to any function with a `returns`
-// clause (spend() has none, so it is left as the top-level spending function). Same
-// rule as chunked/add_internal.mjs; idempotent.
-const fnRe = /(\binternal\s+)?\bfunction\s+\w+\s*\(/g;
+// The current cashc fork (feat/multi-returns, rebased on upstream next) has no
+// `internal` keyword — reusable functions are plain top-level `function`s. Chunks
+// regenerated under it never contain `internal`, but normalize defensively so a
+// stale generated chunk from the old fork still transforms; idempotent.
 function normalizeInternal(src) {
-  let out = '', cursor = 0, m;
-  fnRe.lastIndex = 0;
-  while ((m = fnRe.exec(src)) !== null) {
-    const alreadyInternal = !!m[1];
-    let depth = 1, j = fnRe.lastIndex;
-    while (j < src.length && depth > 0) { const c = src[j]; if (c === '(') depth++; else if (c === ')') depth--; j++; }
-    let k = j; while (k < src.length && /\s/.test(src[k])) k++;
-    const hasReturns = src.startsWith('returns', k);
-    out += src.slice(cursor, m.index);
-    if (hasReturns && !alreadyInternal) out += 'internal ';
-    out += src.slice(m.index, fnRe.lastIndex);
-    cursor = fnRe.lastIndex;
-  }
-  return out + src.slice(cursor);
+  return src.replace(/\binternal function\b/g, 'function');
 }
 
 const reEsc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

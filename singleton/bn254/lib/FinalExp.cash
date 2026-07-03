@@ -1,129 +1,127 @@
-pragma cashscript ^0.13.0;
+pragma cashscript ^0.14.0;
 
 // BN254 final exponentiation f^((p^12-1)/r) (reduced-arithmetic scheme). Easy part:
 // r0 = conj(f)*inv(f); r = frob2(r0)*r0. Hard part: fixed sequence of cyclotomic squarings,
 // powMinusX = conj(cyclotomicExp(.,X)) (X = BN seed, 63 bits), conjugations and Frobenius maps.
-// Builds on the Fp12 library (mul/conj/frob2/frob3).
+// Builds on Fp12.cash (mul/conj/frob2/frob3).
 import "./Fp12.cash";
 
-library FinalExp {
-    // cyclotomic squaring helper (noble _cyclotomicSquare via Fp4Square)
-    function fp4Square(int a0,int a1,int b0,int b1) returns (int,int,int,int) {
-        (int a2a,int a2b) = fp2Sqr(a0, a1);
-        (int b2a,int b2b) = fp2Sqr(b0, b1);
-        (int xbi0,int xbi1) = fp2MulXi(b2a, b2b);
-        (int f0,int f1) = fp2Add(xbi0, xbi1, a2a, a2b);
-        (int aba,int abb) = fp2Add(a0, a1, b0, b1);
-        (int absqa,int absqb) = fp2Sqr(aba, abb);
-        (int sub1a,int sub1b) = fp2Sub(absqa, absqb, a2a, a2b);
-        (int s0,int s1) = fp2Sub(sub1a, sub1b, b2a, b2b);
-        return f0, f1, s0, s1;
-    }
-    function cycSqr(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
-        returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int t3a,int t3b,int t4a,int t4b) = fp4Square(A0,A1, A8,A9);
-        (int t5a,int t5b,int t6a,int t6b) = fp4Square(A6,A7, A4,A5);
-        (int t7a,int t7b,int t8a,int t8b) = fp4Square(A2,A3, A10,A11);
-        (int t9a,int t9b) = fp2MulXi(t8a, t8b);
-        (int z0a,int z0b) = fp2Sub(t3a, t3b, A0, A1);   (int o0a,int o0b) = fp2Add(mulFp(z0a,2), mulFp(z0b,2), t3a, t3b);
-        (int z1a,int z1b) = fp2Sub(t5a, t5b, A2, A3);   (int o1a,int o1b) = fp2Add(mulFp(z1a,2), mulFp(z1b,2), t5a, t5b);
-        (int z2a,int z2b) = fp2Sub(t7a, t7b, A4, A5);   (int o2a,int o2b) = fp2Add(mulFp(z2a,2), mulFp(z2b,2), t7a, t7b);
-        (int z3a,int z3b) = fp2Add(t9a, t9b, A6, A7);   (int o3a,int o3b) = fp2Add(mulFp(z3a,2), mulFp(z3b,2), t9a, t9b);
-        (int z4a,int z4b) = fp2Add(t4a, t4b, A8, A9);   (int o4a,int o4b) = fp2Add(mulFp(z4a,2), mulFp(z4b,2), t4a, t4b);
-        (int z5a,int z5b) = fp2Add(t6a, t6b, A10, A11); (int o5a,int o5b) = fp2Add(mulFp(z5a,2), mulFp(z5b,2), t6a, t6b);
-        return o0a,o0b,o1a,o1b,o2a,o2b,o3a,o3b,o4a,o4b,o5a,o5b;
-    }
-    // cyclotomicExp(num, BN_X) — square-and-multiply over the 63 bits of X (MSB-first)
-    function cycExpX(int N0,int N1,int N2,int N3,int N4,int N5,int N6,int N7,int N8,int N9,int N10,int N11)
-        returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        int Z0=1; int Z1=0; int Z2=0; int Z3=0; int Z4=0; int Z5=0; int Z6=0; int Z7=0; int Z8=0; int Z9=0; int Z10=0; int Z11=0;
-        for (int k = 0; k < 63; k = k + 1) {
-            int i = 62 - k;
-            // tuple-destructure into the existing loop-carried Z accumulator (fork feature) — avoids
-            // the fresh-temp + per-element rebind that doubled the in-place rotate depth each iteration.
+// cyclotomic squaring helper (noble _cyclotomicSquare via Fp4Square)
+function fp4Square(int a0,int a1,int b0,int b1) returns (int,int,int,int) {
+    (int a2a,int a2b) = fp2Sqr(a0, a1);
+    (int b2a,int b2b) = fp2Sqr(b0, b1);
+    (int xbi0,int xbi1) = fp2MulXi(b2a, b2b);
+    (int f0,int f1) = fp2Add(xbi0, xbi1, a2a, a2b);
+    (int aba,int abb) = fp2Add(a0, a1, b0, b1);
+    (int absqa,int absqb) = fp2Sqr(aba, abb);
+    (int sub1a,int sub1b) = fp2Sub(absqa, absqb, a2a, a2b);
+    (int s0,int s1) = fp2Sub(sub1a, sub1b, b2a, b2b);
+    return f0, f1, s0, s1;
+}
+function cycSqr(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11)
+    returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int t3a,int t3b,int t4a,int t4b) = fp4Square(A0,A1, A8,A9);
+    (int t5a,int t5b,int t6a,int t6b) = fp4Square(A6,A7, A4,A5);
+    (int t7a,int t7b,int t8a,int t8b) = fp4Square(A2,A3, A10,A11);
+    (int t9a,int t9b) = fp2MulXi(t8a, t8b);
+    (int z0a,int z0b) = fp2Sub(t3a, t3b, A0, A1);   (int o0a,int o0b) = fp2Add(mulFp(z0a,2), mulFp(z0b,2), t3a, t3b);
+    (int z1a,int z1b) = fp2Sub(t5a, t5b, A2, A3);   (int o1a,int o1b) = fp2Add(mulFp(z1a,2), mulFp(z1b,2), t5a, t5b);
+    (int z2a,int z2b) = fp2Sub(t7a, t7b, A4, A5);   (int o2a,int o2b) = fp2Add(mulFp(z2a,2), mulFp(z2b,2), t7a, t7b);
+    (int z3a,int z3b) = fp2Add(t9a, t9b, A6, A7);   (int o3a,int o3b) = fp2Add(mulFp(z3a,2), mulFp(z3b,2), t9a, t9b);
+    (int z4a,int z4b) = fp2Add(t4a, t4b, A8, A9);   (int o4a,int o4b) = fp2Add(mulFp(z4a,2), mulFp(z4b,2), t4a, t4b);
+    (int z5a,int z5b) = fp2Add(t6a, t6b, A10, A11); (int o5a,int o5b) = fp2Add(mulFp(z5a,2), mulFp(z5b,2), t6a, t6b);
+    return o0a,o0b,o1a,o1b,o2a,o2b,o3a,o3b,o4a,o4b,o5a,o5b;
+}
+// cyclotomicExp(num, BN_X) — square-and-multiply over the 63 bits of X (MSB-first)
+function cycExpX(int N0,int N1,int N2,int N3,int N4,int N5,int N6,int N7,int N8,int N9,int N10,int N11)
+    returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    int Z0=1; int Z1=0; int Z2=0; int Z3=0; int Z4=0; int Z5=0; int Z6=0; int Z7=0; int Z8=0; int Z9=0; int Z10=0; int Z11=0;
+    for (int k = 0; k < 63; k = k + 1) {
+        int i = 62 - k;
+        // tuple-destructure into the existing loop-carried Z accumulator (fork feature) — avoids
+        // the fresh-temp + per-element rebind that doubled the in-place rotate depth each iteration.
+        (Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11) =
+            cycSqr(Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11);
+        if (((4965661367192848881 >> i) % 2) == 1) {
             (Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11) =
-                cycSqr(Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11);
-            if (((4965661367192848881 >> i) % 2) == 1) {
-                (Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11) =
-                    fp12Mul(Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11, N0,N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11);
-            }
+                fp12Mul(Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11, N0,N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11);
         }
-        return Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11;
     }
-    // powMinusX = conj(cycExpX(num))   (X is the positive BN seed; conj for the negation)
-    function powMinusX(int N0,int N1,int N2,int N3,int N4,int N5,int N6,int N7,int N8,int N9,int N10,int N11)
-        returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int p0,int p1,int p2,int p3,int p4,int p5,int p6,int p7,int p8,int p9,int p10,int p11) =
-            cycExpX(N0,N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11);
-        (int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11) =
-            fp12Conj(p0,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11);
-        return c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11;
-    }
+    return Z0,Z1,Z2,Z3,Z4,Z5,Z6,Z7,Z8,Z9,Z10,Z11;
+}
+// powMinusX = conj(cycExpX(num))   (X is the positive BN seed; conj for the negation)
+function powMinusX(int N0,int N1,int N2,int N3,int N4,int N5,int N6,int N7,int N8,int N9,int N10,int N11)
+    returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    (int p0,int p1,int p2,int p3,int p4,int p5,int p6,int p7,int p8,int p9,int p10,int p11) =
+        cycExpX(N0,N1,N2,N3,N4,N5,N6,N7,N8,N9,N10,N11);
+    (int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11) =
+        fp12Conj(p0,p1,p2,p3,p4,p5,p6,p7,p8,p9,p10,p11);
+    return c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11;
+}
 
-    function finalExp(int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8,int A9,int A10,int A11)
-        returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        // easy part: r0 = conj(f) * inv(f)
-        (int cn0,int cn1,int cn2,int cn3,int cn4,int cn5,int cn6,int cn7,int cn8,int cn9,int cn10,int cn11) =
-            fp12Conj(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
-        (int iv0,int iv1,int iv2,int iv3,int iv4,int iv5,int iv6,int iv7,int iv8,int iv9,int iv10,int iv11) =
-            fp12Inv(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
-        (int r0a,int r0b,int r0c,int r0d,int r0e,int r0f,int r0g,int r0h,int r0i,int r0j,int r0k,int r0l) =
-            fp12Mul(cn0,cn1,cn2,cn3,cn4,cn5,cn6,cn7,cn8,cn9,cn10,cn11, iv0,iv1,iv2,iv3,iv4,iv5,iv6,iv7,iv8,iv9,iv10,iv11);
-        // r = frob2(r0) * r0
-        (int fr0,int fr1,int fr2,int fr3,int fr4,int fr5,int fr6,int fr7,int fr8,int fr9,int fr10,int fr11) =
-            fp12Frob2(r0a,r0b,r0c,r0d,r0e,r0f,r0g,r0h,r0i,r0j,r0k,r0l);
-        (int R0,int R1,int R2,int R3,int R4,int R5,int R6,int R7,int R8,int R9,int R10,int R11) =
-            fp12Mul(fr0,fr1,fr2,fr3,fr4,fr5,fr6,fr7,fr8,fr9,fr10,fr11, r0a,r0b,r0c,r0d,r0e,r0f,r0g,r0h,r0i,r0j,r0k,r0l);
-        // hard part
-        (int pm0,int pm1,int pm2,int pm3,int pm4,int pm5,int pm6,int pm7,int pm8,int pm9,int pm10,int pm11) =
-            powMinusX(R0,R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11);
-        (int y10,int y11_,int y12,int y13,int y14,int y15,int y16,int y17,int y18,int y19,int y1a,int y1b) =
-            cycSqr(pm0,pm1,pm2,pm3,pm4,pm5,pm6,pm7,pm8,pm9,pm10,pm11);
-        (int cy10,int cy11,int cy12,int cy13,int cy14,int cy15,int cy16,int cy17,int cy18,int cy19,int cy1a,int cy1b) =
-            cycSqr(y10,y11_,y12,y13,y14,y15,y16,y17,y18,y19,y1a,y1b);
-        (int y20,int y21,int y22,int y23,int y24,int y25,int y26,int y27,int y28,int y29,int y2a,int y2b) =
-            fp12Mul(cy10,cy11,cy12,cy13,cy14,cy15,cy16,cy17,cy18,cy19,cy1a,cy1b, y10,y11_,y12,y13,y14,y15,y16,y17,y18,y19,y1a,y1b);
-        (int y40,int y41,int y42,int y43,int y44,int y45,int y46,int y47,int y48,int y49,int y4a,int y4b) =
-            powMinusX(y20,y21,y22,y23,y24,y25,y26,y27,y28,y29,y2a,y2b);
-        (int cy40,int cy41,int cy42,int cy43,int cy44,int cy45,int cy46,int cy47,int cy48,int cy49,int cy4a,int cy4b) =
-            cycSqr(y40,y41,y42,y43,y44,y45,y46,y47,y48,y49,y4a,y4b);
-        (int y60,int y61,int y62,int y63,int y64,int y65,int y66,int y67,int y68,int y69,int y6a,int y6b) =
-            powMinusX(cy40,cy41,cy42,cy43,cy44,cy45,cy46,cy47,cy48,cy49,cy4a,cy4b);
-        // y8 = conj(y6)*y4*conj(y2)
-        (int ny60,int ny61,int ny62,int ny63,int ny64,int ny65,int ny66,int ny67,int ny68,int ny69,int ny6a,int ny6b) =
-            fp12Conj(y60,y61,y62,y63,y64,y65,y66,y67,y68,y69,y6a,y6b);
-        (int t8a,int t8b,int t8c,int t8d,int t8e,int t8f,int t8g,int t8h,int t8i,int t8j,int t8k,int t8l) =
-            fp12Mul(ny60,ny61,ny62,ny63,ny64,ny65,ny66,ny67,ny68,ny69,ny6a,ny6b, y40,y41,y42,y43,y44,y45,y46,y47,y48,y49,y4a,y4b);
-        (int ny20,int ny21,int ny22,int ny23,int ny24,int ny25,int ny26,int ny27,int ny28,int ny29,int ny2a,int ny2b) =
-            fp12Conj(y20,y21,y22,y23,y24,y25,y26,y27,y28,y29,y2a,y2b);
-        (int y80,int y81,int y82,int y83,int y84,int y85,int y86,int y87,int y88,int y89,int y8a,int y8b) =
-            fp12Mul(t8a,t8b,t8c,t8d,t8e,t8f,t8g,t8h,t8i,t8j,t8k,t8l, ny20,ny21,ny22,ny23,ny24,ny25,ny26,ny27,ny28,ny29,ny2a,ny2b);
-        // y9 = y8*y1
-        (int y90,int y91,int y92,int y93,int y94,int y95,int y96,int y97,int y98,int y99,int y9a,int y9b) =
-            fp12Mul(y80,y81,y82,y83,y84,y85,y86,y87,y88,y89,y8a,y8b, y10,y11_,y12,y13,y14,y15,y16,y17,y18,y19,y1a,y1b);
-        // left = frob3(conj(r)*y9)
-        (int cr0,int cr1,int cr2,int cr3,int cr4,int cr5,int cr6,int cr7,int cr8,int cr9,int cra,int crb) =
-            fp12Conj(R0,R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11);
-        (int cry90,int cry91,int cry92,int cry93,int cry94,int cry95,int cry96,int cry97,int cry98,int cry99,int cry9a,int cry9b) =
-            fp12Mul(cr0,cr1,cr2,cr3,cr4,cr5,cr6,cr7,cr8,cr9,cra,crb, y90,y91,y92,y93,y94,y95,y96,y97,y98,y99,y9a,y9b);
-        (int L0,int L1,int L2,int L3,int L4,int L5,int L6,int L7,int L8,int L9,int La,int Lb) =
-            fp12Frob3(cry90,cry91,cry92,cry93,cry94,cry95,cry96,cry97,cry98,cry99,cry9a,cry9b);
-        // right = frob2(y8) * ( frob1(y9) * ((y8*y4)*r) )
-        (int f2y80,int f2y81,int f2y82,int f2y83,int f2y84,int f2y85,int f2y86,int f2y87,int f2y88,int f2y89,int f2y8a,int f2y8b) =
-            fp12Frob2(y80,y81,y82,y83,y84,y85,y86,y87,y88,y89,y8a,y8b);
-        (int f1y90,int f1y91,int f1y92,int f1y93,int f1y94,int f1y95,int f1y96,int f1y97,int f1y98,int f1y99,int f1y9a,int f1y9b) =
-            fp12Frob1(y90,y91,y92,y93,y94,y95,y96,y97,y98,y99,y9a,y9b);
-        (int y8y40,int y8y41,int y8y42,int y8y43,int y8y44,int y8y45,int y8y46,int y8y47,int y8y48,int y8y49,int y8y4a,int y8y4b) =
-            fp12Mul(y80,y81,y82,y83,y84,y85,y86,y87,y88,y89,y8a,y8b, y40,y41,y42,y43,y44,y45,y46,y47,y48,y49,y4a,y4b);
-        (int y8y4r0,int y8y4r1,int y8y4r2,int y8y4r3,int y8y4r4,int y8y4r5,int y8y4r6,int y8y4r7,int y8y4r8,int y8y4r9,int y8y4ra,int y8y4rb) =
-            fp12Mul(y8y40,y8y41,y8y42,y8y43,y8y44,y8y45,y8y46,y8y47,y8y48,y8y49,y8y4a,y8y4b, R0,R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11);
-        (int inn0,int inn1,int inn2,int inn3,int inn4,int inn5,int inn6,int inn7,int inn8,int inn9,int inna,int innb) =
-            fp12Mul(f1y90,f1y91,f1y92,f1y93,f1y94,f1y95,f1y96,f1y97,f1y98,f1y99,f1y9a,f1y9b, y8y4r0,y8y4r1,y8y4r2,y8y4r3,y8y4r4,y8y4r5,y8y4r6,y8y4r7,y8y4r8,y8y4r9,y8y4ra,y8y4rb);
-        (int RT0,int RT1,int RT2,int RT3,int RT4,int RT5,int RT6,int RT7,int RT8,int RT9,int RTa,int RTb) =
-            fp12Mul(f2y80,f2y81,f2y82,f2y83,f2y84,f2y85,f2y86,f2y87,f2y88,f2y89,f2y8a,f2y8b, inn0,inn1,inn2,inn3,inn4,inn5,inn6,inn7,inn8,inn9,inna,innb);
-        // result = left * right
-        (int O0,int O1,int O2,int O3,int O4,int O5,int O6,int O7,int O8,int O9,int O10,int O11) =
-            fp12Mul(L0,L1,L2,L3,L4,L5,L6,L7,L8,L9,La,Lb, RT0,RT1,RT2,RT3,RT4,RT5,RT6,RT7,RT8,RT9,RTa,RTb);
-        return O0,O1,O2,O3,O4,O5,O6,O7,O8,O9,O10,O11;
-    }
+function finalExp(int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8,int A9,int A10,int A11)
+    returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    // easy part: r0 = conj(f) * inv(f)
+    (int cn0,int cn1,int cn2,int cn3,int cn4,int cn5,int cn6,int cn7,int cn8,int cn9,int cn10,int cn11) =
+        fp12Conj(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+    (int iv0,int iv1,int iv2,int iv3,int iv4,int iv5,int iv6,int iv7,int iv8,int iv9,int iv10,int iv11) =
+        fp12Inv(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+    (int r0a,int r0b,int r0c,int r0d,int r0e,int r0f,int r0g,int r0h,int r0i,int r0j,int r0k,int r0l) =
+        fp12Mul(cn0,cn1,cn2,cn3,cn4,cn5,cn6,cn7,cn8,cn9,cn10,cn11, iv0,iv1,iv2,iv3,iv4,iv5,iv6,iv7,iv8,iv9,iv10,iv11);
+    // r = frob2(r0) * r0
+    (int fr0,int fr1,int fr2,int fr3,int fr4,int fr5,int fr6,int fr7,int fr8,int fr9,int fr10,int fr11) =
+        fp12Frob2(r0a,r0b,r0c,r0d,r0e,r0f,r0g,r0h,r0i,r0j,r0k,r0l);
+    (int R0,int R1,int R2,int R3,int R4,int R5,int R6,int R7,int R8,int R9,int R10,int R11) =
+        fp12Mul(fr0,fr1,fr2,fr3,fr4,fr5,fr6,fr7,fr8,fr9,fr10,fr11, r0a,r0b,r0c,r0d,r0e,r0f,r0g,r0h,r0i,r0j,r0k,r0l);
+    // hard part
+    (int pm0,int pm1,int pm2,int pm3,int pm4,int pm5,int pm6,int pm7,int pm8,int pm9,int pm10,int pm11) =
+        powMinusX(R0,R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11);
+    (int y10,int y11_,int y12,int y13,int y14,int y15,int y16,int y17,int y18,int y19,int y1a,int y1b) =
+        cycSqr(pm0,pm1,pm2,pm3,pm4,pm5,pm6,pm7,pm8,pm9,pm10,pm11);
+    (int cy10,int cy11,int cy12,int cy13,int cy14,int cy15,int cy16,int cy17,int cy18,int cy19,int cy1a,int cy1b) =
+        cycSqr(y10,y11_,y12,y13,y14,y15,y16,y17,y18,y19,y1a,y1b);
+    (int y20,int y21,int y22,int y23,int y24,int y25,int y26,int y27,int y28,int y29,int y2a,int y2b) =
+        fp12Mul(cy10,cy11,cy12,cy13,cy14,cy15,cy16,cy17,cy18,cy19,cy1a,cy1b, y10,y11_,y12,y13,y14,y15,y16,y17,y18,y19,y1a,y1b);
+    (int y40,int y41,int y42,int y43,int y44,int y45,int y46,int y47,int y48,int y49,int y4a,int y4b) =
+        powMinusX(y20,y21,y22,y23,y24,y25,y26,y27,y28,y29,y2a,y2b);
+    (int cy40,int cy41,int cy42,int cy43,int cy44,int cy45,int cy46,int cy47,int cy48,int cy49,int cy4a,int cy4b) =
+        cycSqr(y40,y41,y42,y43,y44,y45,y46,y47,y48,y49,y4a,y4b);
+    (int y60,int y61,int y62,int y63,int y64,int y65,int y66,int y67,int y68,int y69,int y6a,int y6b) =
+        powMinusX(cy40,cy41,cy42,cy43,cy44,cy45,cy46,cy47,cy48,cy49,cy4a,cy4b);
+    // y8 = conj(y6)*y4*conj(y2)
+    (int ny60,int ny61,int ny62,int ny63,int ny64,int ny65,int ny66,int ny67,int ny68,int ny69,int ny6a,int ny6b) =
+        fp12Conj(y60,y61,y62,y63,y64,y65,y66,y67,y68,y69,y6a,y6b);
+    (int t8a,int t8b,int t8c,int t8d,int t8e,int t8f,int t8g,int t8h,int t8i,int t8j,int t8k,int t8l) =
+        fp12Mul(ny60,ny61,ny62,ny63,ny64,ny65,ny66,ny67,ny68,ny69,ny6a,ny6b, y40,y41,y42,y43,y44,y45,y46,y47,y48,y49,y4a,y4b);
+    (int ny20,int ny21,int ny22,int ny23,int ny24,int ny25,int ny26,int ny27,int ny28,int ny29,int ny2a,int ny2b) =
+        fp12Conj(y20,y21,y22,y23,y24,y25,y26,y27,y28,y29,y2a,y2b);
+    (int y80,int y81,int y82,int y83,int y84,int y85,int y86,int y87,int y88,int y89,int y8a,int y8b) =
+        fp12Mul(t8a,t8b,t8c,t8d,t8e,t8f,t8g,t8h,t8i,t8j,t8k,t8l, ny20,ny21,ny22,ny23,ny24,ny25,ny26,ny27,ny28,ny29,ny2a,ny2b);
+    // y9 = y8*y1
+    (int y90,int y91,int y92,int y93,int y94,int y95,int y96,int y97,int y98,int y99,int y9a,int y9b) =
+        fp12Mul(y80,y81,y82,y83,y84,y85,y86,y87,y88,y89,y8a,y8b, y10,y11_,y12,y13,y14,y15,y16,y17,y18,y19,y1a,y1b);
+    // left = frob3(conj(r)*y9)
+    (int cr0,int cr1,int cr2,int cr3,int cr4,int cr5,int cr6,int cr7,int cr8,int cr9,int cra,int crb) =
+        fp12Conj(R0,R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11);
+    (int cry90,int cry91,int cry92,int cry93,int cry94,int cry95,int cry96,int cry97,int cry98,int cry99,int cry9a,int cry9b) =
+        fp12Mul(cr0,cr1,cr2,cr3,cr4,cr5,cr6,cr7,cr8,cr9,cra,crb, y90,y91,y92,y93,y94,y95,y96,y97,y98,y99,y9a,y9b);
+    (int L0,int L1,int L2,int L3,int L4,int L5,int L6,int L7,int L8,int L9,int La,int Lb) =
+        fp12Frob3(cry90,cry91,cry92,cry93,cry94,cry95,cry96,cry97,cry98,cry99,cry9a,cry9b);
+    // right = frob2(y8) * ( frob1(y9) * ((y8*y4)*r) )
+    (int f2y80,int f2y81,int f2y82,int f2y83,int f2y84,int f2y85,int f2y86,int f2y87,int f2y88,int f2y89,int f2y8a,int f2y8b) =
+        fp12Frob2(y80,y81,y82,y83,y84,y85,y86,y87,y88,y89,y8a,y8b);
+    (int f1y90,int f1y91,int f1y92,int f1y93,int f1y94,int f1y95,int f1y96,int f1y97,int f1y98,int f1y99,int f1y9a,int f1y9b) =
+        fp12Frob1(y90,y91,y92,y93,y94,y95,y96,y97,y98,y99,y9a,y9b);
+    (int y8y40,int y8y41,int y8y42,int y8y43,int y8y44,int y8y45,int y8y46,int y8y47,int y8y48,int y8y49,int y8y4a,int y8y4b) =
+        fp12Mul(y80,y81,y82,y83,y84,y85,y86,y87,y88,y89,y8a,y8b, y40,y41,y42,y43,y44,y45,y46,y47,y48,y49,y4a,y4b);
+    (int y8y4r0,int y8y4r1,int y8y4r2,int y8y4r3,int y8y4r4,int y8y4r5,int y8y4r6,int y8y4r7,int y8y4r8,int y8y4r9,int y8y4ra,int y8y4rb) =
+        fp12Mul(y8y40,y8y41,y8y42,y8y43,y8y44,y8y45,y8y46,y8y47,y8y48,y8y49,y8y4a,y8y4b, R0,R1,R2,R3,R4,R5,R6,R7,R8,R9,R10,R11);
+    (int inn0,int inn1,int inn2,int inn3,int inn4,int inn5,int inn6,int inn7,int inn8,int inn9,int inna,int innb) =
+        fp12Mul(f1y90,f1y91,f1y92,f1y93,f1y94,f1y95,f1y96,f1y97,f1y98,f1y99,f1y9a,f1y9b, y8y4r0,y8y4r1,y8y4r2,y8y4r3,y8y4r4,y8y4r5,y8y4r6,y8y4r7,y8y4r8,y8y4r9,y8y4ra,y8y4rb);
+    (int RT0,int RT1,int RT2,int RT3,int RT4,int RT5,int RT6,int RT7,int RT8,int RT9,int RTa,int RTb) =
+        fp12Mul(f2y80,f2y81,f2y82,f2y83,f2y84,f2y85,f2y86,f2y87,f2y88,f2y89,f2y8a,f2y8b, inn0,inn1,inn2,inn3,inn4,inn5,inn6,inn7,inn8,inn9,inna,innb);
+    // result = left * right
+    (int O0,int O1,int O2,int O3,int O4,int O5,int O6,int O7,int O8,int O9,int O10,int O11) =
+        fp12Mul(L0,L1,L2,L3,L4,L5,L6,L7,L8,L9,La,Lb, RT0,RT1,RT2,RT3,RT4,RT5,RT6,RT7,RT8,RT9,RTa,RTb);
+    return O0,O1,O2,O3,O4,O5,O6,O7,O8,O9,O10,O11;
 }

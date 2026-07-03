@@ -1,8 +1,11 @@
 # BN254 singleton libraries
 
-Shared CashScript libraries for the BN254 Groth16 verifier, consumed by the contracts in the parent
-directory (`../*.cash`). These rely on the custom cashc fork's `library` / `import` / global-`constant`
-support (branch `feat/library-support`).
+Shared CashScript function files for the BN254 Groth16 verifier, consumed by the contracts in the
+parent directory (`../*.cash`). These rely on the custom cashc fork's top-level (global) functions +
+`import` support (branch `feat/multi-returns`): a library file is just a bag of plain top-level
+`function`s (no `library` wrapper, no `internal` keyword, no `contract`), and `import "./X.cash";`
+brings its functions into scope unqualified. There are no top-level constants in the language; the
+field prime is written as a literal at each use site and folded by the compiler.
 
 ## Why a `contract` per layer
 
@@ -20,8 +23,8 @@ Keeping one gradable contract per layer buys:
 - **Per-layer size / op-cost** — each compiles on its own, so a layer's cost is measurable in isolation.
 
 The libraries are what make this cheap: every harness *and* the full verifier share one implementation
-from `lib/`, so a layer is written (or fixed) once and all of them pick it up. Files in `lib/` use the
-`library` keyword (no `spend()`, never deployed); the parent-directory files use `contract`.
+from `lib/`, so a layer is written (or fixed) once and all of them pick it up. Files in `lib/` contain
+only top-level functions (no `contract`, never deployed); the parent-directory files use `contract`.
 
 ## The two arithmetic schemes
 
@@ -40,7 +43,7 @@ a contract imports exactly one tower, so the names never collide.
 ## Reduced tower — dependency graph
 
 ```
-Fp.cash            base field Fp; defines `int constant P` (the field prime)
+Fp.cash            base field Fp (the prime appears as a literal at each use site)
  └─ Fp2.cash       Fp2 = Fp[u]/(u^2+1)        imports Fp
      └─ Fp6.cash   Fp6 = Fp2[v]/(v^3-xi)      imports Fp2   (+ fp6Mul01 for mul034)
          └─ Fp12.cash   Fp12 = Fp6[w]/(w^2-v) imports Fp6   (+ mul034, frobenius, inverse)
@@ -50,8 +53,10 @@ G1.cash            G1 (Fp) Jacobian group law + scalar mult (vk_x)   imports Fp
 ```
 
 `import` is transitive and the diamond (e.g. `Fp` reached via several paths) is de-duplicated by the
-compiler. **Tree-shaking** then drops every library function a given contract never calls, so importing
-a big tower costs only the bytecode actually used.
+compiler. **Dead-code elimination** then drops every imported function a given contract never calls,
+so importing a big tower costs only the bytecode actually used; the compiler also **inlines** any
+function where splicing the body at its call sites is cheaper by exact byte accounting than
+OP_DEFINE/OP_INVOKE (single-use functions always inline).
 
 ## What each consumer imports
 
@@ -73,7 +78,7 @@ a big tower costs only the bytecode actually used.
 A consumer is just: `pragma`, the `import`s it needs, and a `contract` with only its `spend()`:
 
 ```cash
-pragma cashscript ^0.13.0;
+pragma cashscript ^0.14.0;
 import "./lib/Fp12.cash";
 contract Foo() { function spend(...) { ... fp12Mul(...) ... } }
 ```
