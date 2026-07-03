@@ -35,7 +35,7 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url));
 const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
-const manifest = JSON.parse(readFileSync(join(here, 'manifest.json'), 'utf8'));
+const manifest = JSON.parse(readFileSync(join(here, 'generated', 'manifest.json'), 'utf8'));
 
 const TARGET_UNLOCK = 10_000;      // pad each unlocking up to this many bytes
 const OP_PUSHDATA2 = 0x4d;         // 0x4d = PUSHDATA2 (2-byte LE length)
@@ -109,7 +109,7 @@ const argListFor = (ch) => {
 };
 
 for (const ch of manifest.chunks) {
-  const lockHex = execFileSync('node', [CASHC, join(here, ch.file), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
+  const lockHex = execFileSync('node', [CASHC, join(here, 'generated', ch.file), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
   const rawLock = hexToBin(lockHex);
   // No OP_DROP: the pad is the chunk's trailing `bytes unused zeroPadding` param now.
   const locking = Uint8Array.from([...rawLock]);

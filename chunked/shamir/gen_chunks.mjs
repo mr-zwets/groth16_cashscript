@@ -28,7 +28,8 @@
 // @noble/curves bn254 (was py_ecc) and the op-cost oracle compiles (cashc, in-process)
 // and evaluates (libauth BCH 2026 VM) candidate chunks WITHOUT spawning a subprocess.
 //
-// Emits:
+// Emits into generated/ (gitignored, like twoloop — the committed derived artifact is the
+// verifier repo's vkx-chunked-shamir-vectors.json):
 //   - lib/{Fp,G1,Vk}.cash : the shared field/curve/VK library tower (written before planning).
 //   - chunkNN.cash        : one self-verifying CashScript contract per chunk.
 //   - manifest.json       : ordered chunk metadata (windows, incoming/outgoing hash256
@@ -49,6 +50,8 @@ import { fileURLToPath } from 'node:url';
 
 const { asmToBytecode } = utils;
 const here = dirname(fileURLToPath(import.meta.url));
+const GEN = join(here, 'generated');
+mkdirSync(GEN, { recursive: true });
 
 const p = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const P = p.toString(); // emitted as `int constant P` in lib/Fp.cash
@@ -185,7 +188,7 @@ const selectPointFn = () => `function selectPoint(int b0, int b1) returns (int, 
 }`;
 
 function emitLibs() {
-  const libdir = join(here, 'lib');
+  const libdir = join(GEN, 'lib');
   mkdirSync(libdir, { recursive: true });
 
   const fp = [
@@ -339,7 +342,7 @@ const padPush = (argLen) => {
 
 function measure(lo, hi, isFinal, incoming, outgoing, incomingState, zInv) {
   const src = genCash(0, { lo, hi, final: isFinal, incoming, outgoing });
-  const tmp = join(here, '._probe.cash');
+  const tmp = join(GEN, '._probe.cash');
   writeFileSync(tmp, src);
   const locking = asmToBytecode(compileFile(tmp).bytecode); // no OP_DROP: trailing unused pad param
   const coords = [...incomingState];
@@ -440,16 +443,16 @@ function buildAll() {
     + `OP_COST_TARGET=${OP_COST_TARGET.toLocaleString()}, BYTE_BUDGET=${BYTE_BUDGET}, continuity OK`);
 
   // ---- emit .cash contracts ----
-  chunks.forEach((ch, idx) => writeFileSync(join(here, `chunk${String(idx).padStart(2, '0')}.cash`), genCash(idx, ch)));
+  chunks.forEach((ch, idx) => writeFileSync(join(GEN, `chunk${String(idx).padStart(2, '0')}.cash`), genCash(idx, ch)));
 
   // remove orphan chunk files from a previous (different) chunk count
-  for (const fn of readdirSync(here)) {
+  for (const fn of readdirSync(GEN)) {
     const m = /^chunk(\d+)\.cash$/.exec(fn);
-    if (m && Number(m[1]) >= chunks.length) { rmSync(join(here, fn)); console.error(`removed orphan ${fn}`); }
+    if (m && Number(m[1]) >= chunks.length) { rmSync(join(GEN, fn)); console.error(`removed orphan ${fn}`); }
   }
 
   // clean up planner scratch
-  rmSync(join(here, '._probe.cash'), { force: true });
+  rmSync(join(GEN, '._probe.cash'), { force: true });
 
   const manifest = {
     K: BYTE_BUDGET,
@@ -474,8 +477,8 @@ function buildAll() {
       plannedOperationCost: ch.operationCost,
     })),
   };
-  writeFileSync(join(here, 'manifest.json'), JSON.stringify(manifest, null, 2));
-  console.error(`wrote ${chunks.length} chunk .cash files + manifest.json`);
+  writeFileSync(join(GEN, 'manifest.json'), JSON.stringify(manifest, null, 2));
+  console.error(`wrote ${chunks.length} chunk .cash files + manifest.json to generated/`);
 }
 
 buildAll();
