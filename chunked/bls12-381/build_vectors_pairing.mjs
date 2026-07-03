@@ -196,17 +196,20 @@ function buildG2check(inst, bad) {
 // Build the FULL groth16 verifier FRESH, in spend order: g2check (EIP-197 input validation) ->
 // vk_x -> batched Miller -> final exp. (Previously this reused the COMMITTED baseline to keep the
 // miller's lazy-arithmetic optimization; now the miller imports the lazy LIBRARY Bls12381Lazy.cash,
-// so a fresh rebuild preserves it — no stale baseline to read.)
+// so a fresh rebuild preserves it — no stale baseline to read.) The miller+finalexp slice doubles
+// as the pairing-only milestone (pairing-bls12381-chunked-vectors.json).
 const OUT = 'C:/Users/mathi/Desktop/verifier/src/bch';
 const buildGroth16 = (inst) => {
   const g2 = buildG2check(inst);
   const vkx = buildVkx(inst);
   const { steps: pair, boundaryVal } = buildPairing(inst);
   const fe = buildFinalexp(inst, boundaryVal);
-  return [...g2, ...vkx, ...pair, ...fe];
+  return { all: [...g2, ...vkx, ...pair, ...fe], pairing: [...pair, ...fe] };
 };
-const steps = buildGroth16(INSTANCES[0]);
-const extraValidProofs = [buildGroth16(INSTANCES[1])];
+const run0 = buildGroth16(INSTANCES[0]);
+const run1 = buildGroth16(INSTANCES[1]);
+const steps = run0.all;
+const extraValidProofs = [run1.all];
 const sumOp = (a) => a.reduce((x, s) => x + s.operationCost, 0);
 const maxOpOf = (a) => Math.max(...a.map((s) => s.operationCost));
 console.error(`full groth16: ${steps.length} steps (g2check + vk_x + miller + finalexp)`);
@@ -231,6 +234,15 @@ for (let i = 1n; i < 800n && !offSub; i++) {
 const offSubRun = offSub ? buildG2check(INSTANCES[0], { Bx: offSub.x, By: offSub.y }) : null;
 console.error(`adversarial: off-curve A (${offCurveARun.length} steps), off-subgroup B (${offSubRun ? offSubRun.length + ' steps' : 'NONE'})`);
 const invalidInputs = [offCurveARun, ...(offSubRun ? [offSubRun] : [])];
+
+writeFileSync(`${OUT}/pairing-bls12381-chunked-vectors.json`, JSON.stringify({
+  description: 'PROOF-AGNOSTIC chunked BLS12-381 Groth16 pairing: a BATCHED 4-pair optimal-ate Miller loop (one shared fp12Sqr per step) -> Miller boundary (the conjugated f; no separate combine), then final exponentiation -> verdict (== Fp12 ONE), multi-tx. Generic covenant: Miller f + 4 R / live final-exp values + proof-derived points ride in the token NFT commitment (48-byte limbs), NO baked proof. Lazy field reduction (addFp deferred). One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct instance under the same VK. The 381-iter Fermat inverse in the easy part is supplied as an unlocking witness and verified by fp12Mul(f, f^-1)==ONE (it would alone exceed one input op-cost budget).',
+  proofBinding: 'runtime', curve: 'BLS12-381', numSteps: run0.pairing.length, budgetPerInput: OP_BUDGET,
+  totalOperationCost: sumOp(run0.pairing), maxStepOperationCost: maxOpOf(run0.pairing),
+  allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
+  steps: run0.pairing, extraValidProofs: [run1.pairing],
+}, null, 2));
+console.error(`wrote src/bch/pairing-bls12381-chunked-vectors.json (${run0.pairing.length} steps)`);
 
 writeFileSync(`${OUT}/groth16-bls12381-chunked-vectors.json`, JSON.stringify({
   description: 'PROOF-AGNOSTIC full chunked BLS12-381 Groth16 verifier with EIP-197 input validation: a G2 prologue (on-curve A/B/C + the prime-order-subgroup test psi(B) == [-x]B) -> vk_x (on-chain from public inputs) -> a BATCHED 4-pair Miller loop -> final exponentiation -> assert verdict == Fp12 ONE, multi-tx. Generic covenant: all state + proof-derived points in the token NFT commitment (48-byte limbs), NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct instance under the same VK. invalidInputs (off-curve A, off-subgroup B) must each REJECT.',
