@@ -2,8 +2,8 @@ pragma cashscript ^0.14.0;
 
 // BLS12-381 Fp shared functions (reduced arithmetic). See lib/README.md.
 // P is a top-level constant (folded to a literal at each use site). Bodies are written
-// in the op-cheapest form; size-scored builds pass the compiler's `hoistRepeatedConstants`
-// option to bind repeated literals to locals (~-46 B per duplicate of the 49-byte prime).
+// in the op-cheapest form; size-scored builds compile with the compiler's `optimizeFor: 'size'`
+// objective to bind repeated literals to locals (~-46 B per duplicate of the 49-byte prime).
 
 int constant P = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
 

@@ -6,7 +6,7 @@ pragma cashscript ^0.14.0;
 // into the importing file's scope unqualified (addFp, mulFp, ...).
 //
 // Bodies are written in the op-cheapest form (each use pushes the folded literal);
-// size-scored builds pass the compiler's `hoistRepeatedConstants` option, which binds
+// size-scored builds compile with the compiler's `optimizeFor: 'size'` objective, which binds
 // a repeated literal to a local so later uses become stack picks (~-30 B per duplicate,
 // ~+2 ops per call) — the byte/op trade is chosen per build, not in the source.
 

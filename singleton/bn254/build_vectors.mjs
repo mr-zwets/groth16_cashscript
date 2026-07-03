@@ -73,7 +73,7 @@ const pairArgs = (inputs) => {
 };
 
 // --- compile contract, build vectors ---
-const template = hexToBin(execFileSync('node', [CASHC, join(here, 'verify.cash'), '-h', '--hoist-repeated-constants'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+const template = hexToBin(execFileSync('node', [CASHC, join(here, 'verify.cash'), '-h', '--optimize-for', 'size'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
 const unlocking = unlockingFor(pairArgs(vec.publicInputs));
 const invalidUnlocking = unlockingFor(pairArgs(vec.invalid.publicInputs));
 
