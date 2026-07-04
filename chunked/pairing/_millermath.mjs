@@ -13,12 +13,37 @@ export const { Fp, Fp2, Fp6, Fp12 } = bn254.fields;
 // of times, so dropping the spawn + file I/O is a real speedup.
 import { compileString, compileFile, utils } from 'cashc';
 const { asmToBytecode } = utils;
+
+// Opt-in op-cost rescheduling of compiled redeems (env RESCHEDULE=opcost): re-derive
+// the stack schedule from the dataflow DAG so operands are on top when needed, selected
+// by the BCH2026 op-cost meter. Runs here — after compilation, before the builders
+// compute P2SH/link/padding — so every consumer sees the final redeem bytes.
+let _reschedule = null;
+if (process.env.RESCHEDULE === 'opcost') ({ rescheduleRedeemOpcost: _reschedule } = await import('../rescheduler/opcost.mjs'));
+// entry arity of the compiled spend(): every declared param. `unused` params count too —
+// the fork keeps them on the stack at entry and drops them during its stack cleanup, so
+// the compiled main still sees them as slots (transformed chunk sources have no `unused`
+// params left; their builders strip the pad param and prepend their own OP_DROP).
+const spendArity = (src) => {
+  const m = src.match(/function\s+spend\(([^)]*)\)/);
+  if (!m) return 0;
+  return m[1].split(',').map((p) => p.trim()).filter(Boolean).length;
+};
+const maybeReschedule = (bytes, src) => {
+  if (!_reschedule) return bytes;
+  try { return _reschedule(bytes, { mainInArity: spendArity(src) }).bytes; }
+  catch (e) { console.error(`[reschedule] keeping cashc bytecode: ${e.message}`); return bytes; }
+};
 /** compile a .cash source string -> redeem bytecode (Uint8Array); throws on compile error */
-export const compileBytecode = (src) => asmToBytecode(compileString(src).bytecode);
+export const compileBytecode = (src) => maybeReschedule(asmToBytecode(compileString(src).bytecode), src);
 /** compile a .cash FILE -> redeem bytecode. Unlike compileString, compileFile resolves
  * relative `import` statements (it has a base path), so chunks can import the shared
  * singleton library instead of inlining the tower functions. */
-export const compileFileBytecode = (path) => asmToBytecode(compileFile(path).bytecode);
+export const compileFileBytecode = (path) => maybeReschedule(asmToBytecode(compileFile(path).bytecode), readFileSync(path, 'utf8'));
+/** unhooked variants: plain cashc output even when RESCHEDULE is set, so builders can
+ * A/B the two redeems per chunk and keep whichever measures better. */
+export const compileBytecodeRaw = (src) => asmToBytecode(compileString(src).bytecode);
+export const compileFileBytecodeRaw = (path) => asmToBytecode(compileFile(path).bytecode);
 
 export const OP_BUDGET = (41 + 10_000) * 800;
 export const TARGET_UNLOCK = 10_000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
