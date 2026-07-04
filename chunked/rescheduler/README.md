@@ -1,5 +1,15 @@
 # Op-cost stack rescheduler for chunk redeems
 
+**Now a compiler pass**: the scheduler is ported into the cashc fork as the opt-in
+`rescheduleStacks` compiler option (`packages/cashc/src/stack-rescheduling.ts`, fork
+commit 230b2c7 on `compiler-optimizations`), and the `RESCHEDULE=opcost` builder hook in
+`_millermath.mjs` routes to it. `opcost.mjs` here is the original standalone
+implementation, kept as the reference the port was byte-for-byte validated against
+(millerres/g2check/finalexpres redeems compile identically both ways). The in-compiler
+version additionally fixes an opcode-table bug the standalone had (`0xa3` is OP_MIN, not
+OP_WITHIN), which unlocks rescheduling of the GLV vk_x mains (`min()` users) that the
+standalone silently fell back on — worth another ~1.2K bytes / ~2.5M op on the flagship.
+
 An op-cost-objective rescheduling pass over compiled chunk bytecode, built on the
 byte-objective singleton recompiler (`singleton/bn254/recompiler/`). It re-derives each
 routine's evaluation schedule from its dataflow DAG so operands are on top of the stack
@@ -58,15 +68,17 @@ All families: `allAccept=true`, `allFit=true`, tampered runs rejected, on the co
 proof, proof#1, and the worst-case proof. The byte-objective singleton recompile is
 unaffected (locking still 8,385 B, accept/reject intact).
 
-Benchmark scores (verifier `npm run benchmark:json`):
+Benchmark scores (verifier `npm run benchmark:json`, final vectors built through the
+in-compiler pass; grouped-residue committed run totalOp 195,408,679 → 184,122,002,
+−5.8%):
 
 | entry | before | after | Δ |
 |---|---:|---:|---:|
-| bch-groth16-grouped-residue | 257,810 | 246,136 | −4.5% |
-| bch-groth16-intratx-residue | 257,696 | 246,026 | −4.5% |
-| bch-groth16-grouped | 405,813 | 385,750 | −4.9% |
-| bch-groth16-intratx | 405,542 | 385,472 | −4.9% |
-| bch-groth16-chunked | 407,968 | 388,702 | −4.7% |
+| bch-groth16-grouped-residue | 257,810 | 244,918 | −5.0% |
+| bch-groth16-intratx-residue | 257,696 | 244,808 | −5.0% |
+| bch-groth16-grouped | 405,813 | 385,547 | −5.0% |
+| bch-groth16-intratx | 405,542 | 385,270 | −5.0% |
+| bch-groth16-chunked | 407,968 | 388,498 | −4.8% |
 | bch-pairing-chunked | 228,811 | 221,181 | −3.3% |
 | bch-pairing-intratx | 226,652 | 219,045 | −3.4% |
 | bch-vkx-chunked-covenant | 17,695 | 13,967 | −21.1% |

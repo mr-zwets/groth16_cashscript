@@ -34,7 +34,7 @@ const VALOP = new Map([
   [0x84, [2, 1]], [0x85, [2, 1]], [0x86, [2, 1]],       // AND OR XOR
   [0x87, [2, 1]],                                       // EQUAL
   [0x8c, [1, 1]], [0x8f, [1, 1]], [0x90, [1, 1]], [0x92, [1, 1]], // 1SUB NEGATE ABS 0NOTEQUAL
-  [0xa3, [3, 1]],                                       // WITHIN
+  [0xa3, [2, 1]], [0xa4, [2, 1]], [0xa5, [3, 1]],       // MIN MAX WITHIN
   [0xa6, [1, 1]], [0xa7, [1, 1]], [0xa8, [1, 1]], [0xa9, [1, 1]], [0xaa, [1, 1]], // RIPEMD160 SHA1 SHA256 HASH160 HASH256
   [0xbc, [1, 1]],                                       // REVERSEBYTES
   // introspection (pure within one evaluated tx context)

@@ -14,32 +14,18 @@ export const { Fp, Fp2, Fp6, Fp12 } = bn254.fields;
 import { compileString, compileFile, utils } from 'cashc';
 const { asmToBytecode } = utils;
 
-// Opt-in op-cost rescheduling of compiled redeems (env RESCHEDULE=opcost): re-derive
-// the stack schedule from the dataflow DAG so operands are on top when needed, selected
-// by the BCH2026 op-cost meter. Runs here — after compilation, before the builders
-// compute P2SH/link/padding — so every consumer sees the final redeem bytes.
-let _reschedule = null;
-if (process.env.RESCHEDULE === 'opcost') ({ rescheduleRedeemOpcost: _reschedule } = await import('../rescheduler/opcost.mjs'));
-// entry arity of the compiled spend(): every declared param. `unused` params count too —
-// the fork keeps them on the stack at entry and drops them during its stack cleanup, so
-// the compiled main still sees them as slots (transformed chunk sources have no `unused`
-// params left; their builders strip the pad param and prepend their own OP_DROP).
-const spendArity = (src) => {
-  const m = src.match(/function\s+spend\(([^)]*)\)/);
-  if (!m) return 0;
-  return m[1].split(',').map((p) => p.trim()).filter(Boolean).length;
-};
-const maybeReschedule = (bytes, src) => {
-  if (!_reschedule) return bytes;
-  try { return _reschedule(bytes, { mainInArity: spendArity(src) }).bytes; }
-  catch (e) { console.error(`[reschedule] keeping cashc bytecode: ${e.message}`); return bytes; }
-};
+// Opt-in op-cost rescheduling of compiled redeems (env RESCHEDULE=opcost): the compiler's
+// own DAG stack-rescheduling pass (cashc fork option `rescheduleStacks` — the in-compiler
+// port of chunked/rescheduler/opcost.mjs; outputs are byte-identical). Re-derives each
+// straight-line block's schedule so operands are on top of the stack when needed,
+// selected by the BCH2026 op-cost meter. Default off, so every consumer stays A/B-able.
+const RESCHED_OPTS = process.env.RESCHEDULE === 'opcost' ? { rescheduleStacks: true } : {};
 /** compile a .cash source string -> redeem bytecode (Uint8Array); throws on compile error */
-export const compileBytecode = (src) => maybeReschedule(asmToBytecode(compileString(src).bytecode), src);
+export const compileBytecode = (src) => asmToBytecode(compileString(src, RESCHED_OPTS).bytecode);
 /** compile a .cash FILE -> redeem bytecode. Unlike compileString, compileFile resolves
  * relative `import` statements (it has a base path), so chunks can import the shared
  * singleton library instead of inlining the tower functions. */
-export const compileFileBytecode = (path) => maybeReschedule(asmToBytecode(compileFile(path).bytecode), readFileSync(path, 'utf8'));
+export const compileFileBytecode = (path) => asmToBytecode(compileFile(path, RESCHED_OPTS).bytecode);
 /** unhooked variants: plain cashc output even when RESCHEDULE is set, so builders can
  * A/B the two redeems per chunk and keep whichever measures better. */
 export const compileBytecodeRaw = (src) => asmToBytecode(compileString(src).bytecode);
