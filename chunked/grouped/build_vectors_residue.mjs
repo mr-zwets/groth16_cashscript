@@ -258,7 +258,7 @@ function groupedCfg(specs, i, lo, hi, groupIdx, G) {
   return { covInHash, epilogueMode, forward };
 }
 
-const RESCHED = !!process.env.RESCHEDULE;
+const RESCHED = process.env.RESCHEDULE !== 'off';
 const compileCache = new Map(); // cfg key -> {resched, raw?} full redeems (raw only when RESCHEDULE differs)
 const chosenCache = new Map();  // cfg key -> 'resched' | 'raw'; fixed on the FIRST assembly (worst-case
                                 // sizing pass) so every instance shares identical lockings.

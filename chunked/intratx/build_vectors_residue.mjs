@@ -202,7 +202,7 @@ function buildSpecs(inst) {
 //   within  -> forward the FULL output (cmpExpr null, equal in/out len)
 //   cross   -> forward only the bound slice (spec.cmp)
 //   stage-final / terminal -> no forward (null)
-const RESCHED = !!process.env.RESCHEDULE;
+const RESCHED = process.env.RESCHEDULE !== 'off';
 const compileCache = new Map(); // key -> {resched, raw?} full redeems (raw only when RESCHEDULE differs)
 const chosenCache = new Map();  // key -> 'resched' | 'raw'; fixed on the FIRST assembly so every
                                 // instance shares identical lockings.

@@ -14,20 +14,21 @@ export const { Fp, Fp2, Fp6, Fp12 } = bn254.fields;
 import { compileString, compileFile, utils } from 'cashc';
 const { asmToBytecode } = utils;
 
-// Opt-in op-cost rescheduling of compiled redeems (env RESCHEDULE=opcost): the compiler's
-// own DAG stack-rescheduling pass (cashc fork option `rescheduleStacks` — the in-compiler
-// port of chunked/rescheduler/opcost.mjs; outputs are byte-identical). Re-derives each
-// straight-line block's schedule so operands are on top of the stack when needed,
-// selected by the BCH2026 op-cost meter. Default off, so every consumer stays A/B-able.
-const RESCHED_OPTS = process.env.RESCHEDULE === 'opcost' ? { rescheduleStacks: true } : {};
+// Compiled redeems go through the compiler's DAG stack-rescheduling pass (cashc fork
+// option `rescheduleStacks`): each straight-line block's schedule is re-derived so
+// operands are on top of the stack when needed, and each function's argument order is
+// chosen jointly with its schedule, selected by the BCH2026 op-cost meter. Default ON —
+// the committed vectors are built this way; set RESCHEDULE=off to A/B the plain compile.
+const RESCHED_OPTS = process.env.RESCHEDULE === 'off' ? {} : { rescheduleStacks: true };
 /** compile a .cash source string -> redeem bytecode (Uint8Array); throws on compile error */
 export const compileBytecode = (src) => asmToBytecode(compileString(src, RESCHED_OPTS).bytecode);
 /** compile a .cash FILE -> redeem bytecode. Unlike compileString, compileFile resolves
  * relative `import` statements (it has a base path), so chunks can import the shared
  * singleton library instead of inlining the tower functions. */
 export const compileFileBytecode = (path) => asmToBytecode(compileFile(path, RESCHED_OPTS).bytecode);
-/** unhooked variants: plain cashc output even when RESCHEDULE is set, so builders can
- * A/B the two redeems per chunk and keep whichever measures better. */
+/** plain-cashc variants (no rescheduling): the vector builders A/B the two redeems per
+ * chunk and keep whichever measures better, and the chunk PLANNERS measure candidate
+ * windows with these so the generated chunk manifests stay independent of the pass. */
 export const compileBytecodeRaw = (src) => asmToBytecode(compileString(src).bytecode);
 export const compileFileBytecodeRaw = (path) => asmToBytecode(compileFile(path).bytecode);
 
@@ -293,7 +294,7 @@ const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint
 // that still pass a probe path — ignored.)
 export function measureChunk(src, stateInts) {
   let raw;
-  try { raw = compileBytecode(src); }
+  try { raw = compileBytecodeRaw(src); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
   const locking = Uint8Array.from([...raw]); // no OP_DROP: trailing `bytes unused zeroPadding` param
   const argBytes = Uint8Array.from([...stateInts].reverse().flatMap((c) => [...pushInt(c)]));
@@ -332,7 +333,7 @@ export const covOut = (outNames) =>
  * resolves. `stateInts`/`outLimbs` are decl-order limbs (outLimbs already reduced). */
 export function measureCovenant(src, stateInts, outLimbs) {
   let raw;
-  try { raw = compileBytecode(src); }
+  try { raw = compileBytecodeRaw(src); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
   return measureCovenantRaw(raw, stateInts, outLimbs);
 }
@@ -341,7 +342,7 @@ export function measureCovenant(src, stateInts, outLimbs) {
  * import the shared singleton library instead of inlining the tower functions. */
 export function measureCovenantFile(src, stateInts, outLimbs, probePath) {
   let raw;
-  try { writeFileSync(probePath, src); raw = compileFileBytecode(probePath); }
+  try { writeFileSync(probePath, src); raw = compileFileBytecodeRaw(probePath); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
   return measureCovenantRaw(raw, stateInts, outLimbs);
 }

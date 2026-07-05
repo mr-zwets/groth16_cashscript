@@ -22,7 +22,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createVirtualMachineBch2026, encodeDataPush, bigIntToVmNumber, numberToBinUint16LE } from '@bitauth/libauth';
-import { measureCovenantFile, compileFileBytecode, planChunk, covIn, covOut, decl, proof, commitBin, CATEGORY, TARGET_UNLOCK, OP_PUSHDATA2 } from './_millermath.mjs';
+import { measureCovenantFile, compileFileBytecodeRaw, planChunk, covIn, covOut, decl, proof, commitBin, CATEGORY, TARGET_UNLOCK, OP_PUSHDATA2 } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -173,7 +173,7 @@ const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); };
 function measureFinalEndo(src, stateLimbs14, witness, probePath) {
   let raw;
-  try { writeFileSync(probePath, src); raw = compileFileBytecode(probePath); }
+  try { writeFileSync(probePath, src); raw = compileFileBytecodeRaw(probePath); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
   const locking = Uint8Array.from([...raw]);
   const pushInts = [...stateLimbs14, ...witness]; // decl order: 14 state, then zinvA, zinvB
