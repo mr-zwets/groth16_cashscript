@@ -110,23 +110,31 @@ export function millerBatchStates(pairs) {
 // most one Rj. ops[i] = {t:'sqr'} | {t:'dl',j} | {t:'al',j,neg}. states[i] = {f,Rs}
 // BEFORE op i; states[ops.length] = the final state (f pre-conjugate). The line
 // function is internal here so the op replay matches the contract bit-for-bit.
-export function millerBatchOps(pairs) {
+export function millerBatchOps(pairs, opts = {}) {
+  // opts.skipPairs (Set of pair indices): omit those pairs' line-folds entirely. Used by the
+  // residue build to drop the fully-constant pair e(alpha,beta) from the loop (its single-pair
+  // Miller value is baked and multiplied in once instead). Default = skip none, so every other
+  // consumer is unaffected. f then = product over the NON-skipped pairs (pre-conjugate).
+  const skip = opts.skipPairs ?? new Set();
   const pds = pairData(pairs);
   const ops = [];
   for (let k = 0; k < ATE_NAF.length; k++) {
     ops.push({ t: 'sqr' });
-    for (let j = 0; j < 4; j++) { ops.push({ t: 'dl', j }); if (ATE_NAF[k]) ops.push({ t: 'al', j, neg: ATE_NAF[k] === -1 }); }
+    for (let j = 0; j < 4; j++) { if (skip.has(j)) continue; ops.push({ t: 'dl', j }); if (ATE_NAF[k]) ops.push({ t: 'al', j, neg: ATE_NAF[k] === -1 }); }
   }
   const states = [];
   let f = Fp12.ONE; const Rs = pds.map((pd) => ({ x: pd.Qx, y: pd.Qy, z: Fp2.ONE }));
+  // Each non-sqr op also records its line coeffs (`op.coeffs`, a triple of Fp2). For a pair
+  // with a FIXED VK G2 point the whole R trajectory is proof-independent, so a generator can
+  // BAKE these coeffs and only evaluate the line at the runtime G1 point (no on-chain G2 work).
   for (const op of ops) {
     states.push({ f, Rs: Rs.slice() });
     if (op.t === 'sqr') f = Fp12.sqr(f);
-    else if (op.t === 'dl') { const d = pointDouble(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z); Rs[op.j] = d.R; f = lineFn(f, d.coeffs[0], d.coeffs[1], d.coeffs[2], pds[op.j].Px, pds[op.j].Py); }
-    else { const pd = pds[op.j]; const a = pointAdd(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z, pd.Qx, op.neg ? pd.negQy : pd.Qy); Rs[op.j] = a.R; f = lineFn(f, a.coeffs[0], a.coeffs[1], a.coeffs[2], pd.Px, pd.Py); }
+    else if (op.t === 'dl') { const d = pointDouble(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z); Rs[op.j] = d.R; op.coeffs = d.coeffs; f = lineFn(f, d.coeffs[0], d.coeffs[1], d.coeffs[2], pds[op.j].Px, pds[op.j].Py); }
+    else { const pd = pds[op.j]; const a = pointAdd(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z, pd.Qx, op.neg ? pd.negQy : pd.Qy); Rs[op.j] = a.R; op.coeffs = a.coeffs; f = lineFn(f, a.coeffs[0], a.coeffs[1], a.coeffs[2], pd.Px, pd.Py); }
   }
   states.push({ f, Rs: Rs.slice() });
-  return { ops, states, finalF: Fp12.conjugate(f) };
+  return { ops, states, boundary: f, finalF: Fp12.conjugate(f) };
 }
 
 // ---- state serialization (matches the .cash hash256(toPaddedBytes(.,48))) ----
