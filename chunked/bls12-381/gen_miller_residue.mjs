@@ -23,7 +23,7 @@ const GEN = join(here, 'generated');
 mkdirSync(GEN, { recursive: true });
 const LIB_IMPORT = '../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash';
 const PROBE = join(GEN, '_probe_millerres.cash');
-const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
+const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_880_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const decl = (names) => names.map((n) => `int ${n}`).join(', ');
 
@@ -76,6 +76,18 @@ function genChunk(opLo, opHi, isFinal) {
   L.push('contract MillerFusedBlsChunk() {');
   L.push(`    function spend(${decl(allParams)}, bytes unused zeroPadding) {`);
   L.push(covIn(allParams));
+  // FUSED input validation (was the standalone g2check pass): the first Miller chunk checks the
+  // prover's points are on-curve (A=-P0 & C=P3 on G1 y^2=x^3+4; B=Q0 on G2 y^2=x^3+(4+4u)); the
+  // final chunk's psi(B)==[|x|]B subgroup test reuses R_B (=[|x|]B) that this loop already walks.
+  if (opLo === 0) {
+    L.push('        require(mSqr(Py0) == mAdd(mulFp(mSqr(Px0), Px0), 4));'); // A on G1 (-A shares the curve)
+    L.push('        require(mSqr(Py3) == mAdd(mulFp(mSqr(Px3), Px3), 4));'); // C on G1
+    L.push('        (int bx2a, int bx2b) = r2Sqr(Q0xa, Q0xb);');
+    L.push('        (int bx3a, int bx3b) = r2Mul(bx2a, bx2b, Q0xa, Q0xb);');
+    L.push('        (int rhsa, int rhsb) = r2Add(bx3a, bx3b, 4, 4);'); // b' = 4 + 4u
+    L.push('        (int by2a, int by2b) = r2Sqr(Q0ya, Q0yb);');
+    L.push('        require(by2a == rhsa); require(by2b == rhsb);');
+  }
   // precompute -Q.y for any runtime pair whose add-line in this window is negated
   const negY = PINFO.map((pi) => {
     if (!pi.cfg.Q) return [`${pi.negQ.c0}`, `${pi.negQ.c1}`];
@@ -108,6 +120,18 @@ function genChunk(opLo, opHi, isFinal) {
       L.push(`        (${decl([...aco, ...ar])}) = pointAdd(${r0.join(',')}, ${pi.Qxae}, ${pi.Qxbe}, ${Y[0]}, ${Y[1]});`); r0 = ar;
       emitLine(aco, pi);
     }
+  }
+  // final chunk: G2 subgroup test on B, fused from the standalone g2check pass. R_B (=r0) is the
+  // running pair-0 point, which at loop end equals [|x|]B (homogeneous projective; affine =
+  // R/Rz). The membership relation is psi(B) == -[|x|]B (same as g2check), so require
+  // Rx == psi(B).x * Rz  and  Ry == -psi(B).y * Rz. Rejects any B outside the prime-order subgroup.
+  if (isFinal) {
+    L.push(`        (int psxa, int psxb, int psya, int psyb) = psi(Q0xa, Q0xb, Q0ya, Q0yb);`);
+    L.push('        (int npya, int npyb) = fp2Neg(psya, psyb);');
+    L.push(`        (int exa, int exb) = r2Mul(psxa, psxb, ${r0[4]}, ${r0[5]});`);
+    L.push(`        require(${r0[0]} == exa); require(${r0[1]} == exb);`);
+    L.push(`        (int eya, int eyb) = r2Mul(npya, npyb, ${r0[4]}, ${r0[5]});`);
+    L.push(`        require(${r0[2]} == eya); require(${r0[3]} == eyb);`);
   }
   // final chunk hands off only [fF, c, cInv] to the residue tail; others carry full state.
   L.push(isFinal ? covOut([...f, ...cNames, ...ciNames]) : covOut([...f, ...r0, ...ptParams, ...cNames, ...ciNames]));

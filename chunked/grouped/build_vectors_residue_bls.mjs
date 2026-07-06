@@ -23,7 +23,6 @@ import {
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
-import { g2checkAccAt } from '../bls12-381/gen_g2check.mjs';
 import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
 import { glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../bls12-381/gen_vkx_glv.mjs';
 import { residueWalkT } from '../bls12-381/gen_finalexp_residue.mjs';
@@ -98,22 +97,8 @@ const TAIL_HANDOFF_LIMBS = 36; // [fF, c, cInv]
 const stateLimbsR = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 42
 const withPtsR = (limbs, ptL) => [...limbs.slice(0, 18), ...ptL, ...limbs.slice(18)]; // insert ptL after f+R_B
 
-const g2sLimbs = (R, Bx, By, Ax, Ay, Cx, Cy) =>
-  [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1, Bx.c0, Bx.c1, By.c0, By.c1, Ax, Ay, Cx, Cy];
-function specsG2check(inst) {
-  const pf = inst.proof ?? proof;
-  const Ba = pf.b.toAffine(), Aa = pf.a.toAffine(), Ca = pf.c.toAffine();
-  const Bx = Ba.x, By = Ba.y, Ax = Aa.x, Ay = Aa.y, Cx = Ca.x, Cy = Ca.y;
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
-  return man.chunks.map((ch) => ({
-    file: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`),
-    inLimbs: g2sLimbs(g2checkAccAt(Bx, By, ch.lo), Bx, By, Ax, Ay, Cx, Cy),
-    outLimbs: ch.last ? [] : g2sLimbs(g2checkAccAt(Bx, By, ch.hi), Bx, By, Ax, Ay, Cx, Cy),
-    extras: [], role: ch.last ? 'terminal' : 'within',
-    label: `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' psi(B)==[-x]B' : ''}`,
-    checkpoint: ch.first ? 'validate-inputs' : undefined,
-  }));
-}
+// g2check is no longer a standalone stage — the on-curve checks + G2 subgroup test are fused into
+// the first/last fused-Miller chunks (see gen_miller_residue.mjs), reusing R_B = [|x|]B.
 function specsVkxGlv(inst) {
   const [in0, in1] = inst.inputs.map(BigInt);
   const [k10, k20] = glvDecompose(in0), [k11, k21] = glvDecompose(in1);
@@ -147,7 +132,7 @@ function specsMillerResidue(inst, c, cInv) {
         label: `miller ops[${ch.opLo},${ch.opHi}) -> boundary fF`, checkpoint: 'miller-boundary',
       };
     }
-    return { file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs: withPtsR(stateLimbsR(states[ch.opHi]), ptL), extras: [], role: 'within', label: `miller ops[${ch.opLo},${ch.opHi})`, checkpoint: undefined };
+    return { file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs: withPtsR(stateLimbsR(states[ch.opHi]), ptL), extras: [], role: 'within', label: `miller ops[${ch.opLo},${ch.opHi})${ch.idx === 0 ? ' + validate inputs (on-curve A/B/C)' : ''}`, checkpoint: ch.idx === 0 ? 'validate-inputs' : undefined };
   });
   return { specs, boundary };
 }
@@ -173,14 +158,16 @@ function specsResidueTail(fF, c, cInv, w) {
   });
 }
 function buildSpecs(inst) {
-  const g2 = specsG2check(inst);
+  // g2check is no longer a standalone stage: its on-curve checks + G2 subgroup test are fused into
+  // the first/last fused-Miller chunks (the Miller loop already walks R_B = [|x|]B). See
+  // gen_miller_residue.mjs. This drops ~3 chunks / ~28 KB of op-cost-bought padding.
   const vkx = specsVkxGlv(inst);
   const pairs = pairsFor(inst.inputs, inst.proof);
   const { boundary: fRaw } = millerBatchOps(pairs);
   const { c, cInv, w } = residueWitness(fRaw);
   const { specs: miller, boundary: fF } = specsMillerResidue(inst, c, cInv);
   const tail = specsResidueTail(fF, c, cInv, w);
-  return [...g2, ...vkx, ...miller, ...tail];
+  return [...vkx, ...miller, ...tail];
 }
 
 // ---- grouping (identical logic to build_vectors_bls.mjs) -----------------------------

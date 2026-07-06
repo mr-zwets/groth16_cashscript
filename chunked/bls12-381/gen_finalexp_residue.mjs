@@ -26,7 +26,7 @@ const LIB_IMPORT = '../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash';
 const Pstr = P.toString();
 const ABS_X = 15132376222941642752n; // |x| MSB-preloaded walk constant (matches the lazy lib)
 const NWALK = 63;
-const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
+const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_880_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 
 const decl = (names) => names.map((n) => `int ${n}`).join(', ');
