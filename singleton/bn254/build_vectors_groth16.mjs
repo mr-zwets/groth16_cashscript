@@ -7,10 +7,10 @@
 // Runtime: proof (A,B,C) + public inputs (in0,in1). VK hardcoded. The contract
 // computes vk_x = IC0 + in0*IC1 + in1*IC2 on-chain and require()s the pairing
 // product == 1. ~1.26B op-cost, ~21.7 KB -> does NOT fit one BCH input.
-import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { compileFile } from 'cashc';
 
 import {
   hexToBin, binToHex, bigIntToVmNumber, encodeDataPush,
@@ -19,7 +19,6 @@ import {
 } from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 const STANDARD_BUDGET = (41 + 10_000) * 800;
 
 const HUGE = Number.MAX_SAFE_INTEGER;
@@ -55,7 +54,9 @@ const proofArgs = (inputs) => {
   ];
 };
 
-const template = hexToBin(execFileSync('node', [CASHC, join(here, 'groth16.cash'), '-h', '--optimize-for', 'size'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+// size objective (the singleton is size-scored) + the compiler's DAG stack-rescheduling
+// pass — the same optimisation the chunk builds use, here worth ~-39% locking bytes
+const template = hexToBin(compileFile(join(here, 'groth16.cash'), { optimizeFor: 'size', rescheduleStacks: true }).debug.bytecode);
 const unlocking = unlockingFor(proofArgs(vec.publicInputs));
 const invalidUnlocking = unlockingFor(proofArgs(vec.invalid.publicInputs));
 

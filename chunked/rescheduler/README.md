@@ -33,6 +33,7 @@ PICK/ROLL-pair population over built vectors.
 | bch-pairing-chunked | 228,811 | 217,562 | −4.9% |
 | bch-pairing-intratx | 226,652 | 215,429 | −5.0% |
 | bch-vkx-chunked-covenant | 17,695 | 13,950 | −21.2% |
+| bch-groth16-singleton (size-scored) | 14,240 | 8,874 | −37.7% |
 
 Flagship total op-cost 195,408,679 → 181,471,250 (−7.1%); the non-residue grouped
 verifier packs into 5 standard transactions (was 6). All families: `allAccept=true`,
