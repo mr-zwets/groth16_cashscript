@@ -14,7 +14,7 @@
 //
 // At ~1.21B op-cost (and a ~20 KB contract) it does NOT fit one BCH input -- the
 // honest result that motivates the chunked multi-tx pairing (task #8).
-import { execFileSync } from 'node:child_process';
+import { compileFile } from 'cashc';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -28,7 +28,6 @@ import { bn254 } from '@noble/curves/bn254.js';
 const { Fp2 } = bn254.fields;
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 const STANDARD_BUDGET = (41 + 10_000) * 800; // 8,032,800
 
 const HUGE = Number.MAX_SAFE_INTEGER;
@@ -73,7 +72,7 @@ const pairArgs = (inputs) => {
 };
 
 // --- compile contract, build vectors ---
-const template = hexToBin(execFileSync('node', [CASHC, join(here, 'verify.cash'), '-h', '--optimize-for', 'size'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+const template = hexToBin(compileFile(join(here, 'verify.cash'), { optimizeFor: 'size', rescheduleStacks: true }).debug.bytecode);
 const unlocking = unlockingFor(pairArgs(vec.publicInputs));
 const invalidUnlocking = unlockingFor(pairArgs(vec.invalid.publicInputs));
 

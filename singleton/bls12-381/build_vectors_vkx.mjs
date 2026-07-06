@@ -10,7 +10,7 @@
 // builder (../bn254/build_vectors_vkx.mjs): public inputs at RUNTIME, only the expected
 // vk_x affine baked (expectedX/expectedY); the pad is vkx.cash's leading `bytes unused
 // zeroPadding` spend arg (no hand-built OP_DROP).
-import { execFileSync } from 'node:child_process';
+import { compileFile } from 'cashc';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -23,7 +23,6 @@ import {
 } from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 
 const INPUT0 = PUBLIC_INPUTS[0];
 const INPUT1 = PUBLIC_INPUTS[1];
@@ -60,7 +59,7 @@ const padPush = (argLen, target) => {
   return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]);
 };
 
-const template = hexToBin(execFileSync('node', [CASHC, join(here, 'vkx.cash'), '-h', '--optimize-for', 'size'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+const template = hexToBin(compileFile(join(here, 'vkx.cash'), { optimizeFor: 'size', rescheduleStacks: true }).debug.bytecode);
 // No OP_DROP prefix: the pad is vkx.cash's leading `bytes unused zeroPadding` param now.
 const buildLocking = (expX, expY) => Uint8Array.from([...pushInt(expY), ...pushInt(expX), ...template]);
 

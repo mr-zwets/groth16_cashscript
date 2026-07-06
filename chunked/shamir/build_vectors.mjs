@@ -19,7 +19,7 @@
 //   1..16, else a data push) -- libauth's real VM rejects non-minimal pushes.
 //
 // Locking layout:  compiled chunk redeem bytecode (no OP_DROP prefix).
-import { execFileSync } from 'node:child_process';
+import { compileFile } from 'cashc';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -34,7 +34,6 @@ import {
 } from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 const manifest = JSON.parse(readFileSync(join(here, 'generated', 'manifest.json'), 'utf8'));
 
 const TARGET_UNLOCK = 10_000;      // pad each unlocking up to this many bytes
@@ -109,7 +108,7 @@ const argListFor = (ch) => {
 };
 
 for (const ch of manifest.chunks) {
-  const lockHex = execFileSync('node', [CASHC, join(here, 'generated', ch.file), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
+  const lockHex = compileFile(join(here, 'generated', ch.file), { rescheduleStacks: true }).debug.bytecode;
   const rawLock = hexToBin(lockHex);
   // No OP_DROP: the pad is the chunk's trailing `bytes unused zeroPadding` param now.
   const locking = Uint8Array.from([...rawLock]);
