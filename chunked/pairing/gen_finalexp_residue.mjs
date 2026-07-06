@@ -15,7 +15,7 @@ import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createVirtualMachineBch2026, encodeDataPush, bigIntToVmNumber, numberToBinUint16LE } from '@bitauth/libauth';
-import { covIn, decl, commitBin, CATEGORY, TARGET_UNLOCK, OP_PUSHDATA2, compileFileBytecode, pairsFor, vec, millerBatchOps } from './_millermath.mjs';
+import { covIn, decl, commitBin, CATEGORY, TARGET_UNLOCK, OP_PUSHDATA2, compileFileBytecodeRaw, pairsFor, vec, millerBatchOps } from './_millermath.mjs';
 import { residueWitness, millerFusedOps, fp12limbsOf, COSET27 } from './_residuemath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -71,7 +71,7 @@ const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); };
 function measureTail(src, stateLimbs36, wLimbs12) {
   let raw;
-  try { writeFileSync(PROBE, src); raw = compileFileBytecode(PROBE); }
+  try { writeFileSync(PROBE, src); raw = compileFileBytecodeRaw(PROBE); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
   const locking = Uint8Array.from([...raw]);
   const pushInts = [...stateLimbs36, ...wLimbs12];

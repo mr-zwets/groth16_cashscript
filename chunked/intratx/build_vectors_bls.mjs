@@ -18,7 +18,7 @@ import {
   le48, P, OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, vk, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
-import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode } from '../bls12-381/_vkxmath.mjs';
+import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
 import { transformChunk } from './transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -132,21 +132,34 @@ function specsFinalexp(boundaryVal) {
   });
 }
 
-const compileCache = new Map();
-function compileSpec(s) {
+const RESCHED = process.env.RESCHEDULE !== 'off';
+const compileCache = new Map(); // key -> {resched, raw?} full redeems (raw only when RESCHEDULE differs)
+const chosenCache = new Map();  // key -> 'resched' | 'raw'; fixed on the FIRST assembly so every
+                                // instance shares identical lockings.
+const specKey = (s) => {
   let forward = null;
   if (s.role === 'within') { const outLen = s.outLimbs.length * W; forward = { cmpExpr: null, nextFullInLen: outLen, skip: 0, cmpLen: outLen }; }
   else if (s.role === 'cross') forward = s.cmp;
-  const key = `${s.file}|${s.role}|${JSON.stringify(forward)}`;
-  let redeem = compileCache.get(key);
-  if (!redeem) {
+  return { key: `${s.file}|${s.role}|${JSON.stringify(forward)}`, forward };
+};
+function compileSpec(s) {
+  const { key, forward } = specKey(s);
+  let v = compileCache.get(key);
+  if (!v) {
     // compile from a file (probe in generated/) so the chunk's relative library import resolves
     writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward }).src);
-    redeem = compileFileBytecode(PROBE);
-    compileCache.set(key, redeem);
+    const resched = compileFileBytecode(PROBE);
+    const raw = RESCHED ? compileFileBytecodeRaw(PROBE) : resched;
+    v = { resched: Uint8Array.from([OP_DROP, ...resched]) };
+    if (RESCHED && binToHex(raw) !== binToHex(resched)) v.raw = Uint8Array.from([OP_DROP, ...raw]);
+    compileCache.set(key, v);
   }
-  return Uint8Array.from([OP_DROP, ...redeem]);
+  return (chosenCache.get(key) === 'raw' && v.raw) ? v.raw : v.resched;
 }
+// effective unlocking length a chunk needs, UNCAPPED (BLS redeems run close to the 10,000 B
+// script caps, so an over-cap fixed part must lose the comparison rather than saturate at
+// TARGET_UNLOCK); Infinity when the variant does not even accept.
+const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41 + 96) : Infinity);
 function argBytesOf(s) {
   const parts = [pd(blob(s.inLimbs))];
   for (const e of [...s.extras].reverse()) parts.push(pushInt(e));
@@ -161,6 +174,38 @@ function assemble(specs) {
   const mkUnlock = (i, target) => { const pad = padPush(0, Math.max(2, target - (argB[i].length + tailLen(i)))); return P2SH ? Uint8Array.from([...argB[i], ...pad, ...rpush[i]]) : Uint8Array.from([...argB[i], ...pad]); };
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
+
+  // Per-chunk variant selection (first assembly only): keep whichever redeem needs the
+  // smaller effective unlocking. BLS chunks run close to the 10,000 B script caps, so a
+  // byte-fatter rescheduled redeem can overflow where the plain one fits — the uncapped
+  // effLen (Infinity on non-accept) makes the plain variant win those.
+  if (RESCHED) {
+    let switched = 0;
+    for (let i = 0; i < specs.length; i++) {
+      const { key } = specKey(specs[i]);
+      if (chosenCache.has(key)) continue;
+      const v = compileCache.get(key);
+      if (!v.raw) { chosenCache.set(key, 'resched'); continue; }
+      const rawRpush = encodeDataPush(v.raw);
+      const rawFixed = argB[i].length + (P2SH ? rawRpush.length : 0);
+      const rawUnlock = P2SH
+        ? Uint8Array.from([...argB[i], ...padPush(0, Math.max(2, TARGET_UNLOCK - rawFixed)), ...rawRpush])
+        : Uint8Array.from([...argB[i], ...padPush(0, Math.max(2, TARGET_UNLOCK - rawFixed))]);
+      const probe = inputs.slice();
+      probe[i] = { locking: P2SH ? p2shSpk(v.raw) : v.raw, unlocking: rawUnlock };
+      const rawOp = evalInput(probe, i);
+      const tR = effLen(argB[i].length + tailLen(i), op1[i].operationCost, op1[i].accepted);
+      const tB = effLen(rawFixed, rawOp.operationCost, rawOp.accepted);
+      // both variants failing usually means a NEIGHBOUR is oversized (the forward-check
+      // pushes the successor's whole unlocking) — defer this chunk's decision to the
+      // reassembly, where the neighbour's switch has taken effect
+      if (tR === Infinity && tB === Infinity) continue;
+      const useRaw = tB < tR;
+      chosenCache.set(key, useRaw ? 'raw' : 'resched');
+      if (useRaw) switched += 1;
+    }
+    if (switched) return assemble(specs); // reassemble with final choices (cached -> recurses once)
+  }
   inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, tunedLen(argB[i].length + tailLen(i), op1[i].operationCost)) }));
   const op2 = specs.map((_, i) => evalInput(inputs, i));
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
@@ -191,6 +236,7 @@ const pair0 = buildPairing(INSTANCES.committed); report('pairing committed', pai
 const pair1 = buildPairing(INSTANCES.proof1); report('pairing proof#1', pair1);
 const pInv = [invalidRun(pair0, 0), invalidRun(pair0, Math.floor(pair0.inputs.length / 2))];
 console.error(`  pairing invalid rejected: ${pInv.map((r) => r.rejected).join(',')}`);
+if (!pair0.accepted || !pair1.accepted || !pInv.every((r) => r.rejected)) { console.error('!! pairing run failed -- NOT writing vectors'); process.exit(1); }
 writeFileSync(`${OUT}/pairing-bls12381-intratx-vectors.json`, JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED BLS12-381 Groth16 pairing (batched 4-pair Miller -> final exponentiation -> verdict==1) as the INPUTS of ONE transaction. State passed as raw 48-byte-limb blobs via sibling-input introspection (OP_INPUTBYTECODE forward-checks); the easy-part inverse is an uncommitted witness. No NFT commitment, no hashing. Same chunk math as bch-pairing-bls12381-chunked.',
   ...meta(pair0), steps: toStepArr(pair0), extraValidProofs: [toStepArr(pair1)], invalid: pInv.map((r) => r.steps),
@@ -202,6 +248,7 @@ const full0 = buildFull(INSTANCES.committed); report('groth16 committed', full0)
 const full1 = buildFull(INSTANCES.proof1); report('groth16 proof#1', full1);
 const fInv = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2))];
 console.error(`  groth16 invalid rejected: ${fInv.map((r) => r.rejected).join(',')}`);
+if (!full0.accepted || !full1.accepted || !fInv.every((r) => r.rejected)) { console.error('!! groth16 run failed -- NOT writing vectors'); process.exit(1); }
 writeFileSync(`${OUT}/groth16-bls12381-intratx-vectors.json`, JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED full BLS12-381 Groth16 verifier in ONE transaction: vk_x -> batched 4-pair Miller -> final exponentiation -> assert verdict==1, as the inputs of a single tx. State passed as raw 48-byte-limb blobs through sibling-input introspection (OP_INPUTBYTECODE forward-checks), not NFT commitments. vk_x is bound into the Miller genesis input and the Miller boundary into the final-exp genesis input. Same chunk math as bch-groth16-bls12381-chunked.',
   ...meta(full0), steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], invalid: fInv.map((r) => r.steps),

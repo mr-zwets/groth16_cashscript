@@ -81,7 +81,7 @@ export function runSubroutine(d, targetId, inputs, override) {
   const state = looseVm.evaluate(createTestAuthenticationProgramBch({ lockingBytecode: serialize(out), unlockingBytecode: new Uint8Array(), valueSatoshis: 1000n }));
   // The only expected "error" is the benign post-eval clean-stack check; stack is still valid.
   const benign = !state.error || /Non-P2SH|clean stack|exactly one|single/i.test(String(state.error));
-  return { stack: state.stack.map((b) => vmNumberToBigInt(b, { maximumVmNumberByteLength: HUGE })), error: benign ? undefined : state.error };
+  return { stack: state.stack.map((b) => vmNumberToBigInt(b, { maximumVmNumberByteLength: HUGE })), error: benign ? undefined : state.error, operationCost: state.metrics.operationCost };
 }
 
 const rnd = (s) => { let x = BigInt(s + 7); for (let i = 0; i < 6; i++) x = (x * 6364136223846793005n + 1442695040888963407n) % P; return x; };
@@ -136,8 +136,43 @@ export function recompileAll(d, arity, onProgress) {
 // body, with require()/verify ops treated as boundaries. `inArity` = number of spend params
 // the unlocking supplies (10 for the BN254 singleton). Correctness is validated by the caller
 // via a full accept-valid / reject-invalid check, since main is not a value-returning routine.
-export function recompileMain(d, arity, inArity, strategy = 'topo') {
-  return recompileBodyV2(serialize(d.mainOps), arity, inArity, strategy);
+export function recompileMain(d, arity, inArity, strategy = 'topo', objective = 'bytes') {
+  return recompileBodyV2(serialize(d.mainOps), arity, inArity, strategy, objective);
+}
+
+// Recompile every subroutine, selecting per body by MEASURED op-cost on the loose VM
+// (K fixed pseudo-random input vectors, identical across candidates, so the arithmetic
+// term is constant and the measured delta is purely scheduling + body-push bytes).
+// Only measured-cheaper AND diff-test-equivalent variants replace the original.
+// Chosen overrides accumulate so later bodies are measured against their (possibly
+// rescheduled) callees — the comparison stays apples-to-apples per body either way.
+export function recompileAllOpcost(d, arity, onProgress, K = 3) {
+  const override = new Map();
+  const rows = [];
+  const measure = (id, cand) => {
+    const a = arity[id];
+    const m = cand ? new Map([...override, [id, cand]]) : new Map(override);
+    let total = 0;
+    for (let t = 0; t < K; t++) {
+      const inp = Array.from({ length: a.in }, (_, i) => rnd(i * 23 + t * 811 + id));
+      const r = m.size ? runSubroutine(d, id, inp, m) : runSubroutine(d, id, inp);
+      if (r.error) return Infinity;
+      total += Number(r.operationCost);
+    }
+    return total;
+  };
+  for (const id of d.order) {
+    const orig = d.bodies.get(id);
+    let best = null, bestCost = measure(id, null), tag = 'cashc';
+    for (const strat of ['topo', 'greedy', 'opcost']) {
+      let rec; try { rec = recompileBodyV2(orig, arity, arity[id].in, strat, 'opcost'); } catch { continue; }
+      const cost = measure(id, rec);
+      if (cost < bestCost && bodyEquiv(d, id, rec, arity)) { best = rec; bestCost = cost; tag = strat; }
+    }
+    if (best) { override.set(id, best); rows.push({ id, orig: orig.length, rec: best.length, tag }); }
+    if (onProgress) onProgress(id, tag);
+  }
+  return { override, rows };
 }
 
 // Evaluate a full (locking, unlocking) pair on the loosened VM -> { accepted, operationCost }.

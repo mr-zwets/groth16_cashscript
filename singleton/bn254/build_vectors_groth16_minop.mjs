@@ -3,7 +3,7 @@
 // generators. Writes verifier/src/bch/groth16-singleton-minop-vectors.json.
 //   node build_vectors_groth16_minop.mjs            (full: fast-G2 + GLV)
 //   CASH=groth16_minop_lazy   STAGE=lazy   node build_vectors_groth16_minop.mjs   (staged)
-import { execFileSync } from 'node:child_process';
+import { compileFile } from 'cashc';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -19,7 +19,6 @@ const G2 = await import('../../chunked/pairing/gen_g2check.mjs');
 const GLV = await import('../../chunked/pairing/gen_vkx_glv.mjs');
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 const STANDARD_BUDGET = (41 + 10_000) * 800;
 const Pm = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 
@@ -79,7 +78,7 @@ function argsFor(publicInputs, resWit) {
   return base;
 }
 
-const template = hexToBin(execFileSync('node', [CASHC, join(here, `${CASH}.cash`), '-h'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+const template = hexToBin(compileFile(join(here, `${CASH}.cash`), { rescheduleStacks: true }).debug.bytecode);
 const rwValid = residueWit(vec.publicInputs);
 const unlocking = unlockingFor(argsFor(vec.publicInputs, rwValid));
 const invalidUnlocking = unlockingFor(argsFor(vec.invalid.publicInputs, rwValid));

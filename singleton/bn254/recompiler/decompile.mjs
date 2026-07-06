@@ -27,6 +27,21 @@ const VALOP = new Map([
   [0x93, [2, 1]], [0x94, [2, 1]], [0x95, [2, 1]], [0x96, [2, 1]], [0x97, [2, 1]], // ADD SUB MUL DIV MOD
   [0x9a, [2, 1]], [0x9b, [2, 1]], [0x9c, [2, 1]], [0x9e, [2, 1]], [0x9f, [2, 1]], // BOOLAND BOOLOR NUMEQUAL NUMNOTEQUAL LESSTHAN
   [0xa0, [2, 1]], [0xa1, [2, 1]], [0xa2, [2, 1]],       // GT LE GE
+  // byte-string ops (chunk redeems: inBlob peel + outBlob rebuild + hash commits)
+  [0x7e, [2, 1]], [0x7f, [2, 2]],                       // CAT, SPLIT (-> head, tail)
+  [0x80, [2, 1]], [0x81, [1, 1]],                       // NUM2BIN, BIN2NUM
+  [0x82, [1, 2]],                                       // SIZE (-> item, size)
+  [0x84, [2, 1]], [0x85, [2, 1]], [0x86, [2, 1]],       // AND OR XOR
+  [0x87, [2, 1]],                                       // EQUAL
+  [0x8c, [1, 1]], [0x8f, [1, 1]], [0x90, [1, 1]], [0x92, [1, 1]], // 1SUB NEGATE ABS 0NOTEQUAL
+  [0xa3, [2, 1]], [0xa4, [2, 1]], [0xa5, [3, 1]],       // MIN MAX WITHIN
+  [0xa6, [1, 1]], [0xa7, [1, 1]], [0xa8, [1, 1]], [0xa9, [1, 1]], [0xaa, [1, 1]], // RIPEMD160 SHA1 SHA256 HASH160 HASH256
+  [0xbc, [1, 1]],                                       // REVERSEBYTES
+  // introspection (pure within one evaluated tx context)
+  [0xc0, [0, 1]], [0xc1, [0, 1]], [0xc2, [0, 1]], [0xc3, [0, 1]], [0xc4, [0, 1]], [0xc5, [0, 1]], // INPUTINDEX ACTIVEBYTECODE TXVERSION TXINPUTCOUNT TXOUTPUTCOUNT TXLOCKTIME
+  [0xc6, [1, 1]], [0xc7, [1, 1]], [0xc8, [1, 1]], [0xc9, [1, 1]], [0xca, [1, 1]], [0xcb, [1, 1]], // UTXOVALUE UTXOBYTECODE OUTPOINTTXHASH OUTPOINTINDEX INPUTBYTECODE INPUTSEQUENCENUMBER
+  [0xcc, [1, 1]], [0xcd, [1, 1]], [0xce, [1, 1]], [0xcf, [1, 1]], [0xd0, [1, 1]],                 // OUTPUTVALUE OUTPUTBYTECODE UTXOTOKENCATEGORY UTXOTOKENCOMMITMENT UTXOTOKENAMOUNT
+  [0xd1, [1, 1]], [0xd2, [1, 1]], [0xd3, [1, 1]],                                                 // OUTPUTTOKENCATEGORY OUTPUTTOKENCOMMITMENT OUTPUTTOKENAMOUNT
 ]);
 
 // numeric value of a const-push op (for PICK/ROLL/INVOKE id args)
@@ -116,7 +131,7 @@ export function decompile(body, arity, inArity = 0) {
         if (VALOP.has(op)) {
           const [nin, nout] = VALOP.get(op);
           const ins = []; for (let k = 0; k < nin; k++) ins.unshift(main.pop());
-          const node = freshNode({ k: 'prim', code: op, ins });
+          const node = freshNode({ k: 'prim', code: op, ins, nout });
           for (let j = 0; j < nout; j++) main.push({ k: 'out', node, j });
           break;
         }

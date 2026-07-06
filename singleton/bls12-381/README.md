@@ -74,13 +74,47 @@ node singleton/bls12-381/build_vectors.mjs        # -> pairing-bls12381-singleto
 node singleton/bls12-381/build_vectors_groth16.mjs# -> groth16-bls12381-singleton-vectors.json
 ```
 
+## Op-optimized variant (`groth16_minop.cash`, generated)
+
+`gen_singleton_minop.mjs` emits the BLS analog of `../bn254/groth16_minop.cash`
+(`bch-groth16-bls12381-singleton-minop`): lazy tower + ONE batched c^-|x|-fused Miller
+(only `(-A,B)` runs on-chain G2; `e(alpha,beta)` and the `(vk_x,gamma)`/`(C,delta)` line
+coefficients baked) + witnessed-residue final exp + GLV vk_x. ~68.7 KB locking,
+**~318M op-cost (~40 inputs) vs the baseline's ~1.04B (~129) as currently measured
+by the harness** — ~69% less (~78% vs the 1.48B the baseline measured pre-rescheduler).
+
+BLS-specific differences vs the BN254 min-op (see `../../chunked/bls12-381/_residuemath.mjs`):
+
+- residue relation `c^lambda == g*w` with `lambda = p + |x|`; the tail is a single
+  Frobenius: `gF*w == frob(c,1)`, on the **unconjugated** boundary (x<0's final
+  conjugation is absorbed into the witness — conj is an automorphism);
+- the witness scaling group is `mu_27A`, `A = (|x|+1)/3 = gcd(m'', p^12-1)` (real valid
+  boundaries DO carry an A-part in their order, removed by a one-exponentiation
+  projection); the on-chain membership check is `((w^|x|) * w)^9 == 1` (27A = 9(|x|+1),
+  |x| sparse: 6 bits);
+- G2 subgroup check is the witness-free 64-bit walk `psi(B) == [-x]B`;
+- **G1 subgroup checks for A and C** (the BLS12-381 G1 cofactor `3*((|x|+1)/3)^2 != 1`,
+  unlike BN254): `phi(P) == [-x^2]P` via two sparse |x|-walks compared against `-phi(P)`;
+  sound because `z^2+z+1` evaluated at `-x^2` is exactly `r`, which no cofactor prime
+  divides (also verified numerically against constructed eigenvector points in the
+  cofactor torsion).
+
+```
+node singleton/bls12-381/gen_singleton_minop.mjs         # regenerate groth16_minop.cash
+node singleton/bls12-381/build_vectors_groth16_minop.mjs # -> groth16-bls12381-singleton-minop-vectors.json
+node singleton/bls12-381/gen_multiproof_minop.mjs        # -> ...-minop-multiproof-vectors.json
+```
+
 ## In the verifier benchmark
 
-Two entries, both on the **same curve as nChain** (so a true apples-to-apples size
+Entries on the **same curve as nChain** (so a true apples-to-apples size
 comparison, unlike the BN254 entries):
 
 - `bch-groth16-bls12381-singleton` — the COMPLETE verifier; ~24.2 KB, ~1.48B op-cost
   (~185 BCH inputs). **~21× smaller bytecode than the nChain reference.**
+- `bch-groth16-bls12381-singleton-minop` — the op-optimized COMPLETE verifier
+  (`groth16_minop.cash`); ~68.7 KB, **~318M op-cost (~40 inputs)** vs the baseline's
+  ~1.04B (~129) on the current harness.
 - `bch-pairing-bls12381-singleton` — the pairing-only milestone (`verify.cash`);
   ~19.8 KB, ~1.38B op-cost.
 

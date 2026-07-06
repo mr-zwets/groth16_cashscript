@@ -31,6 +31,7 @@ import { dirname, join } from 'node:path';
 import {
   Fp2, bn254, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileBytecode, compileFileBytecode, ptLimbs, PT_CFG,
+  compileBytecodeRaw, compileFileBytecodeRaw,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace, le40, CATEGORY, commitBin,
   OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET,
 } from '../pairing/_millermath.mjs';
@@ -241,20 +242,27 @@ function groupedCfg(specs, i, lo, hi, groupIdx, G) {
   return { covInHash, epilogueMode, forward };
 }
 
-const compileCache = new Map();
+const RESCHED = process.env.RESCHEDULE !== 'off';
+const compileCache = new Map(); // cfg key -> {resched, raw?} full redeems (raw only when RESCHEDULE differs)
+const chosenCache = new Map();  // cfg key -> 'resched' | 'raw'; fixed on the FIRST assembly (worst-case
+                                // sizing pass) so every instance shares identical lockings.
 // chunks that `import` the shared singleton library must be compiled FROM A FILE so the
 // relative import resolves; we write the transformed source to a probe inside generated/.
 const PROBE = join(GEN, '_grouped_probe.cash');
+const cfgKey = (spec, cfg) => `${spec.file}|${cfg.covInHash ? 'ci' : ''}|${cfg.epilogueMode ?? ''}|${JSON.stringify(cfg.forward)}`;
 function compileChunk(spec, cfg) {
-  const key = `${spec.file}|${cfg.covInHash ? 'ci' : ''}|${cfg.epilogueMode ?? ''}|${JSON.stringify(cfg.forward)}`;
-  let redeem = compileCache.get(key);
-  if (!redeem) {
+  const key = cfgKey(spec, cfg);
+  let v = compileCache.get(key);
+  if (!v) {
     const t = transformChunk(readFileSync(spec.file, 'utf8'), { W, prime: PRIME, forward: cfg.forward, covInHash: cfg.covInHash, epilogueMode: cfg.epilogueMode });
-    if (/^import\s/m.test(t.src)) { writeFileSync(PROBE, t.src); redeem = compileFileBytecode(PROBE); }
-    else redeem = compileBytecode(t.src);
-    compileCache.set(key, redeem);
+    let resched, raw;
+    if (/^import\s/m.test(t.src)) { writeFileSync(PROBE, t.src); resched = compileFileBytecode(PROBE); raw = RESCHED ? compileFileBytecodeRaw(PROBE) : resched; }
+    else { resched = compileBytecode(t.src); raw = RESCHED ? compileBytecodeRaw(t.src) : resched; }
+    v = { resched: Uint8Array.from([OP_DROP, ...resched]) };
+    if (RESCHED && binToHex(raw) !== binToHex(resched)) v.raw = Uint8Array.from([OP_DROP, ...raw]);
+    compileCache.set(key, v);
   }
-  return Uint8Array.from([OP_DROP, ...redeem]);
+  return (chosenCache.get(key) === 'raw' && v.raw) ? v.raw : v.resched;
 }
 function argBytesOf(spec) {
   const parts = [pd(blob(spec.inLimbs))];
@@ -307,6 +315,29 @@ function assembleGrouped(specs, groups) {
   const perGroupInputs = groups.map(([lo, hi]) => allInputs.slice(lo, hi + 1));
   const op1 = [];
   groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) op1[lo + k] = evalGroup(perGroupInputs[gi], k, gmeta[gi]); });
+
+  // Per-chunk variant selection (RESCHEDULE only; decided once, on the first assembly):
+  // keep whichever redeem yields the smaller TUNED unlocking — see build_vectors_residue.mjs.
+  if (RESCHED) {
+    let switched = 0;
+    for (let i = 0; i < specs.length; i++) {
+      const key = cfgKey(specs[i], cfgs[i]);
+      if (chosenCache.has(key)) continue;
+      const v = compileCache.get(key);
+      if (!v.raw) { chosenCache.set(key, 'resched'); continue; }
+      const gi = cfgs[i].group, lo = groups[gi][0];
+      const rawRpush = encodeDataPush(v.raw);
+      const rawUnlock = Uint8Array.from([...argB[i], ...padPush(0, Math.max(2, TARGET_UNLOCK - (argB[i].length + rawRpush.length))), ...rawRpush]);
+      const rawInputs = perGroupInputs[gi].slice();
+      rawInputs[i - lo] = { locking: p2shSpk(v.raw), unlocking: rawUnlock };
+      const rawOp = evalGroup(rawInputs, i - lo, gmeta[gi]);
+      const tR = tunedLen(argB[i].length + rpush[i].length, op1[i].operationCost);
+      const tB = rawOp.accepted ? tunedLen(argB[i].length + rawRpush.length, rawOp.operationCost) : Infinity;
+      chosenCache.set(key, tB < tR ? 'raw' : 'resched');
+      if (tB < tR) switched += 1;
+    }
+    if (switched) return assembleGrouped(specs, groups); // reassemble with final choices (cached -> recurses once)
+  }
   // pass 2: shrink each pad to just cover its op-cost
   for (let i = 0; i < specs.length; i++) allInputs[i].unlocking = mkUnlock(i, tunedLen(argB[i].length + rpush[i].length, op1[i].operationCost));
   const perGroupInputs2 = groups.map(([lo, hi]) => allInputs.slice(lo, hi + 1));

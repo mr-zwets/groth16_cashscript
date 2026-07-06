@@ -26,7 +26,7 @@
 //
 // Unlocking:  push(input1) || push(input0) || <pad>  (cashc reverses; pad = zeroPadding, on top)
 // Locking:    push(expectedY) || push(expectedX) || template
-import { execFileSync } from 'node:child_process';
+import { compileFile } from 'cashc';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -39,7 +39,6 @@ import {
 } from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 
 // --- vk_x parameters (consistent with bn254-vkx/vkx_vectors.json) ---
 const INPUT0 = 123456789n;
@@ -86,7 +85,7 @@ const padPush = (argLen, target) => {
 };
 
 // --- compile the redeem template, bind constructor args (reverse order) ---
-const templateHex = execFileSync('node', [CASHC, join(here, 'vkx.cash'), '-h', '--optimize-for', 'size'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
+const templateHex = compileFile(join(here, 'vkx.cash'), { optimizeFor: 'size', rescheduleStacks: true }).debug.bytecode;
 const template = hexToBin(templateHex);
 
 // No OP_DROP prefix: the pad is vkx.cash's leading `bytes unused zeroPadding` param now.

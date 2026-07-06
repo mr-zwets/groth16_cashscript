@@ -31,6 +31,38 @@ const keyOf = (ref) => {
   return null; // const
 };
 
+// ---- static op-cost model (BCH2026 metering; see libauth common/stack.js) ----
+// Every evaluated instruction costs 100 + the bytes it pushes. Stack-item lengths are
+// unknown statically, so copies/moves of stack values are charged a nominal L (BN254
+// field elements are <=33-byte VM numbers). Value-producing ops (arith/hash/...) push
+// their result too, but the DAG's node set is identical across candidate schedules, so
+// that term is a common constant and is deliberately left out of the estimate: this
+// estimator RANKS schedules of the same block; it does not predict absolute cost.
+const NOMINAL_LEN = 33;
+export function opCostEstimate(ops, L = NOMINAL_LEN) {
+  const numOf = (o) => {
+    if (o.data !== undefined) { let n = 0; for (let i = o.data.length - 1; i >= 0; i--) n = (n << 8) | o.data[i]; return n; }
+    if (o.op === 0x00) return 0;
+    if (o.op >= 0x51 && o.op <= 0x60) return o.op - 0x50;
+    return 0;
+  };
+  let c = 0;
+  for (let i = 0; i < ops.length; i++) {
+    const o = ops[i]; c += 100;
+    if (o.data !== undefined) { c += o.data.length; continue; }
+    const op = o.op;
+    if (op === 0x4f || (op >= 0x51 && op <= 0x60)) { c += 1; continue; }
+    switch (op) {
+      case 0x76: case 0x78: case 0x7d: case 0x6c: case 0x79: c += L; break;          // DUP OVER TUCK FROMALT PICK
+      case 0x7a: c += L + (i > 0 ? numOf(ops[i - 1]) : 0); break;                     // ROLL pushes len+depth
+      case 0x6e: case 0x70: case 0x71: c += 2 * L; break;                             // 2DUP 2OVER 2ROT
+      case 0x6f: c += 3 * L; break;                                                   // 3DUP
+      default: break; // SWAP/ROT/2SWAP/NIP/DROP/TOALT/2DROP push 0; arith/hash: common across candidates
+    }
+  }
+  return c;
+}
+
 export function emitBlockV2(block, arity, strategy = 'topo') {
   const { entryDepth: n, entryAlt: p, exit, exitAlt } = block;
   const out = [];
@@ -119,17 +151,31 @@ export function emitBlockV2(block, arity, strategy = 'topo') {
     if (lastUse) return s + (dep === 0 ? 0 : dep <= 2 ? 1 : pushBytesForDepth(dep) + 1); // SWAP/ROT or push+ROLL
     return s + (dep <= 1 ? 1 : pushBytesForDepth(dep) + 1);                               // DUP/OVER or push+PICK
   }, 0);
+  // op-cost greedy: same shape, but weighted by the BCH2026 meter (100/instruction +
+  // pushed bytes; SWAP/ROT push 0, copies push the item, ROLL pushes item+depth).
+  const NL = NOMINAL_LEN;
+  const fetchCostOp = (nd) => nd.ins.reduce((s, r) => {
+    if (r.k === 'const') return s + 100 + r.data.length;
+    const k = keyOf(r);
+    const idx = topmostIndex(k);
+    if (idx < 0) return s;
+    const dep = stk.length - 1 - idx;
+    const lastUse = (useCount.get(k) || 0) <= 1 && (exitNeed.get(k) || 0) === 0;
+    if (lastUse) return s + (dep === 0 ? 0 : dep <= 2 ? 100 : 201 + NL + dep);  // free / SWAP,ROT / push+ROLL
+    return s + (dep <= 1 ? 100 + NL : 201 + NL);                                 // DUP,OVER / push+PICK
+  }, 0);
   while (remaining.size) {
     const cands = ready();
     let node;
-    if (strategy === 'greedy') {
-      node = cands[0]; let best = fetchCost(cands[0]);
-      for (const c of cands) { const d = fetchCost(c); if (d < best) { best = d; node = c; } }
+    if (strategy === 'greedy' || strategy === 'opcost') {
+      const cf = strategy === 'opcost' ? fetchCostOp : fetchCost;
+      node = cands[0]; let best = cf(cands[0]);
+      for (const c of cands) { const d = cf(c); if (d < best) { best = d; node = c; } }
     } else { node = cands[0]; } // topo: first remaining ready node (== original topo order)
     remaining.delete(node.id);
     for (const r of node.ins) bringRef(r, true);       // bring nin inputs to top
     const nin = node.ins.length;
-    const m = node.k === 'invoke' ? arity[node.invId].out : 1;
+    const m = node.k === 'invoke' ? arity[node.invId].out : (node.nout ?? 1);
     if (node.k === 'invoke') { for (const o of [...pushNumOps(node.invId), { op: INVOKE }]) out.push(o); }
     else out.push({ op: node.code });
     stk.length -= nin;
@@ -200,7 +246,13 @@ function peepholeMulti(ops) {
   return ops;
 }
 
-export function recompileBodyV2(body, arity, inArity, strategy = 'topo') {
+export function recompileBodyV2(body, arity, inArity, strategy = 'topo', objective = 'bytes') {
+  // Per-block cost for the min(cashc raw, rescheduled) choice. Under the op-cost
+  // objective, redeem bytes still cost 1 op each (the redeem is pushed in the
+  // scriptSig), which doubles as a tiebreak; instructions dominate at 100.
+  const blockCost = objective === 'opcost'
+    ? (ops) => opCostEstimate(ops) + serialize(ops).length
+    : (ops) => serialize(ops).length;
   const items = decompile(body, arity, inArity);
   let ops = [];
   for (const it of items) {
@@ -210,7 +262,7 @@ export function recompileBodyV2(body, arity, inArity, strategy = 'topo') {
       // This makes the recompile never worse than cashc on any block (e.g. low-shuffle
       // straight-line regions keep the original; shuffle-heavy loop bodies get rewritten).
       const mine = emitBlockV2(it.block, arity, strategy);
-      const chosen = serialize(mine).length < serialize(it.block.rawOps).length ? mine : it.block.rawOps;
+      const chosen = blockCost(mine) < blockCost(it.block.rawOps) ? mine : it.block.rawOps;
       for (const o of chosen) ops.push(o);
     } else ops.push({ op: it.ctrl });
   }

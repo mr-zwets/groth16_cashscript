@@ -5,26 +5,27 @@
 //   4. write verifier/src/bch/groth16-singleton-opcode-optimized{,-multiproof}-vectors.json
 //
 // Run:  node singleton/bn254/recompiler/build_vectors_optimized.mjs
-import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   hexToBin, binToHex, createVirtualMachineBch2026, createTestAuthenticationProgramBch,
 } from '@bitauth/libauth';
+import { compileFile } from 'cashc';
 import { dissect, probeArity, recompileAll, recompileMain, rebuild, evalFull } from './recompiler.mjs';
 
 const MAIN_INARITY = 10; // spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1)
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 const VDIR = join(here, '../../../../verifier/src/bch') + '/';
 const STANDARD_BUDGET = (41 + 10_000) * 800;
 const realVm = createVirtualMachineBch2026(false);
 
 // 1. compile the singleton -> baseline locking bytecode
 console.log('compiling ../groth16.cash ...');
-const baselineHex = execFileSync('node', [CASHC, join(here, '../groth16.cash'), '-h', '--optimize-for', 'size'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim();
+// disableDefSinking: the recompiler re-derives placement per body and golfs better from the
+// source-ordered compile
+const baselineHex = compileFile(join(here, '../groth16.cash'), { optimizeFor: 'size', disableDefSinking: true }).debug.bytecode;
 const baseline = hexToBin(baselineHex);
 
 // 2. recompile

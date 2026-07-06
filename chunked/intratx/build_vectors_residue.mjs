@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
-  f12limbs, r6limbs, compileFileBytecode, ptLimbs,
+  f12limbs, r6limbs, compileFileBytecode, compileFileBytecodeRaw, ptLimbs,
   vkxPoint, le40, OP_DROP, TARGET_UNLOCK, OP_BUDGET,
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
@@ -202,20 +202,29 @@ function buildSpecs(inst) {
 //   within  -> forward the FULL output (cmpExpr null, equal in/out len)
 //   cross   -> forward only the bound slice (spec.cmp)
 //   stage-final / terminal -> no forward (null)
-const compileCache = new Map();
-function compileSpec(s) {
+const RESCHED = process.env.RESCHEDULE !== 'off';
+const compileCache = new Map(); // key -> {resched, raw?} full redeems (raw only when RESCHEDULE differs)
+const chosenCache = new Map();  // key -> 'resched' | 'raw'; fixed on the FIRST assembly so every
+                                // instance shares identical lockings.
+const specKey = (s) => {
   let forward = null;
   if (s.role === 'within') { const outLen = s.outLimbs.length * W; forward = { cmpExpr: null, nextFullInLen: outLen, skip: 0, cmpLen: outLen }; }
   else if (s.role === 'cross') forward = s.cmp;
-  const key = `${s.file}|${s.role}|${JSON.stringify(forward)}`;
-  let redeem = compileCache.get(key);
-  if (!redeem) {
+  return { key: `${s.file}|${s.role}|${JSON.stringify(forward)}`, forward };
+};
+function compileSpec(s) {
+  const { key, forward } = specKey(s);
+  let v = compileCache.get(key);
+  if (!v) {
     // compile from a file (probe in generated/) so the chunk's relative library import resolves
     writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward }).src);
-    redeem = compileFileBytecode(PROBE);
-    compileCache.set(key, redeem);
+    const resched = compileFileBytecode(PROBE);
+    const raw = RESCHED ? compileFileBytecodeRaw(PROBE) : resched;
+    v = { resched: Uint8Array.from([OP_DROP, ...resched]) }; // [OP_DROP, contract] — OP_DROP discards the pad
+    if (RESCHED && binToHex(raw) !== binToHex(resched)) v.raw = Uint8Array.from([OP_DROP, ...raw]);
+    compileCache.set(key, v);
   }
-  return Uint8Array.from([OP_DROP, ...redeem]); // [OP_DROP, contract] — OP_DROP discards the pad
+  return (chosenCache.get(key) === 'raw' && v.raw) ? v.raw : v.resched;
 }
 function argBytesOf(s) {
   // inBlob is the LAST declared param (pushed FIRST -> front of the unlocking, where siblings'
@@ -238,6 +247,31 @@ function assemble(specs) {
   // pass 1: full unlocking -> max budget so the real VM accepts and reports true op-cost
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
+
+  // Per-chunk variant selection (RESCHEDULE only; decided once, first assembly): keep the
+  // redeem with the smaller TUNED unlocking — see chunked/grouped/build_vectors_residue.mjs.
+  if (RESCHED) {
+    let switched = 0;
+    for (let i = 0; i < specs.length; i++) {
+      const { key } = specKey(specs[i]);
+      if (chosenCache.has(key)) continue;
+      const v = compileCache.get(key);
+      if (!v.raw) { chosenCache.set(key, 'resched'); continue; }
+      const rawRpush = encodeDataPush(v.raw);
+      const rawFixed = argB[i].length + (P2SH ? rawRpush.length : 0);
+      const rawUnlock = P2SH
+        ? Uint8Array.from([...argB[i], ...padPush(0, Math.max(2, TARGET_UNLOCK - rawFixed)), ...rawRpush])
+        : Uint8Array.from([...argB[i], ...padPush(0, Math.max(2, TARGET_UNLOCK - rawFixed))]);
+      const probe = inputs.slice();
+      probe[i] = { locking: P2SH ? p2shSpk(v.raw) : v.raw, unlocking: rawUnlock };
+      const rawOp = evalInput(probe, i);
+      const tR = tunedLen(argB[i].length + tailLen(i), op1[i].operationCost);
+      const tB = rawOp.accepted ? tunedLen(rawFixed, rawOp.operationCost) : Infinity;
+      chosenCache.set(key, tB < tR ? 'raw' : 'resched');
+      if (tB < tR) switched += 1;
+    }
+    if (switched) return assemble(specs); // reassemble with final choices (cached -> recurses once)
+  }
   // pass 2: shrink the pad so the unlocking just covers its op-cost
   inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, tunedLen(argB[i].length + tailLen(i), op1[i].operationCost)) }));
   const op2 = specs.map((_, i) => evalInput(inputs, i));
@@ -270,6 +304,7 @@ const report = (tag, asm) => {
   const maxOp = Math.max(...asm.meta.map((m) => m.operationCost));
   const maxL = Math.max(...asm.meta.map((m) => m.lockingBytes)), maxU = Math.max(...asm.meta.map((m) => m.unlockingBytes));
   console.error(`${tag}: ${asm.meta.length} inputs, accepted=${asm.accepted} fits=${asm.fits} | totalBytes=${sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes).toLocaleString()} totalOp=${sum(asm.meta, (m) => m.operationCost).toLocaleString()} maxOp=${maxOp.toLocaleString()} maxLock=${maxL} maxUnlock=${maxU}`);
+  if (process.env.DUMP_OPCOSTS) asm.meta.forEach((m, i) => console.error(`  op[${String(i).padStart(2)}] ${String(m.operationCost).padStart(9)} lock=${m.lockingBytes} unlock=${m.unlockingBytes} ${m.accepted ? '' : 'REJECTED '}${m.label}`));
   const bad = asm.meta.find((m) => !m.accepted);
   if (bad) console.error(`  !! first non-accepting: ${bad.label} :: ${bad.error}`);
 };

@@ -3,7 +3,7 @@
 // final exp, require == 1 -- and measure op-cost + size. Writes
 // verifier/src/bch/pairing-bls12381-singleton-vectors.json for the
 // bch-pairing-bls12381-singleton entry.
-import { execFileSync } from 'node:child_process';
+import { compileFile } from 'cashc';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -16,7 +16,6 @@ import {
 } from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 const STANDARD_BUDGET = (41 + 10_000) * 800;
 
 const HUGE = Number.MAX_SAFE_INTEGER;
@@ -43,7 +42,7 @@ const unlockingFor = (args) => Uint8Array.from(args.slice().reverse().flatMap((a
 const validArgs = grothPairs(vkx).flatMap(pairRow);
 const invalidArgs = grothPairs(computeVkx([PUBLIC_INPUTS[0] + 1n, PUBLIC_INPUTS[1]])).flatMap(pairRow);
 
-const template = hexToBin(execFileSync('node', [CASHC, join(here, 'verify.cash'), '-h', '--optimize-for', 'size'], { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).trim());
+const template = hexToBin(compileFile(join(here, 'verify.cash'), { optimizeFor: 'size', rescheduleStacks: true }).debug.bytecode);
 const unlocking = unlockingFor(validArgs);
 const invalidUnlocking = unlockingFor(invalidArgs);
 

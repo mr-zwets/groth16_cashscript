@@ -19,7 +19,7 @@ import {
   compileBytecode, commitBin, CATEGORY, tok, covIn, P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2,
 } from './_pairingmath.mjs';
 import { PUBLIC_INPUTS, vk, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
-import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode } from './_vkxmath.mjs';
+import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode, compileFileBytecodeRaw } from './_vkxmath.mjs';
 import { g2checkAccAt } from './gen_g2check.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -63,12 +63,48 @@ const stats = { maxLock: 0, maxUnlock: 0, allFit: true, allAccept: true, allInva
 // commitLimbs = committed carried state (NFT commitment, decl order). allArgs = everything
 // the unlocking pushes (== commitLimbs except final-exp inv chunks append f^-1 witnesses).
 // terminal = the verdict chunk (asserts ==ONE, produces no output token).
+const RESCHED = process.env.RESCHEDULE !== 'off';
+const chosenCache = new Map(); // cashFile -> chosen contract bytes (fixed on first use so
+                               // both instances share identical lockings)
 function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArgs, terminal, noStats) {
   const pushArgs = allArgs ?? commitLimbs;
-  let contract = compileCache.get(cashFile);
   // compileFile (not compileString) so the g2check chunks' relative library `import` resolves;
-  // it compiles the inlined vkx/miller/finalexp chunks identically.
-  if (!contract) { contract = compileFileBytecode(cashFile); compileCache.set(cashFile, contract); }
+  // it compiles the inlined vkx/miller/finalexp chunks identically. Per-chunk A/B: BLS chunks
+  // run close to the 10,000 B caps, so keep whichever of {rescheduled, plain-cashc} redeem
+  // yields the smaller fitting step (covenant steps are independent txs, so the choice is local).
+  let contract = chosenCache.get(cashFile);
+  if (contract === undefined) {
+    let v = compileCache.get(cashFile);
+    if (!v) {
+      const resched = compileFileBytecode(cashFile);
+      const raw = RESCHED ? compileFileBytecodeRaw(cashFile) : resched;
+      v = { resched };
+      if (RESCHED && binToHex(raw) !== binToHex(resched)) v.raw = raw;
+      compileCache.set(cashFile, v);
+    }
+    if (!v.raw) contract = v.resched;
+    else {
+      const a = evalStepWith(v.resched, commitLimbs, outLimbs, pushArgs, terminal);
+      const b = evalStepWith(v.raw, commitLimbs, outLimbs, pushArgs, terminal);
+      const score = (r) => (r.fits ? r.step.lockingBytes + r.step.unlockingBytes : Infinity);
+      contract = score(b) < score(a) ? v.raw : v.resched;
+    }
+    chosenCache.set(cashFile, contract);
+  }
+  const r = evalStepWith(contract, commitLimbs, outLimbs, pushArgs, terminal, label, checkpoint);
+  if (!noStats) {
+    stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
+    stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
+    if (!r.fits || !r.accepted || !r.invalidRejected) {
+      console.error(`  !! ${label}: lock=${r.step.lockingBytes} unlock=${r.step.unlockingBytes} op=${r.step.operationCost.toLocaleString()} accepted=${r.accepted} invalidRejected=${r.invalidRejected} err=${r.error ?? '(none)'}`);
+    }
+  }
+  return r.step;
+}
+
+// assemble + evaluate one covenant step for a given compiled contract: P2SH envelope,
+// pad tuned to the measured op-cost, tamper check. Pure function of its arguments.
+function evalStepWith(contract, commitLimbs, outLimbs, pushArgs, terminal, label = '', checkpoint = undefined) {
   const redeem = Uint8Array.from([...contract]); // trailing `bytes unused zeroPadding` param absorbs the pad (no OP_DROP)
   const rpush = encodeDataPush(redeem);                   // pushed LAST in the scriptSig (P2SH)
   const locking = P2SH ? p2shSpk(redeem) : redeem;        // P2SH scriptPubKey (35 B) or bare contract
@@ -85,20 +121,15 @@ function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArg
   // tamper a state limb: args follow the leading pad, so the first arg push payload is at padLen + 1.
   const invalid = Uint8Array.from(unlocking); const padLen = unlocking.length - argBytes.length - tail; invalid[padLen + 1] ^= 0x01;
   const invReal = evalCov(locking, invalid, inCommit, outCommit, terminal);
-  const r = {
+  return {
     step: {
       label, locking: binToHex(locking), unlocking: binToHex(unlocking), invalidUnlocking: binToHex(invalid), checkpoint,
       covenant: { category: binToHex(CATEGORY), capability: 'mutable', inCommitment: binToHex(inCommit), outCommitment: binToHex(outCommit), outLockingBytecode: binToHex(locking) },
       lockingBytes: locking.length, unlockingBytes: unlocking.length, operationCost: real.operationCost,
     },
-    accepted: real.accepted, invalidRejected: !invReal.accepted,
+    accepted: real.accepted, invalidRejected: !invReal.accepted, error: real.error,
     fits: locking.length <= 10000 && unlocking.length <= 10000 && real.operationCost <= OP_BUDGET && real.accepted,
   };
-  if (!noStats) {
-    stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
-    stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
-  }
-  return r.step;
 }
 
 // ---- the two instances: #0 committed, #1 a distinct valid instance (same VK) ----
