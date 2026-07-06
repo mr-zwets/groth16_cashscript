@@ -1,15 +1,22 @@
 # Improving cashc's stack management
 
-How CashScript's code generator could do more optimal stack placement / stack
-management — diagnosis grounded in the actual compiler source
-(`packages/cashc/src/generation/GenerateTargetTraversal.ts`) and validated by a custom
-bytecode recompiler that cut the BN254 Groth16 singleton verifier from **14,641 → 9,730
-bytes (−33.5%)** with no algorithmic change, purely by rescheduling stack operations.
+> Status: landed. The Tier-2 rescheduling proposed below now ships in the compiler
+> fork as the `rescheduleStacks` pass, described in
+> [rescheduling-stacks.md](rescheduling-stacks.md) and used by the builds as described
+> in [chunked/rescheduler/README.md](chunked/rescheduler/README.md). This doc remains
+> the diagnosis behind it. The `golf/` recompiler referenced here is the standalone
+> prototype the pass was ported from.
 
-Relevant upstream issues: **#393** ("add variable to stack right before first usage,
-rather than at its definition") and **#217** (related stack-cleanup optimisation). The
-analysis below shows #393 is one symptom of a deeper structural choice, and that fixing
-the structure captures the bulk of the win.
+How CashScript's code generator could do more optimal stack placement / stack
+management: a diagnosis grounded in the actual compiler source
+(`packages/cashc/src/generation/GenerateTargetTraversal.ts`) and validated by a custom
+bytecode recompiler that cut the BN254 Groth16 singleton verifier from 14,641 to 9,730
+bytes (−33.5%) with no algorithmic change, purely by rescheduling stack operations.
+
+Ideas like "add a variable to the stack right before its first usage, rather than at
+its definition" and eager stack cleanup have been proposed upstream; the analysis below
+shows they are symptoms of one deeper structural choice, and that fixing the structure
+captures the bulk of the win.
 
 ## Evidence
 
@@ -140,11 +147,11 @@ Replace "fixed home + bubble-on-assign" with **deferred layout reconciliation**.
   cross-statement DAG (reused variables) a list-scheduler with a locality heuristic — pick
   the ready value whose operands are nearest the top — does the rest.
 
-This is precisely what **#393** asks for, as a special case: "materialize at first use, not
-definition" falls out automatically once a value is only pushed when its consumer is
-scheduled — and it generalizes to "place, move, and reconcile by liveness + schedule, not
-by source position." **#217** (eager cleanup) likewise becomes free: dead values are
-consumed by their final-use `ROLL` rather than accumulating and being swept later.
+"Materialize at first use, not definition" falls out automatically once a value is only
+pushed when its consumer is scheduled, and it generalizes to placing, moving, and
+reconciling by liveness plus schedule instead of source position. Eager cleanup likewise
+becomes free: dead values are consumed by their final-use `ROLL` rather than
+accumulating and being swept later.
 
 ## Tier 3 — the function ABI
 
@@ -173,10 +180,9 @@ aggressively functions can be inlined or restructured.
 
 ## Suggested landing order
 
-1. **Tier 1 peephole** — low risk, immediate bytes, ships as `--optimize`.
-2. **Tier 2 join-point reconciliation** for `emitReplace` and loop bodies — the big lever,
-   and the direct answer to #393 / #217.
-3. **Tier 3** — inlining + calling convention.
+1. Tier 1 peephole: low risk, immediate bytes, ships as `--optimize`.
+2. Tier 2 join-point reconciliation for `emitReplace` and loop bodies: the big lever.
+3. Tier 3: inlining + calling convention.
 
 A working reference implementation of Tier 2 — decompile → value-DAG → schedule → re-emit,
 diff-tested per subroutine and end-to-end — exists as the `golf/` pipeline used to produce

@@ -1,41 +1,42 @@
 # The CashScript Compiler Fork
 
-The verifiers in this repo are compiled with a **local fork of `cashc`**, not the
+The verifiers in this repo are compiled with a local fork of `cashc`, not the
 released compiler.
 
-- **Fork:** `C:\Users\mathi\Desktop\cashscript`, branch **`feat/multi-returns`** —
-  a five-commit patch series on top of **upstream's `next` branch** (v0.14.0-next.0).
-- **CLI used by the graders and `_harness.mjs`:** `packages/cashc/dist/cashc-cli.js`,
+- Fork: `C:\Users\mathi\Desktop\cashscript`, branch `compiler-optimizations`, a patch
+  series on top of upstream's `next` branch (v0.14.0-next.0). It began as the five
+  custom-feature commits of `feat/multi-returns` and has since grown an op-cost
+  optimisation suite: the `optimizeFor` objective, definition-sinking, and the
+  `rescheduleStacks` DAG scheduler. The features below are grouped as language
+  features and op-cost passes.
+- CLI used by the graders and `_harness.mjs`: `packages/cashc/dist/cashc-cli.js`,
   rebuilt with `yarn build` in `packages/utils` and `packages/cashc` after any compiler
   edit (`node_modules/cashc` in this repo symlinks to the fork).
-- **Status:** local-only, not yet upstreamed. The intent is to propose the remaining
-  patches upstream and, over time, compile this repo with **stock CashScript**.
+- Status: local-only, not yet upstreamed. The intent is to propose the remaining
+  patches upstream and, over time, compile this repo with stock CashScript.
 
 ## Alignment with upstream
 
 Earlier iterations of this project carried a much larger custom front-end (branch
 `feat/library-support`, forked from v0.13.1): a custom `internal function` construct for
 reusable functions, a `library Name { ... }` / `import` / global-`constant` module
-system, and assorted codegen fixes. Upstream CashScript has since landed **user-defined
-functions on `next`**
-([#413](https://github.com/CashScript/cashscript/pull/413), for issue
-[#369](https://github.com/CashScript/cashscript/issues/369)): plain top-level (global)
-`function`s compiled to `OP_DEFINE` / `OP_INVOKE`, **`import "./file.cash";`**
+system, and assorted codegen fixes. Upstream CashScript has since landed user-defined
+functions on `next`: plain top-level (global)
+`function`s compiled to `OP_DEFINE` / `OP_INVOKE`, `import "./file.cash";`
 directives that bring another file's functions into scope, SDK debugging support for
-user functions, and **dead-code elimination** of uncalled functions.
+user functions, and dead-code elimination of uncalled functions.
 
 That covered most of what the old custom front-end existed for, so the fork was rebuilt
 as a small patch series on top of upstream `next`, and the contracts were converted to
 the upstream model (2026-07-02):
 
-- `library X { ... }` wrappers → plain **top-level functions** (the `library` and
+- `library X { ... }` wrappers → plain top-level functions (the `library` and
   `internal` keywords are gone);
-- global `constant`s → the value written as a **literal at its use sites** (the
-  compiler folds it; no stack slot). Top-level constants are no longer part of the
-  language — [#264](https://github.com/CashScript/cashscript/issues/264) remains open
-  upstream;
+- global `constant`s → initially dropped (values written as literals at their use
+  sites), but since re-added to the fork as top-level `constant`s (still folded to
+  literals, no stack slot); this remains fork-only;
 - the old repeated-call-argument codegen fix (`fpNSqr(a) = fpNMul(a, a)` used to
-  mis-compile) is **obsolete** — upstream's function model handles it;
+  mis-compile) is obsolete: upstream's function model handles it;
 - `pragma cashscript ^0.14.0;`.
 
 Every remaining custom feature below is a candidate for an upstream PR; the end state
@@ -60,7 +61,7 @@ importing a large shared tower costs only the bytecode actually used — this is
 lets one shared tower back 27 different consumers and still compile each to minimal
 bytecode.
 
-## The custom patch series (branch `feat/multi-returns`)
+## Language / codegen features
 
 ### 1. Multi-return functions
 
@@ -75,7 +76,7 @@ which is only expressible with multi-return functions. Codegen leaves the return
 values on the stack in declared order; type checking enforces return arity and that a
 multi-return call is only used as a destructuring RHS.
 
-### 2. Tuple-destructuring into existing variables (issue [#136](https://github.com/CashScript/cashscript/issues/136))
+### 2. Tuple-destructuring into existing variables
 
 A destructuring target may omit its type to mean "reassign this existing variable":
 
@@ -95,7 +96,7 @@ the feature landed: BN254 `finalexp.cash` −15.9 % bytes / −14.5 % op-cost; f
 `groth16.cash` −6.1 % bytes. Only the singletons benefit (the chunked builds are
 fully-unrolled SSA and never rebind).
 
-### 3. The `unused` declaration modifier (issues [#125](https://github.com/CashScript/cashscript/issues/125), [#412](https://github.com/CashScript/cashscript/issues/412))
+### 3. The `unused` declaration modifier
 
 Syntax: `bytes unused zeroPadding` on a parameter, or `int unused x = ...` on a local.
 It exempts that symbol from `UnusedVariableError` while leaving it a real stack item —
@@ -132,6 +133,55 @@ constant-heavy generated contracts (the 67 KB op-optimized singleton, the pairin
 chunks). The fork matches pre-parsed opcode sequences directly against the `Script`
 array, and adds a peephole rule exploiting `OP_MUL` commutativity.
 
+## The op-cost optimisation suite
+
+The later commits on `compiler-optimizations` add passes aimed at **op-cost**, the
+per-input compute budget that binds the deployable chunk families (a BCH input buys
+budget with unlocking-script length, so every op-cost saving directly buys back
+zero-padding bytes). They are organised around one new setting.
+
+### 6. The `optimizeFor` objective
+
+A compiler option `optimizeFor: 'size' | 'opcost'` (CLI: `-O, --optimize-for <target>`,
+default `opcost`) selects the optimisation *objective*, and several passes read it:
+
+- it flips the **inlining** threshold (§4) — under `opcost`, small multi-use bodies inline
+  to remove `OP_INVOKE`/stepping cost even when that costs bytes;
+- it gates the **size-only** passes below (constant hoisting, definition-sinking);
+- it decides whether function-exit stack cleanup lowers to the **altstack**;
+- it is the ranking objective for `rescheduleStacks` (§7): `size` ranks candidate
+  schedules by serialized bytes, `opcost` by the BCH2026 op-cost meter.
+
+The size-scored singleton recompile compiles with `optimizeFor: 'size'`; the chunk and
+`minop` builds use the `opcost` default.
+
+Under `optimizeFor: 'size'` the compiler additionally **hoists repeated in-body literals**
+into a local (so a prime a function reduces mod p several times is pushed once) and
+**sinks variable definitions** to just before their first use — the latter compiles both
+the sunk and un-sunk variant and keeps the smaller, since sinking can cost bytes on some
+contracts. Two smaller `opcost`-oriented codegen changes also landed: staging
+user-function arguments **right-to-left** (first parameter ends up on top, matching the
+common access pattern) and keeping **loop-resident functions `OP_DEFINE`'d** rather than
+inlined (to avoid paying the body's stepping cost every iteration).
+
+### 7. `rescheduleStacks` — the DAG stack scheduler
+
+The single biggest codegen lever in this project: an opt-in pass
+(`packages/cashc/src/stack-rescheduling.ts`) that lifts each straight-line block of the
+compiled script to a dataflow DAG and re-emits it so operands are computed onto the top
+of the stack instead of fetched from variable slots with `<depth> OP_PICK/OP_ROLL` pairs
+— and chooses each function's argument-arrival order jointly with its schedule. It keeps
+`min(original, rescheduled)` per block, so nothing regresses, and it is restricted to
+single-function contracts (every verifier here). Worth **−4.9 % to −6.7 %** of the whole
+score on the op-bound chunk families and **−37.7 %** on the plain BN254 singleton.
+
+It has its own doc — **[The `rescheduleStacks` Compile Mode](rescheduling-stacks.md)** —
+covering how the pass works, its correctness guarantees, and how to invoke it; the
+chunk-build wiring and full result table are in
+[chunked/rescheduler/README.md](chunked/rescheduler/README.md); and the pre-landing
+diagnosis (why stock cashc codegen wastes these bytes) is in
+[cashc-stack-optimization.md](cashc-stack-optimization.md).
+
 ## Conversion results (2026-07-02)
 
 Recompiling the converted singletons with the new branch vs the old
@@ -154,8 +204,7 @@ benchmark vectors were rebuilt.
 
 ## What is still a genuine CashScript gap
 
-The remaining genuine gap is **array/struct types**
-([#266](https://github.com/CashScript/cashscript/issues/266)): there is still no
+The remaining genuine gap is array/struct types: there is still no
 aggregate type, which is why every field-tower element is carried as a flat list of
 ints and threaded through multi-return functions (see
 [README.md](README.md#cashscript-shortcomings) and [arrays.md](arrays.md)).

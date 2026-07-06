@@ -5,9 +5,16 @@ pairing-friendly curves and validated against `py_ecc` / `@noble/curves` on the 
 BCH 2026 VM:
 
 - **BN254** (a.k.a. BN256 / alt_bn128, the curve behind Ethereum's pairing precompiles)
-  — the full singleton **and** the BCH-limit-viable chunked verifier.
-- **BLS12-381** — the singleton verifier, on the **same curve as the nChain reference**,
-  so the benchmark gets a true apples-to-apples comparison (~21× smaller bytecode).
+  — the full singleton, an op-optimized singleton, and the BCH-limit-viable chunked
+  verifier (plain and residue-optimized packings).
+- **BLS12-381** — the singleton verifier (baseline and op-optimized), on the **same
+  curve as the nChain reference** so the benchmark gets a true apples-to-apples
+  comparison (~21× smaller bytecode), **plus** a deployable grouped-residue chunked
+  verifier (47 inputs in 5 standard transactions).
+
+This has grown into a whole family of verifiers across two curves, two forms, and
+baseline/op-optimized variants — **[verifiers.md](verifiers.md) is the map** of which is
+which and which one is the deployable flagship.
 
 It comes in two forms:
 
@@ -22,23 +29,27 @@ It comes in two forms:
   state forward in a hash commitment. This is the BCH-limit-viable on-chain form. See
   [`chunked/README.md`](chunked/README.md).
 
-The verifier is built with a **local fork of `cashc`** (branch `feat/multi-returns`): a
-small patch series on top of **upstream's `next` branch**, which now provides
-user-defined functions and file imports itself. The fork adds multi-return functions and
-a few codegen improvements, with the goal of upstreaming those too and eventually
-compiling with stock CashScript. See
-[The CashScript Compiler Fork](cashscript-compiler-fork.md).
+The verifier is built with a local fork of `cashc` (branch `compiler-optimizations`):
+a patch series on top of upstream's `next` branch, which now provides user-defined
+functions and file imports itself. On top of those, the fork adds multi-return functions,
+re-added global constants, and an op-cost optimisation suite: an
+`optimizeFor: 'size' | 'opcost'` objective, byte-accounted inlining, and a
+`rescheduleStacks` DAG stack scheduler (the single biggest codegen lever here). The goal
+is to upstream these and eventually compile with stock CashScript. See
+[The CashScript Compiler Fork](cashscript-compiler-fork.md) and, for the rescheduler
+specifically, [The `rescheduleStacks` Compile Mode](rescheduling-stacks.md).
 
-This repo also documents the surrounding design: why the work is split across
-transactions ([multi-step-computation.md](multi-step-computation.md)), how this compares
-to prior ZKP-on-Bitcoin attempts ([zkp-on-bch-vs-prior-attempts.md](zkp-on-bch-vs-prior-attempts.md)),
-the field-tower representation ([arrays.md](arrays.md)), and the build plan
+This repo also documents the surrounding design: the map of all the verifiers
+([verifiers.md](verifiers.md)), why the work is split across transactions
+([multi-step-computation.md](multi-step-computation.md)), how this compares to prior
+ZKP-on-Bitcoin attempts ([zkp-on-bch-vs-prior-attempts.md](zkp-on-bch-vs-prior-attempts.md)),
+the field-tower representation ([arrays.md](arrays.md)), the codegen op-cost lever
+([rescheduling-stacks.md](rescheduling-stacks.md)), and the build plan
 ([roadmap.md](roadmap.md)).
 
 ## CashScript Shortcomings
 
-Implementing a pairing verifier pushed CashScript past several of its limits. The two biggest — reusable functions and multi-file imports — have since **landed upstream on the `next` branch**; the remaining custom features live in a small fork rebased on top of it (see [The CashScript Compiler Fork](cashscript-compiler-fork.md)); the rest still shape the code. Each is
-tracked on the [CashScript v0.14.0 milestone](https://github.com/CashScript/cashscript/milestone/).
+Implementing a pairing verifier pushed CashScript past several of its limits. The two biggest, reusable functions and multi-file imports, have since landed upstream on the `next` branch; the remaining custom features live in a small fork rebased on top of it (see [The CashScript Compiler Fork](cashscript-compiler-fork.md)); the rest still shape the code.
 
 ### Reusable Functions (landed upstream on `next`)
 
@@ -46,11 +57,11 @@ Released CashScript (≤0.13) only allows calling built-in functions: you cannot
 own function and call it from a contract function or from another function. The verifier
 relies on user-defined functions everywhere (the `Fp2 → Fp6 → Fp12` tower, G1/G2 point ops,
 the Miller and final-exponentiation steps), compiled to `OP_DEFINE` / `OP_INVOKE`. This was
-originally a custom fork feature; upstream has since implemented it on `next`
-([#369](https://github.com/CashScript/cashscript/issues/369) /
-[#413](https://github.com/CashScript/cashscript/pull/413), tied to the 2026 network
-upgrade), and our fork is now rebased on that implementation. The remaining custom pieces
-(multi-return functions, tuple reassignment, `unused`, inlining) are in
+originally a custom fork feature; upstream has since implemented it on `next` (tied to
+the 2026 network upgrade), and our fork is now rebased on that implementation. The
+remaining custom pieces (multi-return functions, tuple reassignment, `unused`, global
+constants, and the op-cost optimisation suite: `optimizeFor`, byte-accounted inlining,
+and `rescheduleStacks`) are in
 [The CashScript Compiler Fork](cashscript-compiler-fork.md).
 
 ### Multi-file Imports (landed upstream on `next`)
@@ -65,19 +76,19 @@ contract Fp2Ops() {
 }
 ```
 
-Dead-code elimination means importing the big shared tower costs nothing for the functions a consumer doesn't call (and the fork's byte-accounted inlining removes the `OP_DEFINE`/`OP_INVOKE` overhead wherever splicing is cheaper). Note this tidies the **singleton** source layout; it does not shrink the **chunked** deployment, where each transaction is independent and the per-chunk function prologues are repeated regardless of source organisation.
+Dead-code elimination means importing the big shared tower costs nothing for the functions a consumer doesn't call (and the fork's byte-accounted inlining removes the `OP_DEFINE`/`OP_INVOKE` overhead wherever splicing is cheaper). Note this tidies the singleton source layout; it does not shrink the chunked deployment, where each transaction is independent and the per-chunk function prologues are repeated regardless of source organisation.
 
-The original library/macros request is [#153](https://github.com/CashScript/cashscript/issues/153); upstream's file imports of top-level functions cover this repo's needs.
+Upstream's file imports of top-level functions cover this repo's needs.
 
-### Global Constants (still open upstream)
+### Global Constants (re-added in the fork; still open upstream)
 
-CashScript has no file-level constant — tracked in [#264 Add Global constants](https://github.com/CashScript/cashscript/issues/264). An earlier fork iteration added `int constant NAME = <expr>;`, but to stay close to upstream that was dropped in the rebase: shared values like the BN254 base field prime are now written as literals at each use site (the compiler folds them; no stack slot), at the cost of the prime appearing once per function that reduces mod p.
+Stock CashScript has no file-level constant. An early rebase dropped the fork's constants to stay close to upstream (writing shared values like the BN254 base field prime as literals at each use site), but they were re-added: the fork supports top-level `constant`s again (folded to literals at their use sites, no stack slot), and, under `optimizeFor: 'size'`, additionally hoists repeated in-body literals into a local so a value like the prime that a function reduces mod p several times is pushed once. Both remain fork-only.
 
 ### No Array Type
 
 Groth16 in Solidity usually allows for an array of input parameters, CashScript doesn't allow for `array` types. Now that bounded loops exist, it would be useful to 'loop' over the number of elements in an array, however this would require very heavy abstraction on the CashScript side as arrays don't natively exist. In practice each tower element is instead carried as separate ints (2 for `Fp2`, 12 for `Fp12`), passed through multi-return functions.
 
-Tracked in [#266 Add support for Array types](https://github.com/CashScript/cashscript/issues/266). Arrays are not strictly needed, and since they would compile to a long concatenated byte string for these 256-bit field elements the performance effect would be small. The main win would be cleaner, more auditable code. See [Arrays and the Field Tower](arrays.md) for details.
+Arrays are not strictly needed, and since they would compile to a long concatenated byte string for these 256-bit field elements the performance effect would be small. The main win would be cleaner, more auditable code. See [Arrays and the Field Tower](arrays.md) for details.
 
 ## BCH Shortcomings
 

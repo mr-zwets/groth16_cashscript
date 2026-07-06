@@ -2,10 +2,11 @@
 
 Shared CashScript function files for the BN254 Groth16 verifier, consumed by the contracts in the
 parent directory (`../*.cash`). These rely on the custom cashc fork's top-level (global) functions +
-`import` support (branch `feat/multi-returns`): a library file is just a bag of plain top-level
+`import` support (branch `compiler-optimizations`): a library file is just a bag of plain top-level
 `function`s (no `library` wrapper, no `internal` keyword, no `contract`), and `import "./X.cash";`
-brings its functions into scope unqualified. There are no top-level constants in the language; the
-field prime is written as a literal at each use site and folded by the compiler.
+brings its functions into scope unqualified. Top-level `constant`s are supported by the fork (folded
+to literals; still fork-only pending upstream #264); the field prime is otherwise written as a
+literal at each use site and folded by the compiler.
 
 ## Why a `contract` per layer
 
