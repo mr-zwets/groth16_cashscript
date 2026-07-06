@@ -19,7 +19,7 @@ import {
   compileBytecode, commitBin, CATEGORY, le48, P, OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
-import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode } from '../bls12-381/_vkxmath.mjs';
+import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
 import { g2checkAccAt } from '../bls12-381/gen_g2check.mjs';
 import { transformChunk } from '../intratx/transform.mjs';
 
@@ -189,19 +189,30 @@ function groupedCfg(specs, i, lo, hi, groupIdx, G) {
   return { covInHash, epilogueMode, forward };
 }
 
-const compileCache = new Map();
+const RESCHED = process.env.RESCHEDULE !== 'off';
+const compileCache = new Map(); // cfg key -> {resched, raw?} full redeems (raw only when RESCHEDULE differs)
+const chosenCache = new Map();  // cfg key -> 'resched' | 'raw'; fixed on the FIRST assembly so every
+                                // instance shares identical lockings.
 const PROBE = join(GEN, '_grouped_probe.cash');
+const cfgKey = (spec, cfg) => `${spec.file}|${cfg.covInHash ? 'ci' : ''}|${cfg.epilogueMode ?? ''}|${JSON.stringify(cfg.forward)}`;
 function compileChunk(spec, cfg) {
-  const key = `${spec.file}|${cfg.covInHash ? 'ci' : ''}|${cfg.epilogueMode ?? ''}|${JSON.stringify(cfg.forward)}`;
-  let redeem = compileCache.get(key);
-  if (!redeem) {
+  const key = cfgKey(spec, cfg);
+  let v = compileCache.get(key);
+  if (!v) {
     const t = transformChunk(readFileSync(spec.file, 'utf8'), { W, prime: PRIME, forward: cfg.forward, covInHash: cfg.covInHash, epilogueMode: cfg.epilogueMode });
-    if (/^import\s/m.test(t.src)) { writeFileSync(PROBE, t.src); redeem = compileFileBytecode(PROBE); }
-    else redeem = compileBytecode(t.src);
-    compileCache.set(key, redeem);
+    let resched, raw;
+    if (/^import\s/m.test(t.src)) { writeFileSync(PROBE, t.src); resched = compileFileBytecode(PROBE); raw = RESCHED ? compileFileBytecodeRaw(PROBE) : resched; }
+    else { resched = compileBytecode(t.src); raw = RESCHED ? compileBytecodeRaw(t.src) : resched; }
+    v = { resched: Uint8Array.from([OP_DROP, ...resched]) };
+    if (RESCHED && binToHex(raw) !== binToHex(resched)) v.raw = Uint8Array.from([OP_DROP, ...raw]);
+    compileCache.set(key, v);
   }
-  return Uint8Array.from([OP_DROP, ...redeem]);
+  return (chosenCache.get(key) === 'raw' && v.raw) ? v.raw : v.resched;
 }
+// effective unlocking length a chunk needs, UNCAPPED (BLS redeems run close to the 10,000 B
+// script caps, so an over-cap fixed part must lose the comparison rather than saturate);
+// Infinity when the variant does not even accept.
+const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41 + 96) : Infinity);
 function argBytesOf(spec) {
   const parts = [pd(blob(spec.inLimbs))];
   for (const e of [...spec.extras].reverse()) parts.push(pushInt(BigInt(e)));
@@ -240,6 +251,35 @@ function assembleGrouped(specs, groups) {
   const allInputs = specs.map((s, i) => ({ locking: lockings[i], unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = [];
   groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) op1[lo + k] = evalGroup(ins, k, gmeta[gi]); });
+
+  // Per-chunk variant selection (first assembly only): keep whichever redeem needs the
+  // smaller effective unlocking — BLS chunks run close to the 10,000 B caps, so a
+  // byte-fatter rescheduled redeem can overflow where the plain one fits.
+  if (RESCHED) {
+    let switched = 0;
+    for (let i = 0; i < specs.length; i++) {
+      const key = cfgKey(specs[i], cfgs[i]);
+      if (chosenCache.has(key)) continue;
+      const v = compileCache.get(key);
+      if (!v.raw) { chosenCache.set(key, 'resched'); continue; }
+      const gi = cfgs[i].group, lo = groups[gi][0];
+      const rawRpush = encodeDataPush(v.raw);
+      const rawFixed = argB[i].length + rawRpush.length;
+      const rawUnlock = Uint8Array.from([...argB[i], ...padPush(0, Math.max(2, TARGET_UNLOCK - rawFixed)), ...rawRpush]);
+      const rawInputs = allInputs.slice(lo, groups[gi][1] + 1);
+      rawInputs[i - lo] = { locking: p2shSpk(v.raw), unlocking: rawUnlock };
+      const rawOp = evalGroup(rawInputs, i - lo, gmeta[gi]);
+      const tR = effLen(argB[i].length + rpush[i].length, op1[i].operationCost, op1[i].accepted);
+      const tB = effLen(rawFixed, rawOp.operationCost, rawOp.accepted);
+      // both failing usually means a NEIGHBOUR is oversized (forward-checks push the
+      // successor's whole unlocking) — defer to the reassembly
+      if (tR === Infinity && tB === Infinity) continue;
+      const useRaw = tB < tR;
+      chosenCache.set(key, useRaw ? 'raw' : 'resched');
+      if (useRaw) switched += 1;
+    }
+    if (switched) return assembleGrouped(specs, groups); // reassemble with final choices (cached -> recurses)
+  }
   for (let i = 0; i < specs.length; i++) allInputs[i].unlocking = mkUnlock(i, tunedLen(argB[i].length + rpush[i].length, op1[i].operationCost));
   const op2 = [];
   groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) op2[lo + k] = evalGroup(ins, k, gmeta[gi]); });
@@ -316,6 +356,9 @@ report('groth16-bls-grouped proof#1', asmProof1);
 const firstBoundary = GROUPS[1] ? GROUPS[1][0] : 1;
 const invalids = [invalidRun(cSpecs, GROUPS, Math.floor(cSpecs.length / 2)), invalidRun(cSpecs, GROUPS, firstBoundary)];
 console.error(`  invalid runs rejected: ${invalids.map((r) => r.rejected).join(',')}`);
+if (!asmCommitted.accepted || !asmProof1.accepted || !invalids.every((r) => r.rejected)) {
+  console.error('!! a run failed -- NOT writing vectors'); process.exit(1);
+}
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-grouped-vectors.json', JSON.stringify({
   description: 'GROUPED BLS12-381 Groth16 verifier: the full chunked computation (g2check EIP-197 input validation -> vk_x -> batched 4-pair Miller -> final exponentiation -> verdict==1) packed into a handful of STANDARD (<100,000 B) transactions. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE (intra-tx method); across groups the running state rides a CashToken NFT commitment (covenant method) — a group\'s last chunk commits hash256(outBlob) to output[0], the next group\'s first chunk binds its inBlob via require(tx.inputs[0].nftCommitment == hash256(inBlob)). The token thread chains all groups in order. The easy-part inverses ride as uncommitted witnesses. Same validated chunk math as bch-groth16-bls12381-chunked / -intratx; one fixed set of lockings verifies any proof for the VK.',

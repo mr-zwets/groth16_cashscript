@@ -20,13 +20,21 @@ export const ITERS = 255;  // scalar-field bit width (group order r < 2^255)
 export const MSBASE = ITERS - 1; // MSB-first: window position j -> bit index MSBASE - j
 
 // ---- in-process cashc compile (compileString + asmToBytecode); no subprocess ----
+// Compiled redeems go through the compiler's DAG stack-rescheduling pass (cashc fork
+// option `rescheduleStacks`, same as the BN254 builds). Default ON — the committed
+// vectors are built this way; RESCHEDULE=off compiles plain for A/B.
 import { compileString, compileFile, utils } from 'cashc';
 const { asmToBytecode } = utils;
+const RESCHED_OPTS = process.env.RESCHEDULE === 'off' ? {} : { rescheduleStacks: true };
 /** compile a .cash source string -> redeem bytecode (Uint8Array); throws on compile error */
-export const compileBytecode = (src) => asmToBytecode(compileString(src).bytecode);
+export const compileBytecode = (src) => asmToBytecode(compileString(src, RESCHED_OPTS).bytecode);
 /** compile a .cash FILE -> redeem bytecode. compileFile resolves relative `import`s (it has a
  * base path), so chunks can import the shared singleton library instead of inlining it. */
-export const compileFileBytecode = (path) => asmToBytecode(compileFile(path).bytecode);
+export const compileFileBytecode = (path) => asmToBytecode(compileFile(path, RESCHED_OPTS).bytecode);
+/** plain-cashc variants (no rescheduling) for the chunk planners, so the generated chunk
+ * manifests stay independent of the pass. */
+export const compileBytecodeRaw = (src) => asmToBytecode(compileString(src).bytecode);
+export const compileFileBytecodeRaw = (path) => asmToBytecode(compileFile(path).bytecode);
 
 export const OP_BUDGET = (41 + 10_000) * 800; // 8,032,800 op-cost per standard input
 export const TARGET_UNLOCK = 10_000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
@@ -72,7 +80,7 @@ export const tok = (commitment) => ({ amount: 0n, category: CATEGORY, nft: { cap
  * = the committed incoming state; `outLimbs` = the committed outgoing state. */
 export function measureCovenant(src, stateInts, commitInts, outLimbs) {
   let raw;
-  try { raw = compileBytecode(src); }
+  try { raw = compileBytecodeRaw(src); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
   return measureCovenantRaw(raw, stateInts, commitInts, outLimbs);
 }
@@ -80,7 +88,7 @@ export function measureCovenant(src, stateInts, commitInts, outLimbs) {
  * library `import` resolves — used by the import-based g2check generator. */
 export function measureCovenantFile(src, stateInts, commitInts, outLimbs, probePath) {
   let raw;
-  try { writeFileSync(probePath, src); raw = compileFileBytecode(probePath); }
+  try { writeFileSync(probePath, src); raw = compileFileBytecodeRaw(probePath); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
   return measureCovenantRaw(raw, stateInts, commitInts, outLimbs);
 }
