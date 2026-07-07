@@ -6,11 +6,13 @@
 //     fF*w == frob(c,1), witness subgroup check ((w^|x|)*w)^9 == 1 (w in mu_27A);
 //   - ONE batched c^-|x|-fused Miller (UNROLLED): only (-A,B) runs on-chain G2
 //     arithmetic; e(alpha,beta) baked; (vk_x,gamma)/(C,delta) lines baked;
-//   - G2 subgroup check psi(B) == [-x]B (64-bit walk, no witness needed);
-//   - G1 subgroup checks phi(P) == [-x^2]P for A and C (BLS12-381 G1 cofactor != 1,
-//     unlike BN254!): [x^2]P via two sparse |x|-walks, compare against -phi(P).
-//     Sound because -x^2 is a root of z^2+z+1 only mod r (z^2+z+1 evaluated at -x^2
-//     is exactly r), never mod a cofactor prime;
+//   - G2 subgroup check psi(B) == [-x]B, FUSED into the Miller tail: the loop already
+//     walks R_B to [|x|]B, so the membership test reuses it (no separate 64-step walk);
+//   - NO G1 subgroup checks on A,C: redundant for soundness. A,C are only paired against
+//     order-r G2 elements (B — checked — and the VK's delta), so any cofactor component
+//     is annihilated by the pairing (e(A_cof,B)=1, gcd(ord(A_cof),r)=1); the equation
+//     constrains only A_r/C_r, still a valid witness. On-curve checks remain. Matches the
+//     deployed grouped/intra-tx residue verifiers;
 //   - GLV vk_x: 4-scalar 128-bit Straus over a baked subset-sum table
 //     (lambda = -x^2 mod r, basis {(1,-(x^2-1)),(x^2,1)}), gated witnesses.
 // All field/curve arithmetic comes from the verified lazy lib (lib/lazy/Bls12381LazyG.cash).
@@ -112,49 +114,6 @@ function emitInputValidationLazy() {
     '        require(by2a == onrhsa); require(by2b == onrhsb);',
   ];
 }
-// G1 subgroup check phi(P) == [-x^2]P, i.e. [x^2]P == -phi(P) (two sparse |x|-walks).
-// Needed on BLS12-381 (G1 cofactor 3*((|x|+1)/3)^2 != 1). Sound: an on-curve P passes
-// iff every primary component's phi-eigenvalue matches -x^2; on the r-part it does by
-// construction, on every cofactor prime q it would need z^2+z+1(-x^2) = r == 0 mod q.
-function emitG1SubgroupCheck(px, py, pfx) {
-  const L = [];
-  L.push(`        // ---- G1 subgroup: [x^2]${px.slice(0, -1)} == -phi via two ${X.toString(2).length}-bit |x|-walks ----`);
-  L.push(`        int ${pfx}tx = ${px}; int ${pfx}ty = ${py}; int ${pfx}tz = 1;`);
-  L.push(`        for (int ${pfx}i = 0; ${pfx}i < 63; ${pfx}i = ${pfx}i + 1) {`);
-  L.push(`            (${pfx}tx,${pfx}ty,${pfx}tz) = jacDoubleG1(${pfx}tx, ${pfx}ty, ${pfx}tz);`);
-  L.push(`            if (((${X} >> (62 - ${pfx}i)) % 2) == 1) { (${pfx}tx,${pfx}ty,${pfx}tz) = jacAddG1(${pfx}tx, ${pfx}ty, ${pfx}tz, ${px}, ${py}, 1); }`);
-  L.push('        }');
-  L.push(`        int ${pfx}sx = ${pfx}tx; int ${pfx}sy = ${pfx}ty; int ${pfx}sz = ${pfx}tz;`);
-  L.push(`        for (int ${pfx}j = 0; ${pfx}j < 63; ${pfx}j = ${pfx}j + 1) {`);
-  L.push(`            (${pfx}sx,${pfx}sy,${pfx}sz) = jacDoubleG1(${pfx}sx, ${pfx}sy, ${pfx}sz);`);
-  L.push(`            if (((${X} >> (62 - ${pfx}j)) % 2) == 1) { (${pfx}sx,${pfx}sy,${pfx}sz) = jacAddG1(${pfx}sx, ${pfx}sy, ${pfx}sz, ${pfx}tx, ${pfx}ty, ${pfx}tz); }`);
-  L.push('        }');
-  L.push(`        int ${pfx}z2 = mSqr(${pfx}sz); int ${pfx}z3 = mulFp(${pfx}z2, ${pfx}sz);`);
-  L.push(`        require(${pfx}sx == mulFp(mulFp(${GLV_BETA}, ${px}), ${pfx}z2));`);
-  L.push(`        require(${pfx}sy == mulFp(mSub(0, ${py}), ${pfx}z3));`);
-  return L;
-}
-// G2 subgroup check psi(B) == [-x]B: walk [|x|]B (MSB preloaded), compare to -psi(B).
-function emitG2SubgroupCheck() {
-  return [
-    '        // ---- G2 subgroup membership: psi(B) == [-x]B (64-bit |x|-walk) ----',
-    '        int GXa=Bxa; int GXb=Bxb; int GYa=Bya; int GYb=Byb; int GZa=1; int GZb=0;',
-    '        for (int gi = 1; gi < 64; gi = gi + 1) {',
-    '            (GXa,GXb,GYa,GYb,GZa,GZb) = g2Double(GXa, GXb, GYa, GYb, GZa, GZb);',
-    `            if (((${X} >> (63 - gi)) % 2) == 1) {`,
-    '                (GXa,GXb,GYa,GYb,GZa,GZb) = g2AddAffine(GXa, GXb, GYa, GYb, GZa, GZb, Bxa, Bxb, Bya, Byb);',
-    '            }',
-    '        }',
-    '        (int psxa,int psxb,int psya,int psyb) = psi(Bxa, Bxb, Bya, Byb);',
-    '        (int npya,int npyb) = r2Neg(psya, psyb);',
-    '        (int gz2a,int gz2b) = r2Sqr(GZa, GZb);',
-    '        (int gz3a,int gz3b) = r2Mul(gz2a, gz2b, GZa, GZb);',
-    '        (int gcxa,int gcxb) = r2Mul(psxa, psxb, gz2a, gz2b);',
-    '        (int gcya,int gcyb) = r2Mul(npya, npyb, gz3a, gz3b);',
-    '        require(GXa == gcxa); require(GXb == gcxb);',
-    '        require(GYa == gcya); require(GYb == gcyb);',
-  ];
-}
 // GLV vk_x: 4-scalar 128-bit Straus over baked {IC1,phi(IC1),IC2,phi(IC2)} + baked 16-entry
 // blob table. Witnesses k10,k20,k11,k21 (gated k<2^128, k1+k2*lambda==in mod r) + vkxZinv.
 function emitGlvVkxLazy() {
@@ -238,6 +197,16 @@ function emitMillerTailLazy() {
   }
   // multiply in the baked e(alpha,beta); F is now gF = g * c^-|x| (unconjugated)
   L.push(`        (${use12('F')}) = fp12Mul(${use12('F')}, ${lits(FAB)});`);
+  // ---- G2 subgroup membership, FUSED into the Miller loop ----
+  // The Miller loop above already walks R_B to [|x|]B (homogeneous projective; NAF excludes the
+  // MSB, R_B starts at B), so psi(B) == -[|x|]B needs NO separate 64-step [|x|]B walk. Compare
+  // affine(R_B)=(Rb/Rbz) to -psi(B): Rbx == psi(B).x*Rbz and Rby == -psi(B).y*Rbz.
+  L.push('        (int psxa,int psxb,int psya,int psyb) = psi(Bxa, Bxb, Bya, Byb);');
+  L.push('        (int npya,int npyb) = r2Neg(psya, psyb);');
+  L.push('        (int gcxa,int gcxb) = r2Mul(psxa, psxb, Rbza, Rbzb);');
+  L.push('        require(Rbxa == gcxa); require(Rbxb == gcxb);');
+  L.push('        (int gcya,int gcyb) = r2Mul(npya, npyb, Rbza, Rbzb);');
+  L.push('        require(Rbya == gcya); require(Rbyb == gcyb);');
   L.push(`        require(residueVerdict(${use12('F')}, ${use12('c')}, ${use12('ci')}, ${use12('w')}));`);
   return L;
 }
@@ -248,7 +217,8 @@ function emitMinOp() {
   L.push('// GENERATED by gen_singleton_minop.mjs — op-optimized BLS12-381 Groth16 singleton (lazy tower).');
   L.push('// ONE batched c^-|x|-fused Miller (UNROLLED, unconjugated boundary): only (-A,B) runs on-chain');
   L.push('// G2 arithmetic; e(alpha,beta)=baked fAB, (vk_x,gamma)/(C,delta) lines baked; witnessed-residue');
-  L.push('// final-exp (lambda=p+|x|, w in mu_27A); psi 64-bit G2 check; phi(P)==[-x^2]P G1 checks (A,C);');
+  L.push('// final-exp (lambda=p+|x|, w in mu_27A); G2 subgroup check psi(B)==[-x]B FUSED into the Miller');
+  L.push('// tail (reuses R_B=[|x|]B); no G1 subgroup checks (redundant given B in G2 — see header);');
   L.push('// GLV vk_x. Large by design — bytes are not this variant\'s axis; needs the cashc fork');
   L.push('// large-contract compile fix. Regenerate: node gen_singleton_minop.mjs.');
   L.push('import "./lib/lazy/Bls12381LazyG.cash";');
@@ -258,9 +228,13 @@ function emitMinOp() {
     decl12('c'), decl12('ci'), decl12('w'), 'int k10', 'int k20', 'int k11', 'int k21', 'int vkxZinv'].join(', ');
   L.push(`    function spend(${sig}) {`);
   for (const ln of emitInputValidationLazy()) L.push(ln);
-  for (const ln of emitG1SubgroupCheck('Ax', 'Ay', 'ga')) L.push(ln);
-  for (const ln of emitG1SubgroupCheck('Cx', 'Cy', 'gc')) L.push(ln);
-  for (const ln of emitG2SubgroupCheck()) L.push(ln);
+  // G1 subgroup checks on A,C are OMITTED (not just fused): they are redundant for Groth16
+  // soundness. A and C are only ever paired against G2 elements that are in the order-r subgroup
+  // (B — checked below — and the VK's delta), so any cofactor component of A/C is annihilated by
+  // the pairing (e(A_cof,B)=1 since gcd(ord(A_cof),r)=1); the equation constrains only A_r/C_r,
+  // which must still be a valid witness. On-curve checks (above) remain. This matches the deployed
+  // grouped/intra-tx residue verifiers. The G2 subgroup check on B (which makes this valid) is
+  // FUSED into the Miller tail, reusing R_B=[|x|]B — see emitMillerTailLazy.
   for (const ln of emitGlvVkxLazy()) L.push(ln);
   for (const ln of emitMillerTailLazy()) L.push(ln);
   L.push('    }');

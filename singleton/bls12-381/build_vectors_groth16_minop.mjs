@@ -1,13 +1,13 @@
 // Build + measure the OP-OPTIMIZED BLS12-381 Groth16 singleton (groth16_minop.cash):
-// lazy tower + witnessed-residue tail + psi G2 check + phi G1 checks + GLV vk_x. Reuses
+// lazy tower + witnessed-residue tail + Miller-fused psi G2 check (no G1 checks) + GLV vk_x. Reuses
 // the verified chunked witness generators (_pairingmath/_residuemath) and the GLV helpers
 // exported by gen_singleton_minop.mjs.
 // Writes verifier/src/bch/groth16-bls12381-singleton-minop-vectors.json.
 //   node build_vectors_groth16_minop.mjs
-import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { compileFile, utils } from 'cashc';
 import { PUBLIC_INPUTS } from './bls_instance.mjs';
 import {
   hexToBin, binToHex, bigIntToVmNumber, encodeDataPush,
@@ -20,7 +20,6 @@ const R = await import('../../chunked/bls12-381/_residuemath.mjs');
 const G = await import('./gen_singleton_minop.mjs');
 
 const here = dirname(fileURLToPath(import.meta.url));
-const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 const STANDARD_BUDGET = (41 + 10_000) * 800;
 const Pm = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787n;
 
@@ -68,7 +67,9 @@ function argsFor(publicInputs, resWit) {
   ];
 }
 
-const template = hexToBin(execFileSync('node', [CASHC, join(here, 'groth16_minop.cash'), '-h'], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 }).trim());
+// Compile with the rescheduleStacks pass (same as the chunked builders) — it lowers the
+// monolith's stack-management overhead (~-1.8% op-cost), which the plain cashc CLI does not do.
+const template = utils.asmToBytecode(compileFile(join(here, 'groth16_minop.cash'), { rescheduleStacks: true }).bytecode);
 const rwValid = residueWit(PUBLIC_INPUTS);
 const unlocking = unlockingFor(argsFor(PUBLIC_INPUTS, rwValid));
 // invalid: tamper a public input but reuse the (now non-matching) valid witness
@@ -79,7 +80,7 @@ const looseRejectInvalid = evalPair(looseVm, template, invalidUnlocking);
 const realAccept = evalPair(realVm, template, unlocking);
 const opCost = looseAccept.operationCost;
 
-console.log('=== Groth16VerifyMinOp BLS12-381 (lazy tower + residue tail + psi/phi subgroup checks + GLV) ===');
+console.log('=== Groth16VerifyMinOp BLS12-381 (lazy tower + residue tail + Miller-fused psi G2 check + GLV) ===');
 console.log(`locking ${template.length}B  unlocking ${unlocking.length}B`);
 console.log(`loosened: ACCEPT valid = ${looseAccept.accepted}  (op-cost ${opCost.toLocaleString()})  err=${looseAccept.error ?? '(none)'}`);
 console.log(`loosened: REJECT invalid = ${!looseRejectInvalid.accepted}`);
@@ -88,7 +89,7 @@ console.log(`inputsNeeded = ${Math.ceil(opCost / STANDARD_BUDGET)}`);
 
 const out = {
   contract: 'Groth16VerifyMinOp (singleton/bls12-381/groth16_minop.cash)',
-  description: 'op-optimized full BLS12-381 Groth16 verifier: lazy-tower fused Miller (1 runtime G2 pair, lines/e(alpha,beta) baked) + witnessed-residue final-exp (lambda=p+|x|) + psi G2 check + phi G1 checks (A,C) + GLV vk_x',
+  description: 'op-optimized full BLS12-381 Groth16 verifier: lazy-tower fused Miller (1 runtime G2 pair, lines/e(alpha,beta) baked) + witnessed-residue final-exp (lambda=p+|x|) + G2 subgroup check psi(B)==[-x]B fused into the Miller tail (reuses R_B=[|x|]B; no separate walk) + GLV vk_x. G1 subgroup checks on A,C omitted as redundant (they are only paired against order-r G2 elements, so cofactor components vanish); on-curve checks kept.',
   lockingOK: binToHex(template),
   unlocking: binToHex(unlocking),
   invalidUnlocking: binToHex(invalidUnlocking),
