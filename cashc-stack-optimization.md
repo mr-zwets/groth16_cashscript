@@ -251,3 +251,17 @@ Two consequences for where to push next:
 - **Inherent (the real floor, ~5 KB here): stack addressing itself** — `ROLL`/`PICK` +
   depth argument for every operand fetch; only removable by VM-level addressable locals.
 - **Irreducible (~2.4 KB): constant data** — field moduli, VK points, NAF masks.
+
+**2026-07-08 measurement update (roadmap item 6 census spike): the depth lever is
+CLOSED.** On the current 8,385 B artifact the 16-hot greedy oracle yields gross 397 B
+against ~400 B of demotion risk plus ~800 B of relayout cost across 15 regions — net
+negative, well under the 300 B build threshold; the ~500 B "reducible" line above is the
+everything-shallow ceiling (measured 765 B of 2-byte depth args), not reachable under a
+fixed per-region layout. The static-byte story changed instead: the same census found the
+golfed artifact ~23% compressible by outlining repeated ROLL/PICK relayout runs into
+`OP_DEFINE` bodies (production pass with fixpoint iteration: 8,385 → 6,314 B, BLS
+9,219 → 6,607 B, accept/reject + multiproof pass; `recompiler/outline.mjs`, now part of
+the golf pipeline). The inherent-addressing floor stands for *executed* cost, and the
+addressable-locals CHIP case is unchanged; but the *static byte* floor is lower than this
+document's taxonomy assumed. See `cashc-optimization-roadmap.md` items 6-7 and
+`singleton/bn254/recompiler/outline_spike.mjs`.
