@@ -1,6 +1,7 @@
 // Build the benchmark vectors for the opcode-optimized singleton, reproducibly from source:
 //   1. compile ../groth16.cash with cashc                       -> baseline locking bytecode
 //   2. dissect + probe arities + recompile every subroutine     -> optimized locking bytecode
+//   2c. outline repeated instruction sequences (outline.mjs)    -> outlined locking bytecode
 //   3. reuse the committed proof witnesses (interface-identical) -> validate + measure
 //   4. write verifier/src/bch/groth16-singleton-opcode-optimized{,-multiproof}-vectors.json
 //
@@ -13,6 +14,7 @@ import {
 } from '@bitauth/libauth';
 import { compileFile } from 'cashc';
 import { dissect, probeArity, recompileAll, recompileMain, rebuild, evalFull } from './recompiler.mjs';
+import { outlineArtifact } from './outline.mjs';
 
 const MAIN_INARITY = 10; // spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1)
 
@@ -49,9 +51,20 @@ for (const strat of ['topo', 'greedy']) {
   if (acc && rej && m.length < bestMainLen) { bestMain = m; bestMainLen = m.length; }
   console.log(`  main (${strat}): ${m.length} B  accept=${acc} reject=${rej}`);
 }
-const optimized = bestMain ? rebuild(d, override, bestMain) : mainOrig;
+const scheduled = bestMain ? rebuild(d, override, bestMain) : mainOrig;
+console.log(`full locking bytecode ${baseline.length} -> ${scheduled.length} B (main routine ${bestMain ? 'optimized' : 'kept as cashc'})`);
+
+// 2c. outline repeated instruction sequences (see outline.mjs). Every pass's rewrite
+// batch must keep accepting the committed valid witness and rejecting the tampered one;
+// a failing batch degrades to per-rewrite isolation. The full witness battery (real-VM
+// probe + all multiproofs, accept AND reject) runs below on the final artifact.
+console.log('outlining repeated sequences (verified per rewrite batch) ...');
+const outlineVerify = (bytes) => evalFull(bytes, hexToBin(base.unlocking)).accepted
+  && !evalFull(bytes, hexToBin(base.invalidUnlocking)).accepted;
+const outlined = outlineArtifact(scheduled, { verify: outlineVerify, log: console.log });
+const optimized = outlined.bytes;
 const optimizedHex = binToHex(optimized);
-console.log(`full locking bytecode ${baseline.length} -> ${optimized.length} B (main routine ${bestMain ? 'optimized' : 'kept as cashc'})`);
+console.log(`outlined ${scheduled.length} -> ${optimized.length} B (-${outlined.saved} B in ${outlined.passes.length} passes)`);
 
 const evalReal = (unl) => { const s = realVm.evaluate(createTestAuthenticationProgramBch({ lockingBytecode: optimized, unlockingBytecode: hexToBin(unl), valueSatoshis: 1000n })); const t = s.stack[s.stack.length - 1]; return { accepted: s.error === undefined && s.stack.length === 1 && t?.length === 1 && t[0] === 1, error: s.error }; };
 const looseAccept = evalFull(optimized, hexToBin(base.unlocking));
@@ -64,8 +77,8 @@ const main = {
   contract: 'Groth16Verify (opcode-optimized recompile of singleton/bn254/groth16.cash)',
   description: 'identical Groth16 verifier (vk_x on-chain + full BN254 pairing == 1) as bch-groth16-singleton, '
     + 'but the locking bytecode is a hand-tuned stack-scheduling recompile of cashc output (recompiler/): cashc '
-    + 'altstack park/restore eliminated, ROLL/PICK addressing minimized, multi-item stack ops. Same verdict + same '
-    + 'runtime witnesses; ~34% smaller bytecode.',
+    + 'altstack park/restore eliminated, ROLL/PICK addressing minimized, multi-item stack ops, and repeated '
+    + 'instruction sequences outlined into OP_DEFINE bodies (outline.mjs). Same verdict + same runtime witnesses.',
   lockingOK: optimizedHex,
   unlocking: base.unlocking,
   invalidUnlocking: base.invalidUnlocking,

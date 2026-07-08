@@ -4,10 +4,11 @@
 // Writes verifier/src/bch/groth16-bls12381-singleton-vectors.json for the
 // bch-groth16-bls12381-singleton entry (head-to-head vs nchain, SAME curve).
 import { compileFile } from 'cashc';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { proof, PUBLIC_INPUTS } from './bls_instance.mjs';
+import { outlineArtifact } from '../bn254/recompiler/outline.mjs';
 
 import {
   hexToBin, binToHex, bigIntToVmNumber, encodeDataPush,
@@ -45,14 +46,32 @@ const proofArgs = (inputs) => [
   A.x, A.y, B.x.c0, B.x.c1, B.y.c0, B.y.c1, C.x, C.y, ...inputs,
 ];
 
-const template = hexToBin(compileFile(join(here, 'groth16.cash'), { optimizeFor: 'size', rescheduleStacks: true }).debug.bytecode);
+const compiled = hexToBin(compileFile(join(here, 'groth16.cash'), { optimizeFor: 'size', rescheduleStacks: true }).debug.bytecode);
 const unlocking = unlockingFor(proofArgs(PUBLIC_INPUTS));
 const invalidUnlocking = unlockingFor(proofArgs([PUBLIC_INPUTS[0] + 1n, PUBLIC_INPUTS[1]]));
+
+// outline repeated instruction sequences (singleton/bn254/recompiler/outline.mjs);
+// every rewrite batch must keep accepting the valid witness and rejecting the tampered
+// one on the loosened VM. The multiproof battery runs below on the final artifact.
+console.log('outlining repeated sequences (verified per rewrite batch) ...');
+const outlineVerify = (bytes) => evalPair(looseVm, bytes, unlocking).accepted
+  && !evalPair(looseVm, bytes, invalidUnlocking).accepted;
+const outlined = outlineArtifact(compiled, { verify: outlineVerify, log: console.log });
+const template = outlined.bytes;
+console.log(`outlined ${compiled.length} -> ${template.length} B (-${outlined.saved} B in ${outlined.passes.length} passes)`);
 
 const looseAccept = evalPair(looseVm, template, unlocking);
 const looseRejectInvalid = evalPair(looseVm, template, invalidUnlocking);
 const realAccept = evalPair(realVm, template, unlocking);
 const opCost = looseAccept.operationCost;
+
+// the benchmark entry replays the multiproof unlockings against THIS locking; make the
+// build fail loudly if the outlined artifact ever breaks one of them
+const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-singleton-multiproof-vectors.json', 'utf8'));
+for (const p of mp.proofs) {
+  if (!evalPair(looseVm, template, hexToBin(p.unlocking)).accepted) throw new Error('outlined artifact failed a multiproof accept');
+}
+console.log(`multiproof ${mp.proofs.length}/${mp.proofs.length} accept OK`);
 
 console.log('=== Groth16Verify BLS12-381 singleton (vk_x on-chain + pairing, single-tx) ===');
 console.log(`locking ${template.length}B  unlocking ${unlocking.length}B`);
