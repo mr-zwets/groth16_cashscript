@@ -201,32 +201,77 @@ Graduation criteria to default-on under optimizeFor (the exit condition from opt
 ### 6. Auto-outlining: BUILT project-side 2026-07-08 (prior was wrong by an order of magnitude)
 
 The spike flipped this item and the project-side pass shipped the same day:
-`singleton/bn254/recompiler/outline.mjs`, wired into `build_vectors_optimized.mjs` (BN254
-golf pipeline) and `singleton/bls12-381/build_vectors_groth16.mjs`. Mechanism: byte-exact
-factoring of repeated instruction subsequences (>= 5 B, balanced control flow, no
+`singleton/bn254/recompiler/outline.mjs`. Mechanism: byte-exact factoring of repeated
+instruction subsequences (>= 5 B, balanced control flow, no
 OP_DEFINE/OP_ACTIVEBYTECODE/BEGIN/UNTIL inside) into new OP_DEFINE bodies, greedy per
 pass, iterated to a fixpoint so outlined bodies are themselves scanned; every rewrite
 batch is verified accept-valid/reject-tampered on the loose VM with per-rewrite isolation
-on failure, and the full multiproof battery gates the vectors. Rebuilt and re-scored
-(verifier results.json regenerated):
+on failure, and the full multiproof battery gates the vectors.
 
-| entry | locking before | locking after | score before | score after |
-|---|---:|---:|---:|---:|
-| bch-groth16-singleton-opcode-optimized | 8,385 B | 6,314 B (-24.7%) | 8,744 | 6,673 |
-| bch-groth16-bls12381-singleton | 9,219 B | 6,607 B (-28.3%) | 14,931* | 7,091 |
+Entry taxonomy (settled 2026-07-09): outlining lives in the OPTIMIZED entries only. The
+plain singleton entries stay unprocessed compiler output so each curve keeps both ends of
+the bytesize-vs-opcost tradeoff on the board (outlining trades a few percent op for ~25%
+bytes). The BLS optimized build (`singleton/bls12-381/build_vectors_optimized.mjs`)
+A/Bs the golf recompile against the rescheduled compile, outlines both, and keeps the
+smaller verified artifact; the golf recompiler proved curve-agnostic out of the box (only
+the diff-test input range is parameterized, `setTestInputRange`).
 
-(*last recorded score predated the reschedule harvest; the outlining share is
-9,219 -> 6,607.) Fixpoint iteration beat the single-pass spike numbers (BN254 3 passes:
-67+14+2 sequences; BLS 2 passes: 84+17). The "sources are already factored into
-functions" prior missed that the savings are not source-level: they are repeated
-ROLL/PICK relayout runs the schedulers emit at block boundaries, plus repeated PICK fans
-and `<32B prime> MOD` pairs. Op-cost grows a few percent (BN254 749.4M -> 795.9M),
-irrelevant for byte-scored loose-VM entries; BLS gains ~2.6 kB of headroom under the
-10,000 B cap. Remaining upside, unbooked: smarter-than-greedy selection, and scanning the
-plain BN254 singleton entry (scans at -22.3%, deliberately left as unprocessed compiler
-output). Upstream as a size-objective compiler pass only after the project-side pass has
-soaked; under opcost it stays exactly what collectLoopExcludedFunctions exists to
-prevent, and debug info for synthetic frames must be answered before any upstream PR.
+| entry | locking | op-cost | role |
+|---|---:|---:|---|
+| bch-groth16-singleton | 8,515 B | 746.9M | plain compiler output (BN254) |
+| bch-groth16-singleton-opcode-optimized | 6,314 B | 795.9M | golf recompile + outline |
+| bch-groth16-bls12381-singleton | 9,219 B | 1,035.3M | plain compiler output (BLS) |
+| bch-groth16-bls12381-singleton-opcode-optimized | 6,428 B | 1,058.1M | golf recompile + outline |
+
+Fixpoint iteration beat the single-pass spike numbers (BN254 3 passes: 67+14+2 sequences;
+BLS golf 3 passes: 79+22+1). The "sources are already factored into functions" prior
+missed that the savings are not source-level: they are repeated ROLL/PICK relayout runs
+the schedulers emit at block boundaries, plus repeated PICK fans and `<32B prime> MOD`
+pairs. Remaining upside, unbooked: smarter-than-greedy selection. Upstream as a
+size-objective compiler pass only after the project-side pass has soaked; under opcost it
+stays exactly what collectLoopExcludedFunctions exists to prevent, and debug info for
+synthetic frames must be answered before any upstream PR.
+
+### 7. Op-over-bytes experiments for the chunked (compute-bound) families
+
+The exchange rate that governs every tradeoff here: at the standard limits, op budget
+scales with unlocking length at ~800 op per byte, so 800 op saved is worth ~1 B of padding
+score, while a locking byte costs score 1:1. Chunks are packed to the ~8,032,800 ceiling
+(the maximum budget at the 10,000 B input cap), so op savings pay off primarily by growing
+chunk windows: fewer inputs at ~76 B score each, plus one less preamble execution.
+
+Already settled op-optimally, do not re-chase: in-loop inlining (measured ~2.8x op
+regression: the VM charges per stepped opcode even in untaken branches, so a body spliced
+into a loop is stepped every iteration while a skipped OP_INVOKE site costs 2 opcodes;
+rationale and measurements at `GenerateTargetTraversal.ts:1189-1205`, branch-aware variant
+measured +-0 and rejected), define-vs-inline economics generally (define bodies are pushed
+as data, not stepped, so keeping shared helpers defined wins on both axes for multi-use
+bodies), seam solving (censused), and the calling convention (fully recovered).
+
+Two open experiments, both cheap:
+
+- Scheduler effort scaling / superoptimize the hot bodies. The rescheduler's beam is tiny
+  (`BEAM_WIDTH = 4`, `BEAM_EXPAND = 3`, `stack-rescheduling.ts:449-450`) because it was
+  sized for interactive compile times, but artifact generation here is offline and
+  compile time is nearly free; per-block min makes wider search risk-free. Tier 1 (hours):
+  crank the beam constants (e.g. 32/8) on one hot chunk family and diff total op. Tier 2:
+  exact scheduling of the hottest shared tower bodies (fp2Mul, fp2Sqr, mul034, cycSqr):
+  these are small DAGs executed thousands of times per verification, so even 100-200 op
+  shaved from one body multiplies into whole-build savings; small blocks admit exhaustive
+  or DP-over-subsets enumeration, and the EVM world's superoptimizers (syrup, GASOL, ebso)
+  are the precedent that solver-grade per-block scheduling pays. Measure the greedy-vs-
+  optimal gap first; if the beam is already near-optimal, close this permanently.
+- Partial unroll (x4) of the vk_x rolled loops: already sized by the census at ~2-4% op on
+  the two standalone vkx entries (~0.1% on the flagship), fits the byte caps, and is a
+  generator-level emission tweak, not compiler surface.
+
+Beyond these, remaining op headroom for the chunked families is at the math/advice level,
+where all the large historical wins came from (residue witness, GLV, fused subgroup
+checks, witness inverses). One systematic sweep worth doing: since op-bound chunks must
+pad their unlocking data anyway, advice bytes are score-free up to the padding
+requirement, so any remaining site where verifying a witnessed value is cheaper than
+computing it (divisions, exponentiations, decompositions not yet witnessed) is free
+op-cost. The compiler cannot find those; a manual pass over the chunk sources can.
 
 ## Cut, with reasons
 

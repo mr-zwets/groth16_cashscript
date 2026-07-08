@@ -84,7 +84,13 @@ export function runSubroutine(d, targetId, inputs, override) {
   return { stack: state.stack.map((b) => vmNumberToBigInt(b, { maximumVmNumberByteLength: HUGE })), error: benign ? undefined : state.error, operationCost: state.metrics.operationCost };
 }
 
-const rnd = (s) => { let x = BigInt(s + 7); for (let i = 0; i < 6; i++) x = (x * 6364136223846793005n + 1442695040888963407n) % P; return x; };
+// Range for the random probe/differential-test inputs. Defaults to the BN254 prime;
+// callers grading another curve's artifact set the matching field prime so the test
+// inputs exercise realistic operand sizes (any range is CORRECT for equivalence
+// testing, this is about coverage of size-dependent paths).
+let testInputRange = P;
+export function setTestInputRange(p) { testInputRange = BigInt(p); }
+const rnd = (s) => { let x = BigInt(s + 7); for (let i = 0; i < 6; i++) x = (x * 6364136223846793005n + 1442695040888963407n) % testInputRange; return x; };
 
 // Determine (inputs -> outputs) arity of every subroutine by probing input counts.
 export function probeArity(d) {

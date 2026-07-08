@@ -70,8 +70,9 @@ node singleton/bls12-381/vkx.mjs          # vk_x G1 checkpoint
 node singleton/bls12-381/verify.mjs       # pairing verdict (very slow)
 node singleton/bls12-381/groth16.mjs      # full verifier (very slow)
 
-node singleton/bls12-381/build_vectors.mjs        # -> pairing-bls12381-singleton-vectors.json
-node singleton/bls12-381/build_vectors_groth16.mjs# -> groth16-bls12381-singleton-vectors.json
+node singleton/bls12-381/build_vectors.mjs          # -> pairing-bls12381-singleton-vectors.json
+node singleton/bls12-381/build_vectors_groth16.mjs  # -> groth16-bls12381-singleton-vectors.json
+node singleton/bls12-381/build_vectors_optimized.mjs# -> groth16-bls12381-singleton-opcode-optimized{,-multiproof}-vectors.json
 ```
 
 ## Op-optimized variant (`groth16_minop.cash`, generated)
@@ -110,14 +111,20 @@ node singleton/bls12-381/gen_multiproof_minop.mjs        # -> ...-minop-multipro
 Entries on the **same curve as nChain** (so a true apples-to-apples size
 comparison, unlike the BN254 entries):
 
-- `bch-groth16-bls12381-singleton` — the COMPLETE verifier; ~24.2 KB, ~1.48B op-cost
-  (~185 BCH inputs). **~21× smaller bytecode than the nChain reference.**
+- `bch-groth16-bls12381-singleton` — the COMPLETE verifier, plain compiler output
+  (size objective + rescheduleStacks, no post-passes); ~9.2 KB, ~1.04B op-cost
+  (~129 BCH inputs). **Far smaller bytecode than the nChain reference.**
+- `bch-groth16-bls12381-singleton-opcode-optimized` — the byte-optimized COMPLETE
+  verifier (`build_vectors_optimized.mjs`: golf recompile A/B'd vs the rescheduled
+  compile, then auto-outlining); **~6.4 KB**, ~1.06B op-cost. The pair shows the
+  bytesize-vs-opcost tradeoff, mirroring the BN254 plain/optimized split.
 - `bch-groth16-bls12381-singleton-minop` — the op-optimized COMPLETE verifier
   (`groth16_minop.cash`); ~68.7 KB, **~318M op-cost (~40 inputs)** vs the baseline's
   ~1.04B (~129) on the current harness.
 - `bch-pairing-bls12381-singleton` — the pairing-only milestone (`verify.cash`);
   ~19.8 KB, ~1.38B op-cost.
 
-Both are honest single-tx baselines (BCH-incompatible: script-size + op-cost) that
+All are honest single-tx baselines (BCH-incompatible: op-cost, plus script-size for
+the minop variant) that
 motivate a future `chunked/bls12-381/` multi-tx verifier, exactly as the BN254 work
 sequenced singleton → chunked.
