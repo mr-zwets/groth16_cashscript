@@ -73,9 +73,10 @@ let _st = 0xA5A5A5A5DEADBEEFn;
 const MASK64 = (1n << 64n) - 1n;
 const nextU64 = () => { _st = (_st + 0x9e3779b97f4a7c15n) & MASK64; let z = _st; z = ((z ^ (z >> 30n)) * 0xbf58476d1ce4e5b9n) & MASK64; z = ((z ^ (z >> 27n)) * 0x94d049bb133111ebn) & MASK64; return (z ^ (z >> 31n)) & MASK64; };
 const randScalar = () => { let a = 0n; for (let i = 0; i < 4; i++) a = (a << 64n) | nextU64(); return (a % r) || 1n; };
-const mint = () => {
-  const in0 = randScalar() % 1000000n || 11n;
-  const in1 = randScalar() % 1000000n || 13n;
+// dense=true -> near-r public inputs (maximal GLV-scalar density) for the worst-case op-cost run.
+const mint = (dense) => {
+  const in0 = dense ? (1n << 254n) - 1n : randScalar() % 1000000n || 11n;
+  const in1 = dense ? (1n << 254n) - 1n : randScalar() % 1000000n || 13n;
   const a_s = randScalar(), b_s = randScalar();
   const vkx_s = modr(ic_s[0] + in0 * ic_s[1] + in1 * ic_s[2]);
   const c_s = modr((a_s * b_s - alpha_s * beta_s - vkx_s * gamma_s) * invr(delta_s));
@@ -97,13 +98,24 @@ for (let k = 0; k < EXTRA; k++) {
   proofs.push({ publicInputs: inputs.map(String), unlocking: binToHex(unlocking), invalidUnlocking: binToHex(invalidUnlocking), committed: false });
 }
 
+// worst-case: dense (near-r) public inputs -> the GLV vk_x MSM does an add nearly every iteration.
+// Exposed so the benchmark can measure the op-cost on a dense proof, apples-to-apples with the
+// chunked entries (this GLV singleton is proof-DEPENDENT, ~+15M op vs the committed proof).
+const wcm = mint(true);
+const wcUnlocking = witnessArgs(wcm.A, wcm.B, wcm.Cc, wcm.inputs, wcm.inputs);
+const wcInvalid = witnessArgs(wcm.A, wcm.B, wcm.Cc, wcm.inputs, [wcm.inputs[0], modr(wcm.inputs[1] + 1n)]);
+if (!evalPair(locking, wcUnlocking).accepted) throw new Error('worst-case proof REJECTED');
+if (evalPair(locking, wcInvalid).accepted) throw new Error('worst-case tamper ACCEPTED');
+console.log(`  worst-case (dense inputs): accept OK`);
+
 const out = {
   contract: single.contract,
-  description: `${proofs.length} DISTINCT valid BLS12-381 Groth16 proofs verifying under ONE fixed min-op locking (VK baked); witnesses (residue c/cInv/w, GLV decomposition + vkxZinv) recomputed per proof. Demonstrates runtime-generality.`,
+  description: `${proofs.length} DISTINCT valid BLS12-381 Groth16 proofs verifying under ONE fixed min-op locking (VK baked); witnesses (residue c/cInv/w, GLV decomposition + vkxZinv) recomputed per proof. Demonstrates runtime-generality. Plus a worstCaseProof with dense (near-r) public inputs for apples-to-apples op-cost.`,
   lockingOK: single.lockingOK,
   lockingBytes: single.lockingBytes,
   numProofs: proofs.length,
   proofs,
+  worstCaseProof: { publicInputs: wcm.inputs.map(String), unlocking: binToHex(wcUnlocking), invalidUnlocking: binToHex(wcInvalid) },
 };
 const outPath = VDIR + 'src/bch/groth16-bls12381-singleton-minop-multiproof-vectors.json';
 writeFileSync(outPath, JSON.stringify(out, null, 2));
