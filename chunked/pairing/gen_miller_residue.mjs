@@ -12,9 +12,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp2, f12limbs, r6limbs, pairsFor, vec, commit, millerBatchOps, singlePairMiller,
-  measureCovenantFile, planChunk, covIn, covOut, PT_CFG, ptLimbs, decl,
+  measureCovenantFile, planChunk, covIn, covOut, PT_CFG, ptLimbs, decl, compileFileBytecodeRaw,
 } from './_millermath.mjs';
 import { millerFusedOps, residueWitness } from './_residuemath.mjs';
+import { residueVerdictLines } from './gen_finalexp_residue.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -60,19 +61,24 @@ const outState = (i) => i === states.length - 1
   : withPts(stateLimbs(states[i]));
 
 const bakedCoeffs = (triple) => triple.flatMap((c) => [`${c.c0}`, `${c.c1}`]);
-function genChunk(opLo, opHi, isFinal) {
+// withTail (FUSE_TAIL, final chunk only): fold the residue final-exp verdict into this chunk so
+// the separate ResidueTail input disappears. The chunk computes fF = final f, then runs the
+// witnessed-residue verdict inline (w is an extra UNCOMMITTED witness, appended after the state).
+const wNames = Array.from({ length: 12 }, (_, i) => `w${i}`);
+function genChunk(opLo, opHi, isFinal, withTail = false) {
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
-  const allParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames];
+  const stateParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames]; // 52 committed state limbs
+  const allParams = withTail ? [...stateParams, ...wNames] : stateParams;
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
-  L.push(`// c^-(6x+2)-fused prepared-VK batched BN254 Miller chunk: ops [${opLo},${opHi}).`);
+  L.push(`// c^-(6x+2)-fused prepared-VK batched BN254 Miller chunk: ops [${opLo},${opHi}).${withTail ? ' [+ residue-tail verdict fused]' : ''}`);
   L.push('// state = f(12) + R0(6) [+ runtime points] + c(12) + cInv(12); c,cInv are constant');
   L.push('// carried witness. cf op folds c^-1/c into f (residue method, ePrint 2024/640).');
-  L.push('contract MillerFusedChunk() {');
+  L.push(`contract MillerFused${withTail ? 'Tail' : ''}Chunk() {`);
   L.push(`    function spend(${decl(allParams)}, bytes unused zeroPadding) {`);
-  L.push(covIn(allParams));
+  L.push(covIn(stateParams)); // commit the 52 state limbs only (w is an uncommitted witness)
   const negY = PINFO.map((pi) => {
     if (!pi.cfg.Q) return [`${pi.negQ.c0}`, `${pi.negQ.c1}`];
     const needs = ops.slice(opLo, opHi).some((o) => o.t === 'al' && o.neg && o.j === pi.j);
@@ -117,8 +123,13 @@ function genChunk(opLo, opHi, isFinal) {
       emitLine(cco, pi);
     }
   }
-  // final chunk hands off only [fF, c, cInv] to the residue tail; others carry full state.
-  L.push(isFinal ? covOut([...f, ...cNames, ...ciNames]) : covOut([...f, ...r0, ...ptParams, ...cNames, ...ciNames]));
+  if (withTail) {
+    // fused terminal: f is now fF; run the residue verdict inline instead of handing off.
+    L.push(...residueVerdictLines(f, cNames, ciNames, wNames));
+  } else {
+    // final chunk hands off only [fF, c, cInv] to the residue tail; others carry full state.
+    L.push(isFinal ? covOut([...f, ...cNames, ...ciNames]) : covOut([...f, ...r0, ...ptParams, ...cNames, ...ciNames]));
+  }
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
@@ -152,8 +163,24 @@ while (lo < ops.length) {
 }
 for (let i = 1; i < chunks.length; i++) if (chunks[i - 1].outgoing !== chunks[i].incoming) throw new Error('continuity break at ' + i);
 console.error(`fused miller: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.opCost, 0).toLocaleString()}, maxOp=${Math.max(...chunks.map((c) => c.opCost)).toLocaleString()}`);
+
+// FUSE_TAIL=1: fold the residue final-exp verdict into the FINAL Miller chunk (making it TERMINAL),
+// so the separate ResidueTail input disappears (-1 input). Only the last chunk's SOURCE is
+// regenerated with the verdict inlined; its window/state are unchanged (the verdict replaces the
+// [fF,c,cInv] hand-off, and the final op is an f-only c-fold so no R accumulator dangles). The
+// consuming build must treat it as terminal and supply the w witness. Default (unset) keeps the
+// hand-off form so the flagship builds + the standalone ResidueTail are untouched.
+if (process.env.FUSE_TAIL === '1') {
+  const last = chunks[chunks.length - 1];
+  const src = genChunk(last.opLo, last.opHi, true, true);
+  writeFileSync(join(GEN, `millerres_${String(last.idx).padStart(2, '0')}.cash`), src);
+  try { compileFileBytecodeRaw(join(GEN, `millerres_${String(last.idx).padStart(2, '0')}.cash`)); }
+  catch (e) { throw new Error(`FUSE_TAIL: fused final Miller+tail chunk does not compile: ${e?.message ?? e}`); }
+  last.tailFused = true;
+  console.error(`  chunk ${last.idx}: residue-tail verdict FUSED -> terminal (was hand-off + separate tail)`);
+}
 writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
   fused: true, numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
-  chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, incoming: c.incoming, outgoing: c.outgoing })),
+  chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, tailFused: c.tailFused === true, incoming: c.incoming, outgoing: c.outgoing })),
 }, null, 2));
 console.error('wrote generated/manifest_millerres.json');

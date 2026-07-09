@@ -35,6 +35,33 @@ const ROOT27_2L = fp12limbsOf(COSET27[2]).map(String);
 const matchVec = (names, lits) => '(' + names.map((n, i) => `${n} == ${lits[i]}`).join(' && ') + ')';
 const ONE_L = ['1', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'];
 
+// The residue verdict BODY (no contract/covIn wrapper), parameterized by the fp12 limb-name
+// arrays so it can be emitted standalone (the ResidueTail chunk) OR inlined at the end of the
+// fused-Miller final chunk (chunked/pairing/gen_miller_residue.mjs FUSE_TAIL, folding the separate
+// tail input into the last Miller input). `fFnames` are the fF (final Miller f) limbs, `cNames`/
+// `ciNames` the residue witness c/cInv (carried Miller state), `wNames` the w witness (uncommitted).
+// Gates: c per-limb canonical, c*cInv==ONE, w in {1,ROOT27,ROOT27^2}, verdict fF*w*c^q2==c^q*c^q3.
+export function residueVerdictLines(fFnames, cNames, ciNames, wNames) {
+  const v = (p) => Array.from({ length: 12 }, (_, i) => `${p}${i}`);
+  const L = [];
+  L.push(`        int P = ${P};`); // field prime (lazy-lib chunks declare it locally)
+  L.push('        ' + cNames.map((n) => `require(${n} < P);`).join(' '));
+  const p = v('p');
+  L.push(`        (${decl(p)}) = fp12Mul(${cNames.join(',')}, ${ciNames.join(',')});`);
+  L.push('        ' + p.map((n, i) => `require(${n} % P == ${ONE_L[i]});`).join(' '));
+  L.push(`        require(${matchVec(wNames, ONE_L)} || ${matchVec(wNames, ROOT27L)} || ${matchVec(wNames, ROOT27_2L)});`);
+  const cq = v('cq'), cqq = v('cqq'), cqqq = v('cqqq');
+  L.push(`        (${decl(cq)}) = fp12Frob1(${cNames.join(',')});`);
+  L.push(`        (${decl(cqq)}) = fp12Frob2(${cNames.join(',')});`);
+  L.push(`        (${decl(cqqq)}) = fp12Frob3(${cNames.join(',')});`);
+  const t = v('t'), lhs = v('lhs'), rhs = v('rhs');
+  L.push(`        (${decl(t)}) = fp12Mul(${fFnames.join(',')}, ${wNames.join(',')});`);
+  L.push(`        (${decl(lhs)}) = fp12Mul(${t.join(',')}, ${cqq.join(',')});`);
+  L.push(`        (${decl(rhs)}) = fp12Mul(${cq.join(',')}, ${cqqq.join(',')});`);
+  L.push('        ' + lhs.map((n, i) => `require(${n} % P == ${rhs[i]} % P);`).join(' '));
+  return L;
+}
+
 function genTail() {
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
@@ -43,23 +70,7 @@ function genTail() {
   L.push('contract ResidueTail() {');
   L.push(`    function spend(${decl([...COMMIT, ...wN])}, bytes unused zeroPadding) {`);
   L.push(covIn(COMMIT)); // bind [fF, c, cInv] to the spent token / forwarded blob
-  L.push(`        int P = ${P};`); // field prime (lazy-lib chunks declare it locally)
-  // c per-limb canonical
-  L.push('        ' + cN.map((n) => `require(${n} < P);`).join(' '));
-  // c * cInv == ONE  (lazy fp12Mul returns an unreduced representative -> compare mod P)
-  L.push(`        (${decl(Array.from({ length: 12 }, (_, i) => `p${i}`))}) = fp12Mul(${cN.join(',')}, ${ciN.join(',')});`);
-  L.push('        ' + Array.from({ length: 12 }, (_, i) => `require(p${i} % P == ${ONE_L[i]});`).join(' '));
-  // w in {1, ROOT27, ROOT27^2}
-  L.push(`        require(${matchVec(wN, ONE_L)} || ${matchVec(wN, ROOT27L)} || ${matchVec(wN, ROOT27_2L)});`);
-  // Frobenius c^q, c^q^2, c^q^3
-  L.push(`        (${decl(Array.from({ length: 12 }, (_, i) => `cq${i}`))}) = fp12Frob1(${cN.join(',')});`);
-  L.push(`        (${decl(Array.from({ length: 12 }, (_, i) => `cqq${i}`))}) = fp12Frob2(${cN.join(',')});`);
-  L.push(`        (${decl(Array.from({ length: 12 }, (_, i) => `cqqq${i}`))}) = fp12Frob3(${cN.join(',')});`);
-  // LHS = fF * w * c^q^2 ; RHS = c^q * c^q^3
-  L.push(`        (${decl(Array.from({ length: 12 }, (_, i) => `t${i}`))}) = fp12Mul(${fFn.join(',')}, ${wN.join(',')});`);
-  L.push(`        (${decl(Array.from({ length: 12 }, (_, i) => `lhs${i}`))}) = fp12Mul(${Array.from({ length: 12 }, (_, i) => `t${i}`).join(',')}, ${Array.from({ length: 12 }, (_, i) => `cqq${i}`).join(',')});`);
-  L.push(`        (${decl(Array.from({ length: 12 }, (_, i) => `rhs${i}`))}) = fp12Mul(${Array.from({ length: 12 }, (_, i) => `cq${i}`).join(',')}, ${Array.from({ length: 12 }, (_, i) => `cqqq${i}`).join(',')});`);
-  L.push('        ' + Array.from({ length: 12 }, (_, i) => `require(lhs${i} % P == rhs${i} % P);`).join(' '));
+  L.push(...residueVerdictLines(fFn, cN, ciN, wN));
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
@@ -94,11 +105,12 @@ function measureTail(src, stateLimbs36, wLimbs12) {
   return { lockingBytes: locking.length, operationCost: st.metrics.operationCost, accepted, error: st.error ?? null };
 }
 
-const src = genTail();
-writeFileSync(join(GEN, 'finalexpres_00.cash'), src);
-writeFileSync(join(GEN, 'manifest_finalexpres.json'), JSON.stringify({ numChunks: 1, residueTail: true }, null, 2));
-
+// Emit the standalone tail chunk + self-test ONLY when run as the main script (so importing
+// residueVerdictLines from gen_miller_residue's FUSE_TAIL path has no file-write side effect).
 if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
+  const src = genTail();
+  writeFileSync(join(GEN, 'finalexpres_00.cash'), src);
+  writeFileSync(join(GEN, 'manifest_finalexpres.json'), JSON.stringify({ numChunks: 1, residueTail: true }, null, 2));
   // self-test on the committed instance
   const pairs = pairsFor(vec.publicInputs.map(BigInt));
   const { boundary: fRaw } = millerBatchOps(pairs);

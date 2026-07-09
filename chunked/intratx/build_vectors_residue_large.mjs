@@ -11,11 +11,11 @@
 //   size to a 100 kB unlocking (=> 80,032,800 op/input, ~10x), which collapses the same
 //   ~202M-op verifier into a HANDFUL of fat inputs — one per stage floor:
 //     fast-G2 subgroup check   1 input
-//     GLV vk_x MSM             1 input
-//     c^-(6x+2)-fused Miller   ~3 inputs   (161M op / 80M budget = 2.02 -> 3)
-//     residue final-exp tail   1 input
+//     GLV vk_x MSM             1 input    (one 128-iter loop window)
+//     c^-(6x+2)-fused Miller   3 inputs   (~148M op op-bound; the LAST is terminal, see below)
+//     residue final-exp tail   0 inputs   (verdict FUSED into the final Miller chunk)
 //                              --------
-//                              ~6 inputs   (still ONE non-standard <1 MB tx)
+//                              5 inputs   (still ONE non-standard <1 MB tx)
 //
 // op-cost and total bytes are CONSERVED (~202M / ~260 kB either way) — this is a STRUCTURAL
 // simplification (fewer, fatter UTXOs in one tx), not a resource reduction. Each 100 kB input
@@ -71,8 +71,8 @@ const GEN = join(PAIR, 'generated');
 const GEN_ENV = { ...process.env, BCH_VM: 'spec', TARGET_UNLOCK: String(LARGE_UNLOCK), OP_COST_TARGET: '86000000', BYTE_BUDGET: '95000' };
 console.error('\n== regenerating gen_g2check.mjs at 100 kB budget ==');
 execFileSync(process.execPath, [join(PAIR, 'gen_g2check.mjs')], { env: GEN_ENV, stdio: 'inherit' });
-console.error('\n== regenerating gen_miller_residue.mjs at 100 kB budget ==');
-execFileSync(process.execPath, [join(PAIR, 'gen_miller_residue.mjs')], { env: GEN_ENV, stdio: 'inherit' });
+console.error('\n== regenerating gen_miller_residue.mjs at 100 kB budget (FUSE_TAIL -> residue tail folded into the final Miller chunk) ==');
+execFileSync(process.execPath, [join(PAIR, 'gen_miller_residue.mjs')], { env: { ...GEN_ENV, FUSE_TAIL: '1' }, stdio: 'inherit' });
 console.error('\n== regenerating GLV vk_x as ONE window [0,128] (lever 2) ==');
 regenGlvSafe(GEN, [0, 128]);
 
@@ -200,32 +200,28 @@ function specsVkx(inst, crossToMiller) {
 }
 // c^-(6x+2)-FUSED miller (residue method). State f(12)+R0(6)+pts(10)+c(12)+cInv(12) = 52; the
 // FINAL chunk hands off only [fF, c, cInv] (36) to the residue tail.
-function specsMillerFused(inst, c, cInv) {
+// The FINAL chunk has the residue-tail verdict FUSED in (manifest tailFused, FUSE_TAIL=1): it is
+// TERMINAL (no hand-off; the verdict fF*w*c^q2==c^q*c^q3 runs inline on its own computed fF), with w
+// as an uncommitted witness extra. Earlier chunks forward the full 52-limb state as usual.
+function specsMillerFused(inst, c, cInv, w) {
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const { states, boundary } = millerFusedOps(pairs, c, cInv);
+  const { states } = millerFusedOps(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const full = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...ptL, ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 52
-  const handoff = (s) => [...f12limbs(s.f), ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 36 -> tail
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
-  const specs = man.chunks.map((ch) => ({
-    file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`),
-    inLimbs: full(states[ch.opLo]),
-    outLimbs: ch.final ? handoff(states[ch.opHi]) : full(states[ch.opHi]),
-    extras: [], role: ch.final ? 'cross' : 'within',
-    cmp: ch.final ? { cmpExpr: 'outBlob', nextFullInLen: TAIL_IN_LIMBS * W, skip: 0, cmpLen: TAIL_IN_LIMBS * W } : null,
-    label: `fused-miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' =boundary*c^-(6x+2)' : ''}`,
-    checkpoint: ch.final ? 'miller-boundary' : undefined,
-  }));
-  return { specs, boundary };
-}
-// witnessed-residue final-exp TAIL — ONE chunk. inBlob = [fF, c, cInv] (36); w is a witness extra.
-function specsResidueTail(fF, c, cInv, w) {
-  return [{
-    file: join(GEN, 'finalexpres_00.cash'),
-    inLimbs: [...fp12limbsOf(fF), ...fp12limbsOf(c), ...fp12limbsOf(cInv)],
-    outLimbs: [], extras: fp12limbsOf(w), role: 'terminal', cmp: null,
-    label: 'residue-tail fF*w*c^q2==c^q*c^q3 verdict', checkpoint: 'verify',
-  }];
+  return man.chunks.map((ch) => {
+    const file = join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`);
+    if (ch.tailFused) {
+      return {
+        file, inLimbs: full(states[ch.opLo]), outLimbs: [], extras: fp12limbsOf(w), role: 'terminal', cmp: null,
+        label: `fused-miller+tail ops[${ch.opLo},${ch.opHi}) -> verdict fF*w*c^q2==c^q*c^q3`, checkpoint: 'verify',
+      };
+    }
+    return {
+      file, inLimbs: full(states[ch.opLo]), outLimbs: full(states[ch.opHi]), extras: [], role: 'within', cmp: null,
+      label: `fused-miller ops[${ch.opLo},${ch.opHi})`, checkpoint: undefined,
+    };
+  });
 }
 function buildSpecs(inst) {
   const g2 = specsG2check(inst);
@@ -233,9 +229,8 @@ function buildSpecs(inst) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const { boundary: fRaw } = millerBatchOps(pairs);
   const { c, cInv, w } = residueWitness(fRaw);
-  const { specs: miller, boundary: fF } = specsMillerFused(inst, c, cInv);
-  const tail = specsResidueTail(fF, c, cInv, w);
-  return [...g2, ...vkx, ...miller, ...tail];
+  const miller = specsMillerFused(inst, c, cInv, w); // the residue tail is fused into miller's final chunk
+  return [...g2, ...vkx, ...miller];
 }
 
 // ---- assemble: transform+compile each chunk, build the single tx, tune pad, verify ----
@@ -350,7 +345,7 @@ const fullInvalid = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.in
 console.error(`  invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-residue-large-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts. Identical mechanism and residue chunk graph to bch-groth16-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; fast-G2 endo subgroup check + GLV vk_x MSM + c^-(6x+2)-FUSED batched Miller with e(alpha,beta) skipped + witnessed-residue final-exp tail), but each chunk is sized to a 100 kB unlocking instead of 10 kB. The BCH op-cost budget an input receives is (41 + unlockingLen) * 800, so a 100 kB input gets 80,032,800 op (~10x the 8,032,800 of a 10 kB input); the same ~202M-op verifier therefore collapses from 33 inputs to ~6 fat inputs — roughly one per stage floor (g2check 1, GLV vk_x 1, fused Miller ~3, residue tail 1). Total op-cost and bytes are conserved (this is a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input still fits its own BCH input budget (op-cost <= 80,032,800, scripts <= 100,000 B) and the whole verifier remains ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail. Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; fast-G2 endo subgroup check + GLV vk_x MSM + c^-(6x+2)-FUSED batched Miller with e(alpha,beta) skipped + witnessed-residue final-exp verdict), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the same ~193M-op verifier therefore collapses from 33 inputs to 5: g2check 1, GLV vk_x 1 (one 128-iter loop window), and c^-(6x+2)-fused Miller 3 with the witnessed-residue final-exp verdict (fF*w*c^q2==c^q*c^q3) FOLDED into the last (terminal) Miller chunk — so the separate residue-tail input disappears. Total op-cost and bytes are conserved (a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the fused verdict. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
   method: 'intra-tx-linked-residue-large', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: LARGE_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
