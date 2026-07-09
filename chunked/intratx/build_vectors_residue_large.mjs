@@ -42,6 +42,7 @@ import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
 import { glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
 import { transformChunk } from './transform.mjs';
+import { regenGlvSafe } from '../regen_vkx_windows.mjs';
 
 // ---- LARGE per-input budget on the PROPOSED bch-spec VM (100 kB scripts) ----
 // On bch-spec the op-cost budget an input gets is (densityControlBase 10,000 + unlockingLen)*800,
@@ -57,15 +58,23 @@ const here = dirname(fileURLToPath(import.meta.url));
 const PAIR = join(here, '..', 'pairing');
 const GEN = join(PAIR, 'generated');
 
-// Regenerate the three variable-length stages at the 100 kB budget (fresh child processes so
-// _millermath picks up the big TARGET_UNLOCK; OP_COST_TARGET stays under LARGE_BUDGET and
-// BYTE_BUDGET keeps the redeem under ~94 kB so the P2SH unlocking [inBlob + pad + redeem] stays
-// <=100 kB). The residue tail (finalexpres_00.cash) is a single fixed chunk — not regenerated.
+// Regenerate the variable-length stages at the 100 kB budget. g2check plans to 1 chunk on its own;
+// fused Miller greedy-plans to 3 chunks (op-bound at ~85M each, then a small boundary/handoff chunk
+// the fork compiler forces separate — merging it hits an UnusedVariableError on the dropped R
+// accumulator, so Miller stays 3 for now). The residue tail is a single fixed chunk — not regenerated.
+//
+// Lever 2 (7 inputs -> 6): GLV vk_x as ONE loop window [0,128] via regenGlvSafe. The vk_x codegen
+// LOOPS (not unrolled), so a single 128-iter window is only ~2.5 kB / ~21M op; the greedy planner
+// split off a 1-iter zinv/assert final chunk only because that cross-bind final chunk measures
+// accepted=false STANDALONE in the covenant model. regenGlvSafe writes the window directly (no
+// planner) and the assembly below validates it against max-density on the real spec VM.
 const GEN_ENV = { ...process.env, BCH_VM: 'spec', TARGET_UNLOCK: String(LARGE_UNLOCK), OP_COST_TARGET: '86000000', BYTE_BUDGET: '95000' };
-for (const g of ['gen_g2check.mjs', 'gen_vkx_glv.mjs', 'gen_miller_residue.mjs']) {
-  console.error(`\n== regenerating ${g} at 100 kB budget ==`);
-  execFileSync(process.execPath, [join(PAIR, g)], { env: GEN_ENV, stdio: 'inherit' });
-}
+console.error('\n== regenerating gen_g2check.mjs at 100 kB budget ==');
+execFileSync(process.execPath, [join(PAIR, 'gen_g2check.mjs')], { env: GEN_ENV, stdio: 'inherit' });
+console.error('\n== regenerating gen_miller_residue.mjs at 100 kB budget ==');
+execFileSync(process.execPath, [join(PAIR, 'gen_miller_residue.mjs')], { env: GEN_ENV, stdio: 'inherit' });
+console.error('\n== regenerating GLV vk_x as ONE window [0,128] (lever 2) ==');
+regenGlvSafe(GEN, [0, 128]);
 
 const PROBE = join(GEN, '_intratx_residue_large_probe.cash'); // transformed import-chunks compiled from here
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
