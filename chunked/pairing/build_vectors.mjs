@@ -41,7 +41,8 @@ const padBytes = (total) => { const b = Math.max(2, total); const n = b <= 76 ? 
 
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); };
-const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
+const TUNE_SLACK = Number(process.env.TUNE_SLACK ?? 96);
+const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + TUNE_SLACK));
 
 const tok = (commitment) => ({ amount: 0n, category: CATEGORY, nft: { capability: 'mutable', commitment } });
 function evalCov(locking, unlocking, inCommit, outCommit) {

@@ -12,8 +12,11 @@ against those two. Out of scope regardless: a chunking backend (stays project-si
 
 Provenance: three rounds of adversarial review against the actual code of both repos (this
 repo and the cashscript fork, branch `compiler-optimizations`), claims checked against
-code and measurement docs. Corrections to earlier premises are recorded so the numbers stay
-honest.
+code and measurement docs, followed by applied A/B measurement of every project-side item
+(2026-07-08). Corrections to earlier premises are recorded so the numbers stay honest.
+Calibration lesson from those measurements: static sizing was wrong in both directions
+(outlining's "under 1-2%" prior was off by 10x low, the unroll's "~2-4%" census sizing had
+the wrong sign), so on this stack only applied, end-to-end-verified A/Bs settle a lever.
 
 ## Ground truth (already banked or already settled, do not re-plan)
 
@@ -50,7 +53,8 @@ honest.
   cashc-stack-optimization.md carries the dated closing note. No unroll pass either:
   g2check is already straight-line, only the vk_x families survive rolled, their ~5%
   per-iteration scaffold cannot be recovered (full unroll blows the byte caps at ~330 B
-  per iteration, partial unroll is a generator-level tweak worth ~0.1% of the flagship).
+  per iteration; partial unroll was then MEASURED 2026-07-08 as an op regression, not a
+  win — see item 7 for the numbers and the mechanism the census sizing missed).
 - Structs monomorphized to flat slots save approximately zero bytes: signatures have no
   bytecode representation, calls are already 2 bytes, and the scheduler is DAG-based and
   type-blind (`arrays.md` reaches the same conclusion for compile-time-indexed locals).
@@ -69,6 +73,15 @@ honest.
   2026-07-08). Only a VM change removes the executed tax (see strategic addendum).
 
 ## Roadmap
+
+Status: the COMPILER-side track is complete. Items 6 and 7 are built/closed, and with them
+every compiler-level lever for this project's scores is either banked or measured dead, on
+both axes (bytes: outlining shipped, depth layout dead; op: scheduling within ~0.04% of
+solver-optimal, unrolling a regression, convention recovered, seams a non-starter). The
+outstanding project-side work moved to the BUILDERS: the compounding slack-trim/replan
+sweep in item 7's addendum, expected to dwarf the closed scheduling results. Items 0-5 are
+the upstream merge track and have not started. Remaining headroom beyond both is
+math/advice-level (see the sweep note in item 7).
 
 ### 0. Merge gate: correctness and test infrastructure (before any optimization PR)
 
@@ -232,7 +245,7 @@ size-objective compiler pass only after the project-side pass has soaked; under 
 stays exactly what collectLoopExcludedFunctions exists to prevent, and debug info for
 synthetic frames must be answered before any upstream PR.
 
-### 7. Op-over-bytes experiments for the chunked (compute-bound) families
+### 7. Op-over-bytes experiments for the chunked families (measured 2026-07-08, both closed)
 
 The exchange rate that governs every tradeoff here: at the standard limits, op budget
 scales with unlocking length at ~800 op per byte, so 800 op saved is worth ~1 B of padding
@@ -248,22 +261,80 @@ measured +-0 and rejected), define-vs-inline economics generally (define bodies 
 as data, not stepped, so keeping shared helpers defined wins on both axes for multi-use
 bodies), seam solving (censused), and the calling convention (fully recovered).
 
-Two open experiments, both cheap:
+Both experiments ran end-to-end on the BN254 pairing family (2026-07-08) and both CLOSE
+NEGATIVE. Baselines: pairing 169,808,742 op / full groth16 294,811,516 / standalone vkx
+7,982,162, reproduced byte-identical before each A/B.
 
-- Scheduler effort scaling / superoptimize the hot bodies. The rescheduler's beam is tiny
-  (`BEAM_WIDTH = 4`, `BEAM_EXPAND = 3`, `stack-rescheduling.ts:449-450`) because it was
-  sized for interactive compile times, but artifact generation here is offline and
-  compile time is nearly free; per-block min makes wider search risk-free. Tier 1 (hours):
-  crank the beam constants (e.g. 32/8) on one hot chunk family and diff total op. Tier 2:
-  exact scheduling of the hottest shared tower bodies (fp2Mul, fp2Sqr, mul034, cycSqr):
-  these are small DAGs executed thousands of times per verification, so even 100-200 op
-  shaved from one body multiplies into whole-build savings; small blocks admit exhaustive
-  or DP-over-subsets enumeration, and the EVM world's superoptimizers (syrup, GASOL, ebso)
-  are the precedent that solver-grade per-block scheduling pays. Measure the greedy-vs-
-  optimal gap first; if the beam is already near-optimal, close this permanently.
-- Partial unroll (x4) of the vk_x rolled loops: already sized by the census at ~2-4% op on
-  the two standalone vkx entries (~0.1% on the flagship), fits the byte caps, and is a
-  generator-level emission tweak, not compiler surface.
+- Scheduler effort scaling / superoptimize the hot bodies: CLOSED, the tiny beam is
+  already within ~0.04% of solver-grade. The beam constants are now env-tunable
+  (`CASHC_BEAM_WIDTH`/`CASHC_BEAM_EXPAND`, default 4/3). Beam 32/8: pairing -0.001%,
+  groth16 -0.007%, vkx -0.2%. Beam 256/16: -0.041% / -0.043% / -0.245%, compile 44 s ->
+  2m36s, zero chunk-count changes. Exhaustive per-block enumeration (branch-and-bound
+  over ALL topo orders with the pass's operand-fetch policy, `exhaustiveBlock` +
+  `gap-probe.mjs` in the fork; also wired as an opt-in measured-selected body strategy
+  via `CASHC_EXHAUSTIVE`): the hot small tower bodies (fp2Mul, fp2Sqr, fp2Sub, mulFp,
+  subFp, fp2MulXi, cycSqr, selectPoint) are EXACTLY optimal already; residual static
+  gaps live only in big cold bodies (fp12Sqr -956, jacAdd -652, pointDouble -415,
+  line -406, fp12Mul -323 static op/exec) and realize end-to-end as pairing -0.039% /
+  groth16 -0.036% / vkx -0.166% — same magnitude as beam 256/16, ~130 padding bytes
+  across a whole family, no chunk-count change. The syrup/GASOL analogy fails here
+  because the per-block min already captures the enumerable space; what remains is
+  intrinsic arithmetic, not scheduling.
+- Partial x4 unroll of the vk_x rolled loops: CLOSED, measured a REGRESSION in both
+  emission styles, refuting the census's ~2-4% sizing. Reassignment style (i/b0/b1
+  rebound across copies): vkx 7,982,162 -> 8,755,056 (+9.7%), full groth16 +0.26%.
+  SSA/declaration style (fresh temps per copy): 8,635,575 (+8.2%). The plain-compile
+  planner agrees (worst-case dense-input totals: rolled 53.8M, unrolled 55.3M/58.2M;
+  windows shrink 37/35 -> 34/33 iters). Mechanism the census sizing missed: each
+  unrolled iteration crosses 8 control boundaries (2 ifs per bit-step x 4) carrying
+  MORE live locals, and block-boundary slot discipline makes the compiler pay either
+  emitReplace park/restore bubbles (reassignment) or dead-slot-deepened relayouts
+  (SSA) at every boundary — more than the ~1-decl+1-incr+1-compare per-bit scaffold
+  the unroll removes. Conclusion transfers to the shamir entry (same loop shape).
+  The variant generator was discarded after measurement: failed experiments are
+  recorded here (numbers + mechanism), not kept in the live generators.
+
+Addendum (2026-07-08): the experiments surfaced four BUILDER-side levers that compound;
+together they are the outstanding project-side work, expected to exceed everything the
+closed compiler experiments measured. Run them as ONE combined sweep per family (replan ->
+repack -> tune pads -> verify worst-case + tampered-reject -> regenerate vectors), not
+sequentially, since replanning changes boundaries and pad sizes anyway:
+
+1. Padding-slack trim (MEASURED on the pairing family): every builder tunes each input's
+   zero-pad as ceil(opCost/800) - 41 + 96, but the formula without the +96 is already
+   exact and the tuner re-evaluates with a retry loop, so the margin defends nothing in
+   the per-proof vector flow. Slack 1: bch-pairing-chunked unlocking -2,280 B (~-1.05%
+   score), bch-groth16-chunked -4,085 B; flagship residue builder estimated -4-4.5k score
+   (~-1.8%, unmeasured). The +96 appears at 13 tuning sites (intratx, grouped, BLS,
+   flagship). Env-gated as TUNE_SLACK (default 96) in the pairing builder. Caveat before
+   flipping defaults: op-cost varies with witness values (operand byte lengths), which is
+   plausibly what the 96 silently insured; per-proof tuning with retry makes small slack
+   (1-8) safe for vector builders, but pads must never be reused across proofs without
+   re-tuning.
+2. Stale manifests (MEASURED for vkx): a fresh replan under the current fork packs
+   standalone vkx into 8 chunks instead of 9, one free input (~76 B + one preamble). The
+   other families' manifests date from the same older compiler states; sweep miller,
+   finalexp, g2check, shamir, and the BLS families.
+3. Planner-vs-artifact cost mismatch (structural, UNMEASURED): planners size windows
+   against the plain compile while shipped chunks run rescheduled at 5-6% less op, on top
+   of the OP_TARGET headroom (7.7M vs 8,032,800, ~4%), so chunks under-fill by roughly
+   10%: potentially 2-4 whole inputs on the 24- and 50-step families. Size the residual
+   margin empirically from witness-to-witness op variance over random proofs, not a round
+   number; BLS families (near byte caps, deferred selection) go last.
+4. Free crumbs: building committed artifacts with CASHC_BEAM_WIDTH=32/CASHC_BEAM_EXPAND=8
+   or CASHC_EXHAUSTIVE=1 banks the measured 0.02-0.04% per family, never-worse by
+   construction; the only cost is compile seconds.
+5. Empirical deployment-overhead accounting (the method for finding anything further):
+   diff each chunked entry against its flat singleton oracle, attributing every op and
+   byte to a bucket (math bodies, boundary/forward-check, preamble defines, padding push,
+   shuffle) via VM execution traces. The BN254 intratx-residue vs minop-singleton pair
+   already brackets it: chunking costs only +1.88M op (+1.0%) on the small proof, but
+   +14.9M (+8.2%) at worst case (witness-dependent operand-length spread, which is what
+   the pads are sized against, so reducing the spread cuts padding directly), and
+   +121.8kB of structural script (3.7kB/input of forward-checks, boundary staging, and
+   define tables) plus 51.1kB padding (21% of that entry's score). Mine the buckets that
+   are large and unexplained (the worst-case spread and the per-input structure first);
+   everything small or explained is confirmed irreducible and closes the search.
 
 Beyond these, remaining op headroom for the chunked families is at the math/advice level,
 where all the large historical wins came from (residue witness, GLV, fused subgroup
