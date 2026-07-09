@@ -82,6 +82,24 @@ function genWalkNonFirst(lo, hi) {
   return L.join('\n') + '\n';
 }
 
+// The finalize verdict body (assumes t/w/c/ci/fF locals in scope and `int P` declared): from the
+// t=w^|x| accumulator, check ((t)*w)^9 == ONE, then c canonical + c*cInv == ONE + fF*w == frob(c,1).
+// Shared by the standalone finalize chunk and the FUSE_FINAL walk+finalize chunk (byte-identical).
+const finalizeLines = () => [
+  `        (${tN.join(',')}) = fp12Mul(${tN.join(',')}, ${wN.join(',')});`,
+  `        (${decl(names12('s'))}) = fp12Sqr(${tN.join(',')});`,
+  `        (${names12('s').join(',')}) = fp12Sqr(${names12('s').join(',')});`,
+  `        (${names12('s').join(',')}) = fp12Sqr(${names12('s').join(',')});`,
+  `        (${names12('s').join(',')}) = fp12Mul(${names12('s').join(',')}, ${tN.join(',')});`,
+  '        ' + eqOne('s'),
+  '        ' + canon(cN),
+  `        (${decl(names12('p'))}) = fp12Mul(${cN.join(',')}, ${ciN.join(',')});`,
+  '        ' + eqOne('p'),
+  `        (${decl(names12('lhs'))}) = fp12Mul(${fFn.join(',')}, ${wN.join(',')});`,
+  `        (${decl(names12('rhs'))}) = fp12Frob1(${cN.join(',')});`,
+  '        ' + Array.from({ length: 12 }, (_, i) => `require(lhs${i} % P == rhs${i} % P);`).join(' '),
+];
+
 // finalize: t=w^|x| in, ((t)*w)^9 == ONE, then c*cInv==ONE + verdict fF*w==frob(c,1). terminal.
 function genFinalize() {
   const params = [...fFn, ...cN, ...ciN, ...wN, ...names12('tin')];
@@ -94,18 +112,30 @@ function genFinalize() {
   L.push(covIn([...fFn, ...cN, ...ciN, ...wN, ...names12('tin')]));
   L.push(`        int P = ${Pstr};`);
   L.push(`        ${tN.map((n, i) => `int ${n}=tin${i};`).join(' ')}`);
-  L.push(`        (${tN.join(',')}) = fp12Mul(${tN.join(',')}, ${wN.join(',')});`);
-  L.push(`        (${decl(names12('s'))}) = fp12Sqr(${tN.join(',')});`);
-  L.push(`        (${names12('s').join(',')}) = fp12Sqr(${names12('s').join(',')});`);
-  L.push(`        (${names12('s').join(',')}) = fp12Sqr(${names12('s').join(',')});`);
-  L.push(`        (${names12('s').join(',')}) = fp12Mul(${names12('s').join(',')}, ${tN.join(',')});`);
-  L.push('        ' + eqOne('s'));
-  L.push('        ' + canon(cN));
-  L.push(`        (${decl(names12('p'))}) = fp12Mul(${cN.join(',')}, ${ciN.join(',')});`);
-  L.push('        ' + eqOne('p'));
-  L.push(`        (${decl(names12('lhs'))}) = fp12Mul(${fFn.join(',')}, ${wN.join(',')});`);
-  L.push(`        (${decl(names12('rhs'))}) = fp12Frob1(${cN.join(',')});`);
-  L.push('        ' + Array.from({ length: 12 }, (_, i) => `require(lhs${i} % P == rhs${i} % P);`).join(' '));
+  for (const ln of finalizeLines()) L.push(ln);
+  L.push('    }');
+  L.push('}');
+  return L.join('\n') + '\n';
+}
+
+// FUSE_FINAL: one TERMINAL chunk that does the w^|x| walk [lo,hi=NWALK) AND the finalize verdict
+// inline (no covOut / no forward hand-off), collapsing the separate finalize input. Byte-identical
+// walk loop + finalize body to the split path. Used by the LARGE (bch-spec) build where the whole
+// walk fits one 88M-op input with the ~4M-op verdict to spare.
+function genWalkFinal(lo, hi, first) {
+  const params = first ? [...fFn, ...cN, ...ciN, ...wN] : [...fFn, ...cN, ...ciN, ...wN, ...names12('tin')];
+  const L = [];
+  L.push('pragma cashscript ^0.14.0;');
+  L.push(`import "${LIB_IMPORT}";`);
+  L.push(`// residue tail walk+finalize (FUSED, terminal): w^|x| iters [${lo},${hi}) then ((t)*w)^9==ONE, c*cInv==ONE, fF*w==frob(c,1).`);
+  L.push('contract ResidueWalkFinalBls() {');
+  L.push(`    function spend(${decl(params)}, bytes unused zeroPadding) {`);
+  L.push(covIn(first ? [...fFn, ...cN, ...ciN] : [...fFn, ...cN, ...ciN, ...wN, ...names12('tin')]));
+  L.push(`        int P = ${Pstr};`);
+  if (first) { L.push('        ' + canon(wN)); L.push(`        ${tN.map((n, i) => `int ${n}=w${i};`).join(' ')}`); }
+  else { L.push(`        ${tN.map((n, i) => `int ${n}=tin${i};`).join(' ')}`); }
+  L.push(walkLoop(lo, hi));
+  for (const ln of finalizeLines()) L.push(ln);
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
@@ -147,21 +177,42 @@ if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
     console.error(`  walk chunk ${idx}: iters[${lo},${best.hi}) op=${best.operationCost.toLocaleString()} lock=${best.m.lockingBytes}B`);
     lo = best.hi;
   }
-  // finalize chunk
-  const fin = genFinalize();
-  const fidx = chunks.length;
-  writeFileSync(join(GEN, `finalexpres_${String(fidx).padStart(2, '0')}.cash`), fin);
-  const inFin = state5At(NWALK);
-  const mF = measureCovenantFile(fin, inFin, inFin, [], PROBE);
-  chunks.push({ idx: fidx, role: 'finalize', final: true, incoming: commit(inFin) });
-  console.error(`  finalize chunk ${fidx}: op=${mF.operationCost.toLocaleString()} lock=${mF.lockingBytes}B accepted=${mF.accepted} ${mF.error ?? ''}`);
+  if (process.env.FUSE_FINAL === '1') {
+    // Fold the finalize verdict into the LAST walk chunk (terminal), dropping the separate finalize
+    // input. Fits only when the last walk window + ~4M-op verdict stay under OP_TARGET (the LARGE
+    // bch-spec budget); errors otherwise so a too-tight fusion is caught, not silently mis-planned.
+    const last = chunks[chunks.length - 1];
+    const first = last.lo === 0;
+    const src = genWalkFinal(last.lo, last.hi, first);
+    const inPush = first ? [...commit36, ...wl] : state5At(last.lo);
+    const inCommit = first ? commit36 : state5At(last.lo);
+    const mF = measureCovenantFile(src, inPush, inCommit, [], PROBE); // terminal -> outLimbs []
+    if (!mF.accepted || mF.lockingBytes > BYTE_BUDGET || mF.operationCost > OP_TARGET)
+      throw new Error(`FUSE_FINAL: fused walk+finalize does not fit (accepted=${mF.accepted} lock=${mF.lockingBytes} op=${mF.operationCost.toLocaleString()})`);
+    writeFileSync(join(GEN, `finalexpres_${String(last.idx).padStart(2, '0')}.cash`), src);
+    last.final = true; last.fused = true;
+    console.error(`  FUSED walk+finalize chunk ${last.idx}: iters[${last.lo},${last.hi}) op=${mF.operationCost.toLocaleString()} lock=${mF.lockingBytes}B (finalize folded in, terminal)`);
+    // negative: tamper fF -> the verdict fF*w==frob(c,1) fails -> reject
+    const badPush = inPush.slice(); badPush[0] = badPush[0] + 1n;
+    const badCommit = inCommit.slice(); badCommit[0] = badCommit[0] + 1n;
+    console.error(`  fused finalize (tampered fF): accepted=${measureCovenantFile(src, badPush, badCommit, [], PROBE).accepted} (expect false)`);
+  } else {
+    // finalize chunk (separate terminal input)
+    const fin = genFinalize();
+    const fidx = chunks.length;
+    writeFileSync(join(GEN, `finalexpres_${String(fidx).padStart(2, '0')}.cash`), fin);
+    const inFin = state5At(NWALK);
+    const mF = measureCovenantFile(fin, inFin, inFin, [], PROBE);
+    chunks.push({ idx: fidx, role: 'finalize', final: true, incoming: commit(inFin) });
+    console.error(`  finalize chunk ${fidx}: op=${mF.operationCost.toLocaleString()} lock=${mF.lockingBytes}B accepted=${mF.accepted} ${mF.error ?? ''}`);
+    // negative: tamper fF in finalize verdict -> reject
+    const badF = inFin.slice(); badF[0] = badF[0] + 1n;
+    console.error(`finalize (tampered fF): accepted=${measureCovenantFile(fin, badF, badF, [], PROBE).accepted} (expect false)`);
+  }
   for (let i = 1; i < chunks.length; i++) if (chunks[i - 1].outgoing !== chunks[i].incoming) throw new Error('tail continuity break at ' + i);
   writeFileSync(join(GEN, 'manifest_finalexpres.json'), JSON.stringify({
     residueTail: true, numChunks: chunks.length, nwalk: NWALK,
-    chunks: chunks.map((c) => ({ idx: c.idx, role: c.role, lo: c.lo ?? null, hi: c.hi ?? null, final: c.final })),
+    chunks: chunks.map((c) => ({ idx: c.idx, role: c.role, lo: c.lo ?? null, hi: c.hi ?? null, final: c.final, fused: c.fused ?? false })),
   }, null, 2));
-  console.error(`residue tail: ${chunks.length} chunks (${chunks.length - 1} walk + 1 finalize)`);
-  // negative: tamper fF in finalize verdict -> reject
-  const badF = inFin.slice(); badF[0] = badF[0] + 1n;
-  console.error(`finalize (tampered fF): accepted=${measureCovenantFile(fin, badF, badF, [], PROBE).accepted} (expect false)`);
+  console.error(`residue tail: ${chunks.length} chunks`);
 }
