@@ -21,7 +21,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { createVirtualMachineBch2026, encodeDataPush, bigIntToVmNumber, numberToBinUint16LE } from '@bitauth/libauth';
+import { createVirtualMachineBch2026, createVirtualMachineBchSpec, encodeDataPush, bigIntToVmNumber, numberToBinUint16LE, numberToBinUint32LE } from '@bitauth/libauth';
 import { measureCovenantFile, compileFileBytecodeRaw, planChunk, covIn, covOut, decl, proof, commitBin, CATEGORY, TARGET_UNLOCK, OP_PUSHDATA2 } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -168,9 +168,14 @@ function genChunk(lo, hi, isFirst, isLast) {
 // ONLY the 14 state limbs (matching covIn) while the unlocking ALSO pushes the 2 witness
 // limbs (zinv) as trailing params. (measureCovenantFile auto-commits ALL pushed ints, so
 // it cannot size a chunk whose witness is excluded from the commitment.)
-const realVm = createVirtualMachineBch2026(false);
+const realVm = (process.env.BCH_VM === 'spec' ? createVirtualMachineBchSpec : createVirtualMachineBch2026)(false);
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
-const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); };
+const OP_PUSHDATA4 = 0x4e;
+const padPush = (argLen, target) => {
+  const budget = target - argLen;
+  if (budget - 3 <= 0xffff) { const N = budget - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); }
+  const N = budget - 5; return Uint8Array.from([OP_PUSHDATA4, ...numberToBinUint32LE(N), ...new Uint8Array(N)]);
+};
 function measureFinalEndo(src, stateLimbs14, witness, probePath) {
   let raw;
   try { writeFileSync(probePath, src); raw = compileFileBytecodeRaw(probePath); }

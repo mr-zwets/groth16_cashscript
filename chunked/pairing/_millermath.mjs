@@ -32,11 +32,22 @@ export const compileFileBytecode = (path) => asmToBytecode(compileFile(path, RES
 export const compileBytecodeRaw = (src) => asmToBytecode(compileString(src).bytecode);
 export const compileFileBytecodeRaw = (path) => asmToBytecode(compileFile(path).bytecode);
 
-export const OP_BUDGET = (41 + 10_000) * 800;
-export const TARGET_UNLOCK = 10_000, OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
+// TARGET_UNLOCK is the per-input unlocking-bytecode length the chunk planners/measurers pad to;
+// the BCH op-cost budget an input gets is (densityControlBase + unlockingLen) * 800, so OP_BUDGET
+// follows from it. Both default to the current-BCH (BCH_2026) reference: base 41, 10 kB unlocking
+// => 8,032,800 op. They are env-overridable so the large-script build can plan against the
+// PROPOSED bch-spec limits (100 kB scripts; densityControlBaseLength 10,000 => a 100 kB input
+// gets (10000+100000)*800 = 88,000,000 op) without touching any other build (default => identical).
+export const BCH_SPEC = process.env.BCH_VM === 'spec';
+export const DENSITY_BASE = BCH_SPEC ? 10_000 : 41; // libauth ConsensusBch(2026|Spec).densityControlBaseLength
+export const TARGET_UNLOCK = Number(process.env.TARGET_UNLOCK ?? 10_000);
+export const OP_BUDGET = (DENSITY_BASE + TARGET_UNLOCK) * 800;
+export const OP_DROP = 0x75, OP_PUSHDATA2 = 0x4d;
 
-import { hexToBin, bigIntToVmNumber, encodeDataPush, bigIntToBinUintLE, binToFixedLength, numberToBinUint16LE, createTestAuthenticationProgramBch, createVirtualMachineBch2026 } from '@bitauth/libauth';
-const realVm = createVirtualMachineBch2026(false);
+import { hexToBin, bigIntToVmNumber, encodeDataPush, bigIntToBinUintLE, binToFixedLength, numberToBinUint16LE, numberToBinUint32LE, createTestAuthenticationProgramBch, createVirtualMachineBch2026, createVirtualMachineBchSpec } from '@bitauth/libauth';
+// BCH_VM=spec selects the PROPOSED bch-spec VM (100 kB scripts, densityControlBase 10,000);
+// default is the current-BCH BCH_2026 VM (10 kB scripts). Chunk planners measure against this.
+const realVm = (BCH_SPEC ? createVirtualMachineBchSpec : createVirtualMachineBch2026)(false);
 
 // ---- constants ----
 export const Fp2B = Fp2.fromBigTuple([
@@ -287,7 +298,15 @@ export function fnExtractor(cashPath) {
 
 // ---- real-VM measurement (padded like shamir) ----
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
-const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); };
+// Zero-pad the unlocking up to `target` bytes. PUSHDATA2 tops out at 65535 data bytes, so
+// above that (the 100 kB large-script build) switch to PUSHDATA4; otherwise the uint16 length
+// wraps and the push is malformed (VM rejects). Header is 3 B for PUSHDATA2, 5 B for PUSHDATA4.
+const OP_PUSHDATA4 = 0x4e;
+const padPush = (argLen, target) => {
+  const budget = target - argLen;
+  if (budget - 3 <= 0xffff) { const N = budget - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); }
+  const N = budget - 5; return Uint8Array.from([OP_PUSHDATA4, ...numberToBinUint32LE(N), ...new Uint8Array(N)]);
+};
 // compile `src` IN-PROCESS, run with `stateInts` (declaration order) on the real
 // VM (padded to cap). Returns op-cost + size + accept; a compile error counts as
 // "doesn't fit" so the planner just shrinks the window. (3rd arg kept for callers

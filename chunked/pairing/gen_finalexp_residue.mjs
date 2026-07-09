@@ -14,7 +14,7 @@
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { createVirtualMachineBch2026, encodeDataPush, bigIntToVmNumber, numberToBinUint16LE } from '@bitauth/libauth';
+import { createVirtualMachineBch2026, createVirtualMachineBchSpec, encodeDataPush, bigIntToVmNumber, numberToBinUint16LE, numberToBinUint32LE } from '@bitauth/libauth';
 import { covIn, decl, commitBin, CATEGORY, TARGET_UNLOCK, OP_PUSHDATA2, compileFileBytecodeRaw, pairsFor, vec, millerBatchOps } from './_millermath.mjs';
 import { residueWitness, millerFusedOps, fp12limbsOf, COSET27 } from './_residuemath.mjs';
 
@@ -66,9 +66,14 @@ function genTail() {
 }
 
 // ---- real-VM measurement: commit 36 state limbs, push 36 + 12 (w) ----
-const realVm = createVirtualMachineBch2026(false);
+const realVm = (process.env.BCH_VM === 'spec' ? createVirtualMachineBchSpec : createVirtualMachineBch2026)(false);
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
-const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); };
+const OP_PUSHDATA4 = 0x4e;
+const padPush = (argLen, target) => {
+  const budget = target - argLen;
+  if (budget - 3 <= 0xffff) { const N = budget - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); }
+  const N = budget - 5; return Uint8Array.from([OP_PUSHDATA4, ...numberToBinUint32LE(N), ...new Uint8Array(N)]);
+};
 function measureTail(src, stateLimbs36, wLimbs12) {
   let raw;
   try { writeFileSync(PROBE, src); raw = compileFileBytecodeRaw(PROBE); }
