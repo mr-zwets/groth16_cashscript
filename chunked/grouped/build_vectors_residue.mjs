@@ -40,8 +40,14 @@ import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residue
 import { glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
 import { transformChunk, headerSize } from '../intratx/transform.mjs';
 
+import { regenGlvSafe } from '../regen_vkx_windows.mjs';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
+// Re-plan the GLV vk_x windows to the hash-free SAFE floor (4 chunks, max-density-validated);
+// vk_x within-chunks are never at a group seam, so they run hash-free like intratx. See
+// chunked/regen_vkx_windows.mjs.
+regenGlvSafe(GEN);
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);
 const W = 40; // BN254 limb width (bytes)

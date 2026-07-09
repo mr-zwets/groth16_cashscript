@@ -132,7 +132,7 @@ function selectPoint(int b0, int b1) returns (int, int, int) {
            else { if (b1 == 1) { aX = ${IC2[0]}; aY = ${IC2[1]}; doAdd = 1; } } }
     return aX, aY, doAdd;
 }`;
-function genCash(lo, hi, final, incoming, outgoing) {
+export function genCash(lo, hi, final, incoming, outgoing) {
   const count = hi - lo, hiBit = 253 - lo;
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
@@ -176,6 +176,10 @@ const _zE2 = (_zE * _zE) % P, _zE3 = (_zE2 * _zE) % P;
 const EXP = [(_foldF[0] * _zE2) % P, (_foldF[1] * _zE3) % P];
 
 // ---- plan + emit (greedy linear growth; small state -> loop body is fine) ----
+function modpow(b, e, m) { let r = 1n; b %= m; while (e > 0n) { if (e & 1n) r = (r * b) % m; b = (b * b) % m; e >>= 1n; } return r; }
+// guard: only run the planner when invoked directly (`node gen_vkx.mjs`), so `genCash` can be
+// imported by the intratx/grouped replan tools without triggering a file-writing replan.
+if (process.argv[1] && process.argv[1].endsWith('gen_vkx.mjs')) {
 console.error(`planning vk_x chunks  WORST-CASE all-bits-set (${ITERS} positions, magnitude-independent)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
 const commitState = (st) => commit(st.map(String)); // st = [rX,rY,rZ,in0,in1]
 const chunks = []; let lo = 0; let state = [0n, 1n, 0n, in0, in1];
@@ -204,7 +208,7 @@ while (lo < ITERS) {
   state = [rX, rY, rZ, in0, in1];
   lo = best.hi;
 }
-function modpow(b, e, m) { let r = 1n; b %= m; while (e > 0n) { if (e & 1n) r = (r * b) % m; b = (b * b) % m; e >>= 1n; } return r; }
 try { execFileSync('rm', [PROBE]); } catch {}
 console.error(`vk_x: ${chunks.length} chunks, total op=${chunks.reduce((a, c) => a + c.operationCost, 0).toLocaleString()}`);
 writeFileSync(join(GEN, 'manifest_vkx.json'), JSON.stringify({ numChunks: chunks.length, worstCaseSized: true, iters: ITERS, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, final: c.final, incoming: c.incoming, incomingState: c.incomingState, zInv: c.zInv })) }, null, 2));
+}

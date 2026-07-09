@@ -33,9 +33,14 @@ import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
 import { glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
 import { transformChunk } from './transform.mjs';
+import { regenGlvSafe } from '../regen_vkx_windows.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
+// Re-plan the GLV vk_x windows to the hash-free SAFE floor (4 chunks, max-density-validated)
+// before assembling — the covenant-planned manifest_vkxglv (5 chunks) under-fills this
+// hash-free deployment. See chunked/regen_vkx_windows.mjs.
+regenGlvSafe(GEN);
 const PROBE = join(GEN, '_intratx_residue_probe.cash'); // transformed import-chunks compiled from here
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);

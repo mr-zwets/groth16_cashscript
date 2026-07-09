@@ -37,9 +37,13 @@ import {
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { transformChunk, headerSize } from '../intratx/transform.mjs';
+import { regenShamirSafe } from '../regen_vkx_windows.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
+// Re-plan the Shamir vk_x windows to the hash-free SAFE floor (6 chunks) into a PRIVATE
+// namespace so the covenant build keeps its 8-window manifest_vkx. See regen_vkx_windows.mjs.
+regenShamirSafe(GEN);
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);
 const W = 40; // BN254 limb width (bytes)
@@ -153,13 +157,13 @@ function specsG2check(inst) {
 function specsVkx(inst, crossToMiller) {
   const [in0, in1] = inst.inputs;
   const vkxAff = vkxPoint(inst.inputs).toAffine();
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkx.json'), 'utf8'));
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxplain.json'), 'utf8'));
   return man.chunks.map((ch) => {
     const inAcc = vkxStateAt(in0, in1, ch.lo);
     const inLimbs = [...inAcc, in0, in1];
     if (ch.final) {
       return {
-        file: join(GEN, `vkx_${String(ch.idx).padStart(2, '0')}.cash`),
+        file: join(GEN, `vkxplain_${String(ch.idx).padStart(2, '0')}.cash`),
         inLimbs, outLimbs: [vkxAff.x, vkxAff.y], extras: [vkxFinalZinv(in0, in1)],
         role: crossToMiller ? 'cross' : 'stage-final',
         cmp: crossToMiller ? { cmpExpr: 'outBlob', nextFullInLen: MILLER_IN_LIMBS * W, skip: VKX_LIMB_OFFSET * W, cmpLen: 2 * W } : null,
@@ -167,7 +171,7 @@ function specsVkx(inst, crossToMiller) {
       };
     }
     return {
-      file: join(GEN, `vkx_${String(ch.idx).padStart(2, '0')}.cash`),
+      file: join(GEN, `vkxplain_${String(ch.idx).padStart(2, '0')}.cash`),
       inLimbs, outLimbs: [...vkxStateAt(in0, in1, ch.hi), in0, in1], extras: [], role: 'within',
       label: `vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined,
     };

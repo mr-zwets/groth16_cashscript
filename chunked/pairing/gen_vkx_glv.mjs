@@ -125,7 +125,7 @@ function select16(int idx) returns (int, int, int) {
     return aX, aY, doAdd;
 }`;
 
-function genCash(lo, hi, first, final) {
+export function genCash(lo, hi, first, final) {
   const count = hi - lo, hiBit = (ITERS - 1) - lo;
   const L = [];
   L.push('pragma cashscript ^0.14.0;');

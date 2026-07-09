@@ -251,7 +251,10 @@ The exchange rate that governs every tradeoff here: at the standard limits, op b
 scales with unlocking length at ~800 op per byte, so 800 op saved is worth ~1 B of padding
 score, while a locking byte costs score 1:1. Chunks are packed to the ~8,032,800 ceiling
 (the maximum budget at the 10,000 B input cap), so op savings pay off primarily by growing
-chunk windows: fewer inputs at ~76 B score each, plus one less preamble execution.
+chunk windows and eliminating whole inputs. REPRICED by the 2026-07-09 accounting harness:
+an eliminated fused-miller chunk is worth ~3.9 kB of re-baked constants plus its padding
+share plus envelope, roughly 50x the ~76 B envelope figure the levers below originally
+assumed, which makes chunk-count reduction the main prize of the sweep.
 
 Already settled op-optimally, do not re-chase: in-loop inlining (measured ~2.8x op
 regression: the VM charges per stepped opcode even in untaken branches, so a body spliced
@@ -315,26 +318,142 @@ sequentially, since replanning changes boundaries and pad sizes anyway:
    standalone vkx into 8 chunks instead of 9, one free input (~76 B + one preamble). The
    other families' manifests date from the same older compiler states; sweep miller,
    finalexp, g2check, shamir, and the BLS families.
-3. Planner-vs-artifact cost mismatch (structural, UNMEASURED): planners size windows
-   against the plain compile while shipped chunks run rescheduled at 5-6% less op, on top
-   of the OP_TARGET headroom (7.7M vs 8,032,800, ~4%), so chunks under-fill by roughly
-   10%: potentially 2-4 whole inputs on the 24- and 50-step families. Size the residual
-   margin empirically from witness-to-witness op variance over random proofs, not a round
-   number; BLS families (near byte caps, deferred selection) go last.
+3. Planner-vs-artifact cost mismatch (structural; vk_x instances MEASURED, floors
+   certified, NOT yet shipped): planners under-fill chunks from THREE stacked sources:
+   (a) sizing against the plain compile while shipped chunks run rescheduled at 5-6% less
+   op; (b) the OP_TARGET headroom (7.7M vs 8,032,800, ~4%); (c) sizing with the WRONG
+   DEPLOYMENT MODEL — `gen_vkx_glv.mjs`/`gen_vkx.mjs` plan with `measureCovenant` (which
+   hash256's the state limbs per chunk) but the intratx/grouped transforms deploy
+   hash-free. Certified safe floors (2026-07-09, density-worst-case-validated, see item
+   5's sweep note for full numbers): GLV vk_x 5 -> 4 windows (-1 input on intratx-residue
+   AND grouped-residue; 3 windows REJECTED at 99.8% budget under a max-density proof),
+   Shamir vk_x 8 -> 6 (-2 inputs on intratx-plain AND grouped-plain; wcp verified to BE
+   the density worst case there). Two rules now proven: every planner must measure with
+   the cost model of its actual deployment transform, and MSM windows must be sized
+   against the density worst case in the representation the loop iterates (GLV
+   sub-scalars, not the near-r "worst-case proof" vector, whose decomposition randomizes
+   sub-scalar bits). Miller/g2check/finalexp replan against sources (a)+(b) remains
+   unmeasured; BLS families deferred pending a dense-worst-case harness in their builds.
 4. Free crumbs: building committed artifacts with CASHC_BEAM_WIDTH=32/CASHC_BEAM_EXPAND=8
    or CASHC_EXHAUSTIVE=1 banks the measured 0.02-0.04% per family, never-worse by
    construction; the only cost is compile seconds.
 5. Empirical deployment-overhead accounting (the method for finding anything further):
-   diff each chunked entry against its flat singleton oracle, attributing every op and
-   byte to a bucket (math bodies, boundary/forward-check, preamble defines, padding push,
-   shuffle) via VM execution traces. The BN254 intratx-residue vs minop-singleton pair
-   already brackets it: chunking costs only +1.88M op (+1.0%) on the small proof, but
-   +14.9M (+8.2%) at worst case (witness-dependent operand-length spread, which is what
-   the pads are sized against, so reducing the spread cuts padding directly), and
-   +121.8kB of structural script (3.7kB/input of forward-checks, boundary staging, and
-   define tables) plus 51.1kB padding (21% of that entry's score). Mine the buckets that
-   are large and unexplained (the worst-case spread and the per-input structure first);
-   everything small or explained is confirmed irreducible and closes the search.
+   diff each chunked entry against its flat singleton oracle, attributing overhead to
+   buckets (math bodies, boundary/forward-check, preamble defines, padding push, shuffle).
+   Measurability boundary (verified 2026-07-09; tooling lives in the sibling `verifier`
+   repo's `harness/vm.ts` + this repo's `recompiler/asm.mjs`): BYTE buckets are fully
+   attributable per-opcode statically (`asm.mjs parse` + `recompiler.mjs dissect` split the
+   OP_DEFINE table from main; `benchmark.ts zeroPadBytes` isolates padding), so the +121.8kB
+   structural story is precisely decomposable. OP buckets are only STAGE-granular: libauth
+   exposes cumulative `state.metrics.operationCost` per whole-script evaluation (no
+   per-opcode meter exists), and the intratx-residue vectors persist only the aggregate, so
+   per-input/per-stage op must be recomputed by re-executing each step through
+   `createLoosenedVm()`. That granularity does cover the worst-case-spread question (run
+   every input incl. `worstCaseProof`, diff stage totals), but sub-step op attribution
+   (math vs forward-check vs define-push vs shuffle within one input) needs a libauth
+   instrument, not the vectors. BUILT + RUN 2026-07-09: `verifier/src/harness/bucket-
+   accounting.ts` (`npx tsx`), reconciles to the vector aggregates byte-exact (240,079 B /
+   181,512,304 op). It also CORRECTED the earlier eyeballed breakdown of this same pair,
+   which had mis-attributed the structural bytes to the locking and to forward-checks:
+
+   OP: chunking costs +1.875M op (+1.0%) on the small proof — confirmed lean. The +14.9M
+   worst-case spread (+8.2%) is NOT diffuse "operand-length spread": it is ~entirely the
+   GLV vk_x stage (+14.94M, +267% of that stage's own 5.6M), while Miller — 83.5% of all op
+   — is flat across proofs (+14k, 0.0%) and g2check/tail are flat too. Mechanism: vk_x is
+   the MSM over the PUBLIC-INPUT scalars, whose GLV sub-scalar width varies proof-to-proof;
+   Miller/g2check/tail operate on always-full-width proof points and baked constants, hence
+   flat. IMPORTANT correction (probe `verifier/src/harness/vkx-variance-probe.ts`,
+   2026-07-09): this variance does NOT drive the SCORED (small-proof) padding — an earlier
+   draft of this note claimed it did and was wrong. On the small proof the vk_x window
+   chunks are essentially UNPADDED (pad 3 B; op ~0.85M, and their redeem+witness bytes
+   already buy ~2M budget), so the scored 51.1 kB pad is g2check (19.8 kB, op-bound, 98.7%
+   budget util, flat) + Miller (30.1 kB, the bulk) + vk_x only 1.2 kB. vk_x variance is
+   worst-case HEADROOM, not a scored-pad lever. The real vk_x lever is CHUNK COUNT via the
+   item-3 cost mismatch, now measured: the GLV manifest (`gen_vkx_glv.mjs`, regenerated
+   2026-07-09 — not stale) sizes windows with `measureCovenant` (covenant model: hash256 of
+   9×40-B state limbs/chunk) to OP_TARGET 7.7M, giving 5 chunks of ~35-38 iters. But the
+   intratx-residue family deploys those same windows through a forward-check transform with
+   NO hashing (~2 introspection ops/chunk, zero hash ops), so worst-case intratx vk_x runs
+   at only ~5.9M op = 73% of the 8.03M input budget. REPLANNED + MEASURED end-to-end
+   2026-07-09 (`chunked/intratx/replan_vkx_candidate.mjs` regenerates windows via the now-
+   exported `genCash`; the real builds measure the transformed hash-free redeem, tune pads,
+   gate on tamper-reject; a temporary `WC_IN0/WC_IN1` hook in the intratx build +
+   `check_worstcase_vkx.mjs` measure vk_x op under INJECTED max-density inputs):
+     • 5 chunks (baseline, covenant-planned): 33 inputs, scored 240,079 B.
+     • 4 chunks [0,34)[34,68)[68,101)[101,128)F: 32 inputs (−1), scored 238,288 B (−1,791);
+       vk_x maxes at 6,343,678 = 79% of budget under a MAX-DENSITY proof. SAFE floor.
+     • 3 chunks: 31 inputs, but UNSAFE. Against the vectors' worst-case PROOF it looks fine
+       (7.14M = 89% budget), but that proof is NOT the density worst case for GLV: the raw
+       inputs are decomposed into 4 ~127-bit sub-scalars, and the MSM per-iteration add fires
+       unless all four bits are 0, so max op comes from a proof whose sub-scalars jointly
+       cover all 128 positions — not from near-r inputs. wcp covers only [34,29,35]/window;
+       a searched max-density proof (127/128) pushes the tightest 3-window to 8,016,756 =
+       99.8% of the 8,032,800 budget with the pad already pinned at the 10,000 B unlock cap,
+       and the absolute-max (128/128) tips it over. So 3 is at the cliff and rejected.
+   KEY LESSON (corrects an earlier draft of this note that reported 5→3): size MSM chunks
+   against the density worst case in the representation the loop ITERATES — the raw scalar for
+   Shamir, the GLV sub-scalars for GLV — NOT against the "worst-case proof" vector, which is
+   near-r and is maximal for Shamir but NOT for GLV (its decomposition randomizes the
+   sub-scalar bits). Measured safe drop: 5→4 (−1 input), for BOTH the intratx-residue and
+   grouped-residue families (they share manifest_vkxglv; grouped-residue 33→32 inputs, groups
+   13/11/8, worst group 97.4 kB < 100 kB cap). The op spread itself is not otherwise reducible
+   without cheaper MSM math, and does not need to be.
+
+   SWEEP of the other vk_x families (2026-07-09), same cost-mismatch lever:
+     • BN254 Shamir plain (manifest_vkx, 254-iter 2-scalar, shared by intratx + grouped):
+       8→6 chunks, SAFE (−2 inputs). Unlike GLV, the loop iterates the RAW inputs, and wcp is
+       near-all-ones (in0,in1 popcount 253/254) so its binding windows are 100% add-covered —
+       verified worst case (50k-sample max add-coverage ≤ wcp in every window). 6-window vk_x
+       tops at 7,664,635 = 95.4% of budget (stable: operands are reduced mod P every op, so
+       ≤32 B, and wcp already hits that width). intratx-plain groth16: 49→47 inputs, 375,853
+       →373,485 B; grouped-plain groth16: 49→47 inputs, 5 groups, worst group 89.6 kB < 100
+       kB cap. 5 windows is impossible (51-iter × ~178 K op/iter > budget).
+     • BLS12-381 families (GLV manifest 6 chunks, Shamir manifest 12 chunks; each shared by
+       intratx + grouped): the same under-fill mechanism applies, BUT their builds carry NO
+       dense worst-case proof (only committed+proof1), and — per the GLV lesson — GLV sizing
+       needs a max-density SUB-SCALAR check the builds can't do today. So BLS floors are NOT
+       certified here; safe sizing first needs a dense/max-density worst-case harness added to
+       the BLS builds (and a BLS `genCash` export). Deferred, not dismissed.
+
+   BYTES (P2SH32, so the program is the redeem script in the scriptSig, NOT the 35 B
+   locking — the prior "+121.8 kB in the locking / define tables / forward-checks" was
+   wrong on all three counts). Score delta chunked − oracle = +172.9 kB, three ~equal
+   buckets: (a) program +68.2 kB (134.1 kB of redeem across 33 inputs vs 65.9 kB flat), of
+   which +61.3 kB is DUPLICATED BAKED CONSTANTS — each of the 23 fused-Miller chunks re-
+   embeds ~66 32-byte field constants + coefficient blobs (~3.9 kB/chunk); forward-check
+   surface is negligible (62 introspection opcodes total, ~2/chunk) and the chunks carry NO
+   define table at all (oracle: 4.5 kB); (b) witness/state re-supply +52.3 kB (53.6 kB vs
+   the oracle's 1.2 kB — proof + inter-chunk state fed to each input); (c) padding +51.1 kB
+   (21.3% of score). Threading a constant per-chunk via the forward-check blob is a wash
+   (bytes move redeem→witness at no score change, plus op), so within the current
+   architecture the reducer is FEWER, FATTER chunks: every eliminated fused-Miller chunk
+   drops ~3.9 kB constants + its padding + its 35 B envelope, a far bigger win per chunk
+   than the "~76 B/input" the builder levers assumed. This directly reinforces items 2-3
+   (stale manifests / planner margin) and localizes the op lever to vk_x variance (item
+   6). But "inherent" is only proven for per-chunk threading, not cross-input sharing
+   (item 7). No other large unexplained bucket remains.
+6. vk_x worst-case flattening: REFUTED (probe `verifier/src/harness/vkx-variance-probe.ts`,
+   2026-07-09) — this item's premise ("pads price the worst case") was wrong for the
+   scored entries: pads are tuned per proof, and on the small proof the vk_x window
+   chunks are essentially unpadded (3 B; ~0.85M op against ~2M of budget their own bytes
+   already buy). The scored 51.1 kB pad is g2check (19.8 kB, 98.7% util, flat) + Miller
+   (30.1 kB) + vk_x only 1.2 kB, so a branchless/flat vk_x would buy worst-case headroom,
+   not score. The variance mechanism is confirmed (public-input GLV sub-scalar widths
+   vary per proof; everything else runs full-width) but the actionable vk_x lever is
+   chunk count via item 3(c), already measured at ~2 inputs. Do not build flattening.
+7. Shared-carrier dedup (HYPOTHESIS, challenges item 5's "inherent" verdict): intratx
+   chunks already read sibling inputs' unlocking bytecode for forward-checks, so ONE
+   carrier input can hold the shared constants once and each chunk slices what it needs
+   from `tx.inputs[carrier].unlockingBytecode` — 23 copies to 1 is a dedup, not a move.
+   Op price is roughly the pushed blob size per reading chunk (~6-10 kB push = ~6-10k op,
+   x23 chunks = ~0.2M op, a few hundred padding-bytes equivalent) against tens of kB of
+   score IF the shared fraction of the 61.3 kB is large: the ~66 field constants
+   (primes, Frobenius, curve params) are presumably identical across chunks and dedupe
+   fully; per-window line-coefficient blobs are chunk-unique and do not. The same
+   mechanism may dedupe repeated proof elements inside the 52.3 kB witness bucket.
+   Applies to the intratx and grouped families (one carrier per tx); the NFT-covenant
+   family spans txs and cannot share. Measure the shared fraction first; per the
+   calibration lesson, do not book until an applied A/B lands.
 
 Beyond these, remaining op headroom for the chunked families is at the math/advice level,
 where all the large historical wins came from (residue witness, GLV, fused subgroup
