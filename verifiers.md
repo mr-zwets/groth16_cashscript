@@ -34,6 +34,7 @@ axes; this doc is the map. Individual folders have the authoritative per-verifie
 | `bch-groth16-grouped` | chunked, grouped | score **378,538** | standard-relayable, 5 txs |
 | `bch-groth16-intratx-residue` | chunked, intra-tx + residue | score **241,518** | smallest single-tx BN254 verifier |
 | **`bch-groth16-grouped-residue`** | **chunked, grouped + residue** | **score 241,628 — flagship** | standard-relayable in a few txs (residue tail collapses the packing below the non-residue 5) |
+| `bch-groth16-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **5 inputs**, one tx (proposed 100 kB VM) | targets the proposed `bch-spec` upgrade, not current BCH; structural (fewest UTXOs), own leaderboard category — see [Target VM](#target-vm-bch-spec) |
 | `bch-pairing-chunked` | chunked pairing-only, covenant | score **217,562** | Miller + final-exp milestone |
 | `bch-pairing-intratx` | chunked pairing-only, intra-tx | score **215,429** | |
 | `bch-vkx-chunked-covenant` | chunked `vk_x`-only | score **13,950** | the G1 MSM checkpoint (see `chunked/shamir/`, `chunked/twoloop/`) |
@@ -54,10 +55,37 @@ comparison. Per-layer status and build commands are in
 | `bch-groth16-bls12381-singleton-minop` | singleton, op-optimized | ~68.7 KB / **~318M op-cost** | residue (`λ=p+|x|`, μ₂₇A witness) + GLV; G1 φ-checks |
 | `bch-pairing-bls12381-singleton` | singleton, pairing-only | ~19.8 KB / ~1.38B op-cost | the pairing verdict milestone (`verify.cash`) |
 | `bch-groth16-bls12381-grouped-residue` | chunked, grouped + residue | **47 inputs / 5 standard txs / score 370,686** | the deployable BLS verifier; GLV `vk_x` + fused Miller + μ₂₇A residue tail |
+| `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **5 inputs**, one tx (proposed 100 kB VM) | BLS counterpart of the spec build; targets the proposed `bch-spec` upgrade — see [Target VM](#target-vm-bch-spec) |
 
 The BLS chunked pairing/Miller/final-exp families also exist in
 [chunked/bls12-381/](chunked/bls12-381/) (plain and residue generators); the
 grouped-residue packing above is the assembled full-verifier deployment.
+
+## Target VM (`bch-spec`)
+
+Most entries target **current BCH** (libauth `createVirtualMachineBch2026`, 10 kB scripts). Two —
+`bch-groth16-intratx-residue-large` and `bch-groth16-bls12381-intratx-residue-large` — instead target
+the **proposed `bch-spec` upgrade** (`createVirtualMachineBchSpec`). The harness marks them
+`vm: 'bch-spec'` and files them in their own leaderboard category, so a spec entry cannot be compared
+against, or hijack, the current-BCH frontier. `bch-spec` = `{ ...ConsensusBch2026, ...overrides }`; the
+overrides raise the script / stack-item / big-int size caps 10 kB → 100 kB, raise the density-control
+base 41 → 10,000, and add two opcodes (`OP_EVAL`, `OP_POW`, unused so far).
+
+Extra considerations for spec-targeting verifiers (full detail in
+[chunked/intratx/README.md → Large scripts](chunked/intratx/README.md#large-scripts-targeting-the-proposed-bch-spec-vm)):
+
+- **No op is cheaper.** Every op-cost coefficient (base 100, sig-check 26,000, hashing, arithmetic,
+  1/byte stack push) and the 800 byte→budget rate are unchanged. A script spends the same op-cost on
+  spec as on current BCH; only the size limits and the per-input budget floor grow.
+- **The freebie ⇒ input-count vs bytes.** Each input gets `10,000 × 800 = 8,000,000` op for free, so
+  *more* inputs = *fewer* pad bytes. A large-script build minimizes **input count** (structural: one
+  fat tx), not bytes — the 10 kB build is byte-lighter. Fusing inputs (`FUSE_TAIL` / `FUSE_FINAL`)
+  costs ~10 kB of pad per dropped freebie.
+- **Intra-tx introspection is ~free.** Reading a sibling's unlocking costs the reader 1 op/byte while
+  those bytes grant the sibling 800 op of budget (800 : 1); pad is serialized once, so it is not
+  double-counted in the score.
+- **Non-standard.** A 100 kB input makes the tx exceed the 100 kB standard size, so it is mined
+  directly (the intra-tx bundle was already non-standard).
 
 ## The forms in one paragraph each
 
