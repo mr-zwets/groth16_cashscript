@@ -6,19 +6,18 @@
 // tx.inputs[idx+1].unlockingBytecode — equals its recomputed output), but it consumes the
 // RESIDUE chunk graph instead of the plain one:
 //
-//   fast-G2 endo subgroup check (ePrint 2022/348)            4 chunks   (== plain build)
-//   GLV vk_x MSM (4-scalar ~128-bit Straus)                  5 chunks   (was 9, plain)
-//   c^-(6x+2)-FUSED batched Miller, e(alpha,beta) skipped    23 chunks  (was ~24 + skips pair1)
-//   witnessed-residue final-exp TAIL (verdict in ONE chunk)  1 chunk    (was 12, plain final-exp)
+//   fast-G2 endo subgroup check (ePrint 2022/348)            3 chunks
+//   GLV vk_x MSM (4-scalar ~128-bit Straus)                  4 chunks   (was 9, plain)
+//   c^-(6x+2)-FUSED Miller + terminal residue verdict        20 chunks  (was 12 plain final-exp chunks)
 //                                                            ---------
-//                                                            33 inputs  (plain full build: 54)
+//                                                            27 inputs  (plain full build: 54)
 //
 // The chunk MATH is reused VERBATIM from the same generated/*.cash the grouped-residue
 // build consumes (chunked/grouped/build_vectors_residue.mjs) — only the assembly differs:
 // grouped partitions the chain into token-threaded standard txs, this links the whole chain
 // into ONE non-standard (<1 MB) tx via OP_INPUTBYTECODE forward-checks. The residue witness
-// (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail
-// (c*cInv==ONE, c canonical, w in {1,w27,w27^2}); the verdict is fF*w*c^q2 == c^q*c^q3.
+// (c, cInv) threads through every fused-Miller chunk; the terminal Miller chunk checks
+// c*cInv==ONE, c canonical, the exact w encoding in {1,w27,w27^2}, and the residue verdict.
 //
 //   node build_vectors_residue.mjs   -> verifier/src/bch/groth16-intratx-residue-vectors.json
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -27,7 +26,7 @@ import { dirname, join } from 'node:path';
 import {
   millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileFileBytecode, compileFileBytecodeRaw, ptLimbs,
-  vkxPoint, le40, OP_DROP, TARGET_UNLOCK, OP_BUDGET,
+  vkxPoint, le40, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
@@ -44,7 +43,7 @@ regenGlvSafe(GEN);
 const PROBE = join(GEN, '_intratx_residue_probe.cash'); // transformed import-chunks compiled from here
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);
-const W = 40; // BN254 limb width (bytes)
+const W = 32; // canonical BN254 field-element width (bytes)
 import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 
@@ -56,7 +55,7 @@ const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)); // OP_
 
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
-const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le40(((BigInt(l) % P) + P) % P)]));
+const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le40(((BigInt(l) % P) + P) % P).slice(0, W)]));
 const padPush = (argLen, target) => {
   const budget = Math.max(2, target - argLen);
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
@@ -94,7 +93,7 @@ function parseProofUnlocking(hex) {
   const d = vals.reverse();
   return { Ax: d[0], Ay: d[1], Bxa: d[2], Bxb: d[3], Bya: d[4], Byb: d[5], Cx: d[6], Cy: d[7], in0: d[8], in1: d[9] };
 }
-const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-singleton-multiproof-vectors.json', 'utf8'));
+const mp = JSON.parse(readFileSync(verifierPath('src/bch/groth16-singleton-multiproof-vectors.json'), 'utf8'));
 const p1 = parseProofUnlocking(mp.proofs[1].unlocking);
 const wcp = parseProofUnlocking(mp.worstCaseProof.unlocking);
 const INSTANCES = {
@@ -111,7 +110,6 @@ const dummy = pairsFor([1n, 1n]);
 const VKX_LIMB_OFFSET = MILLER_STATE_LIMBS + ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(1, dummy[1].P.toAffine(), dummy[1].Q.toAffine()).length;
 const PTL_LEN = dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())).length; // 10
 const MILLER_IN_LIMBS = MILLER_STATE_LIMBS + PTL_LEN + 24; // + c(12) + cInv(12) = 52 (fused)
-const TAIL_IN_LIMBS = 12 + 12 + 12; // [fF, c, cInv] hand-off from the fused miller's final chunk
 
 // ---- per-stage chunk specs (inLimbs/outLimbs/extras/role) — IDENTICAL to the grouped-residue
 // build (chunked/grouped/build_vectors_residue.mjs); only the assembly below differs (single tx).
@@ -123,6 +121,9 @@ function specsG2check(inst) {
   const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
+  if (man.linkedLayout !== true) {
+    throw new Error('intratx residue requires G2_LINKED_LAYOUT=1 during G2 generation');
+  }
   const zinv = g2checkFastZinv(Bpair); // [zinvA, zinvB] witnessed inverse of [x0]B.Z (last chunk only)
   return man.chunks.map((ch) => ({
     file: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`),
@@ -161,35 +162,26 @@ function specsVkx(inst, crossToMiller) {
     };
   });
 }
-// c^-(6x+2)-FUSED miller (residue method). State f(12)+R0(6)+pts(10)+c(12)+cInv(12) = 52; the
-// FINAL chunk hands off only [fF, c, cInv] (36) to the residue tail. c,cInv are the (constant)
-// residue witness, carried through every chunk and re-checked in the tail (c*cInv==ONE).
-function specsMillerFused(inst, c, cInv) {
+// c^-(6x+2)-FUSED miller (residue method). The final Miller chunk also consumes w and
+// performs the residue verdict, so there is no separate terminal input or state hand-off.
+function specsMillerFused(inst, c, cInv, w) {
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const { states, boundary } = millerFusedOps(pairs, c, cInv);
+  const { states } = millerFusedOps(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const full = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...ptL, ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 52
-  const handoff = (s) => [...f12limbs(s.f), ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 36 -> tail
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
-  const specs = man.chunks.map((ch) => ({
+  if (man.linkedLayout !== true) {
+    throw new Error('intratx residue requires MILLER_LINKED_LAYOUT=1 during Miller generation');
+  }
+  return man.chunks.map((ch) => ({
     file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`),
     inLimbs: full(states[ch.opLo]),
-    outLimbs: ch.final ? handoff(states[ch.opHi]) : full(states[ch.opHi]),
-    extras: [], role: ch.final ? 'cross' : 'within',
-    cmp: ch.final ? { cmpExpr: 'outBlob', nextFullInLen: TAIL_IN_LIMBS * W, skip: 0, cmpLen: TAIL_IN_LIMBS * W } : null,
-    label: `fused-miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' =boundary*c^-(6x+2)' : ''}`,
-    checkpoint: ch.final ? 'miller-boundary' : undefined,
+    outLimbs: ch.final ? [] : full(states[ch.opHi]),
+    extras: ch.final ? fp12limbsOf(w) : [], role: ch.final ? 'terminal' : 'within',
+    cmp: null,
+    label: `fused-miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' + residue verdict' : ''}`,
+    checkpoint: ch.final ? 'verify' : undefined,
   }));
-  return { specs, boundary };
-}
-// witnessed-residue final-exp TAIL — ONE chunk. inBlob = [fF, c, cInv] (36); w is a witness extra.
-function specsResidueTail(fF, c, cInv, w) {
-  return [{
-    file: join(GEN, 'finalexpres_00.cash'),
-    inLimbs: [...fp12limbsOf(fF), ...fp12limbsOf(c), ...fp12limbsOf(cInv)],
-    outLimbs: [], extras: fp12limbsOf(w), role: 'terminal', cmp: null,
-    label: 'residue-tail fF*w*c^q2==c^q*c^q3 verdict', checkpoint: 'verify',
-  }];
 }
 function buildSpecs(inst) {
   const g2 = specsG2check(inst);
@@ -197,9 +189,8 @@ function buildSpecs(inst) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const { boundary: fRaw } = millerBatchOps(pairs);
   const { c, cInv, w } = residueWitness(fRaw);
-  const { specs: miller, boundary: fF } = specsMillerFused(inst, c, cInv);
-  const tail = specsResidueTail(fF, c, cInv, w);
-  return [...g2, ...vkx, ...miller, ...tail];
+  const miller = specsMillerFused(inst, c, cInv, w);
+  return [...g2, ...vkx, ...miller];
 }
 
 // ---- assemble: transform+compile each chunk, build the single tx, tune pad, verify ----
@@ -324,8 +315,8 @@ report('groth16-intratx-residue worst-case', fullWc);
 const fullInvalid = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2))];
 console.error(`  invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
 
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-residue-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-intratx (each chunk is an input whose witness carries its incoming state as a raw byte blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: fast-G2 endo subgroup check (ePrint 2022/348, 4 chunks), GLV vk_x MSM (5 chunks), c^-(6x+2)-FUSED batched Miller with e(alpha,beta) precomputed/skipped (23 chunks), and a witnessed-residue final-exp TAIL that collapses the hard exponentiation to ONE chunk (33 inputs total vs 54 for the plain intratx build). The residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail (c*cInv==ONE, c canonical, w in {1,w27,w27^2}); the verdict is fF*w*c^q2 == c^q*c^q3. Cross-stage soundness links are bound where layouts allow: vk_x final binds the vk_x point into the fused-Miller genesis input, and the fused-Miller boundary [fF,c,cInv] is bound into the residue tail. Reuses the same validated chunk math as bch-groth16-grouped-residue.',
+writeFileSync(verifierPath('src/bch/groth16-intratx-residue-vectors.json'), JSON.stringify({
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-intratx (each chunk is an input whose witness carries its incoming state as a raw byte blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 4 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks with e(alpha,beta) precomputed/skipped (ePrint 2024/640). The final Miller chunk also performs the witnessed-residue verdict, reducing the full verifier to 27 inputs vs 54 for the plain intratx build. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. The vk_x final chunk binds the vk_x point into the fused-Miller genesis input; every later Miller state is forward-bound. Reuses the same validated chunk math as bch-groth16-grouped-residue.',
   method: 'intra-tx-linked-residue', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),

@@ -12,10 +12,10 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp2, f12limbs, r6limbs, pairsFor, vec, commit, millerBatchOps, singlePairMiller,
-  measureCovenantFile, planChunk, covIn, covOut, PT_CFG, ptLimbs, decl, compileFileBytecodeRaw,
+  measureCovenantFile, planChunk, covIn, covOut, PT_CFG, ptLimbs, decl,
+  commitBin, compileFileBytecodeRaw,
 } from './_millermath.mjs';
-import { millerFusedOps, residueWitness } from './_residuemath.mjs';
-import { residueVerdictLines } from './gen_finalexp_residue.mjs';
+import { millerFusedOps, residueWitness, fp12limbsOf, COSET27 } from './_residuemath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -24,6 +24,9 @@ const LIB_IMPORT = '../../../singleton/bn254/lib/lazy/Bn254Lazy.cash';
 const PROBE = join(GEN, '_probe_millerres.cash');
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
+const LINKED_CUTS = process.env.MILLER_LINKED_LAYOUT === '1'
+  ? [18, 35, 53, 71, 89, 107, 125, 143, 161, 179, 197, 215, 233, 250, 267, 285, 302, 320, 338]
+  : [];
 
 const PAIRS = pairsFor(vec.publicInputs);
 const PINFO = PAIRS.map((pair, j) => {
@@ -42,7 +45,7 @@ const ptL = PAIRS.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
 // witness for the committed planning instance (the chunk math is generic; only window
 // boundaries come from this instance, like the rest of the generators).
 const { boundary: fRawPlan } = millerBatchOps(PAIRS);
-const { c: C_PLAN, cInv: CINV_PLAN } = residueWitness(fRawPlan);
+const { c: C_PLAN, cInv: CINV_PLAN, w: W_PLAN } = residueWitness(fRawPlan);
 const { ops, states, boundary } = millerFusedOps(PAIRS, C_PLAN, CINV_PLAN);
 
 // baked constant f_{alpha,beta} (pair 1's single-pair Miller value; VK-only, proof-independent),
@@ -50,6 +53,10 @@ const { ops, states, boundary } = millerFusedOps(PAIRS, C_PLAN, CINV_PLAN);
 const FAB_LIMBS = f12limbs(singlePairMiller(PAIRS[1]).f).map((x) => x.toString());
 const cNames = Array.from({ length: 12 }, (_, i) => `c${i}`);
 const ciNames = Array.from({ length: 12 }, (_, i) => `ci${i}`);
+const wNames = Array.from({ length: 12 }, (_, i) => `w${i}`);
+const ONE_L = ['1', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'];
+const W_HASHES = [ONE_L, fp12limbsOf(COSET27[1]).map(String), fp12limbsOf(COSET27[2]).map(String)]
+  .map((limbs) => Buffer.from(commitBin(limbs.map(BigInt))).toString('hex'));
 // state = f(12) + R0(6) + runtime points + c(12) + cInv(12)
 const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...f12limbs(s.c), ...f12limbs(s.cInv)];
 const withPts = (limbs) => { const fr = limbs.slice(0, 18); const rest = limbs.slice(18); return [...fr, ...ptL, ...rest]; };
@@ -61,10 +68,9 @@ const outState = (i) => i === states.length - 1
   : withPts(stateLimbs(states[i]));
 
 const bakedCoeffs = (triple) => triple.flatMap((c) => [`${c.c0}`, `${c.c1}`]);
-// withTail (FUSE_TAIL, final chunk only): fold the residue final-exp verdict into this chunk so
+// withTail (linked layout or FUSE_TAIL, final chunk only): fold the residue final-exp verdict into this chunk so
 // the separate ResidueTail input disappears. The chunk computes fF = final f, then runs the
 // witnessed-residue verdict inline (w is an extra UNCOMMITTED witness, appended after the state).
-const wNames = Array.from({ length: 12 }, (_, i) => `w${i}`);
 function genChunk(opLo, opHi, isFinal, withTail = false) {
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
@@ -91,6 +97,8 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   for (let i = opLo; i < opHi; i++) {
     const op = ops[i], pi = op.j !== undefined ? PINFO[op.j] : null;
     const fixed = pi !== null && !pi.cfg.Q;
+    const r0Unused = isFinal && !ops.slice(i + 1, opHi).some((later) =>
+      later.j !== undefined && PINFO[later.j].cfg.Q && ['dl', 'al', 'pp'].includes(later.t));
     if (op.t === 'sqr') { const sf = fresh(12); L.push(`        (${decl(sf)}) = fp12Sqr(${f.join(',')});`); f = sf; }
     else if (op.t === 'cf') { // c-fold: f *= (neg ? c : cInv)
       const g = fresh(12); const m = op.neg ? cNames : ciNames;
@@ -116,16 +124,52 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
       const bco = fresh(6), br = fresh(6);
       L.push(`        (${decl([...bco, ...br])}) = pointAdd(${r0.join(',')}, ${q1.join(',')});`); r0 = br;
       emitLine(bco, pi);
-      const q2 = fresh(4); L.push(`        (${decl(q2)}) = psi(${q1.join(',')});`);
-      const q2ny = fresh(2); L.push(`        (${decl(q2ny)}) = fp2Neg(${q2[2]}, ${q2[3]}, 64);`);
       const cco = fresh(6), cr = fresh(6);
-      L.push(`        (${decl([...cco, ...cr])}) = pointAdd(${r0.join(',')}, ${q2[0]}, ${q2[1]}, ${q2ny[0]}, ${q2ny[1]});`); r0 = cr;
+      if (r0Unused) {
+        // The final handoff drops R0. Emit only pointAdd's line-coefficient prefix so CashScript
+        // does not reject the otherwise-dead new-R tuple, and avoid computing state we discard.
+        // psi^2(Q) = (KX * Q.x, -Q.y), so the final add by
+        // (psi^2(Q).x, -psi^2(Q).y) can use (KX * Q.x, Q.y) directly.
+        const q2x = fresh(2);
+        L.push(`        (${decl(q2x)}) = fp2Scale(${pi.Qxae}, ${pi.Qxbe}, 21888242871839275220042445260109153167277707414472061641714758635765020556616);`);
+        const qyz = fresh(2), t0 = fresh(2), qxz = fresh(2), t1 = fresh(2);
+        const t0qx = fresh(2), t1qy = fresh(2);
+        L.push(`        (${decl(qyz)}) = fp2Mul(${pi.Qyae}, ${pi.Qybe}, ${r0[4]}, ${r0[5]});`);
+        L.push(`        (${decl(t0)}) = fp2Sub(${r0[2]}, ${r0[3]}, ${qyz[0]}, ${qyz[1]}, 0);`);
+        L.push(`        (${decl(qxz)}) = fp2Mul(${q2x[0]}, ${q2x[1]}, ${r0[4]}, ${r0[5]});`);
+        L.push(`        (${decl(t1)}) = fp2Sub(${r0[0]}, ${r0[1]}, ${qxz[0]}, ${qxz[1]}, 1);`);
+        L.push(`        (${decl(t0qx)}) = fp2Mul(${t0[0]}, ${t0[1]}, ${q2x[0]}, ${q2x[1]});`);
+        L.push(`        (${decl(t1qy)}) = fp2Mul(${t1[0]}, ${t1[1]}, ${pi.Qyae}, ${pi.Qybe});`);
+        L.push(`        (${decl(cco.slice(0, 2))}) = fp2Sub(${t0qx[0]}, ${t0qx[1]}, ${t1qy[0]}, ${t1qy[1]}, 1);`);
+        L.push(`        (${decl(cco.slice(2, 4))}) = fp2Neg(${t0[0]}, ${t0[1]}, 64);`);
+        L.push(`        int ${cco[4]} = ${t1[0]}; int ${cco[5]} = ${t1[1]};`);
+      } else {
+        const q2 = fresh(4); L.push(`        (${decl(q2)}) = psi(${q1.join(',')});`);
+        const q2ny = fresh(2); L.push(`        (${decl(q2ny)}) = fp2Neg(${q2[2]}, ${q2[3]}, 64);`);
+        L.push(`        (${decl([...cco, ...cr])}) = pointAdd(${r0.join(',')}, ${q2[0]}, ${q2[1]}, ${q2ny[0]}, ${q2ny[1]});`); r0 = cr;
+      }
       emitLine(cco, pi);
     }
   }
   if (withTail) {
-    // fused terminal: f is now fF; run the residue verdict inline instead of handing off.
-    L.push(...residueVerdictLines(f, cNames, ciNames, wNames));
+    const pNames = Array.from({ length: 12 }, (_, i) => `tailP${i}`);
+    const cqqNames = Array.from({ length: 12 }, (_, i) => `tailCqq${i}`);
+    const uNames = Array.from({ length: 12 }, (_, i) => `tailU${i}`);
+    const rhsNames = Array.from({ length: 12 }, (_, i) => `tailRhs${i}`);
+    const tNames = Array.from({ length: 12 }, (_, i) => `tailT${i}`);
+    const lhsNames = Array.from({ length: 12 }, (_, i) => `tailLhs${i}`);
+    L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
+    L.push('        ' + cNames.map((n) => `require(${n} < P);`).join(' '));
+    L.push(`        (${decl(pNames)}) = fp12Mul(${cNames.join(',')}, ${ciNames.join(',')});`);
+    L.push('        ' + pNames.map((n, i) => `require(${n} % P == ${ONE_L[i]});`).join(' '));
+    L.push(`        bytes wHash = hash256(${wNames.map((n) => `toPaddedBytes(${n}, 40)`).join(' + ')});`);
+    L.push(`        require(wHash == 0x${W_HASHES[0]} || wHash == 0x${W_HASHES[1]} || wHash == 0x${W_HASHES[2]});`);
+    L.push(`        (${decl(cqqNames)}) = fp12Frob2(${cNames.join(',')});`);
+    L.push(`        (${decl(uNames)}) = fp12Mul(${cNames.join(',')}, ${cqqNames.join(',')});`);
+    L.push(`        (${decl(rhsNames)}) = fp12Frob1(${uNames.join(',')});`);
+    L.push(`        (${decl(tNames)}) = fp12Mul(${wNames.join(',')}, ${cqqNames.join(',')});`);
+    L.push(`        (${decl(lhsNames)}) = fp12Mul(${f.join(',')}, ${tNames.join(',')});`);
+    L.push('        ' + lhsNames.map((n, i) => `require((${n} - ${rhsNames[i]}) % P == 0);`).join(' '));
   } else {
     // final chunk hands off only [fF, c, cInv] to the residue tail; others carry full state.
     L.push(isFinal ? covOut([...f, ...cNames, ...ciNames]) : covOut([...f, ...r0, ...ptParams, ...cNames, ...ciNames]));
@@ -137,7 +181,11 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
 
 if (process.argv[2] === 'probe') {
   for (const [a, b] of [[0, 4], [0, 8], [ops.length - 4, ops.length]]) {
-    const m = measureCovenantFile(genChunk(a, b, b === ops.length), inState(a), outState(b), PROBE);
+    const final = b === ops.length;
+    const withTail = final && LINKED_CUTS.length > 0;
+    const inL = inState(a);
+    const args = withTail ? [...inL, ...fp12limbsOf(W_PLAN)] : inL;
+    const m = measureCovenantFile(genChunk(a, b, final, withTail), args, withTail ? [] : outState(b), PROBE, true, inL);
     console.error(`ops [${a},${b}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`);
   }
   process.exit(0);
@@ -148,16 +196,26 @@ const chunks = []; let lo = 0; const planState = { perUnit: null };
 while (lo < ops.length) {
   const inL = inState(lo);
   const tryHi = (hi) => {
-    const outL = outState(hi);
-    const src = genChunk(lo, hi, hi === ops.length);
-    const m = measureCovenantFile(src, inL, outL, PROBE);
-    return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final: hi === ops.length, outgoing: commit(outL), src, m };
+    const final = hi === ops.length;
+    const withTail = final && LINKED_CUTS.length > 0;
+    const outL = withTail ? [] : outState(hi);
+    const args = withTail ? [...inL, ...fp12limbsOf(W_PLAN)] : inL;
+    const src = genChunk(lo, hi, final, withTail);
+    const m = measureCovenantFile(src, args, outL, PROBE, true, inL);
+    return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final, withTail, outgoing: withTail ? null : commit(outL), src, m };
   };
-  const best = planChunk(lo, ops.length, OP_TARGET, tryHi, planState);
+  // The generic covenant layout needs the greedy windows. Linked grouped/intratx packaging
+  // has a cheaper handoff prologue, so use the measured 20-window layout selected by sweeping
+  // every boundary against the assembled verifier and all official proof runs. Some generic
+  // covenant probes exceed OP_TARGET, so keep the complete measured layout opt-in.
+  const linkedHi = LINKED_CUTS[chunks.length];
+  const best = linkedHi === undefined
+    ? planChunk(lo, ops.length, OP_TARGET, tryHi, planState)
+    : tryHi(linkedHi);
   if (!best) throw new Error(`no fitting fused window at op ${lo}`);
   const idx = chunks.length;
   writeFileSync(join(GEN, `millerres_${String(idx).padStart(2, '0')}.cash`), best.src);
-  chunks.push({ idx, opLo: lo, opHi: best.hi, final: best.final, incoming: commit(inL), outgoing: best.outgoing, opCost: best.operationCost, lockingBytes: best.m.lockingBytes });
+  chunks.push({ idx, opLo: lo, opHi: best.hi, final: best.final, tailFused: best.withTail, incoming: commit(inL), outgoing: best.outgoing, opCost: best.operationCost, lockingBytes: best.m.lockingBytes });
   console.error(`  chunk ${idx}: ops[${lo},${best.hi}) lock=${best.m.lockingBytes}B op=${best.operationCost.toLocaleString()} final=${best.final}`);
   lo = best.hi;
 }
@@ -170,7 +228,7 @@ console.error(`fused miller: ${chunks.length} chunks, total op=${chunks.reduce((
 // [fF,c,cInv] hand-off, and the final op is an f-only c-fold so no R accumulator dangles). The
 // consuming build must treat it as terminal and supply the w witness. Default (unset) keeps the
 // hand-off form so the flagship builds + the standalone ResidueTail are untouched.
-if (process.env.FUSE_TAIL === '1') {
+if (process.env.FUSE_TAIL === '1' && chunks[chunks.length - 1].tailFused !== true) {
   const last = chunks[chunks.length - 1];
   const src = genChunk(last.opLo, last.opHi, true, true);
   writeFileSync(join(GEN, `millerres_${String(last.idx).padStart(2, '0')}.cash`), src);
@@ -180,7 +238,8 @@ if (process.env.FUSE_TAIL === '1') {
   console.error(`  chunk ${last.idx}: residue-tail verdict FUSED -> terminal (was hand-off + separate tail)`);
 }
 writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
-  fused: true, numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
+  fused: true, linkedLayout: LINKED_CUTS.length > 0,
+  numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, tailFused: c.tailFused === true, incoming: c.incoming, outgoing: c.outgoing })),
 }, null, 2));
 console.error('wrote generated/manifest_millerres.json');

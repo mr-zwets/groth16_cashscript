@@ -32,8 +32,8 @@ import {
   Fp2, bn254, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileBytecode, compileFileBytecode, ptLimbs, PT_CFG,
   compileBytecodeRaw, compileFileBytecodeRaw,
-  vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace, le40, CATEGORY, commitBin,
-  OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET,
+  vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace, le40, CATEGORY,
+  OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
@@ -50,7 +50,7 @@ const GEN = join(here, '..', 'pairing', 'generated');
 regenGlvSafe(GEN);
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);
-const W = 40; // BN254 limb width (bytes)
+const W = 32; // canonical BN254 field-element width (bytes)
 import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 
@@ -61,10 +61,9 @@ const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)); // OP_
 
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
-const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le40(((BigInt(l) % P) + P) % P)]));
+const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le40(((BigInt(l) % P) + P) % P).slice(0, W)]));
 // NFT commitment a covout chunk produces / a covInHash chunk checks == in-VM hash256(blob(limbs)).
-// limbs here are reduced (< P), so commitBin's le40 concat equals blob(limbs).
-const commitOf = (limbs) => commitBin(limbs);
+const commitOf = (limbs) => hash256(blob(limbs));
 const limbsEqual = (a, b) => a.length === b.length && a.every((x, i) => BigInt(x) === BigInt(b[i]));
 
 const padPush = (argLen, target) => {
@@ -117,7 +116,7 @@ function parseProofUnlocking(hex) {
   const d = vals.reverse();
   return { Ax: d[0], Ay: d[1], Bxa: d[2], Bxb: d[3], Bya: d[4], Byb: d[5], Cx: d[6], Cy: d[7], in0: d[8], in1: d[9] };
 }
-const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-singleton-multiproof-vectors.json', 'utf8'));
+const mp = JSON.parse(readFileSync(verifierPath('src/bch/groth16-singleton-multiproof-vectors.json'), 'utf8'));
 const p1 = parseProofUnlocking(mp.proofs[1].unlocking);
 const wcp = parseProofUnlocking(mp.worstCaseProof.unlocking);
 const INSTANCES = {
@@ -134,7 +133,6 @@ const dummy = pairsFor([1n, 1n]);
 const VKX_LIMB_OFFSET = MILLER_STATE_LIMBS + ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(1, dummy[1].P.toAffine(), dummy[1].Q.toAffine()).length;
 const PTL_LEN = dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())).length; // 10
 const MILLER_IN_LIMBS = MILLER_STATE_LIMBS + PTL_LEN + 24; // + c(12) + cInv(12) = 52 (fused)
-const TAIL_IN_LIMBS = 12 + 12 + 12; // [fF, c, cInv] hand-off from the fused miller's final chunk
 
 // ---- per-stage chunk specs (inLimbs/outLimbs/extras/role) for one instance ----
 // ALIGNED with chunked/pairing/build_vectors.mjs (the current, working covenant build) so the
@@ -152,6 +150,9 @@ function specsG2check(inst) {
   const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
+  if (man.linkedLayout !== true) {
+    throw new Error('grouped residue requires G2_LINKED_LAYOUT=1 during G2 generation');
+  }
   const zinv = g2checkFastZinv(Bpair); // [zinvA, zinvB] witnessed inverse of [x0]B.Z (last chunk only)
   return man.chunks.map((ch) => ({
     file: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`),
@@ -190,35 +191,26 @@ function specsVkx(inst, crossToMiller) {
     };
   });
 }
-// c^-(6x+2)-FUSED miller (residue method). State f(12)+R0(6)+pts(10)+c(12)+cInv(12) = 52; the
-// FINAL chunk hands off only [fF, c, cInv] (36) to the residue tail. c,cInv are the (constant)
-// residue witness, carried through every chunk and re-checked in the tail (c*cInv==ONE).
-function specsMillerFused(inst, c, cInv) {
+// c^-(6x+2)-FUSED miller (residue method). The final Miller chunk also consumes w and
+// performs the residue verdict, so there is no separate terminal input or state hand-off.
+function specsMillerFused(inst, c, cInv, w) {
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const { states, boundary } = millerFusedOps(pairs, c, cInv);
+  const { states } = millerFusedOps(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const full = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...ptL, ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 52
-  const handoff = (s) => [...f12limbs(s.f), ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 36 -> tail
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
-  const specs = man.chunks.map((ch) => ({
+  if (man.linkedLayout !== true) {
+    throw new Error('grouped residue requires MILLER_LINKED_LAYOUT=1 during Miller generation');
+  }
+  return man.chunks.map((ch) => ({
     file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`),
     inLimbs: full(states[ch.opLo]),
-    outLimbs: ch.final ? handoff(states[ch.opHi]) : full(states[ch.opHi]),
-    extras: [], role: ch.final ? 'cross' : 'within',
-    cmp: ch.final ? { cmpExpr: 'outBlob', nextFullInLen: TAIL_IN_LIMBS * W, skip: 0, cmpLen: TAIL_IN_LIMBS * W } : null,
-    label: `fused-miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' =boundary*c^-(6x+2)' : ''}`,
-    checkpoint: ch.final ? 'miller-boundary' : undefined,
+    outLimbs: ch.final ? [] : full(states[ch.opHi]),
+    extras: ch.final ? fp12limbsOf(w) : [], role: ch.final ? 'terminal' : 'within',
+    cmp: null,
+    label: `fused-miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' + residue verdict' : ''}`,
+    checkpoint: ch.final ? 'verify' : undefined,
   }));
-  return { specs, boundary };
-}
-// witnessed-residue final-exp TAIL — ONE chunk. inBlob = [fF, c, cInv] (36); w is a witness extra.
-function specsResidueTail(fF, c, cInv, w) {
-  return [{
-    file: join(GEN, 'finalexpres_00.cash'),
-    inLimbs: [...fp12limbsOf(fF), ...fp12limbsOf(c), ...fp12limbsOf(cInv)],
-    outLimbs: [], extras: fp12limbsOf(w), role: 'terminal',
-    label: 'residue-tail fF*w*c^q2==c^q*c^q3 verdict', checkpoint: 'verify',
-  }];
 }
 function buildSpecs(inst) {
   const g2 = specsG2check(inst);
@@ -226,9 +218,8 @@ function buildSpecs(inst) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const { boundary: fRaw } = millerBatchOps(pairs);
   const { c, cInv, w } = residueWitness(fRaw);
-  const { specs: miller, boundary: fF } = specsMillerFused(inst, c, cInv);
-  const tail = specsResidueTail(fF, c, cInv, w);
-  return [...g2, ...vkx, ...miller, ...tail];
+  const miller = specsMillerFused(inst, c, cInv, w);
+  return [...g2, ...vkx, ...miller];
 }
 
 // ---- grouping: partition the ordered chunk list into transactions -------------------
@@ -236,20 +227,6 @@ function buildSpecs(inst) {
 // (outLimbs[i] == inLimbs[i+1], both non-empty) — i.e. a within-stage link. Stage seams
 // (cross / terminal / genesis) carry no full-state hand-off, so they stay inside one group.
 const PER_INPUT_OV = 43; // outpoint(36) + sequence(4) + script-length varint(~3)
-function packGroups(specs, sz, target) {
-  const allowed = (i) => i < specs.length - 1 && specs[i].outLimbs.length > 0 && limbsEqual(specs[i].outLimbs, specs[i + 1].inLimbs);
-  const groups = []; let start = 0;
-  while (start < specs.length) {
-    let acc = 0, lastAllowed = -1, end = specs.length - 1;
-    for (let i = start; i < specs.length; i++) {
-      acc += sz[i] + PER_INPUT_OV;
-      if (acc > target && lastAllowed >= start) { end = lastAllowed; break; }
-      if (allowed(i)) lastAllowed = i;
-    }
-    groups.push([start, end]); start = end + 1;
-  }
-  return groups;
-}
 
 // grouped role of chunk i in group [lo,hi] (groupIdx of G groups)
 function groupedCfg(specs, i, lo, hi, groupIdx, G) {
@@ -434,25 +411,18 @@ const report = (tag, asm) => {
 };
 
 // ===================== build =====================
-// Compute the group partition ONCE from the WORST-CASE instance (largest pads) so every
-// instance fits and all instances share the SAME lockings (group roles are identical).
-const TARGET_GROUP_BYTES = 99000; // GLV-shrunk verifier packs into 3 standard txs (<100KB each)
+// Exact boundary compilation across all 276 legal three-group partitions selected the
+// balanced 9/9/9 split while preserving standardness for committed, proof #1, and worst-case.
 const wcSpecs = buildSpecs(INSTANCES.worst);
-// size estimate for packing: assemble worst-case in a single trivial partition to size pads,
-// then pack. We size with a conservative per-chunk ceiling first to avoid the chicken/egg of
-// roles affecting size: assemble once with a naive 1-group-per-chunk-free guess is overkill,
-// so instead pack using the worst-case unlocking sizes from a full single-group assembly.
-function sizeEstimate(specs) {
-  // assemble with everything in one group is invalid (cross-tx token), so size each chunk's
-  // unlocking via the intra-tx pad rule using its op-cost measured in a tiny 2-input probe is
-  // also heavy. Simplest robust proxy: tune against TARGET then measure — do a provisional
-  // pack with a generous target, assemble, then read true sizes and repack.
-  const provisional = packGroups(specs, specs.map(() => 9000), TARGET_GROUP_BYTES);
-  const a = assembleGrouped(specs, provisional);
-  return a.meta.map((m) => m.unlockingBytes);
+const GROUP_CUTS = [8, 17];
+if (!GROUP_CUTS.every((i) =>
+  i < wcSpecs.length - 1 &&
+  wcSpecs[i].outLimbs.length > 0 &&
+  limbsEqual(wcSpecs[i].outLimbs, wcSpecs[i + 1].inLimbs)
+)) {
+  throw new Error('measured grouped-residue boundary no longer carries full state');
 }
-const wcSizes = sizeEstimate(wcSpecs);
-const GROUPS = packGroups(wcSpecs, wcSizes, TARGET_GROUP_BYTES);
+const GROUPS = [[0, GROUP_CUTS[0]], [GROUP_CUTS[0] + 1, GROUP_CUTS[1]], [GROUP_CUTS[1] + 1, wcSpecs.length - 1]];
 
 const asmCommitted = assembleGrouped(buildSpecs(INSTANCES.committed), GROUPS);
 report('groth16-grouped committed', asmCommitted);
@@ -467,8 +437,8 @@ const cSpecs = buildSpecs(INSTANCES.committed);
 const invalids = [invalidRun(cSpecs, GROUPS, Math.floor(cSpecs.length / 2)), invalidRun(cSpecs, GROUPS, firstBoundary)];
 console.error(`  invalid runs rejected: ${invalids.map((r) => r.rejected).join(',')}`);
 
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-grouped-residue-vectors.json', JSON.stringify({
-  description: 'GROUPED + RESIDUE BN254 Groth16 verifier: the residue-optimized chunk graph (fast-G2 endo subgroup check, ePrint 2022/348, 4 chunks; vk_x MSM; c^-(6x+2)-FUSED batched Miller, ePrint 2024/640; witnessed-residue final-exp TAIL collapsing the hard part to 1 chunk) packed into a handful of STANDARD (<100,000 B) transactions. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail (c*cInv==ONE, c canonical, w in {1,w27,w27^2}); the verdict is fF*w*c^q2 == c^q*c^q3. One fixed set of lockings verifies any proof for the VK.',
+writeFileSync(verifierPath('src/bch/groth16-grouped-residue-vectors.json'), JSON.stringify({
+  description: 'GROUPED + RESIDUE BN254 Groth16 verifier: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 4 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks (ePrint 2024/640) packed into 3 STANDARD (<100,000 B) transactions. The final Miller chunk also performs the witnessed-residue verdict, eliminating a separate tail input. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. One fixed set of lockings verifies any proof for the VK.',
   method: 'grouped-residue', deployment: 'P2SH32', category: binToHex(CATEGORY),
   numInputs: asmCommitted.meta.length, numGroups: GROUPS.length, budgetPerInput: OP_BUDGET,
   groupSizes: GROUPS.map(([lo, hi]) => hi - lo + 1),

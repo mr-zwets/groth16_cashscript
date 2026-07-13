@@ -13,7 +13,7 @@ import {
   Fp12, Fp2, bn254, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileBytecode, compileFileBytecode, commitBin, CATEGORY, ptLimbs,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace,
-  TARGET_UNLOCK, OP_PUSHDATA2, OP_BUDGET,
+  TARGET_UNLOCK, OP_PUSHDATA2, OP_BUDGET, verifierPath,
 } from './_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from './gen_g2check.mjs';
 
@@ -123,7 +123,7 @@ function parseProofUnlocking(hex) {
 }
 
 // ---- the two proof instances: #0 committed, #1 from the multiproof vectors ----
-const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-singleton-multiproof-vectors.json', 'utf8'));
+const mp = JSON.parse(readFileSync(verifierPath('src/bch/groth16-singleton-multiproof-vectors.json'), 'utf8'));
 const p1 = parseProofUnlocking(mp.proofs[1].unlocking);
 const INSTANCES = [
   { tag: 'committed', proof: undefined, inputs: vec.publicInputs.map(BigInt) },
@@ -252,7 +252,7 @@ const maxOpOf = (a) => Math.max(...a.map((s) => s.operationCost));
 console.error(`pairing(boundary): ${pairing0.length} steps/proof, op ${sumOp(pairing0).toLocaleString()}; proof#1 also built (${pairing1.length} steps)`);
 console.error(`max lock ${stats.maxLock}B max unlock ${stats.maxUnlock}B | allFit=${stats.allFit} allAccept=${stats.allAccept} allInvalidRejected=${stats.allInvalid}`);
 
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-chunked-vectors.json', JSON.stringify({
+writeFileSync(verifierPath('src/bch/pairing-chunked-vectors.json'), JSON.stringify({
   description: 'PROOF-AGNOSTIC chunked BN254 Groth16 pairing to the Miller boundary (ONE batched 4-pair optimal-ate Miller loop with a shared fp12Sqr per step; the folded f IS the boundary, no separate combine), multi-tx. Generic covenant: running state in the token NFT commitment, NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct proof under the same VK.',
   proofBinding: 'runtime', numSteps: pairing0.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(pairing0), maxStepOperationCost: maxOpOf(pairing0),
@@ -262,7 +262,7 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-chunked-vectors.j
 console.error('wrote src/bch/pairing-chunked-vectors.json (proof-agnostic, 2 proofs + worst-case)');
 
 console.error(`groth16(full): ${g0.groth16.length} steps/proof, op ${sumOp(g0.groth16).toLocaleString()}; proof#1 also built (${g1.groth16.length} steps)`);
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-chunked-vectors.json', JSON.stringify({
+writeFileSync(verifierPath('src/bch/groth16-chunked-vectors.json'), JSON.stringify({
   description: 'PROOF-AGNOSTIC full chunked BN254 Groth16 verifier: vk_x (on-chain from public inputs) -> ONE batched 4-pair Miller loop -> final exponentiation -> assert product==1, multi-tx. Generic covenant: state in the token NFT commitment, NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct proof minted under the same VK.',
   proofBinding: 'runtime', numSteps: g0.groth16.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(g0.groth16), maxStepOperationCost: maxOpOf(g0.groth16),
@@ -276,7 +276,7 @@ console.error('wrote src/bch/groth16-chunked-vectors.json (proof-agnostic, 2 pro
 // PROOF-AGNOSTIC: the public inputs ride in the committed state (NFT commitment),
 // so one fixed set of lockings computes vk_x = IC0+in0*IC1+in1*IC2 for ANY inputs.
 console.error(`vk_x(covenant): ${g0.vkx.length} steps/proof, op ${sumOp(g0.vkx).toLocaleString()}; proof#1 also built (${g1.vkx.length} steps)`);
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/vkx-chunked-covenant-vectors.json', JSON.stringify({
+writeFileSync(verifierPath('src/bch/vkx-chunked-covenant-vectors.json'), JSON.stringify({
   description: 'PROOF-AGNOSTIC chunked BN254 vk_x = IC0 + in0*IC1 + in1*IC2 (Shamir/Straus), multi-tx. Generic covenant: the accumulator + public inputs live in the token NFT commitment, NO baked instance. One fixed set of lockings aggregates ANY public inputs (runtime-general): proof #0 = committed instance, extraValidProofs = distinct public inputs.',
   proofBinding: 'runtime', numSteps: g0.vkx.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(g0.vkx), maxStepOperationCost: maxOpOf(g0.vkx),

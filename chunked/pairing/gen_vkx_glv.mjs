@@ -155,11 +155,10 @@ export function genCash(lo, hi, first, final) {
   L.push('        }');
   if (final) {
     L.push(`        (int icx, int icy, int icz) = jacAdd(rX, rY, rZ, ${IC0[0]}, ${IC0[1]}, 1);`);
-    L.push('        rX = icx; rY = icy; rZ = icz;');
-    L.push('        require(mulFp(rZ, zInv) == 1);');
+    L.push('        require(mulFp(icz, zInv) == 1);');
     L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
-    L.push('        int vkxX = mulFp(rX, zInv2);');
-    L.push('        int vkxY = mulFp(rY, zInv3);');
+    L.push('        int vkxX = mulFp(icx, zInv2);');
+    L.push('        int vkxY = mulFp(icy, zInv3);');
     L.push(covOut(['vkxX', 'vkxY']));
   } else {
     L.push(covOut(STATE));
@@ -214,7 +213,7 @@ if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
       if (final) { const zinv = vkxGlvZinv(wk10, wk20, wk11, wk21); const acc = vkxGlvStateAt(wk10, wk20, wk11, wk21, ITERS); const ic0 = [((IC0[0] % P) + P) % P, ((IC0[1] % P) + P) % P]; const [fx, fy, fz] = jacAdd(acc[0], acc[1], acc[2], ic0[0], ic0[1], 1n); const z2 = qF(zinv), z3 = mF(z2, zinv); outLimbs = [mF(fx, z2), mF(fy, z3)].map(String); args = [...inSt, String(zinv)]; }
       else { const [X, Y, Z] = vkxGlvStateAt(wk10, wk20, wk11, wk21, hi); outLimbs = SER_state(X, Y, Z).map(String); args = inSt; }
       const src = genCash(lo, hi, first, final);
-      const m = measureCovenant(src, args.map(BigInt), outLimbs.map(BigInt));
+      const m = measureCovenant(src, args.map(BigInt), outLimbs.map(BigInt), inSt.map(BigInt));
       return { hi, final, src, m, fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET };
     };
     let best = tryHi(lo + 1);

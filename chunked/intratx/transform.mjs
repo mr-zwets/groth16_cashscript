@@ -61,7 +61,7 @@ function parseParams(sig) {
 
 /**
  * Transform one covenant chunk source into a linked chunk.
- *   cfg.W            limb width in bytes (40 BN254, 48 BLS12-381)
+ *   cfg.W            fixed serialized limb width in bytes
  *   cfg.prime        the field prime literal (string)
  *   cfg.forward      null  -> no forward check (stage-final / terminal); for a covOut
  *                            chunk we then emit a tautological length check so the

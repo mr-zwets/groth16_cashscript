@@ -18,17 +18,19 @@
 // final chunk additionally consumes the per-proof witness zinv (2 limbs) from the
 // unlocking — supplied by build_vectors via the chunk `extras`.
 //   node gen_g2check.mjs        plan + emit generated/g2check_NN.cash + manifest_g2check.json
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createVirtualMachineBch2026, createVirtualMachineBchSpec, encodeDataPush, bigIntToVmNumber, numberToBinUint16LE, numberToBinUint32LE } from '@bitauth/libauth';
-import { measureCovenantFile, compileFileBytecodeRaw, planChunk, covIn, covOut, decl, proof, commitBin, CATEGORY, TARGET_UNLOCK, OP_PUSHDATA2 } from './_millermath.mjs';
+import { measureCovenantFile, compileFileBytecode, planChunk, covIn, covOut, decl, proof, commitBin, CATEGORY, TARGET_UNLOCK, OP_PUSHDATA2 } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
+mkdirSync(GEN, { recursive: true });
 const PROBE = join(GEN, `_probe_g2check_${process.pid}.cash`); // planner compiles candidates from file so the lib import resolves
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_900_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
+const LINKED_CUTS = process.env.G2_LINKED_LAYOUT === '1' ? [25, 51] : [];
 const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const BN_X = 4965661367192848881n; // BN254 seed |x0|
 const NBITS = 63; // bitlength of BN_X (MSB at index 62)
@@ -139,10 +141,14 @@ function genChunk(lo, hi, isFirst, isLast) {
     L.push('        (int zi3a,int zi3b) = fp2Mul(zi2a, zi2b, zinvA, zinvB);');
     L.push(`        (int a0xa,int a0xb) = fp2Mul(${Rxa}, ${Rxb}, zi2a, zi2b);`); // affine x of [x0]B
     L.push(`        (int a0ya,int a0yb) = fp2Mul(${Rya}, ${Ryb}, zi3a, zi3b);`); // affine y of [x0]B
-    // psi, psi^2, psi^3 of [x0]B (affine)
+    // psi, psi^2, psi^3 of [x0]B (affine). On BN254,
+    // psi^2(x,y)=(KX*x,-y), and psi^3(x,y)=(KX*psi(x),-psi(y)).
+    // Use those identities directly instead of evaluating three full psi maps.
     L.push('        (int bxa,int bxb,int bya,int byb) = psi(a0xa, a0xb, a0ya, a0yb);');
-    L.push('        (int cxa,int cxb,int cya,int cyb) = psi(bxa, bxb, bya, byb);');
-    L.push('        (int dxa,int dxb,int dya,int dyb) = psi(cxa, cxb, cya, cyb);');
+    L.push('        (int cxa,int cxb) = fp2Scale(a0xa, a0xb, 21888242871839275220042445260109153167277707414472061641714758635765020556616);');
+    L.push('        (int cya,int cyb) = fp2Neg(a0ya, a0yb);');
+    L.push('        (int dxa,int dxb) = fp2Scale(bxa, bxb, 21888242871839275220042445260109153167277707414472061641714758635765020556616);');
+    L.push('        (int dya,int dyb) = fp2Neg(bya, byb);');
     // LHS = [x0]B + B + psi + psi^2  (start jac(a0), accumulate affine points)
     L.push('        (int l1xa,int l1xb,int l1ya,int l1yb,int l1za,int l1zb) = g2AddAffine(a0xa, a0xb, a0ya, a0yb, 1, 0, Bxa, Bxb, Bya, Byb);');
     L.push('        (int l2xa,int l2xb,int l2ya,int l2yb,int l2za,int l2zb) = g2AddAffine(l1xa, l1xb, l1ya, l1yb, l1za, l1zb, bxa, bxb, bya, byb);');
@@ -178,7 +184,7 @@ const padPush = (argLen, target) => {
 };
 function measureFinalEndo(src, stateLimbs14, witness, probePath) {
   let raw;
-  try { writeFileSync(probePath, src); raw = compileFileBytecodeRaw(probePath); }
+  try { writeFileSync(probePath, src); raw = compileFileBytecode(probePath); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
   const locking = Uint8Array.from([...raw]);
   const pushInts = [...stateLimbs14, ...witness]; // decl order: 14 state, then zinvA, zinvB
@@ -213,16 +219,21 @@ while (lo < NBITS) {
     const src = genChunk(lo, hi, lo === 0, last);
     const m = last
       ? measureFinalEndo(src, inLimbs, witness, PROBE)
-      : measureCovenantFile(src, inLimbs, stateLimbs(g2checkAccAt(B, hi)), PROBE);
+      : measureCovenantFile(src, inLimbs, stateLimbs(g2checkAccAt(B, hi)), PROBE, true);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, last, src, m };
   };
-  const best = planChunk(lo, NBITS, OP_TARGET, tryHi, planState);
+  // Linked grouped/intratx packaging has a cheaper handoff prologue. Its measured layout
+  // keeps one more scalar bit in the middle chunk, reducing the assembled verifier size.
+  const linkedHi = LINKED_CUTS[chunks.length];
+  const best = linkedHi === undefined
+    ? planChunk(lo, NBITS, OP_TARGET, tryHi, planState)
+    : tryHi(linkedHi);
   const idx = chunks.length;
   writeFileSync(join(GEN, `g2check_${String(idx).padStart(2, '0')}.cash`), best.src);
   chunks.push({ idx, lo, hi: best.hi, first: lo === 0, last: best.last, lockingBytes: best.m.lockingBytes, operationCost: best.m.operationCost });
   console.error(`  g2check chunk ${idx}: bits[${lo},${best.hi}) lock=${best.m.lockingBytes}B op=${best.m.operationCost.toLocaleString()} accepted=${best.m.accepted} last=${best.last}`);
   lo = best.hi;
 }
-writeFileSync(join(GEN, 'manifest_g2check.json'), JSON.stringify({ numChunks: chunks.length, nbits: NBITS, fastEndo: true, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, last: c.last })) }, null, 2));
+writeFileSync(join(GEN, 'manifest_g2check.json'), JSON.stringify({ numChunks: chunks.length, nbits: NBITS, fastEndo: true, linkedLayout: LINKED_CUTS.length > 0, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, last: c.last })) }, null, 2));
 console.error(`G2-check: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.operationCost, 0).toLocaleString()}`);
 }
