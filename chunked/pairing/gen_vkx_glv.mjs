@@ -74,9 +74,9 @@ for (let idx = 1; idx < 16; idx++) {
 const le32 = (v) => { v = ((v % P) + P) % P; let s = ''; for (let b = 0; b < 32; b++) s += Number((v >> BigInt(8 * b)) & 0xffn).toString(16).padStart(2, '0'); return s; };
 const TABLE_HEX = '0x' + Array.from({ length: 15 }, (_, k) => le32(TABLE[k + 1][0]) + le32(TABLE[k + 1][1])).join('');
 const tableBytes = Buffer.from(TABLE_HEX.slice(2), 'hex');
-// CashScript hash256 is double SHA-256. The carrier chunk checks this digest, so every
+// The carrier chunk checks this SHA-256 digest, so every
 // sibling reading the same transaction input uses the fixed VK-derived table.
-const TABLE_HASH_HEX = '0x' + createHash('sha256').update(createHash('sha256').update(tableBytes).digest()).digest('hex');
+const TABLE_HASH_HEX = '0x' + createHash('sha256').update(tableBytes).digest('hex');
 
 // ---- contract template ----
 const SER = 'hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(in0, 40) + toPaddedBytes(in1, 40) + toPaddedBytes(k10, 40) + toPaddedBytes(k20, 40) + toPaddedBytes(k11, 40) + toPaddedBytes(k21, 40))';
@@ -149,7 +149,7 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
   L.push(`    function spend(${[...stateParams.map((s) => `int ${s}`), ...extraParams, 'bytes unused zeroPadding'].join(', ')}) {`);
   L.push(covIn(stateParams));
   if (sharedTable !== null) {
-    if (final) L.push(`        require(hash256(glvTable) == ${TABLE_HASH_HEX});`);
+    if (final) L.push(`        require(sha256(glvTable) == ${TABLE_HASH_HEX});`);
     else L.push(`        bytes glvTable = tx.inputs[${sharedTable.inputIndex}].unlockingBytecode.split(${sharedTable.dataOffset})[1].split(${tableBytes.length})[0];`);
   }
   if (first) {
