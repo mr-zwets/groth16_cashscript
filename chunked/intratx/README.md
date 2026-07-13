@@ -145,9 +145,12 @@ bundle was already non-standard (< 1 MB), so nothing new is given up.
   `bch-groth16-intratx-residue-large`, `bch-groth16-bls12381-intratx-residue-large`.
 
 Run (after the corresponding `../{pairing,bls12-381}` generators have populated
-`generated/`):
+`generated/`; the BN254 plain builders require the STAGE-BOUND layouts, so regenerate
+`gen_g2check.mjs` and `gen_miller.mjs` with `STAGE_BOUND_LAYOUT=1` first):
 
 ```
+STAGE_BOUND_LAYOUT=1 node ../pairing/gen_g2check.mjs
+STAGE_BOUND_LAYOUT=1 node ../pairing/gen_miller.mjs
 node build_vectors.mjs       # BN254  -> pairing-intratx + groth16-intratx vectors
 node build_vectors_bls.mjs   # BLS    -> pairing-bls12381-intratx + groth16-bls12381-intratx
 ```

@@ -104,28 +104,31 @@ const INSTANCES = {
   worst: { proof: proofFromLimbs(wcp.Ax, wcp.Ay, wcp.Bxa, wcp.Bxb, wcp.Bya, wcp.Byb, wcp.Cx, wcp.Cy), inputs: [wcp.in0, wcp.in1] },
 };
 
-// vk_x position inside the miller genesis inBlob (computed, not hardcoded). Prepared-VK
-// Miller carries only the runtime pair's R0, so the state is f(12)+R0(6), NOT four R's.
-const MILLER_STATE_LIMBS = 12 + 6; // f(12) + ONE running R(6)
+// vk_x position inside the STAGE-BOUND Miller genesis inBlob (computed, not hardcoded).
+// The genesis carries only the runtime points, proof tuple first: [-A/B(6), C(2), vk_x(2)];
+// f and R0 are derived in-contract, so no state limbs precede the points.
 const dummy = pairsFor([1n, 1n]);
-const VKX_LIMB_OFFSET = MILLER_STATE_LIMBS + ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(1, dummy[1].P.toAffine(), dummy[1].Q.toAffine()).length;
-const MILLER_IN_LIMBS = MILLER_STATE_LIMBS + dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())).length;
+const VKX_LIMB_OFFSET = ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(3, dummy[3].P.toAffine(), dummy[3].Q.toAffine()).length;
+const MILLER_IN_LIMBS = dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())).length;
 
 // ---- per-stage chunk specs (inLimbs/outLimbs/extras/role) for one instance ----
 const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0])]; // prepared-VK: only the runtime pair's R0
 
 function specsG2check(inst) {
   const pf = inst.proof ?? proof;
-  const Ba = pf.b.toAffine(), Aa = pf.a.toAffine(), Ca = pf.c.toAffine();
+  const Ba = pf.b.toAffine(), Aa = pf.a.negate().toAffine(), Ca = pf.c.toAffine();
   const Bpair = [[Ba.x.c0, Ba.x.c1], [Ba.y.c0, Ba.y.c1]];
-  const tail = [Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1, Aa.x, Aa.y, Ca.x, Ca.y];
+  const tail = [Aa.x, Aa.y, Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1, Ca.x, Ca.y];
   const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
+  if (man.stageBound !== true) {
+    throw new Error('intratx requires STAGE_BOUND_LAYOUT=1 during G2 generation');
+  }
   const zinv = g2checkFastZinv(Bpair); // [zinvA, zinvB] witnessed inverse of [x0]B.Z (last chunk only)
   return man.chunks.map((ch) => ({
     file: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`),
-    inLimbs: sLimbs(g2checkAccAt(Bpair, ch.lo)),
+    inLimbs: ch.first ? tail : sLimbs(g2checkAccAt(Bpair, ch.lo)),
     outLimbs: ch.last ? [] : sLimbs(g2checkAccAt(Bpair, ch.hi)),
     extras: ch.last ? zinv : [], role: ch.last ? 'terminal' : 'within',
     label: `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' [x0]B-endo==psi(B)' : ''}`,
@@ -159,10 +162,15 @@ function specsMiller(inst, crossToFinalexp) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const { states, boundary } = millerBatchOps(pairs);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
+  // STAGE-BOUND genesis: proof tuple first (-A/B, C), then vk_x; f/R0 derived in-contract.
+  const genesisPts = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_miller.json'), 'utf8'));
+  if (man.stageBound !== true) {
+    throw new Error('intratx requires STAGE_BOUND_LAYOUT=1 during Miller generation');
+  }
   const specs = man.chunks.map((ch) => ({
     file: join(GEN, `miller_${String(ch.idx).padStart(2, '0')}.cash`),
-    inLimbs: [...stateLimbs(states[ch.opLo]), ...ptL],
+    inLimbs: ch.opLo === 0 ? genesisPts : [...stateLimbs(states[ch.opLo]), ...ptL],
     outLimbs: [...stateLimbs(states[ch.opHi]), ...ptL],
     extras: [], role: ch.final ? (crossToFinalexp ? 'cross' : 'stage-final') : 'within',
     cmp: ch.final && crossToFinalexp ? { cmpExpr: 'outBlob.split(480)[0]', nextFullInLen: 12 * W, skip: 0, cmpLen: 12 * W } : null,
@@ -189,19 +197,33 @@ const RESCHED = process.env.RESCHEDULE !== 'off';
 const compileCache = new Map(); // key -> {resched, raw?} full redeems (raw only when RESCHEDULE differs)
 const chosenCache = new Map();  // key -> 'resched' | 'raw'; fixed on the FIRST assembly so every
                                 // instance shares identical lockings.
-const specKey = (s) => {
+const specConfig = (specs, i) => {
+  const s = specs[i];
   let forward = null;
   if (s.role === 'within') { const outLen = s.outLimbs.length * W; forward = { cmpExpr: null, nextFullInLen: outLen, skip: 0, cmpLen: outLen }; }
   else if (s.role === 'cross') forward = s.cmp;
   // 'stage-final' and 'terminal' -> forward = null
-  return { key: `${s.file}|${s.role}|${JSON.stringify(forward)}`, forward };
+  const externalBindings = (s.externalBindings ?? []).map((binding) => {
+    const target = specs[binding.targetSpecIndex];
+    if (!target) throw new Error(`external binding target ${binding.targetSpecIndex} is not a verifier input`);
+    return {
+      sourceOffset: binding.sourceOffset,
+      targetInputIndex: binding.targetSpecIndex,
+      targetFullInLen: target.inLimbs.length * W,
+      targetOffset: binding.targetOffset,
+      length: binding.length,
+    };
+  });
+  const key = `${s.file}|${s.role}|${JSON.stringify(forward)}|${JSON.stringify(externalBindings)}`;
+  return { key, forward, externalBindings };
 };
-function compileSpec(s) {
-  const { key, forward } = specKey(s);
+function compileSpec(specs, i) {
+  const s = specs[i];
+  const { key, forward, externalBindings } = specConfig(specs, i);
   let v = compileCache.get(key);
   if (!v) {
     // compile from a file (probe in generated/) so the chunk's relative library import resolves
-    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward }).src);
+    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward, externalBindings }).src);
     const resched = compileFileBytecode(PROBE);
     const raw = RESCHED ? compileFileBytecodeRaw(PROBE) : resched;
     v = { resched: Uint8Array.from([OP_DROP, ...resched]) }; // [OP_DROP, contract] — OP_DROP discards the pad
@@ -231,7 +253,7 @@ function argBytesOf(s) {
 // Both: the front of the unlocking is [inBlob, extras...], identical, so the
 // forward-check offsets are the same in either model.
 function assemble(specs) {
-  const redeems = specs.map(compileSpec); // [OP_DROP, contract]
+  const redeems = specs.map((_, i) => compileSpec(specs, i)); // [OP_DROP, contract]
   const argB = specs.map(argBytesOf);     // [inBlob, extras...]
   const rpush = redeems.map((r) => encodeDataPush(r));
   const lockingOf = (i) => (P2SH ? p2shSpk(redeems[i]) : redeems[i]);
@@ -251,7 +273,7 @@ function assemble(specs) {
   if (RESCHED) {
     let switched = 0;
     for (let i = 0; i < specs.length; i++) {
-      const { key } = specKey(specs[i]);
+      const { key } = specConfig(specs, i);
       if (chosenCache.has(key)) continue;
       const v = compileCache.get(key);
       if (!v.raw) { chosenCache.set(key, 'resched'); continue; }
@@ -279,12 +301,17 @@ function assemble(specs) {
   return { inputs, meta, fits, accepted };
 }
 
-function buildFull(inst) {
+function buildFullSpecs(inst) {
   const g2 = specsG2check(inst);
   const vkx = specsVkx(inst, true);
   const { specs: miller, boundary } = specsMiller(inst, true);
   const fe = specsFinalexp(boundary);
-  return assemble([...g2, ...vkx, ...miller, ...fe]);
+  const millerGenesisIndex = g2.length + vkx.length;
+  g2[g2.length - 1].externalBindings = [
+    // G2-final inBlob = R(6) || -A/B/C(8); Miller genesis starts with the same proof tuple.
+    { targetSpecIndex: millerGenesisIndex, sourceOffset: (g2.length === 1 ? 0 : 6) * W, targetOffset: 0, length: 8 * W },
+  ];
+  return [...g2, ...vkx, ...miller, ...fe];
 }
 function buildPairing(inst) {
   const { specs } = specsMiller(inst, false); // miller-final = stage-final (boundary milestone)
@@ -292,6 +319,22 @@ function buildPairing(inst) {
 }
 
 const toStepArr = (asm) => asm.inputs.map((inp, i) => ({ label: asm.meta[i].label, locking: binToHex(inp.locking), unlocking: binToHex(inp.unlocking), checkpoint: asm.meta[i].checkpoint }));
+function pushBounds(unlocking, opcodeOffset = 0) {
+  const op = unlocking[opcodeOffset];
+  if (op <= 75) return { dataStart: opcodeOffset + 1, dataLen: op };
+  if (op === 0x4c) return { dataStart: opcodeOffset + 2, dataLen: unlocking[opcodeOffset + 1] };
+  if (op === 0x4d) return { dataStart: opcodeOffset + 3, dataLen: unlocking[opcodeOffset + 1] | (unlocking[opcodeOffset + 2] << 8) };
+  throw new Error(`unsupported push opcode ${op}`);
+}
+function mutateInputBlob(inputs, inputIndex, byteOffset) {
+  const mutated = inputs.slice();
+  const unlocking = Uint8Array.from(mutated[inputIndex].unlocking);
+  const { dataStart, dataLen } = pushBounds(unlocking);
+  if (byteOffset < 0 || byteOffset >= dataLen) throw new Error(`mutation offset ${byteOffset} outside inBlob`);
+  unlocking[dataStart + byteOffset] ^= 0x01;
+  mutated[inputIndex] = { ...mutated[inputIndex], unlocking };
+  return mutated;
+}
 // corrupt one input's inBlob (a MIDDLE limb, so it is a live value the chunk actually
 // uses — flipping the genesis accumulator's leading infinity-limb would be a no-op).
 // Both the predecessor's forward-check (out != this input's blob) and this chunk's own
@@ -341,16 +384,53 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-intratx-vectors.j
 console.error('wrote pairing-intratx-vectors.json');
 
 // ===================== FULL GROTH16 (single tx) =====================
-const full0 = buildFull(INSTANCES.committed);
+const committedSpecs = buildFullSpecs(INSTANCES.committed);
+const proof1Specs = buildFullSpecs(INSTANCES.proof1);
+const worstSpecs = buildFullSpecs(INSTANCES.worst);
+const full0 = assemble(committedSpecs);
 report('groth16 committed', full0);
-const full1 = buildFull(INSTANCES.proof1);
-const fullWc = buildFull(INSTANCES.worst);
+const full1 = assemble(proof1Specs);
+const fullWc = assemble(worstSpecs);
 report('groth16 proof#1', full1);
-const fullInvalid = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2))];
+// ---- cross-stage staple fixtures: prove the G2->Miller binding closes the splice hole ----
+const g2FinalIndex = committedSpecs.findIndex((spec) => (spec.externalBindings ?? []).length > 0);
+if (g2FinalIndex < 0) throw new Error('missing G2-final external bindings');
+const bindings = committedSpecs[g2FinalIndex].externalBindings;
+if (bindings.length !== 1) throw new Error('expected one contiguous proof binding');
+const hybridSpecs = [
+  ...committedSpecs.slice(0, g2FinalIndex + 1),
+  ...proof1Specs.slice(g2FinalIndex + 1),
+];
+const unboundHybrid = assemble(hybridSpecs.map((spec) => ({ ...spec, externalBindings: [] })));
+if (!unboundHybrid.accepted) throw new Error('pre-binding proof0-G2/proof1-remainder hybrid was not accepted');
+const boundHybrid = assemble(hybridSpecs);
+if (boundHybrid.meta[g2FinalIndex].accepted) throw new Error('bound hybrid did not reject at G2 final');
+const unrelatedFailure = boundHybrid.meta.find((meta, i) => i !== g2FinalIndex && !meta.accepted);
+if (unrelatedFailure) throw new Error(`bound hybrid also rejected at ${unrelatedFailure.label}`);
+const bindingMutations = [1 * W, 3 * W, 7 * W].map((offset) => {
+  const binding = bindings[0];
+  const byteOffset = binding.targetOffset + offset;
+  const inputs = mutateInputBlob(full0.inputs, binding.targetSpecIndex, byteOffset);
+  if (evalInput(inputs, g2FinalIndex).accepted) {
+    throw new Error(`G2 final accepted mutated bound region at ${byteOffset}`);
+  }
+  return { steps: toStepArr({ inputs, meta: full0.meta }), rejected: true };
+});
+console.error(
+  `  proof consistency: unbound hybrid accepted=${unboundHybrid.accepted}; ` +
+  `bound hybrid G2-final rejected=${!boundHybrid.meta[g2FinalIndex].accepted}; ` +
+  `-A/B/C mutations rejected=${bindingMutations.map((m) => m.rejected).join(',')}`,
+);
+const fullInvalid = [
+  invalidRun(full0, 0),
+  invalidRun(full0, Math.floor(full0.inputs.length / 2)),
+  { steps: toStepArr(boundHybrid), rejected: true },
+  ...bindingMutations,
+];
 console.error(`  groth16 invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED full BN254 Groth16 verifier in ONE transaction: validate G2 inputs -> vk_x -> batched 4-pair Miller -> final exponentiation -> assert product==1, as the inputs of a single tx. State is passed as raw byte blobs through sibling-input introspection (OP_INPUTBYTECODE forward-checks), not NFT commitments — no hashing, arbitrary intermediate size. Cross-stage soundness links are bound where layouts allow: vk_x final binds the vk_x point into the Miller genesis input, and the Miller boundary is bound into the final-exponentiation genesis input. Reuses the same validated chunk math as bch-groth16-chunked.',
+  description: 'INTRA-TRANSACTION LINKED full BN254 Groth16 verifier in ONE transaction: validate G2 inputs -> vk_x -> batched 4-pair Miller -> final exponentiation -> assert product==1, as the inputs of a single tx. State is passed as raw byte blobs through sibling-input introspection (OP_INPUTBYTECODE forward-checks), not NFT commitments — no hashing, arbitrary intermediate size. All stages are bound to ONE proof tuple: the Miller genesis derives f=1 and R0=B in-contract and leads with the contiguous -A/B/C points, the G2 final chunk byte-binds that same tuple into the Miller genesis input, the vk_x final chunk binds the computed vk_x point into it, and the Miller boundary is bound into the final-exponentiation genesis input. Reuses the same validated chunk math as bch-groth16-chunked.',
   method: 'intra-tx-linked', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),

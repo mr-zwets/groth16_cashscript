@@ -35,7 +35,9 @@ A THIRD chunking method for the BN254 Groth16 verifier, a hybrid of the other tw
   (valid + extraValidProofs + worstCaseProof + invalid, each carrying per-group token config).
 - The chunk MATH is reused verbatim from `chunked/pairing/generated/*.cash`; the grouped
   prologue/epilogue swap lives in `chunked/intratx/transform.mjs` (`covInHash` / `epilogueMode`
-  options). Run: `node chunked/grouped/build_vectors.mjs`.
+  options). The BN254 build requires the STAGE-BOUND layouts (regenerate `gen_g2check.mjs` and
+  `gen_miller.mjs` with `STAGE_BOUND_LAYOUT=1` first) and keeps the G2-final -> Miller-genesis
+  proof binding inside one group. Run: `node chunked/grouped/build_vectors.mjs`.
 
 ## Result (benchmark `bch-groth16-grouped`)
 
