@@ -30,7 +30,7 @@ import {
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
-import { GLV_TABLE_HEX, glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
+import { GLV_LAMBDA, GLV_R, GLV_TABLE_HEX, glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
 import { transformChunk } from './transform.mjs';
 import { GLV_SAFE_BOUNDS, regenGlvSafe } from '../regen_vkx_windows.mjs';
 
@@ -155,7 +155,7 @@ function specsG2check(inst) {
 // (9 limbs). The genesis chunk binds the GLV witnesses to the public inputs (k1+k2*lambda==in).
 function specsVkx(inst, crossToMiller) {
   const [in0, in1] = inst.inputs.map(BigInt);
-  const [k10, k20] = glvDecompose(in0), [k11, k21] = glvDecompose(in1);
+  const [k10, k20, k11, k21] = inst.glvScalars ?? [...glvDecompose(in0), ...glvDecompose(in1)];
   const vkxAff = vkxPoint(inst.inputs).toAffine();
   const st = (X, Y, Z) => [X, Y, Z, in0, in1, k10, k20, k11, k21];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglv.json'), 'utf8'));
@@ -369,6 +369,26 @@ const proof1Specs = buildSpecs(INSTANCES.proof1);
 const worstSpecs = buildSpecs(INSTANCES.worst);
 const full0 = assemble(committedSpecs);
 report('groth16-intratx-residue committed', full0);
+// The benchmark's dense proof is not the GLV density worst case: its four decomposition
+// witnesses have unrelated bit gaps. Exercise the absolute case explicitly (all 128 bits set
+// in all four bounded witnesses) so a window replan cannot silently exceed the input budget.
+const denseScalar = (1n << 128n) - 1n;
+const denseInput = (denseScalar + denseScalar * GLV_LAMBDA) % GLV_R;
+const densitySpecs = committedSpecs.slice();
+densitySpecs.splice(3, 4, ...specsVkx({
+  inputs: [denseInput, denseInput],
+  glvScalars: [denseScalar, denseScalar, denseScalar, denseScalar],
+}, true));
+const denseVkx = vkxPoint([denseInput, denseInput]).toAffine();
+const millerGenesis = densitySpecs[7];
+const millerIn = millerGenesis.inLimbs.slice();
+millerIn.splice(VKX_LIMB_OFFSET, 2, denseVkx.x, denseVkx.y);
+densitySpecs[7] = { ...millerGenesis, inLimbs: millerIn };
+const densityGlv = assemble(densitySpecs).meta.slice(3, 7);
+if (densityGlv.some((meta) => !meta.accepted || meta.operationCost > OP_BUDGET || meta.unlockingBytes > TARGET_UNLOCK)) {
+  throw new Error('max-density GLV window exceeds the BCH input budget');
+}
+console.error(`  max-density GLV max op: ${Math.max(...densityGlv.map((meta) => meta.operationCost)).toLocaleString()}`);
 const full1 = assemble(proof1Specs);
 const fullWc = assemble(worstSpecs);
 report('groth16-intratx-residue proof#1', full1);
