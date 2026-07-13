@@ -9,9 +9,10 @@
 // genesis (k < 2^128, k1 + k2*lambda == in mod r); phi(IC*) and the table are baked.
 // State (committed, 9 limbs): rX,rY,rZ, in0,in1, k10,k20,k11,k21.
 //   node gen_vkx_glv.mjs    plan + emit vkxglv_NN.cash + manifest_vkxglv.json
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { P, OP_BUDGET, covIn, covOut, measureCovenant, planChunk, vk, bls12_381 } from './_vkxmath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -46,6 +47,10 @@ for (let idx = 1; idx < 16; idx++) {
 // 48-byte LE is sign-safe: p < 2^382 -> top byte <= 0x1a -> int() recovers positive.
 const le48hex = (v) => { v = modP(v); let s = ''; for (let b = 0; b < 48; b++) s += Number((v >> BigInt(8 * b)) & 0xffn).toString(16).padStart(2, '0'); return s; };
 export const GLV_TABLE_HEX = '0x' + Array.from({ length: 15 }, (_, k) => le48hex(TABLE[k + 1][0]) + le48hex(TABLE[k + 1][1])).join('');
+const tableBytes = Buffer.from(GLV_TABLE_HEX.slice(2), 'hex');
+// CashScript hash256 is double SHA-256. The carrier chunk checks this digest, so every
+// sibling reading the same transaction input uses the fixed VK-derived table.
+const TABLE_HASH_HEX = '0x' + createHash('sha256').update(createHash('sha256').update(tableBytes).digest()).digest('hex');
 
 // ---- GLV decomposition (shared with the vector builder) ----
 // basis {(1, -(x^2-1)), (x^2, 1)}: 1 - (x^2-1)*lambda == r == 0 and x^2 + lambda == 0 (mod r).
@@ -87,7 +92,7 @@ export const GLV_IC0 = IC0;
 
 // ---- contract template ----
 const STATE = ['rX', 'rY', 'rZ', 'in0', 'in1', 'k10', 'k20', 'k11', 'k21'];
-const prologue = () => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
+const prologue = (sharedTable) => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
 function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
 function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
@@ -125,10 +130,10 @@ function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, in
     }
     return rx, ry, rz;
 }
-function select16(int idx) returns (int, int, int) {
+function select16(int idx${sharedTable ? ', bytes table' : ''}) returns (int, int, int) {
     int aX = 0; int aY = 0; int doAdd = 0;
     if (idx != 0) {
-        bytes table = ${GLV_TABLE_HEX};
+        ${sharedTable ? '' : `bytes table = ${GLV_TABLE_HEX};`}
         bytes ent = table.split((idx - 1) * 96)[1].split(96)[0];
         aX = int(ent.split(48)[0]);
         aY = int(ent.split(48)[1]);
@@ -137,17 +142,25 @@ function select16(int idx) returns (int, int, int) {
     return aX, aY, doAdd;
 }`;
 
-function genCash(lo, hi, first, final) {
+export function genCash(lo, hi, first, final, sharedTable = null) {
+  if (sharedTable !== null && (!Number.isSafeInteger(sharedTable.inputIndex) || sharedTable.inputIndex < 0 ||
+    !Number.isSafeInteger(sharedTable.dataOffset) || sharedTable.dataOffset < 0)) {
+    throw new Error(`invalid shared GLV table source: ${JSON.stringify(sharedTable)}`);
+  }
   const count = hi - lo, hiBit = (ITERS - 1) - lo;
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
   L.push(`// BLS12-381 GLV vk_x chunk: 4-scalar Straus window [${lo},${hi}), first=${first} final=${final}.`);
-  L.push(prologue());
+  L.push(prologue(sharedTable !== null));
   L.push('contract VkxGlvBlsChunk() {');
-  L.push(final
-    ? `    function spend(${STATE.map((s) => `int ${s}`).join(', ')}, int zInv, bytes unused zeroPadding) {`
-    : `    function spend(${STATE.map((s) => `int ${s}`).join(', ')}, bytes unused zeroPadding) {`);
+  const extraParams = [final ? 'int zInv' : null, sharedTable !== null && final ? 'bytes glvTable' : null]
+    .filter(Boolean);
+  L.push(`    function spend(${[...STATE.map((s) => `int ${s}`), ...extraParams, 'bytes unused zeroPadding'].join(', ')}) {`);
   L.push(covIn(STATE));
+  if (sharedTable !== null) {
+    if (final) L.push(`        require(hash256(glvTable) == ${TABLE_HASH_HEX});`);
+    else L.push(`        bytes glvTable = tx.inputs[${sharedTable.inputIndex}].unlockingBytecode.split(${sharedTable.dataOffset})[1].split(${tableBytes.length})[0];`);
+  }
   if (first) {
     // bind the GLV witnesses to the committed public inputs: k1 + k2*lambda == in (mod r),
     // AND bound their magnitude to < 2^128 so the 128-iteration MSM processes every bit (else a
@@ -161,7 +174,7 @@ function genCash(lo, hi, first, final) {
   L.push(`            int i = ${hiBit} - k;`);
   L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
   L.push('            int idx = (k10 >> i) % 2 + 2 * ((k20 >> i) % 2) + 4 * ((k11 >> i) % 2) + 8 * ((k21 >> i) % 2);');
-  L.push('            (int aX, int aY, int doAdd) = select16(idx);');
+  L.push(`            (int aX, int aY, int doAdd) = select16(idx${sharedTable !== null ? ', glvTable' : ''});`);
   L.push('            if (doAdd == 1) { (int ax, int ay, int az) = jacAdd(rX, rY, rZ, aX, aY, 1); rX = ax; rY = ay; rZ = az; }');
   L.push('        }');
   if (final) {
@@ -178,6 +191,19 @@ function genCash(lo, hi, first, final) {
   L.push('    }');
   L.push('}');
   return (L.join('\n') + '\n');
+}
+
+/** Re-emit the GLV chunks from the existing manifest windows in SHARED-TABLE mode (the 960*1.5-byte
+ * Straus table is carried once by the final GLV input and read by siblings via input-bytecode
+ * introspection; the carrier pins it with hash256). Window bounds are unchanged (sharing the table
+ * barely moves op-cost), so no replanning; the manifest gains sharedTable for builder guards. */
+export function regenGlvShared(GEN_DIR, sharedTable) {
+  const man = JSON.parse(readFileSync(join(GEN_DIR, 'manifest_vkxglv.json'), 'utf8'));
+  for (const ch of man.chunks) {
+    writeFileSync(join(GEN_DIR, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), genCash(ch.lo, ch.hi, ch.first, ch.final, sharedTable));
+  }
+  writeFileSync(join(GEN_DIR, 'manifest_vkxglv.json'), JSON.stringify({ ...man, sharedTable: sharedTable !== null }, null, 2));
+  return man.chunks.length;
 }
 
 // ---- plan + emit (worst-case planning scalars: dense ~127-bit) ----
