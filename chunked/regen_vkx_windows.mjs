@@ -40,16 +40,16 @@ const clearPrefix = (GEN, prefix) => {
 
 /** Regenerate the GLV vk_x windows (manifest_vkxglv.json + vkxglv_NN.cash) at the safe floor.
  * Shared by intratx-residue and grouped-residue (the only consumers of manifest_vkxglv). */
-export function regenGlvSafe(GEN, bounds = GLV_SAFE_BOUNDS) {
+export function regenGlvSafe(GEN, bounds = GLV_SAFE_BOUNDS, stageBound = false, sharedTable = null) {
   clearPrefix(GEN, 'vkxglv');
   const chunks = [];
   for (let i = 0; i < bounds.length - 1; i++) {
     const lo = bounds[i], hi = bounds[i + 1];
     const first = i === 0, final = i === bounds.length - 2;
-    writeFileSync(join(GEN, `vkxglv_${String(i).padStart(2, '0')}.cash`), glvGenCash(lo, hi, first, final));
+    writeFileSync(join(GEN, `vkxglv_${String(i).padStart(2, '0')}.cash`), glvGenCash(lo, hi, first, final, stageBound, sharedTable));
     chunks.push({ idx: i, lo, hi, first, final });
   }
-  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ numChunks: chunks.length, iters: 128, glv: true, safeFloor: true, chunks }, null, 2));
+  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ numChunks: chunks.length, iters: 128, glv: true, safeFloor: true, stageBound, sharedTable: sharedTable !== null, chunks }, null, 2));
   return chunks.length;
 }
 

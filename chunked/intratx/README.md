@@ -152,6 +152,18 @@ node build_vectors.mjs       # BN254  -> pairing-intratx + groth16-intratx vecto
 node build_vectors_bls.mjs   # BLS    -> pairing-bls12381-intratx + groth16-bls12381-intratx
 ```
 
+To reproduce the current-BCH BN254 residue vectors from the repository root, point
+`VERIFIER_DIR` at a `zk-verifier-bench` checkout and generate the measured linked layouts before
+assembling either deployment. The builders regenerate the four max-density-safe GLV windows.
+
+```
+export VERIFIER_DIR=/absolute/path/to/zk-verifier-bench
+STAGE_BOUND_LAYOUT=1 G2_LINKED_LAYOUT=1 node chunked/pairing/gen_g2check.mjs
+STAGE_BOUND_LAYOUT=1 MILLER_LINKED_LAYOUT=1 node chunked/pairing/gen_miller_residue.mjs
+node chunked/intratx/build_vectors_residue.mjs
+node chunked/grouped/build_vectors_residue.mjs
+```
+
 ## Harness support
 
 The benchmark harness (`verifier`) gained a `Step.intraTx { index, inputs }` context: a

@@ -15,7 +15,7 @@ importers:
         specifier: 2.2.0
         version: 2.2.0
       cashc:
-        specifier: link:..\cashscript\packages\cashc
+        specifier: link:../cashscript/packages/cashc
         version: link:../cashscript/packages/cashc
 
 packages:

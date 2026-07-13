@@ -61,7 +61,8 @@ function parseParams(sig) {
 
 /**
  * Transform one covenant chunk source into a linked chunk.
- *   cfg.W            limb width in bytes (40 BN254, 48 BLS12-381)
+ *   cfg.W            default serialized limb width in bytes
+ *   cfg.widthsByName optional fixed-width overrides for bounded non-field state values
  *   cfg.prime        the field prime literal (string)
  *   cfg.forward      null  -> no forward check (stage-final / terminal); for a covOut
  *                            chunk we then emit a tautological length check so the
@@ -82,10 +83,14 @@ function parseParams(sig) {
  *                    LAST chunk of a non-terminal group (it has no in-tx successor to
  *                    forward-check; it hands state to the NEXT group's tx via a token).
  *                    Undefined => legacy behavior (forward-check / terminal).
+ *   cfg.externalBindings additional byte-slice bindings from this chunk's inBlob to another
+ *                    input's inBlob: [{sourceOffset,targetInputIndex,targetFullInLen,
+ *                    targetOffset,length}]. targetInputIndex is transaction-local.
  * Returns { src, inNames, outNames|null, extras, isTerminal, inLen, outLen }.
  */
 export function transformChunk(src, cfg) {
   const W = cfg.W;
+  const widthOf = (name) => cfg.widthsByName?.[name] ?? W;
   const lines = normalizeInternal(src).split('\n');
   const sigIdx = lines.findIndex((l) => /^\s*function spend\(/.test(l));
   if (sigIdx < 0) throw new Error('no spend()');
@@ -95,7 +100,23 @@ export function transformChunk(src, cfg) {
   const ciIdx = lines.findIndex((l) => l.includes('activeInputIndex].nftCommitment'));
   if (ciIdx < 0) throw new Error('no covIn');
   const inNames = [...lines[ciIdx].matchAll(/toPaddedBytes\((\w+),\s*\d+\)/g)].map((m) => m[1]);
+  const inWidths = inNames.map(widthOf);
   const inSet = new Set(inNames);
+  const externalBindings = cfg.externalBindings ?? [];
+  const externalChecks = externalBindings.map((binding) => {
+    const { sourceOffset, targetInputIndex, targetFullInLen, targetOffset, length } = binding;
+    const values = [sourceOffset, targetInputIndex, targetFullInLen, targetOffset, length];
+    if (!values.every(Number.isSafeInteger) || values.some((value) => value < 0) || length === 0) {
+      throw new Error(`invalid external binding: ${JSON.stringify(binding)}`);
+    }
+    if (sourceOffset + length > inWidths.reduce((sum, width) => sum + width, 0) || targetOffset + length > targetFullInLen) {
+      throw new Error(`external binding outside input blob: ${JSON.stringify(binding)}`);
+    }
+    const source = sourceOffset === 0 ? 'inBlob' : `inBlob.split(${sourceOffset})[1]`;
+    const targetStart = headerSize(targetFullInLen) + targetOffset;
+    const target = `tx.inputs[${targetInputIndex}].unlockingBytecode.split(${targetStart})[1]`;
+    return `        require(${source}.split(${length})[0] == ${target}.split(${length})[0]);`;
+  });
   // extras = real spend params that are neither incoming-state limbs nor the dropped budget
   // pad (e.g. vk_x's zInv). The `unused` budget pad is stripped — we supply our own pad.
   const extras = params.filter((p) => !inSet.has(p.name) && !p.unused);
@@ -119,19 +140,20 @@ export function transformChunk(src, cfg) {
   // the unlocking bytecode, so a sibling's forward-check reads it at a fixed offset).
   const newSig = `    function spend(${[...extras.map((e) => `${e.type} ${e.name}`), 'bytes inBlob'].join(', ')}) {`;
 
-  let outNames = null;
+  let outNames = null, outWidths = null, outLen = 0;
   let body, epilogue;
   if (isTerminal) {
     // keep the math + terminal asserts (e.g. finalExp result == ONE) verbatim.
     body = lines.slice(ciIdx + 1, closeIdx);
-    epilogue = [];
+    epilogue = externalChecks;
   } else {
     // the reducing modulus is declared locally as `int P =` or (lazy-lib chunks) `int Pmod =`
     // on the line before covOut; either way drop that line and the covOut from the body.
     const hasIntP = /^int P(mod)? =/.test(lines[coIdx - 1].trim());
     body = lines.slice(ciIdx + 1, hasIntP ? coIdx - 1 : coIdx);
     outNames = [...lines[coIdx].matchAll(/toPaddedBytes\((\w+)\s*%\s*P(?:mod)?,\s*\d+\)/g)].map((m) => m[1]);
-    const outLen = outNames.length * W;
+    outWidths = outNames.map(widthOf);
+    outLen = outWidths.reduce((sum, width) => sum + width, 0);
     // local name `Pmod` (not `P`): chunks that import the shared singleton library inherit a
     // global `constant P`, and `int P` would collide with it (same reason the lazy-lib covOut
     // uses Pmod). Non-importing chunks have no global P either way, so Pmod is always safe.
@@ -148,10 +170,12 @@ export function transformChunk(src, cfg) {
     const assigned = collectAssignedNames(body.join('\n'));
     let carry = outNames.length;
     if (inNames.length === outNames.length) {
-      while (carry > 0 && inNames[carry - 1] === outNames[carry - 1] && !assigned.has(outNames[carry - 1])) carry -= 1;
+      while (carry > 0 && inNames[carry - 1] === outNames[carry - 1] &&
+        inWidths[carry - 1] === outWidths[carry - 1] && !assigned.has(outNames[carry - 1])) carry -= 1;
     }
-    const headExpr = outNames.slice(0, carry).map((n) => `toPaddedBytes(${n} % Pmod, ${W})`).join(' + ');
-    const tailExpr = carry < outNames.length ? `inBlob.split(${carry * W})[1]` : '';
+    const headExpr = outNames.slice(0, carry).map((n, i) => `toPaddedBytes(${n} % Pmod, ${outWidths[i]})`).join(' + ');
+    const tailOffset = outWidths.slice(0, carry).reduce((sum, width) => sum + width, 0);
+    const tailExpr = carry < outNames.length ? `inBlob.split(${tailOffset})[1]` : '';
     const outBlobExpr = [headExpr, tailExpr].filter(Boolean).join(' + ');
     epilogue = [
       // Pmod is only referenced by the head's `% Pmod` reductions; if the whole suffix is spliced
@@ -180,6 +204,7 @@ export function transformChunk(src, cfg) {
       // / vk_x result) with an always-true size check so the recomputation still runs.
       epilogue.push(`        require(outBlob.length == ${outLen});`);
     }
+    epilogue.push(...externalChecks);
   }
 
   // prologue: peel the incoming limbs out of inBlob and cast to int. Only names
@@ -201,14 +226,15 @@ export function transformChunk(src, cfg) {
   let cur = 'inBlob';
   for (let p = 0; p <= maxUsed; p++) {
     const nm = inNames[p];
+    const width = inWidths[p];
     if (p === maxUsed) {
       // last limb to read: if it's the very last in the blob, `cur` IS that limb.
-      prologue.push(p === inNames.length - 1 ? `        int ${nm} = int(${cur});` : `        int ${nm} = int(${cur}.split(${W})[0]);`);
+      prologue.push(p === inNames.length - 1 ? `        int ${nm} = int(${cur});` : `        int ${nm} = int(${cur}.split(${width})[0]);`);
     } else if (used[p]) {
-      prologue.push(`        bytes hh${p}, bytes rr${p} = ${cur}.split(${W}); int ${nm} = int(hh${p});`);
+      prologue.push(`        bytes hh${p}, bytes rr${p} = ${cur}.split(${width}); int ${nm} = int(hh${p});`);
       cur = `rr${p}`;
     } else {
-      prologue.push(`        bytes rr${p} = ${cur}.split(${W})[1];`);
+      prologue.push(`        bytes rr${p} = ${cur}.split(${width})[1];`);
       cur = `rr${p}`;
     }
   }
@@ -220,7 +246,7 @@ export function transformChunk(src, cfg) {
     outNames,
     extras: extras.map((e) => e.name),
     isTerminal,
-    inLen: inNames.length * W,
-    outLen: outNames ? outNames.length * W : 0,
+    inLen: inWidths.reduce((sum, width) => sum + width, 0),
+    outLen,
   };
 }

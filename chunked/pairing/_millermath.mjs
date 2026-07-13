@@ -3,6 +3,7 @@
 // instance's 4 Groth16 pairs, state serialization, and a real-VM measurer.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 
 import { bn254 } from '@noble/curves/bn254.js';
 export { bn254 };
@@ -162,7 +163,9 @@ const sha256 = (b) => createHash('sha256').update(b).digest();
 export const commit = (limbs) => sha256(sha256(Buffer.concat(limbs.map(le40)))).toString('hex');
 
 // ---- the committed instance's 4 pairs ----
-export const vec = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/checkpoints/pairing-vectors.json', 'utf8'));
+const verifierDir = process.env.VERIFIER_DIR || 'C:/Users/mathi/Desktop/verifier';
+export const verifierPath = (...parts) => join(verifierDir, ...parts);
+export const vec = JSON.parse(readFileSync(verifierPath('src/checkpoints/pairing-vectors.json'), 'utf8'));
 const g1 = (o) => bn254.G1.Point.fromAffine({ x: BigInt(o.x), y: BigInt(o.y) });
 const g2 = (o) => bn254.G2.Point.fromAffine({ x: Fp2.fromBigTuple([BigInt(o.x.c0), BigInt(o.x.c1)]), y: Fp2.fromBigTuple([BigInt(o.y.c0), BigInt(o.y.c1)]) });
 export const vk = { alpha: g1(vec.vk.alpha), beta: g2(vec.vk.beta), gamma: g2(vec.vk.gamma), delta: g2(vec.vk.delta), ic: vec.vk.ic.map(g1) };
@@ -349,30 +352,36 @@ export const covOut = (outNames) =>
 
 /** Real-VM measurer for a COVENANT chunk: drives it through a synthetic token tx
  * (spent UTXO = hash(incoming), output[0] = hash(outgoing)) so the introspection
- * resolves. `stateInts`/`outLimbs` are decl-order limbs (outLimbs already reduced). */
-export function measureCovenant(src, stateInts, outLimbs) {
+ * resolves. `stateInts` contains every pushed declaration-order argument;
+ * `committedStateInts` selects the threaded state hashed into the spent NFT and defaults
+ * to all arguments. `outLimbs` is already reduced. */
+export function measureCovenant(src, stateInts, outLimbs, committedStateInts = stateInts) {
   let raw;
   try { raw = compileBytecodeRaw(src); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
-  return measureCovenantRaw(raw, stateInts, outLimbs);
+  return measureCovenantRaw(raw, stateInts, outLimbs, committedStateInts);
 }
 /** Like measureCovenant, but compiles `src` from a FILE (written to `probePath`) so its
  * relative library `import` resolves. Used by the prepared-VK Miller planner, whose chunks
- * import the shared singleton library instead of inlining the tower functions. */
-export function measureCovenantFile(src, stateInts, outLimbs, probePath) {
+ * import the shared singleton library instead of inlining the tower functions. The optional
+ * rescheduling and committed-state arguments mirror the final compiler and covenant path. */
+export function measureCovenantFile(src, stateInts, outLimbs, probePath, reschedule = false, committedStateInts = stateInts) {
   let raw;
-  try { writeFileSync(probePath, src); raw = compileFileBytecodeRaw(probePath); }
+  try {
+    writeFileSync(probePath, src);
+    raw = reschedule ? compileFileBytecode(probePath) : compileFileBytecodeRaw(probePath);
+  }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
-  return measureCovenantRaw(raw, stateInts, outLimbs);
+  return measureCovenantRaw(raw, stateInts, outLimbs, committedStateInts);
 }
-function measureCovenantRaw(raw, stateInts, outLimbs) {
+function measureCovenantRaw(raw, stateInts, outLimbs, committedStateInts = stateInts) {
   const locking = Uint8Array.from([...raw]); // no OP_DROP: trailing `bytes unused zeroPadding` param
   const argBytes = Uint8Array.from([...stateInts].reverse().flatMap((c) => [...pushInt(c)]));
   const unlocking = Uint8Array.from([...padPush(argBytes.length, TARGET_UNLOCK), ...argBytes]); // pad first (pushed first)
   const tok = (commitment) => ({ amount: 0n, category: CATEGORY, nft: { capability: 'mutable', commitment } });
   const program = {
     inputIndex: 0,
-    sourceOutputs: [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(commitBin(stateInts)) }],
+    sourceOutputs: [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(commitBin(committedStateInts)) }],
     transaction: {
       version: 2,
       inputs: [{ outpointTransactionHash: new Uint8Array(32), outpointIndex: 0, sequenceNumber: 0, unlockingBytecode: unlocking }],

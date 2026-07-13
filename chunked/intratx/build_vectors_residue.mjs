@@ -6,19 +6,18 @@
 // tx.inputs[idx+1].unlockingBytecode — equals its recomputed output), but it consumes the
 // RESIDUE chunk graph instead of the plain one:
 //
-//   fast-G2 endo subgroup check (ePrint 2022/348)            4 chunks   (== plain build)
-//   GLV vk_x MSM (4-scalar ~128-bit Straus)                  5 chunks   (was 9, plain)
-//   c^-(6x+2)-FUSED batched Miller, e(alpha,beta) skipped    23 chunks  (was ~24 + skips pair1)
-//   witnessed-residue final-exp TAIL (verdict in ONE chunk)  1 chunk    (was 12, plain final-exp)
+//   fast-G2 endo subgroup check (ePrint 2022/348)            3 chunks
+//   GLV vk_x MSM (4-scalar ~128-bit Straus)                  4 chunks   (was 9, plain)
+//   c^-(6x+2)-FUSED Miller + terminal residue verdict        20 chunks  (was 12 plain final-exp chunks)
 //                                                            ---------
-//                                                            33 inputs  (plain full build: 54)
+//                                                            27 inputs  (plain full build: 54)
 //
 // The chunk MATH is reused VERBATIM from the same generated/*.cash the grouped-residue
 // build consumes (chunked/grouped/build_vectors_residue.mjs) — only the assembly differs:
 // grouped partitions the chain into token-threaded standard txs, this links the whole chain
 // into ONE non-standard (<1 MB) tx via OP_INPUTBYTECODE forward-checks. The residue witness
-// (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail
-// (c*cInv==ONE, c canonical, w in {1,w27,w27^2}); the verdict is fF*w*c^q2 == c^q*c^q3.
+// (c, cInv) threads through every fused-Miller chunk; the terminal Miller chunk checks
+// c*cInv==ONE, c canonical, the exact w encoding in {1,w27,w27^2}, and the residue verdict.
 //
 //   node build_vectors_residue.mjs   -> verifier/src/bch/groth16-intratx-residue-vectors.json
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -27,26 +26,40 @@ import { dirname, join } from 'node:path';
 import {
   millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileFileBytecode, compileFileBytecodeRaw, ptLimbs,
-  vkxPoint, le40, OP_DROP, TARGET_UNLOCK, OP_BUDGET,
+  vkxPoint, le40, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
-import { glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
+import { GLV_TABLE_HEX, glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
 import { transformChunk } from './transform.mjs';
-import { regenGlvSafe } from '../regen_vkx_windows.mjs';
+import { GLV_SAFE_BOUNDS, regenGlvSafe } from '../regen_vkx_windows.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
 // Re-plan the GLV vk_x windows to the hash-free SAFE floor (4 chunks, max-density-validated)
 // before assembling — the covenant-planned manifest_vkxglv (5 chunks) under-fills this
 // hash-free deployment. See chunked/regen_vkx_windows.mjs.
-regenGlvSafe(GEN);
+// The final GLV input carries the table after its 228-byte state blob: PUSHDATA1(blob)
+// takes 230 bytes, then the table's PUSHDATA2 header places table data at byte 233.
+const GLV_TABLE_SOURCE = { inputIndex: 6, dataOffset: 233 };
+regenGlvSafe(GEN, GLV_SAFE_BOUNDS, true, GLV_TABLE_SOURCE);
 const PROBE = join(GEN, '_intratx_residue_probe.cash'); // transformed import-chunks compiled from here
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);
-const W = 40; // BN254 limb width (bytes)
+const W = 32; // canonical BN254 field-element width (bytes)
+const GLV_WITNESS_WIDTH = 17; // non-negative and <2^128; byte 17 carries the positive sign bit
+const GLV_WIDTHS_BY_NAME = {
+  k10: GLV_WITNESS_WIDTH, k20: GLV_WITNESS_WIDTH,
+  k11: GLV_WITNESS_WIDTH, k21: GLV_WITNESS_WIDTH,
+};
+const GLV_STATE_WIDTHS = [
+  W, W, W, W, W,
+  GLV_WITNESS_WIDTH, GLV_WITNESS_WIDTH, GLV_WITNESS_WIDTH, GLV_WITNESS_WIDTH,
+];
+const GLV_GENESIS_WIDTHS = GLV_STATE_WIDTHS.slice(3);
 import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
+const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
 
 // Deploy each chunk as P2SH (same lever as build_vectors.mjs): the redeem rides in the
 // scriptSig where it counts toward the op-cost budget ((41 + unlockingLen) * 800); the
@@ -56,7 +69,10 @@ const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)); // OP_
 
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
-const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le40(((BigInt(l) % P) + P) % P)]));
+const blob = (limbs, widths = limbs.map(() => W)) => Uint8Array.from(limbs.flatMap((l, i) =>
+  [...le40(((BigInt(l) % P) + P) % P).slice(0, widths[i])]));
+const widthsOf = (spec, side) => spec[`${side}Widths`] ?? spec[`${side}Limbs`].map(() => W);
+const byteLengthOf = (spec, side) => widthsOf(spec, side).reduce((sum, width) => sum + width, 0);
 const padPush = (argLen, target) => {
   const budget = Math.max(2, target - argLen);
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
@@ -94,7 +110,7 @@ function parseProofUnlocking(hex) {
   const d = vals.reverse();
   return { Ax: d[0], Ay: d[1], Bxa: d[2], Bxb: d[3], Bya: d[4], Byb: d[5], Cx: d[6], Cy: d[7], in0: d[8], in1: d[9] };
 }
-const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-singleton-multiproof-vectors.json', 'utf8'));
+const mp = JSON.parse(readFileSync(verifierPath('src/bch/groth16-singleton-multiproof-vectors.json'), 'utf8'));
 const p1 = parseProofUnlocking(mp.proofs[1].unlocking);
 const wcp = parseProofUnlocking(mp.worstCaseProof.unlocking);
 const INSTANCES = {
@@ -103,30 +119,32 @@ const INSTANCES = {
   worst: { proof: proofFromLimbs(wcp.Ax, wcp.Ay, wcp.Bxa, wcp.Bxb, wcp.Bya, wcp.Byb, wcp.Cx, wcp.Cy), inputs: [wcp.in0, wcp.in1] },
 };
 
-// vk_x position inside the FUSED miller genesis inBlob. The fused layout is
-// f(12)+R0(6)+pts(10)+c(12)+cInv(12) = 52 limbs; vk_x (pair2 P) sits at the SAME offset as the
-// non-fused build (after f+R0+pair0 pts) since c,cInv are appended at the END.
-const MILLER_STATE_LIMBS = 12 + 6; // f(12) + R0(6)
+// vk_x position inside the 34-limb Miller genesis inBlob: runtime points(10)+c(12)+cInv(12).
 const dummy = pairsFor([1n, 1n]);
-const VKX_LIMB_OFFSET = MILLER_STATE_LIMBS + ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(1, dummy[1].P.toAffine(), dummy[1].Q.toAffine()).length;
+const VKX_LIMB_OFFSET = ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(3, dummy[3].P.toAffine(), dummy[3].Q.toAffine()).length;
 const PTL_LEN = dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())).length; // 10
-const MILLER_IN_LIMBS = MILLER_STATE_LIMBS + PTL_LEN + 24; // + c(12) + cInv(12) = 52 (fused)
-const TAIL_IN_LIMBS = 12 + 12 + 12; // [fF, c, cInv] hand-off from the fused miller's final chunk
+const MILLER_IN_LIMBS = PTL_LEN + 24;
 
 // ---- per-stage chunk specs (inLimbs/outLimbs/extras/role) — IDENTICAL to the grouped-residue
 // build (chunked/grouped/build_vectors_residue.mjs); only the assembly below differs (single tx).
 function specsG2check(inst) {
   const pf = inst.proof ?? proof;
-  const Ba = pf.b.toAffine(), Aa = pf.a.toAffine(), Ca = pf.c.toAffine();
+  const Ba = pf.b.toAffine(), Aa = pf.a.negate().toAffine(), Ca = pf.c.toAffine();
   const Bpair = [[Ba.x.c0, Ba.x.c1], [Ba.y.c0, Ba.y.c1]];
-  const tail = [Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1, Aa.x, Aa.y, Ca.x, Ca.y];
+  const tail = [Aa.x, Aa.y, Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1, Ca.x, Ca.y];
   const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
+  if (man.linkedLayout !== true) {
+    throw new Error('intratx residue requires G2_LINKED_LAYOUT=1 during G2 generation');
+  }
+  if (man.stageBound !== true) {
+    throw new Error('intratx residue requires STAGE_BOUND_LAYOUT=1 during G2 generation');
+  }
   const zinv = g2checkFastZinv(Bpair); // [zinvA, zinvB] witnessed inverse of [x0]B.Z (last chunk only)
   return man.chunks.map((ch) => ({
     file: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`),
-    inLimbs: sLimbs(g2checkAccAt(Bpair, ch.lo)),
+    inLimbs: ch.first ? tail : sLimbs(g2checkAccAt(Bpair, ch.lo)),
     outLimbs: ch.last ? [] : sLimbs(g2checkAccAt(Bpair, ch.hi)),
     extras: ch.last ? zinv : [], role: ch.last ? 'terminal' : 'within',
     label: `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' [x0]B-endo==psi(B)' : ''}`,
@@ -141,13 +159,18 @@ function specsVkx(inst, crossToMiller) {
   const vkxAff = vkxPoint(inst.inputs).toAffine();
   const st = (X, Y, Z) => [X, Y, Z, in0, in1, k10, k20, k11, k21];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglv.json'), 'utf8'));
+  if (man.stageBound !== true) throw new Error('intratx residue requires stage-bound GLV generation');
+  if (man.sharedTable !== true) throw new Error('intratx residue requires shared-table GLV generation');
   return man.chunks.map((ch) => {
     const [X0, Y0, Z0] = vkxGlvStateAt(k10, k20, k11, k21, ch.lo);
-    const inLimbs = st(X0, Y0, Z0);
+    const fullIn = st(X0, Y0, Z0);
+    const inLimbs = ch.first ? fullIn.slice(3) : fullIn;
     if (ch.final) {
       return {
         file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`),
-        inLimbs, outLimbs: [vkxAff.x, vkxAff.y], extras: [vkxGlvZinv(k10, k20, k11, k21)],
+        inLimbs, inWidths: ch.first ? GLV_GENESIS_WIDTHS : GLV_STATE_WIDTHS,
+        outLimbs: [vkxAff.x, vkxAff.y], outWidths: [W, W],
+        extras: [vkxGlvZinv(k10, k20, k11, k21), GLV_TABLE_BYTES],
         role: crossToMiller ? 'cross' : 'stage-final',
         cmp: crossToMiller ? { cmpExpr: 'outBlob', nextFullInLen: MILLER_IN_LIMBS * W, skip: VKX_LIMB_OFFSET * W, cmpLen: 2 * W } : null,
         label: 'GLV vk_x final -> assert vk_x', checkpoint: 'vk_x',
@@ -156,40 +179,38 @@ function specsVkx(inst, crossToMiller) {
     const [X1, Y1, Z1] = vkxGlvStateAt(k10, k20, k11, k21, ch.hi);
     return {
       file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`),
-      inLimbs, outLimbs: st(X1, Y1, Z1), extras: [], role: 'within',
+      inLimbs, inWidths: ch.first ? GLV_GENESIS_WIDTHS : GLV_STATE_WIDTHS,
+      outLimbs: st(X1, Y1, Z1), outWidths: GLV_STATE_WIDTHS,
+      extras: [], role: 'within',
       label: `GLV vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined,
     };
   });
 }
-// c^-(6x+2)-FUSED miller (residue method). State f(12)+R0(6)+pts(10)+c(12)+cInv(12) = 52; the
-// FINAL chunk hands off only [fF, c, cInv] (36) to the residue tail. c,cInv are the (constant)
-// residue witness, carried through every chunk and re-checked in the tail (c*cInv==ONE).
-function specsMillerFused(inst, c, cInv) {
+// c^-(6x+2)-FUSED miller (residue method). The final Miller chunk also consumes w and
+// performs the residue verdict, so there is no separate terminal input or state hand-off.
+function specsMillerFused(inst, c, cInv, w) {
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const { states, boundary } = millerFusedOps(pairs, c, cInv);
+  const { states } = millerFusedOps(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const full = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...ptL, ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 52
-  const handoff = (s) => [...f12limbs(s.f), ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 36 -> tail
+  const genesisPts = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
+  const genesis = [...genesisPts, ...f12limbs(c), ...f12limbs(cInv)];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
-  const specs = man.chunks.map((ch) => ({
+  if (man.linkedLayout !== true) {
+    throw new Error('intratx residue requires MILLER_LINKED_LAYOUT=1 during Miller generation');
+  }
+  if (man.stageBound !== true) {
+    throw new Error('intratx residue requires STAGE_BOUND_LAYOUT=1 during Miller generation');
+  }
+  return man.chunks.map((ch) => ({
     file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`),
-    inLimbs: full(states[ch.opLo]),
-    outLimbs: ch.final ? handoff(states[ch.opHi]) : full(states[ch.opHi]),
-    extras: [], role: ch.final ? 'cross' : 'within',
-    cmp: ch.final ? { cmpExpr: 'outBlob', nextFullInLen: TAIL_IN_LIMBS * W, skip: 0, cmpLen: TAIL_IN_LIMBS * W } : null,
-    label: `fused-miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' =boundary*c^-(6x+2)' : ''}`,
-    checkpoint: ch.final ? 'miller-boundary' : undefined,
+    inLimbs: ch.opLo === 0 ? genesis : full(states[ch.opLo]),
+    outLimbs: ch.final ? [] : full(states[ch.opHi]),
+    extras: ch.final ? fp12limbsOf(w) : [], role: ch.final ? 'terminal' : 'within',
+    cmp: null,
+    label: `fused-miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' + residue verdict' : ''}`,
+    checkpoint: ch.final ? 'verify' : undefined,
   }));
-  return { specs, boundary };
-}
-// witnessed-residue final-exp TAIL — ONE chunk. inBlob = [fF, c, cInv] (36); w is a witness extra.
-function specsResidueTail(fF, c, cInv, w) {
-  return [{
-    file: join(GEN, 'finalexpres_00.cash'),
-    inLimbs: [...fp12limbsOf(fF), ...fp12limbsOf(c), ...fp12limbsOf(cInv)],
-    outLimbs: [], extras: fp12limbsOf(w), role: 'terminal', cmp: null,
-    label: 'residue-tail fF*w*c^q2==c^q*c^q3 verdict', checkpoint: 'verify',
-  }];
 }
 function buildSpecs(inst) {
   const g2 = specsG2check(inst);
@@ -197,9 +218,13 @@ function buildSpecs(inst) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const { boundary: fRaw } = millerBatchOps(pairs);
   const { c, cInv, w } = residueWitness(fRaw);
-  const { specs: miller, boundary: fF } = specsMillerFused(inst, c, cInv);
-  const tail = specsResidueTail(fF, c, cInv, w);
-  return [...g2, ...vkx, ...miller, ...tail];
+  const miller = specsMillerFused(inst, c, cInv, w);
+  const millerGenesisIndex = g2.length + vkx.length;
+  g2[g2.length - 1].externalBindings = [
+    // G2-final inBlob = R(6) || -A/B/C(8); Miller genesis starts with the same proof tuple.
+    { targetSpecIndex: millerGenesisIndex, sourceOffset: 6 * W, targetOffset: 0, length: 8 * W },
+  ];
+  return [...g2, ...vkx, ...miller];
 }
 
 // ---- assemble: transform+compile each chunk, build the single tx, tune pad, verify ----
@@ -211,21 +236,37 @@ const RESCHED = process.env.RESCHEDULE !== 'off';
 const compileCache = new Map(); // key -> {resched, raw?} full redeems (raw only when RESCHEDULE differs)
 const chosenCache = new Map();  // key -> 'resched' | 'raw'; fixed on the FIRST assembly so every
                                 // instance shares identical lockings.
-const specKey = (s) => {
+const specConfig = (specs, i) => {
+  const s = specs[i];
   let forward = null;
-  if (s.role === 'within') { const outLen = s.outLimbs.length * W; forward = { cmpExpr: null, nextFullInLen: outLen, skip: 0, cmpLen: outLen }; }
+  if (s.role === 'within') { const outLen = byteLengthOf(s, 'out'); forward = { cmpExpr: null, nextFullInLen: outLen, skip: 0, cmpLen: outLen }; }
   else if (s.role === 'cross') forward = s.cmp;
-  return { key: `${s.file}|${s.role}|${JSON.stringify(forward)}`, forward };
+  const externalBindings = (s.externalBindings ?? []).map((binding) => {
+    const target = specs[binding.targetSpecIndex];
+    if (!target) throw new Error(`external binding target ${binding.targetSpecIndex} is not a verifier input`);
+    return {
+      sourceOffset: binding.sourceOffset,
+      targetInputIndex: binding.targetSpecIndex,
+      targetFullInLen: byteLengthOf(target, 'in'),
+      targetOffset: binding.targetOffset,
+      length: binding.length,
+    };
+  });
+  const key = `${s.file}|${s.role}|${JSON.stringify(forward)}|${JSON.stringify(externalBindings)}`;
+  return { key, forward, externalBindings };
 };
-function compileSpec(s) {
-  const { key, forward } = specKey(s);
+function compileSpec(specs, i) {
+  const s = specs[i];
+  const { key, forward, externalBindings } = specConfig(specs, i);
   let v = compileCache.get(key);
   if (!v) {
     // compile from a file (probe in generated/) so the chunk's relative library import resolves
-    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward }).src);
+    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), {
+      W, widthsByName: GLV_WIDTHS_BY_NAME, prime: PRIME, forward, externalBindings,
+    }).src);
     const resched = compileFileBytecode(PROBE);
     const raw = RESCHED ? compileFileBytecodeRaw(PROBE) : resched;
-    v = { resched: Uint8Array.from([OP_DROP, ...resched]) }; // [OP_DROP, contract] — OP_DROP discards the pad
+    v = { resched: Uint8Array.from([OP_DROP, ...resched]) };
     if (RESCHED && binToHex(raw) !== binToHex(resched)) v.raw = Uint8Array.from([OP_DROP, ...raw]);
     compileCache.set(key, v);
   }
@@ -234,12 +275,12 @@ function compileSpec(s) {
 function argBytesOf(s) {
   // inBlob is the LAST declared param (pushed FIRST -> front of the unlocking, where siblings'
   // forward-checks read it); extras come before inBlob in the decl, pushed AFTER it in reverse.
-  const parts = [pd(blob(s.inLimbs))];
-  for (const e of [...s.extras].reverse()) parts.push(pushInt(e));
+  const parts = [pd(blob(s.inLimbs, widthsOf(s, 'in')))];
+  for (const e of [...s.extras].reverse()) parts.push(e instanceof Uint8Array ? pd(e) : pushInt(e));
   return Uint8Array.from(parts.flatMap((p) => [...p]));
 }
 function assemble(specs) {
-  const redeems = specs.map(compileSpec); // [OP_DROP, contract]
+  const redeems = specs.map((_, i) => compileSpec(specs, i)); // [OP_DROP, contract]
   const argB = specs.map(argBytesOf);     // [inBlob, extras...]
   const rpush = redeems.map((r) => encodeDataPush(r));
   const lockingOf = (i) => (P2SH ? p2shSpk(redeems[i]) : redeems[i]);
@@ -258,7 +299,7 @@ function assemble(specs) {
   if (RESCHED) {
     let switched = 0;
     for (let i = 0; i < specs.length; i++) {
-      const { key } = specKey(specs[i]);
+      const { key } = specConfig(specs, i);
       if (chosenCache.has(key)) continue;
       const v = compileCache.get(key);
       if (!v.raw) { chosenCache.set(key, 'resched'); continue; }
@@ -286,20 +327,28 @@ function assemble(specs) {
   return { inputs, meta, fits, accepted };
 }
 
-function buildFull(inst) { return assemble(buildSpecs(inst)); }
-
 const toStepArr = (asm) => asm.inputs.map((inp, i) => ({ label: asm.meta[i].label, locking: binToHex(inp.locking), unlocking: binToHex(inp.unlocking), checkpoint: asm.meta[i].checkpoint }));
+function pushBounds(unlocking, opcodeOffset = 0) {
+  const op = unlocking[opcodeOffset];
+  if (op <= 75) return { dataStart: opcodeOffset + 1, dataLen: op };
+  if (op === 0x4c) return { dataStart: opcodeOffset + 2, dataLen: unlocking[opcodeOffset + 1] };
+  if (op === 0x4d) return { dataStart: opcodeOffset + 3, dataLen: unlocking[opcodeOffset + 1] | (unlocking[opcodeOffset + 2] << 8) };
+  throw new Error(`unsupported push opcode ${op}`);
+}
+function mutateInputBlob(inputs, inputIndex, byteOffset) {
+  const mutated = inputs.slice();
+  const unlocking = Uint8Array.from(mutated[inputIndex].unlocking);
+  const { dataStart, dataLen } = pushBounds(unlocking);
+  if (byteOffset < 0 || byteOffset >= dataLen) throw new Error(`mutation offset ${byteOffset} outside inBlob`);
+  unlocking[dataStart + byteOffset] ^= 0x01;
+  mutated[inputIndex] = { ...mutated[inputIndex], unlocking };
+  return mutated;
+}
 // corrupt one input's inBlob (a MIDDLE limb, so it is a live value the chunk uses); the
 // predecessor's forward-check (and/or this chunk's own) then fails -> the run is rejected.
 function invalidRun(asm, idx) {
-  const inputs = asm.inputs.map((inp, i) => (i === idx ? { ...inp, unlocking: (() => {
-    const u = Uint8Array.from(inp.unlocking);
-    const op = u[0];
-    const dataStart = op <= 75 ? 1 : op === 0x4c ? 2 : 3;
-    const dataLen = op <= 75 ? op : op === 0x4c ? u[1] : u[1] | (u[2] << 8);
-    u[dataStart + Math.floor(dataLen / 2)] ^= 0x01;
-    return u;
-  })() } : inp));
+  const { dataLen } = pushBounds(asm.inputs[idx].unlocking);
+  const inputs = mutateInputBlob(asm.inputs, idx, Math.floor(dataLen / 2));
   const meta = inputs.map((_, i) => evalInput(inputs, i));
   return { steps: inputs.map((inp, i) => ({ label: asm.meta[i].label, locking: binToHex(inp.locking), unlocking: binToHex(inp.unlocking), checkpoint: asm.meta[i].checkpoint })), rejected: meta.some((m) => !m.accepted) };
 }
@@ -315,17 +364,65 @@ const report = (tag, asm) => {
 };
 
 // ===================== FULL GROTH16 (residue, single tx) =====================
-const full0 = buildFull(INSTANCES.committed);
+const committedSpecs = buildSpecs(INSTANCES.committed);
+const proof1Specs = buildSpecs(INSTANCES.proof1);
+const worstSpecs = buildSpecs(INSTANCES.worst);
+const full0 = assemble(committedSpecs);
 report('groth16-intratx-residue committed', full0);
-const full1 = buildFull(INSTANCES.proof1);
-const fullWc = buildFull(INSTANCES.worst);
+const full1 = assemble(proof1Specs);
+const fullWc = assemble(worstSpecs);
 report('groth16-intratx-residue proof#1', full1);
 report('groth16-intratx-residue worst-case', fullWc);
-const fullInvalid = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2))];
+const g2FinalIndex = committedSpecs.findIndex((spec) => (spec.externalBindings ?? []).length > 0);
+if (g2FinalIndex < 0) throw new Error('missing G2-final external bindings');
+const bindings = committedSpecs[g2FinalIndex].externalBindings;
+const hybridSpecs = [
+  ...committedSpecs.slice(0, g2FinalIndex + 1),
+  ...proof1Specs.slice(g2FinalIndex + 1),
+];
+const unboundHybrid = assemble(hybridSpecs.map((spec) => ({ ...spec, externalBindings: [] })));
+if (!unboundHybrid.accepted) throw new Error('pre-binding proof0-G2/proof1-remainder hybrid was not accepted');
+const boundHybrid = assemble(hybridSpecs);
+if (boundHybrid.meta[g2FinalIndex].accepted) throw new Error('bound hybrid did not reject at G2 final');
+const unrelatedFailure = boundHybrid.meta.find((meta, i) => i !== g2FinalIndex && !meta.accepted);
+if (unrelatedFailure) throw new Error(`bound hybrid also rejected at ${unrelatedFailure.label}`);
+if (bindings.length !== 1) throw new Error('expected one contiguous proof binding');
+const bindingMutations = [3 * W, 7 * W].map((offset) => {
+  const binding = bindings[0];
+  const byteOffset = binding.targetOffset + offset;
+  const inputs = mutateInputBlob(full0.inputs, binding.targetSpecIndex, byteOffset);
+  if (evalInput(inputs, g2FinalIndex).accepted) {
+    throw new Error(`G2 final accepted mutated bound region at ${binding.targetOffset}`);
+  }
+  return { steps: toStepArr({ inputs, meta: full0.meta }), rejected: true };
+});
+const tableCarrierIndex = committedSpecs.findIndex((spec) => spec.extras.some((extra) => extra instanceof Uint8Array));
+if (tableCarrierIndex < 0) throw new Error('missing shared GLV table carrier');
+const tableInputs = full0.inputs.slice();
+const tableUnlocking = Uint8Array.from(tableInputs[tableCarrierIndex].unlocking);
+const carrierBlob = pushBounds(tableUnlocking);
+const tablePush = pushBounds(tableUnlocking, carrierBlob.dataStart + carrierBlob.dataLen);
+if (tablePush.dataLen !== GLV_TABLE_BYTES.length) throw new Error('shared GLV table push has unexpected length');
+tableUnlocking[tablePush.dataStart + Math.floor(tablePush.dataLen / 2)] ^= 0x01;
+tableInputs[tableCarrierIndex] = { ...tableInputs[tableCarrierIndex], unlocking: tableUnlocking };
+if (evalInput(tableInputs, tableCarrierIndex).accepted) throw new Error('GLV carrier accepted a mutated shared table');
+const tableMutation = { steps: toStepArr({ inputs: tableInputs, meta: full0.meta }), rejected: true };
+console.error(
+  `  proof consistency: unbound hybrid accepted=${unboundHybrid.accepted}; ` +
+  `bound hybrid G2-final rejected=${!boundHybrid.meta[g2FinalIndex].accepted}; ` +
+  `-A/B mutation rejected=${bindingMutations[0].rejected}; C mutation rejected=${bindingMutations[1].rejected}`,
+);
+const fullInvalid = [
+  invalidRun(full0, 0),
+  invalidRun(full0, Math.floor(full0.inputs.length / 2)),
+  { steps: toStepArr(boundHybrid), rejected: true },
+  ...bindingMutations,
+  tableMutation,
+];
 console.error(`  invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
 
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-residue-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-intratx (each chunk is an input whose witness carries its incoming state as a raw byte blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: fast-G2 endo subgroup check (ePrint 2022/348, 4 chunks), GLV vk_x MSM (5 chunks), c^-(6x+2)-FUSED batched Miller with e(alpha,beta) precomputed/skipped (23 chunks), and a witnessed-residue final-exp TAIL that collapses the hard exponentiation to ONE chunk (33 inputs total vs 54 for the plain intratx build). The residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail (c*cInv==ONE, c canonical, w in {1,w27,w27^2}); the verdict is fF*w*c^q2 == c^q*c^q3. Cross-stage soundness links are bound where layouts allow: vk_x final binds the vk_x point into the fused-Miller genesis input, and the fused-Miller boundary [fF,c,cInv] is bound into the residue tail. Reuses the same validated chunk math as bch-groth16-grouped-residue.',
+writeFileSync(verifierPath('src/bch/groth16-intratx-residue-vectors.json'), JSON.stringify({
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-intratx (each chunk is an input whose witness carries its incoming state as a raw byte blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 4 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks with e(alpha,beta) precomputed/skipped (ePrint 2024/640). The four GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding four copies. The final Miller chunk also performs the witnessed-residue verdict, reducing the full verifier to 27 inputs vs 54 for the plain intratx build. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. The G2 final chunk binds the proof-derived -A/B and C bytes into the fused-Miller genesis input, while the vk_x final chunk binds the GLV result into that same genesis; every later Miller state is forward-bound. Reuses the same validated chunk math as bch-groth16-grouped-residue.',
   method: 'intra-tx-linked-residue', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
