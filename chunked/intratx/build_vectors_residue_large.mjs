@@ -68,13 +68,13 @@ const GEN = join(PAIR, 'generated');
 // split off a 1-iter zinv/assert final chunk only because that cross-bind final chunk measures
 // accepted=false STANDALONE in the covenant model. regenGlvSafe writes the window directly (no
 // planner) and the assembly below validates it against max-density on the real spec VM.
-const GEN_ENV = { ...process.env, BCH_VM: 'spec', TARGET_UNLOCK: String(LARGE_UNLOCK), OP_COST_TARGET: '86000000', BYTE_BUDGET: '95000' };
-console.error('\n== regenerating gen_g2check.mjs at 100 kB budget ==');
+const GEN_ENV = { ...process.env, BCH_VM: 'spec', TARGET_UNLOCK: String(LARGE_UNLOCK), OP_COST_TARGET: '86000000', BYTE_BUDGET: '95000', STAGE_BOUND_LAYOUT: '1' };
+console.error('\n== regenerating gen_g2check.mjs at 100 kB budget (stage-bound) ==');
 execFileSync(process.execPath, [join(PAIR, 'gen_g2check.mjs')], { env: GEN_ENV, stdio: 'inherit' });
-console.error('\n== regenerating gen_miller_residue.mjs at 100 kB budget (FUSE_TAIL -> residue tail folded into the final Miller chunk) ==');
+console.error('\n== regenerating gen_miller_residue.mjs at 100 kB budget (stage-bound; FUSE_TAIL -> residue tail folded into the final Miller chunk) ==');
 execFileSync(process.execPath, [join(PAIR, 'gen_miller_residue.mjs')], { env: { ...GEN_ENV, FUSE_TAIL: '1' }, stdio: 'inherit' });
-console.error('\n== regenerating GLV vk_x as ONE window [0,128] (lever 2) ==');
-regenGlvSafe(GEN, [0, 128]);
+console.error('\n== regenerating GLV vk_x as ONE stage-bound window [0,128] (lever 2) ==');
+regenGlvSafe(GEN, [0, 128], true);
 
 const PROBE = join(GEN, '_intratx_residue_large_probe.cash'); // transformed import-chunks compiled from here
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
@@ -141,29 +141,31 @@ const INSTANCES = {
   worst: { proof: proofFromLimbs(wcp.Ax, wcp.Ay, wcp.Bxa, wcp.Bxb, wcp.Bya, wcp.Byb, wcp.Cx, wcp.Cy), inputs: [wcp.in0, wcp.in1] },
 };
 
-// vk_x position inside the FUSED miller genesis inBlob. Layout f(12)+R0(6)+pts(10)+c(12)+cInv(12)
-// = 52 limbs; vk_x (pair2 P) sits after f+R0+pair0 pts (c,cInv are appended at the END).
-const MILLER_STATE_LIMBS = 12 + 6; // f(12) + R0(6)
+// vk_x position inside the STAGE-BOUND fused-Miller genesis inBlob. Layout: runtime points
+// with the proof tuple first [-A/B(6), C(2), vk_x(2)] + c(12) + cInv(12) = 34 limbs; f and R0
+// are derived in-contract (f = cInv, R0 = B).
 const dummy = pairsFor([1n, 1n]);
-const VKX_LIMB_OFFSET = MILLER_STATE_LIMBS + ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(1, dummy[1].P.toAffine(), dummy[1].Q.toAffine()).length;
+const VKX_LIMB_OFFSET = ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(3, dummy[3].P.toAffine(), dummy[3].Q.toAffine()).length;
 const PTL_LEN = dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())).length; // 10
-const MILLER_IN_LIMBS = MILLER_STATE_LIMBS + PTL_LEN + 24; // + c(12) + cInv(12) = 52 (fused)
-const TAIL_IN_LIMBS = 12 + 12 + 12; // [fF, c, cInv] hand-off from the fused miller's final chunk
+const MILLER_IN_LIMBS = PTL_LEN + 24; // + c(12) + cInv(12) = 34 (stage-bound genesis)
 
 // ---- per-stage chunk specs (inLimbs/outLimbs/extras/role) — IDENTICAL to build_vectors_residue.mjs;
 // only the assembly budget below differs (100 kB inputs). ----
 function specsG2check(inst) {
   const pf = inst.proof ?? proof;
-  const Ba = pf.b.toAffine(), Aa = pf.a.toAffine(), Ca = pf.c.toAffine();
+  const Ba = pf.b.toAffine(), Aa = pf.a.negate().toAffine(), Ca = pf.c.toAffine();
   const Bpair = [[Ba.x.c0, Ba.x.c1], [Ba.y.c0, Ba.y.c1]];
-  const tail = [Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1, Aa.x, Aa.y, Ca.x, Ca.y];
+  const tail = [Aa.x, Aa.y, Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1, Ca.x, Ca.y];
   const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
+  if (man.stageBound !== true) {
+    throw new Error('intratx residue-large requires STAGE_BOUND_LAYOUT=1 during G2 generation');
+  }
   const zinv = g2checkFastZinv(Bpair); // [zinvA, zinvB] witnessed inverse of [x0]B.Z (last chunk only)
   return man.chunks.map((ch) => ({
     file: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`),
-    inLimbs: sLimbs(g2checkAccAt(Bpair, ch.lo)),
+    inLimbs: ch.first ? tail : sLimbs(g2checkAccAt(Bpair, ch.lo)),
     outLimbs: ch.last ? [] : sLimbs(g2checkAccAt(Bpair, ch.hi)),
     extras: ch.last ? zinv : [], role: ch.last ? 'terminal' : 'within',
     label: `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' [x0]B-endo==psi(B)' : ''}`,
@@ -178,9 +180,12 @@ function specsVkx(inst, crossToMiller) {
   const vkxAff = vkxPoint(inst.inputs).toAffine();
   const st = (X, Y, Z) => [X, Y, Z, in0, in1, k10, k20, k11, k21];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglv.json'), 'utf8'));
+  if (man.stageBound !== true) throw new Error('intratx residue-large requires stage-bound GLV generation');
   return man.chunks.map((ch) => {
     const [X0, Y0, Z0] = vkxGlvStateAt(k10, k20, k11, k21, ch.lo);
-    const inLimbs = st(X0, Y0, Z0);
+    const fullIn = st(X0, Y0, Z0);
+    // stage-bound genesis initializes the accumulator in-contract: state drops rX,rY,rZ
+    const inLimbs = ch.first ? fullIn.slice(3) : fullIn;
     if (ch.final) {
       return {
         file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`),
@@ -208,17 +213,23 @@ function specsMillerFused(inst, c, cInv, w) {
   const { states } = millerFusedOps(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const full = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...ptL, ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 52
+  // STAGE-BOUND genesis: proof tuple first (-A/B, C), then vk_x; f=cInv and R0=B derived in-contract.
+  const genesisPts = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
+  const genesis = [...genesisPts, ...f12limbs(c), ...f12limbs(cInv)]; // 34
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
+  if (man.stageBound !== true) {
+    throw new Error('intratx residue-large requires STAGE_BOUND_LAYOUT=1 during Miller generation');
+  }
   return man.chunks.map((ch) => {
     const file = join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`);
     if (ch.tailFused) {
       return {
-        file, inLimbs: full(states[ch.opLo]), outLimbs: [], extras: fp12limbsOf(w), role: 'terminal', cmp: null,
+        file, inLimbs: ch.opLo === 0 ? genesis : full(states[ch.opLo]), outLimbs: [], extras: fp12limbsOf(w), role: 'terminal', cmp: null,
         label: `fused-miller+tail ops[${ch.opLo},${ch.opHi}) -> verdict fF*w*c^q2==c^q*c^q3`, checkpoint: 'verify',
       };
     }
     return {
-      file, inLimbs: full(states[ch.opLo]), outLimbs: full(states[ch.opHi]), extras: [], role: 'within', cmp: null,
+      file, inLimbs: ch.opLo === 0 ? genesis : full(states[ch.opLo]), outLimbs: full(states[ch.opHi]), extras: [], role: 'within', cmp: null,
       label: `fused-miller ops[${ch.opLo},${ch.opHi})`, checkpoint: undefined,
     };
   });
@@ -230,6 +241,12 @@ function buildSpecs(inst) {
   const { boundary: fRaw } = millerBatchOps(pairs);
   const { c, cInv, w } = residueWitness(fRaw);
   const miller = specsMillerFused(inst, c, cInv, w); // the residue tail is fused into miller's final chunk
+  const millerGenesisIndex = g2.length + vkx.length;
+  g2[g2.length - 1].externalBindings = [
+    // G2-final inBlob = [R(6) ||] -A/B/C(8) (no R prefix when g2check is a single stage-bound
+    // chunk); Miller genesis starts with the same proof tuple.
+    { targetSpecIndex: millerGenesisIndex, sourceOffset: (g2.length === 1 ? 0 : 6) * W, targetOffset: 0, length: 8 * W },
+  ];
   return [...g2, ...vkx, ...miller];
 }
 
@@ -237,17 +254,31 @@ function buildSpecs(inst) {
 const RESCHED = process.env.RESCHEDULE !== 'off';
 const compileCache = new Map();
 const chosenCache = new Map();
-const specKey = (s) => {
+const specConfig = (specs, i) => {
+  const s = specs[i];
   let forward = null;
   if (s.role === 'within') { const outLen = s.outLimbs.length * W; forward = { cmpExpr: null, nextFullInLen: outLen, skip: 0, cmpLen: outLen }; }
   else if (s.role === 'cross') forward = s.cmp;
-  return { key: `${s.file}|${s.role}|${JSON.stringify(forward)}`, forward };
+  const externalBindings = (s.externalBindings ?? []).map((binding) => {
+    const target = specs[binding.targetSpecIndex];
+    if (!target) throw new Error(`external binding target ${binding.targetSpecIndex} is not a verifier input`);
+    return {
+      sourceOffset: binding.sourceOffset,
+      targetInputIndex: binding.targetSpecIndex,
+      targetFullInLen: target.inLimbs.length * W,
+      targetOffset: binding.targetOffset,
+      length: binding.length,
+    };
+  });
+  const key = `${s.file}|${s.role}|${JSON.stringify(forward)}|${JSON.stringify(externalBindings)}`;
+  return { key, forward, externalBindings };
 };
-function compileSpec(s) {
-  const { key, forward } = specKey(s);
+function compileSpec(specs, i) {
+  const s = specs[i];
+  const { key, forward, externalBindings } = specConfig(specs, i);
   let v = compileCache.get(key);
   if (!v) {
-    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward }).src);
+    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward, externalBindings }).src);
     const resched = compileFileBytecode(PROBE);
     const raw = RESCHED ? compileFileBytecodeRaw(PROBE) : resched;
     v = { resched: Uint8Array.from([OP_DROP, ...resched]) };
@@ -262,7 +293,7 @@ function argBytesOf(s) {
   return Uint8Array.from(parts.flatMap((p) => [...p]));
 }
 function assemble(specs) {
-  const redeems = specs.map(compileSpec);
+  const redeems = specs.map((_, i) => compileSpec(specs, i));
   const argB = specs.map(argBytesOf);
   const rpush = redeems.map((r) => encodeDataPush(r));
   const lockingOf = (i) => (P2SH ? p2shSpk(redeems[i]) : redeems[i]);
@@ -279,7 +310,7 @@ function assemble(specs) {
   if (RESCHED) {
     let switched = 0;
     for (let i = 0; i < specs.length; i++) {
-      const { key } = specKey(specs[i]);
+      const { key } = specConfig(specs, i);
       if (chosenCache.has(key)) continue;
       const v = compileCache.get(key);
       if (!v.raw) { chosenCache.set(key, 'resched'); continue; }
@@ -308,9 +339,23 @@ function assemble(specs) {
   return { inputs, meta, fits, accepted };
 }
 
-function buildFull(inst) { return assemble(buildSpecs(inst)); }
-
 const toStepArr = (asm) => asm.inputs.map((inp, i) => ({ label: asm.meta[i].label, locking: binToHex(inp.locking), unlocking: binToHex(inp.unlocking), checkpoint: asm.meta[i].checkpoint }));
+function pushBounds(unlocking, opcodeOffset = 0) {
+  const op = unlocking[opcodeOffset];
+  if (op <= 75) return { dataStart: opcodeOffset + 1, dataLen: op };
+  if (op === 0x4c) return { dataStart: opcodeOffset + 2, dataLen: unlocking[opcodeOffset + 1] };
+  if (op === 0x4d) return { dataStart: opcodeOffset + 3, dataLen: unlocking[opcodeOffset + 1] | (unlocking[opcodeOffset + 2] << 8) };
+  throw new Error(`unsupported push opcode ${op}`);
+}
+function mutateInputBlob(inputs, inputIndex, byteOffset) {
+  const mutated = inputs.slice();
+  const unlocking = Uint8Array.from(mutated[inputIndex].unlocking);
+  const { dataStart, dataLen } = pushBounds(unlocking);
+  if (byteOffset < 0 || byteOffset >= dataLen) throw new Error(`mutation offset ${byteOffset} outside inBlob`);
+  unlocking[dataStart + byteOffset] ^= 0x01;
+  mutated[inputIndex] = { ...mutated[inputIndex], unlocking };
+  return mutated;
+}
 function invalidRun(asm, idx) {
   const inputs = asm.inputs.map((inp, i) => (i === idx ? { ...inp, unlocking: (() => {
     const u = Uint8Array.from(inp.unlocking);
@@ -335,17 +380,54 @@ const report = (tag, asm) => {
 };
 
 // ===================== FULL GROTH16 (residue, single tx, 100 kB inputs) =====================
-const full0 = buildFull(INSTANCES.committed);
+const committedSpecs = buildSpecs(INSTANCES.committed);
+const proof1Specs = buildSpecs(INSTANCES.proof1);
+const worstSpecs = buildSpecs(INSTANCES.worst);
+const full0 = assemble(committedSpecs);
 report('groth16-intratx-residue-large committed', full0);
-const full1 = buildFull(INSTANCES.proof1);
-const fullWc = buildFull(INSTANCES.worst);
+const full1 = assemble(proof1Specs);
+const fullWc = assemble(worstSpecs);
 report('groth16-intratx-residue-large proof#1', full1);
 report('groth16-intratx-residue-large worst-case', fullWc);
-const fullInvalid = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2))];
+// ---- cross-stage staple fixtures: prove the G2->Miller binding closes the splice hole ----
+const g2FinalIndex = committedSpecs.findIndex((spec) => (spec.externalBindings ?? []).length > 0);
+if (g2FinalIndex < 0) throw new Error('missing G2-final external bindings');
+const bindings = committedSpecs[g2FinalIndex].externalBindings;
+if (bindings.length !== 1) throw new Error('expected one contiguous proof binding');
+const hybridSpecs = [
+  ...committedSpecs.slice(0, g2FinalIndex + 1),
+  ...proof1Specs.slice(g2FinalIndex + 1),
+];
+const unboundHybrid = assemble(hybridSpecs.map((spec) => ({ ...spec, externalBindings: [] })));
+if (!unboundHybrid.accepted) throw new Error('pre-binding proof0-G2/proof1-remainder hybrid was not accepted');
+const boundHybrid = assemble(hybridSpecs);
+if (boundHybrid.meta[g2FinalIndex].accepted) throw new Error('bound hybrid did not reject at G2 final');
+const unrelatedFailure = boundHybrid.meta.find((meta, i) => i !== g2FinalIndex && !meta.accepted);
+if (unrelatedFailure) throw new Error(`bound hybrid also rejected at ${unrelatedFailure.label}`);
+const bindingMutations = [1 * W, 3 * W, 7 * W].map((offset) => {
+  const binding = bindings[0];
+  const byteOffset = binding.targetOffset + offset;
+  const inputs = mutateInputBlob(full0.inputs, binding.targetSpecIndex, byteOffset);
+  if (evalInput(inputs, g2FinalIndex).accepted) {
+    throw new Error(`G2 final accepted mutated bound region at ${byteOffset}`);
+  }
+  return { steps: toStepArr({ inputs, meta: full0.meta }), rejected: true };
+});
+console.error(
+  `  proof consistency: unbound hybrid accepted=${unboundHybrid.accepted}; ` +
+  `bound hybrid G2-final rejected=${!boundHybrid.meta[g2FinalIndex].accepted}; ` +
+  `-A/B/C mutations rejected=${bindingMutations.map((m) => m.rejected).join(',')}`,
+);
+const fullInvalid = [
+  invalidRun(full0, 0),
+  invalidRun(full0, Math.floor(full0.inputs.length / 2)),
+  { steps: toStepArr(boundHybrid), rejected: true },
+  ...bindingMutations,
+];
 console.error(`  invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-residue-large-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; fast-G2 endo subgroup check + GLV vk_x MSM + c^-(6x+2)-FUSED batched Miller with e(alpha,beta) skipped + witnessed-residue final-exp verdict), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the same ~193M-op verifier therefore collapses from 33 inputs to 5: g2check 1, GLV vk_x 1 (one 128-iter loop window), and c^-(6x+2)-fused Miller 3 with the witnessed-residue final-exp verdict (fF*w*c^q2==c^q*c^q3) FOLDED into the last (terminal) Miller chunk — so the separate residue-tail input disappears. Total op-cost and bytes are conserved (a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the fused verdict. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; fast-G2 endo subgroup check + GLV vk_x MSM + c^-(6x+2)-FUSED batched Miller with e(alpha,beta) skipped + witnessed-residue final-exp verdict), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the same ~193M-op verifier therefore collapses from 33 inputs to 5: g2check 1, GLV vk_x 1 (one 128-iter loop window), and c^-(6x+2)-fused Miller 3 with the witnessed-residue final-exp verdict (fF*w*c^q2==c^q*c^q3) FOLDED into the last (terminal) Miller chunk — so the separate residue-tail input disappears. Total op-cost and bytes are conserved (a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the fused verdict. All stages are bound to ONE proof tuple: the fused-Miller genesis derives f=cInv and R0=B in-contract and leads with the contiguous -A/B/C points, the G2 chunk byte-binds that same tuple into the Miller genesis input, the GLV vk_x chunk initializes its accumulator in-contract, range-checks its decomposition witnesses, and binds the computed vk_x point into that same genesis. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
   method: 'intra-tx-linked-residue-large', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: LARGE_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
