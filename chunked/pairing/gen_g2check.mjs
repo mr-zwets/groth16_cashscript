@@ -31,6 +31,7 @@ const PROBE = join(GEN, `_probe_g2check_${process.pid}.cash`); // planner compil
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_900_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const LINKED_CUTS = process.env.G2_LINKED_LAYOUT === '1' ? [25, 51] : [];
+const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const BN_X = 4965661367192848881n; // BN254 seed |x0|
 const NBITS = 63; // bitlength of BN_X (MSB at index 62)
@@ -90,18 +91,24 @@ export { NBITS as G2CHECK_NBITS };
 const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
 
 // ---- the committed instance's points — the reference run for chunk planning
-const Baff = proof.b.toAffine(), Aaff = proof.a.toAffine(), Caff = proof.c.toAffine();
+const Baff = proof.b.toAffine();
+const Aaff = (STAGE_BOUND ? proof.a.negate() : proof.a).toAffine();
+const Caff = proof.c.toAffine();
 const B = [[Baff.x.c0, Baff.x.c1], [Baff.y.c0, Baff.y.c1]];
 const Blimbs = [B[0][0], B[0][1], B[1][0], B[1][1]];
-const AClimbs = [Aaff.x, Aaff.y, Caff.x, Caff.y];
-const stateLimbs = (R) => [...rLimbs(R), ...Blimbs, ...AClimbs]; // R(6)+B(4)+A(2)+C(2)=14
+const proofLimbs = STAGE_BOUND
+  ? [Aaff.x, Aaff.y, ...Blimbs, Caff.x, Caff.y]
+  : [...Blimbs, Aaff.x, Aaff.y, Caff.x, Caff.y];
+const stateLimbs = (R) => [...rLimbs(R), ...proofLimbs];
 const B2 = [19485874751759354771024239261021720505790618469301721065564631296452457478373n,
             266929791119991161246907387137283842545076965332900288569378510910307636690n]; // twist b2
 
 // ---- contract emitter (reuses verified groth16 tower via the shared singleton library) ----
 const LIB_IMPORT = '../../../singleton/bn254/lib/Miller.cash';
-const RN = ['RXa', 'RXb', 'RYa', 'RYb', 'RZa', 'RZb'], BN = ['Bxa', 'Bxb', 'Bya', 'Byb'], ACN = ['Ax', 'Ay', 'Cx', 'Cy'];
-const ALL = [...RN, ...BN, ...ACN];
+const RN = ['RXa', 'RXb', 'RYa', 'RYb', 'RZa', 'RZb'];
+const AN = ['Ax', 'Ay'], BN = ['Bxa', 'Bxb', 'Bya', 'Byb'], CN = ['Cx', 'Cy'];
+const PROOF = STAGE_BOUND ? [...AN, ...BN, ...CN] : [...BN, ...AN, ...CN];
+const ALL = [...RN, ...PROOF];
 
 function genChunk(lo, hi, isFirst, isLast) {
   const L = [];
@@ -110,10 +117,11 @@ function genChunk(lo, hi, isFirst, isLast) {
   L.push(`// G2 input-validation chunk: fast-endo [x0]B double-and-add bits [${lo},${hi}); first=${isFirst} last=${isLast}.`);
   L.push('contract G2Check() {');
   // the final (endo) chunk additionally takes the witnessed Fp2 inverse zinv of R.Z.
-  const sig = isLast ? `    function spend(${decl(ALL)}, int zinvA, int zinvB, bytes unused zeroPadding) {`
-                     : `    function spend(${decl(ALL)}, bytes unused zeroPadding) {`;
+  const stateParams = STAGE_BOUND && isFirst ? PROOF : ALL;
+  const sig = isLast ? `    function spend(${decl(stateParams)}, int zinvA, int zinvB, bytes unused zeroPadding) {`
+                     : `    function spend(${decl(stateParams)}, bytes unused zeroPadding) {`;
   L.push(sig);
-  L.push(covIn(ALL)); // incoming (R,B,A,C) == spent token commitment
+  L.push(covIn(stateParams));
   if (isFirst) {
     L.push('        require(mulFp(Ay, Ay) == addFp(mulFp(mulFp(Ax, Ax), Ax), 3));'); // A on G1
     L.push('        require(mulFp(Cy, Cy) == addFp(mulFp(mulFp(Cx, Cx), Cx), 3));'); // C on G1
@@ -123,7 +131,7 @@ function genChunk(lo, hi, isFirst, isLast) {
     L.push('        (int oba,int obb) = fp2Sqr(Bya, Byb);');
     L.push('        require(oba == ora); require(obb == orb);');
   }
-  let r = RN.slice(), uid = 0;
+  let r = STAGE_BOUND && isFirst ? ['0', '0', '1', '0', '0', '0'] : RN.slice(), uid = 0;
   const fresh = () => Array.from({ length: 6 }, () => `v${uid++}`);
   for (let k = lo; k < hi; k++) {
     const d = fresh();
@@ -163,7 +171,7 @@ function genChunk(lo, hi, isFirst, isLast) {
     L.push('        (int yl_a,int yl_b) = fp2Mul(lya, lyb, rz3a, rz3b); (int yr_a,int yr_b) = fp2Mul(rya, ryb, lz3a, lz3b);');
     L.push('        require(yl_a == yr_a); require(yl_b == yr_b);');
   } else {
-    L.push(covOut([...r, ...BN, ...ACN])); // carry (R', B, A, C) forward
+    L.push(covOut([...r, ...PROOF]));
   }
   L.push('    }');
   L.push('}');
@@ -213,7 +221,7 @@ console.error(`planning G2-check chunks (fast-endo, ${NBITS}-bit [x0]B)  OP_TARG
 const witness = g2checkFastZinv(B);
 const chunks = []; let lo = 0; const planState = { perUnit: null };
 while (lo < NBITS) {
-  const inLimbs = stateLimbs(g2checkAccAt(B, lo));
+  const inLimbs = STAGE_BOUND && lo === 0 ? proofLimbs : stateLimbs(g2checkAccAt(B, lo));
   const tryHi = (hi) => {
     const last = hi === NBITS;
     const src = genChunk(lo, hi, lo === 0, last);
@@ -234,6 +242,6 @@ while (lo < NBITS) {
   console.error(`  g2check chunk ${idx}: bits[${lo},${best.hi}) lock=${best.m.lockingBytes}B op=${best.m.operationCost.toLocaleString()} accepted=${best.m.accepted} last=${best.last}`);
   lo = best.hi;
 }
-writeFileSync(join(GEN, 'manifest_g2check.json'), JSON.stringify({ numChunks: chunks.length, nbits: NBITS, fastEndo: true, linkedLayout: LINKED_CUTS.length > 0, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, last: c.last })) }, null, 2));
+writeFileSync(join(GEN, 'manifest_g2check.json'), JSON.stringify({ numChunks: chunks.length, nbits: NBITS, fastEndo: true, linkedLayout: LINKED_CUTS.length > 0, stageBound: STAGE_BOUND, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, last: c.last })) }, null, 2));
 console.error(`G2-check: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.operationCost, 0).toLocaleString()}`);
 }

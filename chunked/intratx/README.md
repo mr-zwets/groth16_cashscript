@@ -158,8 +158,8 @@ assembling either deployment. The builders regenerate the four max-density-safe 
 
 ```
 export VERIFIER_DIR=/absolute/path/to/zk-verifier-bench
-G2_LINKED_LAYOUT=1 node chunked/pairing/gen_g2check.mjs
-MILLER_LINKED_LAYOUT=1 node chunked/pairing/gen_miller_residue.mjs
+STAGE_BOUND_LAYOUT=1 G2_LINKED_LAYOUT=1 node chunked/pairing/gen_g2check.mjs
+STAGE_BOUND_LAYOUT=1 MILLER_LINKED_LAYOUT=1 node chunked/pairing/gen_miller_residue.mjs
 node chunked/intratx/build_vectors_residue.mjs
 node chunked/grouped/build_vectors_residue.mjs
 ```

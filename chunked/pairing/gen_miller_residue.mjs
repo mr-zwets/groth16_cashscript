@@ -27,6 +27,7 @@ const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const LINKED_CUTS = process.env.MILLER_LINKED_LAYOUT === '1'
   ? [18, 35, 53, 71, 89, 107, 125, 143, 161, 179, 197, 215, 233, 250, 267, 285, 302, 320, 338]
   : [];
+const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 
 const PAIRS = pairsFor(vec.publicInputs);
 const PINFO = PAIRS.map((pair, j) => {
@@ -60,7 +61,9 @@ const W_HASHES = [ONE_L, fp12limbsOf(COSET27[1]).map(String), fp12limbsOf(COSET2
 // state = f(12) + R0(6) + runtime points + c(12) + cInv(12)
 const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...f12limbs(s.c), ...f12limbs(s.cInv)];
 const withPts = (limbs) => { const fr = limbs.slice(0, 18); const rest = limbs.slice(18); return [...fr, ...ptL, ...rest]; };
-const inState = (i) => withPts(stateLimbs(states[i]));
+const inState = (i) => STAGE_BOUND && i === 0
+  ? [...ptL, ...f12limbs(states[i].c), ...f12limbs(states[i].cInv)]
+  : withPts(stateLimbs(states[i]));
 // the FINAL chunk hands off only [fF, c, cInv] (36 limbs, contiguous) to the residue tail —
 // R0/pts are done with once the loop ends. Non-final hand-offs carry the full 52-limb state.
 const outState = (i) => i === states.length - 1
@@ -74,7 +77,8 @@ const bakedCoeffs = (triple) => triple.flatMap((c) => [`${c.c0}`, `${c.c1}`]);
 function genChunk(opLo, opHi, isFinal, withTail = false) {
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
-  const stateParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames]; // 52 committed state limbs
+  const fullStateParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames];
+  const stateParams = STAGE_BOUND && opLo === 0 ? [...ptParams, ...cNames, ...ciNames] : fullStateParams;
   const allParams = withTail ? [...stateParams, ...wNames] : stateParams;
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
@@ -84,14 +88,20 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   L.push('// carried witness. cf op folds c^-1/c into f (residue method, ePrint 2024/640).');
   L.push(`contract MillerFused${withTail ? 'Tail' : ''}Chunk() {`);
   L.push(`    function spend(${decl(allParams)}, bytes unused zeroPadding) {`);
-  L.push(covIn(stateParams)); // commit the 52 state limbs only (w is an uncommitted witness)
+  L.push(covIn(stateParams));
   const negY = PINFO.map((pi) => {
     if (!pi.cfg.Q) return [`${pi.negQ.c0}`, `${pi.negQ.c1}`];
     const needs = ops.slice(opLo, opHi).some((o) => o.t === 'al' && o.neg && o.j === pi.j);
     if (needs) { L.push(`        (int nq${pi.j}a,int nq${pi.j}b) = fp2Neg(${pi.Qyae}, ${pi.Qybe}, 64);`); return [`nq${pi.j}a`, `nq${pi.j}b`]; }
     return [pi.Qyae, pi.Qybe];
   });
-  let f = inF.slice(); let r0 = inR0.slice(); let uid = 0;
+  // The fused MSB optimization starts f at cInv and R0 at the runtime B point. Derive both
+  // genesis values here instead of accepting independent witness state.
+  let f = STAGE_BOUND && opLo === 0 ? ciNames.slice() : inF.slice();
+  let r0 = STAGE_BOUND && opLo === 0
+    ? [PINFO[0].Qxae, PINFO[0].Qxbe, PINFO[0].Qyae, PINFO[0].Qybe, '1', '0']
+    : inR0.slice();
+  let uid = 0;
   const fresh = (n) => Array.from({ length: n }, () => `v${uid++}`);
   const emitLine = (coeffs, pi) => { const g = fresh(12); L.push(`        (${decl(g)}) = line(${f.join(',')}, ${coeffs.join(',')}, ${pi.Pxe}, ${pi.Pye});`); f = g; };
   for (let i = opLo; i < opHi; i++) {
@@ -238,7 +248,7 @@ if (process.env.FUSE_TAIL === '1' && chunks[chunks.length - 1].tailFused !== tru
   console.error(`  chunk ${last.idx}: residue-tail verdict FUSED -> terminal (was hand-off + separate tail)`);
 }
 writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
-  fused: true, linkedLayout: LINKED_CUTS.length > 0,
+  fused: true, linkedLayout: LINKED_CUTS.length > 0, stageBound: STAGE_BOUND,
   numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, tailFused: c.tailFused === true, incoming: c.incoming, outgoing: c.outgoing })),
 }, null, 2));

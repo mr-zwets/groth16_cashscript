@@ -21,6 +21,7 @@ const P = 2188824287183927522224640574525727508869631115729782366268903789464522
 const Pstr = P.toString();
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
+const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 const ITERS = 128; // GLV sub-scalars are <= 127 bits; 128 MSB-first positions
 
 // ---- GLV constants (computed; proof-independent) ----
@@ -75,6 +76,7 @@ const TABLE_HEX = '0x' + Array.from({ length: 15 }, (_, k) => le32(TABLE[k + 1][
 // ---- contract template ----
 const SER = 'hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(in0, 40) + toPaddedBytes(in1, 40) + toPaddedBytes(k10, 40) + toPaddedBytes(k20, 40) + toPaddedBytes(k11, 40) + toPaddedBytes(k21, 40))';
 const STATE = ['rX', 'rY', 'rZ', 'in0', 'in1', 'k10', 'k20', 'k11', 'k21'];
+const GENESIS_STATE = STATE.slice(3);
 const prologue = () => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
 function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
@@ -125,23 +127,26 @@ function select16(int idx) returns (int, int, int) {
     return aX, aY, doAdd;
 }`;
 
-export function genCash(lo, hi, first, final) {
+export function genCash(lo, hi, first, final, stageBound = false) {
   const count = hi - lo, hiBit = (ITERS - 1) - lo;
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
   L.push(`// GLV vk_x chunk: 4-scalar Straus window [${lo},${hi}), first=${first} final=${final}.`);
   L.push(prologue());
   L.push('contract VkxGlvChunk() {');
+  const stateParams = stageBound && first ? GENESIS_STATE : STATE;
   L.push(final
-    ? `    function spend(${STATE.map((s) => `int ${s}`).join(', ')}, int zInv, bytes unused zeroPadding) {`
-    : `    function spend(${STATE.map((s) => `int ${s}`).join(', ')}, bytes unused zeroPadding) {`);
-  L.push(covIn(STATE));
+    ? `    function spend(${stateParams.map((s) => `int ${s}`).join(', ')}, int zInv, bytes unused zeroPadding) {`
+    : `    function spend(${stateParams.map((s) => `int ${s}`).join(', ')}, bytes unused zeroPadding) {`);
+  L.push(covIn(stateParams));
   if (first) {
+    if (stageBound) L.push('        int rX = 0; int rY = 1; int rZ = 0;');
     // bind the GLV witnesses to the committed public inputs: k1 + k2*lambda == in (mod r),
     // AND bound their magnitude to < 2^128 so the 128-iteration MSM processes every bit (else a
     // prover could add r to a scalar — same residue mod r, but bits above 127 would be silently
     // dropped, computing the wrong vk_x).
     const BOUND = 1n << 128n;
+    L.push('        require(k10 >= 0 && k20 >= 0 && k11 >= 0 && k21 >= 0);');
     L.push(`        require(k10 < ${BOUND}); require(k20 < ${BOUND}); require(k11 < ${BOUND}); require(k21 < ${BOUND});`);
     L.push(`        require((k10 + k20 * ${LAM}) % ${r} == in0);`);
     L.push(`        require((k11 + k21 * ${LAM}) % ${r} == in1);`);
@@ -208,11 +213,12 @@ if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
     const [X0, Y0, Z0] = vkxGlvStateAt(wk10, wk20, wk11, wk21, lo);
     const tryHi = (hi) => {
       const final = hi === ITERS, first = lo === 0;
-      const inSt = SER_state(X0, Y0, Z0).map(String);
+      const fullIn = SER_state(X0, Y0, Z0).map(String);
+      const inSt = STAGE_BOUND && first ? fullIn.slice(3) : fullIn;
       let outLimbs, args;
       if (final) { const zinv = vkxGlvZinv(wk10, wk20, wk11, wk21); const acc = vkxGlvStateAt(wk10, wk20, wk11, wk21, ITERS); const ic0 = [((IC0[0] % P) + P) % P, ((IC0[1] % P) + P) % P]; const [fx, fy, fz] = jacAdd(acc[0], acc[1], acc[2], ic0[0], ic0[1], 1n); const z2 = qF(zinv), z3 = mF(z2, zinv); outLimbs = [mF(fx, z2), mF(fy, z3)].map(String); args = [...inSt, String(zinv)]; }
       else { const [X, Y, Z] = vkxGlvStateAt(wk10, wk20, wk11, wk21, hi); outLimbs = SER_state(X, Y, Z).map(String); args = inSt; }
-      const src = genCash(lo, hi, first, final);
+      const src = genCash(lo, hi, first, final, STAGE_BOUND);
       const m = measureCovenant(src, args.map(BigInt), outLimbs.map(BigInt), inSt.map(BigInt));
       return { hi, final, src, m, fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET };
     };
@@ -224,6 +230,6 @@ if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
     console.error(`  vkxglv chunk ${idx}: [${lo},${best.hi}) lock=${best.m.lockingBytes}B op=${best.m.operationCost.toLocaleString()} accepted=${best.m.accepted} final=${best.final}`);
     lo = best.hi;
   }
-  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ numChunks: chunks.length, iters: ITERS, glv: true, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, final: c.final })) }, null, 2));
+  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ numChunks: chunks.length, iters: ITERS, glv: true, stageBound: STAGE_BOUND, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, final: c.final })) }, null, 2));
   console.error(`GLV vk_x: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.operationCost, 0).toLocaleString()}`);
 }
