@@ -30,6 +30,7 @@ const LIB_IMPORT = '../../../singleton/bn254/lib/lazy/Bn254Lazy.cash';
 const PROBE = join(GEN, '_probe.cash'); // planner writes candidate chunks here to compile-from-file
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
+const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 
 const PAIRS = pairsFor(vec.publicInputs);
 const PINFO = PAIRS.map((pair, j) => {
@@ -44,6 +45,10 @@ const PINFO = PAIRS.map((pair, j) => {
 const ptParams = [];
 PINFO.forEach((pi, j) => { if (pi.cfg.P) ptParams.push(`Px${j}`, `Py${j}`); if (pi.cfg.Q) ptParams.push(`Q${j}xa`, `Q${j}xb`, `Q${j}ya`, `Q${j}yb`); });
 const ptL = PAIRS.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
+// Keep the proof tuple contiguous at stage genesis so G2-final can bind -A/B/C with one slice.
+// Later Miller states retain the generic -A/B, vk_x, C point order.
+const stagePtParams = [...ptParams.slice(0, 6), ...ptParams.slice(8, 10), ...ptParams.slice(6, 8)];
+const stagePtL = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
 
 const { ops, states, boundary } = millerBatchOps(PAIRS);
 // Prepared-VK state: only the RUNTIME pair's accumulator R0 (= e(-A,B), PT_CFG[0]) is carried;
@@ -51,8 +56,11 @@ const { ops, states, boundary } = millerBatchOps(PAIRS);
 // is never needed on-chain and never enters the committed state. f(12) + R0(6) [+ runtime points].
 const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0])];
 const withPts = (limbs) => [...limbs, ...ptL];
-const inState = (i) => withPts(stateLimbs(states[i]));
+const inState = (i) => STAGE_BOUND && i === 0 ? stagePtL : withPts(stateLimbs(states[i]));
 const outState = (i) => withPts(stateLimbs(states[i]));
+// Genesis f/R0 are derived in-contract under STAGE_BOUND (f = 1, R0 = runtime B); the literal
+// limb strings come from the plan states so the serialization stays canonical.
+const F_ONE_L = f12limbs(states[0].f).map(String);
 
 // limbs of a baked line-coeff triple [c0,c1,c2] (each Fp2) in the order `line` expects:
 // c0a,c0b,c1a,c1b,c2a,c2b. Reduced (canonical) reps; the lazy line()/mul034 accept any
@@ -61,6 +69,7 @@ const bakedCoeffs = (triple) => triple.flatMap((c) => [`${c.c0}`, `${c.c1}`]);
 function genChunk(opLo, opHi) {
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb']; // only the runtime pair's R
+  const stateParams = STAGE_BOUND && opLo === 0 ? stagePtParams : [...inF, ...inR0, ...ptParams];
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
@@ -69,8 +78,8 @@ function genChunk(opLo, opHi) {
   L.push('// pair e(-A,B) keeps on-chain G2 (pointDouble/pointAdd); the fixed-VK pairs (alpha/beta,');
   L.push('// vk_x/gamma, C/delta) fold BAKED line coeffs in — no on-chain G2, no carried R.');
   L.push('contract MillerBatchChunk() {');
-  L.push(`    function spend(${decl([...inF, ...inR0, ...ptParams])}, bytes unused zeroPadding) {`);
-  L.push(covIn([...inF, ...inR0, ...ptParams]));
+  L.push(`    function spend(${decl(stateParams)}, bytes unused zeroPadding) {`);
+  L.push(covIn(stateParams));
   // -Qy (bias 64) for the runtime pair's add-line with digit -1 in this window (fixed pairs
   // never do an on-chain add, so only PT_CFG[*].Q===true [pair 0] can need this).
   const negY = PINFO.map((pi) => {
@@ -79,7 +88,13 @@ function genChunk(opLo, opHi) {
     if (needs) { L.push(`        (int nq${pi.j}a,int nq${pi.j}b) = fp2Neg(${pi.Qyae}, ${pi.Qybe}, 64);`); return [`nq${pi.j}a`, `nq${pi.j}b`]; }
     return [pi.Qyae, pi.Qybe];
   });
-  let f = inF.slice(); let r0 = inR0.slice(); let uid = 0;
+  // Stage-bound genesis derives f = 1 and R0 = the runtime B point in-contract instead of
+  // accepting them as independent witness state.
+  let f = STAGE_BOUND && opLo === 0 ? F_ONE_L.slice() : inF.slice();
+  let r0 = STAGE_BOUND && opLo === 0
+    ? [PINFO[0].Qxae, PINFO[0].Qxbe, PINFO[0].Qyae, PINFO[0].Qybe, '1', '0']
+    : inR0.slice();
+  let uid = 0;
   const fresh = (n) => Array.from({ length: n }, () => `v${uid++}`);
   // fold one line(f, coeffs, Px, Py) into f; `coeffs` is a 6-name/literal array.
   const emitLine = (coeffs, pi) => { const g = fresh(12); L.push(`        (${decl(g)}) = line(${f.join(',')}, ${coeffs.join(',')}, ${pi.Pxe}, ${pi.Pye});`); f = g; };
@@ -149,7 +164,7 @@ while (lo < ops.length) {
 for (let i = 1; i < chunks.length; i++) if (chunks[i - 1].outgoing !== chunks[i].incoming) throw new Error('continuity break at ' + i);
 console.error(`batched miller: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.opCost, 0).toLocaleString()}, maxOp=${Math.max(...chunks.map((c) => c.opCost)).toLocaleString()}`);
 writeFileSync(join(GEN, 'manifest_miller.json'), JSON.stringify({
-  batched: true, numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
+  batched: true, stageBound: STAGE_BOUND, numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, incoming: c.incoming, outgoing: c.outgoing })),
 }, null, 2));
 console.error('wrote generated/manifest_miller.json');
