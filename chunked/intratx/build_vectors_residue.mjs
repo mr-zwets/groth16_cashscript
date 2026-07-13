@@ -117,7 +117,7 @@ const INSTANCES = {
 
 // vk_x position inside the 34-limb Miller genesis inBlob: runtime points(10)+c(12)+cInv(12).
 const dummy = pairsFor([1n, 1n]);
-const VKX_LIMB_OFFSET = ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(1, dummy[1].P.toAffine(), dummy[1].Q.toAffine()).length;
+const VKX_LIMB_OFFSET = ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(3, dummy[3].P.toAffine(), dummy[3].Q.toAffine()).length;
 const PTL_LEN = dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())).length; // 10
 const MILLER_IN_LIMBS = PTL_LEN + 24;
 
@@ -186,7 +186,8 @@ function specsMillerFused(inst, c, cInv, w) {
   const { states } = millerFusedOps(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const full = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...ptL, ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 52
-  const genesis = [...ptL, ...f12limbs(c), ...f12limbs(cInv)];
+  const genesisPts = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
+  const genesis = [...genesisPts, ...f12limbs(c), ...f12limbs(cInv)];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
   if (man.linkedLayout !== true) {
     throw new Error('intratx residue requires MILLER_LINKED_LAYOUT=1 during Miller generation');
@@ -213,10 +214,8 @@ function buildSpecs(inst) {
   const miller = specsMillerFused(inst, c, cInv, w);
   const millerGenesisIndex = g2.length + vkx.length;
   g2[g2.length - 1].externalBindings = [
-    // G2-final inBlob = R(6) || -A/B(6) || C(2); Miller genesis starts
-    // -A/B(6) || vk_x(2) || C(2). Bind both proof-derived regions.
-    { targetSpecIndex: millerGenesisIndex, sourceOffset: 6 * W, targetOffset: 0, length: 6 * W },
-    { targetSpecIndex: millerGenesisIndex, sourceOffset: 12 * W, targetOffset: 8 * W, length: 2 * W },
+    // G2-final inBlob = R(6) || -A/B/C(8); Miller genesis starts with the same proof tuple.
+    { targetSpecIndex: millerGenesisIndex, sourceOffset: 6 * W, targetOffset: 0, length: 8 * W },
   ];
   return [...g2, ...vkx, ...miller];
 }
@@ -380,8 +379,10 @@ const boundHybrid = assemble(hybridSpecs);
 if (boundHybrid.meta[g2FinalIndex].accepted) throw new Error('bound hybrid did not reject at G2 final');
 const unrelatedFailure = boundHybrid.meta.find((meta, i) => i !== g2FinalIndex && !meta.accepted);
 if (unrelatedFailure) throw new Error(`bound hybrid also rejected at ${unrelatedFailure.label}`);
-const bindingMutations = bindings.map((binding) => {
-  const byteOffset = binding.targetOffset + Math.floor(binding.length / 2);
+if (bindings.length !== 1) throw new Error('expected one contiguous proof binding');
+const bindingMutations = [3 * W, 7 * W].map((offset) => {
+  const binding = bindings[0];
+  const byteOffset = binding.targetOffset + offset;
   const inputs = mutateInputBlob(full0.inputs, binding.targetSpecIndex, byteOffset);
   if (evalInput(inputs, g2FinalIndex).accepted) {
     throw new Error(`G2 final accepted mutated bound region at ${binding.targetOffset}`);

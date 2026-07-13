@@ -42,6 +42,10 @@ const PINFO = PAIRS.map((pair, j) => {
 const ptParams = [];
 PINFO.forEach((pi, j) => { if (pi.cfg.P) ptParams.push(`Px${j}`, `Py${j}`); if (pi.cfg.Q) ptParams.push(`Q${j}xa`, `Q${j}xb`, `Q${j}ya`, `Q${j}yb`); });
 const ptL = PAIRS.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
+// Keep the proof tuple contiguous at stage genesis so G2-final can bind -A/B/C with one slice.
+// Later Miller states retain the generic -A/B, vk_x, C point order.
+const stagePtParams = [...ptParams.slice(0, 6), ...ptParams.slice(8, 10), ...ptParams.slice(6, 8)];
+const stagePtL = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
 
 // witness for the committed planning instance (the chunk math is generic; only window
 // boundaries come from this instance, like the rest of the generators).
@@ -62,7 +66,7 @@ const W_HASHES = [ONE_L, fp12limbsOf(COSET27[1]).map(String), fp12limbsOf(COSET2
 const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...f12limbs(s.c), ...f12limbs(s.cInv)];
 const withPts = (limbs) => { const fr = limbs.slice(0, 18); const rest = limbs.slice(18); return [...fr, ...ptL, ...rest]; };
 const inState = (i) => STAGE_BOUND && i === 0
-  ? [...ptL, ...f12limbs(states[i].c), ...f12limbs(states[i].cInv)]
+  ? [...stagePtL, ...f12limbs(states[i].c), ...f12limbs(states[i].cInv)]
   : withPts(stateLimbs(states[i]));
 // the FINAL chunk hands off only [fF, c, cInv] (36 limbs, contiguous) to the residue tail —
 // R0/pts are done with once the loop ends. Non-final hand-offs carry the full 52-limb state.
@@ -78,7 +82,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
   const fullStateParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames];
-  const stateParams = STAGE_BOUND && opLo === 0 ? [...ptParams, ...cNames, ...ciNames] : fullStateParams;
+  const stateParams = STAGE_BOUND && opLo === 0 ? [...stagePtParams, ...cNames, ...ciNames] : fullStateParams;
   const allParams = withTail ? [...stateParams, ...wNames] : stateParams;
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
