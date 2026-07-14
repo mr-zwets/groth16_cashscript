@@ -59,6 +59,7 @@ const GLV_STATE_WIDTHS = [
 const GLV_GENESIS_WIDTHS = GLV_STATE_WIDTHS.slice(3);
 import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
+const standardVm = createVirtualMachineBch2026(true);
 const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
 
 // Deploy each chunk as P2SH (same lever as build_vectors.mjs): the redeem rides in the
@@ -78,10 +79,10 @@ const padPush = (argLen, target) => {
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
   return encodeDataPush(new Uint8Array(N));
 };
-const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
+const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41));
 
 // ---- multi-input evaluation: build ONE tx from all inputs, evaluate at `index` ----
-function evalInput(inputs, index) {
+function evalInput(inputs, index, vm = realVm) {
   const program = {
     inputIndex: index,
     sourceOutputs: inputs.map((i) => ({ lockingBytecode: i.locking, valueSatoshis: 1000n })),
@@ -92,7 +93,7 @@ function evalInput(inputs, index) {
       locktime: 0,
     },
   };
-  const st = realVm.evaluate(program);
+  const st = vm.evaluate(program);
   const top = st.stack[st.stack.length - 1];
   return { accepted: st.error === undefined && st.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1, operationCost: st.metrics.operationCost, error: st.error ?? null };
 }
@@ -290,9 +291,18 @@ function assemble(specs) {
     const pad = padPush(0, Math.max(2, target - fixed));
     return P2SH ? Uint8Array.from([...argB[i], ...pad, ...rpush[i]]) : Uint8Array.from([...argB[i], ...pad]);
   };
-  // pass 1: full unlocking -> max budget so the real VM accepts and reports true op-cost
+  // Start from the full unlocking budget so both consensus and standard-policy VMs can
+  // run without a density error and report their complete op-cost before padding shrinks.
+  // A forward check may return false until successor unlockings reach their tuned lengths.
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
+  const standardOp1 = specs.map((_, i) => evalInput(inputs, i, standardVm));
+  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+    const failures = [...op1, ...standardOp1]
+      .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
+      .filter((outcome) => outcome.error !== null);
+    throw new Error(`full-budget input errored during padding measurement: ${JSON.stringify(failures)}`);
+  }
 
   // Per-chunk variant selection (RESCHEDULE only; decided once, first assembly): keep the
   // redeem with the smaller TUNED unlocking — see chunked/grouped/build_vectors_residue.mjs.
@@ -311,16 +321,35 @@ function assemble(specs) {
       const probe = inputs.slice();
       probe[i] = { locking: P2SH ? p2shSpk(v.raw) : v.raw, unlocking: rawUnlock };
       const rawOp = evalInput(probe, i);
-      const tR = tunedLen(argB[i].length + tailLen(i), op1[i].operationCost);
-      const tB = rawOp.accepted ? tunedLen(rawFixed, rawOp.operationCost) : Infinity;
+      const rawStandardOp = evalInput(probe, i, standardVm);
+      const tR = tunedLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost));
+      const tB = rawOp.accepted && rawStandardOp.accepted
+        ? tunedLen(rawFixed, Math.max(rawOp.operationCost, rawStandardOp.operationCost))
+        : Infinity;
       chosenCache.set(key, tB < tR ? 'raw' : 'resched');
       if (tB < tR) switched += 1;
     }
     if (switched) return assemble(specs); // reassemble with final choices (cached -> recurses once)
   }
-  // pass 2: shrink the pad so the unlocking just covers its op-cost
-  inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, tunedLen(argB[i].length + tailLen(i), op1[i].operationCost)) }));
-  const op2 = specs.map((_, i) => evalInput(inputs, i));
+  // Re-measure after each shrink: shorter successor unlockings make forward introspection
+  // cheaper, which can safely expose another byte of density headroom in the predecessor.
+  let targets = specs.map((_, i) => tunedLen(
+    argB[i].length + tailLen(i),
+    Math.max(op1[i].operationCost, standardOp1[i].operationCost),
+  ));
+  let op2;
+  while (true) {
+    inputs = specs.map((_, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, targets[i]) }));
+    op2 = specs.map((_, i) => evalInput(inputs, i));
+    const standardOp2 = specs.map((_, i) => evalInput(inputs, i, standardVm));
+    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    const tightened = targets.map((target, i) => Math.min(
+      target,
+      tunedLen(argB[i].length + tailLen(i), Math.max(op2[i].operationCost, standardOp2[i].operationCost)),
+    ));
+    if (tightened.every((target, i) => target === targets[i])) break;
+    targets = tightened;
+  }
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
   const fits = meta.every((m) => m.lockingBytes <= 10000 && m.unlockingBytes <= 10000 && m.operationCost <= OP_BUDGET) && accepted;
