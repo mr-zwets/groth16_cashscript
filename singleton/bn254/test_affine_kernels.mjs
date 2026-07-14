@@ -78,7 +78,7 @@ const doubleVector = (name, x, y, slope) => {
   const nY = Fp2.sub(Fp2.mul(m, Fp2.sub(X, nX)), Y);
   const mx = limbs(Fp2.mul(m, X));
   const exactC0 = [mod(y[0]) - mx[0] + P, mod(y[1]) - mx[1] + P];
-  return { name, args: [...x.map(mod), ...y.map(mod), ...limbs(m), ...exactC0, ...limbs(m), P - 1n, 0n, ...limbs(nX), ...limbs(nY)] };
+  return { name, args: [...x.map(mod), ...y.map(mod), ...limbs(m), ...exactC0, ...limbs(m), ...limbs(nX), ...limbs(nY)] };
 };
 const addVector = (name, x, y, qx, qy, slope) => {
   const X = asFp2(x), Y = asFp2(y), Qx = asFp2(qx), Qy = asFp2(qy);
@@ -87,7 +87,7 @@ const addVector = (name, x, y, qx, qy, slope) => {
   const nY = Fp2.sub(Fp2.mul(m, Fp2.sub(X, nX)), Y);
   const mx = limbs(Fp2.mul(m, X));
   const exactC0 = [mod(y[0]) - mx[0] + P, mod(y[1]) - mx[1] + P];
-  return { name, args: [...x.map(mod), ...y.map(mod), ...qx.map(mod), ...qy.map(mod), ...limbs(m), ...exactC0, ...limbs(m), P - 1n, 0n, ...limbs(nX), ...limbs(nY)] };
+  return { name, args: [...x.map(mod), ...y.map(mod), ...qx.map(mod), ...qy.map(mod), ...limbs(m), ...exactC0, ...limbs(m), ...limbs(nX), ...limbs(nY)] };
 };
 
 const sqrVectors = [
