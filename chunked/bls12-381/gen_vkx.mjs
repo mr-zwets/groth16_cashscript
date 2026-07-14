@@ -35,6 +35,7 @@ mkdirSync(GEN, { recursive: true });
 const Pstr = P.toString();
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_900_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
+if ([IC1, IC2, T].some(([x]) => x === 0n)) throw new Error('x=0 is reserved for the Shamir no-add sentinel');
 
 // WORST-CASE planning input: every bit set -> every position does double + add.
 // Sizing windows against this makes the covenant work for ANY input < r.
@@ -79,12 +80,13 @@ function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int,
     }
     return rx, ry, rz;
 }
-function selectPoint(int b0, int b1) returns (int, int, int) {
-    int aX = 0; int aY = 0; int doAdd = 0;
-    if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; doAdd = 1; }
-    else { if (b0 == 1) { aX = ${IC1[0]}; aY = ${IC1[1]}; doAdd = 1; }
-           else { if (b1 == 1) { aX = ${IC2[0]}; aY = ${IC2[1]}; doAdd = 1; } } }
-    return aX, aY, doAdd;
+// x=0 denotes no add; every fixed-table x-coordinate is nonzero.
+function selectPoint(int b0, int b1) returns (int, int) {
+    int aX = 0; int aY = 0;
+    if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; }
+    else { if (b0 == 1) { aX = ${IC1[0]}; aY = ${IC1[1]}; }
+           else { if (b1 == 1) { aX = ${IC2[0]}; aY = ${IC2[1]}; } } }
+    return aX, aY;
 }`;
 
 function genCash(lo, hi, final) {
@@ -101,8 +103,8 @@ function genCash(lo, hi, final) {
   L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
   L.push('            int b0 = (input0 >> i) % 2;');
   L.push('            int b1 = (input1 >> i) % 2;');
-  L.push('            (int aX, int aY, int doAdd) = selectPoint(b0, b1);');
-  L.push('            if (doAdd == 1) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
+  L.push('            (int aX, int aY) = selectPoint(b0, b1);');
+  L.push('            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
   L.push('        }');
   if (final) {
     L.push(`        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, ${IC0[0]}, ${IC0[1]});`);

@@ -113,6 +113,7 @@ const expected = v.expected.map(BigInt);
 const g1 = (o) => bn254.G1.Point.fromAffine({ x: o[0], y: o[1] });
 const _T = g1(ic1).add(g1(ic2)).toAffine();
 const T = [_T.x, _T.y];
+if ([ic1, ic2, T].some(([x]) => x === 0n)) throw new Error('x=0 is reserved for the Shamir no-add sentinel');
 const _vkx = g1(ic0).add(g1(ic1).multiply(input0)).add(g1(ic2).multiply(input1)).toAffine();
 if (_vkx.x !== expected[0] || _vkx.y !== expected[1]) throw new Error('noble vs vector mismatch');
 
@@ -174,14 +175,14 @@ const jacAddAffineFn = () => `function jacAddAffine(int aX, int aY, int aZ, int 
 }`;
 
 // 2-bit Shamir select over the hardcoded VK constants {IC1, IC2, T=IC1+IC2}.
-const selectPointFn = () => `function selectPoint(int b0, int b1) returns (int, int, int) {
+// x=0 denotes no add; every fixed-table x-coordinate is nonzero.
+const selectPointFn = () => `function selectPoint(int b0, int b1) returns (int, int) {
     int aX = 0;
     int aY = 0;
-    int doAdd = 0;
-    if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; doAdd = 1; }
-    else { if (b0 == 1) { aX = ${ic1[0]}; aY = ${ic1[1]}; doAdd = 1; }
-           else { if (b1 == 1) { aX = ${ic2[0]}; aY = ${ic2[1]}; doAdd = 1; } } }
-    return aX, aY, doAdd;
+    if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; }
+    else { if (b0 == 1) { aX = ${ic1[0]}; aY = ${ic1[1]}; }
+           else { if (b1 == 1) { aX = ${ic2[0]}; aY = ${ic2[1]}; } } }
+    return aX, aY;
 }`;
 
 function emitLibs() {
@@ -248,8 +249,8 @@ function loopLines(lo, hi) {
             // runtime 2-bit Shamir select over VK consts {IC1,IC2,T}, then add
             int b0 = (input0 >> i) % 2;
             int b1 = (input1 >> i) % 2;
-            (int aX, int aY, int doAdd) = selectPoint(b0, b1);
-            if (doAdd == 1) {
+            (int aX, int aY) = selectPoint(b0, b1);
+            if (aX != 0) {
                 (rX, rY, rZ) = jacAddAffine(rX, rY, rZ, aX, aY);
             }
         }`;

@@ -66,6 +66,7 @@ for (let idx = 1; idx < 16; idx++) {
   for (let i = 0; i < 4; i++) if (idx & (1 << i)) acc = acc.add(BP[i]);
   const a = acc.toAffine(); TABLE[idx] = [a.x, a.y];
 }
+if (TABLE.slice(1).some(([x]) => x === 0n)) throw new Error('x=0 is reserved for the GLV no-add sentinel');
 // Encode the 15-entry table as a single 960-byte blob: entry (idx-1) = x(LE32) || y(LE32).
 // A runtime `split` reads entry idx in O(1) (one indexed slice) — ~74% cheaper op-cost than the
 // 15-deep if/else dispatch, which costs ~3.5M op in branch comparisons over the 128-iter Straus.
@@ -120,16 +121,16 @@ function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int,
     }
     return rx, ry, rz;
 }
-function select16(int idx${sharedTable ? ', bytes table' : ''}) returns (int, int, int) {
-    int aX = 0; int aY = 0; int doAdd = 0;
+function select16(int idx${sharedTable ? ', bytes table' : ''}) returns (int, int) {
+    // idx=0 keeps aX=0; every fixed affine table entry has nonzero x.
+    int aX = 0; int aY = 0;
     if (idx != 0) {
         ${sharedTable ? '' : `bytes table = ${TABLE_HEX};`}
         bytes ent = table.split((idx - 1) * 64)[1].split(64)[0];
         aX = int(ent.split(32)[0]);
         aY = int(ent.split(32)[1]);
-        doAdd = 1;
     }
-    return aX, aY, doAdd;
+    return aX, aY;
 }`;
 
 export function genCash(lo, hi, first, final, stageBound = false, sharedTable = null) {
@@ -168,8 +169,8 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
   L.push(`            int i = ${hiBit} - k;`);
   L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
   L.push('            int idx = (k10 >> i) % 2 + 2 * ((k20 >> i) % 2) + 4 * ((k11 >> i) % 2) + 8 * ((k21 >> i) % 2);');
-  L.push(`            (int aX, int aY, int doAdd) = select16(idx${sharedTable !== null ? ', glvTable' : ''});`);
-  L.push('            if (doAdd == 1) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
+  L.push(`            (int aX, int aY) = select16(idx${sharedTable !== null ? ', glvTable' : ''});`);
+  L.push('            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
   L.push('        }');
   if (final) {
     L.push(`        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, ${IC0[0]}, ${IC0[1]});`);
