@@ -29,14 +29,14 @@ axes; this doc is the map. Individual folders have the authoritative per-verifie
 |---|---|---|---|
 | `bch-groth16-singleton` | singleton, baseline | ~14.4 KB source; size-scored recompile **8,874 B** | correctness oracle; over per-input limits |
 | `bch-groth16-singleton-minop` | singleton, op-optimized | ~66.5 KB / ~195M op-cost | residue + GLV, still single-input (oracle) |
-| `bch-groth16-chunked` | chunked, covenant chain | **48 inputs / 373,256 B / 293.69M op** | NFT-commitment chain |
-| `bch-groth16-intratx` | chunked, intra-tx linked | **46 inputs / 368,748 B / 293.54M op** | whole verifier in one (non-standard) tx |
-| `bch-groth16-grouped` | chunked, grouped | **46 inputs / 368,664 B / 293.45M op** | standard-relayable |
+| `bch-groth16-chunked` | chunked, covenant chain | **44 inputs / 334,578 B / 262.82M op** | NFT-commitment chain |
+| `bch-groth16-intratx` | chunked, intra-tx linked | **42 inputs / 330,580 B / 262.68M op** | whole verifier in one (non-standard) tx |
+| `bch-groth16-grouped` | chunked, grouped | **42 inputs / 330,501 B / 262.59M op** | standard-relayable in 5 txs |
 | `bch-groth16-intratx-residue` | chunked, intra-tx + residue | **26 inputs / 224,875 B / 179.64M op** | smallest single-tx BN254 verifier |
 | **`bch-groth16-grouped-residue`** | **chunked, grouped + residue** | **26 inputs / 224,830 B / 179.59M op — flagship** | standard-relayable in 3 txs |
 | `bch-groth16-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **4 inputs / 187,792 B / 177.33M op** | targets the proposed `bch-spec` upgrade, not current BCH; structural (fewest UTXOs), own leaderboard category — see [Target VM](#target-vm-bch-spec) |
-| `bch-pairing-chunked` | chunked pairing-only, covenant | score **217,562** | Miller + final-exp milestone |
-| `bch-pairing-intratx` | chunked pairing-only, intra-tx | score **215,429** | |
+| `bch-pairing-chunked` | chunked pairing-only, covenant | **20 inputs / 175,788 B / 138.94M op**; score **178,368** | Miller-boundary milestone |
+| `bch-pairing-intratx` | chunked pairing-only, intra-tx | **20 inputs / 174,134 B / 138.80M op**; score **175,014** | Miller-boundary milestone |
 | `bch-vkx-chunked-covenant` | chunked `vk_x`-only | **8 inputs / 11,306 B / 7.07M op** | the G1 MSM checkpoint (see `chunked/shamir/`, `chunked/twoloop/`) |
 
 Headline values are the current committed-proof benchmark totals after `rescheduleStacks`;

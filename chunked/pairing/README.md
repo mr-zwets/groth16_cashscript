@@ -8,11 +8,12 @@ inputs' worth of op-cost in one go).
 Two benchmark entries (in the verifier repo) are produced from here:
 
 - **`bch-pairing-chunked`** — the **Miller boundary** `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)`
-  (checkpoint #2) as ONE **batched 4-pair optimal-ate Miller loop** (a shared `fp12Sqr`
-  per NAF step; the folded `f` is the boundary, so there is no separate combine). 59 chunks.
-- **`bch-groth16-chunked`** — the **complete verifier** (checkpoint #3): the vk_x
-  chunks (computed on-chain from the public inputs) → the batched Miller chunks → the
-  final-exponentiation chunks → a final step asserting the product == Fp12 ONE. 93 chunks.
+  (checkpoint #2) as one prepared, batched optimal-ate loop. It shares each `fp12Sqr`
+  across the three runtime-dependent pairs, omits the fixed `e(α,β)` pair, then multiplies
+  its precomputed raw Miller value into `f` once. The exact four-pair boundary takes 20 inputs.
+- **`bch-groth16-chunked`** — the **complete verifier** (checkpoint #3): G2 input
+  validation → vk_x (computed on-chain from the public inputs) → the prepared Miller
+  chunks → final exponentiation → a final step asserting the product == Fp12 ONE. 44 inputs.
 
 Every chunk is validated on the real BCH 2026 VM.
 
@@ -20,20 +21,18 @@ Every chunk is validated on the real BCH 2026 VM.
 
 - **Lazy reduction** — `addFp`/`subFp` defer the `% p` with per-call-site bias (option-B;
   see the build memos). `mulFp` and the committed state stay reduced.
-- **Batched 4-pair Miller** — instead of four independent single-pair chains (each
-  squaring `f` every step), ONE loop squares `f` once per NAF step and folds all four
-  pairs' lines into the shared `f` (each pair's `R` evolves independently), then the
-  Q1/Q2 (psi) postPrecompute per pair. Eliminates 3 of every 4 `fp12Sqr`, and the folded
-  `f` IS the boundary — **no combine step**. A batched step is ~8 `mul034` (too coarse for
-  one input), so the loop is chunked as a FLAT op list (sqr / double-line / add-line /
-  postPrecompute) at any op boundary, carrying `f + 4 R + points`. Cut the full verifier
-  from 116 to 93 chunks and ~754M to ~612M op-cost (the BLS12-381 sibling got the same
-  treatment — see `../bls12-381/`).
+- **Prepared batched Miller** — one loop squares `f` once per NAF step and folds the
+  runtime-dependent pairs' lines into the shared `f`. The fixed `e(α,β)` pair contributes
+  a VK-only raw Miller value, so its 87 op objects (88 line folds) are removed and replaced
+  by one terminal `fp12Mul`. Fixed-G2 line coefficients are baked, leaving on-chain G2
+  arithmetic only for `e(-A,B)`. The folded `f` is the exact four-pair boundary — no
+  combine step. The flat trace falls from 413 to 327 ops and the pairing from 24 to 20
+  inputs, saving 38,678 bytes and 30,872,282 op-cost in the covenant deployment.
 
 ## How it works
 
-Each chunk carries its state — `f` (Fp12, 12 limbs) + the 4 running G2 points `R`
-(6 limbs each) for the batched Miller; the live Fp12 values for final-exp — committed
+Each chunk carries its state — `f` (Fp12, 12 limbs) + the runtime pair's G2 point `R0`
+(6 limbs) for the prepared Miller; the live Fp12 values for final-exp — committed
 as `hash256` of the 40-byte little-endian limbs, re-supplied in the witness and
 verified on entry and exit (the same stateful-covenant pattern as the chunked
 vk_x in `../shamir`). Within a chunk the ops are **unrolled straight-line with fresh
@@ -45,7 +44,7 @@ op-cost.
 
 ## Regenerating (everything in `generated/` is git-ignored)
 
-The ~93 chunk contracts + manifests are reproducible artifacts, so they are
+The 44 full-verifier chunk contracts + manifests are reproducible artifacts, so they are
 **not committed** — only the generators are. Regenerate them (and the benchmark
 vectors) with one command:
 
@@ -56,7 +55,7 @@ node generate.mjs
 This runs (several minutes):
 
 1. `gen_miller.mjs` → `generated/miller_NN.cash` + `manifest_miller.json`
-   — the batched 4-pair Miller loop as a flat op list, chunked at any op boundary.
+   — the prepared batched Miller loop as a flat op list, chunked at any op boundary.
 2. `gen_finalexp.mjs` → `generated/finalexp_NN.cash` + `manifest_finalexp.json`
    — the final exponentiation `f^((p¹²−1)/r)` traced as an SSA op-DAG (the 3
    cyclotomic-exp ladders chunked like the Miller loop; liveness carries only the
@@ -64,10 +63,12 @@ This runs (several minutes):
 3. `gen_vkx.mjs` → `generated/vkx_NN.cash` + `manifest_vkx.json`
    — vk_x = IC0 + in0·IC1 + in1·IC2 for the pairing instance (Shamir/Straus,
    public inputs at runtime), asserting it == the point the pairing bakes.
-4. `build_vectors.mjs` → two files in `../../verifier/src/bch/`:
+4. `gen_g2check.mjs` → `generated/g2check_NN.cash` + `manifest_g2check.json`
+   — on-curve checks plus the fast-endomorphism G2 subgroup check.
+5. `build_vectors.mjs` → three files in `../../verifier/src/bch/`:
    `pairing-chunked-vectors.json` (boundary, for `bch-pairing-chunked`) and
    `groth16-chunked-vectors.json` (vk_x → pairing → final-exp → verdict, for
-   `bch-groth16-chunked`).
+   `bch-groth16-chunked`), plus `vkx-chunked-covenant-vectors.json`.
 
 ### Why it takes a few minutes
 
@@ -76,9 +77,9 @@ formula for "how many steps fit one BCH input", so each chunk is sized empirical
 the generator grows a window one step at a time and, for every candidate, **shells
 out to the custom `cashc` to compile the contract and then evaluates it on the real
 BCH 2026 VM to measure its exact op-cost**, stopping when the next step would exceed
-the per-input budget. That's a few compile+measure iterations per chunk × ~93
+the per-input budget. That's a few compile+measure iterations per chunk × 44
 chunks ≈ several hundred `cashc` subprocess invocations and VM runs. `build_vectors`
-then compiles, pads, and evaluates every one of the ~93 chunks **twice** (the valid
+then compiles, pads, and evaluates every one of the 44 chunks **twice** (the valid
 witness and a tampered one) on the real VM. So the cost is dominated by hundreds of
 compiler launches + VM evaluations, not the field/pairing math (which is fast). The
 result is fully deterministic, so it only needs to run when the instance or the
@@ -93,12 +94,13 @@ Run a single piece directly if needed: `node gen_miller.mjs`, `node gen_finalexp
 | file | role | committed |
 |------|------|:--------:|
 | `_millermath.mjs` | shared reference math (noble), serialization, instance pairs, real-VM measurer | ✅ |
-| `gen_miller.mjs` | plan + emit the batched 4-pair Miller chunks (flat-op) | ✅ |
+| `gen_miller.mjs` | plan + emit the prepared batched Miller chunks (flat-op) | ✅ |
 | `gen_finalexp.mjs` | trace + chunk the final exponentiation (op-DAG + liveness) | ✅ |
 | `gen_vkx.mjs` | chunk vk_x for the pairing instance (Shamir/Straus) | ✅ |
-| `build_vectors.mjs` | assemble all chunks → the two verifier benchmark vector files | ✅ |
+| `gen_g2check.mjs` | chunk G2 on-curve and subgroup validation | ✅ |
+| `build_vectors.mjs` | assemble all chunks → the pairing, full-verifier, and vk_x vectors | ✅ |
 | `generate.mjs` | one-command orchestrator (runs all of the above) | ✅ |
-| `generated/` | the ~93 `.cash` chunks + manifests (derived) | ❌ git-ignored |
+| `generated/` | the 44 full-verifier `.cash` chunks + manifests (derived) | ❌ git-ignored |
 
 The committed instance lives in the verifier repo
 (`src/checkpoints/pairing-vectors.json`); the singleton oracle is `../../singleton/bn254/`.

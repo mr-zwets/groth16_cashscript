@@ -4,10 +4,11 @@
 //   node generate.mjs
 //
 // Steps:
-//   1. gen_miller.mjs    -> batched 4-pair Miller chunks (shared fp12Sqr; no combine)
+//   1. gen_miller.mjs    -> prepared batched Miller chunks (fixed pair folded once)
 //   2. gen_finalexp.mjs  -> final exponentiation chunks
 //   3. gen_vkx.mjs       -> vk_x chunks (worst-case / full-width)
-//   4. build_vectors.mjs -> ../../verifier/src/bch/{pairing,groth16,vkx}-chunked-vectors.json
+//   4. gen_g2check.mjs   -> G2 input-validation chunks
+//   5. build_vectors.mjs -> ../../verifier/src/bch/{pairing,groth16,vkx}-chunked-vectors.json
 //
 // Everything is derived from the committed instance (verifier's
 // pairing-vectors.json) via the singleton oracle math, so this is fully
@@ -22,9 +23,9 @@ const run = (script, args = []) => new Promise((resolve, reject) => {
   p.on('exit', (code) => (code === 0 ? resolve() : reject(new Error(`${script} ${args.join(' ')} exited ${code}`))));
 });
 
-console.log('[1/4] generating batched 4-pair Miller chunks...');
+console.log('[1/5] generating prepared batched Miller chunks...');
 await run('gen_miller.mjs');
-console.log('[2/4] generating final-exponentiation chunks...');
+console.log('[2/5] generating final-exponentiation chunks...');
 await run('gen_finalexp.mjs');
 console.log('[3/5] generating vk_x chunks (pairing instance)...');
 await run('gen_vkx.mjs');
