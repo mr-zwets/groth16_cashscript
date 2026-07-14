@@ -29,6 +29,7 @@ const W = 48; // BLS12-381 limb width
 const PRIME = P.toString();
 import { hexToBin, binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
+const standardVm = createVirtualMachineBch2026(true);
 
 const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem));
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
@@ -42,15 +43,15 @@ const padPush = (argLen, target) => {
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
   return encodeDataPush(new Uint8Array(N));
 };
-const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
+const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41));
 const OP_RETURN = Uint8Array.from([0x6a]);
 
 // ---- per-group evaluation: one token-carrying tx for the group, evaluate input `index` ----
 function tokenOf(t) {
   return t ? { amount: 0n, category: CATEGORY, nft: { capability: t.cap, commitment: t.commit } } : undefined;
 }
-function evalGroup(inputs, index, gm) {
-  const st = realVm.evaluate({
+function evalGroup(inputs, index, gm, vm = realVm) {
+  const st = vm.evaluate({
     inputIndex: index,
     sourceOutputs: inputs.map((inp, n) => ({ lockingBytecode: inp.locking, valueSatoshis: 1000n, token: n === 0 ? tokenOf(gm.inToken) : undefined })),
     transaction: {
@@ -76,7 +77,13 @@ const mkInstance = (inputs) => {
   const A = mod(3n * 5n + vx * 7n + 13n * 11n);
   return { inputs, proof: { a: G1.BASE.multiply(A), b: proof.b, c: proof.c } };
 };
-const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]) };
+// Both valid scalars set bits 0..253, exercising every add branch in the 11 main vk_x windows.
+const DENSE_INPUTS = [(1n << 254n) - 1n, (1n << 254n) - 1n];
+const INSTANCES = {
+  committed: { inputs: PUBLIC_INPUTS, proof },
+  proof1: mkInstance([135208n, 67633n]),
+  dense: mkInstance(DENSE_INPUTS),
+};
 
 // vk_x position inside the Miller genesis inBlob (4 running R's -> 36 state limbs; same PT_CFG as BN254)
 const dummy = pairsFor(PUBLIC_INPUTS, proof);
@@ -212,7 +219,7 @@ function compileChunk(spec, cfg) {
 // effective unlocking length a chunk needs, UNCAPPED (BLS redeems run close to the 10,000 B
 // script caps, so an over-cap fixed part must lose the comparison rather than saturate);
 // Infinity when the variant does not even accept.
-const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41 + 96) : Infinity);
+const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41) : Infinity);
 function argBytesOf(spec) {
   const parts = [pd(blob(spec.inLimbs))];
   for (const e of [...spec.extras].reverse()) parts.push(pushInt(BigInt(e)));
@@ -251,6 +258,8 @@ function assembleGrouped(specs, groups) {
   const allInputs = specs.map((s, i) => ({ locking: lockings[i], unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = [];
   groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) op1[lo + k] = evalGroup(ins, k, gmeta[gi]); });
+  const standardOp1 = [];
+  groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) standardOp1[lo + k] = evalGroup(ins, k, gmeta[gi], standardVm); });
 
   // Per-chunk variant selection (first assembly only): keep whichever redeem needs the
   // smaller effective unlocking — BLS chunks run close to the 10,000 B caps, so a
@@ -269,8 +278,9 @@ function assembleGrouped(specs, groups) {
       const rawInputs = allInputs.slice(lo, groups[gi][1] + 1);
       rawInputs[i - lo] = { locking: p2shSpk(v.raw), unlocking: rawUnlock };
       const rawOp = evalGroup(rawInputs, i - lo, gmeta[gi]);
-      const tR = effLen(argB[i].length + rpush[i].length, op1[i].operationCost, op1[i].accepted);
-      const tB = effLen(rawFixed, rawOp.operationCost, rawOp.accepted);
+      const rawStandardOp = evalGroup(rawInputs, i - lo, gmeta[gi], standardVm);
+      const tR = effLen(argB[i].length + rpush[i].length, Math.max(op1[i].operationCost, standardOp1[i].operationCost), op1[i].accepted && standardOp1[i].accepted);
+      const tB = effLen(rawFixed, Math.max(rawOp.operationCost, rawStandardOp.operationCost), rawOp.accepted && rawStandardOp.accepted);
       // both failing usually means a NEIGHBOUR is oversized (forward-checks push the
       // successor's whole unlocking) — defer to the reassembly
       if (tR === Infinity && tB === Infinity) continue;
@@ -280,9 +290,36 @@ function assembleGrouped(specs, groups) {
     }
     if (switched) return assembleGrouped(specs, groups); // reassemble with final choices (cached -> recurses)
   }
-  for (let i = 0; i < specs.length; i++) allInputs[i].unlocking = mkUnlock(i, tunedLen(argB[i].length + rpush[i].length, op1[i].operationCost));
+  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+    const failures = [...op1, ...standardOp1]
+      .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
+      .filter((outcome) => outcome.error !== null);
+    throw new Error(`chosen full-budget input errored during padding measurement: ${JSON.stringify(failures)}`);
+  }
   const op2 = [];
-  groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) op2[lo + k] = evalGroup(ins, k, gmeta[gi]); });
+  let standardOp2;
+  let targets = specs.map((_, i) => tunedLen(argB[i].length + rpush[i].length, Math.max(op1[i].operationCost, standardOp1[i].operationCost)));
+  while (true) {
+    for (let i = 0; i < specs.length; i++) allInputs[i].unlocking = mkUnlock(i, targets[i]);
+    standardOp2 = [];
+    groups.forEach(([lo, hi], gi) => {
+      const ins = allInputs.slice(lo, hi + 1);
+      for (let k = 0; k <= hi - lo; k++) {
+        op2[lo + k] = evalGroup(ins, k, gmeta[gi]);
+        standardOp2[lo + k] = evalGroup(ins, k, gmeta[gi], standardVm);
+      }
+    });
+    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    const tightened = targets.map((target, i) => Math.min(target, tunedLen(
+      argB[i].length + rpush[i].length,
+      Math.max(op2[i].operationCost, standardOp2[i].operationCost),
+    )));
+    if (tightened.every((target, i) => target === targets[i])) break;
+    targets = tightened;
+  }
+  if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) {
+    throw new Error('tightened input rejected during padding measurement');
+  }
 
   const meta = specs.map((s, i) => ({
     label: s.label, checkpoint: s.checkpoint, group: cfgs[i].group,
@@ -335,28 +372,32 @@ const report = (tag, asm) => {
 };
 
 // ===================== build =====================
-// Pack ONCE using max(committed, proof#1) per-chunk sizes (no dense worst-case instance exists
-// for BLS), with margin under 100,000 B; the partition (hence the lockings) is shared by both.
-const TARGET_GROUP_BYTES = 84000;
+// Pack once using the largest per-chunk size across both ordinary proofs and the dense vk_x case;
+// the partition (hence the lockings) is shared by every proof and leaves at least 3,430 bytes
+// below the 100,000-byte policy cap across the measured runs.
+const TARGET_GROUP_BYTES = 97000;
 const cSpecs = buildSpecs(INSTANCES.committed);
 const p1Specs = buildSpecs(INSTANCES.proof1);
+const denseSpecs = buildSpecs(INSTANCES.dense);
 function sizeEstimate(specs) {
   const provisional = packGroups(specs, specs.map(() => 9000), TARGET_GROUP_BYTES);
   return assembleGrouped(specs, provisional).meta.map((m) => m.unlockingBytes);
 }
-const cSizes = sizeEstimate(cSpecs), p1Sizes = sizeEstimate(p1Specs);
-const packSizes = cSizes.map((s, i) => Math.max(s, p1Sizes[i]));
+const cSizes = sizeEstimate(cSpecs), p1Sizes = sizeEstimate(p1Specs), denseSizes = sizeEstimate(denseSpecs);
+const packSizes = cSizes.map((s, i) => Math.max(s, p1Sizes[i], denseSizes[i]));
 const GROUPS = packGroups(cSpecs, packSizes, TARGET_GROUP_BYTES);
 
 const asmCommitted = assembleGrouped(cSpecs, GROUPS);
 report('groth16-bls-grouped committed', asmCommitted);
 const asmProof1 = assembleGrouped(p1Specs, GROUPS);
 report('groth16-bls-grouped proof#1', asmProof1);
+const asmDense = assembleGrouped(denseSpecs, GROUPS);
+report('groth16-bls-grouped max-density', asmDense);
 
 const firstBoundary = GROUPS[1] ? GROUPS[1][0] : 1;
 const invalids = [invalidRun(cSpecs, GROUPS, Math.floor(cSpecs.length / 2)), invalidRun(cSpecs, GROUPS, firstBoundary)];
 console.error(`  invalid runs rejected: ${invalids.map((r) => r.rejected).join(',')}`);
-if (!asmCommitted.accepted || !asmProof1.accepted || !invalids.every((r) => r.rejected)) {
+if (!asmCommitted.accepted || !asmProof1.accepted || !asmDense.fits || !invalids.every((r) => r.rejected)) {
   console.error('!! a run failed -- NOT writing vectors'); process.exit(1);
 }
 
@@ -372,6 +413,7 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-grouped-
   allFit: asmCommitted.fits, allAccept: asmCommitted.accepted,
   valid: toRun(asmCommitted),
   extraValidProofs: [toRun(asmProof1)],
+  worstCaseProof: toRun(asmDense),
   invalid: invalids.map((r) => r.run),
 }, null, 2));
 console.error(`wrote groth16-bls12381-grouped-vectors.json (${GROUPS.length} groups, ${asmCommitted.meta.length} inputs)`);

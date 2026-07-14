@@ -28,6 +28,7 @@ const W = 48; // BLS12-381 limb width
 const PRIME = P.toString();
 import { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
+const standardVm = createVirtualMachineBch2026(true);
 
 // Deploy as P2SH so the ~4-5 KB redeem (in the scriptSig) counts toward the op-cost
 // budget and offsets the pad (~30% smaller on-chain than bare). See build_vectors.mjs.
@@ -39,17 +40,16 @@ const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem));
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
 const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le48(((BigInt(l) % P) + P) % P)]));
-// trailing all-zero pad (libauth-minimal push); 1-byte boundary rounding absorbed by the
-// +96 op-cost margin in tunedLen. Pad sits at the END, never shifting the front inBlob.
+// trailing all-zero pad (libauth-minimal push). Pad sits at the END, never shifting the front inBlob.
 const padPush = (argLen, target) => {
   const budget = Math.max(2, target - argLen);
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
   return encodeDataPush(new Uint8Array(N));
 };
-const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
+const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41));
 
-function evalInput(inputs, index) {
-  const st = realVm.evaluate({
+function evalInput(inputs, index, vm = realVm) {
+  const st = vm.evaluate({
     inputIndex: index,
     sourceOutputs: inputs.map((i) => ({ lockingBytecode: i.locking, valueSatoshis: 1000n })),
     transaction: { version: 2, inputs: inputs.map((i, n) => ({ outpointTransactionHash: new Uint8Array(32), outpointIndex: n, sequenceNumber: 0, unlockingBytecode: i.unlocking })), outputs: [{ lockingBytecode: Uint8Array.from([0x6a]), valueSatoshis: 1000n }], locktime: 0 },
@@ -68,7 +68,13 @@ const mkInstance = (inputs) => {
   const A = mod(3n * 5n + vx * 7n + 13n * 11n);
   return { inputs, proof: { a: G1.BASE.multiply(A), b: proof.b, c: proof.c } };
 };
-const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]) };
+// Both valid scalars set bits 0..253, exercising every add branch in the 11 main vk_x windows.
+const DENSE_INPUTS = [(1n << 254n) - 1n, (1n << 254n) - 1n];
+const INSTANCES = {
+  committed: { inputs: PUBLIC_INPUTS, proof },
+  proof1: mkInstance([135208n, 67633n]),
+  dense: mkInstance(DENSE_INPUTS),
+};
 
 // vk_x position in the Miller genesis inBlob (stateLimbs=36, then ptL; pair2's P at
 // ptL offset = pairs 0+1 lengths). Same PT_CFG as BN254.
@@ -159,7 +165,7 @@ function compileSpec(s) {
 // effective unlocking length a chunk needs, UNCAPPED (BLS redeems run close to the 10,000 B
 // script caps, so an over-cap fixed part must lose the comparison rather than saturate at
 // TARGET_UNLOCK); Infinity when the variant does not even accept.
-const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41 + 96) : Infinity);
+const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41) : Infinity);
 function argBytesOf(s) {
   const parts = [pd(blob(s.inLimbs))];
   for (const e of [...s.extras].reverse()) parts.push(pushInt(e));
@@ -174,6 +180,7 @@ function assemble(specs) {
   const mkUnlock = (i, target) => { const pad = padPush(0, Math.max(2, target - (argB[i].length + tailLen(i)))); return P2SH ? Uint8Array.from([...argB[i], ...pad, ...rpush[i]]) : Uint8Array.from([...argB[i], ...pad]); };
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
+  const standardOp1 = specs.map((_, i) => evalInput(inputs, i, standardVm));
 
   // Per-chunk variant selection (first assembly only): keep whichever redeem needs the
   // smaller effective unlocking. BLS chunks run close to the 10,000 B script caps, so a
@@ -194,8 +201,9 @@ function assemble(specs) {
       const probe = inputs.slice();
       probe[i] = { locking: P2SH ? p2shSpk(v.raw) : v.raw, unlocking: rawUnlock };
       const rawOp = evalInput(probe, i);
-      const tR = effLen(argB[i].length + tailLen(i), op1[i].operationCost, op1[i].accepted);
-      const tB = effLen(rawFixed, rawOp.operationCost, rawOp.accepted);
+      const rawStandardOp = evalInput(probe, i, standardVm);
+      const tR = effLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost), op1[i].accepted && standardOp1[i].accepted);
+      const tB = effLen(rawFixed, Math.max(rawOp.operationCost, rawStandardOp.operationCost), rawOp.accepted && rawStandardOp.accepted);
       // both variants failing usually means a NEIGHBOUR is oversized (the forward-check
       // pushes the successor's whole unlocking) — defer this chunk's decision to the
       // reassembly, where the neighbour's switch has taken effect
@@ -206,8 +214,30 @@ function assemble(specs) {
     }
     if (switched) return assemble(specs); // reassemble with final choices (cached -> recurses once)
   }
-  inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, tunedLen(argB[i].length + tailLen(i), op1[i].operationCost)) }));
-  const op2 = specs.map((_, i) => evalInput(inputs, i));
+  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+    const failures = [...op1, ...standardOp1]
+      .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
+      .filter((outcome) => outcome.error !== null);
+    throw new Error(`chosen full-budget input errored during padding measurement: ${JSON.stringify(failures)}`);
+  }
+  let targets = specs.map((_, i) => tunedLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost)));
+  let op2;
+  let standardOp2;
+  while (true) {
+    inputs = specs.map((_, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, targets[i]) }));
+    op2 = specs.map((_, i) => evalInput(inputs, i));
+    standardOp2 = specs.map((_, i) => evalInput(inputs, i, standardVm));
+    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    const tightened = targets.map((target, i) => Math.min(target, tunedLen(
+      argB[i].length + tailLen(i),
+      Math.max(op2[i].operationCost, standardOp2[i].operationCost),
+    )));
+    if (tightened.every((target, i) => target === targets[i])) break;
+    targets = tightened;
+  }
+  if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) {
+    throw new Error('tightened input rejected during padding measurement');
+  }
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
   const fits = meta.every((m) => m.lockingBytes <= 10000 && m.unlockingBytes <= 10000 && m.operationCost <= OP_BUDGET) && accepted;
@@ -234,23 +264,25 @@ const OUT = 'C:/Users/mathi/Desktop/verifier/src/bch';
 // pairing (miller + final exp -> verdict) single tx
 const pair0 = buildPairing(INSTANCES.committed); report('pairing committed', pair0);
 const pair1 = buildPairing(INSTANCES.proof1); report('pairing proof#1', pair1);
+const pairDense = buildPairing(INSTANCES.dense); report('pairing max-density', pairDense);
 const pInv = [invalidRun(pair0, 0), invalidRun(pair0, Math.floor(pair0.inputs.length / 2))];
 console.error(`  pairing invalid rejected: ${pInv.map((r) => r.rejected).join(',')}`);
-if (!pair0.accepted || !pair1.accepted || !pInv.every((r) => r.rejected)) { console.error('!! pairing run failed -- NOT writing vectors'); process.exit(1); }
+if (!pair0.accepted || !pair1.accepted || !pairDense.fits || !pInv.every((r) => r.rejected)) { console.error('!! pairing run failed -- NOT writing vectors'); process.exit(1); }
 writeFileSync(`${OUT}/pairing-bls12381-intratx-vectors.json`, JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED BLS12-381 Groth16 pairing (batched 4-pair Miller -> final exponentiation -> verdict==1) as the INPUTS of ONE transaction. State passed as raw 48-byte-limb blobs via sibling-input introspection (OP_INPUTBYTECODE forward-checks); the easy-part inverse is an uncommitted witness. No NFT commitment, no hashing. Same chunk math as bch-pairing-bls12381-chunked.',
-  ...meta(pair0), steps: toStepArr(pair0), extraValidProofs: [toStepArr(pair1)], invalid: pInv.map((r) => r.steps),
+  ...meta(pair0), steps: toStepArr(pair0), extraValidProofs: [toStepArr(pair1)], worstCaseProof: toStepArr(pairDense), invalid: pInv.map((r) => r.steps),
 }, null, 2));
 console.error('wrote pairing-bls12381-intratx-vectors.json');
 
 // full groth16 (vkx + miller + final exp) single tx
 const full0 = buildFull(INSTANCES.committed); report('groth16 committed', full0);
 const full1 = buildFull(INSTANCES.proof1); report('groth16 proof#1', full1);
+const fullDense = buildFull(INSTANCES.dense); report('groth16 max-density', fullDense);
 const fInv = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2))];
 console.error(`  groth16 invalid rejected: ${fInv.map((r) => r.rejected).join(',')}`);
-if (!full0.accepted || !full1.accepted || !fInv.every((r) => r.rejected)) { console.error('!! groth16 run failed -- NOT writing vectors'); process.exit(1); }
+if (!full0.accepted || !full1.accepted || !fullDense.fits || !fInv.every((r) => r.rejected)) { console.error('!! groth16 run failed -- NOT writing vectors'); process.exit(1); }
 writeFileSync(`${OUT}/groth16-bls12381-intratx-vectors.json`, JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED full BLS12-381 Groth16 verifier in ONE transaction: vk_x -> batched 4-pair Miller -> final exponentiation -> assert verdict==1, as the inputs of a single tx. State passed as raw 48-byte-limb blobs through sibling-input introspection (OP_INPUTBYTECODE forward-checks), not NFT commitments. vk_x is bound into the Miller genesis input and the Miller boundary into the final-exp genesis input. Same chunk math as bch-groth16-bls12381-chunked.',
-  ...meta(full0), steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], invalid: fInv.map((r) => r.steps),
+  ...meta(full0), steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullDense), invalid: fInv.map((r) => r.steps),
 }, null, 2));
 console.error('wrote groth16-bls12381-intratx-vectors.json');
