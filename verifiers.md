@@ -53,8 +53,9 @@ comparison. Per-layer status and build commands are in
 | `bch-groth16-bls12381-singleton` | singleton, baseline | ~24.2 KB / ~1.04–1.48B op-cost | **~21× smaller bytecode than the nChain reference** |
 | `bch-groth16-bls12381-singleton-minop` | singleton, op-optimized | 67,163 B / **256.6M op-cost** | residue (`λ=p+|x|`, μ₂₇A witness) + GLV; fused G2 ψ-check; A/C on-curve (G1 subgroup checks omitted) |
 | `bch-pairing-bls12381-singleton` | singleton, pairing-only | ~19.8 KB / ~1.38B op-cost | the pairing verdict milestone (`verify.cash`) |
-| `bch-groth16-bls12381-grouped-residue` | chunked, grouped + residue | **39 inputs / 5 standard txs / 324,267 B / 256.72M op** | the deployable BLS verifier; GLV `vk_x` + fused Miller + μ₂₇A residue tail |
-| `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **5 inputs / 270,713 B / 250.65M op** | BLS counterpart of the spec build; targets the proposed `bch-spec` upgrade — see [Target VM](#target-vm-bch-spec) |
+| `bch-groth16-bls12381-intratx-residue` | chunked, intra-tx + residue | **39 inputs / 324,469 B / 256,960,795 op** | one non-standard transaction on current BCH |
+| `bch-groth16-bls12381-grouped-residue` | chunked, grouped + residue | **39 inputs / 5 standard txs / 324,420 B / 256,880,928 op** | deployable BLS verifier; group hand-offs pin state and the successor P2SH32 locking |
+| `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **5 inputs / 270,812 B / 250,831,432 op** | BLS counterpart of the spec build; targets the proposed `bch-spec` upgrade — see [Target VM](#target-vm-bch-spec) |
 
 The BLS chunked pairing/Miller/final-exp families also exist in
 [chunked/bls12-381/](chunked/bls12-381/) (plain and residue generators); the
