@@ -91,7 +91,7 @@ function evalGroup(inputs, index, gm, vm = realVm) {
 }
 
 // ---- instances: #0 committed, #1 distinct (same VK; only A and vk_x change) ----
-const G1 = bls12_381.G1.Point;
+const G1 = bls12_381.G1.Point, G2 = bls12_381.G2.Point, F2 = bls12_381.fields.Fp2;
 const Rord = 52435875175126190479447740508185965837690552500527637822603658699938581184513n;
 const mod = (x) => ((x % Rord) + Rord) % Rord;
 const mkInstance = (inputs) => {
@@ -137,13 +137,15 @@ function specsVkxGlv(inst) {
     return { file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs: [...vkxGlvStateAt(k10, k20, k11, k21, ch.hi), ...scal], extras: [], role: 'within', label: `GLV vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined };
   });
 }
-function specsMillerResidue(inst, c, cInv) {
+function specsMillerResidue(inst, c, cInv, bad = {}) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const { states, boundary } = millerFusedOps(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
   if (man.stageBound !== true) throw new Error('grouped BLS residue requires stage-bound Miller generation');
   const genesisPts = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
+  if (bad.Ay !== undefined) genesisPts[5] = bad.Ay;
+  if (bad.Cy !== undefined) genesisPts[9] = bad.Cy;
   const genesis = [...f12limbs(cInv), ...f12limbs(c), ...genesisPts];
   const specs = man.chunks.map((ch) => {
     const inLimbs = ch.opLo === 0 ? genesis : withPtsR(stateLimbsR(states[ch.opLo]), ptL);
@@ -262,7 +264,7 @@ function argBytesOf(spec) {
   return Uint8Array.from(parts.flatMap((p) => [...p]));
 }
 
-function assembleGrouped(specs, groups) {
+function assembleGrouped(specs, groups, expectRejected = false) {
   const G = groups.length;
   const cfgs = specs.map((_, i) => {
     const gi = groups.findIndex(([lo, hi]) => i >= lo && i <= hi);
@@ -295,9 +297,13 @@ function assembleGrouped(specs, groups) {
     return { lo, hi, inToken, outToken, outLocking: null };
   });
   for (let gi = 0; gi < G - 1; gi++) gmeta[gi].outLocking = lockings[groups[gi + 1][0]];
+  let handoffsMatch = true;
   for (let gi = 0; gi < G - 1; gi++) {
     const a = binToHex(gmeta[gi].outToken.commit), b = binToHex(gmeta[gi + 1].inToken.commit);
-    if (a !== b) throw new Error(`group ${gi} hand-off mismatch: ${a} != ${b}`);
+    if (a !== b) {
+      handoffsMatch = false;
+      if (!expectRejected) throw new Error(`group ${gi} hand-off mismatch: ${a} != ${b}`);
+    }
   }
 
   const allInputs = specs.map((s, i) => ({ locking: lockings[i], unlocking: mkUnlock(i, TARGET_UNLOCK) }));
@@ -305,7 +311,7 @@ function assembleGrouped(specs, groups) {
   groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) op1[lo + k] = evalGroup(ins, k, gmeta[gi]); });
   const standardOp1 = [];
   groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) standardOp1[lo + k] = evalGroup(ins, k, gmeta[gi], standardVm); });
-  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+  if (!expectRejected && [...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
     const failures = [...op1, ...standardOp1]
       .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
       .filter((outcome) => outcome.error !== null);
@@ -334,7 +340,7 @@ function assembleGrouped(specs, groups) {
       chosenCache.set(key, useRaw ? 'raw' : 'resched');
       if (useRaw) switched += 1;
     }
-    if (switched) return assembleGrouped(specs, groups);
+    if (switched) return assembleGrouped(specs, groups, expectRejected);
   }
   const op2 = [];
   let standardOp2;
@@ -349,7 +355,7 @@ function assembleGrouped(specs, groups) {
         standardOp2[lo + k] = evalGroup(ins, k, gmeta[gi], standardVm);
       }
     });
-    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) break;
     const tightened = targets.map((target, i) => Math.min(target, tunedLen(
       argB[i].length + rpush[i].length,
       Math.max(op2[i].operationCost, standardOp2[i].operationCost),
@@ -357,7 +363,7 @@ function assembleGrouped(specs, groups) {
     if (tightened.every((target, i) => target === targets[i])) break;
     targets = tightened;
   }
-  if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) {
+  if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) {
     throw new Error('tightened input rejected during padding measurement');
   }
 
@@ -366,7 +372,8 @@ function assembleGrouped(specs, groups) {
     lockingBytes: allInputs[i].locking.length, unlockingBytes: allInputs[i].unlocking.length,
     operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error,
   }));
-  const accepted = op2.every((o) => o.accepted);
+  const accepted = handoffsMatch && op2.every((o) => o.accepted);
+  if (expectRejected && accepted) throw new Error('invalid grouped residue fixture unexpectedly accepted');
   const groupBytes = groups.map(([lo, hi], gi) => {
     let b = 8 + 1 + 1;
     for (let i = lo; i <= hi; i++) b += allInputs[i].unlocking.length + PER_INPUT_OV;
@@ -520,8 +527,38 @@ const invalids = [
   tableMutation,
   changedSuccessorLock,
 ];
-console.error(`  invalid runs rejected: ${invalids.map((r) => r.rejected).join(',')}`);
-if (!asmCommitted.accepted || !asmProof1.accepted || !asmStress.fits || !invalids.every((r) => r.rejected)) {
+
+// Isolate the fused A on-curve and B subgroup checks from the residue verdict.
+const committedPairs = pairsFor(INSTANCES.committed.inputs, INSTANCES.committed.proof);
+const { boundary: committedRawBoundary } = millerBatchOps(committedPairs);
+const { c: committedC, cInv: committedCInv } = residueWitness(committedRawBoundary);
+const isolated = (specs) => assembleGrouped(specs, packGroups(specs, specs.map(() => 9000), TARGET_GROUP_BYTES), true);
+const negA = proof.a.negate().toAffine();
+const firstMiller = specsMillerResidue(INSTANCES.committed, committedC, committedCInv, { Ay: (negA.y + 1n) % P }).specs[0];
+firstMiller.role = 'stage-final'; firstMiller.cmp = null;
+const offCurveA = isolated([firstMiller]);
+const twistB = F2.create({ c0: 4n, c1: 4n });
+let offSub = null;
+for (let i = 1n; i < 800n && !offSub; i++) {
+  const x = F2.create({ c0: i, c1: 0n });
+  const rhs = F2.add(F2.mul(F2.sqr(x), x), twistB);
+  let y; try { y = F2.sqrt(rhs); } catch { continue; }
+  if (!F2.eql(F2.sqr(y), rhs)) continue;
+  try { G2.fromAffine({ x, y }).assertValidity(); } catch { offSub = { x, y }; }
+}
+if (!offSub) throw new Error('failed to construct off-subgroup B grouped-residue fixture');
+const offSubInst = {
+  inputs: INSTANCES.committed.inputs,
+  proof: { ...INSTANCES.committed.proof, b: G2.fromAffine({ x: offSub.x, y: offSub.y }) },
+};
+const offSubSpecs = specsMillerResidue(offSubInst, committedC, committedCInv).specs;
+offSubSpecs[offSubSpecs.length - 1].role = 'stage-final';
+offSubSpecs[offSubSpecs.length - 1].cmp = null;
+const offSubgroupB = isolated(offSubSpecs);
+const semanticInvalids = [offCurveA, offSubgroupB].map((asm) => ({ run: toRun(asm), rejected: !asm.accepted }));
+const allInvalids = [...invalids, ...semanticInvalids];
+console.error(`  invalid runs rejected: ${allInvalids.map((r) => r.rejected).join(',')}`);
+if (!asmCommitted.accepted || !asmProof1.accepted || !asmStress.fits || !allInvalids.every((r) => r.rejected)) {
   console.error('!! a run failed -- NOT writing vectors'); process.exit(1);
 }
 
@@ -538,6 +575,7 @@ writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-grouped-residue-vecto
   valid: toRun(asmCommitted),
   extraValidProofs: [toRun(asmProof1)],
   worstCaseProof: toRun(asmStress),
-  invalid: invalids.map((r) => r.run),
+  invalid: allInvalids.map((r) => r.run),
+  invalidInputs: [toRun(offCurveA), toRun(offSubgroupB)],
 }, null, 2));
 console.error(`wrote groth16-bls12381-grouped-residue-vectors.json (${GROUPS.length} groups, ${asmCommitted.meta.length} inputs)`);

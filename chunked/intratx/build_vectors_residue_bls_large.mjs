@@ -111,7 +111,7 @@ function evalInput(inputs, index, vm = realVm) {
 }
 
 // ---- instances: #0 committed, #1 distinct (same VK; only A and vk_x change) ----
-const G1 = bls12_381.G1.Point;
+const G1 = bls12_381.G1.Point, G2 = bls12_381.G2.Point, F2 = bls12_381.fields.Fp2;
 const Rord = 52435875175126190479447740508185965837690552500527637822603658699938581184513n;
 const mod = (x) => ((x % Rord) + Rord) % Rord;
 const mkInstance = (inputs) => {
@@ -156,13 +156,15 @@ function specsVkxGlv(inst) {
     return { file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs: [...vkxGlvStateAt(k10, k20, k11, k21, ch.hi), ...scal], extras: [], role: 'within', label: `GLV vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined };
   });
 }
-function specsMillerResidue(inst, c, cInv) {
+function specsMillerResidue(inst, c, cInv, bad = {}) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const { states, boundary } = millerFusedOps(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
   if (man.stageBound !== true) throw new Error('intratx BLS residue-large requires stage-bound Miller generation');
   const genesisPts = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
+  if (bad.Ay !== undefined) genesisPts[5] = bad.Ay;
+  if (bad.Cy !== undefined) genesisPts[9] = bad.Cy;
   const genesis = [...f12limbs(cInv), ...f12limbs(c), ...genesisPts];
   const specs = man.chunks.map((ch) => {
     const inLimbs = ch.opLo === 0 ? genesis : withPtsR(stateLimbsR(states[ch.opLo]), ptL);
@@ -251,7 +253,7 @@ function argBytesOf(s) {
   for (const e of [...s.extras].reverse()) parts.push(pushInt(BigInt(e)));
   return Uint8Array.from(parts.flatMap((p) => [...p]));
 }
-function assemble(specs) {
+function assemble(specs, expectRejected = false) {
   const redeems = specs.map(compileSpec);
   const argB = specs.map(argBytesOf);
   const rpush = redeems.map((r) => encodeDataPush(r));
@@ -262,7 +264,7 @@ function assemble(specs) {
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, LARGE_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
   const standardOp1 = specs.map((_, i) => evalInput(inputs, i, standardVm));
-  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+  if (!expectRejected && [...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
     throw new Error('full-budget input errored during padding measurement');
   }
 
@@ -289,7 +291,7 @@ function assemble(specs) {
       chosenCache.set(key, useRaw ? 'raw' : 'resched');
       if (useRaw) switched += 1;
     }
-    if (switched) return assemble(specs);
+    if (switched) return assemble(specs, expectRejected);
   }
   let targets = specs.map((_, i) => tunedLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost)));
   let op2;
@@ -298,7 +300,7 @@ function assemble(specs) {
     inputs = specs.map((_, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, targets[i]) }));
     op2 = specs.map((_, i) => evalInput(inputs, i));
     standardOp2 = specs.map((_, i) => evalInput(inputs, i, standardVm));
-    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) break;
     const tightened = targets.map((target, i) => Math.min(target, tunedLen(
       argB[i].length + tailLen(i),
       Math.max(op2[i].operationCost, standardOp2[i].operationCost),
@@ -306,11 +308,12 @@ function assemble(specs) {
     if (tightened.every((target, i) => target === targets[i])) break;
     targets = tightened;
   }
-  if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) {
+  if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) {
     throw new Error('tightened input rejected during padding measurement');
   }
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
+  if (expectRejected && accepted) throw new Error('invalid large-script residue fixture unexpectedly accepted');
   // spec caps: locking/unlocking each <= 100 kB; op-cost <= the input's own (10000+unlockingLen)*800.
   const fits = meta.every((m) => m.lockingBytes <= LARGE_UNLOCK && m.unlockingBytes <= LARGE_UNLOCK && m.operationCost <= opBudgetFor(m.unlockingBytes)) && accepted;
   return { inputs, meta, fits, accepted };
@@ -374,8 +377,38 @@ for (const [label, otherSpecs, otherRun] of [['proof#1', proof1Specs, full1], ['
 }
 console.error('  stage genesis layouts and proof#1/stress vk_x boundaries verified');
 const fInv = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2))];
-console.error(`  invalid runs rejected: ${fInv.map((r) => r.rejected).join(',')}`);
-if (!full0.accepted || !full1.accepted || !fullStress.fits || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
+
+// Point-validation fixtures use only the fused Miller stage, so rejection cannot be attributed to
+// the later residue verdict. The first chunk checks A on-curve; the final chunk checks B subgroup.
+const committedPairs = pairsFor(INSTANCES.committed.inputs, INSTANCES.committed.proof);
+const { boundary: committedRawBoundary } = millerBatchOps(committedPairs);
+const { c: committedC, cInv: committedCInv } = residueWitness(committedRawBoundary);
+const negA = proof.a.negate().toAffine();
+const firstMiller = specsMillerResidue(INSTANCES.committed, committedC, committedCInv, { Ay: (negA.y + 1n) % P }).specs[0];
+firstMiller.role = 'stage-final'; firstMiller.cmp = null;
+const offCurveA = assemble([firstMiller], true);
+const twistB = F2.create({ c0: 4n, c1: 4n });
+let offSub = null;
+for (let i = 1n; i < 800n && !offSub; i++) {
+  const x = F2.create({ c0: i, c1: 0n });
+  const rhs = F2.add(F2.mul(F2.sqr(x), x), twistB);
+  let y; try { y = F2.sqrt(rhs); } catch { continue; }
+  if (!F2.eql(F2.sqr(y), rhs)) continue;
+  try { G2.fromAffine({ x, y }).assertValidity(); } catch { offSub = { x, y }; }
+}
+if (!offSub) throw new Error('failed to construct off-subgroup B large-script residue fixture');
+const offSubInst = {
+  inputs: INSTANCES.committed.inputs,
+  proof: { ...INSTANCES.committed.proof, b: G2.fromAffine({ x: offSub.x, y: offSub.y }) },
+};
+const offSubSpecs = specsMillerResidue(offSubInst, committedC, committedCInv).specs;
+offSubSpecs[offSubSpecs.length - 1].role = 'stage-final';
+offSubSpecs[offSubSpecs.length - 1].cmp = null;
+const offSubgroupB = assemble(offSubSpecs, true);
+const semanticRuns = [offCurveA, offSubgroupB].map((asm) => ({ steps: toStepArr(asm), rejected: !asm.accepted }));
+const allInvalid = [...fInv, ...semanticRuns];
+console.error(`  invalid runs rejected: ${allInvalid.map((r) => r.rejected).join(',')}`);
+if (!full0.accepted || !full1.accepted || !fullStress.fits || !allInvalid.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-large-vectors.json'), JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-bls12381-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; GLV vk_x MSM + c^-|x|-FUSED batched Miller with e(alpha,beta) baked and the G2 on-curve+prime-order-subgroup validation fused into the first/last Miller chunks + witnessed-residue mu_27A final-exp tail), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the current-BCH plan therefore collapses from 39 inputs to 5 (GLV vk_x 1, c^-|x|-fused Miller 3, witnessed-residue walk+finalize 1). The verifier arithmetic is unchanged, while fewer state boundaries remove repeated checks and padding. Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail, w enters the tail as an uncommitted witness. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
@@ -385,7 +418,8 @@ writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-large
   maxStepOperationCost: Math.max(...full0.meta.map((m) => m.operationCost)),
   allFit: full0.fits, allAccept: full0.accepted,
   steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullStress),
-  invalid: fInv.map((r) => r.steps),
+  invalid: allInvalid.map((r) => r.steps),
+  invalidInputs: [toStepArr(offCurveA), toStepArr(offSubgroupB)],
 }, null, 2));
 console.error('\nwrote groth16-bls12381-intratx-residue-large-vectors.json');
 console.error('NOTE: generated/ now holds 100 kB-budget chunks. Regenerate the default-budget chunks before rebuilding a flagship 10 kB build:');

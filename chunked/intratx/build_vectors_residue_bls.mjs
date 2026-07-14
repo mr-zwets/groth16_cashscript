@@ -88,7 +88,7 @@ function evalInput(inputs, index, vm = realVm) {
 }
 
 // ---- instances: #0 committed, #1 distinct (same VK; only A and vk_x change) ----
-const G1 = bls12_381.G1.Point;
+const G1 = bls12_381.G1.Point, G2 = bls12_381.G2.Point, F2 = bls12_381.fields.Fp2;
 const Rord = 52435875175126190479447740508185965837690552500527637822603658699938581184513n;
 const mod = (x) => ((x % Rord) + Rord) % Rord;
 const mkInstance = (inputs) => {
@@ -133,13 +133,15 @@ function specsVkxGlv(inst) {
     return { file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs: [...vkxGlvStateAt(k10, k20, k11, k21, ch.hi), ...scal], extras: [], role: 'within', label: `GLV vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined };
   });
 }
-function specsMillerResidue(inst, c, cInv) {
+function specsMillerResidue(inst, c, cInv, bad = {}) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const { states, boundary } = millerFusedOps(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
   if (man.stageBound !== true) throw new Error('intratx BLS residue requires stage-bound Miller generation');
   const genesisPts = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
+  if (bad.Ay !== undefined) genesisPts[5] = bad.Ay;
+  if (bad.Cy !== undefined) genesisPts[9] = bad.Cy;
   const genesis = [...f12limbs(cInv), ...f12limbs(c), ...genesisPts];
   const specs = man.chunks.map((ch) => {
     const inLimbs = ch.opLo === 0 ? genesis : withPtsR(stateLimbsR(states[ch.opLo]), ptL);
@@ -232,7 +234,7 @@ function argBytesOf(s) {
   for (const e of [...s.extras].reverse()) parts.push(e instanceof Uint8Array ? pd(e) : pushInt(BigInt(e)));
   return Uint8Array.from(parts.flatMap((p) => [...p]));
 }
-function assemble(specs) {
+function assemble(specs, expectRejected = false) {
   const redeems = specs.map(compileSpec); // [OP_DROP, contract]
   const argB = specs.map(argBytesOf);     // [inBlob, extras...]
   const rpush = redeems.map((r) => encodeDataPush(r));
@@ -242,7 +244,7 @@ function assemble(specs) {
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
   const standardOp1 = specs.map((_, i) => evalInput(inputs, i, standardVm));
-  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+  if (!expectRejected && [...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
     const failures = [...op1, ...standardOp1]
       .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
       .filter((outcome) => outcome.error !== null);
@@ -276,7 +278,7 @@ function assemble(specs) {
       chosenCache.set(key, useRaw ? 'raw' : 'resched');
       if (useRaw) switched += 1;
     }
-    if (switched) return assemble(specs); // reassemble with final choices (cached -> recurses once)
+    if (switched) return assemble(specs, expectRejected); // reassemble with final choices (cached -> recurses once)
   }
   let targets = specs.map((_, i) => tunedLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost)));
   let op2;
@@ -285,7 +287,7 @@ function assemble(specs) {
     inputs = specs.map((_, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, targets[i]) }));
     op2 = specs.map((_, i) => evalInput(inputs, i));
     standardOp2 = specs.map((_, i) => evalInput(inputs, i, standardVm));
-    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) break;
     const tightened = targets.map((target, i) => Math.min(target, tunedLen(
       argB[i].length + tailLen(i),
       Math.max(op2[i].operationCost, standardOp2[i].operationCost),
@@ -293,11 +295,12 @@ function assemble(specs) {
     if (tightened.every((target, i) => target === targets[i])) break;
     targets = tightened;
   }
-  if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) {
+  if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) {
     throw new Error('tightened input rejected during padding measurement');
   }
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
+  if (expectRejected && accepted) throw new Error('invalid intra-transaction residue fixture unexpectedly accepted');
   const fits = meta.every((m) => m.lockingBytes <= 10000 && m.unlockingBytes <= 10000 && m.operationCost <= OP_BUDGET) && accepted;
   return { inputs, meta, fits, accepted };
 }
@@ -382,8 +385,39 @@ const tableMutation = { steps: toStepArr({ inputs: tableInputs, meta: full0.meta
 console.error('  shared GLV table mutation rejected at carrier');
 
 const fInv = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2)), tableMutation];
-console.error(`  invalid runs rejected: ${fInv.map((r) => r.rejected).join(',')}`);
-if (!full0.accepted || !full1.accepted || !fullStress.fits || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
+
+// Isolate the two fused point-validation checks from the later residue verdict. The first Miller
+// chunk rejects an off-curve A immediately; the full Miller-only trace reaches the final guarded
+// psi(B)==[-x]B check for an on-curve point outside the order-r subgroup.
+const committedPairs = pairsFor(INSTANCES.committed.inputs, INSTANCES.committed.proof);
+const { boundary: committedRawBoundary } = millerBatchOps(committedPairs);
+const { c: committedC, cInv: committedCInv } = residueWitness(committedRawBoundary);
+const negA = proof.a.negate().toAffine();
+const firstMiller = specsMillerResidue(INSTANCES.committed, committedC, committedCInv, { Ay: (negA.y + 1n) % P }).specs[0];
+firstMiller.role = 'stage-final'; firstMiller.cmp = null;
+const offCurveA = assemble([firstMiller], true);
+const twistB = F2.create({ c0: 4n, c1: 4n });
+let offSub = null;
+for (let i = 1n; i < 800n && !offSub; i++) {
+  const x = F2.create({ c0: i, c1: 0n });
+  const rhs = F2.add(F2.mul(F2.sqr(x), x), twistB);
+  let y; try { y = F2.sqrt(rhs); } catch { continue; }
+  if (!F2.eql(F2.sqr(y), rhs)) continue;
+  try { G2.fromAffine({ x, y }).assertValidity(); } catch { offSub = { x, y }; }
+}
+if (!offSub) throw new Error('failed to construct off-subgroup B residue fixture');
+const offSubInst = {
+  inputs: INSTANCES.committed.inputs,
+  proof: { ...INSTANCES.committed.proof, b: G2.fromAffine({ x: offSub.x, y: offSub.y }) },
+};
+const offSubSpecs = specsMillerResidue(offSubInst, committedC, committedCInv).specs;
+offSubSpecs[offSubSpecs.length - 1].role = 'stage-final';
+offSubSpecs[offSubSpecs.length - 1].cmp = null;
+const offSubgroupB = assemble(offSubSpecs, true);
+const semanticRuns = [offCurveA, offSubgroupB].map((asm) => ({ steps: toStepArr(asm), rejected: !asm.accepted }));
+const allInvalid = [...fInv, ...semanticRuns];
+console.error(`  invalid runs rejected: ${allInvalid.map((r) => r.rejected).join(',')}`);
+if (!full0.accepted || !full1.accepted || !fullStress.fits || !allInvalid.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-vectors.json'), JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-bls12381-intratx (each chunk is an input whose witness carries its incoming state as a raw 48-byte-limb blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: GLV vk_x MSM (5 chunks; the five inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding five copies), c^-|x|-FUSED batched Miller with e(alpha,beta) baked and only e(-A,B) running on-chain G2 arithmetic (29 chunks; the G2 on-curve + prime-order-subgroup validation is FUSED into the first/last Miller chunks, reusing the running R_B=[|x|]B the loop already walks), and a 5-chunk witnessed-residue final-exp TAIL collapsing the Hayashida-Scott hard part to a mu_27A ((w^|x|)*w)^9 walk + fF*w==frob(c,1) verdict (the final walk chunk fuses the verdict). The residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail; w enters the tail as an uncommitted witness. Cross-stage soundness links are bound where layouts allow: vk_x final binds the vk_x point into the fused-Miller genesis input, and the fused-Miller boundary [fF,c,cInv] is bound into the residue tail. Reuses the same validated chunk math as bch-groth16-bls12381-grouped-residue. Deployed P2SH32.',
@@ -393,6 +427,7 @@ writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-vecto
   maxStepOperationCost: Math.max(...full0.meta.map((m) => m.operationCost)),
   allFit: full0.fits, allAccept: full0.accepted,
   steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullStress),
-  invalid: fInv.map((r) => r.steps),
+  invalid: allInvalid.map((r) => r.steps),
+  invalidInputs: [toStepArr(offCurveA), toStepArr(offSubgroupB)],
 }, null, 2));
 console.error('wrote groth16-bls12381-intratx-residue-vectors.json');
