@@ -46,7 +46,8 @@ function canonicalFp(int x) returns (int) {
     }
 
 function fp2Sqr(int a0, int a1) returns (int, int) {
-        return mulFp(addFp(a0, a1), subFp(a0, a1, 64)), mulFp(2, mulFp(a0, a1));
+        // Global lazy bound is <36p, so (2*a0)*a1 is <2592p^2 before the one reduction.
+        return mulFp(addFp(a0, a1), subFp(a0, a1, 64)), mulFp(a0 + a0, a1);
     }
 
 function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
@@ -399,14 +400,15 @@ function pointDoubleAffine(int Xa,int Xb,int Ya,int Yb,int ma,int mb)
         int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
         require(within(ma, 0, p)); require(within(mb, 0, p));
         require(Ya % p != 0 || Yb % p != 0);
-        (int twoYa,int twoYb) = fp2Scale(Ya, Yb, 2);
+        // Affine state is canonical: these additions stay below 2p/3p, and each consumer reduces.
+        int twoYa = Ya + Ya; int twoYb = Yb + Yb;
         (int slopeLhsA,int slopeLhsB) = fp2Mul(ma, mb, twoYa, twoYb);
         (int x2a,int x2b) = fp2Sqr(Xa, Xb);
-        (int slopeRhsA,int slopeRhsB) = fp2Scale(x2a, x2b, 3);
+        int slopeRhsA = x2a + x2a + x2a; int slopeRhsB = x2b + x2b + x2b;
         require((slopeLhsA - slopeRhsA) % p == 0);
         require((slopeLhsB - slopeRhsB) % p == 0);
         (int m2a,int m2b) = fp2Sqr(ma, mb);
-        (int twoXa,int twoXb) = fp2Scale(Xa, Xb, 2);
+        int twoXa = Xa + Xa; int twoXb = Xb + Xb;
         int nXa = canonicalFp(m2a - twoXa); int nXb = canonicalFp(m2b - twoXb);
         (int xdnXa,int xdnXb) = fp2Sub(Xa, Xb, nXa, nXb, 1);
         (int mxdnXa,int mxdnXb) = fp2Mul(ma, mb, xdnXa, xdnXb);

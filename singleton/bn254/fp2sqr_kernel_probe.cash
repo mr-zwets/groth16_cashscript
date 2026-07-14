@@ -1,0 +1,12 @@
+pragma cashscript ^0.14.0;
+
+import "./lib/lazy/Bn254Lazy.cash";
+
+contract Fp2SqrKernelProbe() {
+    function spend(int a0,int a1, int z0,int z1, bytes unused zeroPadding) {
+        (int r0,int r1) = fp2Sqr(a0,a1);
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require(within(r0,0,p)); require(within(r1,0,p));
+        require(r0==z0); require(r1==z1);
+    }
+}
