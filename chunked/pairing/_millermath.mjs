@@ -237,23 +237,31 @@ export const vk = { alpha: g1(vec.vk.alpha), beta: g2(vec.vk.beta), gamma: g2(ve
 export const proof = { a: g1(vec.proof.a), b: g2(vec.proof.b), c: g1(vec.proof.c) };
 export const vkxPoint = (inputs) => { let x = vk.ic[0]; inputs.map(BigInt).forEach((s, i) => { x = x.add(vk.ic[i + 1].multiply(s)); }); return x; };
 /** Point-limb overrides for isolated input-validation rejection fixtures. */
-export function invalidG2Overrides(proofValue = proof) {
+export function invalidG2Overrides(proofValue = proof, offSubgroupCount = 1) {
+  if (!Number.isInteger(offSubgroupCount) || offSubgroupCount < 1) {
+    throw new Error('offSubgroupCount must be a positive integer');
+  }
   const A = proofValue.a.negate().toAffine();
   const C = proofValue.c.toAffine();
+  const B = proofValue.b.toAffine();
   const offCurveA = { Ay: (A.y + 1n) % Fp.ORDER };
   const offCurveC = { Cy: (C.y + 1n) % Fp.ORDER };
+  const offCurveB = { By: Fp2.create({ c0: (B.y.c0 + 1n) % Fp.ORDER, c1: B.y.c1 }) };
   const b2 = Fp2.div(Fp2.fromBigTuple([3n, 0n]), Fp2.fromBigTuple([9n, 1n]));
-  let offSubgroup;
-  for (let i = 1n; i < 400n && offSubgroup === undefined; i++) {
+  const offSubgroups = [];
+  for (let i = 1n; i < 10_000n && offSubgroups.length < offSubgroupCount; i++) {
     const x = Fp2.fromBigTuple([i, 0n]);
     const rhs = Fp2.add(Fp2.mul(Fp2.sqr(x), x), b2);
     let y;
     try { y = Fp2.sqrt(rhs); } catch { continue; }
     if (!Fp2.eql(Fp2.sqr(y), rhs)) continue;
-    try { bn254.G2.Point.fromAffine({ x, y }).assertValidity(); } catch { offSubgroup = { Bx: x, By: y }; }
+    try { bn254.G2.Point.fromAffine({ x, y }).assertValidity(); }
+    catch { offSubgroups.push({ Bx: x, By: y }); }
   }
-  if (offSubgroup === undefined) throw new Error('failed to construct an off-subgroup G2 fixture');
-  return [offCurveA, offCurveC, offSubgroup];
+  if (offSubgroups.length !== offSubgroupCount) {
+    throw new Error(`failed to construct ${offSubgroupCount} off-subgroup G2 fixtures`);
+  }
+  return [offCurveA, offCurveC, offCurveB, ...offSubgroups];
 }
 const G2_STAGE_LAYOUT = ['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy'];
 /** Fail fast when a builder reads G2 chunks generated for a different state layout. */
