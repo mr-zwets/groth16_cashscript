@@ -10,7 +10,7 @@ BCH 2026 VM:
 - **BLS12-381** — the singleton verifier (baseline and op-optimized), on the **same
   curve as the nChain reference** so the benchmark gets a true apples-to-apples
   comparison (~21× smaller bytecode), **plus** a deployable grouped-residue chunked
-  verifier (47 inputs in 5 standard transactions).
+  verifier (39 inputs in 5 standard transactions).
 
 This has grown into a whole family of verifiers across two curves, two forms, and
 baseline/op-optimized variants — **[verifiers.md](verifiers.md) is the map** of which is

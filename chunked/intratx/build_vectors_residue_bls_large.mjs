@@ -11,17 +11,17 @@
 //
 //   the BCH op-cost budget an input gets is (densityControlBase + unlockingLen) * 800. The flagship
 //   BLS residue build sizes each chunk to a 10 kB unlocking under BCH_2026 (base 41 => 8,032,800
-//   op/input, 41 inputs). Here we size to a 100 kB unlocking under bch-spec (base 10,000 =>
-//   88,000,000 op/input, ~11x), collapsing the same ~257M-op verifier into a HANDFUL of fat inputs,
+//   op/input, 39 inputs). Here we size to a 100 kB unlocking under bch-spec (base 10,000 =>
+//   88,000,000 op/input, ~11x), collapsing the same verifier into a HANDFUL of fat inputs,
 //   one per stage floor:
 //     GLV vk_x MSM             1 input
-//     c^-|x|-fused Miller      ~3 inputs   (op-bound; the on-curve+subgroup check stays fused in)
-//     witnessed-residue tail   ~2 inputs   (mu_27A ((w^|x|)*w)^9 walk + finalize)
+//     c^-|x|-fused Miller       3 inputs   (op-bound; the on-curve+subgroup check stays fused in)
+//     witnessed-residue tail    1 input   (mu_27A ((w^|x|)*w)^9 walk + finalize)
 //                              ---------
-//                              ~6 inputs   (still ONE non-standard <1 MB tx)
+//                               5 inputs   (still ONE non-standard <1 MB tx)
 //
-// op-cost and total bytes are CONSERVED — a STRUCTURAL simplification (fewer, fatter UTXOs in one
-// tx), not a resource reduction. Each 100 kB input exceeds standard relay policy, so the tx is
+// The verifier arithmetic is unchanged; fewer state boundaries also remove repeated checks and
+// padding. Each 100 kB input exceeds standard relay policy, so the tx is
 // mine-direct — but the single-tx intratx bundle is already non-standard, so nothing new is given
 // up. The chunks are regenerated at startup at the 100 kB budget by re-running the three BLS stage
 // generators with big OP_COST_TARGET / BYTE_BUDGET / TARGET_UNLOCK env.
@@ -340,7 +340,7 @@ console.error(`  invalid runs rejected: ${fInv.map((r) => r.rejected).join(',')}
 if (!full0.accepted || !full1.accepted || !fullStress.fits || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-intratx-residue-large-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-bls12381-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; GLV vk_x MSM + c^-|x|-FUSED batched Miller with e(alpha,beta) baked and the G2 on-curve+prime-order-subgroup validation fused into the first/last Miller chunks + witnessed-residue mu_27A final-exp tail), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the same ~257M-op verifier therefore collapses from 41 inputs to a handful (GLV vk_x, c^-|x|-fused Miller, and the witnessed-residue tail, one fat input per stage floor). Total op-cost and bytes are conserved (a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail, w enters the tail as an uncommitted witness. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-bls12381-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; GLV vk_x MSM + c^-|x|-FUSED batched Miller with e(alpha,beta) baked and the G2 on-curve+prime-order-subgroup validation fused into the first/last Miller chunks + witnessed-residue mu_27A final-exp tail), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the current-BCH plan therefore collapses from 39 inputs to 5 (GLV vk_x 1, c^-|x|-fused Miller 3, witnessed-residue walk+finalize 1). The verifier arithmetic is unchanged, while fewer state boundaries remove repeated checks and padding. Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail, w enters the tail as an uncommitted witness. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
   method: 'intra-tx-linked-residue-large', deployment: 'P2SH32', curve: 'BLS12-381', numInputs: full0.inputs.length, budgetPerInput: LARGE_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),

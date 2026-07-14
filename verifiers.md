@@ -29,19 +29,18 @@ axes; this doc is the map. Individual folders have the authoritative per-verifie
 |---|---|---|---|
 | `bch-groth16-singleton` | singleton, baseline | ~14.4 KB source; size-scored recompile **8,874 B** | correctness oracle; over per-input limits |
 | `bch-groth16-singleton-minop` | singleton, op-optimized | ~66.5 KB / ~195M op-cost | residue + GLV, still single-input (oracle) |
-| `bch-groth16-chunked` | chunked, covenant chain | score **381,549** | the original ~54-tx NFT-commitment chain |
-| `bch-groth16-intratx` | chunked, intra-tx linked | score **378,323** | whole verifier in one (non-standard) tx |
-| `bch-groth16-grouped` | chunked, grouped | score **378,538** | standard-relayable, 5 txs |
-| `bch-groth16-intratx-residue` | chunked, intra-tx + residue | score **241,518** | smallest single-tx BN254 verifier |
-| **`bch-groth16-grouped-residue`** | **chunked, grouped + residue** | **score 241,628 — flagship** | standard-relayable in a few txs (residue tail collapses the packing below the non-residue 5) |
-| `bch-groth16-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **5 inputs**, one tx (proposed 100 kB VM) | targets the proposed `bch-spec` upgrade, not current BCH; structural (fewest UTXOs), own leaderboard category — see [Target VM](#target-vm-bch-spec) |
+| `bch-groth16-chunked` | chunked, covenant chain | **48 inputs / 373,256 B / 293.69M op** | NFT-commitment chain |
+| `bch-groth16-intratx` | chunked, intra-tx linked | **46 inputs / 368,748 B / 293.54M op** | whole verifier in one (non-standard) tx |
+| `bch-groth16-grouped` | chunked, grouped | **46 inputs / 368,664 B / 293.45M op** | standard-relayable |
+| `bch-groth16-intratx-residue` | chunked, intra-tx + residue | **26 inputs / 224,875 B / 179.64M op** | smallest single-tx BN254 verifier |
+| **`bch-groth16-grouped-residue`** | **chunked, grouped + residue** | **26 inputs / 224,830 B / 179.59M op — flagship** | standard-relayable in 3 txs |
+| `bch-groth16-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **4 inputs / 187,792 B / 177.33M op** | targets the proposed `bch-spec` upgrade, not current BCH; structural (fewest UTXOs), own leaderboard category — see [Target VM](#target-vm-bch-spec) |
 | `bch-pairing-chunked` | chunked pairing-only, covenant | score **217,562** | Miller + final-exp milestone |
 | `bch-pairing-intratx` | chunked pairing-only, intra-tx | score **215,429** | |
-| `bch-vkx-chunked-covenant` | chunked `vk_x`-only | score **13,950** | the G1 MSM checkpoint (see `chunked/shamir/`, `chunked/twoloop/`) |
+| `bch-vkx-chunked-covenant` | chunked `vk_x`-only | **8 inputs / 11,306 B / 7.07M op** | the G1 MSM checkpoint (see `chunked/shamir/`, `chunked/twoloop/`) |
 
-Scores are the current, post-`rescheduleStacks` figures from
-[chunked/rescheduler/README.md](chunked/rescheduler/README.md) (committed-proof benchmark;
-lower is better).
+Headline values are the current committed-proof benchmark totals after `rescheduleStacks`;
+lower is better.
 
 ## BLS12-381 verifiers
 
@@ -54,8 +53,8 @@ comparison. Per-layer status and build commands are in
 | `bch-groth16-bls12381-singleton` | singleton, baseline | ~24.2 KB / ~1.04–1.48B op-cost | **~21× smaller bytecode than the nChain reference** |
 | `bch-groth16-bls12381-singleton-minop` | singleton, op-optimized | 67,163 B / **256.6M op-cost** | residue (`λ=p+|x|`, μ₂₇A witness) + GLV; fused G2 ψ-check; A/C on-curve (G1 subgroup checks omitted) |
 | `bch-pairing-bls12381-singleton` | singleton, pairing-only | ~19.8 KB / ~1.38B op-cost | the pairing verdict milestone (`verify.cash`) |
-| `bch-groth16-bls12381-grouped-residue` | chunked, grouped + residue | **47 inputs / 5 standard txs / score 370,686** | the deployable BLS verifier; GLV `vk_x` + fused Miller + μ₂₇A residue tail |
-| `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **5 inputs**, one tx (proposed 100 kB VM) | BLS counterpart of the spec build; targets the proposed `bch-spec` upgrade — see [Target VM](#target-vm-bch-spec) |
+| `bch-groth16-bls12381-grouped-residue` | chunked, grouped + residue | **39 inputs / 5 standard txs / 324,267 B / 256.72M op** | the deployable BLS verifier; GLV `vk_x` + fused Miller + μ₂₇A residue tail |
+| `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **5 inputs / 270,713 B / 250.65M op** | BLS counterpart of the spec build; targets the proposed `bch-spec` upgrade — see [Target VM](#target-vm-bch-spec) |
 
 The BLS chunked pairing/Miller/final-exp families also exist in
 [chunked/bls12-381/](chunked/bls12-381/) (plain and residue generators); the
