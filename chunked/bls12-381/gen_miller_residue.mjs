@@ -114,7 +114,7 @@ function genChunk(opLo, opHi, isFinal) {
   const negY = PINFO.map((pi) => {
     if (!pi.cfg.Q) return [`${pi.negQ.c0}`, `${pi.negQ.c1}`];
     const needs = ops.slice(opLo, opHi).some((o) => o.t === 'al' && o.neg && o.j === pi.j);
-    if (needs) { L.push(`        (int nq${pi.j}a, int nq${pi.j}b) = fp2Neg(${pi.Qyae}, ${pi.Qybe});`); return [`nq${pi.j}a`, `nq${pi.j}b`]; }
+    if (needs) { L.push(`        (int nq${pi.j}a, int nq${pi.j}b) = fp2Neg(${pi.Qyae}, ${pi.Qybe}, 1);`); return [`nq${pi.j}a`, `nq${pi.j}b`]; }
     return [pi.Qyae, pi.Qybe];
   });
   // Stage-bound genesis derives the fused MSB state from inputs already needed by the loop:
@@ -160,18 +160,21 @@ function genChunk(opLo, opHi, isFinal) {
     // satisfy the compare (0 == psi.x*0). gcd(prefix, r)=1 makes order-13 the only collapsing case,
     // so requiring Rz != 0 closes it; non-collapsing walks give the true [|x|]B and gcd(lambda,h2)=1
     // then makes the compare a faithful G2 test. See psi-subgroup-degeneracy.md.
-    L.push(`        require(${r0[4]} != 0 || ${r0[5]} != 0);`);
+    L.push(`        require(redFp(${r0[4]}) != 0 || redFp(${r0[5]}) != 0);`);
     L.push(`        (int psxa, int psxb, int psya, int psyb) = psi(Q0xa, Q0xb, Q0ya, Q0yb);`);
-    L.push('        (int npya, int npyb) = fp2Neg(psya, psyb);');
+    L.push('        (int npya, int npyb) = fp2Neg(psya, psyb, 1);');
     L.push(`        (int exa, int exb) = r2Mul(psxa, psxb, ${r0[4]}, ${r0[5]});`);
-    L.push(`        require(${r0[0]} == exa); require(${r0[1]} == exb);`);
+    L.push(`        require(redFp(${r0[0]}) == exa); require(redFp(${r0[1]}) == exb);`);
     L.push(`        (int eya, int eyb) = r2Mul(npya, npyb, ${r0[4]}, ${r0[5]});`);
-    L.push(`        require(${r0[2]} == eya); require(${r0[3]} == eyb);`);
+    L.push(`        require(redFp(${r0[2]}) == eya); require(redFp(${r0[3]}) == eyb);`);
   }
   // final chunk hands off only [fF, c, cInv] to the residue tail; others carry full state.
   const outNames = isFinal ? [...f, ...cNames, ...ciNames] : [...f, ...r0, ...ptParams, ...cNames, ...ciNames];
+  // Lazy point arithmetic can leave R_B above p, so every computed f/R limb is reduced exactly
+  // once at this ownership boundary. Proof coordinates and c/cInv are range-gated at genesis and
+  // never reassigned; carrying those byte-for-byte preserves their canonical encoding.
   const exactNames = COVENANT_RESIDUE
-    ? isFinal ? [...cNames, ...ciNames] : [...new Set([...r0, ...ptParams, ...cNames, ...ciNames])]
+    ? isFinal ? [...cNames, ...ciNames] : [...new Set([...ptParams, ...cNames, ...ciNames])]
     : [];
   L.push(covOut(outNames, exactNames));
   L.push('    }');

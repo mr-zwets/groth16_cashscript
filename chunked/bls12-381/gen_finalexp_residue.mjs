@@ -66,6 +66,8 @@ function genWalk(lo, hi) {
   if (first) { L.push('        ' + canon(wN)); L.push(`        ${tN.map((n, i) => `int ${n}=w${i};`).join(' ')}`); }
   else { L.push(`        ${tN.map((n) => `int ${n}=${n}in;`).join(' ')}`); } // rename param tin -> local t
   L.push(walkLoop(lo, hi));
+  // fF/c/cInv arrive canonical from the Miller boundary, and first-walk w is range-gated above;
+  // only the newly computed t needs normalization at each ownership boundary.
   L.push(covOut(STATE5, COVENANT_RESIDUE ? [...fFn, ...cN, ...ciN, ...wN] : []));
   L.push('    }');
   L.push('}');
@@ -83,6 +85,7 @@ function genWalkNonFirst(lo, hi) {
   L.push(covIn([...fFn, ...cN, ...ciN, ...wN, ...names12('tin')]));
   L.push(`        ${tN.map((n, i) => `int ${n}=tin${i};`).join(' ')}`);
   L.push(walkLoop(lo, hi));
+  // The exact suffix was canonicalized by its first producer; t is the only recomputed state.
   L.push(covOut(STATE5, COVENANT_RESIDUE ? [...fFn, ...cN, ...ciN, ...wN] : []));
   L.push('    }');
   L.push('}');

@@ -98,7 +98,7 @@ function genChunk(opLo, opHi, final) {
   for (const pi of PINFO) {
     if (pi.cfg.Q) {
       const needs = ops.slice(opLo, opHi).some((o) => o.t === 'al' && o.neg && o.j === pi.j);
-      negY[pi.j] = needs ? (() => { L.push(`        (int nq${pi.j}a,int nq${pi.j}b) = fp2Neg(${pi.Qyae}, ${pi.Qybe});`); return [`nq${pi.j}a`, `nq${pi.j}b`]; })() : [pi.Qyae, pi.Qybe];
+      negY[pi.j] = needs ? (() => { L.push(`        (int nq${pi.j}a,int nq${pi.j}b) = fp2Neg(${pi.Qyae}, ${pi.Qybe}, 1);`); return [`nq${pi.j}a`, `nq${pi.j}b`]; })() : [pi.Qyae, pi.Qybe];
     } else negY[pi.j] = [`${pi.negQ.c0}`, `${pi.negQ.c1}`];
   }
   let f = opLo === 0 ? F_ONE_LIMBS.slice() : inF.slice();
@@ -137,16 +137,16 @@ function genChunk(opLo, opHi, final) {
     }
   }
   if (VALIDATED && final) {
-    L.push(`        require(${r0[4]} != 0 || ${r0[5]} != 0);`);
+    L.push(`        require(redFp(${r0[4]}) != 0 || redFp(${r0[5]}) != 0);`);
     L.push('        (int psxa, int psxb, int psya, int psyb) = psi(Q0xa, Q0xb, Q0ya, Q0yb);');
-    L.push('        (int npya, int npyb) = fp2Neg(psya, psyb);');
+    L.push('        (int npya, int npyb) = fp2Neg(psya, psyb, 1);');
     L.push(`        (int exa, int exb) = r2Mul(psxa, psxb, ${r0[4]}, ${r0[5]});`);
-    L.push(`        require(${r0[0]} == exa); require(${r0[1]} == exb);`);
+    L.push(`        require(redFp(${r0[0]}) == exa); require(redFp(${r0[1]}) == exb);`);
     L.push(`        (int eya, int eyb) = r2Mul(npya, npyb, ${r0[4]}, ${r0[5]});`);
-    L.push(`        require(${r0[2]} == eya); require(${r0[3]} == eyb);`);
+    L.push(`        require(redFp(${r0[2]}) == eya); require(redFp(${r0[3]}) == eyb);`);
   }
   let outF = f;
-  if (final) { outF = f.slice(0, 6); for (let j = 6; j < 12; j++) { const nm = `cj${j}`; L.push(`        int ${nm} = subFp(0, ${f[j]});`); outF.push(nm); } }
+  if (final) { outF = f.slice(0, 6); for (let j = 6; j < 12; j++) { const nm = `cj${j}`; L.push(`        int ${nm} = subFp(0, ${f[j]}, 62);`); outF.push(nm); } }
   L.push(covOut(final ? outF : [...outF, ...r0, ...ptParams]));
   L.push('    }');
   L.push('}');

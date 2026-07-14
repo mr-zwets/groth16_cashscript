@@ -189,7 +189,7 @@ function emitMillerTailLazy() {
       if (op.j === 0) {
         const a = N(6).map((i) => `a${uid}_${i}`), rr = N(6).map((i) => `ar${uid}_${i}`); const u = `uy${uid}`; uid++;
         L.push(`        int ${u}a = Bya; int ${u}b = Byb;`);
-        if (op.neg) L.push(`        (${u}a,${u}b) = fp2Neg(Bya, Byb);`);
+        if (op.neg) L.push(`        (${u}a,${u}b) = fp2Neg(Bya, Byb, 1);`);
         L.push(`        (${a.map((n) => 'int ' + n).join(',')}, ${rr.map((n) => 'int ' + n).join(',')}) = pointAdd(Rbxa,Rbxb,Rbya,Rbyb,Rbza,Rbzb, Bxa,Bxb,${u}a,${u}b);`);
         L.push(`        Rbxa=${rr[0]}; Rbxb=${rr[1]}; Rbya=${rr[2]}; Rbyb=${rr[3]}; Rbza=${rr[4]}; Rbzb=${rr[5]};`);
         L.push(`        (${use12('F')}) = line(${use12('F')}, ${a.join(',')}, ${px}, ${py});`);
@@ -210,13 +210,13 @@ function emitMillerTailLazy() {
   // compare below (0 == psi.x*0). Requiring Rbz != 0 rejects that: gcd(prefix, r)=1 forces any
   // collapsing B to order exactly 13 -> Rbz=0, while every non-collapsing walk yields the true
   // [|x|]B where gcd(lambda, h2)=1 makes psi(B)==[x]B equivalent to B in G2. See psi-subgroup-degeneracy.md.
-  L.push('        require(Rbza != 0 || Rbzb != 0);');
+  L.push('        require(redFp(Rbza) != 0 || redFp(Rbzb) != 0);');
   L.push('        (int psxa,int psxb,int psya,int psyb) = psi(Bxa, Bxb, Bya, Byb);');
   L.push('        (int npya,int npyb) = r2Neg(psya, psyb);');
   L.push('        (int gcxa,int gcxb) = r2Mul(psxa, psxb, Rbza, Rbzb);');
-  L.push('        require(Rbxa == gcxa); require(Rbxb == gcxb);');
+  L.push('        require(redFp(Rbxa) == gcxa); require(redFp(Rbxb) == gcxb);');
   L.push('        (int gcya,int gcyb) = r2Mul(npya, npyb, Rbza, Rbzb);');
-  L.push('        require(Rbya == gcya); require(Rbyb == gcyb);');
+  L.push('        require(redFp(Rbya) == gcya); require(redFp(Rbyb) == gcyb);');
   L.push(`        require(residueVerdict(${use12('F')}, ${use12('c')}, ${use12('ci')}, ${use12('w')}));`);
   return L;
 }
