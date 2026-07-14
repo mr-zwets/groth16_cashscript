@@ -7,13 +7,13 @@ locking+unlocking ≤ 10,000 B). The BLS12-381 counterpart of the BN254
 oracle. Three benchmark entries (in the verifier repo) are produced from here:
 
 - **`bch-vkx-bls12381-chunked-covenant`** — the public-input aggregation
-  `vk_x = IC0 + in0·IC1 + in1·IC2` (G1 multi-scalar-mult), 11 chunks / 23,070 B / 6,842,845 op-cost.
+  `vk_x = IC0 + in0·IC1 + in1·IC2` (G1 multi-scalar-mult), 11 chunks / 22,277 B / 6,808,579 op-cost.
 - **`bch-pairing-bls12381-chunked`** — the **Miller loops + final exponentiation**:
   `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)` as one prepared-VK 4-pair Miller product →
   the BLS/Hayashida-Scott final exponentiation → verdict (== Fp12 ONE). 51 chunks / 470,061 B / 372,314,128 op-cost.
 - **`bch-groth16-bls12381-chunked`** — the **complete verifier**: five stage-bound GLV vk_x
-  chunks prepended to an input-validated Miller namespace. 56 chunks / 484,865 B /
-  377,821,912 op-cost; ranked in the main
+  chunks prepended to an input-validated Miller namespace. 56 chunks / 484,519 B /
+  377,785,509 op-cost; ranked in the main
   Groth16 leaderboard against nchain (its BLS12-381 reference) — the only BCH-compatible
   full Groth16 verifier on that curve.
 
@@ -21,9 +21,15 @@ The separate 29-chunk input-unvalidated pairing and input-validated full Miller 
 also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` builders:
 
 - `bch-pairing-bls12381-intratx`: 51 inputs / 465,462 B / 372,116,160 op-cost.
-- `bch-groth16-bls12381-intratx`: 56 inputs / 475,579 B / 377,687,307 op-cost.
-- `bch-groth16-bls12381-grouped`: 56 inputs / 6 standard transactions / 475,561 B /
-  377,584,999 op-cost.
+- `bch-groth16-bls12381-intratx`: 56 inputs / 475,310 B / 377,658,775 op-cost.
+- `bch-groth16-bls12381-grouped`: 56 inputs / 6 standard transactions / 475,292 B /
+  377,556,467 op-cost.
+- `bch-groth16-bls12381-intratx-residue`: 39 inputs / 324,228 B / 256,954,915 op-cost.
+- `bch-groth16-bls12381-grouped-residue`: 39 inputs / 5 standard transactions / 324,179 B /
+  256,875,048 op-cost.
+- `bch-groth16-bls12381-intratx-residue-large`: 5 inputs / 270,769 B / 250,833,313 op-cost
+  on the proposed 100 kB-script VM. Versus the prior vector, the GLV step saves 53 B / 5,483 op,
+  while the canonical-coordinate gate adds 10 B / 7,364 op: net −43 B / +1,881 op.
 
 ## Optimizations (prepared batched Miller + lazy reduction)
 
@@ -41,7 +47,8 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
   folds. The flat trace falls from 340 to 272 ops and each interior hand-off carries
   `f + R_B + runtime points` (28 limbs rather than 46).
 - **Fused input validation for full Groth16** — the first full-Miller chunk checks A/C
-  and B on-curve. The last reuses its existing homogeneous `R_B=[|x|]B` walk for the
+  and B on-curve after requiring canonical `[0,p)` encodings for all ten stage coordinates.
+  The last reuses its existing homogeneous `R_B=[|x|]B` walk for the
   guarded `psi(B)==[-x]B` subgroup relation. This removes the separate three-input G2
   pass while keeping pairing-only in a distinct, explicitly input-unvalidated namespace.
 - **Lazy reduction** — `addFp` drops its `% p` (values only grow inside a chunk; `mulFp`,
@@ -58,6 +65,10 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
   by input introspection. The first contract derives infinity from only six scalar limbs,
   and the last emits the exact `(-A,B,C,vk_x)` stage. The standalone vk_x benchmark remains
   the existing 11-chunk full-width Shamir implementation for a like-for-like track.
+- **Exact canonical handoffs** — stage-bound vk_x and validated G2 producers serialize values
+  exactly once their bounds or field operations prove canonicality. The full-stage proof tuple is
+  preserved byte-for-byte until the first Miller range gate, so a coordinate encoded as `x+p` is
+  rejected rather than silently normalized.
 
 Since per-step bytes are dominated (~64%) by op-cost-proportional unlocking padding,
 op-cost cuts translate ~1:1 into size.

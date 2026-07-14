@@ -14,12 +14,12 @@
 import { readFileSync } from 'node:fs';
 import {
   P, compileBytecode, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2,
-  le48, commit, CATEGORY, commitBin, covIn, covOut, planChunk, tok, verifierPath,
+  le48, le48Exact, commit, CATEGORY, commitBin, commitBinExact, covIn, covOut, planChunk, tok, verifierPath,
   measureCovenant as _measureCov, bls12_381,
 } from './_vkxmath.mjs';
 import { vk, proof, computeVkx, boundaryFor } from '../../singleton/bls12-381/bls_instance.mjs';
 
-export { P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, le48, commit, CATEGORY, commitBin, covIn, covOut, planChunk, tok, verifierPath, compileBytecode, vk, proof, computeVkx, boundaryFor };
+export { P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, le48, le48Exact, commit, CATEGORY, commitBin, commitBinExact, covIn, covOut, planChunk, tok, verifierPath, compileBytecode, vk, proof, computeVkx, boundaryFor };
 export const { Fp, Fp2, Fp6, Fp12 } = bls12_381.fields;
 
 // ---- miller-step math (noble, M-twist) ----

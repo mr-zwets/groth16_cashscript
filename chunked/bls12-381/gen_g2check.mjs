@@ -83,6 +83,7 @@ function genChunk(lo, hi, isFirst, isLast) {
   L.push(`    function spend(${decl(inNames)}, bytes unused zeroPadding) {`);
   L.push(covIn(inNames));
   if (isFirst) {
+    for (const name of STAGE) L.push(`        require(within(${name}, 0, ${Fp.ORDER}));`);
     L.push('        require(mulFp(Ay, Ay) == addFp(mulFp(mulFp(Ax, Ax), Ax), 4));'); // A on G1 (b=4)
     L.push('        require(mulFp(Cy, Cy) == addFp(mulFp(mulFp(Cx, Cx), Cx), 4));'); // C on G1
     L.push('        (int bx2a,int bx2b) = fp2Sqr(Bxa, Bxb);'); // B on G2: y^2 == x^3 + (4+4u)
@@ -110,8 +111,8 @@ function genChunk(lo, hi, isFirst, isLast) {
     L.push('        (int cxa,int cxb) = fp2Mul(psxa, psxb, z2a, z2b);');
     L.push('        (int cya,int cyb) = fp2Mul(npya, npyb, z3a, z3b);');
     L.push(`        require(${r[0]} == cxa); require(${r[1]} == cxb); require(${r[2]} == cya); require(${r[3]} == cyb);`);
-    L.push(covOut(STAGE)); // validated tuple becomes the exact Miller genesis state
-  } else L.push(covOut([...r, ...STAGE]));
+    L.push(covOut(STAGE, STAGE)); // validated tuple becomes the exact Miller genesis state
+  } else L.push(covOut([...r, ...STAGE], [...r, ...STAGE]));
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';

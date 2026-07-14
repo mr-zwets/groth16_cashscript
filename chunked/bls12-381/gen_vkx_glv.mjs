@@ -210,13 +210,30 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
     L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
     L.push('        int vkxX = mulFp(rX, zInv2);');
     L.push('        int vkxY = mulFp(rY, zInv3);');
-    L.push(covOut(fullStageBound ? [...PROOF_NAMES, 'vkxX', 'vkxY'] : ['vkxX', 'vkxY']));
+    // Preserve the proof tuple exactly for the downstream range gate. mulFp makes vk_x canonical.
+    const outputs = fullStageBound ? [...PROOF_NAMES, 'vkxX', 'vkxY'] : ['vkxX', 'vkxY'];
+    L.push(covOut(outputs, outputs));
   } else {
-    L.push(covOut(STATE));
+    // A stage-bound genesis derives the accumulator and bounds every scalar. Otherwise only the
+    // first caller-supplied accumulator needs normalization; every later state is predecessor-bound.
+    L.push(covOut(STATE, stageBound ? STATE : first ? [] : STATE));
   }
   L.push('    }');
   L.push('}');
   return (L.join('\n') + '\n');
+}
+
+// Legacy non-stage-bound genesis accepts a caller-supplied accumulator, so its first handoff must
+// normalize every limb. Stage-bound genesis derives the accumulator and bounds all six scalars.
+{
+  const legacyFirst = genCash(0, 1, true, false, false);
+  if (!STATE.every((name) => legacyFirst.includes(`toPaddedBytes(${name} % Pmod, 48)`))) {
+    throw new Error('legacy GLV genesis emitted an exact caller-supplied state');
+  }
+  const stageBoundFirst = genCash(0, 1, true, false, true);
+  if (stageBoundFirst.includes('int Pmod =') || !STATE.every((name) => stageBoundFirst.includes(`toPaddedBytes(${name}, 48)`))) {
+    throw new Error('stage-bound GLV genesis did not emit its proven-exact state');
+  }
 }
 
 /** Emit the empirically audited five-window plan. Linked callers provide one shared-table

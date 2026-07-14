@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp12, millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs,
-  compileBytecode, commitBin, CATEGORY, le48, P, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath,
+  compileBytecode, commitBinExact, CATEGORY, le48Exact, P, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
@@ -57,8 +57,8 @@ regenGlvSharedAudited(GEN, {
 const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem));
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
-const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le48(((BigInt(l) % P) + P) % P)]));
-const commitOf = (limbs) => commitBin(limbs.map(BigInt));
+const blob = (limbs) => Uint8Array.from(limbs.flatMap((limb) => [...le48Exact(limb)]));
+const commitOf = (limbs) => commitBinExact(limbs.map(BigInt));
 const limbsEqual = (a, b) => a.length === b.length && a.every((x, i) => BigInt(x) === BigInt(b[i]));
 
 const padPush = (argLen, target) => {
@@ -144,6 +144,7 @@ function specsMillerResidue(inst, c, cInv, bad = {}) {
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
   if (man.stageBound !== true) throw new Error('grouped BLS residue requires stage-bound Miller generation');
   const genesisPts = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
+  if (bad.Ax !== undefined) genesisPts[4] = bad.Ax;
   if (bad.Ay !== undefined) genesisPts[5] = bad.Ay;
   if (bad.Cy !== undefined) genesisPts[9] = bad.Cy;
   const genesis = [...f12limbs(cInv), ...f12limbs(c), ...genesisPts];
@@ -537,6 +538,10 @@ const negA = proof.a.negate().toAffine();
 const firstMiller = specsMillerResidue(INSTANCES.committed, committedC, committedCInv, { Ay: (negA.y + 1n) % P }).specs[0];
 firstMiller.role = 'stage-final'; firstMiller.cmp = null;
 const offCurveA = isolated([firstMiller]);
+const plusPFirstMiller = specsMillerResidue(INSTANCES.committed, committedC, committedCInv, { Ax: negA.x + P }).specs[0];
+plusPFirstMiller.role = 'stage-final'; plusPFirstMiller.cmp = null;
+const plusPRange = isolated([plusPFirstMiller]);
+if (plusPRange.meta[0].accepted) throw new Error('+P proof encoding passed grouped-residue Miller input validation');
 const twistB = F2.create({ c0: 4n, c1: 4n });
 let offSub = null;
 for (let i = 1n; i < 800n && !offSub; i++) {
@@ -555,7 +560,7 @@ const offSubSpecs = specsMillerResidue(offSubInst, committedC, committedCInv).sp
 offSubSpecs[offSubSpecs.length - 1].role = 'stage-final';
 offSubSpecs[offSubSpecs.length - 1].cmp = null;
 const offSubgroupB = isolated(offSubSpecs);
-const semanticInvalids = [offCurveA, offSubgroupB].map((asm) => ({ run: toRun(asm), rejected: !asm.accepted }));
+const semanticInvalids = [offCurveA, offSubgroupB, plusPRange].map((asm) => ({ run: toRun(asm), rejected: !asm.accepted }));
 const allInvalids = [...invalids, ...semanticInvalids];
 console.error(`  invalid runs rejected: ${allInvalids.map((r) => r.rejected).join(',')}`);
 if (!asmCommitted.accepted || !asmProof1.accepted || !asmStress.fits || !allInvalids.every((r) => r.rejected)) {
@@ -576,6 +581,6 @@ writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-grouped-residue-vecto
   extraValidProofs: [toRun(asmProof1)],
   worstCaseProof: toRun(asmStress),
   invalid: allInvalids.map((r) => r.run),
-  invalidInputs: [toRun(offCurveA), toRun(offSubgroupB)],
+  invalidInputs: [toRun(offCurveA), toRun(offSubgroupB), toRun(plusPRange)],
 }, null, 2));
 console.error(`wrote groth16-bls12381-grouped-residue-vectors.json (${GROUPS.length} groups, ${asmCommitted.meta.length} inputs)`);

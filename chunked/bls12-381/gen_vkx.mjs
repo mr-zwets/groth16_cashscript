@@ -138,9 +138,13 @@ function genCash(lo, hi, final) {
     L.push('        int vkxY = mulFp(rY, zInv3);');
     // The full-stage namespace commits the proof tuple beside vk_x so G2 validation
     // and Miller consume one exact, sequential token state.
-    L.push(covOut(FULL_STAGE ? [...PROOF_NAMES, 'vkxX', 'vkxY'] : ['vkxX', 'vkxY']));
+    // Preserve the proof tuple exactly for the downstream range gate. mulFp makes vk_x canonical.
+    const outputs = FULL_STAGE ? [...PROOF_NAMES, 'vkxX', 'vkxY'] : ['vkxX', 'vkxY'];
+    L.push(covOut(outputs, outputs));
   } else {
-    L.push(covOut(['rX', 'rY', 'rZ', 'input0', 'input1']));
+    // Genesis bounds the scalars and derives infinity; fixed-point Jacobian helpers are reduced.
+    const outputs = ['rX', 'rY', 'rZ', 'input0', 'input1'];
+    L.push(covOut(outputs, outputs));
   }
   L.push('    }');
   L.push('}');

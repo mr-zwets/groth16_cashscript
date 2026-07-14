@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { basename, dirname, join } from 'node:path';
 import {
   Fp12, millerPreparedOps, assertPreparedMillerManifest, f12limbs, r6limbs, pairsFor, ptLimbs, finalexpTrace, boundaryFor,
-  commitBin, CATEGORY, tok, P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, verifierPath,
+  commitBinExact, CATEGORY, tok, P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, verifierPath,
 } from './_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from './_vkxmath.mjs';
@@ -137,7 +137,7 @@ function evalStepWith(contract, commitLimbs, outLimbs, pushArgs, terminal, nextL
   const rpush = encodeDataPush(redeem);                   // pushed LAST in the scriptSig (P2SH)
   const locking = P2SH ? p2shSpk(redeem) : redeem;        // P2SH scriptPubKey (35 B) or bare contract
   const tail = P2SH ? rpush.length : 0;                   // redeem in the scriptSig counts toward the budget
-  const inCommit = commitBin(commitLimbs.map(BigInt)), outCommit = terminal ? new Uint8Array(32) : commitBin(outLimbs.map(BigInt));
+  const inCommit = commitBinExact(commitLimbs.map(BigInt)), outCommit = terminal ? new Uint8Array(32) : commitBinExact(outLimbs.map(BigInt));
   const argBytes = Uint8Array.from([...pushArgs].reverse().flatMap((c) => [...pushInt(BigInt(c))]));
   // `zeroPadding` is the LAST spend param -> pushed FIRST -> pad leads: [pad][args][redeem push (P2SH)].
   const mkUnlock = (target) => { const pad = padBytes(target - argBytes.length - tail); return P2SH ? Uint8Array.from([...pad, ...argBytes, ...rpush]) : Uint8Array.from([...pad, ...argBytes]); };
@@ -283,7 +283,7 @@ function specsFinalexp(inst, boundaryVal, expectOne = true) {
 }
 
 // ---- stage-bound GLV vk_x chunks (the standalone Shamir vector remains unchanged) ----
-function specsVkx(inst) {
+function specsVkx(inst, bad = {}) {
   const [in0, in1] = inst.inputs.map(BigInt);
   const [k10, k20] = glvDecompose(in0), [k11, k21] = glvDecompose(in1);
   const scalars = [in0, in1, k10, k20, k11, k21];
@@ -291,7 +291,7 @@ function specsVkx(inst) {
   if (man.stageBound !== true || man.fullStageBound !== true || man.sharedTable !== false || man.numChunks !== GLV_COUNT) {
     throw new Error('full GLV vk_x manifest is not the stage-bound baked-table layout');
   }
-  const stage = stageLimbs(inst);
+  const stage = stageLimbs(inst, bad);
   const proofTuple = stage.slice(0, 8);
   const specs = [];
   for (const ch of man.chunks) {
@@ -349,6 +349,23 @@ const buildInvalidFirstMiller = (bad, extraArgs = []) => {
   return buildChain([first], { noStats: true, tailLocking: firstMillerTail, expectRejected: true });
 };
 const offCurveARun = buildInvalidFirstMiller({ Ay: (Aa.y + 1n) % P });
+// Preserve a non-canonical proof encoding across the final GLV handoff, then reject it at the
+// validated Miller range gate. This catches accidental `% P` normalization at the stage seam.
+const plusPBad = { Ax: Aa.x + P };
+const plusPVkx = specsVkx(INSTANCES[0], plusPBad);
+const plusPFirstMiller = specsMiller(INSTANCES[0], true, plusPBad).specs[0];
+const plusPRangeRun = buildChain(
+  [plusPVkx[plusPVkx.length - 1], plusPFirstMiller],
+  { noStats: true, tailLocking: firstMillerTail, expectRejected: true },
+);
+const plusPOutcomes = plusPRangeRun.map((step) => evalCov(
+  hexToBin(step.locking), hexToBin(step.unlocking),
+  hexToBin(step.covenant.inCommitment), hexToBin(step.covenant.outCommitment), false,
+  hexToBin(step.covenant.outLockingBytecode),
+));
+if (!plusPOutcomes[0].accepted || plusPOutcomes[1].accepted) {
+  throw new Error('+P proof encoding did not cross the GLV seam and reject at Miller input validation');
+}
 // on-curve but OFF-SUBGROUP B: a point on the twist y^2=x^3+(4+4u) outside the order-r
 // subgroup -> psi(B) == [-x]B fails in the final validated Miller chunk. Search small x.
 const F2b = bls12_381.fields.Fp2;
@@ -411,8 +428,8 @@ try {
 }
 if (!seamSpliceRejected) throw new Error('cross-proof stage seam was not rejected');
 
-console.error(`negative cases: off-curve A/C, off-subgroup B, forged state, Fr/GLV ranges, GLV congruence, and proof splice all rejected`);
-const invalidInputs = [offCurveARun, offSubRun, offCurveCRun, forgedStateRun, outOfRangeRun, oversizedGlvRun, incongruentGlvRun, splicedRun];
+console.error(`negative cases: off-curve A/C, off-subgroup B, +P encoding, forged state, Fr/GLV ranges, GLV congruence, and proof splice all rejected`);
+const invalidInputs = [offCurveARun, offSubRun, plusPRangeRun, offCurveCRun, forgedStateRun, outOfRangeRun, oversizedGlvRun, incongruentGlvRun, splicedRun];
 
 writeFileSync(verifierPath('src', 'bch', 'pairing-bls12381-chunked-vectors.json'), JSON.stringify({
   description: 'PROOF-AGNOSTIC chunked BLS12-381 Groth16 pairing: a prepared-VK 4-pair optimal-ate Miller product -> Miller boundary (the conjugated f; no separate combine), then final exponentiation -> verdict (== Fp12 ONE), multi-tx. Pairing-only intentionally does not validate G1/G2 inputs; the full Groth16 track does. Miller genesis accepts only (-A,B,C,vk_x), derives f=1 and R_B=B, and every nonterminal token state pins the actual successor locking. Fixed gamma/delta G2 trajectories use manifest-bound baked line coefficients, and fixed e(alpha,beta) is folded as one dense multiplication. Lazy field reduction (addFp deferred). One fixed set of lockings verifies multiple proofs under the same VK. The 381-iter Fermat inverse in the easy part is supplied as an unlocking witness and verified by fp12Mul(f, f^-1)==ONE.',

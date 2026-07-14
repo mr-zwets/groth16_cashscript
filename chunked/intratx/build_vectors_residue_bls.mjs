@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs,
-  le48, P, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath,
+  le48Exact, P, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
@@ -68,7 +68,7 @@ const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem));
 
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
-const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le48(((BigInt(l) % P) + P) % P)]));
+const blob = (limbs) => Uint8Array.from(limbs.flatMap((limb) => [...le48Exact(limb)]));
 const padPush = (argLen, target) => {
   const budget = Math.max(2, target - argLen);
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
@@ -140,6 +140,7 @@ function specsMillerResidue(inst, c, cInv, bad = {}) {
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
   if (man.stageBound !== true) throw new Error('intratx BLS residue requires stage-bound Miller generation');
   const genesisPts = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
+  if (bad.Ax !== undefined) genesisPts[4] = bad.Ax;
   if (bad.Ay !== undefined) genesisPts[5] = bad.Ay;
   if (bad.Cy !== undefined) genesisPts[9] = bad.Cy;
   const genesis = [...f12limbs(cInv), ...f12limbs(c), ...genesisPts];
@@ -396,6 +397,10 @@ const negA = proof.a.negate().toAffine();
 const firstMiller = specsMillerResidue(INSTANCES.committed, committedC, committedCInv, { Ay: (negA.y + 1n) % P }).specs[0];
 firstMiller.role = 'stage-final'; firstMiller.cmp = null;
 const offCurveA = assemble([firstMiller], true);
+const plusPFirstMiller = specsMillerResidue(INSTANCES.committed, committedC, committedCInv, { Ax: negA.x + P }).specs[0];
+plusPFirstMiller.role = 'stage-final'; plusPFirstMiller.cmp = null;
+const plusPRange = assemble([plusPFirstMiller], true);
+if (plusPRange.meta[0].accepted) throw new Error('+P proof encoding passed residue Miller input validation');
 const twistB = F2.create({ c0: 4n, c1: 4n });
 let offSub = null;
 for (let i = 1n; i < 800n && !offSub; i++) {
@@ -414,7 +419,7 @@ const offSubSpecs = specsMillerResidue(offSubInst, committedC, committedCInv).sp
 offSubSpecs[offSubSpecs.length - 1].role = 'stage-final';
 offSubSpecs[offSubSpecs.length - 1].cmp = null;
 const offSubgroupB = assemble(offSubSpecs, true);
-const semanticRuns = [offCurveA, offSubgroupB].map((asm) => ({ steps: toStepArr(asm), rejected: !asm.accepted }));
+const semanticRuns = [offCurveA, offSubgroupB, plusPRange].map((asm) => ({ steps: toStepArr(asm), rejected: !asm.accepted }));
 const allInvalid = [...fInv, ...semanticRuns];
 console.error(`  invalid runs rejected: ${allInvalid.map((r) => r.rejected).join(',')}`);
 if (!full0.accepted || !full1.accepted || !fullStress.fits || !allInvalid.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
@@ -428,6 +433,6 @@ writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-vecto
   allFit: full0.fits, allAccept: full0.accepted,
   steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullStress),
   invalid: allInvalid.map((r) => r.steps),
-  invalidInputs: [toStepArr(offCurveA), toStepArr(offSubgroupB)],
+  invalidInputs: [toStepArr(offCurveA), toStepArr(offSubgroupB), toStepArr(plusPRange)],
 }, null, 2));
 console.error('wrote groth16-bls12381-intratx-residue-vectors.json');

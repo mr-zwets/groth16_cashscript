@@ -15,7 +15,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp2, f12limbs, r6limbs, pairsFor, singlePairMiller, millerBatchOps, PT_CFG, ptLimbs,
+  P, Fp2, f12limbs, r6limbs, pairsFor, singlePairMiller, millerBatchOps, PT_CFG, ptLimbs,
 } from './_pairingmath.mjs';
 import { commit, measureCovenantFile, planChunk, covIn, covOut, PUBLIC_INPUTS } from './_vkxmath.mjs';
 import { millerFusedOps, residueWitness, conj, fp12limbsOf } from './_residuemath.mjs';
@@ -93,6 +93,7 @@ function genChunk(opLo, opHi, isFinal) {
   // prover's points are on-curve (A=-P0 & C=P3 on G1 y^2=x^3+4; B=Q0 on G2 y^2=x^3+(4+4u)); the
   // final chunk's psi(B)==[|x|]B subgroup test reuses R_B (=[|x|]B) that this loop already walks.
   if (opLo === 0) {
+    for (const name of ptParams) L.push(`        require(within(${name}, 0, ${P}));`);
     L.push('        require(mSqr(Py0) == mAdd(mulFp(mSqr(Px0), Px0), 4));'); // A on G1 (-A shares the curve)
     L.push('        require(mSqr(Py3) == mAdd(mulFp(mSqr(Px3), Px3), 4));'); // C on G1
     L.push('        (int bx2a, int bx2b) = r2Sqr(Q0xa, Q0xb);');

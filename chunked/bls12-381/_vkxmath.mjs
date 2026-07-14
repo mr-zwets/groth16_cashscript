@@ -62,6 +62,13 @@ const realVm = (BCH_SPEC ? createVirtualMachineBchSpec : createVirtualMachineBch
 
 // ---- state serialization (matches cash hash256(toPaddedBytes(., 48))) ----
 export const le48 = (n) => binToFixedLength(bigIntToBinUintLE(((BigInt(n) % P) + P) % P), 48);
+/** Serialize the caller's exact non-negative 48-byte integer encoding without field reduction. */
+export const le48Exact = (n) => {
+  const value = BigInt(n);
+  // The top bit is Script's sign bit; a non-negative 48-byte Script integer must keep it clear.
+  if (value < 0n || value >= (1n << 383n)) throw new Error('exact BLS limb is outside positive int383');
+  return binToFixedLength(bigIntToBinUintLE(value), 48);
+};
 const sha256 = (b) => createHash('sha256').update(b).digest();
 const sha256d = (b) => sha256(sha256(b));
 export const commit = (limbs) => sha256d(Buffer.concat(limbs.map(le48))).toString('hex');
@@ -75,17 +82,27 @@ export const commit = (limbs) => sha256d(Buffer.concat(limbs.map(le48))).toStrin
 export const CATEGORY = new Uint8Array(32).fill(0xbe); // BLS vk_x benchmark thread id
 /** 32-byte NFT commitment of a state (decl-order limbs), as bytes. */
 export const commitBin = (limbs) => new Uint8Array(sha256d(Buffer.concat(limbs.map(le48))));
+export const commitBinExact = (limbs) => new Uint8Array(sha256d(Buffer.concat(limbs.map(le48Exact))));
 export const serExpr = (names) => 'hash256(' + names.map((n) => `toPaddedBytes(${n}, 48)`).join(' + ') + ')';
 /** require: the spent token commits hash(incoming state) (decl-order `names`). */
 export const covIn = (names) =>
   `        require(tx.inputs[this.activeInputIndex].nftCommitment == ${serExpr(names)});`;
-/** require: output[0] commits hash(outgoing, reduced) + perpetuates the token thread.
+/** require: output[0] commits hash(outgoing) + perpetuates the token thread.
+ * `exactNames` identifies values intentionally serialized without normalization: either their
+ * producer guarantees a canonical field representative, or a downstream range gate must see the
+ * caller's exact encoding (e.g. the full-stage proof handoff).
  * Local is named `Pmod` (matching the BN254 covOut): chunks that import lib/Fp.cash inherit
  * its global `constant P`, and a local `int P` would be a ConstantNameCollisionError. */
-export const covOut = (outNames) =>
-  `        int Pmod = ${P};\n` +
-  `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((n) => `toPaddedBytes(${n} % Pmod, 48)`).join(' + ')}));\n` +
-  '        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);';
+export const covOut = (outNames, exactNames = []) => {
+  const exact = new Set(exactNames);
+  if (exact.size !== exactNames.length || exactNames.some((name) => typeof name !== 'string' || !outNames.includes(name))) {
+    throw new Error('covOut exactNames must be unique names in outNames');
+  }
+  const needsReduction = outNames.some((name) => !exact.has(name));
+  return (needsReduction ? `        int Pmod = ${P};\n` : '') +
+    `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((name) => `toPaddedBytes(${name}${exact.has(name) ? '' : ' % Pmod'}, 48)`).join(' + ')}));\n` +
+    '        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);';
+};
 
 // ---- real-VM measurement (padded to buy op-cost budget) ----
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));

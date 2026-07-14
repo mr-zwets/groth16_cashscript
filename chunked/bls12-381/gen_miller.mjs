@@ -17,7 +17,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp2, ATE_NAF, OP_BUDGET, millerPreparedOps, f12limbs, r6limbs, pairsFor, commit,
+  P, Fp2, ATE_NAF, OP_BUDGET, millerPreparedOps, f12limbs, r6limbs, pairsFor, commit,
   planChunk, covIn, covOut, PT_CFG, ptLimbs, decl,
 } from './_pairingmath.mjs';
 import { measureCovenantFile } from './_vkxmath.mjs';
@@ -84,6 +84,7 @@ function genChunk(opLo, opHi, final) {
   L.push(`    function spend(${decl(stateParams)}, bytes unused zeroPadding) {`);
   L.push(covIn(stateParams));
   if (VALIDATED && opLo === 0) {
+    for (const name of stagePtParams) L.push(`        require(within(${name}, 0, ${P}));`);
     L.push('        require(mSqr(Py0) == mAdd(mulFp(mSqr(Px0), Px0), 4));');
     L.push('        require(mSqr(Py3) == mAdd(mulFp(mSqr(Px3), Px3), 4));');
     L.push('        (int bx2a, int bx2b) = r2Sqr(Q0xa, Q0xb);');

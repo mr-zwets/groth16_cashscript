@@ -48,6 +48,9 @@ runtime-general (2/2 proofs), invalid runs rejected. The only full Groth16 verif
 standard-relayable and within the mempool chain limit.
 
 The BLS12-381 entry (`bch-groth16-bls12381-grouped`) is 56 inputs / **6 transactions**,
-475,561 B total, op-cost 377,584,999, every group < 100,000 B — likewise standard-relayable
+475,292 B total, op-cost 377,556,467, every group < 100,000 B — likewise standard-relayable
 and six deep. Its five GLV inputs remain together in group 0 so four siblings can read the one
 hash-bound VK table carried by the fifth.
+
+The residue entry (`bch-groth16-bls12381-grouped-residue`) is 39 inputs / **5 transactions**,
+324,179 B total, op-cost 256,875,048, with the same standard-relayable group handoffs.

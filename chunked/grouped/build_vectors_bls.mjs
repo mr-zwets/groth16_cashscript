@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp12, millerPreparedOps, assertPreparedMillerManifest, f12limbs, r6limbs, pairsFor, ptLimbs, finalexpTrace,
-  compileBytecode, commitBin, CATEGORY, le48, P, OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET, verifierPath,
+  compileBytecode, commitBinExact, CATEGORY, le48Exact, P, OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
@@ -44,8 +44,8 @@ regenGlvSharedAudited(GEN, {
 const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem));
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
-const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le48(((BigInt(l) % P) + P) % P)]));
-const commitOf = (limbs) => commitBin(limbs.map(BigInt)); // == in-VM hash256(blob(limbs))
+const blob = (limbs) => Uint8Array.from(limbs.flatMap((limb) => [...le48Exact(limb)]));
+const commitOf = (limbs) => commitBinExact(limbs.map(BigInt)); // == in-VM hash256(blob(limbs))
 const limbsEqual = (a, b) => a.length === b.length && a.every((x, i) => BigInt(x) === BigInt(b[i]));
 
 const padPush = (argLen, target) => {
@@ -480,6 +480,14 @@ const isolatedFirstMiller = (bad, forgedPrefix = []) => {
   return isolated([first]);
 };
 const offCurveA = isolatedFirstMiller({ Ay: (negA.y + 1n) % P });
+const plusPBad = { Ax: negA.x + P };
+const plusPVkx = specsVkx(INSTANCES.committed, plusPBad);
+const plusPFirstMiller = specsMiller(INSTANCES.committed, true, plusPBad).specs[0];
+plusPFirstMiller.role = 'stage-final';
+const plusPRange = isolated([plusPVkx[plusPVkx.length - 1], plusPFirstMiller]);
+if (!plusPRange.meta[0].accepted || plusPRange.meta[1].accepted) {
+  throw new Error('+P proof encoding did not cross the GLV seam and reject at Miller input validation');
+}
 const offCurveC = isolatedFirstMiller({ Cy: (C.y + 1n) % P });
 const twistB = F2.create({ c0: 4n, c1: 4n });
 let offSub = null;
@@ -534,7 +542,7 @@ handoff.outLocking = Uint8Array.from(handoff.outLocking);
 handoff.outLocking[handoff.outLocking.length - 1] ^= 0x01;
 const lockTamper = evaluateMutated(lockTamperAsm);
 
-const semantic = [offCurveA, offSubgroupB, offCurveC, forgedState, outOfRange, oversizedGlv, incongruentGlv];
+const semantic = [offCurveA, offSubgroupB, plusPRange, offCurveC, forgedState, outOfRange, oversizedGlv, incongruentGlv];
 const securityInvalids = [
   ...semantic.map(evaluateMutated),
   tableMutation,
@@ -562,6 +570,6 @@ writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-grouped-vectors.json'
   extraValidProofs: [toRun(asmProof1)],
   worstCaseProof: toRun(asmDense),
   invalid: allInvalids.map((r) => r.run),
-  invalidInputs: [toRun(offCurveA), toRun(offSubgroupB)],
+  invalidInputs: [toRun(offCurveA), toRun(offSubgroupB), toRun(plusPRange)],
 }, null, 2));
 console.error(`wrote groth16-bls12381-grouped-vectors.json (${GROUPS.length} groups, ${asmCommitted.meta.length} inputs)`);

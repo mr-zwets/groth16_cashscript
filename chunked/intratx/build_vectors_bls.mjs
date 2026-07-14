@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp12, millerPreparedOps, assertPreparedMillerManifest, f12limbs, r6limbs, pairsFor, ptLimbs, finalexpTrace,
-  le48, P, OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET, verifierPath,
+  le48Exact, P, OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
@@ -51,7 +51,7 @@ const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem));
 // minimal forms (OP_0/OP_1..16/OP_1NEGATE) that encodeDataPush omits.
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
-const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le48(((BigInt(l) % P) + P) % P)]));
+const blob = (limbs) => Uint8Array.from(limbs.flatMap((limb) => [...le48Exact(limb)]));
 // trailing all-zero pad (libauth-minimal push). Pad sits at the END, never shifting the front inBlob.
 const padPush = (argLen, target) => {
   const budget = Math.max(2, target - argLen);
@@ -106,11 +106,11 @@ const stageLimbs = (inst, bad = {}) => {
   ];
 };
 
-function specsVkx(inst) {
+function specsVkx(inst, bad = {}) {
   const [in0, in1] = inst.inputs.map(BigInt);
   const [k10, k20] = glvDecompose(in0), [k11, k21] = glvDecompose(in1);
   const scalars = [in0, in1, k10, k20, k11, k21];
-  const stage = stageLimbs(inst);
+  const stage = stageLimbs(inst, bad);
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglvfull.json'), 'utf8'));
   if (man.stageBound !== true || man.fullStageBound !== true || man.sharedTable !== true || man.numChunks !== GLV_COUNT) {
     throw new Error('full GLV vk_x manifest is not the stage-bound shared-table layout');
@@ -353,6 +353,14 @@ const isolatedFirstMiller = (bad, forgedPrefix = []) => {
   return assemble([first], true);
 };
 const offCurveA = isolatedFirstMiller({ Ay: (negA.y + 1n) % P });
+const plusPBad = { Ax: negA.x + P };
+const plusPVkx = specsVkx(INSTANCES.committed, plusPBad);
+const plusPFirstMiller = specsMiller(INSTANCES.committed, true, plusPBad).specs[0];
+plusPFirstMiller.role = 'stage-final';
+const plusPRange = assemble([plusPVkx[plusPVkx.length - 1], plusPFirstMiller], true);
+if (!plusPRange.meta[0].accepted || plusPRange.meta[1].accepted) {
+  throw new Error('+P proof encoding did not cross the GLV seam and reject at Miller input validation');
+}
 const offCurveC = isolatedFirstMiller({ Cy: (C.y + 1n) % P });
 const twistB = F2.create({ c0: 4n, c1: 4n });
 let offSub = null;
@@ -408,7 +416,7 @@ const bindingMutations = [1 * W, 3 * W, 7 * W].map((offset) => {
   return run;
 });
 
-const semanticInvalid = [offCurveA, offSubgroupB, offCurveC, forgedState, outOfRange, oversizedGlv, incongruentGlv];
+const semanticInvalid = [offCurveA, offSubgroupB, plusPRange, offCurveC, forgedState, outOfRange, oversizedGlv, incongruentGlv];
 const semanticRuns = semanticInvalid.map((asm) => ({ steps: toStepArr(asm), rejected: !asm.accepted }));
 const proofBindingInvalid = [{ steps: toStepArr(hybrid), rejected: !hybrid.accepted }, ...bindingMutations];
 const allInvalid = [...fInv, tableMutation, ...semanticRuns, ...proofBindingInvalid];
@@ -420,6 +428,6 @@ writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-vectors.json'
   description: 'INTRA-TRANSACTION LINKED full BLS12-381 Groth16 verifier in ONE transaction: canonical-range-checked five-chunk GLV vk_x with one hash-bound shared VK table -> exact (-A,B,C,vk_x) state -> input-validated prepared-VK Miller product -> final exponentiation -> verdict. The first Miller chunk checks A/C and B on-curve; the final Miller chunk reuses its running R_B=[|x|]B for the guarded psi(B)==[-x]B subgroup check. Miller derives f=1 and R_B=B. Every adjacent input checks the entire next-stage blob, including all stage seams; exact blob lengths reject legacy caller-supplied f/R layouts. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. Negative cases cover the shared table, GLV decomposition bounds/congruence, off-curve, off-subgroup, forged-state, scalar-range, proof-splice, and A/B/C mutations.',
   ...meta(full0), steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullDense),
   invalid: allInvalid.map((r) => r.steps),
-  invalidInputs: [toStepArr(offCurveA), toStepArr(offSubgroupB)],
+  invalidInputs: [toStepArr(offCurveA), toStepArr(offSubgroupB), toStepArr(plusPRange)],
 }, null, 2));
 console.error('wrote groth16-bls12381-intratx-vectors.json');
