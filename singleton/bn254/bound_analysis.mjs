@@ -5,6 +5,9 @@
 //   addFp(x,y)        -> b_x + b_y
 //   subFp(x,y) bias k -> needs k >= b_y; out bound = b_x + k  (minimal k = b_y)
 //   mulFp/scale       -> 1   (reduces);   neg(0,y) -> b_y
+//   fp2Mul/mul034     -> 1 per source limb (raw expressions are biased nonnegative, then reduced)
+// The fp2Mul model intentionally returns its former [2,3] bounds after recording safety data, so
+// its proof cannot depend on the canonical output it is proving. The mul034 model returns [1,...].
 //
 // Sites are labeled FUNCTION-LOCALLY (not caller-prefixed). Because every field
 // function's internal sub biases are caller-INDEPENDENT (internal muls reset input
@@ -13,6 +16,22 @@
 // (cycSqr.z*, fp12conj, frob conj) are pinned by the worst-case probe (global max
 // carried bound). One bias per fp2Sub/fp6Sub CALL (coarse: max over limbs).
 // Run: node bound_analysis.mjs
+
+const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
+const FP2_INPUT_BOUND = 149;
+const FP2_NEGATIVE_BIAS = FP2_INPUT_BOUND ** 2;
+const MUL034_INPUT_BOUND = 37;
+const MUL034_NEGATIVE_COEFFICIENT = 97;
+const MUL034_RAW_BIAS = MUL034_NEGATIVE_COEFFICIENT * MUL034_INPUT_BOUND ** 2;
+const FP2_NEGATIVE_BIAS_LITERAL = 10636392002745043725054576591855484724484200679306969358911577657842610149931283249579519191443340195632349945621165638913026711333532969846898571500690003689n;
+const MUL034_RAW_BIAS_LITERAL = 63620485708775397116398918488458420026955112869114471513803213004724729950895225285411156794258613332669998933780976023070021894424298169671600468685695583977n;
+
+if (FP2_NEGATIVE_BIAS_LITERAL !== BigInt(FP2_NEGATIVE_BIAS) * P * P) {
+  throw new Error('fp2Mul bias literal is not exactly 22,201*p^2');
+}
+if (MUL034_RAW_BIAS_LITERAL !== BigInt(MUL034_RAW_BIAS) * P * P) {
+  throw new Error('mul034 bias literal is not exactly 132,793*p^2');
+}
 
 const sites = new Map();
 function rec(site, by) { if (!sites.has(site) || sites.get(site) < by) sites.set(site, by); return by; }
@@ -25,7 +44,16 @@ const f2add = (a, b) => [a[0] + b[0], a[1] + b[1]];
 const f2sub = (s, a, b) => { const k = rec(s, Math.max(b[0], b[1])); return [a[0] + k, a[1] + k]; };
 const f2neg = (s, a) => { const k = rec(s, Math.max(a[0], a[1])); return [k, k]; };
 const f2scale = () => [1, 1];
-const f2mul = (a, b) => { const v0 = 1, v1 = 1; const c0 = v0 + rec('f2mul.c0', v1); const c1 = 1 + rec('f2mul.c1', v0 + v1); return [c0, c1]; };
+let maxF2MulInputBound = 0;
+let maxF2MulNegativeBound = 0;
+const f2mul = (a, b) => {
+  maxF2MulInputBound = Math.max(maxF2MulInputBound, ...a, ...b);
+  // The first raw limb is a0*b0-a1*b1; the second is a0*b1+a1*b0 >= 0.
+  maxF2MulNegativeBound = Math.max(maxF2MulNegativeBound, a[1] * b[1]);
+  // Keep the former lazy-output bounds here. This deliberately avoids using
+  // fp2Mul's new canonical output to prove the input domain that makes it safe.
+  return [2, 3];
+};
 const f2sqr = () => { rec('f2sqr.s', 36); return [1, 1]; }; // subFp(a0,a1) feeds mulFp; bias=max input (36); out reduced
 const f2mulxi = (s, a) => { const k = rec(s, a[1]); return [1 + k, 1 + a[0]]; };
 const f2conj = (s, a) => { rec(s, a[1]); return [a[0], a[1]]; };
@@ -84,14 +112,100 @@ function f12sqr(A) {
 }
 const f12conj = (A) => { const [a0, a1] = split12(A); return [...a0, ...f6neg('f12conj.neg', a1)]; };
 
+const interval = (lo, hi) => ({ lo, hi });
+const intervalAdd = (a, b) => interval(a.lo + b.lo, a.hi + b.hi);
+const intervalSub = (a, b) => interval(a.lo - b.hi, a.hi - b.lo);
+const intervalScale = (k, a) => k >= 0
+  ? interval(k * a.lo, k * a.hi)
+  : interval(k * a.hi, k * a.lo);
+const rawFp2Bounds = (a, b) => [
+  interval(-a[1] * b[1], a[0] * b[0]),
+  interval(0, a[0] * b[1] + a[1] * b[0]),
+];
+
+let maxMul034InputBound = 0;
+let maxMul034NegativeBound = 0;
+let maxMul034PositiveBound = 0;
 function mul034(F, o0, o3, o4) {
-  const [f0, f1] = split12(F);
-  const A = join6(f2mul([f0[0], f0[1]], o0), f2mul([f0[2], f0[3]], o0), f2mul([f0[4], f0[5]], o0));
-  const B = f6mul01(f1, o3, o4);
-  const G = f6mul01(f6add(f0, f1), f2add(o0, o3), o4);
-  const C0 = f6add(f6mulByV('mul034.VB', B), A);
-  const C6 = f6sub('mul034.C6', G, f6add(A, B));
-  return [...C0, ...C6];
+  const M = Math.max(...F, ...o0, ...o3, ...o4);
+  maxMul034InputBound = Math.max(maxMul034InputBound, M);
+
+  // Re-run the direct CashScript algebra over intervals. All source limbs are
+  // nonnegative and less than M*p; the resulting intervals are in p^2 units.
+  const f = Array(12).fill(M);
+  const q0 = [M, M];
+  const q3 = [M, M];
+  const q4 = [M, M];
+
+  const A = [
+    ...rawFp2Bounds(f.slice(0, 2), q0),
+    ...rawFp2Bounds(f.slice(2, 4), q0),
+    ...rawFp2Bounds(f.slice(4, 6), q0),
+  ];
+
+  const bt0 = rawFp2Bounds(f.slice(6, 8), q3);
+  const bt1 = rawFp2Bounds(f.slice(8, 10), q4);
+  const bm12 = rawFp2Bounds([f[8] + f[10], f[9] + f[11]], q4);
+  const bu0 = [intervalSub(bm12[0], bt1[0]), intervalSub(bm12[1], bt1[1])];
+  const B = [
+    intervalAdd(intervalSub(intervalScale(9, bu0[0]), bu0[1]), bt0[0]),
+    intervalAdd(intervalAdd(bu0[0], intervalScale(9, bu0[1])), bt0[1]),
+  ];
+  const bm1 = rawFp2Bounds(
+    [q3[0] + q4[0], q3[1] + q4[1]],
+    [f[6] + f[8], f[7] + f[9]],
+  );
+  B.push(
+    intervalSub(intervalSub(bm1[0], bt0[0]), bt1[0]),
+    intervalSub(intervalSub(bm1[1], bt0[1]), bt1[1]),
+  );
+  const bm2 = rawFp2Bounds([f[6] + f[10], f[7] + f[11]], q3);
+  B.push(
+    intervalAdd(intervalSub(bm2[0], bt0[0]), bt1[0]),
+    intervalAdd(intervalSub(bm2[1], bt0[1]), bt1[1]),
+  );
+
+  const S = f.slice(0, 6).map((x, i) => x + f[i + 6]);
+  const q = [q0[0] + q3[0], q0[1] + q3[1]];
+  const gt0 = rawFp2Bounds(S.slice(0, 2), q);
+  const gt1 = rawFp2Bounds(S.slice(2, 4), q4);
+  const gm12 = rawFp2Bounds([S[2] + S[4], S[3] + S[5]], q4);
+  const gu0 = [intervalSub(gm12[0], gt1[0]), intervalSub(gm12[1], gt1[1])];
+  const G = [
+    intervalAdd(intervalSub(intervalScale(9, gu0[0]), gu0[1]), gt0[0]),
+    intervalAdd(intervalAdd(gu0[0], intervalScale(9, gu0[1])), gt0[1]),
+  ];
+  const gm1 = rawFp2Bounds(
+    [q[0] + q4[0], q[1] + q4[1]],
+    [S[0] + S[2], S[1] + S[3]],
+  );
+  G.push(
+    intervalSub(intervalSub(gm1[0], gt0[0]), gt1[0]),
+    intervalSub(intervalSub(gm1[1], gt0[1]), gt1[1]),
+  );
+  const gm2 = rawFp2Bounds([S[0] + S[4], S[1] + S[5]], q);
+  G.push(
+    intervalAdd(intervalSub(gm2[0], gt0[0]), gt1[0]),
+    intervalAdd(intervalSub(gm2[1], gt0[1]), gt1[1]),
+  );
+
+  const outputs = [
+    intervalAdd(intervalSub(intervalScale(9, B[4]), B[5]), A[0]),
+    intervalAdd(intervalAdd(B[4], intervalScale(9, B[5])), A[1]),
+    intervalAdd(B[0], A[2]),
+    intervalAdd(B[1], A[3]),
+    intervalAdd(B[2], A[4]),
+    intervalAdd(B[3], A[5]),
+    intervalSub(intervalSub(G[0], A[0]), B[0]),
+    intervalSub(intervalSub(G[1], A[1]), B[1]),
+    intervalSub(intervalSub(G[2], A[2]), B[2]),
+    intervalSub(intervalSub(G[3], A[3]), B[3]),
+    intervalSub(intervalSub(G[4], A[4]), B[4]),
+    intervalSub(intervalSub(G[5], A[5]), B[5]),
+  ];
+  maxMul034NegativeBound = Math.max(maxMul034NegativeBound, ...outputs.map((x) => -x.lo));
+  maxMul034PositiveBound = Math.max(maxMul034PositiveBound, ...outputs.map((x) => x.hi));
+  return Array(12).fill(1);
 }
 const line = (F, c0, c1, c2) => mul034(F, [1, 1], [1, 1], c0);
 function pointDouble(X, Y, Z) {
@@ -203,6 +317,27 @@ for (let it = 0; it < 50; it++) {
 }
 psi([1, 1], [1, 1]); // body psi (Q reduced)
 console.log('GLOBAL max carried bound =', G, 'p\n');
+console.log('max fp2Mul input bound =', maxF2MulInputBound, 'p');
+console.log('max fp2Mul negative bound =', maxF2MulNegativeBound, 'p^2');
+console.log('max mul034 input bound =', maxMul034InputBound, 'p');
+console.log('max mul034 negative bound =', maxMul034NegativeBound, 'p^2');
+console.log('max mul034 positive bound =', maxMul034PositiveBound, 'p^2\n');
+
+if (maxF2MulInputBound > FP2_INPUT_BOUND) {
+  throw new Error(`fp2Mul input bound ${maxF2MulInputBound}p exceeds ${FP2_INPUT_BOUND}p`);
+}
+if (maxF2MulNegativeBound > FP2_NEGATIVE_BIAS) {
+  throw new Error(`fp2Mul needs ${maxF2MulNegativeBound}p^2, bias is ${FP2_NEGATIVE_BIAS}p^2`);
+}
+if (maxMul034InputBound > MUL034_INPUT_BOUND) {
+  throw new Error(`mul034 input bound ${maxMul034InputBound}p exceeds ${MUL034_INPUT_BOUND}p`);
+}
+if (maxMul034NegativeBound !== MUL034_NEGATIVE_COEFFICIENT * maxMul034InputBound ** 2) {
+  throw new Error('mul034 interval expansion no longer has a 97*M^2 negative bound');
+}
+if (maxMul034NegativeBound > MUL034_RAW_BIAS) {
+  throw new Error(`mul034 needs ${maxMul034NegativeBound}p^2, bias is ${MUL034_RAW_BIAS}p^2`);
+}
 
 // ===== bake-table =====
 const tab = [...sites.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
