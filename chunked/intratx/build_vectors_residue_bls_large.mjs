@@ -11,7 +11,7 @@
 //
 //   the BCH op-cost budget an input gets is (densityControlBase + unlockingLen) * 800. The flagship
 //   BLS residue build sizes each chunk to a 10 kB unlocking under BCH_2026 (base 41 => 8,032,800
-//   op/input, 42 inputs). Here we size to a 100 kB unlocking under bch-spec (base 10,000 =>
+//   op/input, 41 inputs). Here we size to a 100 kB unlocking under bch-spec (base 10,000 =>
 //   88,000,000 op/input, ~11x), collapsing the same ~257M-op verifier into a HANDFUL of fat inputs,
 //   one per stage floor:
 //     GLV vk_x MSM             1 input
@@ -41,7 +41,7 @@ import {
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
 import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
-import { glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../bls12-381/gen_vkx_glv.mjs';
+import { glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_MAX_DENSITY_INPUTS } from '../bls12-381/gen_vkx_glv.mjs';
 import { residueWalkT } from '../bls12-381/gen_finalexp_residue.mjs';
 import { transformChunk } from './transform.mjs';
 
@@ -76,6 +76,7 @@ execFileSync(process.execPath, [join(BLS, 'gen_finalexp_residue.mjs')], { env: {
 
 import { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, numberToBinUint16LE, numberToBinUint32LE, createVirtualMachineBchSpec } from '@bitauth/libauth';
 const realVm = createVirtualMachineBchSpec(false); // PROPOSED bch-spec VM (100 kB scripts, 88M-op inputs)
+const standardVm = createVirtualMachineBchSpec(true);
 
 // Deploy each chunk as P2SH (same lever as the flagship build): the redeem rides in the scriptSig
 // where it counts toward the op-cost budget ((10000 + unlockingLen) * 800); the inBlob stays the
@@ -95,12 +96,12 @@ const padPush = (argLen, target) => {
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget <= 65538 ? budget - 3 : budget - 5;
   return encodeDataPush(new Uint8Array(N));
 };
-// minimal total unlocking length whose spec budget (10000+len)*800 covers opCost, +96 margin.
-const tunedLen = (argLen, opCost) => Math.min(LARGE_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - DENSITY_BASE + 96));
+// minimal total unlocking length whose spec budget (10000+len)*800 covers opCost.
+const tunedLen = (argLen, opCost) => Math.min(LARGE_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - DENSITY_BASE));
 
 // ---- multi-input evaluation: build ONE tx from all inputs, evaluate at `index` ----
-function evalInput(inputs, index) {
-  const st = realVm.evaluate({
+function evalInput(inputs, index, vm = realVm) {
+  const st = vm.evaluate({
     inputIndex: index,
     sourceOutputs: inputs.map((i) => ({ lockingBytecode: i.locking, valueSatoshis: 1000n })),
     transaction: { version: 2, inputs: inputs.map((i, n) => ({ outpointTransactionHash: new Uint8Array(32), outpointIndex: n, sequenceNumber: 0, unlockingBytecode: i.unlocking })), outputs: [{ lockingBytecode: Uint8Array.from([0x6a]), valueSatoshis: 1000n }], locktime: 0 },
@@ -238,7 +239,7 @@ function compileSpec(s) {
   return (chosenCache.get(key) === 'raw' && v.raw) ? v.raw : v.resched;
 }
 // effective unlocking length a chunk needs, UNCAPPED; Infinity when the variant does not accept.
-const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - DENSITY_BASE + 96) : Infinity);
+const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - DENSITY_BASE) : Infinity);
 function argBytesOf(s) {
   const parts = [pd(blob(s.inLimbs))];
   for (const e of [...s.extras].reverse()) parts.push(pushInt(BigInt(e)));
@@ -254,6 +255,10 @@ function assemble(specs) {
   // pass 1: full unlocking -> max budget so the real VM accepts and reports true op-cost
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, LARGE_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
+  const standardOp1 = specs.map((_, i) => evalInput(inputs, i, standardVm));
+  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+    throw new Error('full-budget input errored during padding measurement');
+  }
 
   if (RESCHED) {
     let switched = 0;
@@ -270,8 +275,9 @@ function assemble(specs) {
       const probe = inputs.slice();
       probe[i] = { locking: P2SH ? p2shSpk(v.raw) : v.raw, unlocking: rawUnlock };
       const rawOp = evalInput(probe, i);
-      const tR = effLen(argB[i].length + tailLen(i), op1[i].operationCost, op1[i].accepted);
-      const tB = effLen(rawFixed, rawOp.operationCost, rawOp.accepted);
+      const rawStandardOp = evalInput(probe, i, standardVm);
+      const tR = effLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost), op1[i].accepted && standardOp1[i].accepted);
+      const tB = effLen(rawFixed, Math.max(rawOp.operationCost, rawStandardOp.operationCost), rawOp.accepted && rawStandardOp.accepted);
       if (tR === Infinity && tB === Infinity) continue;
       const useRaw = tB < tR;
       chosenCache.set(key, useRaw ? 'raw' : 'resched');
@@ -279,9 +285,24 @@ function assemble(specs) {
     }
     if (switched) return assemble(specs);
   }
-  // pass 2: shrink the pad so the unlocking just covers its op-cost
-  inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, tunedLen(argB[i].length + tailLen(i), op1[i].operationCost)) }));
-  const op2 = specs.map((_, i) => evalInput(inputs, i));
+  let targets = specs.map((_, i) => tunedLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost)));
+  let op2;
+  let standardOp2;
+  while (true) {
+    inputs = specs.map((_, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, targets[i]) }));
+    op2 = specs.map((_, i) => evalInput(inputs, i));
+    standardOp2 = specs.map((_, i) => evalInput(inputs, i, standardVm));
+    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    const tightened = targets.map((target, i) => Math.min(target, tunedLen(
+      argB[i].length + tailLen(i),
+      Math.max(op2[i].operationCost, standardOp2[i].operationCost),
+    )));
+    if (tightened.every((target, i) => target === targets[i])) break;
+    targets = tightened;
+  }
+  if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) {
+    throw new Error('tightened input rejected during padding measurement');
+  }
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
   // spec caps: locking/unlocking each <= 100 kB; op-cost <= the input's own (10000+unlockingLen)*800.
@@ -312,18 +333,20 @@ const full0 = buildFull(INSTANCES.committed);
 report('groth16-bls12381-intratx-residue-large committed', full0);
 const full1 = buildFull(INSTANCES.proof1);
 report('groth16-bls12381-intratx-residue-large proof#1', full1);
+const fullDense = buildFull(mkInstance(GLV_MAX_DENSITY_INPUTS));
+report('groth16-bls12381-intratx-residue-large max-density', fullDense);
 const fInv = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2))];
 console.error(`  invalid runs rejected: ${fInv.map((r) => r.rejected).join(',')}`);
-if (!full0.accepted || !full1.accepted || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
+if (!full0.accepted || !full1.accepted || !fullDense.fits || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-intratx-residue-large-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-bls12381-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; GLV vk_x MSM + c^-|x|-FUSED batched Miller with e(alpha,beta) baked and the G2 on-curve+prime-order-subgroup validation fused into the first/last Miller chunks + witnessed-residue mu_27A final-exp tail), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the same ~257M-op verifier therefore collapses from 42 inputs to a handful (GLV vk_x, c^-|x|-fused Miller, and the witnessed-residue tail, one fat input per stage floor). Total op-cost and bytes are conserved (a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail, w enters the tail as an uncommitted witness. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-bls12381-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; GLV vk_x MSM + c^-|x|-FUSED batched Miller with e(alpha,beta) baked and the G2 on-curve+prime-order-subgroup validation fused into the first/last Miller chunks + witnessed-residue mu_27A final-exp tail), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the same ~257M-op verifier therefore collapses from 41 inputs to a handful (GLV vk_x, c^-|x|-fused Miller, and the witnessed-residue tail, one fat input per stage floor). Total op-cost and bytes are conserved (a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail, w enters the tail as an uncommitted witness. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
   method: 'intra-tx-linked-residue-large', deployment: 'P2SH32', curve: 'BLS12-381', numInputs: full0.inputs.length, budgetPerInput: LARGE_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
   maxStepOperationCost: Math.max(...full0.meta.map((m) => m.operationCost)),
   allFit: full0.fits, allAccept: full0.accepted,
-  steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)],
+  steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullDense),
   invalid: fInv.map((r) => r.steps),
 }, null, 2));
 console.error('\nwrote groth16-bls12381-intratx-residue-large-vectors.json');

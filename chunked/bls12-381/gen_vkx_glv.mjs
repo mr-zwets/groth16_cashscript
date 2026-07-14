@@ -5,11 +5,11 @@
 // into NON-NEGATIVE k1 + k2*lambda (mod r) with k1,k2 < 2^128, turning the 2-scalar 255-bit MSM
 // into a 4-scalar 128-bit Straus over the FIXED points {IC1, phi(IC1), IC2, phi(IC2)}
 // (phi(x,y)=(beta*x,y)). A baked 16-entry subset-sum table folds all 4 scalars into ONE add per
-// iteration -> ~half the doublings (vkx 12 -> ~6 chunks). Witnesses k10,k20,k11,k21 are gated at
+// iteration -> ~half the doublings (vkx 12 -> 5 shared-table chunks). Witnesses k10,k20,k11,k21 are gated at
 // genesis (k < 2^128, k1 + k2*lambda == in mod r); phi(IC*) and the table are baked.
 // State (committed, 9 limbs): rX,rY,rZ, in0,in1, k10,k20,k11,k21.
 //   node gen_vkx_glv.mjs    plan + emit vkxglv_NN.cash + manifest_vkxglv.json
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -31,6 +31,14 @@ export const GLV_BETA = 79347939072921551262137970163342144706088674028106049301
 export const GLV_LAMBDA = r - ((X * X) % r); // -x^2 mod r
 export const GLV_R = r;
 export { ITERS as VKXGLV_ITERS };
+// Deterministically searched valid inputs whose four GLV sub-scalars have a nonzero bit
+// at every one of the 128 Straus positions. This is the density case the loop actually
+// executes; near-r inputs are not sufficient because decomposition randomizes the bits.
+export const GLV_MAX_DENSITY_INPUTS = [
+  34858469356782761897909152752726474392223647467802337015319438976734096243172n,
+  7481747670021426200056538375384252329781435103268576271399310381963838742462n,
+];
+export const GLV_SHARED_SAFE_BOUNDS = [0, 25, 51, 77, 103, 128];
 
 const modP = (v) => ((v % P) + P) % P;
 const phiPt = (Pt) => { const a = Pt.toAffine(); return G1.fromAffine({ x: (a.x * GLV_BETA) % P, y: a.y }); };
@@ -193,22 +201,29 @@ export function genCash(lo, hi, first, final, sharedTable = null) {
   return (L.join('\n') + '\n');
 }
 
-/** Re-emit the GLV chunks from the existing manifest windows in SHARED-TABLE mode (the 960*1.5-byte
- * Straus table is carried once by the final GLV input and read by siblings via input-bytecode
- * introspection; the carrier pins it with hash256). Window bounds are unchanged (sharing the table
- * barely moves op-cost), so no replanning; the manifest gains sharedTable for builder guards. */
-export function regenGlvShared(GEN_DIR, sharedTable) {
-  const man = JSON.parse(readFileSync(join(GEN_DIR, 'manifest_vkxglv.json'), 'utf8'));
-  for (const ch of man.chunks) {
+/** Emit the density-validated five-window plan for hash-free, shared-table deployment. */
+export function regenGlvSharedSafe(GEN_DIR, sharedTable) {
+  const chunks = GLV_SHARED_SAFE_BOUNDS.slice(0, -1).map((lo, idx) => ({
+    idx,
+    lo,
+    hi: GLV_SHARED_SAFE_BOUNDS[idx + 1],
+    first: idx === 0,
+    final: idx === GLV_SHARED_SAFE_BOUNDS.length - 2,
+  }));
+  for (const ch of chunks) {
     writeFileSync(join(GEN_DIR, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), genCash(ch.lo, ch.hi, ch.first, ch.final, sharedTable));
   }
-  writeFileSync(join(GEN_DIR, 'manifest_vkxglv.json'), JSON.stringify({ ...man, sharedTable: sharedTable !== null }, null, 2));
-  return man.chunks.length;
+  writeFileSync(join(GEN_DIR, 'manifest_vkxglv.json'), JSON.stringify({
+    curve: 'BLS12-381', numChunks: chunks.length, iters: ITERS, glv: true, chunks,
+    sharedTable: sharedTable !== null,
+  }, null, 2));
+  return chunks.length;
 }
 
-// ---- plan + emit (worst-case planning scalars: dense ~127-bit) ----
+// ---- plan + emit (valid inputs with add coverage at all 128 loop positions) ----
 if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
-  const [wk10, wk20] = glvDecompose(r - 1n), [wk11, wk21] = glvDecompose((1n << 253n) - 1n);
+  const [wk10, wk20] = glvDecompose(GLV_MAX_DENSITY_INPUTS[0]), [wk11, wk21] = glvDecompose(GLV_MAX_DENSITY_INPUTS[1]);
+  if ((wk10 | wk20 | wk11 | wk21) !== (1n << 128n) - 1n) throw new Error('GLV density vector does not cover every loop position');
   const win0 = ((wk10 + wk20 * GLV_LAMBDA) % r + r) % r, win1 = ((wk11 + wk21 * GLV_LAMBDA) % r + r) % r;
   const SER_state = (Xj, Yj, Zj) => [Xj, Yj, Zj, win0, win1, wk10, wk20, wk11, wk21];
   console.error(`planning BLS12-381 GLV vk_x chunks (${ITERS}-bit 4-scalar Straus)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
