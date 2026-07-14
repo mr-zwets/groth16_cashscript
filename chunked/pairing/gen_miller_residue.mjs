@@ -362,7 +362,8 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     const lhsNames = Array.from({ length: 12 }, (_, i) => `tailLhs${i}`);
     L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
     L.push(`        (${decl(pNames)}) = fp12Mul(${cNames.join(',')}, ${ciNames.join(',')});`);
-    L.push('        ' + pNames.map((n, i) => `require(${n} % P == ${ONE_L[i]});`).join(' '));
+    L.push('        // fp12Mul returns canonical limbs, so direct equality is field equality.');
+    L.push('        ' + pNames.map((n, i) => `require(${n} == ${ONE_L[i]});`).join(' '));
     L.push(`        bytes wHash = hash256(${wNames.map((n) => `toPaddedBytes(${n}, ${STATE_BYTES})`).join(' + ')});`);
     L.push(`        require(wHash == 0x${W_HASHES[0]} || wHash == 0x${W_HASHES[1]} || wHash == 0x${W_HASHES[2]});`);
     L.push(`        (${decl(cqqNames)}) = fp12Frob2(${cNames.join(',')});`);
@@ -370,7 +371,10 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     L.push(`        (${decl(rhsNames)}) = fp12Frob1(${uNames.join(',')});`);
     L.push(`        (${decl(tNames)}) = fp12Mul(${wNames.join(',')}, ${cqqNames.join(',')});`);
     L.push(`        (${decl(lhsNames)}) = fp12Mul(${f.join(',')}, ${tNames.join(',')});`);
-    L.push('        ' + lhsNames.map((n, i) => `require((${n} - ${rhsNames[i]}) % P == 0);`).join(' '));
+    L.push('        // fp12Frob1 leaves only its conjugated c0.c0 imaginary limb noncanonical.');
+    L.push('        ' + lhsNames.map((n, i) => i === 1
+      ? `require((${n} - ${rhsNames[i]}) % P == 0);`
+      : `require(${n} == ${rhsNames[i]});`).join(' '));
   } else {
     // final chunk hands off only [fF, c, cInv] to the residue tail; others carry full state.
     const exactState = COVENANT_RESIDUE
