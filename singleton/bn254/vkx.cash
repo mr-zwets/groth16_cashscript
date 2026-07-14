@@ -33,27 +33,25 @@ function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int,
     return rx, ry, rz;
 }
 
-function selectPoint(int b0, int b1) returns (int, int, int) {
+function selectPoint(int b0, int b1) returns (int, int) {
     // Fixed affine table for the joint scalar bits: IC1, IC2, or IC1 + IC2.
-    int x = 0; int y = 0; int add = 0;
+    // x == 0 encodes the 00/no-add case; every fixed table x coordinate is nonzero.
+    int x = 0; int y = 0;
     if (b0 == 1 && b1 == 1) {
         x = 20687098839691105097230132006705975099432129393118730698937199498853576759031;
         y = 2784555085364475896955849729890301289648525422842103121195101376751786827234;
-        add = 1;
     } else {
         if (b0 == 1) {
             x = 10415861484417082502655338383609494480414113902179649885744799961447382638712;
             y = 10196215078179488638353184030336251401353352596818396260819493263908881608606;
-            add = 1;
         } else {
             if (b1 == 1) {
                 x = 19033251874843656108471242320417533909414939332036131356573128480367742634479;
                 y = 20792135454608030201903199625673964159744755218442260092768620403349374102584;
-                add = 1;
             }
         }
     }
-    return x, y, add;
+    return x, y;
 }
 
 contract VkX(int expectedX, int expectedY) {
@@ -67,8 +65,8 @@ contract VkX(int expectedX, int expectedY) {
             }
             int b0 = (input0 >> i) % 2;
             int b1 = (input1 >> i) % 2;
-            (int x, int y, int add) = selectPoint(b0, b1);
-            if (add == 1) {
+            (int x, int y) = selectPoint(b0, b1);
+            if (x != 0) {
                 (rX, rY, rZ) = jacAddAffine(rX, rY, rZ, x, y);
             }
         }

@@ -81,7 +81,7 @@ node singleton/bls12-381/build_vectors_optimized.mjs# -> groth16-bls12381-single
 (`bch-groth16-bls12381-singleton-minop`): lazy tower + ONE batched c^-|x|-fused Miller
 (only `(-A,B)` runs on-chain G2; `e(alpha,beta)` and the `(vk_x,gamma)`/`(C,delta)` line
 coefficients baked) + witnessed-residue final exp + GLV vk_x. ~68.7 KB locking,
-**~318M op-cost (~40 inputs) vs the baseline's ~967M (~121) as currently measured
+**~318M op-cost (~40 inputs) vs the baseline's ~966M (~121) as currently measured
 by the harness** — ~67% less (~78% vs the 1.48B the baseline measured pre-rescheduler).
 
 BLS-specific differences vs the BN254 min-op (see `../../chunked/bls12-381/_residuemath.mjs`):
@@ -112,15 +112,15 @@ Entries on the **same curve as nChain** (so a true apples-to-apples size
 comparison, unlike the BN254 entries):
 
 - `bch-groth16-bls12381-singleton` — the COMPLETE verifier, plain compiler output
-  (size objective + rescheduleStacks, no post-passes); 7,728-byte locking, ~967M
+  (size objective + rescheduleStacks, no post-passes); 7,698-byte locking, ~966M
   op-cost (~121 BCH inputs). **Far smaller bytecode than the nChain reference.**
 - `bch-groth16-bls12381-singleton-opcode-optimized` — the byte-optimized COMPLETE
   verifier (`build_vectors_optimized.mjs`: golf recompile A/B'd vs the rescheduled
-  compile, then auto-outlining); **5,804-byte locking**, ~1.00B op-cost. The pair shows the
+  compile, then auto-outlining); **5,789-byte locking**, ~1.004B op-cost. The pair shows the
   bytesize-vs-opcost tradeoff, mirroring the BN254 plain/optimized split.
 - `bch-groth16-bls12381-singleton-minop` — the op-optimized COMPLETE verifier
   (`groth16_minop.cash`); ~68.7 KB, **~318M op-cost (~40 inputs)** vs the baseline's
-  ~967M (~121) on the current harness.
+  ~966M (~121) on the current harness.
 - `bch-pairing-bls12381-singleton` — the pairing-only milestone (`verify.cash`);
   ~19.8 KB, ~1.38B op-cost.
 

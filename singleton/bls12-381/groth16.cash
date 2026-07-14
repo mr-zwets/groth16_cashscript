@@ -34,26 +34,24 @@ function jacAddAffineG1(int aX, int aY, int aZ, int bX, int bY) returns (int, in
     return rx, ry, rz;
 }
 
-function selectVkPoint(int b0, int b1) returns (int, int, int) {
-    int x = 0; int y = 0; int add = 0;
+function selectVkPoint(int b0, int b1) returns (int, int) {
+    // x == 0 encodes the 00/no-add case; every fixed table x coordinate is nonzero.
+    int x = 0; int y = 0;
     if (b0 == 1 && b1 == 1) {
         x = 2386781901035473772144341182407687860118005925033428055218509614629770831545237878364312588177396809142590665502445;
         y = 2721985711015193199868848835229056819857651383925471979786755635273858421658233285328399263507021600622741844499993;
-        add = 1;
     } else {
         if (b0 == 1) {
             x = 1940386630589042756063486004190165295069185078823041184114464346315715796897349637805088429212932248421554491972448;
             y = 3114296198575988357603748217414299058449850389627766458803888308926785677746356789015548793127623382888106859156543;
-            add = 1;
         } else {
             if (b1 == 1) {
                 x = 1063080548659463434646774310890803636667161539235054707411467714858983518890075240133758563865893724012200489498889;
                 y = 3669927104170827068533340245967707139563249539898402807511810342954528074138727808893798913182606104785795124774780;
-                add = 1;
             }
         }
     }
-    return x, y, add;
+    return x, y;
 }
 
 function computeVkx(int in0, int in1) returns (int, int) {
@@ -65,8 +63,8 @@ function computeVkx(int in0, int in1) returns (int, int) {
         }
         int b0 = (in0 >> i) % 2;
         int b1 = (in1 >> i) % 2;
-        (int x, int y, int add) = selectVkPoint(b0, b1);
-        if (add == 1) {
+        (int x, int y) = selectVkPoint(b0, b1);
+        if (x != 0) {
             (vx, vy, vz) = jacAddAffineG1(vx, vy, vz, x, y);
         }
     }
