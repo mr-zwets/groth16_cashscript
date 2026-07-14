@@ -192,18 +192,16 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
     L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
     L.push('        int vkxX = mulFp(icx, zInv2);');
     L.push('        int vkxY = mulFp(icy, zInv3);');
-    L.push(covOut(
-      covenantResidue ? [...PROOF_STATE, 'vkxX', 'vkxY'] : ['vkxX', 'vkxY'],
-      covenantResidue ? [...PROOF_STATE, 'vkxX', 'vkxY'] : [],
-    ));
+    const finalState = covenantResidue
+      ? [...PROOF_STATE, 'vkxX', 'vkxY']
+      : ['vkxX', 'vkxY'];
+    L.push(covOut(finalState, finalState));
   } else {
     // Upstream G2 bounds the proof tuple and its exact commitment seam carries it here; this
     // genesis bounds inputs/GLV witnesses, and the Jacobian helpers reduce derived coordinates.
     // Legacy layouts still reduce here.
-    L.push(covOut(
-      covenantResidue ? [...STATE, ...PROOF_STATE] : STATE,
-      covenantResidue ? [...STATE, ...PROOF_STATE] : [],
-    ));
+    const nextState = covenantResidue ? [...STATE, ...PROOF_STATE] : STATE;
+    L.push(covOut(nextState, covenantResidue || stageBound || !first ? nextState : []));
   }
   L.push('    }');
   L.push('}');

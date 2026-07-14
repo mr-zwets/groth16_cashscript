@@ -137,7 +137,10 @@ function genChunk(opLo, opHi) {
     // consumed. The point formulas keep these biased representatives non-negative.
     L.push(`        require(${r0.join(' + ')} >= 0);`);
   }
-  L.push(covOut(STAGE_BOUND && opHi === ops.length ? f : [...f, ...r0, ...ptParams]));
+  const terminal = STAGE_BOUND && opHi === ops.length;
+  const outState = terminal ? f : [...f, ...r0, ...ptParams];
+  const exactState = terminal || (!STAGE_BOUND && opLo === 0) ? [] : ptParams;
+  L.push(covOut(outState, exactState));
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';

@@ -176,12 +176,13 @@ export function genCash(lo, hi, final, incoming, outgoing, stageBound = false, f
     L.push('        int vkxY = mulFp(rY, zInv3);');
     // commit the computed vk_x to output[0] (consumed by the pairing's pair-2);
     // NOT compared to a baked point, so this verifies any instance's public inputs.
-    L.push(covOut(
-      fullStage ? [...PROOF_NAMES, 'vkxX', 'vkxY'] : ['vkxX', 'vkxY'],
-      fullStage ? PROOF_NAMES : [],
-    ));
+    const finalState = fullStage ? [...PROOF_NAMES, 'vkxX', 'vkxY'] : ['vkxX', 'vkxY'];
+    L.push(covOut(finalState, finalState));
   } else {
-    L.push(covOut(['rX', 'rY', 'rZ', 'input0', 'input1']));
+    const nextState = ['rX', 'rY', 'rZ', 'input0', 'input1'];
+    // Stage genesis bounds the inputs and derives the accumulator. In the legacy layout,
+    // the first output performs the one required normalization; later seams are exact.
+    L.push(covOut(nextState, stageBound || lo > 0 ? nextState : []));
   }
   L.push('    }');
   L.push('}');

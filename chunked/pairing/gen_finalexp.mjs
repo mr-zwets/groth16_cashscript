@@ -111,8 +111,12 @@ function buildChunkSrc(s, e) {
     L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
     L.push(`        require(${rv[0]} % P == 1); ` + Array.from({ length: 11 }, (_, j) => `require(${rv[j + 1]} % P == 0);`).join(' '));
   } else {
-    // outgoing live state (lazy, reduced %P) committed to output[0]'s NFT commitment
-    L.push(covOut(liveOut.flatMap((id) => name.get(id))));
+    // Unchanged live inputs already match the canonical incoming commitment. Newly computed
+    // lazy limbs still normalize once at this seam.
+    const exactState = liveOut
+      .filter((id) => liveIn.includes(id))
+      .flatMap((id) => name.get(id));
+    L.push(covOut(liveOut.flatMap((id) => name.get(id)), exactState));
   }
   L.push('    }');
   L.push('}');
