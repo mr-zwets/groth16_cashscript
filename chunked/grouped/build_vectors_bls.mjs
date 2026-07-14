@@ -19,8 +19,12 @@ import {
   compileBytecode, commitBin, CATEGORY, le48, P, OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
-import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
-import { transformChunk } from '../intratx/transform.mjs';
+import { computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
+import {
+  glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX,
+  GLV_HIGH_COST_INPUTS, GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
+} from '../bls12-381/gen_vkx_glv.mjs';
+import { transformChunk, headerSize } from '../intratx/transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'bls12-381', 'generated');
@@ -29,6 +33,13 @@ const PRIME = P.toString();
 import { hexToBin, binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 const standardVm = createVirtualMachineBch2026(true);
+const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
+const GLV_COUNT = GLV_SHARED_AUDITED_BOUNDS.length - 1;
+const GLV_STATE_BYTES = 9 * W;
+regenGlvSharedAudited(GEN, {
+  inputIndex: GLV_COUNT - 1,
+  dataOffset: headerSize(GLV_STATE_BYTES) + GLV_STATE_BYTES + headerSize(GLV_TABLE_BYTES.length),
+}, true, true);
 
 const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem));
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
@@ -79,12 +90,10 @@ const mkInstance = (inputs, bS = 1n, cS = 13n) => {
   const A = Fr.mul(rhs, Fr.inv(bS));
   return { inputs, proof: { a: G1.BASE.multiply(A), b: G2.BASE.multiply(bS), c: G1.BASE.multiply(cS) } };
 };
-// Both valid scalars set bits 0..253, exercising every add branch in the 11 main vk_x windows.
-const DENSE_INPUTS = [(1n << 254n) - 1n, (1n << 254n) - 1n];
 const INSTANCES = {
   committed: { inputs: PUBLIC_INPUTS, proof },
   proof1: mkInstance([135208n, 67633n], 17n, 19n),
-  dense: mkInstance(DENSE_INPUTS),
+  dense: mkInstance(GLV_HIGH_COST_INPUTS),
 };
 
 // ---- per-stage specs ----
@@ -103,17 +112,26 @@ const stageLimbs = (inst, bad = {}) => {
 };
 function specsVkx(inst, bad = {}) {
   const [in0, in1] = inst.inputs.map(BigInt);
+  const [k10, k20] = glvDecompose(in0), [k11, k21] = glvDecompose(in1);
+  const scalars = [in0, in1, k10, k20, k11, k21];
   const stage = stageLimbs(inst, bad);
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxfull.json'), 'utf8'));
-  if (man.genesisDerived !== true || man.fullStageBound !== true) throw new Error('full vk_x manifest is not stage-bound');
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglvfull.json'), 'utf8'));
+  if (man.stageBound !== true || man.fullStageBound !== true || man.sharedTable !== true || man.numChunks !== GLV_COUNT) {
+    throw new Error('full GLV vk_x manifest is not the stage-bound shared-table layout');
+  }
   return man.chunks.map((ch) => {
-    const inLimbs = ch.lo === 0 ? [in0, in1] : [...vkxStateAt(in0, in1, ch.lo), in0, in1];
+    const fullIn = [...vkxGlvStateAt(k10, k20, k11, k21, ch.lo), ...scalars];
+    const inLimbs = ch.first ? fullIn.slice(3) : fullIn;
     if (ch.final) return {
-      file: join(GEN, `vkxfull_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs,
-      outLimbs: stage, extras: [vkxFinalZinv(in0, in1), ...stage.slice(0, 8)], role: 'within',
-      label: 'vk_x final -> bind (-A,B,C,vk_x)', checkpoint: 'vk_x',
+      file: join(GEN, `vkxglvfull_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs,
+      outLimbs: stage, extras: [vkxGlvZinv(k10, k20, k11, k21), ...stage.slice(0, 8), GLV_TABLE_BYTES], role: 'within',
+      label: 'GLV vk_x final -> bind (-A,B,C,vk_x)', checkpoint: 'vk_x',
     };
-    return { file: join(GEN, `vkxfull_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs: [...vkxStateAt(in0, in1, ch.hi), in0, in1], extras: [], role: 'within', label: `vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined };
+    return {
+      file: join(GEN, `vkxglvfull_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs,
+      outLimbs: [...vkxGlvStateAt(k10, k20, k11, k21, ch.hi), ...scalars], extras: [],
+      role: 'within', label: `GLV vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined,
+    };
   });
 }
 function specsMiller(inst, validated = false, bad = {}) {
@@ -164,8 +182,9 @@ function buildSpecs(inst) {
 
 // ---- grouping (identical logic to the BN254 build) ----------------------------------
 const PER_INPUT_OV = 43;
+const blockedCut = (i) => i < GLV_COUNT - 1;
 function packGroups(specs, sz, target) {
-  const allowed = (i) => i < specs.length - 1 && specs[i].outLimbs.length > 0 && limbsEqual(specs[i].outLimbs, specs[i + 1].inLimbs);
+  const allowed = (i) => i < specs.length - 1 && !blockedCut(i) && specs[i].outLimbs.length > 0 && limbsEqual(specs[i].outLimbs, specs[i + 1].inLimbs);
   const groups = []; let start = 0;
   while (start < specs.length) {
     let acc = 0, lastAllowed = -1, end = specs.length - 1;
@@ -220,7 +239,7 @@ function compileChunk(spec, cfg) {
 const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41) : Infinity);
 function argBytesOf(spec) {
   const parts = [pd(blob(spec.inLimbs))];
-  for (const e of [...spec.extras].reverse()) parts.push(pushInt(BigInt(e)));
+  for (const e of [...spec.extras].reverse()) parts.push(e instanceof Uint8Array ? pd(e) : pushInt(BigInt(e)));
   return Uint8Array.from(parts.flatMap((p) => [...p]));
 }
 
@@ -360,11 +379,11 @@ const toRun = (asm) => ({
   })),
 });
 
-function pushBounds(unlocking) {
-  const op = unlocking[0];
-  if (op <= 75) return { dataStart: 1, dataLen: op };
-  if (op === 0x4c) return { dataStart: 2, dataLen: unlocking[1] };
-  if (op === 0x4d) return { dataStart: 3, dataLen: unlocking[1] | (unlocking[2] << 8) };
+function pushBounds(unlocking, opcodeOffset = 0) {
+  const op = unlocking[opcodeOffset];
+  if (op <= 75) return { dataStart: opcodeOffset + 1, dataLen: op };
+  if (op === 0x4c) return { dataStart: opcodeOffset + 2, dataLen: unlocking[opcodeOffset + 1] };
+  if (op === 0x4d) return { dataStart: opcodeOffset + 3, dataLen: unlocking[opcodeOffset + 1] | (unlocking[opcodeOffset + 2] << 8) };
   throw new Error(`unsupported inBlob push opcode ${op}`);
 }
 function evaluateMutated(asm) {
@@ -416,6 +435,9 @@ const TARGET_GROUP_BYTES = 97000;
 const cSpecs = buildSpecs(INSTANCES.committed);
 const p1Specs = buildSpecs(INSTANCES.proof1);
 const denseSpecs = buildSpecs(INSTANCES.dense);
+if (cSpecs[0].inLimbs.length !== 6 || !limbsEqual(cSpecs[GLV_COUNT - 1].outLimbs, cSpecs[GLV_COUNT].inLimbs)) {
+  throw new Error('GLV genesis or exact (-A,B,C,vk_x) seam is not stage-bound');
+}
 function sizeEstimate(specs) {
   const provisional = packGroups(specs, specs.map(() => 9000), TARGET_GROUP_BYTES);
   return assembleGrouped(specs, provisional).meta.map((m) => m.unlockingBytes);
@@ -430,6 +452,20 @@ const asmProof1 = assembleGrouped(p1Specs, GROUPS);
 report('groth16-bls-grouped proof#1', asmProof1);
 const asmDense = assembleGrouped(denseSpecs, GROUPS);
 report('groth16-bls-grouped max-density', asmDense);
+
+if (GROUPS[0][0] !== 0 || GROUPS[0][1] < GLV_COUNT - 1) {
+  throw new Error(`shared GLV table span [0,${GLV_COUNT - 1}] is not contained in group 0`);
+}
+const tableInputs = asmCommitted.inputs.slice();
+const tableUnlocking = Uint8Array.from(tableInputs[GLV_COUNT - 1].unlocking);
+const carrierBlob = pushBounds(tableUnlocking);
+const tablePush = pushBounds(tableUnlocking, carrierBlob.dataStart + carrierBlob.dataLen);
+if (tablePush.dataLen !== GLV_TABLE_BYTES.length) throw new Error('shared GLV table push has unexpected length');
+tableUnlocking[tablePush.dataStart + Math.floor(tablePush.dataLen / 2)] ^= 0x01;
+tableInputs[GLV_COUNT - 1] = { ...tableInputs[GLV_COUNT - 1], unlocking: tableUnlocking };
+const tableGroupInputs = tableInputs.slice(GROUPS[0][0], GROUPS[0][1] + 1);
+if (evalGroup(tableGroupInputs, GLV_COUNT - 1, asmCommitted.gmeta[0]).accepted) throw new Error('mutated shared GLV table was accepted');
+const tableMutation = evaluateMutated({ ...asmCommitted, inputs: tableInputs });
 
 const firstBoundary = GROUPS[1] ? GROUPS[1][0] : 1;
 const invalids = [invalidRun(cSpecs, GROUPS, Math.floor(cSpecs.length / 2)), invalidRun(cSpecs, GROUPS, firstBoundary)];
@@ -464,8 +500,18 @@ offSubSpecs[offSubSpecs.length - 1].role = 'stage-final';
 const offSubgroupB = isolated(offSubSpecs);
 
 const forgedState = isolatedFirstMiller({}, Array.from({ length: 18 }, (_, i) => BigInt(i + 1)));
-const rangeSpec = specsVkx(INSTANCES.committed)[0];
-const outOfRange = isolated([{ ...rangeSpec, inLimbs: [Rord, PUBLIC_INPUTS[1]], role: 'stage-final' }]);
+const rangeSpecs = buildSpecs(INSTANCES.committed);
+const rangeGenesis = [...rangeSpecs[0].inLimbs]; rangeGenesis[0] = Rord;
+rangeSpecs[0] = { ...rangeSpecs[0], inLimbs: rangeGenesis };
+const outOfRange = assembleGrouped(rangeSpecs, GROUPS, true);
+const oversizedSpecs = buildSpecs(INSTANCES.committed);
+const oversizedGenesis = [...oversizedSpecs[0].inLimbs]; oversizedGenesis[2] = 1n << 128n;
+oversizedSpecs[0] = { ...oversizedSpecs[0], inLimbs: oversizedGenesis };
+const oversizedGlv = assembleGrouped(oversizedSpecs, GROUPS, true);
+const incongruentSpecs = buildSpecs(INSTANCES.committed);
+const incongruentGenesis = [...incongruentSpecs[0].inLimbs]; incongruentGenesis[2] += 1n;
+incongruentSpecs[0] = { ...incongruentSpecs[0], inLimbs: incongruentGenesis };
+const incongruentGlv = assembleGrouped(incongruentSpecs, GROUPS, true);
 
 // Exact full-state seams reject proof splices and mutations of each proof component.
 const vkxCount = specsVkx(INSTANCES.committed).length;
@@ -488,9 +534,10 @@ handoff.outLocking = Uint8Array.from(handoff.outLocking);
 handoff.outLocking[handoff.outLocking.length - 1] ^= 0x01;
 const lockTamper = evaluateMutated(lockTamperAsm);
 
-const semantic = [offCurveA, offSubgroupB, offCurveC, forgedState, outOfRange];
+const semantic = [offCurveA, offSubgroupB, offCurveC, forgedState, outOfRange, oversizedGlv, incongruentGlv];
 const securityInvalids = [
   ...semantic.map(evaluateMutated),
+  tableMutation,
   hybridInvalid,
   ...proofMutations,
   lockTamper,
@@ -502,7 +549,7 @@ if (!asmCommitted.fits || !asmProof1.fits || !asmDense.fits || !allInvalids.ever
 }
 
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-grouped-vectors.json'), JSON.stringify({
-  description: 'GROUPED BLS12-381 Groth16 verifier: canonical-range-checked vk_x -> exact (-A,B,C,vk_x) state -> input-validated prepared-VK Miller product -> final exponentiation -> verdict, packed into standard transactions. The first Miller chunk checks A/C and B on-curve; the final Miller chunk reuses its running R_B=[|x|]B for the guarded psi(B)==[-x]B subgroup check. Miller derives f=1 and R_B=B. Within a group every chunk forward-checks the entire successor blob; across groups a mutable NFT carries hash256(outBlob), and the boundary covenant pins the actual successor P2SH32 locking. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. Negative cases for off-curve, off-subgroup, forged-state, scalar-range, proof-splice, A/B/C mutation, and successor-lock inputs reject.',
+  description: 'GROUPED BLS12-381 Groth16 verifier: canonical-range-checked five-chunk GLV vk_x with one hash-bound shared VK table -> exact (-A,B,C,vk_x) state -> input-validated prepared-VK Miller product -> final exponentiation -> verdict, packed into standard transactions. The first Miller chunk checks A/C and B on-curve; the final Miller chunk reuses its running R_B=[|x|]B for the guarded psi(B)==[-x]B subgroup check. Miller derives f=1 and R_B=B. Within a group every chunk forward-checks the entire successor blob; across groups a mutable NFT carries hash256(outBlob), and the boundary covenant pins the actual successor P2SH32 locking. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. Negative cases cover the table, GLV bounds/congruence, off-curve, off-subgroup, forged-state, scalar-range, proof-splice, A/B/C mutation, and successor locking.',
   method: 'grouped', deployment: 'P2SH32', curve: 'BLS12-381', category: binToHex(CATEGORY),
   numInputs: asmCommitted.meta.length, numGroups: GROUPS.length, budgetPerInput: OP_BUDGET,
   groupSizes: GROUPS.map(([lo, hi]) => hi - lo + 1),

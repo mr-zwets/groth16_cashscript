@@ -135,8 +135,8 @@ bundle was already non-standard (< 1 MB), so nothing new is given up.
   the full verifier (`bch-groth16-intratx`) into one-transaction vectors, evaluates every
   input on the real BCH 2026 VM, and writes `verifier/src/bch/{pairing,groth16}-intratx-vectors.json`.
 - `build_vectors_bls.mjs` — BLS12-381 counterpart (`bch-pairing-bls12381-intratx`,
-  `bch-groth16-bls12381-intratx`); 48-byte limbs, the easy-part inverse rides as an
-  uncommitted witness.
+  `bch-groth16-bls12381-intratx`); the full track uses five stage-bound GLV vk_x inputs
+  sharing one hash-bound VK table, 48-byte limbs, and an uncommitted easy-part inverse.
 - `build_vectors_residue.mjs` / `build_vectors_residue_bls.mjs` — the residue-optimized chunk graph
   (GLV `vk_x` + fused Miller + witnessed-residue tail) assembled as one tx, current-BCH 10 kB budget
   (`bch-groth16-intratx-residue`, `bch-groth16-bls12381-intratx-residue`).

@@ -19,17 +19,28 @@ import {
   le48, P, OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
-import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
-import { transformChunk } from './transform.mjs';
+import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
+import {
+  glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX,
+  GLV_HIGH_COST_INPUTS, GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
+} from '../bls12-381/gen_vkx_glv.mjs';
+import { transformChunk, headerSize } from './transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'bls12-381', 'generated');
 const PROBE = join(GEN, '_intratx_probe.cash'); // transformed import-chunks compiled from here
 const W = 48; // BLS12-381 limb width
 const PRIME = P.toString();
-import { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
+import { hexToBin, binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 const standardVm = createVirtualMachineBch2026(true);
+const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
+const GLV_COUNT = GLV_SHARED_AUDITED_BOUNDS.length - 1;
+const GLV_STATE_BYTES = 9 * W;
+regenGlvSharedAudited(GEN, {
+  inputIndex: GLV_COUNT - 1,
+  dataOffset: headerSize(GLV_STATE_BYTES) + GLV_STATE_BYTES + headerSize(GLV_TABLE_BYTES.length),
+}, true, true);
 
 // Deploy as P2SH so the ~4-5 KB redeem (in the scriptSig) counts toward the op-cost
 // budget and offsets the pad (~30% smaller on-chain than bare). See build_vectors.mjs.
@@ -72,12 +83,11 @@ const mkInstance = (inputs, bS = 1n, cS = 13n) => {
   const A = Fr.mul(rhs, Fr.inv(bS));
   return { inputs, proof: { a: G1.BASE.multiply(A), b: G2.BASE.multiply(bS), c: G1.BASE.multiply(cS) } };
 };
-// Both valid scalars set bits 0..253, exercising every add branch in the 11 main vk_x windows.
-const DENSE_INPUTS = [(1n << 254n) - 1n, (1n << 254n) - 1n];
 const INSTANCES = {
   committed: { inputs: PUBLIC_INPUTS, proof },
   proof1: mkInstance([135208n, 67633n], 17n, 19n),
-  dense: mkInstance(DENSE_INPUTS),
+  pairingDense: mkInstance([(1n << 254n) - 1n, (1n << 254n) - 1n]),
+  dense: mkInstance(GLV_HIGH_COST_INPUTS),
 };
 
 // ---- per-stage specs ----
@@ -98,17 +108,26 @@ const stageLimbs = (inst, bad = {}) => {
 
 function specsVkx(inst) {
   const [in0, in1] = inst.inputs.map(BigInt);
+  const [k10, k20] = glvDecompose(in0), [k11, k21] = glvDecompose(in1);
+  const scalars = [in0, in1, k10, k20, k11, k21];
   const stage = stageLimbs(inst);
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxfull.json'), 'utf8'));
-  if (man.genesisDerived !== true || man.fullStageBound !== true) throw new Error('full vk_x manifest is not stage-bound');
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglvfull.json'), 'utf8'));
+  if (man.stageBound !== true || man.fullStageBound !== true || man.sharedTable !== true || man.numChunks !== GLV_COUNT) {
+    throw new Error('full GLV vk_x manifest is not the stage-bound shared-table layout');
+  }
   return man.chunks.map((ch) => {
-    const inLimbs = ch.lo === 0 ? [in0, in1] : [...vkxStateAt(in0, in1, ch.lo), in0, in1];
+    const fullIn = [...vkxGlvStateAt(k10, k20, k11, k21, ch.lo), ...scalars];
+    const inLimbs = ch.first ? fullIn.slice(3) : fullIn;
     if (ch.final) return {
-      file: join(GEN, `vkxfull_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs,
-      outLimbs: stage, extras: [vkxFinalZinv(in0, in1), ...stage.slice(0, 8)],
-      role: 'within', label: 'vk_x final -> bind (-A,B,C,vk_x)', checkpoint: 'vk_x',
+      file: join(GEN, `vkxglvfull_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs,
+      outLimbs: stage, extras: [vkxGlvZinv(k10, k20, k11, k21), ...stage.slice(0, 8), GLV_TABLE_BYTES],
+      role: 'within', label: 'GLV vk_x final -> bind (-A,B,C,vk_x)', checkpoint: 'vk_x',
     };
-    return { file: join(GEN, `vkxfull_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs: [...vkxStateAt(in0, in1, ch.hi), in0, in1], extras: [], role: 'within', label: `vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined };
+    return {
+      file: join(GEN, `vkxglvfull_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs,
+      outLimbs: [...vkxGlvStateAt(k10, k20, k11, k21, ch.hi), ...scalars], extras: [],
+      role: 'within', label: `GLV vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined,
+    };
   });
 }
 
@@ -182,7 +201,7 @@ function compileSpec(s) {
 const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41) : Infinity);
 function argBytesOf(s) {
   const parts = [pd(blob(s.inLimbs))];
-  for (const e of [...s.extras].reverse()) parts.push(pushInt(e));
+  for (const e of [...s.extras].reverse()) parts.push(e instanceof Uint8Array ? pd(e) : pushInt(BigInt(e)));
   return Uint8Array.from(parts.flatMap((p) => [...p]));
 }
 function assemble(specs, expectRejected = false) {
@@ -266,11 +285,11 @@ function buildFullSpecs(inst) {
 function buildFull(inst) { return assemble(buildFullSpecs(inst)); }
 
 const toStepArr = (asm) => asm.inputs.map((inp, i) => ({ label: asm.meta[i].label, locking: binToHex(inp.locking), unlocking: binToHex(inp.unlocking), checkpoint: asm.meta[i].checkpoint }));
-function pushBounds(unlocking) {
-  const op = unlocking[0];
-  if (op <= 75) return { dataStart: 1, dataLen: op };
-  if (op === 0x4c) return { dataStart: 2, dataLen: unlocking[1] };
-  if (op === 0x4d) return { dataStart: 3, dataLen: unlocking[1] | (unlocking[2] << 8) };
+function pushBounds(unlocking, opcodeOffset = 0) {
+  const op = unlocking[opcodeOffset];
+  if (op <= 75) return { dataStart: opcodeOffset + 1, dataLen: op };
+  if (op === 0x4c) return { dataStart: opcodeOffset + 2, dataLen: unlocking[opcodeOffset + 1] };
+  if (op === 0x4d) return { dataStart: opcodeOffset + 3, dataLen: unlocking[opcodeOffset + 1] | (unlocking[opcodeOffset + 2] << 8) };
   throw new Error(`unsupported inBlob push opcode ${op}`);
 }
 function mutateInputBlob(inputs, inputIndex, byteOffset) {
@@ -301,7 +320,7 @@ const meta = (asm) => ({ method: 'intra-tx-linked', deployment: 'P2SH32', curve:
 // pairing (miller + final exp -> verdict) single tx
 const pair0 = buildPairing(INSTANCES.committed); report('pairing committed', pair0);
 const pair1 = buildPairing(INSTANCES.proof1); report('pairing proof#1', pair1);
-const pairDense = buildPairing(INSTANCES.dense); report('pairing max-density', pairDense);
+const pairDense = buildPairing(INSTANCES.pairingDense); report('pairing max-density', pairDense);
 const pInv = [invalidRun(pair0, 0), invalidRun(pair0, Math.floor(pair0.inputs.length / 2))];
 console.error(`  pairing invalid rejected: ${pInv.map((r) => r.rejected).join(',')}`);
 if (!pair0.fits || !pair1.fits || !pairDense.fits || !pInv.every((r) => r.rejected)) {
@@ -317,6 +336,9 @@ console.error('wrote pairing-bls12381-intratx-vectors.json');
 const full0Specs = buildFullSpecs(INSTANCES.committed);
 const full1Specs = buildFullSpecs(INSTANCES.proof1);
 const fullDenseSpecs = buildFullSpecs(INSTANCES.dense);
+if (full0Specs[0].inLimbs.length !== 6 || !sameLimbs(full0Specs[GLV_COUNT - 1].outLimbs, full0Specs[GLV_COUNT].inLimbs)) {
+  throw new Error('GLV genesis or exact (-A,B,C,vk_x) seam is not stage-bound');
+}
 const full0 = assemble(full0Specs); report('groth16 committed', full0);
 const full1 = assemble(full1Specs); report('groth16 proof#1', full1);
 const fullDense = assemble(fullDenseSpecs); report('groth16 max-density', fullDense);
@@ -353,8 +375,28 @@ const offSubgroupB = assemble(offSubSpecs, true);
 // The validated Miller genesis accepts exactly ten stage limbs and derives f/R_B.
 const forgedState = isolatedFirstMiller({}, Array.from({ length: 18 }, (_, i) => BigInt(i + 1)));
 
-const badRangeSpec = specsVkx(INSTANCES.committed)[0];
-const outOfRange = assemble([{ ...badRangeSpec, inLimbs: [Rord, PUBLIC_INPUTS[1]], role: 'stage-final' }], true);
+const badRangeSpecs = buildFullSpecs(INSTANCES.committed);
+const badRangeGenesis = [...badRangeSpecs[0].inLimbs]; badRangeGenesis[0] = Rord;
+badRangeSpecs[0] = { ...badRangeSpecs[0], inLimbs: badRangeGenesis };
+const outOfRange = assemble(badRangeSpecs, true);
+const oversizedSpecs = buildFullSpecs(INSTANCES.committed);
+const oversizedGenesis = [...oversizedSpecs[0].inLimbs]; oversizedGenesis[2] = 1n << 128n;
+oversizedSpecs[0] = { ...oversizedSpecs[0], inLimbs: oversizedGenesis };
+const oversizedGlv = assemble(oversizedSpecs, true);
+const incongruentSpecs = buildFullSpecs(INSTANCES.committed);
+const incongruentGenesis = [...incongruentSpecs[0].inLimbs]; incongruentGenesis[2] += 1n;
+incongruentSpecs[0] = { ...incongruentSpecs[0], inLimbs: incongruentGenesis };
+const incongruentGlv = assemble(incongruentSpecs, true);
+
+const tableInputs = full0.inputs.slice();
+const tableUnlocking = Uint8Array.from(tableInputs[GLV_COUNT - 1].unlocking);
+const carrierBlob = pushBounds(tableUnlocking);
+const tablePush = pushBounds(tableUnlocking, carrierBlob.dataStart + carrierBlob.dataLen);
+if (tablePush.dataLen !== GLV_TABLE_BYTES.length) throw new Error('shared GLV table push has unexpected length');
+tableUnlocking[tablePush.dataStart + Math.floor(tablePush.dataLen / 2)] ^= 0x01;
+tableInputs[GLV_COUNT - 1] = { ...tableInputs[GLV_COUNT - 1], unlocking: tableUnlocking };
+const tableMutation = invalidInputsRun(full0, tableInputs);
+if (!tableMutation.rejected || evalInput(tableInputs, GLV_COUNT - 1).accepted) throw new Error('mutated shared GLV table was accepted');
 
 const vkxCount = specsVkx(INSTANCES.committed).length;
 const millerGenesisIndex = vkxCount;
@@ -366,16 +408,16 @@ const bindingMutations = [1 * W, 3 * W, 7 * W].map((offset) => {
   return run;
 });
 
-const semanticInvalid = [offCurveA, offSubgroupB, offCurveC, forgedState, outOfRange];
+const semanticInvalid = [offCurveA, offSubgroupB, offCurveC, forgedState, outOfRange, oversizedGlv, incongruentGlv];
 const semanticRuns = semanticInvalid.map((asm) => ({ steps: toStepArr(asm), rejected: !asm.accepted }));
 const proofBindingInvalid = [{ steps: toStepArr(hybrid), rejected: !hybrid.accepted }, ...bindingMutations];
-const allInvalid = [...fInv, ...semanticRuns, ...proofBindingInvalid];
+const allInvalid = [...fInv, tableMutation, ...semanticRuns, ...proofBindingInvalid];
 console.error(`  groth16 semantic/binding invalid rejected: ${allInvalid.map((r) => r.rejected).join(',')}`);
 if (!full0.fits || !full1.fits || !fullDense.fits || !allInvalid.every((r) => r.rejected)) {
   throw new Error('Groth16 valid, dense, or invalid fixture failed; refusing to write vectors');
 }
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-vectors.json'), JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED full BLS12-381 Groth16 verifier in ONE transaction: canonical-range-checked vk_x -> exact (-A,B,C,vk_x) state -> input-validated prepared-VK Miller product -> final exponentiation -> verdict. The first Miller chunk checks A/C and B on-curve; the final Miller chunk reuses its running R_B=[|x|]B for the guarded psi(B)==[-x]B subgroup check. Miller derives f=1 and R_B=B. Every adjacent input checks the entire next-stage blob, including all stage seams; exact blob lengths reject legacy caller-supplied f/R layouts. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. Negative cases for off-curve, off-subgroup, forged-state, scalar-range, proof-splice, and A/B/C mutation inputs reject.',
+  description: 'INTRA-TRANSACTION LINKED full BLS12-381 Groth16 verifier in ONE transaction: canonical-range-checked five-chunk GLV vk_x with one hash-bound shared VK table -> exact (-A,B,C,vk_x) state -> input-validated prepared-VK Miller product -> final exponentiation -> verdict. The first Miller chunk checks A/C and B on-curve; the final Miller chunk reuses its running R_B=[|x|]B for the guarded psi(B)==[-x]B subgroup check. Miller derives f=1 and R_B=B. Every adjacent input checks the entire next-stage blob, including all stage seams; exact blob lengths reject legacy caller-supplied f/R layouts. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. Negative cases cover the shared table, GLV decomposition bounds/congruence, off-curve, off-subgroup, forged-state, scalar-range, proof-splice, and A/B/C mutations.',
   ...meta(full0), steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullDense),
   invalid: allInvalid.map((r) => r.steps),
   invalidInputs: [toStepArr(offCurveA), toStepArr(offSubgroupB)],

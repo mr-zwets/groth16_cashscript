@@ -11,8 +11,9 @@ oracle. Three benchmark entries (in the verifier repo) are produced from here:
 - **`bch-pairing-bls12381-chunked`** — the **Miller loops + final exponentiation**:
   `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)` as one prepared-VK 4-pair Miller product →
   the BLS/Hayashida-Scott final exponentiation → verdict (== Fp12 ONE). 51 chunks / 470,061 B / 372,314,128 op-cost.
-- **`bch-groth16-bls12381-chunked`** — the **complete verifier**: the vk_x chunks
-  prepended to an input-validated Miller namespace. 62 chunks / 486,512 B / 379,566,940 op-cost; ranked in the main
+- **`bch-groth16-bls12381-chunked`** — the **complete verifier**: five stage-bound GLV vk_x
+  chunks prepended to an input-validated Miller namespace. 56 chunks / 484,865 B /
+  377,821,912 op-cost; ranked in the main
   Groth16 leaderboard against nchain (its BLS12-381 reference) — the only BCH-compatible
   full Groth16 verifier on that curve.
 
@@ -20,9 +21,9 @@ The separate 29-chunk input-unvalidated pairing and input-validated full Miller 
 also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` builders:
 
 - `bch-pairing-bls12381-intratx`: 51 inputs / 465,462 B / 372,116,160 op-cost.
-- `bch-groth16-bls12381-intratx`: 62 inputs / 483,320 B / 379,271,083 op-cost.
-- `bch-groth16-bls12381-grouped`: 62 inputs / 7 standard transactions / 483,303 B /
-  379,156,958 op-cost.
+- `bch-groth16-bls12381-intratx`: 56 inputs / 475,579 B / 377,687,307 op-cost.
+- `bch-groth16-bls12381-grouped`: 56 inputs / 6 standard transactions / 475,561 B /
+  377,584,999 op-cost.
 
 ## Optimizations (prepared batched Miller + lazy reduction)
 
@@ -50,6 +51,13 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
 - **Forward final-exp packing** — the planner targets 100,000 op-cost below the per-input
   budget by default, fitting the final-exponentiation trace into 22 chunks while preserving
   the existing forward execution order.
+- **GLV full-verifier aggregation** — the full verifier decomposes each canonical Fr input
+  into two non-negative 128-bit scalars and uses a four-scalar Straus walk over the fixed
+  endomorphism table. The covenant form embeds the exact VK table; the intra/grouped forms
+  carry it once in the fifth GLV input, hash-pin it there, and let the four siblings read it
+  by input introspection. The first contract derives infinity from only six scalar limbs,
+  and the last emits the exact `(-A,B,C,vk_x)` stage. The standalone vk_x benchmark remains
+  the existing 11-chunk full-width Shamir implementation for a like-for-like track.
 
 Since per-step bytes are dominated (~64%) by op-cost-proportional unlocking padding,
 op-cost cuts translate ~1:1 into size.
@@ -100,7 +108,8 @@ Individual pieces (all reproducible artifacts; only the generators are committed
 
 ```
 node gen_vkx.mjs                    # standalone vk_x covenant chunks
-node gen_vkx.mjs full               # full-stage vk_x -> (-A,B,C,vk_x)
+node gen_vkx.mjs full               # legacy full-stage Shamir generator
+node gen_vkx_glv.mjs                # GLV planner; full builders emit the audited stage-bound layout
 node gen_miller.mjs                 # pairing-only prepared Miller (input-unvalidated)
 node gen_miller.mjs full            # full prepared Miller with fused input validation
 node gen_finalexp.mjs               # final exponentiation -> verdict
@@ -159,7 +168,8 @@ the first chunk rejects negative or out-of-range scalars rather than silently tr
 | `_vkxmath.mjs` | shared Fp/Jacobian math, 48-byte serialization, covenant emitters, real-VM measurer, planner | ✅ |
 | `_pairingmath.mjs` | shared noble Miller/finalExp math, op-DAG trace, instance pairs, fnExtractor | ✅ |
 | `_residue_linked_plan.mjs` | audited hash-free Miller/tail boundaries and stress fixture, shared by grouped + intra-tx | ✅ |
-| `gen_vkx.mjs` | plan + emit the worst-case-sized vk_x chunks | ✅ |
+| `gen_vkx.mjs` | plan + emit the standalone worst-case-sized Shamir vk_x chunks | ✅ |
+| `gen_vkx_glv.mjs` | emit the hardened five-window GLV layout used by full-verifier builders | ✅ |
 | `gen_miller.mjs` | plan + emit separate pairing-only and input-validated full prepared-Miller namespaces | ✅ |
 | `gen_finalexp.mjs` | trace + chunk the final exponentiation (op-DAG + liveness, lazy) | ✅ |
 | `build_vectors.mjs` | assemble the vk_x covenant vectors | ✅ |

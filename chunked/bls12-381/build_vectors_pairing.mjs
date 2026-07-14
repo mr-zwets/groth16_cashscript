@@ -19,10 +19,16 @@ import {
   commitBin, CATEGORY, tok, P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, verifierPath,
 } from './_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
-import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode, compileFileBytecodeRaw } from './_vkxmath.mjs';
+import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from './_vkxmath.mjs';
+import {
+  glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_HIGH_COST_INPUTS,
+  GLV_SHARED_AUDITED_BOUNDS, GLV_TABLE_HEX, regenGlvSharedAudited,
+} from './gen_vkx_glv.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
+const GLV_COUNT = GLV_SHARED_AUDITED_BOUNDS.length - 1;
+regenGlvSharedAudited(GEN, null, true, true);
 import { binToHex, hexToBin, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, numberToBinUint16LE, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 
@@ -205,7 +211,8 @@ const mkInstance = (inputs, bS = 1n, cS = 13n) => {
 };
 const INSTANCES = [
   { tag: 'committed', inputs: PUBLIC_INPUTS, proof },
-  { tag: 'dense-instance', ...mkInstance([(1n << 254n) - 1n, (1n << 254n) - 1n], 17n, 19n) },
+  { tag: 'instance#1', ...mkInstance([135208n, 67633n], 17n, 19n) },
+  { tag: 'all-position', ...mkInstance(GLV_HIGH_COST_INPUTS, 23n, 29n) },
 ];
 
 // ---- BATCHED Miller replay (flat op list; final chunk conjugates f = boundary) ----
@@ -271,23 +278,29 @@ function specsFinalexp(inst, boundaryVal, expectOne = true) {
   return specs;
 }
 
-// ---- vk_x chunks (for the full groth16 verifier; from gen_vkx's manifest) ----
+// ---- stage-bound GLV vk_x chunks (the standalone Shamir vector remains unchanged) ----
 function specsVkx(inst) {
   const [in0, in1] = inst.inputs.map(BigInt);
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxfull.json'), 'utf8'));
-  if (man.genesisDerived !== true || man.fullStageBound !== true) throw new Error('full vk_x manifest is not stage-bound');
+  const [k10, k20] = glvDecompose(in0), [k11, k21] = glvDecompose(in1);
+  const scalars = [in0, in1, k10, k20, k11, k21];
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglvfull.json'), 'utf8'));
+  if (man.stageBound !== true || man.fullStageBound !== true || man.sharedTable !== false || man.numChunks !== GLV_COUNT) {
+    throw new Error('full GLV vk_x manifest is not the stage-bound baked-table layout');
+  }
   const stage = stageLimbs(inst);
   const proofTuple = stage.slice(0, 8);
   const specs = [];
   for (const ch of man.chunks) {
-    const inAcc = vkxStateAt(in0, in1, ch.lo);
-    const commitLimbs = ch.lo === 0 ? [in0, in1] : [...inAcc, in0, in1];
+    const fullIn = [...vkxGlvStateAt(k10, k20, k11, k21, ch.lo), ...scalars];
+    const commitLimbs = ch.first ? fullIn.slice(3) : fullIn;
     let outLimbs, allArgs;
-    if (ch.final) { outLimbs = stage; allArgs = [...commitLimbs, vkxFinalZinv(in0, in1), ...proofTuple]; }
-    else { outLimbs = [...vkxStateAt(in0, in1, ch.hi), in0, in1]; allArgs = commitLimbs; }
+    if (ch.final) { outLimbs = stage; allArgs = [...commitLimbs, vkxGlvZinv(k10, k20, k11, k21), ...proofTuple]; }
+    else { outLimbs = [...vkxGlvStateAt(k10, k20, k11, k21, ch.hi), ...scalars]; allArgs = commitLimbs; }
+    const cashFile = join(GEN, `vkxglvfull_${String(ch.idx).padStart(2, '0')}.cash`);
+    if (!readFileSync(cashFile, 'utf8').includes(GLV_TABLE_HEX)) throw new Error('covenant GLV chunk does not embed the exact VK table');
     specs.push({
-      cashFile: join(GEN, `vkxfull_${String(ch.idx).padStart(2, '0')}.cash`), commitLimbs, outLimbs,
-      label: `vk_x [${ch.lo},${ch.hi})${ch.final ? ' bind (-A,B,C,vk_x)' : ''}`,
+      cashFile, commitLimbs, outLimbs,
+      label: `GLV vk_x [${ch.lo},${ch.hi})${ch.final ? ' bind (-A,B,C,vk_x)' : ''}`,
       checkpoint: ch.final ? 'vk_x' : undefined, allArgs,
     });
   }
@@ -310,6 +323,7 @@ const buildPairing = (inst) => {
 };
 const run0 = { ...buildGroth16(INSTANCES[0]), pairing: buildPairing(INSTANCES[0]).all };
 const run1 = { ...buildGroth16(INSTANCES[1]), pairing: buildPairing(INSTANCES[1]).all };
+const runDense = buildGroth16(INSTANCES[2]);
 const steps = run0.all;
 const extraValidProofs = [run1.all];
 const sumOp = (a) => a.reduce((x, s) => x + s.operationCost, 0);
@@ -358,8 +372,21 @@ const forgedStateRun = buildInvalidFirstMiller({}, Array.from({ length: 18 }, (_
 
 // Public scalars are canonical Fr elements, not values silently truncated to 255 bits.
 const badRangeSpecs = specsVkx(INSTANCES[0]);
-badRangeSpecs[0] = { ...badRangeSpecs[0], commitLimbs: [Rord, PUBLIC_INPUTS[1]], allArgs: [Rord, PUBLIC_INPUTS[1]] };
+const badRangeGenesis = [...badRangeSpecs[0].commitLimbs]; badRangeGenesis[0] = Rord;
+badRangeSpecs[0] = { ...badRangeSpecs[0], commitLimbs: badRangeGenesis, allArgs: badRangeGenesis };
 const outOfRangeRun = buildChain([badRangeSpecs[0]], { noStats: true, tailLocking: hexToBin(run0.all[1].locking), expectRejected: true });
+
+// The stage-bound GLV genesis exposes exactly six scalar limbs and rejects both oversized
+// decomposition witnesses and witnesses that are not congruent to the public input.
+if (specsVkx(INSTANCES[0])[0].commitLimbs.length !== 6) throw new Error('GLV genesis is not six-limb stage-bound');
+const oversizedSpecs = specsVkx(INSTANCES[0]);
+const oversizedGenesis = [...oversizedSpecs[0].commitLimbs]; oversizedGenesis[2] = 1n << 128n;
+oversizedSpecs[0] = { ...oversizedSpecs[0], commitLimbs: oversizedGenesis, allArgs: oversizedGenesis };
+const oversizedGlvRun = buildChain([oversizedSpecs[0]], { noStats: true, tailLocking: hexToBin(run0.all[1].locking), expectRejected: true });
+const incongruentSpecs = specsVkx(INSTANCES[0]);
+const incongruentGenesis = [...incongruentSpecs[0].commitLimbs]; incongruentGenesis[2] += 1n;
+incongruentSpecs[0] = { ...incongruentSpecs[0], commitLimbs: incongruentGenesis, allArgs: incongruentGenesis };
+const incongruentGlvRun = buildChain([incongruentSpecs[0]], { noStats: true, tailLocking: hexToBin(run0.all[1].locking), expectRejected: true });
 
 // A proof from the second valid instance cannot be spliced onto the first instance's public
 // inputs: all validation stages accept the points, but the final pairing verdict rejects.
@@ -378,8 +405,8 @@ try {
 }
 if (!seamSpliceRejected) throw new Error('cross-proof stage seam was not rejected');
 
-console.error(`negative cases: off-curve A/C, off-subgroup B, forged state, Fr range, and proof splice all rejected`);
-const invalidInputs = [offCurveARun, offSubRun, offCurveCRun, forgedStateRun, outOfRangeRun, splicedRun];
+console.error(`negative cases: off-curve A/C, off-subgroup B, forged state, Fr/GLV ranges, GLV congruence, and proof splice all rejected`);
+const invalidInputs = [offCurveARun, offSubRun, offCurveCRun, forgedStateRun, outOfRangeRun, oversizedGlvRun, incongruentGlvRun, splicedRun];
 
 writeFileSync(verifierPath('src', 'bch', 'pairing-bls12381-chunked-vectors.json'), JSON.stringify({
   description: 'PROOF-AGNOSTIC chunked BLS12-381 Groth16 pairing: a prepared-VK 4-pair optimal-ate Miller product -> Miller boundary (the conjugated f; no separate combine), then final exponentiation -> verdict (== Fp12 ONE), multi-tx. Pairing-only intentionally does not validate G1/G2 inputs; the full Groth16 track does. Miller genesis accepts only (-A,B,C,vk_x), derives f=1 and R_B=B, and every nonterminal token state pins the actual successor locking. Fixed gamma/delta G2 trajectories use manifest-bound baked line coefficients, and fixed e(alpha,beta) is folded as one dense multiplication. Lazy field reduction (addFp deferred). One fixed set of lockings verifies multiple proofs under the same VK. The 381-iter Fermat inverse in the easy part is supplied as an unlocking witness and verified by fp12Mul(f, f^-1)==ONE.',
@@ -391,11 +418,11 @@ writeFileSync(verifierPath('src', 'bch', 'pairing-bls12381-chunked-vectors.json'
 console.error(`wrote src/bch/pairing-bls12381-chunked-vectors.json (${run0.pairing.length} steps)`);
 
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-chunked-vectors.json'), JSON.stringify({
-  description: 'PROOF-AGNOSTIC full chunked BLS12-381 Groth16 verifier with EIP-197 input validation: public inputs -> canonical-range-checked vk_x -> committed (-A,B,C,vk_x) -> input-validated prepared-VK Miller product -> final exponentiation -> verdict. The first Miller chunk checks A/C and B on-curve; the final Miller chunk reuses its running R_B=[|x|]B for the guarded psi(B)==[-x]B subgroup check. Miller derives f=1 and R_B=B; callers cannot supply either accumulator. Every stage emits the exact next-stage state, and every nonterminal covenant pins the actual successor locking, forming one cryptographically continuous mutable-NFT token chain. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. One fixed locking chain verifies multiple proofs. Negative cases for off-curve, off-subgroup, forged-state, out-of-range, and cross-proof splice inputs must reject.',
+  description: 'PROOF-AGNOSTIC full chunked BLS12-381 Groth16 verifier with EIP-197 input validation: public inputs -> five-chunk stage-bound GLV vk_x with the exact fixed VK table embedded in each independent covenant locking -> committed (-A,B,C,vk_x) -> input-validated prepared-VK Miller product -> final exponentiation -> verdict. The GLV genesis accepts only six canonical scalar/decomposition limbs and derives infinity. The first Miller chunk checks A/C and B on-curve; the final Miller chunk reuses its running R_B=[|x|]B for the guarded psi(B)==[-x]B subgroup check. Miller derives f=1 and R_B=B; callers cannot supply either accumulator. Every stage emits the exact next-stage state, and every nonterminal covenant pins the actual successor locking, forming one cryptographically continuous mutable-NFT token chain. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. One fixed locking chain verifies multiple proofs. Negative cases cover point validity, forged state, Fr and GLV bounds, decomposition congruence, and cross-proof splices.',
   proofBinding: 'runtime', curve: 'BLS12-381', numSteps: steps.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(steps), maxStepOperationCost: maxOpOf(steps),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
-  steps, extraValidProofs,
+  steps, extraValidProofs, worstCaseProof: runDense.all,
   invalidInputs,
 }, null, 2));
 console.error('wrote src/bch/groth16-bls12381-chunked-vectors.json');
