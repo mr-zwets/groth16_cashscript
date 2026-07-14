@@ -75,7 +75,10 @@ const GLV_STATE_WIDTHS = [
   GLV_WITNESS_WIDTH, GLV_WITNESS_WIDTH, GLV_WITNESS_WIDTH, GLV_WITNESS_WIDTH,
 ];
 const GLV_GENESIS_WIDTHS = GLV_STATE_WIDTHS.slice(3);
-import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
+import {
+  hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, sha256,
+  encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026,
+} from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 const standardVm = createVirtualMachineBch2026(true);
 const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
@@ -540,7 +543,7 @@ if (MILLER_AFFINE_G2) {
   // Resolve the proof-independent genesis locking after redeem selection, then pin every
   // static-context reader to that exact UTXO script before producing the measured vectors.
   const carrierProbe = assemble(committedSpecs);
-  millerGenesisLockingHash = binToHex(hash256(carrierProbe.inputs[MILLER_GENESIS_INPUT].locking));
+  millerGenesisLockingHash = binToHex(sha256.hash(carrierProbe.inputs[MILLER_GENESIS_INPUT].locking));
   committedSpecs = buildSpecs(INSTANCES.committed, millerGenesisLockingHash);
 }
 const proof1Specs = buildSpecs(INSTANCES.proof1, millerGenesisLockingHash);

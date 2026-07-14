@@ -92,7 +92,7 @@ function parseParams(sig) {
  *   cfg.externalParams incoming-state parameters loaded from another input's first witness
  *                    push instead of this chunk's inBlob. Each entry has
  *                    {name,targetInputIndex,targetFullInLen,targetOffset,width,
- *                    targetLockingHash}. The optional locking hash pins the carrier UTXO.
+ *                    targetLockingHash}. The optional SHA-256 locking hash pins the carrier UTXO.
  *   cfg.outputCount  emit only this many leading covOut limbs. Used when immutable state is
  *                    supplied independently and only a dynamic prefix is forwarded.
  *   cfg.enforceExactInputLength when true, reject inBlob values with trailing/legacy
@@ -295,7 +295,7 @@ export function transformChunk(src, cfg) {
       }
     }
     if (targetLockingHash !== undefined) {
-      prologue.push(`        require(hash256(tx.inputs[${targetInputIndex}].lockingBytecode) == 0x${targetLockingHash});`);
+      prologue.push(`        require(sha256(tx.inputs[${targetInputIndex}].lockingBytecode) == 0x${targetLockingHash});`);
     }
     prologue.push(
       `        bytes linkedCarrier = tx.inputs[${targetInputIndex}].unlockingBytecode.split(${headerSize(targetFullInLen)})[1].split(${targetFullInLen})[0];`,
