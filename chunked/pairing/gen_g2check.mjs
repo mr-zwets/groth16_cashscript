@@ -130,7 +130,7 @@ function genChunk(lo, hi, isFirst, isLast) {
   if (isFirst) {
     L.push('        int fieldP = P;');
     for (const name of [...AN, ...BN, ...CN]) {
-      L.push(`        require(${name} >= 0 && ${name} < fieldP);`);
+      L.push(`        require(within(${name}, 0, fieldP));`);
     }
     L.push('        require(mulFp(Ay, Ay) == addFp(mulFp(mulFp(Ax, Ax), Ax), 3));'); // A on G1
     L.push('        require(mulFp(Cy, Cy) == addFp(mulFp(mulFp(Cx, Cx), Cx), 3));'); // C on G1

@@ -97,7 +97,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   L.push(covIn(committedParams));
   if (COVENANT_RESIDUE && opLo === 0) {
     L.push('        int residueP = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
-    L.push('        ' + [...cNames, ...ciNames].map((n) => `require(${n} >= 0 && ${n} < residueP);`).join(' '));
+    L.push('        ' + [...cNames, ...ciNames].map((n) => `require(within(${n}, 0, residueP));`).join(' '));
   }
   const negY = PINFO.map((pi) => {
     if (!pi.cfg.Q) return [`${pi.negQ.c0}`, `${pi.negQ.c1}`];
