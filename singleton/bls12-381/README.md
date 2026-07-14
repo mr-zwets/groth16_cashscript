@@ -80,9 +80,9 @@ node singleton/bls12-381/build_vectors_optimized.mjs# -> groth16-bls12381-single
 `gen_singleton_minop.mjs` emits the BLS analog of `../bn254/groth16_minop.cash`
 (`bch-groth16-bls12381-singleton-minop`): lazy tower + ONE batched c^-|x|-fused Miller
 (only `(-A,B)` runs on-chain G2; `e(alpha,beta)` and the `(vk_x,gamma)`/`(C,delta)` line
-coefficients baked) + witnessed-residue final exp + GLV vk_x. ~68.7 KB locking,
-**~318M op-cost (~40 inputs) vs the baseline's ~966M (~121) as currently measured
-by the harness** — ~67% less (~78% vs the 1.48B the baseline measured pre-rescheduler).
+coefficients baked) + witnessed-residue final exp + GLV vk_x. 65,474-byte locking,
+**~256.6M op-cost (~32 inputs) vs the baseline's ~966M (~121) as currently measured
+by the harness** — ~73% less (~83% vs the 1.48B the baseline measured pre-rescheduler).
 
 BLS-specific differences vs the BN254 min-op (see `../../chunked/bls12-381/_residuemath.mjs`):
 
@@ -118,7 +118,7 @@ comparison, unlike the BN254 entries):
   compile, then auto-outlining); **5,789-byte locking**, ~1.004B op-cost. The pair shows the
   bytesize-vs-opcost tradeoff, mirroring the BN254 plain/optimized split.
 - `bch-groth16-bls12381-singleton-minop` — the op-optimized COMPLETE verifier
-  (`groth16_minop.cash`); ~68.7 KB, **~318M op-cost (~40 inputs)** vs the baseline's
+  (`groth16_minop.cash`); 67,163 total bytes, **~256.6M op-cost (~32 inputs)** vs the baseline's
   ~966M (~121) on the current harness.
 - `bch-pairing-bls12381-singleton` — the pairing-only milestone (`verify.cash`);
   ~19.8 KB, ~1.38B op-cost.
