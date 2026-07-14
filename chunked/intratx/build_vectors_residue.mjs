@@ -10,9 +10,8 @@
 //   GLV vk_x MSM (4-scalar ~128-bit Straus)                3 chunks
 //   c^-(6x+2)-FUSED Miller + terminal residue verdict      manifest-selected chunk count
 //
-// Endpoint fusion validates canonical/on-curve proof coordinates at Miller genesis and reuses
-// runtime B's post-processing line to enforce exact G2 subgroup membership. The selected current-
-// BCH graph is 3 GLV + 14 Miller inputs; the standalone G2 stage is removed.
+// Endpoint fusion validates canonical/on-curve proof coordinates at Miller genesis and enforces
+// exact G2 subgroup membership in runtime B's post-processing. The standalone G2 stage is removed.
 //
 // Outside endpoint-fusion mode, the chunk math is reused verbatim by the grouped-residue build;
 // only the assembly differs:
@@ -33,7 +32,7 @@ import {
   assertG2StageManifest,
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
-import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
+import { millerFusedOps, millerFusedAffineOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
 import { GLV_LAMBDA, GLV_R, GLV_TABLE_HEX, glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
 import { transformChunk } from './transform.mjs';
 import { GLV_SAFE_BOUNDS, regenGlvSafe } from '../regen_vkx_windows.mjs';
@@ -41,6 +40,10 @@ import { GLV_SAFE_BOUNDS, regenGlvSafe } from '../regen_vkx_windows.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
 const FUSE_G2_ENDPOINT = process.env.FUSE_G2_ENDPOINT === '1';
+const MILLER_AFFINE_G2 = process.env.MILLER_AFFINE_G2 === '1';
+if (MILLER_AFFINE_G2 && !FUSE_G2_ENDPOINT) {
+  throw new Error('MILLER_AFFINE_G2 requires FUSE_G2_ENDPOINT=1');
+}
 const ENDPOINT_VM_CASES = Number(process.env.ENDPOINT_VM_CASES ?? 1);
 if (!Number.isInteger(ENDPOINT_VM_CASES) || ENDPOINT_VM_CASES < 1) {
   throw new Error('ENDPOINT_VM_CASES must be a positive integer');
@@ -198,9 +201,13 @@ function specsVkx(inst, crossToMiller) {
 // performs the residue verdict, so there is no separate terminal input or state hand-off.
 function specsMillerFused(inst, c, cInv, w) {
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const { states } = millerFusedOps(pairs, c, cInv);
+  const traceMiller = MILLER_AFFINE_G2 ? millerFusedAffineOps : millerFusedOps;
+  const { ops, states } = traceMiller(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
-  const full = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...ptL, ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 52
+  const runtimeRLimbs = (R) => MILLER_AFFINE_G2
+    ? [R.x.c0, R.x.c1, R.y.c0, R.y.c1]
+    : r6limbs(R);
+  const full = (s) => [...f12limbs(s.f), ...runtimeRLimbs(s.Rs[0]), ...ptL, ...f12limbs(s.c), ...f12limbs(s.cInv)];
   const genesisPts = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
   const genesis = [...genesisPts, ...f12limbs(c), ...f12limbs(cInv)];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
@@ -213,22 +220,32 @@ function specsMillerFused(inst, c, cInv, w) {
   if (man.endpointSubgroup !== FUSE_G2_ENDPOINT) {
     throw new Error(`Miller endpoint subgroup mode mismatch: generated=${man.endpointSubgroup} requested=${FUSE_G2_ENDPOINT}`);
   }
-  return man.chunks.map((ch) => ({
-    file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`),
-    inLimbs: ch.opLo === 0 ? genesis : full(states[ch.opLo]),
-    outLimbs: ch.final ? [] : full(states[ch.opHi]),
-    extras: ch.final ? fp12limbsOf(w) : [],
-    role: ch.final ? 'terminal' : 'within',
-    cmp: null,
-    label: `fused-miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' + residue verdict' : ''}`,
-    checkpoint: ch.final ? 'verify' : undefined,
-  }));
+  if (man.affineG2 !== MILLER_AFFINE_G2) {
+    throw new Error(`Miller affine-G2 mode mismatch: generated=${man.affineG2} requested=${MILLER_AFFINE_G2}`);
+  }
+  return man.chunks.map((ch) => {
+    const slopes = ops.slice(ch.opLo, ch.opHi).flatMap((op) =>
+      (op.affineSlopes ?? []).flatMap((slope) => [slope.c0, slope.c1]));
+    return {
+      file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`),
+      inLimbs: ch.opLo === 0 ? genesis : full(states[ch.opLo]),
+      outLimbs: ch.final ? [] : full(states[ch.opHi]),
+      extras: [...slopes, ...(ch.final ? fp12limbsOf(w) : [])],
+      affineSlopeCount: slopes.length,
+      role: ch.final ? 'terminal' : 'within',
+      cmp: null,
+      label: `fused-miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' + residue verdict' : ''}`,
+      checkpoint: ch.final ? 'verify' : undefined,
+    };
+  });
 }
 function buildSpecs(inst) {
   const g2 = FUSE_G2_ENDPOINT ? [] : specsG2check(inst);
   const vkx = specsVkx(inst, true);
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const { boundary: fRaw } = millerBatchOps(pairs);
+  const fRaw = MILLER_AFFINE_G2
+    ? millerFusedAffineOps(pairs, bn254.fields.Fp12.ONE, bn254.fields.Fp12.ONE).boundary
+    : millerBatchOps(pairs).boundary;
   const { c, cInv, w } = residueWitness(fRaw);
   const miller = specsMillerFused(inst, c, cInv, w);
   if (!FUSE_G2_ENDPOINT) {
@@ -551,7 +568,8 @@ const fullInvalid = [
 let endpointSpecIndex = -1;
 if (FUSE_G2_ENDPOINT) {
   const manifest = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
-  const trace = millerFusedOps(
+  const traceMiller = MILLER_AFFINE_G2 ? millerFusedAffineOps : millerFusedOps;
+  const trace = traceMiller(
     pairsFor(INSTANCES.committed.inputs, proof),
     bn254.fields.Fp12.ONE,
     bn254.fields.Fp12.ONE,
@@ -615,6 +633,39 @@ if (FUSE_G2_ENDPOINT) {
   fullInvalid.push({ steps: toStepArr({ inputs: endpointInputs, meta: full0.meta }), rejected: true });
 }
 
+if (MILLER_AFFINE_G2) {
+  const slopeSpecIndex = committedSpecs.findIndex((spec) =>
+    spec.role === 'within' && spec.affineSlopeCount > 0 && spec.extras.length === spec.affineSlopeCount);
+  if (slopeSpecIndex < 0) throw new Error('missing non-final affine slope witness');
+  const slopeSpec = committedSpecs[slopeSpecIndex];
+  // Extras are pushed in reverse declaration order, so the first push after inBlob is the last
+  // slope limb. Mutate that minimally encoded integer without touching the forward-bound inBlob.
+  const originalSlope = BigInt(slopeSpec.extras[slopeSpec.affineSlopeCount - 1]);
+  const wrongCanonicalSlope = originalSlope === P - 1n ? originalSlope - 1n : originalSlope + 1n;
+  const baseUnlocking = full0.inputs[slopeSpecIndex].unlocking;
+  const inBlobPush = pushBounds(baseUnlocking);
+  const slopeOpcodeOffset = inBlobPush.dataStart + inBlobPush.dataLen;
+  const slopePush = pushBounds(baseUnlocking, slopeOpcodeOffset);
+  for (const [label, replacement] of [
+    ['wrong canonical', pushInt(wrongCanonicalSlope)],
+    ['noncanonical p', pushInt(P)],
+  ]) {
+    const inputs = full0.inputs.slice();
+    const unlocking = Uint8Array.from([
+      ...baseUnlocking.slice(0, slopeOpcodeOffset),
+      ...replacement,
+      ...baseUnlocking.slice(slopePush.dataStart + slopePush.dataLen),
+    ]);
+    inputs[slopeSpecIndex] = { ...inputs[slopeSpecIndex], unlocking };
+    const outcomes = inputs.map((_, i) => evalInput(inputs, i));
+    if (outcomes[slopeSpecIndex].accepted) throw new Error(`affine step accepted ${label} slope witness`);
+    const unrelatedFailure = outcomes.find((outcome, i) => i !== slopeSpecIndex && !outcome.accepted);
+    if (unrelatedFailure) throw new Error(`${label} slope mutation also rejected outside its affine step`);
+    fullInvalid.push({ steps: toStepArr({ inputs, meta: full0.meta }), rejected: true });
+  }
+  console.error('  affine slope mutations: wrong canonical and noncanonical-p witnesses rejected at their step');
+}
+
 if (FUSE_G2_ENDPOINT && ENDPOINT_VM_CASES > 1) {
   for (const scalar of [2n, 7n, BN_X]) {
     const scaledProof = {
@@ -652,7 +703,9 @@ if (!full0.fits || !full1.fits || !fullWc.fits || !fullInvalid.every((run) => ru
 }
 
 const description = FUSE_G2_ENDPOINT
-  ? `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates, checks A and C on G1, and reuses runtime B's first doubling coefficients for its twist-curve equation. Exact G2 subgroup membership is fused into B's existing Miller post-processing: for R=[6x+2]B, the second-add line through R+psi(B) and -psi^2(B) must also contain psi^3(B), equivalent to R+psi(B)-psi^2(B)+psi^3(B)=O. prove_miller_endpoint_subgroup.mjs proves this condition has exactly the r-torsion kernel on the full rational twist group. The GLV result is cross-bound into Miller genesis and every later state is forward-bound with OP_INPUTBYTECODE.`
+  ? MILLER_AFFINE_G2
+    ? `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates and checks all three proof points on their curves. Runtime B uses a four-limb affine accumulator; every tangent/chord carries a two-limb canonical slope witness, rejects a zero denominator, and checks the slope equation before emitting a normalized line. The normalized line differs only by an Fp2 scale, which vanishes in final exponentiation. Exact G2 subgroup membership is fused into B's post-processing by requiring R+psi(B)-psi^2(B)=-psi^3(B). prove_miller_affine.mjs proves valid-subgroup completeness and line-scale equivalence; prove_miller_endpoint_subgroup.mjs proves the endpoint relation has exactly the r-torsion kernel on the full rational twist group. The GLV result is cross-bound into Miller genesis and every later state is forward-bound with OP_INPUTBYTECODE.`
+    : `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates, checks A and C on G1, and reuses runtime B's first doubling coefficients for its twist-curve equation. Exact G2 subgroup membership is fused into B's existing Miller post-processing: for R=[6x+2]B, the second-add line through R+psi(B) and -psi^2(B) must also contain psi^3(B), equivalent to R+psi(B)-psi^2(B)+psi^3(B)=O. prove_miller_endpoint_subgroup.mjs proves this condition has exactly the r-torsion kernel on the full rational twist group. The GLV result is cross-bound into Miller genesis and every later state is forward-bound with OP_INPUTBYTECODE.`
   : 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-intratx (each chunk is an input whose witness carries its incoming state as a raw byte blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: 3 canonical-coordinate/on-curve/subgroup fast-G2 endomorphism chunks (ePrint 2022/348), 3 GLV vk_x chunks, and c^-(6x+2)-FUSED batched Miller chunks with e(alpha,beta) precomputed/skipped (ePrint 2024/640). The three GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding three copies. The final Miller chunk also performs the witnessed-residue verdict. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. The G2 final chunk binds the proof-derived -A/B and C bytes into the fused-Miller genesis input, while the vk_x final chunk binds the GLV result into that same genesis; every later Miller state is forward-bound.';
 
 writeFileSync(verifierPath('src/bch/groth16-intratx-residue-vectors.json'), JSON.stringify({

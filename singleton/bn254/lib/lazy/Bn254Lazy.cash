@@ -324,6 +324,52 @@ function line(
         return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
     }
 
+// Runtime-G2 affine Miller steps. Each caller supplies a canonical slope witness. The explicit
+// nonzero-denominator gates exclude the equal/inverse exceptional cases, so the slope equation
+// uniquely binds the tangent/chord. New affine state is canonical; normalized lines use c2=-1.
+function pointDoubleAffine(int Xa,int Xb,int Ya,int Yb,int ma,int mb)
+    returns (int,int,int,int,int,int, int,int,int,int) {
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require(within(ma, 0, p)); require(within(mb, 0, p));
+        require(Ya % p != 0 || Yb % p != 0);
+        (int twoYa,int twoYb) = fp2Scale(Ya, Yb, 2);
+        (int slopeLhsA,int slopeLhsB) = fp2Mul(ma, mb, twoYa, twoYb);
+        (int x2a,int x2b) = fp2Sqr(Xa, Xb);
+        (int slopeRhsA,int slopeRhsB) = fp2Scale(x2a, x2b, 3);
+        require((slopeLhsA - slopeRhsA) % p == 0);
+        require((slopeLhsB - slopeRhsB) % p == 0);
+        (int m2a,int m2b) = fp2Sqr(ma, mb);
+        (int twoXa,int twoXb) = fp2Scale(Xa, Xb, 2);
+        int nXa = canonicalFp(m2a - twoXa); int nXb = canonicalFp(m2b - twoXb);
+        (int xdnXa,int xdnXb) = fp2Sub(Xa, Xb, nXa, nXb, 1);
+        (int mxdnXa,int mxdnXb) = fp2Mul(ma, mb, xdnXa, xdnXb);
+        int nYa = canonicalFp(mxdnXa - Ya); int nYb = canonicalFp(mxdnXb - Yb);
+        (int mxA,int mxB) = fp2Mul(ma, mb, Xa, Xb);
+        (int c0a,int c0b) = fp2Sub(Ya, Yb, mxA, mxB, 1);
+        return c0a,c0b,ma,mb,p - 1,0, nXa,nXb,nYa,nYb;
+    }
+
+function pointAddAffine(int Xa,int Xb,int Ya,int Yb, int Qxa,int Qxb,int Qya,int Qyb, int ma,int mb)
+    returns (int,int,int,int,int,int, int,int,int,int) {
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require(within(ma, 0, p)); require(within(mb, 0, p));
+        (int dxa,int dxb) = fp2Sub(Qxa, Qxb, Xa, Xb, 1);
+        require(dxa % p != 0 || dxb % p != 0);
+        (int dya,int dyb) = fp2Sub(Qya, Qyb, Ya, Yb, 1);
+        (int slopeLhsA,int slopeLhsB) = fp2Mul(ma, mb, dxa, dxb);
+        require((slopeLhsA - dya) % p == 0); require((slopeLhsB - dyb) % p == 0);
+        (int m2a,int m2b) = fp2Sqr(ma, mb);
+        (int txa,int txb) = fp2Sub(m2a, m2b, Xa, Xb, 1);
+        (int nxRawA,int nxRawB) = fp2Sub(txa, txb, Qxa, Qxb, 1);
+        int nXa = canonicalFp(nxRawA); int nXb = canonicalFp(nxRawB);
+        (int xdnXa,int xdnXb) = fp2Sub(Xa, Xb, nXa, nXb, 1);
+        (int mxdnXa,int mxdnXb) = fp2Mul(ma, mb, xdnXa, xdnXb);
+        int nYa = canonicalFp(mxdnXa - Ya); int nYb = canonicalFp(mxdnXb - Yb);
+        (int mxA,int mxB) = fp2Mul(ma, mb, Xa, Xb);
+        (int c0a,int c0b) = fp2Sub(Ya, Yb, mxA, mxB, 1);
+        return c0a,c0b,ma,mb,p - 1,0, nXa,nXb,nYa,nYb;
+    }
+
 function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
         returns (int,int,int,int,int,int, int,int,int,int,int,int) {
         (int t0a,int t0b) = fp2Sqr(Ya, Yb);

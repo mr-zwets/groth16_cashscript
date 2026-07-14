@@ -5,7 +5,10 @@
 //   where fF = fRaw * c^-(6x+2) (folded into the Miller loop), c,w the residue witness.
 //   Equivalent to c^lambda == fRaw*w with lambda = 6x+2 + q - q^2 + q^3, i.e. the pairing
 //   product finalExp == 1. Witness from gnark's finalExpWitness (scaling + r,m,cube roots).
-import { bn254, Fp, Fp2, Fp6, Fp12, BN_X, ATE_NAF, pairsFor, millerBatchOps, singlePairMiller, pointDouble, pointAdd } from './_millermath.mjs';
+import {
+  bn254, Fp, Fp2, Fp6, Fp12, BN_X, ATE_NAF,
+  pairsFor, millerBatchOps, singlePairMiller, pointDouble, pointAdd, lineFn, psi,
+} from './_millermath.mjs';
 
 const p = Fp.ORDER;
 const r = bn254.fields.Fr.ORDER;
@@ -101,6 +104,82 @@ export function millerFusedOps(pairs, c, cInv) {
   const boundary = mul(preF1, fAB);
   states.push({ f: boundary, Rs: base.states[base.states.length - 1].Rs.slice(), c, cInv });
   return { ops, states, boundary, baseBoundary: base.boundary, cpowFinal: cpow, fAB };
+}
+
+// ---- affine runtime-G2 variant -------------------------------------------------------
+// Only pair 0 has a runtime G2 point. Keep its Miller accumulator affine and witness each
+// tangent/chord slope; pairs 2 and 3 retain their baked projective line coefficients. Every
+// normalized runtime line has c2=-1, an Fp2 line scaling that disappears in final exponentiation.
+const affineDouble = (point) => {
+  const denominator = Fp2.mul(point.y, 2n);
+  if (Fp2.eql(denominator, Fp2.ZERO)) throw new Error('affine Miller doubling denominator is zero');
+  const slope = Fp2.div(Fp2.mul(Fp2.sqr(point.x), 3n), denominator);
+  const x = Fp2.sub(Fp2.sqr(slope), Fp2.mul(point.x, 2n));
+  const y = Fp2.sub(Fp2.mul(slope, Fp2.sub(point.x, x)), point.y);
+  return {
+    R: { x, y }, slope,
+    coeffs: [Fp2.sub(point.y, Fp2.mul(slope, point.x)), slope, Fp2.neg(Fp2.ONE)],
+  };
+};
+const affineAdd = (point, addend) => {
+  const denominator = Fp2.sub(addend.x, point.x);
+  if (Fp2.eql(denominator, Fp2.ZERO)) throw new Error('affine Miller addition denominator is zero');
+  const slope = Fp2.div(Fp2.sub(addend.y, point.y), denominator);
+  const x = Fp2.sub(Fp2.sub(Fp2.sqr(slope), point.x), addend.x);
+  const y = Fp2.sub(Fp2.mul(slope, Fp2.sub(point.x, x)), point.y);
+  return {
+    R: { x, y }, slope,
+    coeffs: [Fp2.sub(point.y, Fp2.mul(slope, point.x)), slope, Fp2.neg(Fp2.ONE)],
+  };
+};
+
+export function millerFusedAffineOps(pairs, c, cInv) {
+  const raw = millerFusedOps(pairs, c, cInv);
+  const pairData = pairs.map((pair) => ({ P: pair.P.toAffine(), Q: pair.Q.toAffine() }));
+  const ops = [];
+  const states = [];
+  let f = cInv;
+  let runtimeR = { ...pairData[0].Q };
+  for (const rawOp of raw.ops) {
+    states.push({ f, Rs: [runtimeR], c, cInv });
+    const op = { ...rawOp, affineSlopes: [] };
+    if (op.t === 'sqr') f = Fp12.sqr(f);
+    else if (op.t === 'cf') f = Fp12.mul(f, op.neg ? c : cInv);
+    else if (op.t === 'cmul1') f = Fp12.mul(f, raw.fAB);
+    else if (op.j !== 0) {
+      const triples = op.t === 'pp' ? op.coeffs : [op.coeffs];
+      for (const coeffs of triples) f = lineFn(f, coeffs[0], coeffs[1], coeffs[2], pairData[op.j].P.x, pairData[op.j].P.y);
+    } else if (op.t === 'dl') {
+      const step = affineDouble(runtimeR);
+      runtimeR = step.R;
+      op.affineSlopes.push(step.slope);
+      f = lineFn(f, step.coeffs[0], step.coeffs[1], step.coeffs[2], pairData[0].P.x, pairData[0].P.y);
+    } else if (op.t === 'al') {
+      const step = affineAdd(runtimeR, {
+        x: pairData[0].Q.x,
+        y: op.neg ? Fp2.neg(pairData[0].Q.y) : pairData[0].Q.y,
+      });
+      runtimeR = step.R;
+      op.affineSlopes.push(step.slope);
+      f = lineFn(f, step.coeffs[0], step.coeffs[1], step.coeffs[2], pairData[0].P.x, pairData[0].P.y);
+    } else {
+      const [q1x, q1y] = psi(pairData[0].Q.x, pairData[0].Q.y);
+      const q1 = { x: q1x, y: q1y };
+      const first = affineAdd(runtimeR, q1);
+      runtimeR = first.R;
+      op.affineSlopes.push(first.slope);
+      f = lineFn(f, first.coeffs[0], first.coeffs[1], first.coeffs[2], pairData[0].P.x, pairData[0].P.y);
+      const [q2x, q2y] = psi(q1.x, q1.y);
+      const q2 = { x: q2x, y: q2y };
+      const second = affineAdd(runtimeR, { x: q2.x, y: Fp2.neg(q2.y) });
+      runtimeR = second.R;
+      op.affineSlopes.push(second.slope);
+      f = lineFn(f, second.coeffs[0], second.coeffs[1], second.coeffs[2], pairData[0].P.x, pairData[0].P.y);
+    }
+    ops.push(op);
+  }
+  states.push({ f, Rs: [runtimeR], c, cInv });
+  return { ops, states, boundary: f, fAB: raw.fAB };
 }
 
 // ---- cInv-ONLY fused Miller (binary of 6x+2, threads only cInv) -----------------------

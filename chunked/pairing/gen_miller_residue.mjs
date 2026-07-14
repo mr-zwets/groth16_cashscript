@@ -6,24 +6,25 @@
 // the loop's implicit MSB (R=Q preload -> 2^65 term). The minimal-weight NAF of 6x+2 (22 c-folds)
 // beats a cInv-only binary fold (37 folds) — measured 27 chunks / 194.9M op vs 28 / 201.1M.
 // One fixed locking per chunk verifies ANY proof (c,cInv are runtime state, like the rest).
-// FUSE_G2_ENDPOINT=1 also validates the proof points at genesis and proves B is in G2 by reusing
-// the second runtime-B post-processing line; prove_miller_endpoint_subgroup.mjs proves that the
-// line-incidence condition is equivalent to subgroup membership on the complete twist group.
+// FUSE_G2_ENDPOINT=1 also validates the proof points at genesis and proves B is in G2 during
+// runtime-B post-processing; prove_miller_endpoint_subgroup.mjs proves the enforced group relation
+// is equivalent to subgroup membership on the complete twist group.
 //   node gen_miller_residue.mjs        plan + emit millerres_NN.cash + manifest_millerres.json
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp2, BN_X, f12limbs, r6limbs, pairsFor, vec, commit, millerBatchOps, singlePairMiller,
+  Fp2, Fp12, BN_X, f12limbs, r6limbs, pairsFor, vec, commit, millerBatchOps, singlePairMiller,
   measureCovenantFile, planChunk, covIn, covOut, PT_CFG, ptLimbs, decl,
   commitBin, compileFileBytecodeRaw, STATE_BYTES,
 } from './_millermath.mjs';
-import { millerFusedOps, residueWitness, fp12limbsOf, COSET27 } from './_residuemath.mjs';
+import { millerFusedOps, millerFusedAffineOps, residueWitness, fp12limbsOf, COSET27 } from './_residuemath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
 mkdirSync(GEN, { recursive: true });
 const FUSE_G2_ENDPOINT = process.env.FUSE_G2_ENDPOINT === '1';
+const MILLER_AFFINE_G2 = process.env.MILLER_AFFINE_G2 === '1';
 const LIB_IMPORT = FUSE_G2_ENDPOINT
   ? '../../../singleton/bn254/lib/lazy/Bn254LazyG.cash'
   : '../../../singleton/bn254/lib/lazy/Bn254Lazy.cash';
@@ -41,6 +42,9 @@ const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 const COVENANT_RESIDUE = STAGE_BOUND && process.env.COVENANT_RESIDUE_LAYOUT === '1';
 if (FUSE_G2_ENDPOINT && !STAGE_BOUND) {
   throw new Error('FUSE_G2_ENDPOINT requires STAGE_BOUND_LAYOUT=1');
+}
+if (MILLER_AFFINE_G2 && !FUSE_G2_ENDPOINT) {
+  throw new Error('MILLER_AFFINE_G2 requires FUSE_G2_ENDPOINT=1');
 }
 
 const PAIRS = pairsFor(vec.publicInputs);
@@ -63,9 +67,12 @@ const stagePtL = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
 
 // witness for the committed planning instance (the chunk math is generic; only window
 // boundaries come from this instance, like the rest of the generators).
-const { boundary: fRawPlan } = millerBatchOps(PAIRS);
+const fRawPlan = MILLER_AFFINE_G2
+  ? millerFusedAffineOps(PAIRS, Fp12.ONE, Fp12.ONE).boundary
+  : millerBatchOps(PAIRS).boundary;
 const { c: C_PLAN, cInv: CINV_PLAN, w: W_PLAN } = residueWitness(fRawPlan);
-const { ops, states, boundary } = millerFusedOps(PAIRS, C_PLAN, CINV_PLAN);
+const traceMiller = MILLER_AFFINE_G2 ? millerFusedAffineOps : millerFusedOps;
+const { ops, states, boundary } = traceMiller(PAIRS, C_PLAN, CINV_PLAN);
 if (LINKED_CUTS.some((cut, i) => !Number.isInteger(cut) || cut <= (LINKED_CUTS[i - 1] ?? 0) || cut >= ops.length)) {
   throw new Error('MILLER_LINKED_CUTS must be strictly increasing integer boundaries inside the op range');
 }
@@ -74,10 +81,12 @@ const endpointOp = ops.findIndex((op) => op.t === 'pp' && op.j === 0);
 if (endpointOp < 0) throw new Error('missing runtime-B Miller endpoint');
 const firstRuntimeDoubleOp = ops.findIndex((op) => op.t === 'dl' && op.j === 0);
 if (firstRuntimeDoubleOp < 0) throw new Error('missing runtime-B Miller genesis double');
-const endpointAffine = {
-  x: Fp2.div(states[endpointOp].Rs[0].x, states[endpointOp].Rs[0].z),
-  y: Fp2.div(states[endpointOp].Rs[0].y, states[endpointOp].Rs[0].z),
-};
+const endpointAffine = MILLER_AFFINE_G2
+  ? states[endpointOp].Rs[0]
+  : {
+      x: Fp2.div(states[endpointOp].Rs[0].x, states[endpointOp].Rs[0].z),
+      y: Fp2.div(states[endpointOp].Rs[0].y, states[endpointOp].Rs[0].z),
+    };
 const expectedEndpoint = PAIRS[0].Q.multiply(6n * BN_X + 2n).toAffine();
 if (!Fp2.eql(endpointAffine.x, expectedEndpoint.x) || !Fp2.eql(endpointAffine.y, expectedEndpoint.y)) {
   throw new Error('runtime-B Miller endpoint is not [6x+2]B');
@@ -92,9 +101,19 @@ const wNames = Array.from({ length: 12 }, (_, i) => `w${i}`);
 const ONE_L = ['1', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'];
 const W_HASHES = [ONE_L, fp12limbsOf(COSET27[1]).map(String), fp12limbsOf(COSET27[2]).map(String)]
   .map((limbs) => Buffer.from(commitBin(limbs.map(BigInt))).toString('hex'));
-// state = f(12) + R0(6) + runtime points + c(12) + cInv(12)
-const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...f12limbs(s.c), ...f12limbs(s.cInv)];
-const withPts = (limbs) => { const fr = limbs.slice(0, 18); const rest = limbs.slice(18); return [...fr, ...ptL, ...rest]; };
+// state = f(12) + R0(4 affine or 6 projective) + runtime points + c(12) + cInv(12)
+const affineRLimbs = (R) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1];
+const runtimeRLimbs = (R) => MILLER_AFFINE_G2 ? affineRLimbs(R) : r6limbs(R);
+const stateLimbs = (s) => [...f12limbs(s.f), ...runtimeRLimbs(s.Rs[0]), ...f12limbs(s.c), ...f12limbs(s.cInv)];
+const statePrefixLength = 12 + (MILLER_AFFINE_G2 ? 4 : 6);
+const withPts = (limbs) => {
+  const fr = limbs.slice(0, statePrefixLength);
+  const rest = limbs.slice(statePrefixLength);
+  return [...fr, ...ptL, ...rest];
+};
+const slopeLimbs = (opLo, opHi) => MILLER_AFFINE_G2
+  ? ops.slice(opLo, opHi).flatMap((op) => op.affineSlopes.flatMap((m) => [m.c0, m.c1]))
+  : [];
 const inState = (i) => STAGE_BOUND && i === 0
   ? [...stagePtL, ...f12limbs(states[i].c), ...f12limbs(states[i].cInv)]
   : withPts(stateLimbs(states[i]));
@@ -110,16 +129,23 @@ const bakedCoeffs = (triple) => triple.flatMap((c) => [`${c.c0}`, `${c.c1}`]);
 // witnessed-residue verdict inline (w is an extra UNCOMMITTED witness, appended after the state).
 function genChunk(opLo, opHi, isFinal, withTail = false) {
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
-  const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
+  const inR0 = MILLER_AFFINE_G2
+    ? ['R0xa', 'R0xb', 'R0ya', 'R0yb']
+    : ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
   const fullStateParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames];
   const stateParams = STAGE_BOUND && opLo === 0 ? [...stagePtParams, ...cNames, ...ciNames] : fullStateParams;
   const committedParams = COVENANT_RESIDUE && opLo === 0 ? stagePtParams : stateParams;
-  const allParams = withTail ? [...stateParams, ...wNames] : stateParams;
+  const slopeNamesByOp = new Map();
+  for (let i = opLo; i < opHi; i++) {
+    slopeNamesByOp.set(i, (ops[i].affineSlopes ?? []).map((_, j) => [`m${i}_${j}a`, `m${i}_${j}b`]));
+  }
+  const slopeParams = [...slopeNamesByOp.values()].flat(2);
+  const allParams = [...stateParams, ...slopeParams, ...(withTail ? wNames : [])];
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
   L.push(`// c^-(6x+2)-fused prepared-VK batched BN254 Miller chunk: ops [${opLo},${opHi}).${withTail ? ' [+ residue-tail verdict fused]' : ''}`);
-  L.push('// state = f(12) + R0(6) [+ runtime points] + c(12) + cInv(12); c,cInv are constant');
+  L.push(`// state = f(12) + R0(${MILLER_AFFINE_G2 ? '4 affine' : '6 projective'}) [+ runtime points] + c(12) + cInv(12); c,cInv are constant`);
   L.push('// carried witness. cf op folds c^-1/c into f (residue method, ePrint 2024/640).');
   L.push(`contract MillerFused${withTail ? 'Tail' : ''}Chunk() {`);
   L.push(`    function spend(${decl(allParams)}, bytes unused zeroPadding) {`);
@@ -130,6 +156,13 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     L.push('        ' + proofNames.map((name) => `require(within(${name}, 0, fieldP));`).join(' '));
     L.push('        require((mulFp(Py0, Py0) - addFp(mulFp(mulFp(Px0, Px0), Px0), 3)) % fieldP == 0);');
     L.push('        require((mulFp(Py3, Py3) - addFp(mulFp(mulFp(Px3, Px3), Px3), 3)) % fieldP == 0);');
+    if (MILLER_AFFINE_G2) {
+      L.push('        (int bx2a,int bx2b) = fp2Sqr(Q0xa, Q0xb);');
+      L.push('        (int bx3a,int bx3b) = fp2Mul(bx2a, bx2b, Q0xa, Q0xb);');
+      L.push('        (int by2a,int by2b) = fp2Sqr(Q0ya, Q0yb);');
+      L.push('        require((by2a - bx3a - 19485874751759354771024239261021720505790618469301721065564631296452457478373) % fieldP == 0);');
+      L.push('        require((by2b - bx3b - 266929791119991161246907387137283842545076965332900288569378510910307636690) % fieldP == 0);');
+    }
   }
   if (COVENANT_RESIDUE && opLo === 0) {
     L.push('        int residueP = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
@@ -145,7 +178,8 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   // genesis values here instead of accepting independent witness state.
   let f = STAGE_BOUND && opLo === 0 ? ciNames.slice() : inF.slice();
   let r0 = STAGE_BOUND && opLo === 0
-    ? [PINFO[0].Qxae, PINFO[0].Qxbe, PINFO[0].Qyae, PINFO[0].Qybe, '1', '0']
+    ? [PINFO[0].Qxae, PINFO[0].Qxbe, PINFO[0].Qyae, PINFO[0].Qybe,
+        ...(MILLER_AFFINE_G2 ? [] : ['1', '0'])]
     : inR0.slice();
   let uid = 0;
   const fresh = (n) => Array.from({ length: n }, () => `v${uid++}`);
@@ -164,9 +198,15 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
       L.push(`        (${decl(g)}) = fp12Mul(${f.join(',')}, ${FAB_LIMBS.join(',')});`); f = g;
     } else if (op.t === 'dl') {
       if (fixed) { emitLine(bakedCoeffs(op.coeffs), pi); continue; }
-      const dco = fresh(6), dr = fresh(6);
-      L.push(`        (${decl([...dco, ...dr])}) = pointDouble(${r0.join(',')});`); r0 = dr;
-      if (FUSE_G2_ENDPOINT && i === firstRuntimeDoubleOp) {
+      const dco = fresh(6), dr = fresh(MILLER_AFFINE_G2 ? 4 : 6);
+      if (MILLER_AFFINE_G2) {
+        const slope = slopeNamesByOp.get(i)[0];
+        L.push(`        (${decl([...dco, ...dr])}) = pointDoubleAffine(${r0.join(',')}, ${slope.join(',')});`);
+      } else {
+        L.push(`        (${decl([...dco, ...dr])}) = pointDouble(${r0.join(',')});`);
+      }
+      r0 = dr;
+      if (FUSE_G2_ENDPOINT && !MILLER_AFFINE_G2 && i === firstRuntimeDoubleOp) {
         const c1x = fresh(2);
         L.push('        // With c0=3*b2-y^2 and c1=3*x^2 from this doubling,');
         L.push('        // c1*x+3*c0=6*b2 is exactly the twist-curve equation.');
@@ -178,13 +218,46 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     } else if (op.t === 'al') {
       if (fixed) { emitLine(bakedCoeffs(op.coeffs), pi); continue; }
       const Y = op.neg ? negY[op.j] : [pi.Qyae, pi.Qybe];
-      const aco = fresh(6), ar = fresh(6);
-      L.push(`        (${decl([...aco, ...ar])}) = pointAdd(${r0.join(',')}, ${pi.Qxae}, ${pi.Qxbe}, ${Y[0]}, ${Y[1]});`); r0 = ar;
+      const aco = fresh(6), ar = fresh(MILLER_AFFINE_G2 ? 4 : 6);
+      if (MILLER_AFFINE_G2) {
+        const slope = slopeNamesByOp.get(i)[0];
+        L.push(`        (${decl([...aco, ...ar])}) = pointAddAffine(${r0.join(',')}, ${pi.Qxae}, ${pi.Qxbe}, ${Y[0]}, ${Y[1]}, ${slope.join(',')});`);
+      } else {
+        L.push(`        (${decl([...aco, ...ar])}) = pointAdd(${r0.join(',')}, ${pi.Qxae}, ${pi.Qxbe}, ${Y[0]}, ${Y[1]});`);
+      }
+      r0 = ar;
       emitLine(aco, pi);
     } else { // pp
       if (fixed) { emitLine(bakedCoeffs(op.coeffs[0]), pi); emitLine(bakedCoeffs(op.coeffs[1]), pi); continue; }
       const q1 = fresh(4);
       L.push(`        (${decl(q1)}) = psi(${pi.Qxae}, ${pi.Qxbe}, ${pi.Qyae}, ${pi.Qybe});`);
+      if (MILLER_AFFINE_G2) {
+        const [firstSlope, secondSlope] = slopeNamesByOp.get(i);
+        const bco = fresh(6), br = fresh(4);
+        L.push(`        (${decl([...bco, ...br])}) = pointAddAffine(${r0.join(',')}, ${q1.join(',')}, ${firstSlope.join(',')});`);
+        r0 = br;
+        emitLine(bco, pi);
+        const q2 = fresh(4);
+        L.push(`        (${decl(q2)}) = psi(${q1.join(',')});`);
+        const q2ny = fresh(2);
+        L.push(`        (${decl(q2ny)}) = fp2Neg(${q2[2]}, ${q2[3]}, 64);`);
+        const cco = fresh(6), cr = fresh(4);
+        L.push(`        (${decl([...cco, ...cr])}) = pointAddAffine(${r0.join(',')}, ${q2[0]}, ${q2[1]}, ${q2ny[0]}, ${q2ny[1]}, ${secondSlope.join(',')});`);
+        r0 = cr;
+        if (FUSE_G2_ENDPOINT && i === endpointOp) {
+          const q3x = fresh(2);
+          L.push('        // The two checked affine additions compute R+psi(B)-psi^2(B).');
+          L.push('        // Requiring the result to equal -psi^3(B) proves exact G2 membership.');
+          L.push(`        (${decl(q3x)}) = fp2Scale(${q1[0]}, ${q1[1]}, 21888242871839275220042445260109153167277707414472061641714758635765020556616);`);
+          L.push('        int subgroupP = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
+          L.push(`        require((${r0[0]} - ${q3x[0]}) % subgroupP == 0);`);
+          L.push(`        require((${r0[1]} - ${q3x[1]}) % subgroupP == 0);`);
+          L.push(`        require((${r0[2]} - ${q1[2]}) % subgroupP == 0);`);
+          L.push(`        require((${r0[3]} - ${q1[3]}) % subgroupP == 0);`);
+        }
+        emitLine(cco, pi);
+        continue;
+      }
       const bco = fresh(6), br = fresh(6);
       L.push(`        (${decl([...bco, ...br])}) = pointAdd(${r0.join(',')}, ${q1.join(',')});`); r0 = br;
       emitLine(bco, pi);
@@ -264,7 +337,7 @@ if (process.argv[2] === 'probe') {
     const final = b === ops.length;
     const withTail = final && LINKED_LAYOUT;
     const inL = inState(a);
-    const args = withTail ? [...inL, ...fp12limbsOf(W_PLAN)] : inL;
+    const args = [...inL, ...slopeLimbs(a, b), ...(withTail ? fp12limbsOf(W_PLAN) : [])];
     const committedIn = COVENANT_RESIDUE && a === 0 ? stagePtL : inL;
     const m = measureCovenantFile(genChunk(a, b, final, withTail), args, withTail ? [] : outState(b), PROBE, true, committedIn);
     console.error(`ops [${a},${b}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`);
@@ -281,7 +354,7 @@ while (lo < ops.length) {
     const final = hi === ops.length;
     const withTail = final && LINKED_LAYOUT;
     const outL = withTail ? [] : outState(hi);
-    const args = withTail ? [...inL, ...fp12limbsOf(W_PLAN)] : inL;
+    const args = [...inL, ...slopeLimbs(lo, hi), ...(withTail ? fp12limbsOf(W_PLAN) : [])];
     const src = genChunk(lo, hi, final, withTail);
     const m = measureCovenantFile(src, args, outL, PROBE, true, committedIn);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final, withTail, outgoing: withTail ? null : commit(outL), src, m };
@@ -322,6 +395,7 @@ if (process.env.FUSE_TAIL === '1' && chunks[chunks.length - 1].tailFused !== tru
 writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
   fused: true, linkedLayout: LINKED_LAYOUT, stageBound: STAGE_BOUND,
   covenantResidue: COVENANT_RESIDUE, endpointSubgroup: FUSE_G2_ENDPOINT,
+  affineG2: MILLER_AFFINE_G2,
   numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, tailFused: c.tailFused === true, incoming: c.incoming, outgoing: c.outgoing })),
 }, null, 2));
