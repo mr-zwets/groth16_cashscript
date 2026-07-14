@@ -214,6 +214,10 @@ const INSTANCES = [
   { tag: 'instance#1', ...mkInstance([135208n, 67633n], 17n, 19n) },
   { tag: 'all-position', ...mkInstance(GLV_HIGH_COST_INPUTS, 23n, 29n) },
 ];
+const PAIRING_INSTANCE_1 = {
+  tag: 'dense-instance',
+  ...mkInstance([(1n << 254n) - 1n, (1n << 254n) - 1n], 17n, 19n),
+};
 
 // ---- BATCHED Miller replay (flat op list; final chunk conjugates f = boundary) ----
 const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0])];
@@ -321,9 +325,11 @@ const buildPairing = (inst) => {
   const fe = specsFinalexp(inst, boundaryVal);
   return { all: buildChain([...miller, ...fe]), miller, fe };
 };
-const run0 = { ...buildGroth16(INSTANCES[0]), pairing: buildPairing(INSTANCES[0]).all };
-const run1 = { ...buildGroth16(INSTANCES[1]), pairing: buildPairing(INSTANCES[1]).all };
+const run0 = buildGroth16(INSTANCES[0]);
+const run1 = buildGroth16(INSTANCES[1]);
 const runDense = buildGroth16(INSTANCES[2]);
+const pairing0 = buildPairing(INSTANCES[0]).all;
+const pairing1 = buildPairing(PAIRING_INSTANCE_1).all;
 const steps = run0.all;
 const extraValidProofs = [run1.all];
 const sumOp = (a) => a.reduce((x, s) => x + s.operationCost, 0);
@@ -410,12 +416,12 @@ const invalidInputs = [offCurveARun, offSubRun, offCurveCRun, forgedStateRun, ou
 
 writeFileSync(verifierPath('src', 'bch', 'pairing-bls12381-chunked-vectors.json'), JSON.stringify({
   description: 'PROOF-AGNOSTIC chunked BLS12-381 Groth16 pairing: a prepared-VK 4-pair optimal-ate Miller product -> Miller boundary (the conjugated f; no separate combine), then final exponentiation -> verdict (== Fp12 ONE), multi-tx. Pairing-only intentionally does not validate G1/G2 inputs; the full Groth16 track does. Miller genesis accepts only (-A,B,C,vk_x), derives f=1 and R_B=B, and every nonterminal token state pins the actual successor locking. Fixed gamma/delta G2 trajectories use manifest-bound baked line coefficients, and fixed e(alpha,beta) is folded as one dense multiplication. Lazy field reduction (addFp deferred). One fixed set of lockings verifies multiple proofs under the same VK. The 381-iter Fermat inverse in the easy part is supplied as an unlocking witness and verified by fp12Mul(f, f^-1)==ONE.',
-  proofBinding: 'runtime', curve: 'BLS12-381', numSteps: run0.pairing.length, budgetPerInput: OP_BUDGET,
-  totalOperationCost: sumOp(run0.pairing), maxStepOperationCost: maxOpOf(run0.pairing),
+  proofBinding: 'runtime', curve: 'BLS12-381', numSteps: pairing0.length, budgetPerInput: OP_BUDGET,
+  totalOperationCost: sumOp(pairing0), maxStepOperationCost: maxOpOf(pairing0),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
-  steps: run0.pairing, extraValidProofs: [run1.pairing],
+  steps: pairing0, extraValidProofs: [pairing1],
 }, null, 2));
-console.error(`wrote src/bch/pairing-bls12381-chunked-vectors.json (${run0.pairing.length} steps)`);
+console.error(`wrote src/bch/pairing-bls12381-chunked-vectors.json (${pairing0.length} steps)`);
 
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-chunked-vectors.json'), JSON.stringify({
   description: 'PROOF-AGNOSTIC full chunked BLS12-381 Groth16 verifier with EIP-197 input validation: public inputs -> five-chunk stage-bound GLV vk_x with the exact fixed VK table embedded in each independent covenant locking -> committed (-A,B,C,vk_x) -> input-validated prepared-VK Miller product -> final exponentiation -> verdict. The GLV genesis accepts only six canonical scalar/decomposition limbs and derives infinity. The first Miller chunk checks A/C and B on-curve; the final Miller chunk reuses its running R_B=[|x|]B for the guarded psi(B)==[-x]B subgroup check. Miller derives f=1 and R_B=B; callers cannot supply either accumulator. Every stage emits the exact next-stage state, and every nonterminal covenant pins the actual successor locking, forming one cryptographically continuous mutable-NFT token chain. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. One fixed locking chain verifies multiple proofs. Negative cases cover point validity, forged state, Fr and GLV bounds, decomposition congruence, and cross-proof splices.',
