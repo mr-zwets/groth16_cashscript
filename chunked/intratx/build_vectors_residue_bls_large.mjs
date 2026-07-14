@@ -41,7 +41,7 @@ import {
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
 import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
-import { glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_ALL_POSITIONS_INPUTS } from '../bls12-381/gen_vkx_glv.mjs';
+import { glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_HIGH_COST_INPUTS } from '../bls12-381/gen_vkx_glv.mjs';
 import { residueWalkT } from '../bls12-381/gen_finalexp_residue.mjs';
 import { transformChunk } from './transform.mjs';
 
@@ -333,11 +333,11 @@ const full0 = buildFull(INSTANCES.committed);
 report('groth16-bls12381-intratx-residue-large committed', full0);
 const full1 = buildFull(INSTANCES.proof1);
 report('groth16-bls12381-intratx-residue-large proof#1', full1);
-const fullAllPositions = buildFull(mkInstance(GLV_ALL_POSITIONS_INPUTS));
-report('groth16-bls12381-intratx-residue-large all-positions', fullAllPositions);
+const fullStress = buildFull(mkInstance(GLV_HIGH_COST_INPUTS));
+report('groth16-bls12381-intratx-residue-large all-position stress', fullStress);
 const fInv = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2))];
 console.error(`  invalid runs rejected: ${fInv.map((r) => r.rejected).join(',')}`);
-if (!full0.accepted || !full1.accepted || !fullAllPositions.fits || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
+if (!full0.accepted || !full1.accepted || !fullStress.fits || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-intratx-residue-large-vectors.json', JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-bls12381-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; GLV vk_x MSM + c^-|x|-FUSED batched Miller with e(alpha,beta) baked and the G2 on-curve+prime-order-subgroup validation fused into the first/last Miller chunks + witnessed-residue mu_27A final-exp tail), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the same ~257M-op verifier therefore collapses from 41 inputs to a handful (GLV vk_x, c^-|x|-fused Miller, and the witnessed-residue tail, one fat input per stage floor). Total op-cost and bytes are conserved (a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail, w enters the tail as an uncommitted witness. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
@@ -346,7 +346,7 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-intratx-
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
   maxStepOperationCost: Math.max(...full0.meta.map((m) => m.operationCost)),
   allFit: full0.fits, allAccept: full0.accepted,
-  steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullAllPositions),
+  steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullStress),
   invalid: fInv.map((r) => r.steps),
 }, null, 2));
 console.error('\nwrote groth16-bls12381-intratx-residue-large-vectors.json');

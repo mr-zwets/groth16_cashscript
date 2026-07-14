@@ -28,7 +28,7 @@ import { computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecod
 import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
 import {
   glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX,
-  GLV_ALL_POSITIONS_INPUTS, GLV_SHARED_SAFE_BOUNDS, regenGlvSharedSafe,
+  GLV_HIGH_COST_INPUTS, GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
 } from '../bls12-381/gen_vkx_glv.mjs';
 import { residueWalkT } from '../bls12-381/gen_finalexp_residue.mjs';
 import { transformChunk, headerSize } from '../intratx/transform.mjs';
@@ -46,9 +46,9 @@ const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
 // 9-limb inBlob push); the four sibling GLV inputs read that exact slice via input-bytecode
 // introspection and the carrier pins it with hash256. The GLV chunks lead the graph and the packer
 // blocks cuts inside the span, so the carrier's transaction-local index equals its graph index.
-const GLV_COUNT = GLV_SHARED_SAFE_BOUNDS.length - 1;
+const GLV_COUNT = GLV_SHARED_AUDITED_BOUNDS.length - 1;
 const GLV_STATE_BYTES = 9 * W; // rX,rY,rZ,in0,in1,k10,k20,k11,k21
-regenGlvSharedSafe(GEN, {
+regenGlvSharedAudited(GEN, {
   inputIndex: GLV_COUNT - 1,
   dataOffset: headerSize(GLV_STATE_BYTES) + GLV_STATE_BYTES + headerSize(GLV_TABLE_BYTES.length),
 });
@@ -99,7 +99,7 @@ const mkInstance = (inputs) => {
   const A = mod(3n * 5n + vx * 7n + 13n * 11n);
   return { inputs, proof: { a: G1.BASE.multiply(A), b: proof.b, c: proof.c } };
 };
-const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]), allPositions: mkInstance(GLV_ALL_POSITIONS_INPUTS) };
+const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]), stress: mkInstance(GLV_HIGH_COST_INPUTS) };
 
 // ---- residue chunk-graph layout constants ----
 // fused-Miller state = f(12) + R_B(6) + runtime points(10) + c(12) + cInv(12) = 52 limbs.
@@ -392,21 +392,21 @@ const TARGET_GROUP_BYTES = 84000;
 console.error('building residue specs (residueWitness per instance ~seconds)...');
 const cSpecs = buildSpecs(INSTANCES.committed);
 const p1Specs = buildSpecs(INSTANCES.proof1);
-const allPositionSpecs = buildSpecs(INSTANCES.allPositions);
+const stressSpecs = buildSpecs(INSTANCES.stress);
 function sizeEstimate(specs) {
   const provisional = packGroups(specs, specs.map(() => 9000), TARGET_GROUP_BYTES);
   return assembleGrouped(specs, provisional).meta.map((m) => m.unlockingBytes);
 }
-const cSizes = sizeEstimate(cSpecs), p1Sizes = sizeEstimate(p1Specs), allPositionSizes = sizeEstimate(allPositionSpecs);
-const packSizes = cSizes.map((s, i) => Math.max(s, p1Sizes[i], allPositionSizes[i]));
+const cSizes = sizeEstimate(cSpecs), p1Sizes = sizeEstimate(p1Specs), stressSizes = sizeEstimate(stressSpecs);
+const packSizes = cSizes.map((s, i) => Math.max(s, p1Sizes[i], stressSizes[i]));
 const GROUPS = packGroups(cSpecs, packSizes, TARGET_GROUP_BYTES);
 
 const asmCommitted = assembleGrouped(cSpecs, GROUPS);
 report('groth16-bls-grouped-residue committed', asmCommitted);
 const asmProof1 = assembleGrouped(p1Specs, GROUPS);
 report('groth16-bls-grouped-residue proof#1', asmProof1);
-const asmAllPositions = assembleGrouped(allPositionSpecs, GROUPS);
-report('groth16-bls-grouped-residue all-positions', asmAllPositions);
+const asmStress = assembleGrouped(stressSpecs, GROUPS);
+report('groth16-bls-grouped-residue all-position stress', asmStress);
 
 if (GROUPS[0][0] !== 0 || GROUPS[0][1] < GLV_COUNT - 1) {
   throw new Error(`shared GLV table span [0,${GLV_COUNT - 1}] not contained in group 0: ${JSON.stringify(GROUPS[0])}`);
@@ -439,7 +439,7 @@ console.error('  shared GLV table mutation rejected at carrier');
 const firstBoundary = GROUPS[1] ? GROUPS[1][0] : 1;
 const invalids = [invalidRun(cSpecs, GROUPS, Math.floor(cSpecs.length / 2)), invalidRun(cSpecs, GROUPS, firstBoundary), tableMutation];
 console.error(`  invalid runs rejected: ${invalids.map((r) => r.rejected).join(',')}`);
-if (!asmCommitted.accepted || !asmProof1.accepted || !asmAllPositions.fits || !invalids.every((r) => r.rejected)) {
+if (!asmCommitted.accepted || !asmProof1.accepted || !asmStress.fits || !invalids.every((r) => r.rejected)) {
   console.error('!! a run failed -- NOT writing vectors'); process.exit(1);
 }
 
@@ -455,7 +455,7 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-grouped-
   allFit: asmCommitted.fits, allAccept: asmCommitted.accepted,
   valid: toRun(asmCommitted),
   extraValidProofs: [toRun(asmProof1)],
-  worstCaseProof: toRun(asmAllPositions),
+  worstCaseProof: toRun(asmStress),
   invalid: invalids.map((r) => r.run),
 }, null, 2));
 console.error(`wrote groth16-bls12381-grouped-residue-vectors.json (${GROUPS.length} groups, ${asmCommitted.meta.length} inputs)`);

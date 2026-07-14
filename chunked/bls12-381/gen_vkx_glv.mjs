@@ -31,14 +31,16 @@ export const GLV_BETA = 79347939072921551262137970163342144706088674028106049301
 export const GLV_LAMBDA = r - ((X * X) % r); // -x^2 mod r
 export const GLV_R = r;
 export { ITERS as VKXGLV_ITERS };
-// First pair found by find_glv_all_positions.mjs: four GLV sub-scalars whose bitwise OR
-// covers every Straus position. This proves maximum branch density, not globally maximum
-// VM op-cost (operand magnitudes can still change arithmetic cost).
-export const GLV_ALL_POSITIONS_INPUTS = [
-  8699704594833010954851366198470438521970004240853464087613791907674188083256n,
-  35838398061043276980008993352276457174860298808037557677162090056906418425524n,
+// Deterministic all-position stress pair reproduced by find_glv_all_positions.mjs. Its four
+// GLV sub-scalars execute an add at every Straus position. It produced the largest total op-cost
+// among 32 full valid verifier proofs and a heavier maximum step than the previous fixture. A
+// separate 256-pair audit of the exact shared-table lockings observed at most 7,646,311 of the
+// 8,032,800 input budget. These are empirical stress results, not a formal global maximum.
+export const GLV_HIGH_COST_INPUTS = [
+  40792793307691160132937706698213704133054528069427933762012433436987942497952n,
+  20976222017425405296340351928930328963278634447870202382235661951061637561134n,
 ];
-export const GLV_SHARED_SAFE_BOUNDS = [0, 25, 51, 77, 103, 128];
+export const GLV_SHARED_AUDITED_BOUNDS = [0, 25, 51, 77, 103, 128];
 
 const modP = (v) => ((v % P) + P) % P;
 const phiPt = (Pt) => { const a = Pt.toAffine(); return G1.fromAffine({ x: (a.x * GLV_BETA) % P, y: a.y }); };
@@ -201,14 +203,14 @@ export function genCash(lo, hi, first, final, sharedTable = null) {
   return (L.join('\n') + '\n');
 }
 
-/** Emit the density-validated five-window plan for hash-free, shared-table deployment. */
-export function regenGlvSharedSafe(GEN_DIR, sharedTable) {
-  const chunks = GLV_SHARED_SAFE_BOUNDS.slice(0, -1).map((lo, idx) => ({
+/** Emit the empirically audited five-window plan for hash-free, shared-table deployment. */
+export function regenGlvSharedAudited(GEN_DIR, sharedTable) {
+  const chunks = GLV_SHARED_AUDITED_BOUNDS.slice(0, -1).map((lo, idx) => ({
     idx,
     lo,
-    hi: GLV_SHARED_SAFE_BOUNDS[idx + 1],
+    hi: GLV_SHARED_AUDITED_BOUNDS[idx + 1],
     first: idx === 0,
-    final: idx === GLV_SHARED_SAFE_BOUNDS.length - 2,
+    final: idx === GLV_SHARED_AUDITED_BOUNDS.length - 2,
   }));
   for (const ch of chunks) {
     writeFileSync(join(GEN_DIR, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), genCash(ch.lo, ch.hi, ch.first, ch.final, sharedTable));
@@ -222,7 +224,7 @@ export function regenGlvSharedSafe(GEN_DIR, sharedTable) {
 
 // ---- plan + emit (valid inputs with add coverage at all 128 loop positions) ----
 if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
-  const [wk10, wk20] = glvDecompose(GLV_ALL_POSITIONS_INPUTS[0]), [wk11, wk21] = glvDecompose(GLV_ALL_POSITIONS_INPUTS[1]);
+  const [wk10, wk20] = glvDecompose(GLV_HIGH_COST_INPUTS[0]), [wk11, wk21] = glvDecompose(GLV_HIGH_COST_INPUTS[1]);
   if ((wk10 | wk20 | wk11 | wk21) !== (1n << 128n) - 1n) throw new Error('GLV all-positions vector does not cover every loop position');
   const win0 = ((wk10 + wk20 * GLV_LAMBDA) % r + r) % r, win1 = ((wk11 + wk21 * GLV_LAMBDA) % r + r) % r;
   const SER_state = (Xj, Yj, Zj) => [Xj, Yj, Zj, win0, win1, wk10, wk20, wk11, wk21];
