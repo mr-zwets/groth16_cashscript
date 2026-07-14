@@ -1,11 +1,11 @@
 // Assemble the GROUPED verifier vectors for BN254 — a hybrid of the intra-tx linked
 // method (chunked/intratx) and the covenant NFT hand-off (chunked/pairing).
 //
-// MOTIVATION. The multi-tx covenant (bch-groth16-chunked / -covenant) is 54 SEQUENTIAL
-// transactions, one chunk each — a 54-deep unconfirmed chain that exceeds BCH's default
+// MOTIVATION. The multi-tx covenant (bch-groth16-chunked / -covenant) is 46 SEQUENTIAL
+// transactions, one chunk each — a 46-deep unconfirmed chain that approaches BCH's default
 // mempool ancestor/descendant limit (50). The single-tx intra-tx bundle (bch-groth16-
-// intratx) is one ~0.5 MB transaction — fine at consensus but NON-standard (> 100,000 B,
-// must be mined directly). GROUPED packs the same 46 chunks into ~6 STANDARD transactions
+// intratx) is one ~0.37 MB transaction — fine at consensus but NON-standard (> 100,000 B,
+// must be mined directly). GROUPED packs the same 46 chunks into 5 STANDARD transactions
 // of < 100,000 B each: comfortably under the chain limit AND relayable under standard policy.
 //
 // MECHANISM. Within one group transaction the chunks bind each other exactly as in the
