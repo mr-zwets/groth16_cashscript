@@ -9,6 +9,7 @@
 // Run: node singleton/bls12-381/bound_analysis.mjs
 
 import assert from 'node:assert/strict';
+import { bigIntToVmNumber } from '@bitauth/libauth';
 
 const P = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787n;
 
@@ -31,12 +32,14 @@ const f2scale = () => [1, 1];
 
 let maxFp2MulInput = 0;
 let maxFp2MulNegative = 0;
+let maxFp2SqrInput = 0;
 const f2mul = (a, b) => {
   maxFp2MulInput = Math.max(maxFp2MulInput, ...a, ...b);
   maxFp2MulNegative = Math.max(maxFp2MulNegative, a[1] * b[1]);
   return [2, 3];
 };
 const f2sqr = (site, a) => {
+  maxFp2SqrInput = Math.max(maxFp2SqrInput, ...a);
   record(site, a[1]);
   return [1, 1];
 };
@@ -420,14 +423,20 @@ const expectedBiases = new Map(Object.entries({
 assert.deepEqual([...sites].sort(), [...expectedBiases].sort(), 'source subtraction biases changed');
 assert.equal(maxFp2MulInput, 310);
 assert.equal(maxFp2MulNegative, 76880);
+assert.equal(maxFp2SqrInput, 124);
+assert.equal(2 * maxFp2SqrInput * maxFp2SqrInput, 30752);
 assert.equal(maxMul014Input, 60);
 assert.equal(maxMul014Negative, 1931);
 assert.equal(maxMul014Positive, 2190);
 assert.equal(76880n * P * P, 1231562419205459752070235395775242614848400833236532888490220123203481892424015537184642439376752630896474493160328325763231266643412666928375071562129281185156830842074816964836301444694877978129857433900347334309803230379471635168720n);
 assert.equal(1931n * P * P, 30933234020366061150463378632179936124769276911807297186194264540919921101336810643906666889132535513281636918478069680655561601046174035362802590875021357551220608169178870435729683789097416438199202716721783331844823593428196247539n);
+assert.equal(bigIntToVmNumber(30752n * P * P).length, 98);
+assert.equal(bigIntToVmNumber(76880n * P * P).length, 98);
 
 console.log(`max fp2Mul input: ${maxFp2MulInput}p`);
 console.log(`max fp2Mul negative term: ${maxFp2MulNegative}p^2`);
+console.log(`max fp2Sqr input: ${maxFp2SqrInput}p`);
+console.log(`max fp2Sqr direct imaginary product: ${2 * maxFp2SqrInput * maxFp2SqrInput}p^2 (98 signed bytes)`);
 console.log(`max mul014 input: ${maxMul014Input}p`);
 console.log(`max mul014 negative output: ${maxMul014Negative}p^2`);
 console.log(`max mul014 positive output: ${maxMul014Positive}p^2`);

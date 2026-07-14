@@ -27,7 +27,9 @@ function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
 }
 
 function fp2Sqr(int a0, int a1) returns (int, int) {
-    return mulFp(addFp(a0, a1), subFp(a0, a1, 124)), mulFp(2, mulFp(a0, a1));
+    // bound_analysis.mjs proves a0,a1 < 124p, so (a0+a0)*a1 < 30752p^2,
+    // below the already-audited 76880p^2 fp2Mul envelope.
+    return mulFp(addFp(a0, a1), subFp(a0, a1, 124)), mulFp(addFp(a0, a0), a1);
 }
 
 function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
