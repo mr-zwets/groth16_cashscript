@@ -20,12 +20,12 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp12, millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs,
+  millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs,
   compileBytecode, commitBinExact, CATEGORY, le48Exact, P, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
-import { frob, mk12, residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
+import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
 import {
   glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX,
   GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
@@ -163,17 +163,18 @@ function specsMillerResidue(inst, c, cInv, bad = {}) {
   return { specs, boundary };
 }
 function specsResidueTail(fF, c, cInv, w) {
-  const fFl = f12limbs(fF), cl = f12limbs(c), cil = f12limbs(cInv), wl = f12limbs(w);
+  const fFl = f12limbs(fF), cl = f12limbs(c), cil = f12limbs(cInv), wl = f12limbs(w).slice(0, 6);
   const commit36 = [...fFl, ...cl, ...cil];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_finalexpres.json'), 'utf8'));
   const chunk = man.chunks?.[0];
   if (man.residueTail !== true || man.fp6Membership !== true || man.deployment !== 'linked-hash-free' ||
-    man.numChunks !== 1 || man.nwalk !== 0 || chunk?.idx !== 0 || chunk.role !== 'finalize' || chunk.final !== true) {
+    man.numChunks !== 1 || man.nwalk !== 0 || chunk?.idx !== 0 || chunk.role !== 'finalize' || chunk.final !== true ||
+    chunk.witnessLimbs?.join(',') !== '0,1,2,3,4,5' || chunk.implicitZeroLimbs?.join(',') !== '6,7,8,9,10,11') {
     throw new Error('grouped BLS residue requires the one-chunk Fp6 tail');
   }
   return [{
     file: join(GEN, 'finalexpres_00.cash'), inLimbs: commit36, outLimbs: [], extras: wl, role: 'terminal',
-    label: 'residue Fp6 membership + verdict', checkpoint: 'verify',
+    label: 'residue Fp6 verdict', checkpoint: 'verify',
   }];
 }
 function buildSpecs(inst) {
@@ -581,21 +582,7 @@ const rangeInvalids = [
   rangeInvalid(firstRangeTail, { extra: 0 }, -1n, 'reject negative w limb'),
   rangeInvalid(firstRangeTail, { extra: 0 }, P, 'reject w limb at P'),
 ];
-const fp6ShapeInvalids = Array.from({ length: 6 }, (_, upper) => {
-  const hi = Array(6).fill(0n);
-  hi[upper] = 1n;
-  const wBad = mk12([1n, 0n, 0n, 0n, 0n, 0n], hi);
-  const rhs = frob(committedC, 1);
-  const fFBad = Fp12.mul(rhs, Fp12.inv(wBad));
-  if (!Fp12.eql(Fp12.mul(fFBad, wBad), rhs)) throw new Error('failed to isolate the Fp6 witness gate');
-  const asm = assembleGrouped(
-    specsResidueTail(fFBad, committedC, committedCInv, wBad),
-    [[0, 0]],
-    true,
-  );
-  return { run: toRun(asm), rejected: !asm.accepted };
-});
-const allInvalids = [...invalids, ...semanticInvalids, ...rangeInvalids, ...fp6ShapeInvalids];
+const allInvalids = [...invalids, ...semanticInvalids, ...rangeInvalids];
 console.error(`  invalid runs rejected: ${allInvalids.map((r) => r.rejected).join(',')}`);
 if (!asmCommitted.accepted || !asmProof1.accepted || !asmStress.fits || !allInvalids.every((r) => r.rejected)) {
   console.error('!! a run failed -- NOT writing vectors'); process.exit(1);
@@ -604,7 +591,7 @@ if (!asmCommitted.accepted || !asmProof1.accepted || !asmStress.fits || !allInva
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-grouped-residue-vectors.json'), JSON.stringify({
   description: 'GROUPED + RESIDUE BLS12-381 Groth16 verifier: 35 inputs packed into four standard transactions. ' +
     'The graph is five shared-table GLV vk_x chunks, 29 input-validation-fused prepared Miller chunks, and one terminal residue chunk. ' +
-    'The terminal checks c*cInv==1, fF*w==frob(c,1), and w in the embedded Fp6 by requiring its upper six Fp12 limbs to be zero; ' +
+    'The terminal checks c*cInv==1 and fF*w==frob(c,1), with w supplied directly as six Fp6 limbs and its Fp12 upper half fixed to zero; ' +
     'p^6-1 divides (p^12-1)/r, and the terminal equations exclude zero. Within each group OP_INPUTBYTECODE binds handoffs; ' +
     'across groups a CashToken NFT commitment and pinned successor P2SH32 locking bind the state. One fixed locking graph verifies every proof for the VK.',
   method: 'grouped-residue', deployment: 'P2SH32', curve: 'BLS12-381', category: binToHex(CATEGORY),

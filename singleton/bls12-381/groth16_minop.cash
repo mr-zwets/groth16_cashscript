@@ -10,7 +10,7 @@ pragma cashscript ^0.14.0;
 import "./lib/lazy/Bls12381LazyG.cash";
 
 contract Groth16VerifyMinOp() {
-    function spend(int Ax, int Ay, int Bxa, int Bxb, int Bya, int Byb, int Cx, int Cy, int in0, int in1, int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11, int ci0,int ci1,int ci2,int ci3,int ci4,int ci5,int ci6,int ci7,int ci8,int ci9,int ci10,int ci11, int w0,int w1,int w2,int w3,int w4,int w5,int w6,int w7,int w8,int w9,int w10,int w11, int k10, int k20, int k11, int k21, int vkxZinv) {
+    function spend(int Ax, int Ay, int Bxa, int Bxb, int Bya, int Byb, int Cx, int Cy, int in0, int in1, int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11, int ci0,int ci1,int ci2,int ci3,int ci4,int ci5,int ci6,int ci7,int ci8,int ci9,int ci10,int ci11, int w0,int w1,int w2,int w3,int w4,int w5, int k10, int k20, int k11, int k21, int vkxZinv) {
         // ---- validate spender-supplied proof points: on-curve (b=4, b'=4+4u) ----
         int fieldP = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
         require(within(Ax, 0, fieldP));
@@ -481,6 +481,6 @@ contract Groth16VerifyMinOp() {
         require(redFp(Rbxa) == gcxa); require(redFp(Rbxb) == gcxb);
         (int gcya,int gcyb) = r2Mul(npya, npyb, Rbza, Rbzb);
         require(redFp(Rbya) == gcya); require(redFp(Rbyb) == gcyb);
-        require(residueVerdict(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11, ci0,ci1,ci2,ci3,ci4,ci5,ci6,ci7,ci8,ci9,ci10,ci11, w0,w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11));
+        require(residueVerdict(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11, ci0,ci1,ci2,ci3,ci4,ci5,ci6,ci7,ci8,ci9,ci10,ci11, w0,w1,w2,w3,w4,w5));
     }
 }

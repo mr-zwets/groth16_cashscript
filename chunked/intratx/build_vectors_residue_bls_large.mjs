@@ -36,11 +36,11 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp12, millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs, le48Exact, P, OP_DROP, verifierPath,
+  millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs, le48Exact, P, OP_DROP, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
-import { frob, mk12, residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
+import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
 import { glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_HIGH_COST_INPUTS } from '../bls12-381/gen_vkx_glv.mjs';
 import { transformChunk } from './transform.mjs';
 
@@ -182,17 +182,18 @@ function specsMillerResidue(inst, c, cInv, bad = {}) {
   return { specs, boundary };
 }
 function specsResidueTail(fF, c, cInv, w) {
-  const fFl = f12limbs(fF), cl = f12limbs(c), cil = f12limbs(cInv), wl = f12limbs(w);
+  const fFl = f12limbs(fF), cl = f12limbs(c), cil = f12limbs(cInv), wl = f12limbs(w).slice(0, 6);
   const commit36 = [...fFl, ...cl, ...cil];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_finalexpres.json'), 'utf8'));
   const chunk = man.chunks?.[0];
   if (man.residueTail !== true || man.fp6Membership !== true || man.deployment !== 'covenant' ||
-    man.numChunks !== 1 || man.nwalk !== 0 || chunk?.idx !== 0 || chunk.role !== 'finalize' || chunk.final !== true) {
+    man.numChunks !== 1 || man.nwalk !== 0 || chunk?.idx !== 0 || chunk.role !== 'finalize' || chunk.final !== true ||
+    chunk.witnessLimbs?.join(',') !== '0,1,2,3,4,5' || chunk.implicitZeroLimbs?.join(',') !== '6,7,8,9,10,11') {
     throw new Error('large-script BLS residue requires the one-chunk Fp6 tail');
   }
   return [{
     file: join(GEN, 'finalexpres_00.cash'), inLimbs: commit36, outLimbs: [], extras: wl, role: 'terminal',
-    label: 'residue Fp6 membership + verdict', checkpoint: 'verify',
+    label: 'residue Fp6 verdict', checkpoint: 'verify',
   }];
 }
 function buildSpecs(inst) {
@@ -432,24 +433,14 @@ const rangeRuns = [
   rangeInvalid(firstRangeTail, { extra: 0 }, -1n, 'reject negative w limb'),
   rangeInvalid(firstRangeTail, { extra: 0 }, P, 'reject w limb at P'),
 ];
-const fp6ShapeRuns = Array.from({ length: 6 }, (_, upper) => {
-  const hi = Array(6).fill(0n);
-  hi[upper] = 1n;
-  const wBad = mk12([1n, 0n, 0n, 0n, 0n, 0n], hi);
-  const rhs = frob(committedC, 1);
-  const fFBad = Fp12.mul(rhs, Fp12.inv(wBad));
-  if (!Fp12.eql(Fp12.mul(fFBad, wBad), rhs)) throw new Error('failed to isolate the Fp6 witness gate');
-  const asm = assemble(specsResidueTail(fFBad, committedC, committedCInv, wBad), true);
-  return { steps: toStepArr(asm), rejected: !asm.accepted };
-});
-const allInvalid = [...fInv, ...semanticRuns, ...rangeRuns, ...fp6ShapeRuns];
+const allInvalid = [...fInv, ...semanticRuns, ...rangeRuns];
 console.error(`  invalid runs rejected: ${allInvalid.map((r) => r.rejected).join(',')}`);
 if (!full0.accepted || !full1.accepted || !fullStress.fits || !allInvalid.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-large-vectors.json'), JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier targeting the proposed 100 kB-script VM. ' +
     'The current-BCH 35-input graph collapses to four inputs: one GLV vk_x input, two input-validation-fused prepared Miller inputs, and one terminal residue input. ' +
-    'The terminal checks c*cInv==1, fF*w==frob(c,1), and w in the embedded Fp6 by requiring its upper six Fp12 limbs to be zero; ' +
+    'The terminal checks c*cInv==1 and fF*w==frob(c,1), with w supplied directly as six Fp6 limbs and its Fp12 upper half fixed to zero; ' +
     'p^6-1 divides (p^12-1)/r, and the terminal equations exclude zero. OP_INPUTBYTECODE binds handoffs without hashing. ' +
     'Every input fits the proposed per-input budget and 100,000-byte script cap, but this one-transaction benchmark is not valid under current BCH 10,000-byte script limits. Deployed P2SH32.',
   method: 'intra-tx-linked-residue-large', deployment: 'P2SH32', curve: 'BLS12-381', numInputs: full0.inputs.length, budgetPerInput: LARGE_BUDGET,

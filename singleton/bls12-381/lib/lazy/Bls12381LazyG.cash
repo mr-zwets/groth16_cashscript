@@ -155,21 +155,19 @@ function jacAddG1(int aX, int aY, int aZ, int bX, int bY) returns (int, int, int
 // product; conj is an automorphism so witnessing g is equivalent to witnessing conj(g)).
 // Verifies  fF * w == c^p  (i.e. c^lambda == g*w, lambda = p + |x|), with
 //   - c canonical + cInv pinned by c*cInv == ONE,
-//   - w in the embedded Fp6* (upper six limbs zero).
+//   - w supplied as the six limbs of an embedded Fp6* value (upper half implicit zero).
 // Soundness: p^6-1 divides h=(p^12-1)/r, so every nonzero Fp6 element has order dividing h.
 // c*cInv == ONE and the tail equality exclude zero.
 function residueVerdict(
     int fF0,int fF1,int fF2,int fF3,int fF4,int fF5,int fF6,int fF7,int fF8,int fF9,int fF10,int fF11,
     int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11,
     int ci0,int ci1,int ci2,int ci3,int ci4,int ci5,int ci6,int ci7,int ci8,int ci9,int ci10,int ci11,
-    int w0,int w1,int w2,int w3,int w4,int w5,int w6,int w7,int w8,int w9,int w10,int w11
+    int w0,int w1,int w2,int w3,int w4,int w5
 ) returns (bool) {
     int P = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
     require(within(c0, 0, P)); require(within(c1, 0, P)); require(within(c2, 0, P)); require(within(c3, 0, P)); require(within(c4, 0, P)); require(within(c5, 0, P));
     require(within(c6, 0, P)); require(within(c7, 0, P)); require(within(c8, 0, P)); require(within(c9, 0, P)); require(within(c10, 0, P)); require(within(c11, 0, P));
     require(within(w0, 0, P)); require(within(w1, 0, P)); require(within(w2, 0, P)); require(within(w3, 0, P)); require(within(w4, 0, P)); require(within(w5, 0, P));
-    require(within(w6, 0, P)); require(within(w7, 0, P)); require(within(w8, 0, P)); require(within(w9, 0, P)); require(within(w10, 0, P)); require(within(w11, 0, P));
-    require(w6 == 0); require(w7 == 0); require(w8 == 0); require(w9 == 0); require(w10 == 0); require(w11 == 0);
     // c * cInv == ONE
     (int p0,int p1,int p2,int p3,int p4,int p5,int p6,int p7,int p8,int p9,int p10,int p11) =
         fp12Mul(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11, ci0,ci1,ci2,ci3,ci4,ci5,ci6,ci7,ci8,ci9,ci10,ci11);
@@ -177,7 +175,7 @@ function residueVerdict(
     require(p6 % P == 0); require(p7 % P == 0); require(p8 % P == 0); require(p9 % P == 0); require(p10 % P == 0); require(p11 % P == 0);
     // tail: fF * w == frob1(c)
     (int lhs0,int lhs1,int lhs2,int lhs3,int lhs4,int lhs5,int lhs6,int lhs7,int lhs8,int lhs9,int lhs10,int lhs11) =
-        fp12Mul(fF0,fF1,fF2,fF3,fF4,fF5,fF6,fF7,fF8,fF9,fF10,fF11, w0,w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11);
+        fp12Mul(fF0,fF1,fF2,fF3,fF4,fF5,fF6,fF7,fF8,fF9,fF10,fF11, w0,w1,w2,w3,w4,w5,0,0,0,0,0,0);
     (int rhs0,int rhs1,int rhs2,int rhs3,int rhs4,int rhs5,int rhs6,int rhs7,int rhs8,int rhs9,int rhs10,int rhs11) =
         fp12Frob1(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11);
     return lhs0 % P == rhs0 % P && lhs1 % P == rhs1 % P && lhs2 % P == rhs2 % P && lhs3 % P == rhs3 % P

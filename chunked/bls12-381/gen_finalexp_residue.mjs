@@ -4,8 +4,9 @@
 //   fF = g * c^-|x|,
 //
 // so the terminal relation is fF*w == frob(c, 1). The witness construction
-// produces w in the embedded Fp6*: its upper six Fp12 limbs are zero. This is
-// sufficient for soundness because p^6-1 divides h=(p^12-1)/r, so every
+// produces w in the embedded Fp6*: only its six Fp6 limbs are witnessed, and its
+// upper six Fp12 limbs are implicit zeros. This is sufficient for soundness
+// because p^6-1 divides h=(p^12-1)/r, so every
 // nonzero Fp6 element has order dividing h. c*cInv == ONE and the terminal
 // equality exclude zero without a separate w inverse.
 //
@@ -35,10 +36,11 @@ const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 
 const decl = (names) => names.map((name) => `int ${name}`).join(', ');
 const names12 = (prefix) => Array.from({ length: 12 }, (_, i) => `${prefix}${i}`);
+const names6 = (prefix) => Array.from({ length: 6 }, (_, i) => `${prefix}${i}`);
 const fFn = names12('fF');
 const cN = names12('c');
 const ciN = names12('ci');
-const wN = names12('w');
+const wN = names6('w');
 const canon = (names) => names.map((name) => `require(within(${name}, 0, P));`).join(' ');
 const eqOne = (prefix) => Array.from(
   { length: 12 },
@@ -56,10 +58,9 @@ function genFinalize() {
     `        int P = ${P};`,
     `        ${canon(cN)}`,
     `        ${canon(wN)}`,
-    `        ${wN.slice(6).map((name) => `require(${name} == 0);`).join(' ')}`,
     `        (${decl(names12('p'))}) = fp12Mul(${cN.join(',')}, ${ciN.join(',')});`,
     `        ${eqOne('p')}`,
-    `        (${decl(names12('lhs'))}) = fp12Mul(${fFn.join(',')}, ${wN.join(',')});`,
+    `        (${decl(names12('lhs'))}) = fp12Mul(${fFn.join(',')}, ${wN.join(',')}, 0,0,0,0,0,0);`,
     `        (${decl(names12('rhs'))}) = fp12Frob1(${cN.join(',')});`,
     `        ${Array.from({ length: 12 }, (_, i) => `require(lhs${i} % P == rhs${i} % P);`).join(' ')}`,
     '    }',
@@ -76,7 +77,9 @@ if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
   const fFl = fp12limbsOf(fF);
   const cl = fp12limbsOf(c);
   const cil = fp12limbsOf(cInv);
-  const wl = fp12limbsOf(w);
+  const w12 = fp12limbsOf(w);
+  if (w12.slice(6).some((limb) => limb !== 0n)) throw new Error('residue witness is not in the embedded Fp6');
+  const wl = w12.slice(0, 6);
   const commit36 = [...fFl, ...cl, ...cil];
   const source = genFinalize();
   const measurement = measureCovenantFile(
@@ -106,23 +109,18 @@ if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
   if (badFMeasurement.accepted) throw new Error('tampered fF passed the residue verdict');
   console.error('  tampered fF rejected');
 
-  for (let upper = 0; upper < 6; upper++) {
-    const hi = Array(6).fill(0n);
-    hi[upper] = 1n;
-    const wBad = mk12([1n, 0n, 0n, 0n, 0n, 0n], hi);
-    const fFBad = Fp12.mul(frob(c, 1), Fp12.inv(wBad));
-    const badCommit = [...fp12limbsOf(fFBad), ...cl, ...cil];
-    const badW = fp12limbsOf(wBad);
-    const badMeasurement = measureCovenantFile(
-      source,
-      [...badCommit, ...badW],
-      badCommit,
-      [],
-      PROBE,
-    );
-    if (badMeasurement.accepted) throw new Error(`non-Fp6 w limb ${upper + 6} passed the residue verdict`);
-    console.error(`  non-Fp6 w limb ${upper + 6} rejected with matching tail relation`);
-  }
+  const alternateW = mk12([1n, 2n, 3n, 4n, 5n, 6n], Array(6).fill(0n));
+  const alternateF = Fp12.mul(frob(c, 1), Fp12.inv(alternateW));
+  const alternateCommit = [...fp12limbsOf(alternateF), ...cl, ...cil];
+  const alternateMeasurement = measureCovenantFile(
+    source,
+    [...alternateCommit, ...fp12limbsOf(alternateW).slice(0, 6)],
+    alternateCommit,
+    [],
+    PROBE,
+  );
+  if (!alternateMeasurement.accepted) throw new Error('arbitrary embedded Fp6 witness rejected');
+  console.error('  arbitrary embedded Fp6 witness accepted');
 
   writeFileSync(join(GEN, 'manifest_finalexpres.json'), JSON.stringify({
     residueTail: true,
@@ -131,7 +129,10 @@ if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
     covenantResidue: COVENANT_RESIDUE,
     numChunks: 1,
     nwalk: 0,
-    chunks: [{ idx: 0, role: 'finalize', final: true, upperZeroLimbs: [6, 7, 8, 9, 10, 11] }],
+    chunks: [{
+      idx: 0, role: 'finalize', final: true,
+      witnessLimbs: [0, 1, 2, 3, 4, 5], implicitZeroLimbs: [6, 7, 8, 9, 10, 11],
+    }],
   }, null, 2));
   console.error('residue tail: 1 chunk');
 }

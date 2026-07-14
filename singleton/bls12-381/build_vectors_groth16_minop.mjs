@@ -50,9 +50,9 @@ function residueWit(publicInputs) {
   const pairs = C.pairsFor(publicInputs);
   const { boundary: g } = C.millerBatchOps(pairs); // UNCONJUGATED batched boundary
   const { c, cInv, w } = R.residueWitness(g);
-  return [...R.fp12limbsOf(c), ...R.fp12limbsOf(cInv), ...R.fp12limbsOf(w)].map(canon);
+  return [...R.fp12limbsOf(c), ...R.fp12limbsOf(cInv), ...R.fp12limbsOf(w).slice(0, 6)].map(canon);
 }
-// spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1, c[12],ci[12],w[12], k10,k20,k11,k21,vkxZinv)
+// spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1, c[12],ci[12],w[6], k10,k20,k11,k21,vkxZinv)
 function argsFor(publicInputs, resWit) {
   const [k10, k20] = G.glvDecompose(publicInputs[0] % G.GLV_R);
   const [k11, k21] = G.glvDecompose(publicInputs[1] % G.GLV_R);
@@ -79,12 +79,7 @@ const rangeInvalidUnlockings = [
   { label: 'non-canonical B.x limb', index: 2, value: validArgs[2] - Pm },
   { label: 'non-canonical residue c limb', index: 10, value: validArgs[10] - Pm },
   { label: 'non-canonical residue w limb', index: 34, value: validArgs[34] - Pm },
-  { label: 'negative GLV decomposition limb', index: 46, value: -1n },
-  ...Array.from({ length: 6 }, (_, upper) => ({
-    label: `non-Fp6 residue w limb ${upper + 6}`,
-    index: 40 + upper,
-    value: 1n,
-  })),
+  { label: 'negative GLV decomposition limb', index: 40, value: -1n },
 ].map(({ label, index, value }) => {
   const args = validArgs.slice();
   args[index] = value;

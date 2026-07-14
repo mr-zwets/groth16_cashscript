@@ -13,12 +13,12 @@ import { basename, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import {
-  Fp12, f12limbs, r6limbs, pairsFor, ptLimbs, millerBatchOps,
+  f12limbs, r6limbs, pairsFor, ptLimbs, millerBatchOps,
   commitBinExact, CATEGORY, P, TARGET_UNLOCK, verifierPath,
 } from './_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { compileFileBytecode, compileFileBytecodeRaw, computeVkx } from './_vkxmath.mjs';
-import { fp12limbsOf, frob, millerFusedOps, mk12, residueWitness } from './_residuemath.mjs';
+import { fp12limbsOf, millerFusedOps, mk12, residueWitness } from './_residuemath.mjs';
 import {
   GLV_HIGH_COST_INPUTS, GLV_SHARED_AUDITED_BOUNDS, GLV_TABLE_HEX,
   glvDecompose, regenGlvSharedAudited, vkxGlvStateAt, vkxGlvZinv,
@@ -490,13 +490,14 @@ function tailSpecs(fF, c, cInv, w) {
   const fLimbs = fp12limbsOf(fF);
   const cLimbs = fp12limbsOf(c);
   const cInvLimbs = fp12limbsOf(cInv);
-  const wLimbs = fp12limbsOf(w);
+  const wLimbs = fp12limbsOf(w).slice(0, 6);
   const handoff = [...fLimbs, ...cLimbs, ...cInvLimbs];
   const manifest = JSON.parse(readFileSync(join(GEN, 'manifest_finalexpres.json'), 'utf8'));
   const chunk = manifest.chunks?.[0];
   if (manifest.residueTail !== true || manifest.fp6Membership !== true || manifest.deployment !== 'covenant' ||
     manifest.covenantResidue !== true || manifest.numChunks !== 1 || manifest.nwalk !== 0 ||
-    chunk?.idx !== 0 || chunk.role !== 'finalize' || chunk.final !== true) {
+    chunk?.idx !== 0 || chunk.role !== 'finalize' || chunk.final !== true ||
+    chunk.witnessLimbs?.join(',') !== '0,1,2,3,4,5' || chunk.implicitZeroLimbs?.join(',') !== '6,7,8,9,10,11') {
     throw new Error('covenant BLS residue requires the one-chunk Fp6 tail');
   }
   return [{
@@ -504,7 +505,7 @@ function tailSpecs(fF, c, cInv, w) {
     commitLimbs: handoff,
     outLimbs: [],
     allArgs: [...handoff, ...wLimbs],
-    label: 'residue Fp6 membership + verdict',
+    label: 'residue Fp6 verdict',
     checkpoint: 'verify',
     kind: 'terminal',
     tailGenesis: true,
@@ -702,19 +703,6 @@ invalidInputSteps.wrongCanonicalW = buildChain(
   { rejectAt: wrongWTail.length - 1 },
 ).steps;
 
-for (let upper = 0; upper < 6; upper++) {
-  const hi = Array(6).fill(0n);
-  hi[upper] = 1n;
-  const wBad = mk12([1n, 0n, 0n, 0n, 0n, 0n], hi);
-  const rhs = frob(committedSpecs.witness.c, 1);
-  const fFBad = Fp12.mul(rhs, Fp12.inv(wBad));
-  if (!Fp12.eql(Fp12.mul(fFBad, wBad), rhs)) throw new Error('failed to isolate the Fp6 witness gate');
-  invalidInputSteps[`nonFp6W${upper + 6}`] = buildChain(
-    tailSpecs(fFBad, committedSpecs.witness.c, committedSpecs.witness.cInv, wBad),
-    { rejectAt: 0 },
-  ).steps;
-}
-
 // Cross-proof seam mutations must reject at the consumer, after its predecessor state is known
 // to be valid in the complete runs above.
 const secondMillerFirst = { ...secondSpecs.miller[0], commitLimbs: committedSpecs.glv.at(-1).outLimbs };
@@ -733,7 +721,7 @@ if (!stats.allFit || !stats.allAccept || !stats.allRejected) {
 
 const output = verifierPath('src', 'bch', 'groth16-bls12381-chunked-covenant-residue-vectors.json');
 writeFileSync(output, JSON.stringify({
-  description: 'Source-reproducible BLS12-381 Groth16 covenant-residue verifier: five-window full-stage GLV vk_x, input-validation-fused prepared Miller, and a one-input Fp6 residue verdict. The terminal checks c*cInv==1, fF*w==frob(c,1), and six zero upper limbs of w. This is sound because p^6-1 divides (p^12-1)/r; the equations exclude zero. The genesis spends and recreates a minting baton, every nonterminal P2SH32 contract pins its successor, and the terminal creates an immutable empty-commitment verdict locked to itself. Exact 48-byte stage seams carry (-A,B,C,vk_x), c, and cInv without modular aliasing. Every valid and invalid fixture is evaluated on the standard BCH 2026 VM.',
+  description: 'Source-reproducible BLS12-381 Groth16 covenant-residue verifier: five-window full-stage GLV vk_x, input-validation-fused prepared Miller, and a one-input Fp6 residue verdict. The terminal checks c*cInv==1 and fF*w==frob(c,1), with w supplied directly as six Fp6 limbs and its Fp12 upper half fixed to zero. This is sound because p^6-1 divides (p^12-1)/r; the equations exclude zero. The genesis spends and recreates a minting baton, every nonterminal P2SH32 contract pins its successor, and the terminal creates an immutable empty-commitment verdict locked to itself. Exact 48-byte stage seams carry (-A,B,C,vk_x), c, and cInv without modular aliasing. Every valid and invalid fixture is evaluated on the standard BCH 2026 VM.',
   generator: 'chunked/bls12-381/generate_covenant_residue.mjs',
   proofBinding: 'runtime',
   curve: 'BLS12-381',

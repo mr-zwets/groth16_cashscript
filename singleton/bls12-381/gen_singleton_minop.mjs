@@ -50,6 +50,8 @@ const N = (n) => Array.from({ length: n }, (_, i) => i);
 const list = (a) => a.join(',');
 const decl12 = (p) => list(N(12).map((i) => `int ${p}${i}`));
 const use12 = (p) => list(N(12).map((i) => `${p}${i}`));
+const decl6 = (p) => list(N(6).map((i) => `int ${p}${i}`));
+const use6 = (p) => list(N(6).map((i) => `${p}${i}`));
 const lits = (arr) => list(arr);
 
 // ---- GLV table (baked; proof-independent) ----
@@ -217,7 +219,7 @@ function emitMillerTailLazy() {
   L.push('        require(redFp(Rbxa) == gcxa); require(redFp(Rbxb) == gcxb);');
   L.push('        (int gcya,int gcyb) = r2Mul(npya, npyb, Rbza, Rbzb);');
   L.push('        require(redFp(Rbya) == gcya); require(redFp(Rbyb) == gcyb);');
-  L.push(`        require(residueVerdict(${use12('F')}, ${use12('c')}, ${use12('ci')}, ${use12('w')}));`);
+  L.push(`        require(residueVerdict(${use12('F')}, ${use12('c')}, ${use12('ci')}, ${use6('w')}));`);
   return L;
 }
 function emitMinOp() {
@@ -235,7 +237,7 @@ function emitMinOp() {
   L.push('');
   L.push('contract Groth16VerifyMinOp() {');
   const sig = ['int Ax', 'int Ay', 'int Bxa', 'int Bxb', 'int Bya', 'int Byb', 'int Cx', 'int Cy', 'int in0', 'int in1',
-    decl12('c'), decl12('ci'), decl12('w'), 'int k10', 'int k20', 'int k11', 'int k21', 'int vkxZinv'].join(', ');
+    decl12('c'), decl12('ci'), decl6('w'), 'int k10', 'int k20', 'int k11', 'int k21', 'int vkxZinv'].join(', ');
   L.push(`    function spend(${sig}) {`);
   for (const ln of emitInputValidationLazy()) L.push(ln);
   // G1 subgroup checks on A,C are OMITTED (not just fused): they are redundant for Groth16
