@@ -1,211 +1,89 @@
 pragma cashscript ^0.14.0;
 
-// BN254 singleton harness `vkx` — the field/pairing arithmetic comes from the shared lib/
-// libraries (imported below). See lib/README.md for the structure and how to grade.
-
+// BN254 singleton harness `vkx` — the field arithmetic comes from the shared lib/ library.
 import "./lib/Fp.cash";
 
+function jacDouble(int x, int y, int z) returns (int, int, int) {
+    int a = sqrFp(x); int b = sqrFp(y); int c = sqrFp(b);
+    int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
+    int e = mulFp(3, a); int f = sqrFp(e);
+    int nx = subFp(f, mulFp(2, d));
+    int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
+    int nz = mulFp(2, mulFp(y, z));
+    return nx, ny, nz;
+}
+
+function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int, int) {
+    int rx = bX; int ry = bY; int rz = 1;
+    if (aZ != 0) {
+        int z1z1 = sqrFp(aZ);
+        int u2 = mulFp(bX, z1z1);
+        int s2 = mulFp(mulFp(bY, aZ), z1z1);
+        if (aX == u2 && aY == s2) {
+            (rx, ry, rz) = jacDouble(aX, aY, aZ);
+        } else {
+            int h = subFp(u2, aX); int i2 = sqrFp(mulFp(2, h)); int j = mulFp(h, i2);
+            int rr = mulFp(2, subFp(s2, aY)); int v = mulFp(aX, i2);
+            int nx = subFp(subFp(sqrFp(rr), j), mulFp(2, v));
+            int ny = subFp(mulFp(rr, subFp(v, nx)), mulFp(2, mulFp(aY, j)));
+            int nz = mulFp(subFp(subFp(sqrFp(addFp(aZ, 1)), z1z1), 1), h);
+            rx = nx; ry = ny; rz = nz;
+        }
+    }
+    return rx, ry, rz;
+}
+
+function selectPoint(int b0, int b1) returns (int, int, int) {
+    // Fixed affine table for the joint scalar bits: IC1, IC2, or IC1 + IC2.
+    int x = 0; int y = 0; int add = 0;
+    if (b0 == 1 && b1 == 1) {
+        x = 20687098839691105097230132006705975099432129393118730698937199498853576759031;
+        y = 2784555085364475896955849729890301289648525422842103121195101376751786827234;
+        add = 1;
+    } else {
+        if (b0 == 1) {
+            x = 10415861484417082502655338383609494480414113902179649885744799961447382638712;
+            y = 10196215078179488638353184030336251401353352596818396260819493263908881608606;
+            add = 1;
+        } else {
+            if (b1 == 1) {
+                x = 19033251874843656108471242320417533909414939332036131356573128480367742634479;
+                y = 20792135454608030201903199625673964159744755218442260092768620403349374102584;
+                add = 1;
+            }
+        }
+    }
+    return x, y, add;
+}
+
 contract VkX(int expectedX, int expectedY) {
-    // `zeroPadding`: unused arg the unlocker fills with zero bytes to buy op-cost budget.
     function spend(bytes unused zeroPadding, int input0, int input1) {
-        // Hardcoded VK IC points (affine).
-        int ic0X = 10744596414106452074759370245733544594153395043370666422502510773307029471145;
-        int ic0Y = 848677436511517736191562425154572367705380862894644942948681172815252343932;
-        int ic1X = 10415861484417082502655338383609494480414113902179649885744799961447382638712;
-        int ic1Y = 10196215078179488638353184030336251401353352596818396260819493263908881608606;
-        int ic2X = 19033251874843656108471242320417533909414939332036131356573128480367742634479;
-        int ic2Y = 20792135454608030201903199625673964159744755218442260092768620403349374102584;
-
-        // Accumulator in Jacobian coords, initialised to IC0 (Z=1).
-        int accX = ic0X;
-        int accY = ic0Y;
-        int accZ = 1;
-
-        // ---- term 1: input0 * IC1, accumulated into acc ----
-        // base = IC1 in Jacobian (Z=1); running result R = infinity (Z=0).
-        int rX = 0;
-        int rY = 1;
-        int rZ = 0;
-        int bX = ic1X;
-        int bY = ic1Y;
-        int bZ = 1;
-
-        for (int i = 0; i < 254; i++) {
-            // if bit i of input0 set: R = R + base  (Jacobian add, add-2007-bl)
-            if (((input0 >> i) % 2) == 1) {
-                if (rZ == 0) {
-                    rX = bX; rY = bY; rZ = bZ;
-                } else {
-                    int z1z1 = sqrFp(rZ);
-                    int z2z2 = sqrFp(bZ);
-                    int u1 = mulFp(rX, z2z2);
-                    int u2 = mulFp(bX, z1z1);
-                    int s1 = mulFp(mulFp(rY, bZ), z2z2);
-                    int s2 = mulFp(mulFp(bY, rZ), z1z1);
-                    if (u1 == u2 && s1 == s2) {
-                        // R == base -> double R (dbl-2009-l)
-                        int a = sqrFp(rX);
-                        int b = sqrFp(rY);
-                        int c = sqrFp(b);
-                        int d = mulFp(2, subFp(subFp(sqrFp(addFp(rX, b)), a), c));
-                        int e = mulFp(3, a);
-                        int f = sqrFp(e);
-                        int nx = subFp(f, mulFp(2, d));
-                        int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
-                        int nz = mulFp(2, mulFp(rY, rZ));
-                        rX = nx; rY = ny; rZ = nz;
-                    } else {
-                        int h = subFp(u2, u1);
-                        int i2 = sqrFp(mulFp(2, h));
-                        int j = mulFp(h, i2);
-                        int rr = mulFp(2, subFp(s2, s1));
-                        int v = mulFp(u1, i2);
-                        int nx = subFp(subFp(sqrFp(rr), j), mulFp(2, v));
-                        int ny = subFp(mulFp(rr, subFp(v, nx)), mulFp(2, mulFp(s1, j)));
-                        int nz = mulFp(subFp(subFp(sqrFp(addFp(rZ, bZ)), z1z1), z2z2), h);
-                        rX = nx; rY = ny; rZ = nz;
-                    }
-                }
+        int rX = 0; int rY = 1; int rZ = 0;
+        // One MSB-first Shamir/Straus pass shares all 254 accumulator doublings.
+        for (int k = 0; k < 254; k = k + 1) {
+            int i = 253 - k;
+            if (rZ != 0) {
+                (rX, rY, rZ) = jacDouble(rX, rY, rZ);
             }
-            // base = 2 * base  (Jacobian double of base, Z may be 1 only on first step)
-            if (bZ != 0 && bY != 0) {
-                int a = sqrFp(bX);
-                int b = sqrFp(bY);
-                int c = sqrFp(b);
-                int d = mulFp(2, subFp(subFp(sqrFp(addFp(bX, b)), a), c));
-                int e = mulFp(3, a);
-                int f = sqrFp(e);
-                int nx = subFp(f, mulFp(2, d));
-                int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
-                int nz = mulFp(2, mulFp(bY, bZ));
-                bX = nx; bY = ny; bZ = nz;
+            int b0 = (input0 >> i) % 2;
+            int b1 = (input1 >> i) % 2;
+            (int x, int y, int add) = selectPoint(b0, b1);
+            if (add == 1) {
+                (rX, rY, rZ) = jacAddAffine(rX, rY, rZ, x, y);
             }
         }
 
-        // acc = acc + R  (acc is affine-Z=1 Jacobian + R Jacobian)
-        if (rZ != 0) {
-            int z1z1 = sqrFp(accZ);
-            int z2z2 = sqrFp(rZ);
-            int u1 = mulFp(accX, z2z2);
-            int u2 = mulFp(rX, z1z1);
-            int s1 = mulFp(mulFp(accY, rZ), z2z2);
-            int s2 = mulFp(mulFp(rY, accZ), z1z1);
-            if (u1 == u2 && s1 == s2) {
-                int a = sqrFp(accX);
-                int b = sqrFp(accY);
-                int c = sqrFp(b);
-                int d = mulFp(2, subFp(subFp(sqrFp(addFp(accX, b)), a), c));
-                int e = mulFp(3, a);
-                int f = sqrFp(e);
-                int nx = subFp(f, mulFp(2, d));
-                int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
-                int nz = mulFp(2, mulFp(accY, accZ));
-                accX = nx; accY = ny; accZ = nz;
-            } else {
-                int h = subFp(u2, u1);
-                int i2 = sqrFp(mulFp(2, h));
-                int j = mulFp(h, i2);
-                int rr = mulFp(2, subFp(s2, s1));
-                int v = mulFp(u1, i2);
-                int nx = subFp(subFp(sqrFp(rr), j), mulFp(2, v));
-                int ny = subFp(mulFp(rr, subFp(v, nx)), mulFp(2, mulFp(s1, j)));
-                int nz = mulFp(subFp(subFp(sqrFp(addFp(accZ, rZ)), z1z1), z2z2), h);
-                accX = nx; accY = ny; accZ = nz;
-            }
-        }
-
-        // ---- term 2: input1 * IC2, accumulated into acc ----
-        rX = 0; rY = 1; rZ = 0;
-        bX = ic2X; bY = ic2Y; bZ = 1;
-
-        for (int i = 0; i < 254; i++) {
-            if (((input1 >> i) % 2) == 1) {
-                if (rZ == 0) {
-                    rX = bX; rY = bY; rZ = bZ;
-                } else {
-                    int z1z1 = sqrFp(rZ);
-                    int z2z2 = sqrFp(bZ);
-                    int u1 = mulFp(rX, z2z2);
-                    int u2 = mulFp(bX, z1z1);
-                    int s1 = mulFp(mulFp(rY, bZ), z2z2);
-                    int s2 = mulFp(mulFp(bY, rZ), z1z1);
-                    if (u1 == u2 && s1 == s2) {
-                        int a = sqrFp(rX);
-                        int b = sqrFp(rY);
-                        int c = sqrFp(b);
-                        int d = mulFp(2, subFp(subFp(sqrFp(addFp(rX, b)), a), c));
-                        int e = mulFp(3, a);
-                        int f = sqrFp(e);
-                        int nx = subFp(f, mulFp(2, d));
-                        int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
-                        int nz = mulFp(2, mulFp(rY, rZ));
-                        rX = nx; rY = ny; rZ = nz;
-                    } else {
-                        int h = subFp(u2, u1);
-                        int i2 = sqrFp(mulFp(2, h));
-                        int j = mulFp(h, i2);
-                        int rr = mulFp(2, subFp(s2, s1));
-                        int v = mulFp(u1, i2);
-                        int nx = subFp(subFp(sqrFp(rr), j), mulFp(2, v));
-                        int ny = subFp(mulFp(rr, subFp(v, nx)), mulFp(2, mulFp(s1, j)));
-                        int nz = mulFp(subFp(subFp(sqrFp(addFp(rZ, bZ)), z1z1), z2z2), h);
-                        rX = nx; rY = ny; rZ = nz;
-                    }
-                }
-            }
-            if (bZ != 0 && bY != 0) {
-                int a = sqrFp(bX);
-                int b = sqrFp(bY);
-                int c = sqrFp(b);
-                int d = mulFp(2, subFp(subFp(sqrFp(addFp(bX, b)), a), c));
-                int e = mulFp(3, a);
-                int f = sqrFp(e);
-                int nx = subFp(f, mulFp(2, d));
-                int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
-                int nz = mulFp(2, mulFp(bY, bZ));
-                bX = nx; bY = ny; bZ = nz;
-            }
-        }
-
-        if (rZ != 0) {
-            int z1z1 = sqrFp(accZ);
-            int z2z2 = sqrFp(rZ);
-            int u1 = mulFp(accX, z2z2);
-            int u2 = mulFp(rX, z1z1);
-            int s1 = mulFp(mulFp(accY, rZ), z2z2);
-            int s2 = mulFp(mulFp(rY, accZ), z1z1);
-            if (u1 == u2 && s1 == s2) {
-                int a = sqrFp(accX);
-                int b = sqrFp(accY);
-                int c = sqrFp(b);
-                int d = mulFp(2, subFp(subFp(sqrFp(addFp(accX, b)), a), c));
-                int e = mulFp(3, a);
-                int f = sqrFp(e);
-                int nx = subFp(f, mulFp(2, d));
-                int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
-                int nz = mulFp(2, mulFp(accY, accZ));
-                accX = nx; accY = ny; accZ = nz;
-            } else {
-                int h = subFp(u2, u1);
-                int i2 = sqrFp(mulFp(2, h));
-                int j = mulFp(h, i2);
-                int rr = mulFp(2, subFp(s2, s1));
-                int v = mulFp(u1, i2);
-                int nx = subFp(subFp(sqrFp(rr), j), mulFp(2, v));
-                int ny = subFp(mulFp(rr, subFp(v, nx)), mulFp(2, mulFp(s1, j)));
-                int nz = mulFp(subFp(subFp(sqrFp(addFp(accZ, rZ)), z1z1), z2z2), h);
-                accX = nx; accY = ny; accZ = nz;
-            }
-        }
-
-        // ---- single final inverse: Jacobian (accX,accY,accZ) -> affine ----
-        int zInv = inverseFp(accZ);
+        (rX, rY, rZ) = jacAddAffine(
+            rX,
+            rY,
+            rZ,
+            10744596414106452074759370245733544594153395043370666422502510773307029471145,
+            848677436511517736191562425154572367705380862894644942948681172815252343932
+        );
+        int zInv = inverseFp(rZ);
         int zInv2 = sqrFp(zInv);
         int zInv3 = mulFp(zInv2, zInv);
-        int affX = mulFp(accX, zInv2);
-        int affY = mulFp(accY, zInv3);
-
-        require(affX == expectedX);
-        require(affY == expectedY);
+        require(mulFp(rX, zInv2) == expectedX);
+        require(mulFp(rY, zInv3) == expectedY);
     }
 }

@@ -21,8 +21,8 @@
 // zeroPadding, ...). The never-referenced `zeroPadding` arg is the pad -- `unused` lets
 // the compiler drop it during stack cleanup (no hand-built OP_DROP). We pad the unlocking
 // to the 10,000-byte cap to buy the max per-input op-cost budget ((41+10000)*800 =
-// 8,032,800); the singleton still needs ~76M op-cost, so even max padding cannot fit one
-// input -- the CORRECT, honest multi-input baseline.
+// 8,032,800); for this vector the singleton still needs ~11.95M op-cost, so even max
+// padding cannot fit one input -- the CORRECT, honest multi-input baseline.
 //
 // Unlocking:  push(input1) || push(input0) || <pad>  (cashc reverses; pad = zeroPadding, on top)
 // Locking:    push(expectedY) || push(expectedX) || template
