@@ -309,7 +309,10 @@ export function transformChunk(src, cfg) {
         carrierOffset = param.targetOffset;
       }
       if (p === usedExternalParams.length - 1) {
-        prologue.push(`        int ${param.name} = int(${carrierTail}.split(${param.width})[0]);`);
+        const value = param.targetOffset + param.width === targetFullInLen
+          ? carrierTail
+          : `${carrierTail}.split(${param.width})[0]`;
+        prologue.push(`        int ${param.name} = int(${value});`);
       } else {
         prologue.push(
           `        bytes linkedValue${p}, bytes linkedTail${p} = ${carrierTail}.split(${param.width}); int ${param.name} = int(linkedValue${p});`,
