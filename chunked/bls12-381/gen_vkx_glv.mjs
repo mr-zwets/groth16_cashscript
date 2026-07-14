@@ -113,13 +113,13 @@ function jacDouble(int x, int y, int z) returns (int, int, int) {
     int nz = mulFp(2, mulFp(y, z));
     return nx, ny, nz;
 }
-function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
-    int rx = bX; int ry = bY; int rz = bZ;
+function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int, int) {
+    int rx = bX; int ry = bY; int rz = 1;
     if (aZ != 0) {
-        int z1z1 = sqrFp(aZ); int z2z2 = sqrFp(bZ);
-        int u1 = mulFp(aX, z2z2); int u2 = mulFp(bX, z1z1);
-        int s1 = mulFp(mulFp(aY, bZ), z2z2); int s2 = mulFp(mulFp(bY, aZ), z1z1);
-        if (u1 == u2 && s1 == s2) {
+        int z1z1 = sqrFp(aZ);
+        int u2 = mulFp(bX, z1z1);
+        int s2 = mulFp(mulFp(bY, aZ), z1z1);
+        if (aX == u2 && aY == s2) {
             int da = sqrFp(aX); int db = sqrFp(aY); int dc = sqrFp(db);
             int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
             int de = mulFp(3, da); int df = sqrFp(de);
@@ -128,11 +128,11 @@ function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, in
             int dnz = mulFp(2, mulFp(aY, aZ));
             rx = dnx; ry = dny; rz = dnz;
         } else {
-            int h = subFp(u2, u1); int i2 = sqrFp(mulFp(2, h)); int jj = mulFp(h, i2);
-            int rr = mulFp(2, subFp(s2, s1)); int vv = mulFp(u1, i2);
+            int h = subFp(u2, aX); int i2 = sqrFp(mulFp(2, h)); int jj = mulFp(h, i2);
+            int rr = mulFp(2, subFp(s2, aY)); int vv = mulFp(aX, i2);
             int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
-            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
-            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
+            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(aY, jj)));
+            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, 1)), z1z1), 1), h);
             rx = anx; ry = any; rz = anz;
         }
     }
@@ -183,10 +183,10 @@ export function genCash(lo, hi, first, final, sharedTable = null) {
   L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
   L.push('            int idx = (k10 >> i) % 2 + 2 * ((k20 >> i) % 2) + 4 * ((k11 >> i) % 2) + 8 * ((k21 >> i) % 2);');
   L.push(`            (int aX, int aY, int doAdd) = select16(idx${sharedTable !== null ? ', glvTable' : ''});`);
-  L.push('            if (doAdd == 1) { (int ax, int ay, int az) = jacAdd(rX, rY, rZ, aX, aY, 1); rX = ax; rY = ay; rZ = az; }');
+  L.push('            if (doAdd == 1) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
   L.push('        }');
   if (final) {
-    L.push(`        (int icx, int icy, int icz) = jacAdd(rX, rY, rZ, ${modP(IC0[0])}, ${modP(IC0[1])}, 1);`);
+    L.push(`        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, ${modP(IC0[0])}, ${modP(IC0[1])});`);
     L.push('        rX = icx; rY = icy; rZ = icz;');
     L.push('        require(mulFp(rZ, zInv) == 1);');
     L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
