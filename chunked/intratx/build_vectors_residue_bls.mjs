@@ -33,7 +33,7 @@ import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls1
 import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
 import {
   glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX,
-  GLV_MAX_DENSITY_INPUTS, GLV_SHARED_SAFE_BOUNDS, regenGlvSharedSafe,
+  GLV_ALL_POSITIONS_INPUTS, GLV_SHARED_SAFE_BOUNDS, regenGlvSharedSafe,
 } from '../bls12-381/gen_vkx_glv.mjs';
 import { residueWalkT } from '../bls12-381/gen_finalexp_residue.mjs';
 import { transformChunk, headerSize } from './transform.mjs';
@@ -96,7 +96,7 @@ const mkInstance = (inputs) => {
   const A = mod(3n * 5n + vx * 7n + 13n * 11n);
   return { inputs, proof: { a: G1.BASE.multiply(A), b: proof.b, c: proof.c } };
 };
-const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]), dense: mkInstance(GLV_MAX_DENSITY_INPUTS) };
+const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]), allPositions: mkInstance(GLV_ALL_POSITIONS_INPUTS) };
 
 // ---- residue chunk-graph layout constants (identical to grouped/build_vectors_residue_bls.mjs) ----
 // fused-Miller state = f(12) + R_B(6) + runtime points(10) + c(12) + cInv(12) = 52 limbs.
@@ -312,8 +312,8 @@ const full0 = buildFull(INSTANCES.committed);
 report('groth16-bls12381-intratx-residue committed', full0);
 const full1 = buildFull(INSTANCES.proof1);
 report('groth16-bls12381-intratx-residue proof#1', full1);
-const fullDense = buildFull(INSTANCES.dense);
-report('groth16-bls12381-intratx-residue max-density', fullDense);
+const fullAllPositions = buildFull(INSTANCES.allPositions);
+report('groth16-bls12381-intratx-residue all-positions', fullAllPositions);
 // shared-table fixture: flip a middle byte of the carried GLV table -> the carrier's hash256
 // pin must reject (the four sibling readers consume that exact slice).
 function pushBounds(unlocking, opcodeOffset = 0) {
@@ -338,7 +338,7 @@ console.error('  shared GLV table mutation rejected at carrier');
 
 const fInv = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2)), tableMutation];
 console.error(`  invalid runs rejected: ${fInv.map((r) => r.rejected).join(',')}`);
-if (!full0.accepted || !full1.accepted || !fullDense.fits || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
+if (!full0.accepted || !full1.accepted || !fullAllPositions.fits || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-intratx-residue-vectors.json', JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-bls12381-intratx (each chunk is an input whose witness carries its incoming state as a raw 48-byte-limb blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: GLV vk_x MSM (5 chunks; the five inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding five copies), c^-|x|-FUSED batched Miller with e(alpha,beta) baked and only e(-A,B) running on-chain G2 arithmetic (30 chunks; the G2 on-curve + prime-order-subgroup validation is FUSED into the first/last Miller chunks, reusing the running R_B=[|x|]B the loop already walks), and a witnessed-residue final-exp TAIL collapsing the Hayashida-Scott hard part to a mu_27A ((w^|x|)*w)^9 walk + fF*w==frob(c,1) verdict (6 chunks). The residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail; w enters the tail as an uncommitted witness. Cross-stage soundness links are bound where layouts allow: vk_x final binds the vk_x point into the fused-Miller genesis input, and the fused-Miller boundary [fF,c,cInv] is bound into the residue tail. Reuses the same validated chunk math as bch-groth16-bls12381-grouped-residue. Deployed P2SH32.',
@@ -347,7 +347,7 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-intratx-
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
   maxStepOperationCost: Math.max(...full0.meta.map((m) => m.operationCost)),
   allFit: full0.fits, allAccept: full0.accepted,
-  steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullDense),
+  steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullAllPositions),
   invalid: fInv.map((r) => r.steps),
 }, null, 2));
 console.error('wrote groth16-bls12381-intratx-residue-vectors.json');

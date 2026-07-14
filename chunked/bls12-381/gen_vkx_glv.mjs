@@ -31,12 +31,12 @@ export const GLV_BETA = 79347939072921551262137970163342144706088674028106049301
 export const GLV_LAMBDA = r - ((X * X) % r); // -x^2 mod r
 export const GLV_R = r;
 export { ITERS as VKXGLV_ITERS };
-// Deterministically searched valid inputs whose four GLV sub-scalars have a nonzero bit
-// at every one of the 128 Straus positions. This is the density case the loop actually
-// executes; near-r inputs are not sufficient because decomposition randomizes the bits.
-export const GLV_MAX_DENSITY_INPUTS = [
-  34858469356782761897909152752726474392223647467802337015319438976734096243172n,
-  7481747670021426200056538375384252329781435103268576271399310381963838742462n,
+// First pair found by find_glv_all_positions.mjs: four GLV sub-scalars whose bitwise OR
+// covers every Straus position. This proves maximum branch density, not globally maximum
+// VM op-cost (operand magnitudes can still change arithmetic cost).
+export const GLV_ALL_POSITIONS_INPUTS = [
+  8699704594833010954851366198470438521970004240853464087613791907674188083256n,
+  35838398061043276980008993352276457174860298808037557677162090056906418425524n,
 ];
 export const GLV_SHARED_SAFE_BOUNDS = [0, 25, 51, 77, 103, 128];
 
@@ -222,8 +222,8 @@ export function regenGlvSharedSafe(GEN_DIR, sharedTable) {
 
 // ---- plan + emit (valid inputs with add coverage at all 128 loop positions) ----
 if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
-  const [wk10, wk20] = glvDecompose(GLV_MAX_DENSITY_INPUTS[0]), [wk11, wk21] = glvDecompose(GLV_MAX_DENSITY_INPUTS[1]);
-  if ((wk10 | wk20 | wk11 | wk21) !== (1n << 128n) - 1n) throw new Error('GLV density vector does not cover every loop position');
+  const [wk10, wk20] = glvDecompose(GLV_ALL_POSITIONS_INPUTS[0]), [wk11, wk21] = glvDecompose(GLV_ALL_POSITIONS_INPUTS[1]);
+  if ((wk10 | wk20 | wk11 | wk21) !== (1n << 128n) - 1n) throw new Error('GLV all-positions vector does not cover every loop position');
   const win0 = ((wk10 + wk20 * GLV_LAMBDA) % r + r) % r, win1 = ((wk11 + wk21 * GLV_LAMBDA) % r + r) % r;
   const SER_state = (Xj, Yj, Zj) => [Xj, Yj, Zj, win0, win1, wk10, wk20, wk11, wk21];
   console.error(`planning BLS12-381 GLV vk_x chunks (${ITERS}-bit 4-scalar Straus)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
