@@ -1,0 +1,146 @@
+# BLS12-381 fused ψ subgroup check: point-at-infinity degeneracy and the `Rbz != 0` guard
+
+**Status:** fixed (guard added to the generators; verifiers regenerated).
+**Severity:** subgroup check weaker than its stated guarantee (a full forgery was *not*
+demonstrated, but the check must hold unconditionally). Fixed proactively.
+**Affects:** the BLS12-381 **residue** verifiers that *fuse* the G2 subgroup check into the
+homogeneous-projective Miller walk. Does **not** affect BN254 or the BLS non-residue verifiers.
+
+This documents an optimization that turned out to need hardening: the "free" fused G2 subgroup
+check (`ψ(B) == [-x]B`, reusing the Miller loop's running `R_B`) could be satisfied *vacuously*
+by a maliciously chosen low-order B. The fix is a one-line point-at-infinity guard; the
+optimization itself (fusing the check into the loop, and separately omitting the G1 A/C subgroup
+checks) is retained.
+
+## Background: the two min-op optimizations
+
+The op-optimized BLS12-381 verifiers stack two subgroup-check optimizations over a textbook
+Groth16 verifier:
+
+1. **Omit the G1 subgroup checks on A and C** — sound, and *unaffected by this issue*. A and C are
+   paired only against order-`r` G2 elements, so any G1-cofactor component is annihilated by the
+   pairing; on-curve checks remain. (Independently audited; see `_soundness_audit.mjs`.)
+2. **Fuse the G2 subgroup check on B into the Miller loop.** The batched Miller loop already walks
+   the running accumulator `R_B` to `[|x|]B`. Instead of a separate `[|x|]B` walk, the verifier
+   reuses that `R_B` and checks the eigenvalue relation `ψ(B) == [-x]B`, i.e. `[|x|]B == -ψ(B)`.
+
+The soundness of (2) rests on `gcd(λ, h2) = 1` (λ = p+|x|, h2 = the G2/twist cofactor): *if* `R_B`
+equals the true `[|x|]B`, then `ψ(B) == [x]B` forces `B ∈ G2` (up to O). **This issue is that
+`R_B` is not always the true `[|x|]B`.**
+
+## The defect: homogeneous O collapses to `(0:0:0)` → vacuous pass
+
+The compare is done projectively, by cross-multiplying with the accumulator's Fp2 `z`:
+
+```
+require(Rbx == ψ(B).x · Rbz);
+require(Rby == -ψ(B).y · Rbz);
+```
+
+The Miller `pointDouble`/`pointAdd` are the standard homogeneous-projective formulas — **not**
+complete addition formulas. When the running point passes through the point at infinity O, they
+collapse the accumulator to `(0:0:0)` and stay there (the all-zero state is absorbing). With
+`Rbz = 0` the compare degenerates to `0 == ψ(B).x·0` and `0 == -ψ(B).y·0` — **both hold
+vacuously**, so the subgroup check passes for a B that is *not* in G2.
+
+### Why an attacker can trigger it
+
+- `|x| = 0xd201000000010000`. Its ate/NAF walk has the **prefix 13** (`R_B = [13]B` at that step).
+- **`13 | h2`**, and in fact **`13² | h2`**, so genuine order-exactly-13 points exist on the twist
+  E′(F_p²).
+- The contract's on-curve check on B is the *raw* curve equation `by² == bx³ + 4 + 4u` — it does
+  **not** test subgroup membership, so an order-13 B passes it.
+- For an order-13 B, `[13]B = O` at the prefix-13 step; `R_B` collapses to `(0:0:0)`, is absorbing
+  for the rest of the loop, and the final compare passes vacuously.
+
+Empirically (see the evidence scripts) all 12 order-13 points collapse the walk (`Rbz = 0`) and
+pass the *unguarded* ψ compare.
+
+### What this is and isn't
+
+- The **residue tail** (`g^h == 1`, witnessed by `c, w`) is an *independent* gate. For an order-13
+  B with honest A/C/inputs, `g^h ≠ 1` and `residueWitness` fails, so that particular transaction is
+  rejected — a full forgery was **not** constructed here. A real break would need to steer `g` into
+  the `g^h == 1` subgroup *while* using a degenerate B.
+- But a subgroup check on B that can be satisfied by a non-G2 point does not meet its stated
+  guarantee, and small-subgroup gaps in pairing verifiers are exactly the class one closes
+  proactively rather than after a weaponized proof. Hence the fix.
+
+## The fix: reject `R_B = O` before the compare
+
+Add, immediately before the ψ compare in the final fused-Miller chunk:
+
+```
+require(Rbza != 0 || Rbzb != 0);   // reject R_B = O (homogeneous Fp2 z == 0)
+```
+
+Emitted by:
+- `singleton/bls12-381/gen_singleton_minop.mjs` (`emitMillerTailLazy`)
+- `chunked/bls12-381/gen_miller_residue.mjs` (final-chunk `isFinal` block)
+
+### Why the guard is sufficient (not just a patch on order-13)
+
+Let `k` be any NAF prefix of `|x|` (`k < 2⁶⁴`). `R_B = O` at step `k` iff `ord(B) | k`, so a
+collapsing B has `ord(B) | gcd(k, h2·r)`.
+
+- `r` is a 255-bit prime and every prefix `k < 2⁶⁴ < r`, so `gcd(k, r) = 1`. Hence
+  `gcd(k, h2·r) = gcd(k, h2)`.
+- Across **all 64** NAF prefixes, the only common factor with `h2` is **13** (verified by direct
+  gcd; `13²` divides no prefix). So the only collapsing case is `ord(B) = 13`, which yields
+  `Rbz = 0` and is rejected by the guard.
+- Every **non-collapsing** walk produces the true `R_B = [|x|]B` with `Rbz ≠ 0`, and then
+  `gcd(λ, h2) = 1` makes `ψ(B) == [x]B` a faithful test of `B ∈ G2`.
+
+So: collapse ⟹ `Rbz = 0` ⟹ rejected; no collapse ⟹ compare is faithful. The guard closes the gap
+completely while preserving the fusion optimization (cost: one `require`, a few bytes / negligible
+op-cost per verifier).
+
+## What is *not* affected, and why
+
+- **BN254 singleton** (`singleton/bn254/gen_singletons.mjs`) and the **BLS non-residue** chunked
+  `g2check`: these run a **separate Jacobian** `[k]B` accumulator initialized to `O = (0:1:0)`. In
+  Jacobian, O has `Y ≠ 0`, so the cross-multiplied compare requires `GY == ψ(B).y·Z³ == 0`, which
+  fails at O (`GY = 1`). These reject O rather than passing vacuously — no change needed. (A
+  matching `require(Z != 0)` there would be free insurance but is not required for soundness.)
+- The G1 A/C subgroup-check omission (optimization 1 above) is independent and remains sound.
+
+## Affected / regenerated verifiers
+
+| id | source | fixed |
+|---|---|---|
+| `bch-groth16-bls12381-singleton-minop` | `singleton/bls12-381/gen_singleton_minop.mjs` | ✓ |
+| `bch-groth16-bls12381-grouped-residue` | `chunked/bls12-381/gen_miller_residue.mjs` (shared) | ✓ |
+| `bch-groth16-bls12381-intratx-residue` | ″ | ✓ |
+| `bch-groth16-bls12381-intratx-residue-large` | ″ | ✓ |
+
+## Reproduction / evidence
+
+Two standalone verification scripts accompany this doc in the repo root (run with `node`):
+
+- `_psi_degeneracy_test.mjs` — drives the **exact** contract Miller walk (`_pairingmath` formulas,
+  byte-identical to the `.cash`) with all 12 order-13 points; shows the unguarded compare accepts
+  every one (`UNGUARDED_pass=true`) and the guarded compare rejects every one
+  (`GUARDED_pass=false`) while still accepting an honest G2 B. This is the decisive test of both
+  the defect and the fix.
+- `_soundness_audit.mjs` — number-theory audit of the surrounding argument: it asserts the facts
+  the fix relies on (`gcd(prefix, r)=1`, `gcd(λ, h2)=1`), enumerates the NAF prefixes' `gcd` with
+  `h2` (only 13), and independently checks that the omitted G1 A/C subgroup checks remain sound.
+
+**Order matters when regenerating** — the `-large` builder rewrites `generated/` at the 100 kB
+budget, so restore the default-budget chunks before rebuilding the 10 kB grouped/intra-tx flagships:
+
+```
+# singleton minop
+node singleton/bls12-381/gen_singleton_minop.mjs
+node singleton/bls12-381/build_vectors_groth16_minop.mjs
+
+# chunked residue (default 10 kB budget)
+node chunked/bls12-381/gen_miller_residue.mjs
+node chunked/intratx/build_vectors_residue_bls.mjs
+node chunked/grouped/build_vectors_residue_bls.mjs
+
+# the bch-spec 100 kB variant LAST (it re-plans generated/ at 100 kB)
+node chunked/intratx/build_vectors_residue_bls_large.mjs
+
+# then, in the bench repo:  pnpm run benchmark:json
+```

@@ -201,6 +201,13 @@ function emitMillerTailLazy() {
   // The Miller loop above already walks R_B to [|x|]B (homogeneous projective; NAF excludes the
   // MSB, R_B starts at B), so psi(B) == -[|x|]B needs NO separate 64-step [|x|]B walk. Compare
   // affine(R_B)=(Rb/Rbz) to -psi(B): Rbx == psi(B).x*Rbz and Rby == -psi(B).y*Rbz.
+  // GUARD (soundness): reject R_B = O. |x| has NAF prefix 13, and 13 | h2 (the G2 twist cofactor),
+  // so an order-13 B (which passes the raw on-curve check) drives R_B through O; the homogeneous
+  // pointDouble/pointAdd collapse it to (0:0:0), which VACUOUSLY satisfies the cross-multiplied
+  // compare below (0 == psi.x*0). Requiring Rbz != 0 rejects that: gcd(prefix, r)=1 forces any
+  // collapsing B to order exactly 13 -> Rbz=0, while every non-collapsing walk yields the true
+  // [|x|]B where gcd(lambda, h2)=1 makes psi(B)==[x]B equivalent to B in G2. See psi-subgroup-degeneracy.md.
+  L.push('        require(Rbza != 0 || Rbzb != 0);');
   L.push('        (int psxa,int psxb,int psya,int psyb) = psi(Bxa, Bxb, Bya, Byb);');
   L.push('        (int npya,int npyb) = r2Neg(psya, psyb);');
   L.push('        (int gcxa,int gcxb) = r2Mul(psxa, psxb, Rbza, Rbzb);');

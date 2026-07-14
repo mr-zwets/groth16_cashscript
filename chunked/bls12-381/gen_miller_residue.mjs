@@ -126,6 +126,13 @@ function genChunk(opLo, opHi, isFinal) {
   // R/Rz). The membership relation is psi(B) == -[|x|]B (same as g2check), so require
   // Rx == psi(B).x * Rz  and  Ry == -psi(B).y * Rz. Rejects any B outside the prime-order subgroup.
   if (isFinal) {
+    // GUARD (soundness): reject R_B = O before the cross-multiplied psi compare. |x| has NAF
+    // prefix 13 and 13 | h2 (G2 twist cofactor), so an order-13 B (passes the raw on-curve check)
+    // walks R_B through O; the homogeneous point ops collapse it to (0:0:0), which would VACUOUSLY
+    // satisfy the compare (0 == psi.x*0). gcd(prefix, r)=1 makes order-13 the only collapsing case,
+    // so requiring Rz != 0 closes it; non-collapsing walks give the true [|x|]B and gcd(lambda,h2)=1
+    // then makes the compare a faithful G2 test. See psi-subgroup-degeneracy.md.
+    L.push(`        require(${r0[4]} != 0 || ${r0[5]} != 0);`);
     L.push(`        (int psxa, int psxb, int psya, int psyb) = psi(Q0xa, Q0xb, Q0ya, Q0yb);`);
     L.push('        (int npya, int npyb) = fp2Neg(psya, psyb);');
     L.push(`        (int exa, int exb) = r2Mul(psxa, psxb, ${r0[4]}, ${r0[5]});`);
