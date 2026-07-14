@@ -48,7 +48,8 @@ export function residueVerdictLines(fFnames, cNames, ciNames, wNames) {
   L.push('        ' + cNames.map((n) => `require(${n} < P);`).join(' '));
   const p = v('p');
   L.push(`        (${decl(p)}) = fp12Mul(${cNames.join(',')}, ${ciNames.join(',')});`);
-  L.push('        ' + p.map((n, i) => `require(${n} % P == ${ONE_L[i]});`).join(' '));
+  L.push('        // fp12Mul canonicalizes every returned limb to [0,P), so direct equality is field equality.');
+  L.push('        ' + p.map((n, i) => `require(${n} == ${ONE_L[i]});`).join(' '));
   L.push(`        require(${matchVec(wNames, ONE_L)} || ${matchVec(wNames, ROOT27L)} || ${matchVec(wNames, ROOT27_2L)});`);
   const cq = v('cq'), cqq = v('cqq'), cqqq = v('cqqq');
   L.push(`        (${decl(cq)}) = fp12Frob1(${cNames.join(',')});`);
@@ -58,7 +59,7 @@ export function residueVerdictLines(fFnames, cNames, ciNames, wNames) {
   L.push(`        (${decl(t)}) = fp12Mul(${fFnames.join(',')}, ${wNames.join(',')});`);
   L.push(`        (${decl(lhs)}) = fp12Mul(${t.join(',')}, ${cqq.join(',')});`);
   L.push(`        (${decl(rhs)}) = fp12Mul(${cq.join(',')}, ${cqqq.join(',')});`);
-  L.push('        ' + lhs.map((n, i) => `require(${n} % P == ${rhs[i]} % P);`).join(' '));
+  L.push('        ' + lhs.map((n, i) => `require(${n} == ${rhs[i]});`).join(' '));
   return L;
 }
 

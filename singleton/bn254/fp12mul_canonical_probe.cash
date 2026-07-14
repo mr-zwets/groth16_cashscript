@@ -1,0 +1,23 @@
+pragma cashscript ^0.14.0;
+
+import "./lib/lazy/Bn254Lazy.cash";
+
+contract Fp12MulCanonicalProbe() {
+    function spend(
+        int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8,int A9,int A10,int A11,
+        int B0,int B1,int B2,int B3,int B4,int B5,int B6,int B7,int B8,int B9,int B10,int B11,
+        int Z0,int Z1,int Z2,int Z3,int Z4,int Z5,int Z6,int Z7,int Z8,int Z9,int Z10,int Z11,
+        bytes unused zeroPadding
+    ) {
+        (int R0,int R1,int R2,int R3,int R4,int R5,int R6,int R7,int R8,int R9,int R10,int R11) =
+            fp12Mul(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,
+                    B0,B1,B2,B3,B4,B5,B6,B7,B8,B9,B10,B11);
+        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require(within(R0,0,P)); require(within(R1,0,P)); require(within(R2,0,P)); require(within(R3,0,P));
+        require(within(R4,0,P)); require(within(R5,0,P)); require(within(R6,0,P)); require(within(R7,0,P));
+        require(within(R8,0,P)); require(within(R9,0,P)); require(within(R10,0,P)); require(within(R11,0,P));
+        require(R0==Z0); require(R1==Z1); require(R2==Z2); require(R3==Z3);
+        require(R4==Z4); require(R5==Z5); require(R6==Z6); require(R7==Z7);
+        require(R8==Z8); require(R9==Z9); require(R10==Z10); require(R11==Z11);
+    }
+}
