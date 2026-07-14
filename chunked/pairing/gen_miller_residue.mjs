@@ -28,6 +28,7 @@ const LINKED_CUTS = process.env.MILLER_LINKED_LAYOUT === '1'
   ? [18, 32, 50, 68, 86, 104, 122, 140, 158, 176, 194, 212, 230, 249, 266, 285, 303, 320, 338]
   : [];
 const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
+const COVENANT_RESIDUE = STAGE_BOUND && process.env.COVENANT_RESIDUE_LAYOUT === '1';
 
 const PAIRS = pairsFor(vec.publicInputs);
 const PINFO = PAIRS.map((pair, j) => {
@@ -83,6 +84,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
   const fullStateParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames];
   const stateParams = STAGE_BOUND && opLo === 0 ? [...stagePtParams, ...cNames, ...ciNames] : fullStateParams;
+  const committedParams = COVENANT_RESIDUE && opLo === 0 ? stagePtParams : stateParams;
   const allParams = withTail ? [...stateParams, ...wNames] : stateParams;
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
@@ -92,7 +94,11 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   L.push('// carried witness. cf op folds c^-1/c into f (residue method, ePrint 2024/640).');
   L.push(`contract MillerFused${withTail ? 'Tail' : ''}Chunk() {`);
   L.push(`    function spend(${decl(allParams)}, bytes unused zeroPadding) {`);
-  L.push(covIn(stateParams));
+  L.push(covIn(committedParams));
+  if (COVENANT_RESIDUE && opLo === 0) {
+    L.push('        int residueP = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
+    L.push('        ' + [...cNames, ...ciNames].map((n) => `require(${n} >= 0 && ${n} < residueP);`).join(' '));
+  }
   const negY = PINFO.map((pi) => {
     if (!pi.cfg.Q) return [`${pi.negQ.c0}`, `${pi.negQ.c1}`];
     const needs = ops.slice(opLo, opHi).some((o) => o.t === 'al' && o.neg && o.j === pi.j);
@@ -173,7 +179,6 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     const tNames = Array.from({ length: 12 }, (_, i) => `tailT${i}`);
     const lhsNames = Array.from({ length: 12 }, (_, i) => `tailLhs${i}`);
     L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
-    L.push('        ' + cNames.map((n) => `require(${n} < P);`).join(' '));
     L.push(`        (${decl(pNames)}) = fp12Mul(${cNames.join(',')}, ${ciNames.join(',')});`);
     L.push('        ' + pNames.map((n, i) => `require(${n} % P == ${ONE_L[i]});`).join(' '));
     L.push(`        bytes wHash = hash256(${wNames.map((n) => `toPaddedBytes(${n}, ${STATE_BYTES})`).join(' + ')});`);
@@ -186,7 +191,12 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     L.push('        ' + lhsNames.map((n, i) => `require((${n} - ${rhsNames[i]}) % P == 0);`).join(' '));
   } else {
     // final chunk hands off only [fF, c, cInv] to the residue tail; others carry full state.
-    L.push(isFinal ? covOut([...f, ...cNames, ...ciNames]) : covOut([...f, ...r0, ...ptParams, ...cNames, ...ciNames]));
+    const exactState = COVENANT_RESIDUE
+      ? (isFinal ? [...cNames, ...ciNames] : [...ptParams, ...cNames, ...ciNames])
+      : [];
+    L.push(isFinal
+      ? covOut([...f, ...cNames, ...ciNames], exactState)
+      : covOut([...f, ...r0, ...ptParams, ...cNames, ...ciNames], exactState));
   }
   L.push('    }');
   L.push('}');
@@ -199,7 +209,8 @@ if (process.argv[2] === 'probe') {
     const withTail = final && LINKED_CUTS.length > 0;
     const inL = inState(a);
     const args = withTail ? [...inL, ...fp12limbsOf(W_PLAN)] : inL;
-    const m = measureCovenantFile(genChunk(a, b, final, withTail), args, withTail ? [] : outState(b), PROBE, true, inL);
+    const committedIn = COVENANT_RESIDUE && a === 0 ? stagePtL : inL;
+    const m = measureCovenantFile(genChunk(a, b, final, withTail), args, withTail ? [] : outState(b), PROBE, true, committedIn);
     console.error(`ops [${a},${b}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`);
   }
   process.exit(0);
@@ -209,13 +220,14 @@ console.error(`planning FUSED BN254 Miller chunks (${ops.length} flat ops, ${ops
 const chunks = []; let lo = 0; const planState = { perUnit: null };
 while (lo < ops.length) {
   const inL = inState(lo);
+  const committedIn = COVENANT_RESIDUE && lo === 0 ? stagePtL : inL;
   const tryHi = (hi) => {
     const final = hi === ops.length;
     const withTail = final && LINKED_CUTS.length > 0;
     const outL = withTail ? [] : outState(hi);
     const args = withTail ? [...inL, ...fp12limbsOf(W_PLAN)] : inL;
     const src = genChunk(lo, hi, final, withTail);
-    const m = measureCovenantFile(src, args, outL, PROBE, true, inL);
+    const m = measureCovenantFile(src, args, outL, PROBE, true, committedIn);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final, withTail, outgoing: withTail ? null : commit(outL), src, m };
   };
   // The generic covenant layout needs the greedy windows. Linked grouped/intratx packaging
@@ -253,6 +265,7 @@ if (process.env.FUSE_TAIL === '1' && chunks[chunks.length - 1].tailFused !== tru
 }
 writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
   fused: true, linkedLayout: LINKED_CUTS.length > 0, stageBound: STAGE_BOUND,
+  covenantResidue: COVENANT_RESIDUE,
   numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, tailFused: c.tailFused === true, incoming: c.incoming, outgoing: c.outgoing })),
 }, null, 2));

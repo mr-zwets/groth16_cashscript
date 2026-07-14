@@ -179,9 +179,10 @@ function genChunk(lo, hi, isFirst, isLast) {
     L.push('        require(xl_a == xr_a); require(xl_b == xr_b);');
     L.push('        (int yl_a,int yl_b) = fp2Mul(lya, lyb, rz3a, rz3b); (int yr_a,int yr_b) = fp2Mul(rya, ryb, lz3a, lz3b);');
     L.push('        require(yl_a == yr_a); require(yl_b == yr_b);');
-    if (STAGE_BOUND) L.push(covOut(PROOF));
+    if (STAGE_BOUND) L.push(covOut(PROOF, PROOF));
   } else {
-    L.push(covOut([...r, ...PROOF]));
+    // Genesis bounds the proof tuple, and all Fp2 helpers return reduced limbs.
+    L.push(covOut([...r, ...PROOF], [...r, ...PROOF]));
   }
   L.push('    }');
   L.push('}');

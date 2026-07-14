@@ -16,6 +16,23 @@ Three benchmark entries (in the verifier repo) are produced from here:
   prepared Miller chunks → final exponentiation → a final step asserting the product
   == Fp12 ONE. 43 inputs.
 
+The source-owned covenant-residue deployment is reproduced separately:
+
+```sh
+VERIFIER_DIR=/path/to/zk-verifier-bench node generate_covenant_residue.mjs
+```
+
+It writes exactly
+`$VERIFIER_DIR/src/bch/groth16-chunked-covenant-residue-vectors.json`.
+The graph uses a fast-G2 minting-baton genesis, a four-chunk GLV `vk_x` stage that
+carries the validated `(-A,B,C)` tuple, and a stage-bound fused Miller loop whose
+final chunk also performs the witnessed-residue verdict. State limbs use canonical
+32-byte BN254 serialization. Every nonterminal covenant pins its successor P2SH32
+locking; the mutable thread terminates as an immutable NFT. The writer refuses to
+emit vectors unless the committed, second, and dense proofs all pass the same locking
+graph and the point, residue-range, state, successor-locking, token-lifecycle, and
+stage-splice negative cases reject on the standard BCH 2026 VM.
+
 Every chunk is validated on the real BCH 2026 VM.
 
 ## Optimizations
@@ -107,6 +124,9 @@ Run a single piece directly if needed: `node gen_miller.mjs`, `node gen_finalexp
 | `gen_g2check.mjs` | chunk G2 on-curve and subgroup validation | ✅ |
 | `build_vectors.mjs` | assemble all chunks → the pairing, full-verifier, and vk_x vectors | ✅ |
 | `generate.mjs` | one-command orchestrator (runs all of the above) | ✅ |
+| `generated/` | the 43 full-verifier `.cash` chunks + manifests (derived) | ❌ git-ignored |
+| `build_vectors_covenant_residue.mjs` | assemble and gate the covenant-residue lifecycle | ✅ |
+| `generate_covenant_residue.mjs` | one-command covenant-residue vector reproduction | ✅ |
 | `generated/` | the 43 full-verifier `.cash` chunks + manifests (derived) | ❌ git-ignored |
 
 The committed instance lives in the verifier repo

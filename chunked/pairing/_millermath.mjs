@@ -442,13 +442,21 @@ export const commitBin = (limbs) => new Uint8Array(sha256d(Buffer.concat(limbs.m
 /** require: the spent token commits hash(incoming state) (decl-order `names`). */
 export const covIn = (names) =>
   `        require(tx.inputs[this.activeInputIndex].nftCommitment == ${serExpr(names)});`;
-/** require: output[0] commits hash(outgoing, reduced) + perpetuates the token thread. */
-export const covOut = (outNames, exactNames = []) =>
+/** require: output[0] commits hash(outgoing) + perpetuates the token thread. */
+export const covOut = (outNames, exactNames = []) => {
+  const exact = new Set(exactNames);
+  if (exact.size !== exactNames.length || exactNames.some((name) => !outNames.includes(name))) {
+    throw new Error('exact covenant outputs must be unique members of the outgoing state');
+  }
   // local name `Pmod` (not `P`) avoids colliding with the global `constant P` that the non-lazy
   // library exports (g2check imports it); the lazy-lib consumers have no global P either way.
-  '        int Pmod = 21888242871839275222246405745257275088696311157297823662689037894645226208583;\n' +
-  `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((n) => `toPaddedBytes(${n}${exactNames.includes(n) ? '' : ' % Pmod'}, ${STATE_BYTES})`).join(' + ')}));\n` +
-  '        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);';
+  const modulus = outNames.some((name) => !exact.has(name))
+    ? '        int Pmod = 21888242871839275222246405745257275088696311157297823662689037894645226208583;\n'
+    : '';
+  return modulus +
+    `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((name) => `toPaddedBytes(${name}${exact.has(name) ? '' : ' % Pmod'}, ${STATE_BYTES})`).join(' + ')}));\n` +
+    '        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);';
+};
 
 /** Real-VM measurer for a COVENANT chunk: drives it through a synthetic token tx
  * (spent UTXO = hash(incoming), output[0] = hash(outgoing)) so the introspection
