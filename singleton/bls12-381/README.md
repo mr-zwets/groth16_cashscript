@@ -93,12 +93,11 @@ BLS-specific differences vs the BN254 min-op (see `../../chunked/bls12-381/_resi
   boundaries DO carry an A-part in their order, removed by a one-exponentiation
   projection); the on-chain membership check is `((w^|x|) * w)^9 == 1` (27A = 9(|x|+1),
   |x| sparse: 6 bits);
-- G2 subgroup check is the witness-free 64-bit walk `psi(B) == [-x]B`;
-- **G1 subgroup checks for A and C** (the BLS12-381 G1 cofactor `3*((|x|+1)/3)^2 != 1`,
-  unlike BN254): `phi(P) == [-x^2]P` via two sparse |x|-walks compared against `-phi(P)`;
-  sound because `z^2+z+1` evaluated at `-x^2` is exactly `r`, which no cofactor prime
-  divides (also verified numerically against constructed eigenvector points in the
-  cofactor torsion).
+- the G2 subgroup check `psi(B) == [-x]B` is fused into the Miller tail and reuses
+  `[|x|]B`;
+- G1 subgroup checks for A and C are omitted as redundant: both points remain checked
+  on-curve and are paired only with order-`r` G2 points, so their cofactor components
+  pair trivially. This matches the grouped/intra-tx residue verifiers.
 
 ```
 node singleton/bls12-381/gen_singleton_minop.mjs         # regenerate groth16_minop.cash
