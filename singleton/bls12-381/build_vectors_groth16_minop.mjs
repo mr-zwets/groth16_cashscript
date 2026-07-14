@@ -71,12 +71,30 @@ function argsFor(publicInputs, resWit) {
 // monolith's stack-management overhead (~-1.8% op-cost), which the plain cashc CLI does not do.
 const template = utils.asmToBytecode(compileFile(join(here, 'groth16_minop.cash'), { rescheduleStacks: true }).bytecode);
 const rwValid = residueWit(PUBLIC_INPUTS);
-const unlocking = unlockingFor(argsFor(PUBLIC_INPUTS, rwValid));
+const validArgs = argsFor(PUBLIC_INPUTS, rwValid);
+const unlocking = unlockingFor(validArgs);
 // invalid: tamper a public input but reuse the (now non-matching) valid witness
 const invalidUnlocking = unlockingFor(argsFor([PUBLIC_INPUTS[0] + 1n, PUBLIC_INPUTS[1]], rwValid));
+const rangeInvalidUnlockings = [
+  { label: 'non-canonical B.x limb', index: 2, value: validArgs[2] - Pm },
+  { label: 'non-canonical residue c limb', index: 10, value: validArgs[10] - Pm },
+  { label: 'non-canonical residue w limb', index: 34, value: validArgs[34] - Pm },
+  { label: 'negative GLV decomposition limb', index: 46, value: -1n },
+].map(({ label, index, value }) => {
+  const args = validArgs.slice();
+  args[index] = value;
+  return { label, unlocking: binToHex(unlockingFor(args)) };
+});
 
 const looseAccept = evalPair(looseVm, template, unlocking);
 const looseRejectInvalid = evalPair(looseVm, template, invalidUnlocking);
+const rangeRejections = rangeInvalidUnlockings.map(({ label, unlocking: candidate }) => ({
+  label,
+  rejected: !evalPair(looseVm, template, hexToBin(candidate)).accepted,
+}));
+if (rangeRejections.some(({ rejected }) => !rejected)) {
+  throw new Error(`canonical range fixture accepted: ${rangeRejections.filter(({ rejected }) => !rejected).map(({ label }) => label).join(', ')}`);
+}
 const realAccept = evalPair(realVm, template, unlocking);
 const opCost = looseAccept.operationCost;
 
@@ -84,6 +102,7 @@ console.log('=== Groth16VerifyMinOp BLS12-381 (lazy tower + residue tail + Mille
 console.log(`locking ${template.length}B  unlocking ${unlocking.length}B`);
 console.log(`loosened: ACCEPT valid = ${looseAccept.accepted}  (op-cost ${opCost.toLocaleString()})  err=${looseAccept.error ?? '(none)'}`);
 console.log(`loosened: REJECT invalid = ${!looseRejectInvalid.accepted}`);
+console.log(`canonical range rejects = ${rangeRejections.map(({ rejected }) => rejected).join(',')}`);
 console.log(`real BCH 2026: accepted = ${realAccept.accepted}  err = ${realAccept.error ?? '(none)'}`);
 console.log(`inputsNeeded = ${Math.ceil(opCost / STANDARD_BUDGET)}`);
 
@@ -93,6 +112,7 @@ const out = {
   lockingOK: binToHex(template),
   unlocking: binToHex(unlocking),
   invalidUnlocking: binToHex(invalidUnlocking),
+  rangeInvalidUnlockings,
   lockingBytes: template.length,
   unlockingBytes: unlocking.length,
   operationCost: opCost,
@@ -102,5 +122,5 @@ const out = {
   looseAccept: looseAccept.accepted,
   rejectInvalid: !looseRejectInvalid.accepted,
 };
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-singleton-minop-vectors.json', JSON.stringify(out, null, 2));
+writeFileSync(C.verifierPath('src/bch/groth16-bls12381-singleton-minop-vectors.json'), JSON.stringify(out, null, 2));
 console.log('wrote src/bch/groth16-bls12381-singleton-minop-vectors.json');

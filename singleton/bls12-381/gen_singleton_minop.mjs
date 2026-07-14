@@ -105,6 +105,9 @@ export function vkxGlvZinv(k10, k20, k11, k21) {
 function emitInputValidationLazy() {
   return [
     '        // ---- validate spender-supplied proof points: on-curve (b=4, b\'=4+4u) ----',
+    `        int fieldP = ${P};`,
+    ...['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy']
+      .map((name) => `        require(within(${name}, 0, fieldP));`),
     '        require(mulFp(Ay, Ay) == mAdd(mulFp(mulFp(Ax, Ax), Ax), 4)); // A on E(Fp)',
     '        require(mulFp(Cy, Cy) == mAdd(mulFp(mulFp(Cx, Cx), Cx), 4)); // C on E(Fp)',
     '        (int bx2a,int bx2b) = r2Sqr(Bxa, Bxb);                       // B on E\'(Fp2)',
@@ -121,7 +124,7 @@ function emitGlvVkxLazy() {
   const ic0 = IC0.map((v) => modP(v).toString());
   const L = [];
   L.push('        // ---- vk_x via GLV 4-scalar Straus (baked table) ----');
-  L.push(`        require(k10 < ${BOUND}); require(k20 < ${BOUND}); require(k11 < ${BOUND}); require(k21 < ${BOUND});`);
+  L.push(`        require(within(k10, 0, ${BOUND})); require(within(k20, 0, ${BOUND})); require(within(k11, 0, ${BOUND})); require(within(k21, 0, ${BOUND}));`);
   L.push(`        require((k10 + k20 * ${GLV_LAMBDA}) % ${r} == in0);`);
   L.push(`        require((k11 + k21 * ${GLV_LAMBDA}) % ${r} == in1);`);
   L.push('        int gX = 0; int gY = 1; int gZ = 0;');

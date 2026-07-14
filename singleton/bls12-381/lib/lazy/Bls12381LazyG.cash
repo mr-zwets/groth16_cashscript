@@ -164,10 +164,10 @@ function residueVerdict(
     int w0,int w1,int w2,int w3,int w4,int w5,int w6,int w7,int w8,int w9,int w10,int w11
 ) returns (bool) {
     int P = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
-    require(c0 < P); require(c1 < P); require(c2 < P); require(c3 < P); require(c4 < P); require(c5 < P);
-    require(c6 < P); require(c7 < P); require(c8 < P); require(c9 < P); require(c10 < P); require(c11 < P);
-    require(w0 < P); require(w1 < P); require(w2 < P); require(w3 < P); require(w4 < P); require(w5 < P);
-    require(w6 < P); require(w7 < P); require(w8 < P); require(w9 < P); require(w10 < P); require(w11 < P);
+    require(within(c0, 0, P)); require(within(c1, 0, P)); require(within(c2, 0, P)); require(within(c3, 0, P)); require(within(c4, 0, P)); require(within(c5, 0, P));
+    require(within(c6, 0, P)); require(within(c7, 0, P)); require(within(c8, 0, P)); require(within(c9, 0, P)); require(within(c10, 0, P)); require(within(c11, 0, P));
+    require(within(w0, 0, P)); require(within(w1, 0, P)); require(within(w2, 0, P)); require(within(w3, 0, P)); require(within(w4, 0, P)); require(within(w5, 0, P));
+    require(within(w6, 0, P)); require(within(w7, 0, P)); require(within(w8, 0, P)); require(within(w9, 0, P)); require(within(w10, 0, P)); require(within(w11, 0, P));
     // c * cInv == ONE
     (int p0,int p1,int p2,int p3,int p4,int p5,int p6,int p7,int p8,int p9,int p10,int p11) =
         fp12Mul(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11, ci0,ci1,ci2,ci3,ci4,ci5,ci6,ci7,ci8,ci9,ci10,ci11);

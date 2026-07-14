@@ -12,6 +12,15 @@ import "./lib/lazy/Bls12381LazyG.cash";
 contract Groth16VerifyMinOp() {
     function spend(int Ax, int Ay, int Bxa, int Bxb, int Bya, int Byb, int Cx, int Cy, int in0, int in1, int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11, int ci0,int ci1,int ci2,int ci3,int ci4,int ci5,int ci6,int ci7,int ci8,int ci9,int ci10,int ci11, int w0,int w1,int w2,int w3,int w4,int w5,int w6,int w7,int w8,int w9,int w10,int w11, int k10, int k20, int k11, int k21, int vkxZinv) {
         // ---- validate spender-supplied proof points: on-curve (b=4, b'=4+4u) ----
+        int fieldP = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
+        require(within(Ax, 0, fieldP));
+        require(within(Ay, 0, fieldP));
+        require(within(Bxa, 0, fieldP));
+        require(within(Bxb, 0, fieldP));
+        require(within(Bya, 0, fieldP));
+        require(within(Byb, 0, fieldP));
+        require(within(Cx, 0, fieldP));
+        require(within(Cy, 0, fieldP));
         require(mulFp(Ay, Ay) == mAdd(mulFp(mulFp(Ax, Ax), Ax), 4)); // A on E(Fp)
         require(mulFp(Cy, Cy) == mAdd(mulFp(mulFp(Cx, Cx), Cx), 4)); // C on E(Fp)
         (int bx2a,int bx2b) = r2Sqr(Bxa, Bxb);                       // B on E'(Fp2)
@@ -20,7 +29,7 @@ contract Groth16VerifyMinOp() {
         (int by2a,int by2b) = r2Sqr(Bya, Byb);
         require(by2a == onrhsa); require(by2b == onrhsb);
         // ---- vk_x via GLV 4-scalar Straus (baked table) ----
-        require(k10 < 340282366920938463463374607431768211456); require(k20 < 340282366920938463463374607431768211456); require(k11 < 340282366920938463463374607431768211456); require(k21 < 340282366920938463463374607431768211456);
+        require(within(k10, 0, 340282366920938463463374607431768211456)); require(within(k20, 0, 340282366920938463463374607431768211456)); require(within(k11, 0, 340282366920938463463374607431768211456)); require(within(k21, 0, 340282366920938463463374607431768211456));
         require((k10 + k20 * 52435875175126190479447740508185965837461563690374988244538805122978187051009) % 52435875175126190479447740508185965837690552500527637822603658699938581184513 == in0);
         require((k11 + k21 * 52435875175126190479447740508185965837461563690374988244538805122978187051009) % 52435875175126190479447740508185965837690552500527637822603658699938581184513 == in1);
         int gX = 0; int gY = 1; int gZ = 0;
