@@ -27,9 +27,9 @@ only top-level functions (no `contract`, never deployed); the parent-directory f
 
 - **One arithmetic scheme.** Every BLS contract uses reduced arithmetic (`addFp`/`subFp` reduce mod p),
   so there is a single tower — no separate "lazy" library (bn254 needed one for `miller`/`finalexp`).
-- **Six libraries, no `G1`.** The vk_x G1 Jacobian scalar-multiply is *inlined* in the `groth16` and
-  `vkx` spend functions (CashScript can't yet return the 3-coord points as tuples), so there is no `G1`
-  library — those contracts just `import Fp`.
+- **Six libraries, no `G1`.** The two G1 consumers keep their small Jacobian helpers beside the
+  curve-specific fixed IC tables in `groth16.cash` and `vkx.cash`, so there is no separate `G1`
+  library — those contracts reach the shared base-field arithmetic through their existing imports.
 - **No `psi`.** The BLS Miller loop has no untwist-Frobenius post-precompute step.
 - **Different field constants.** BLS prime, Fp6 non-residue `xi = u+1` (not `9+u`), M-twist sparse
   multiply `mul014` (not `mul034`), BLS seed, and Frobenius/twist constants — all baked into the
