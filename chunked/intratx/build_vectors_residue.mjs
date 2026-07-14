@@ -335,22 +335,39 @@ function assemble(specs, expectRejected = false) {
     argB[i].length + tailLen(i),
     Math.max(op1[i].operationCost, standardOp1[i].operationCost),
   ));
+  const minimumTargets = specs.map(() => 0);
   let op2;
   let standardOp2;
   while (true) {
     inputs = specs.map((_, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, targets[i]) }));
     op2 = specs.map((_, i) => evalInput(inputs, i));
     standardOp2 = specs.map((_, i) => evalInput(inputs, i, standardVm));
-    if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) break;
-    const tightened = targets.map((target, i) => Math.min(
-      target,
-      tunedLen(argB[i].length + tailLen(i), Math.max(op2[i].operationCost, standardOp2[i].operationCost)),
+    if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) {
+      let relaxed = false;
+      targets = targets.map((target, i) => {
+        const failures = [op2[i], standardOp2[i]].filter((outcome) => !outcome.accepted);
+        if (failures.length === 0 || failures.some((outcome) => !outcome.error?.includes('operation cost density limit')) || target >= TARGET_UNLOCK) {
+          return target;
+        }
+        minimumTargets[i] = target + 1;
+        relaxed = true;
+        return target + 1;
+      });
+      if (relaxed) continue;
+      break;
+    }
+    const tightened = targets.map((target, i) => Math.max(
+      minimumTargets[i],
+      Math.min(target, tunedLen(argB[i].length + tailLen(i), Math.max(op2[i].operationCost, standardOp2[i].operationCost))),
     ));
     if (tightened.every((target, i) => target === targets[i])) break;
     targets = tightened;
   }
   if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) {
-    throw new Error('tightened input rejected during padding measurement');
+    const failures = [...op2, ...standardOp2]
+      .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
+      .filter((outcome) => !outcome.accepted);
+    throw new Error(`tightened input rejected during padding measurement: ${JSON.stringify(failures)}`);
   }
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);

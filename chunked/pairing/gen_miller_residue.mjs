@@ -24,9 +24,13 @@ const LIB_IMPORT = '../../../singleton/bn254/lib/lazy/Bn254Lazy.cash';
 const PROBE = join(GEN, '_probe_millerres.cash');
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
-const LINKED_CUTS = process.env.MILLER_LINKED_LAYOUT === '1'
-  ? [18, 32, 50, 68, 86, 104, 122, 140, 158, 176, 194, 212, 230, 249, 266, 285, 303, 320, 338]
-  : [];
+const LINKED_LAYOUT = process.env.MILLER_LINKED_LAYOUT === '1';
+const linkedCutsOverride = process.env.MILLER_LINKED_CUTS;
+const LINKED_CUTS = !LINKED_LAYOUT || linkedCutsOverride === 'auto'
+  ? []
+  : linkedCutsOverride === undefined
+    ? [18, 32, 50, 68, 86, 104, 122, 140, 158, 176, 194, 212, 230, 249, 266, 285, 303, 320, 338]
+    : linkedCutsOverride.split(',').map(Number);
 const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 const COVENANT_RESIDUE = STAGE_BOUND && process.env.COVENANT_RESIDUE_LAYOUT === '1';
 
@@ -53,6 +57,9 @@ const stagePtL = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
 const { boundary: fRawPlan } = millerBatchOps(PAIRS);
 const { c: C_PLAN, cInv: CINV_PLAN, w: W_PLAN } = residueWitness(fRawPlan);
 const { ops, states, boundary } = millerFusedOps(PAIRS, C_PLAN, CINV_PLAN);
+if (LINKED_CUTS.some((cut, i) => !Number.isInteger(cut) || cut <= (LINKED_CUTS[i - 1] ?? 0) || cut >= ops.length)) {
+  throw new Error('MILLER_LINKED_CUTS must be strictly increasing integer boundaries inside the op range');
+}
 
 // baked constant f_{alpha,beta} (pair 1's single-pair Miller value; VK-only, proof-independent),
 // multiplied in once by the 'cmul1' op instead of folding pair 1's ~89 lines through the loop.
@@ -206,7 +213,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
 if (process.argv[2] === 'probe') {
   for (const [a, b] of [[0, 4], [0, 8], [ops.length - 4, ops.length]]) {
     const final = b === ops.length;
-    const withTail = final && LINKED_CUTS.length > 0;
+    const withTail = final && LINKED_LAYOUT;
     const inL = inState(a);
     const args = withTail ? [...inL, ...fp12limbsOf(W_PLAN)] : inL;
     const committedIn = COVENANT_RESIDUE && a === 0 ? stagePtL : inL;
@@ -223,7 +230,7 @@ while (lo < ops.length) {
   const committedIn = COVENANT_RESIDUE && lo === 0 ? stagePtL : inL;
   const tryHi = (hi) => {
     const final = hi === ops.length;
-    const withTail = final && LINKED_CUTS.length > 0;
+    const withTail = final && LINKED_LAYOUT;
     const outL = withTail ? [] : outState(hi);
     const args = withTail ? [...inL, ...fp12limbsOf(W_PLAN)] : inL;
     const src = genChunk(lo, hi, final, withTail);
@@ -264,7 +271,7 @@ if (process.env.FUSE_TAIL === '1' && chunks[chunks.length - 1].tailFused !== tru
   console.error(`  chunk ${last.idx}: residue-tail verdict FUSED -> terminal (was hand-off + separate tail)`);
 }
 writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
-  fused: true, linkedLayout: LINKED_CUTS.length > 0, stageBound: STAGE_BOUND,
+  fused: true, linkedLayout: LINKED_LAYOUT, stageBound: STAGE_BOUND,
   covenantResidue: COVENANT_RESIDUE,
   numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, tailFused: c.tailFused === true, incoming: c.incoming, outgoing: c.outgoing })),
