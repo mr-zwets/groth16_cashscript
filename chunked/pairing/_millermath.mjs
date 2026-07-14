@@ -92,6 +92,7 @@ function mul034(f, o0, o3, o4) {
   return Fp12.create({ c0: Fp6.add(Fp6.mulByNonresidue(B), A), c1: Fp6.sub(E, Fp6.add(A, B)) });
 }
 export const lineFn = (f, c0, c1, c2, Px, Py) => mul034(f, scalarFp2(c2, Py), scalarFp2(c1, Px), c0);
+export const lineUnitFn = (f, c0, c1, u, v) => mul034(f, Fp2.ONE, scalarFp2(c1, u), scalarFp2(c0, v));
 export const psi = (x, y) => [Fp2.mul(Fp2.frobeniusMap(x, 1), PSI_X), Fp2.mul(Fp2.frobeniusMap(y, 1), PSI_Y)];
 
 export function millerStep(f, R, k, Qx, Qy, negQy, Px, Py) {
@@ -300,9 +301,12 @@ export const proofFromLimbs = (Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy) => ({
 // VK points stay literals. This is what makes the chunks proof-agnostic.
 export const PT_CFG = [{ P: true, Q: true }, { P: false, Q: false }, { P: true, Q: false }, { P: true, Q: false }];
 /** runtime point limbs (declaration order) for a pair's affine P (G1) and Q (G2). */
-export const ptLimbs = (pairIdx, P, Q) => {
+export const ptLimbs = (pairIdx, P, Q, unitLines = false) => {
   const o = [], c = PT_CFG[pairIdx];
-  if (c.P) o.push(P.x, P.y);
+  if (c.P && unitLines) {
+    const invY = Fp.inv(P.y);
+    o.push(Fp.neg(Fp.mul(P.x, invY)), Fp.neg(invY));
+  } else if (c.P) o.push(P.x, P.y);
   if (c.Q) o.push(Q.x.c0, Q.x.c1, Q.y.c0, Q.y.c1);
   return o;
 };

@@ -28,7 +28,7 @@ import { dirname, join } from 'node:path';
 import {
   bn254, BN_X, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileFileBytecode, compileFileBytecodeRaw, ptLimbs,
-  vkxPoint, le40, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath, invalidG2Overrides,
+  vkxPoint, le40, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath, invalidG2Overrides, PT_CFG,
   assertG2StageManifest,
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
@@ -41,8 +41,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
 const FUSE_G2_ENDPOINT = process.env.FUSE_G2_ENDPOINT === '1';
 const MILLER_AFFINE_G2 = process.env.MILLER_AFFINE_G2 === '1';
+const MILLER_UNIT_LINES = process.env.MILLER_UNIT_LINES === '1';
 if (MILLER_AFFINE_G2 && !FUSE_G2_ENDPOINT) {
   throw new Error('MILLER_AFFINE_G2 requires FUSE_G2_ENDPOINT=1');
+}
+if (MILLER_UNIT_LINES && !MILLER_AFFINE_G2) {
+  throw new Error('MILLER_UNIT_LINES requires MILLER_AFFINE_G2=1');
 }
 const ENDPOINT_VM_CASES = Number(process.env.ENDPOINT_VM_CASES ?? 1);
 if (!Number.isInteger(ENDPOINT_VM_CASES) || ENDPOINT_VM_CASES < 1) {
@@ -201,14 +205,20 @@ function specsVkx(inst, crossToMiller) {
 // performs the residue verdict, so there is no separate terminal input or state hand-off.
 function specsMillerFused(inst, c, cInv, w) {
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const traceMiller = MILLER_AFFINE_G2 ? millerFusedAffineOps : millerFusedOps;
-  const { ops, states } = traceMiller(pairs, c, cInv);
-  const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
+  const trace = MILLER_AFFINE_G2
+    ? millerFusedAffineOps(pairs, c, cInv, { unitLines: MILLER_UNIT_LINES })
+    : millerFusedOps(pairs, c, cInv);
+  const { ops, states } = trace;
+  const rawPtL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
+  const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine(), MILLER_UNIT_LINES));
+  const invY = MILLER_UNIT_LINES
+    ? pairs.filter((_, j) => PT_CFG[j].P).map((pair) => bn254.fields.Fp.inv(pair.P.toAffine().y))
+    : [];
   const runtimeRLimbs = (R) => MILLER_AFFINE_G2
     ? [R.x.c0, R.x.c1, R.y.c0, R.y.c1]
     : r6limbs(R);
   const full = (s) => [...f12limbs(s.f), ...runtimeRLimbs(s.Rs[0]), ...ptL, ...f12limbs(s.c), ...f12limbs(s.cInv)];
-  const genesisPts = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
+  const genesisPts = [...rawPtL.slice(0, 6), ...rawPtL.slice(8, 10), ...rawPtL.slice(6, 8)];
   const genesis = [...genesisPts, ...f12limbs(c), ...f12limbs(cInv)];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
   if (man.linkedLayout !== true) {
@@ -223,6 +233,9 @@ function specsMillerFused(inst, c, cInv, w) {
   if (man.affineG2 !== MILLER_AFFINE_G2) {
     throw new Error(`Miller affine-G2 mode mismatch: generated=${man.affineG2} requested=${MILLER_AFFINE_G2}`);
   }
+  if (man.unitLines !== MILLER_UNIT_LINES) {
+    throw new Error(`Miller unit-line mode mismatch: generated=${man.unitLines} requested=${MILLER_UNIT_LINES}`);
+  }
   return man.chunks.map((ch) => {
     const slopes = ops.slice(ch.opLo, ch.opHi).flatMap((op) =>
       (op.affineSlopes ?? []).flatMap((slope) => [slope.c0, slope.c1]));
@@ -230,7 +243,8 @@ function specsMillerFused(inst, c, cInv, w) {
       file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`),
       inLimbs: ch.opLo === 0 ? genesis : full(states[ch.opLo]),
       outLimbs: ch.final ? [] : full(states[ch.opHi]),
-      extras: [...slopes, ...(ch.final ? fp12limbsOf(w) : [])],
+      extras: [...(ch.opLo === 0 ? invY : []), ...slopes, ...(ch.final ? fp12limbsOf(w) : [])],
+      unitInvYCount: ch.opLo === 0 ? invY.length : 0,
       affineSlopeCount: slopes.length,
       role: ch.final ? 'terminal' : 'within',
       cmp: null,
@@ -244,7 +258,12 @@ function buildSpecs(inst) {
   const vkx = specsVkx(inst, true);
   const pairs = pairsFor(inst.inputs, inst.proof);
   const fRaw = MILLER_AFFINE_G2
-    ? millerFusedAffineOps(pairs, bn254.fields.Fp12.ONE, bn254.fields.Fp12.ONE).boundary
+    ? millerFusedAffineOps(
+        pairs,
+        bn254.fields.Fp12.ONE,
+        bn254.fields.Fp12.ONE,
+        { unitLines: MILLER_UNIT_LINES },
+      ).boundary
     : millerBatchOps(pairs).boundary;
   const { c, cInv, w } = residueWitness(fRaw);
   const miller = specsMillerFused(inst, c, cInv, w);
@@ -568,12 +587,15 @@ const fullInvalid = [
 let endpointSpecIndex = -1;
 if (FUSE_G2_ENDPOINT) {
   const manifest = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
-  const traceMiller = MILLER_AFFINE_G2 ? millerFusedAffineOps : millerFusedOps;
-  const trace = traceMiller(
-    pairsFor(INSTANCES.committed.inputs, proof),
-    bn254.fields.Fp12.ONE,
-    bn254.fields.Fp12.ONE,
-  );
+  const endpointPairs = pairsFor(INSTANCES.committed.inputs, proof);
+  const trace = MILLER_AFFINE_G2
+    ? millerFusedAffineOps(
+        endpointPairs,
+        bn254.fields.Fp12.ONE,
+        bn254.fields.Fp12.ONE,
+        { unitLines: MILLER_UNIT_LINES },
+      )
+    : millerFusedOps(endpointPairs, bn254.fields.Fp12.ONE, bn254.fields.Fp12.ONE);
   const endpointOp = trace.ops.findIndex((op) => op.t === 'pp' && op.j === 0);
   const endpointChunk = manifest.chunks.findIndex((chunk) => chunk.opLo <= endpointOp && endpointOp < chunk.opHi);
   if (endpointChunk < 0) throw new Error('missing fused Miller endpoint chunk');
@@ -666,6 +688,45 @@ if (MILLER_AFFINE_G2) {
   console.error('  affine slope mutations: wrong canonical and noncanonical-p witnesses rejected at their step');
 }
 
+if (MILLER_UNIT_LINES) {
+  const inverseSpec = committedSpecs[millerGenesisIndex];
+  if (inverseSpec.unitInvYCount !== 3) throw new Error('unit-line genesis must carry three inverse-Y witnesses');
+  const baseUnlocking = full0.inputs[millerGenesisIndex].unlocking;
+  const inBlobPush = pushBounds(baseUnlocking);
+  const extraStart = inBlobPush.dataStart + inBlobPush.dataLen;
+  const mutations = Array.from({ length: inverseSpec.unitInvYCount }, (_, invIndex) => {
+    const value = BigInt(inverseSpec.extras[invIndex]);
+    return [`wrong canonical inverse ${invIndex}`, invIndex, pushInt(value === P - 1n ? value - 1n : value + 1n)];
+  });
+  mutations.push(['noncanonical inverse p', 0, pushInt(P)]);
+  for (const [label, invIndex, replacement] of mutations) {
+    const physicalPushIndex = inverseSpec.extras.length - 1 - invIndex;
+    let opcodeOffset = extraStart;
+    for (let i = 0; i < physicalPushIndex; i++) {
+      const current = pushBounds(baseUnlocking, opcodeOffset);
+      opcodeOffset = current.dataStart + current.dataLen;
+    }
+    const inversePush = pushBounds(baseUnlocking, opcodeOffset);
+    const inputs = full0.inputs.slice();
+    const unlocking = Uint8Array.from([
+      ...baseUnlocking.slice(0, opcodeOffset),
+      ...replacement,
+      ...baseUnlocking.slice(inversePush.dataStart + inversePush.dataLen),
+    ]);
+    inputs[millerGenesisIndex] = { ...inputs[millerGenesisIndex], unlocking };
+    const consensusOutcomes = inputs.map((_, i) => evalInput(inputs, i));
+    const standardOutcomes = inputs.map((_, i) => evalInput(inputs, i, standardVm));
+    if (consensusOutcomes[millerGenesisIndex].accepted || standardOutcomes[millerGenesisIndex].accepted) {
+      throw new Error(`unit-line genesis accepted ${label}`);
+    }
+    const unrelatedFailure = [...consensusOutcomes, ...standardOutcomes].find((outcome, i) =>
+      i % inputs.length !== millerGenesisIndex && !outcome.accepted);
+    if (unrelatedFailure) throw new Error(`${label} also rejected outside the unit-line genesis`);
+    fullInvalid.push({ steps: toStepArr({ inputs, meta: full0.meta }), rejected: true });
+  }
+  console.error('  unit-line inverse mutations: three wrong canonical and one noncanonical-p witness rejected at genesis');
+}
+
 if (FUSE_G2_ENDPOINT && ENDPOINT_VM_CASES > 1) {
   for (const scalar of [2n, 7n, BN_X]) {
     const scaledProof = {
@@ -704,7 +765,9 @@ if (!full0.fits || !full1.fits || !fullWc.fits || !fullInvalid.every((run) => ru
 
 const description = FUSE_G2_ENDPOINT
   ? MILLER_AFFINE_G2
-    ? `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates and checks all three proof points on their curves. Runtime B uses a four-limb affine accumulator; every tangent/chord carries a two-limb canonical slope witness, rejects a zero denominator, and checks the slope equation before emitting a normalized line. The normalized line differs only by an Fp2 scale, which vanishes in final exponentiation. Exact G2 subgroup membership is fused into B's post-processing by requiring R+psi(B)-psi^2(B)=-psi^3(B). prove_miller_affine.mjs proves valid-subgroup completeness and line-scale equivalence; prove_miller_endpoint_subgroup.mjs proves the endpoint relation has exactly the r-torsion kernel on the full rational twist group. The GLV result is cross-bound into Miller genesis and every later state is forward-bound with OP_INPUTBYTECODE.`
+    ? MILLER_UNIT_LINES
+      ? `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates, checks all three proof points on their curves, and binds canonical inverse-Y witnesses for the three runtime G1 points. Each G1 point is carried as (-x/y,-1/y), and every fixed line is normalized offline to c2=1, making the sparse multiplier's o0 coefficient one. Runtime B uses a four-limb affine accumulator; every tangent/chord carries a two-limb canonical slope witness, rejects a zero denominator, and checks the slope equation. These normalizations change the Miller value only by an Fp2 scale, which vanishes in final exponentiation. Exact G2 subgroup membership is fused into B's post-processing by requiring R+psi(B)-psi^2(B)=-psi^3(B). prove_miller_unit_lines.mjs proves the line-scale equivalence and all fixed-line denominators; unit_line_bound_analysis.mjs proves the specialized integer bounds; the affine and endpoint proof scripts retain their original completeness guarantees. The GLV result is cross-bound into Miller genesis and every later state is forward-bound with OP_INPUTBYTECODE.`
+      : `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates and checks all three proof points on their curves. Runtime B uses a four-limb affine accumulator; every tangent/chord carries a two-limb canonical slope witness, rejects a zero denominator, and checks the slope equation before emitting a normalized line. The normalized line differs only by an Fp2 scale, which vanishes in final exponentiation. Exact G2 subgroup membership is fused into B's post-processing by requiring R+psi(B)-psi^2(B)=-psi^3(B). prove_miller_affine.mjs proves valid-subgroup completeness and line-scale equivalence; prove_miller_endpoint_subgroup.mjs proves the endpoint relation has exactly the r-torsion kernel on the full rational twist group. The GLV result is cross-bound into Miller genesis and every later state is forward-bound with OP_INPUTBYTECODE.`
     : `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates, checks A and C on G1, and reuses runtime B's first doubling coefficients for its twist-curve equation. Exact G2 subgroup membership is fused into B's existing Miller post-processing: for R=[6x+2]B, the second-add line through R+psi(B) and -psi^2(B) must also contain psi^3(B), equivalent to R+psi(B)-psi^2(B)+psi^3(B)=O. prove_miller_endpoint_subgroup.mjs proves this condition has exactly the r-torsion kernel on the full rational twist group. The GLV result is cross-bound into Miller genesis and every later state is forward-bound with OP_INPUTBYTECODE.`
   : 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-intratx (each chunk is an input whose witness carries its incoming state as a raw byte blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: 3 canonical-coordinate/on-curve/subgroup fast-G2 endomorphism chunks (ePrint 2022/348), 3 GLV vk_x chunks, and c^-(6x+2)-FUSED batched Miller chunks with e(alpha,beta) precomputed/skipped (ePrint 2024/640). The three GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding three copies. The final Miller chunk also performs the witnessed-residue verdict. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. The G2 final chunk binds the proof-derived -A/B and C bytes into the fused-Miller genesis input, while the vk_x final chunk binds the GLV result into that same genesis; every later Miller state is forward-bound.';
 

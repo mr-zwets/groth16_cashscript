@@ -7,7 +7,7 @@
 //   product finalExp == 1. Witness from gnark's finalExpWitness (scaling + r,m,cube roots).
 import {
   bn254, Fp, Fp2, Fp6, Fp12, BN_X, ATE_NAF,
-  pairsFor, millerBatchOps, singlePairMiller, pointDouble, pointAdd, lineFn, psi,
+  pairsFor, millerBatchOps, singlePairMiller, pointDouble, pointAdd, lineFn, lineUnitFn, psi,
 } from './_millermath.mjs';
 
 const p = Fp.ORDER;
@@ -133,9 +133,32 @@ const affineAdd = (point, addend) => {
   };
 };
 
-export function millerFusedAffineOps(pairs, c, cInv) {
+export function millerFusedAffineOps(pairs, c, cInv, { unitLines = false } = {}) {
   const raw = millerFusedOps(pairs, c, cInv);
-  const pairData = pairs.map((pair) => ({ P: pair.P.toAffine(), Q: pair.Q.toAffine() }));
+  const pairData = pairs.map((pair) => {
+    const P = pair.P.toAffine();
+    const invY = unitLines ? Fp.inv(P.y) : null;
+    return {
+      P, Q: pair.Q.toAffine(),
+      u: unitLines ? Fp.neg(Fp.mul(P.x, invY)) : null,
+      v: unitLines ? Fp.neg(invY) : null,
+    };
+  });
+  const lineCoeffs = (coeffs) => {
+    if (!unitLines) return coeffs;
+    if (Fp2.eql(coeffs[2], Fp2.ZERO)) throw new Error('unit Miller line has zero c2');
+    const scale = Fp2.neg(Fp2.inv(coeffs[2]));
+    return [Fp2.mul(coeffs[0], scale), Fp2.mul(coeffs[1], scale), Fp2.ONE];
+  };
+  const foldLine = (value, coeffs, j) => {
+    const normalized = lineCoeffs(coeffs);
+    return {
+      coeffs: normalized,
+      f: unitLines
+        ? lineUnitFn(value, normalized[0], normalized[1], pairData[j].u, pairData[j].v)
+        : lineFn(value, normalized[0], normalized[1], normalized[2], pairData[j].P.x, pairData[j].P.y),
+    };
+  };
   const ops = [];
   const states = [];
   let f = cInv;
@@ -148,12 +171,18 @@ export function millerFusedAffineOps(pairs, c, cInv) {
     else if (op.t === 'cmul1') f = Fp12.mul(f, raw.fAB);
     else if (op.j !== 0) {
       const triples = op.t === 'pp' ? op.coeffs : [op.coeffs];
-      for (const coeffs of triples) f = lineFn(f, coeffs[0], coeffs[1], coeffs[2], pairData[op.j].P.x, pairData[op.j].P.y);
+      const normalized = [];
+      for (const coeffs of triples) {
+        const folded = foldLine(f, coeffs, op.j);
+        f = folded.f;
+        normalized.push(folded.coeffs);
+      }
+      op.coeffs = op.t === 'pp' ? normalized : normalized[0];
     } else if (op.t === 'dl') {
       const step = affineDouble(runtimeR);
       runtimeR = step.R;
       op.affineSlopes.push(step.slope);
-      f = lineFn(f, step.coeffs[0], step.coeffs[1], step.coeffs[2], pairData[0].P.x, pairData[0].P.y);
+      f = foldLine(f, step.coeffs, 0).f;
     } else if (op.t === 'al') {
       const step = affineAdd(runtimeR, {
         x: pairData[0].Q.x,
@@ -161,20 +190,20 @@ export function millerFusedAffineOps(pairs, c, cInv) {
       });
       runtimeR = step.R;
       op.affineSlopes.push(step.slope);
-      f = lineFn(f, step.coeffs[0], step.coeffs[1], step.coeffs[2], pairData[0].P.x, pairData[0].P.y);
+      f = foldLine(f, step.coeffs, 0).f;
     } else {
       const [q1x, q1y] = psi(pairData[0].Q.x, pairData[0].Q.y);
       const q1 = { x: q1x, y: q1y };
       const first = affineAdd(runtimeR, q1);
       runtimeR = first.R;
       op.affineSlopes.push(first.slope);
-      f = lineFn(f, first.coeffs[0], first.coeffs[1], first.coeffs[2], pairData[0].P.x, pairData[0].P.y);
+      f = foldLine(f, first.coeffs, 0).f;
       const [q2x, q2y] = psi(q1.x, q1.y);
       const q2 = { x: q2x, y: q2y };
       const second = affineAdd(runtimeR, { x: q2.x, y: Fp2.neg(q2.y) });
       runtimeR = second.R;
       op.affineSlopes.push(second.slope);
-      f = lineFn(f, second.coeffs[0], second.coeffs[1], second.coeffs[2], pairData[0].P.x, pairData[0].P.y);
+      f = foldLine(f, second.coeffs, 0).f;
     }
     ops.push(op);
   }

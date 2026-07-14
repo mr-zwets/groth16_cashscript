@@ -311,6 +311,60 @@ function mul034(
                (G4 - A4 - B4 + rawBias) % p, (G5 - A5 - B5 + rawBias) % p;
     }
 
+// Sparse Fp12 multiply specialized for o0=1. A=F.c0 is free, and the G-side constant
+// becomes (1+o3), removing three fp2MulRaw calls from every Miller line.
+function mul034Unit(
+        int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
+        int o3a,int o3b, int o4a,int o4b
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        (int bt0a,int bt0b) = fp2MulRaw(F6, F7, o3a, o3b);
+        (int bt1a,int bt1b) = fp2MulRaw(F8, F9, o4a, o4b);
+        (int bm12a,int bm12b) = fp2MulRaw(F8 + F10, F9 + F11, o4a, o4b);
+        int bu0a = bm12a - bt1a;
+        int bu0b = bm12b - bt1b;
+        int B0 = 9 * bu0a - bu0b + bt0a;
+        int B1 = bu0a + 9 * bu0b + bt0b;
+        (int bm1a,int bm1b) = fp2MulRaw(o3a + o4a, o3b + o4b, F6 + F8, F7 + F9);
+        int B2 = bm1a - bt0a - bt1a;
+        int B3 = bm1b - bt0b - bt1b;
+        (int bm2a,int bm2b) = fp2MulRaw(F6 + F10, F7 + F11, o3a, o3b);
+        int B4 = bm2a - bt0a + bt1a;
+        int B5 = bm2b - bt0b + bt1b;
+
+        int S0 = F0 + F6;
+        int S1 = F1 + F7;
+        int S2 = F2 + F8;
+        int S3 = F3 + F9;
+        int S4 = F4 + F10;
+        int S5 = F5 + F11;
+        int qa = 1 + o3a;
+        int qb = o3b;
+        (int gt0a,int gt0b) = fp2MulRaw(S0, S1, qa, qb);
+        (int gt1a,int gt1b) = fp2MulRaw(S2, S3, o4a, o4b);
+        (int gm12a,int gm12b) = fp2MulRaw(S2 + S4, S3 + S5, o4a, o4b);
+        int gu0a = gm12a - gt1a;
+        int gu0b = gm12b - gt1b;
+        int G0 = 9 * gu0a - gu0b + gt0a;
+        int G1 = gu0a + 9 * gu0b + gt0b;
+        (int gm1a,int gm1b) = fp2MulRaw(qa + o4a, qb + o4b, S0 + S2, S1 + S3);
+        int G2 = gm1a - gt0a - gt1a;
+        int G3 = gm1b - gt0b - gt1b;
+        (int gm2a,int gm2b) = fp2MulRaw(S0 + S4, S1 + S5, qa, qb);
+        int G4 = gm2a - gt0a + gt1a;
+        int G5 = gm2b - gt0b + gt1b;
+
+        // unit_line_bound_analysis.mjs proves the same 132,793*p^2 bias is positive for canonical
+        // F/o3/o4 limbs (the derived qa is in [1,p]); the shared multiple of p preserves residues.
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int rawBias = 63620485708775397116398918488458420026955112869114471513803213004724729950895225285411156794258613332669998933780976023070021894424298169671600468685695583977;
+        return (9 * B4 - B5 + F0 + rawBias) % p, (B4 + 9 * B5 + F1 + rawBias) % p,
+               (B0 + F2 + rawBias) % p, (B1 + F3 + rawBias) % p,
+               (B2 + F4 + rawBias) % p, (B3 + F5 + rawBias) % p,
+               (G0 - F0 - B0 + rawBias) % p, (G1 - F1 - B1 + rawBias) % p,
+               (G2 - F2 - B2 + rawBias) % p, (G3 - F3 - B3 + rawBias) % p,
+               (G4 - F4 - B4 + rawBias) % p, (G5 - F5 - B5 + rawBias) % p;
+    }
+
 function line(
         int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
         int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int Px, int Py
@@ -324,11 +378,24 @@ function line(
         return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
     }
 
+function lineUnit(
+        int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
+        int c0a,int c0b,int c1a,int c1b, int u, int v
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        int o3a = mulFp(c1a, u);
+        int o3b = mulFp(c1b, u);
+        int o4a = mulFp(c0a, v);
+        int o4b = mulFp(c0b, v);
+        (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7,int r8,int r9,int r10,int r11) =
+            mul034Unit(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, o3a,o3b, o4a,o4b);
+        return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
+    }
+
 // Runtime-G2 affine Miller steps. Each caller supplies a canonical slope witness. The explicit
 // nonzero-denominator gates exclude the equal/inverse exceptional cases, so the slope equation
 // uniquely binds the tangent/chord. New affine state is canonical; normalized lines use c2=-1.
 function pointDoubleAffine(int Xa,int Xb,int Ya,int Yb,int ma,int mb)
-    returns (int,int,int,int,int,int, int,int,int,int) {
+    returns (int,int,int,int, int,int,int,int) {
         int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
         require(within(ma, 0, p)); require(within(mb, 0, p));
         require(Ya % p != 0 || Yb % p != 0);
@@ -346,11 +413,11 @@ function pointDoubleAffine(int Xa,int Xb,int Ya,int Yb,int ma,int mb)
         int nYa = canonicalFp(mxdnXa - Ya); int nYb = canonicalFp(mxdnXb - Yb);
         (int mxA,int mxB) = fp2Mul(ma, mb, Xa, Xb);
         (int c0a,int c0b) = fp2Sub(Ya, Yb, mxA, mxB, 1);
-        return c0a,c0b,ma,mb,p - 1,0, nXa,nXb,nYa,nYb;
+        return c0a,c0b,ma,mb, nXa,nXb,nYa,nYb;
     }
 
 function pointAddAffine(int Xa,int Xb,int Ya,int Yb, int Qxa,int Qxb,int Qya,int Qyb, int ma,int mb)
-    returns (int,int,int,int,int,int, int,int,int,int) {
+    returns (int,int,int,int, int,int,int,int) {
         int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
         require(within(ma, 0, p)); require(within(mb, 0, p));
         (int dxa,int dxb) = fp2Sub(Qxa, Qxb, Xa, Xb, 1);
@@ -367,7 +434,7 @@ function pointAddAffine(int Xa,int Xb,int Ya,int Yb, int Qxa,int Qxb,int Qya,int
         int nYa = canonicalFp(mxdnXa - Ya); int nYb = canonicalFp(mxdnXb - Yb);
         (int mxA,int mxB) = fp2Mul(ma, mb, Xa, Xb);
         (int c0a,int c0b) = fp2Sub(Ya, Yb, mxA, mxB, 1);
-        return c0a,c0b,ma,mb,p - 1,0, nXa,nXb,nYa,nYb;
+        return c0a,c0b,ma,mb, nXa,nXb,nYa,nYb;
     }
 
 function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
