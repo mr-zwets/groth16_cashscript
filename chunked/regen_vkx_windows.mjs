@@ -8,12 +8,13 @@
 // grouped builders call the helpers below at startup so re-running a builder reproduces the
 // replanned count instead of inheriting the covenant-planned manifest.
 //
-// SAFE FLOORS — validated 2026-07-09 against MAX-DENSITY inputs (roadmap lever 5 sweep),
-// NOT merely the "worst-case proof" (which is maximal for Shamir but NOT for GLV, whose raw
-// inputs decompose into 4 sub-scalars that a denser proof can pack fuller):
-//   GLV (128-iter, 4-scalar Straus): 4 windows [0,39)[39,77)[77,117)[117,128)F — worst-case
-//     max-density vk_x tops at 7,450,211 = 92.7% of the 8,032,800 budget. (3 windows reaches
-//     99.8% under max density with the pad pinned at the 10 kB cap — rejected.)
+// SAFE FLOORS — GLV revalidated 2026-07-14 against the all-ones max-branch-density witness
+// and a deterministic 10,000 accepted-witness search; Shamir validated 2026-07-09. These are
+// NOT based merely on the "worst-case proof" (which is maximal for Shamir but NOT for GLV,
+// whose raw inputs decompose into 4 sub-scalars that a denser witness can pack fuller):
+//   GLV (128-iter, 4-scalar Straus): 3 windows [0,43)[43,86)[86,128)F — revalidated
+//     after specializing fixed-table additions for affine second operands in
+//     gen_vkx_glv.mjs. Builder max-density peak: 7,659,296 of 8,032,800.
 //   Shamir (254-iter, 2-scalar): 6 windows [0,43)[43,86)[86,129)[129,172)[172,215)[215,254)F
 //     — 95.4% of budget; the worst-case proof (in0,in1 popcount 253/254) already saturates
 //     the binding windows, verified worst case. (5 windows > budget.)
@@ -28,7 +29,7 @@ import { join } from 'node:path';
 import { genCash as glvGenCash } from './pairing/gen_vkx_glv.mjs';
 import { genCash as shamirGenCash } from './pairing/gen_vkx.mjs';
 
-export const GLV_SAFE_BOUNDS = [0, 39, 77, 117, 128];
+export const GLV_SAFE_BOUNDS = [0, 43, 86, 128];
 export const SHAMIR_SAFE_BOUNDS = [0, 43, 86, 129, 172, 215, 254];
 
 const clearPrefix = (GEN, prefix) => {

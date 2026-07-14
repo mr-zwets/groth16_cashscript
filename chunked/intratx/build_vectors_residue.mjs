@@ -7,10 +7,10 @@
 // RESIDUE chunk graph instead of the plain one:
 //
 //   fast-G2 endo subgroup check (ePrint 2022/348)            3 chunks
-//   GLV vk_x MSM (4-scalar ~128-bit Straus)                  4 chunks   (was 9, plain)
+//   GLV vk_x MSM (4-scalar ~128-bit Straus)                  3 chunks   (was 9, plain)
 //   c^-(6x+2)-FUSED Miller + terminal residue verdict        20 chunks  (was 12 plain final-exp chunks)
 //                                                            ---------
-//                                                            27 inputs  (plain full build: 54)
+//                                                            26 inputs  (plain full build: 54)
 //
 // The chunk MATH is reused VERBATIM from the same generated/*.cash the grouped-residue
 // build consumes (chunked/grouped/build_vectors_residue.mjs) — only the assembly differs:
@@ -36,12 +36,13 @@ import { GLV_SAFE_BOUNDS, regenGlvSafe } from '../regen_vkx_windows.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
-// Re-plan the GLV vk_x windows to the hash-free SAFE floor (4 chunks, max-density-validated)
-// before assembling — the covenant-planned manifest_vkxglv (5 chunks) under-fills this
+// Re-plan the GLV vk_x windows to the hash-free SAFE floor (3 chunks, max-density-validated)
+// before assembling — the covenant-planned manifest_vkxglv (4 chunks) under-fills this
 // hash-free deployment. See chunked/regen_vkx_windows.mjs.
 // The final GLV input carries the table after its 228-byte state blob: PUSHDATA1(blob)
 // takes 230 bytes, then the table's PUSHDATA2 header places table data at byte 233.
-const GLV_TABLE_SOURCE = { inputIndex: 6, dataOffset: 233 };
+const GLV_COUNT = GLV_SAFE_BOUNDS.length - 1;
+const GLV_TABLE_SOURCE = { inputIndex: 3 + GLV_COUNT - 1, dataOffset: 233 };
 regenGlvSafe(GEN, GLV_SAFE_BOUNDS, true, GLV_TABLE_SOURCE);
 const PROBE = join(GEN, '_intratx_residue_probe.cash'); // transformed import-chunks compiled from here
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
@@ -404,20 +405,22 @@ report('groth16-intratx-residue committed', full0);
 const denseScalar = (1n << 128n) - 1n;
 const denseInput = (denseScalar + denseScalar * GLV_LAMBDA) % GLV_R;
 const densitySpecs = committedSpecs.slice();
-densitySpecs.splice(3, 4, ...specsVkx({
+densitySpecs.splice(3, GLV_COUNT, ...specsVkx({
   inputs: [denseInput, denseInput],
   glvScalars: [denseScalar, denseScalar, denseScalar, denseScalar],
 }, true));
 const denseVkx = vkxPoint([denseInput, denseInput]).toAffine();
-const millerGenesis = densitySpecs[7];
+const millerGenesisIndex = 3 + GLV_COUNT;
+const millerGenesis = densitySpecs[millerGenesisIndex];
 const millerIn = millerGenesis.inLimbs.slice();
 millerIn.splice(VKX_LIMB_OFFSET, 2, denseVkx.x, denseVkx.y);
-densitySpecs[7] = { ...millerGenesis, inLimbs: millerIn };
-const densityGlv = assemble(densitySpecs).meta.slice(3, 7);
+densitySpecs[millerGenesisIndex] = { ...millerGenesis, inLimbs: millerIn };
+const densityGlv = assemble(densitySpecs).meta.slice(3, 3 + GLV_COUNT);
 if (densityGlv.some((meta) => !meta.accepted || meta.operationCost > OP_BUDGET || meta.unlockingBytes > TARGET_UNLOCK)) {
   throw new Error('max-density GLV window exceeds the BCH input budget');
 }
 console.error(`  max-density GLV max op: ${Math.max(...densityGlv.map((meta) => meta.operationCost)).toLocaleString()}`);
+if (process.env.DUMP_OPCOSTS) console.error(`  max-density GLV ops: ${densityGlv.map((meta) => meta.operationCost.toLocaleString()).join(', ')}`);
 const full1 = assemble(proof1Specs);
 const fullWc = assemble(worstSpecs);
 report('groth16-intratx-residue proof#1', full1);
@@ -471,7 +474,7 @@ const fullInvalid = [
 console.error(`  invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
 
 writeFileSync(verifierPath('src/bch/groth16-intratx-residue-vectors.json'), JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-intratx (each chunk is an input whose witness carries its incoming state as a raw byte blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 4 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks with e(alpha,beta) precomputed/skipped (ePrint 2024/640). The four GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding four copies. The final Miller chunk also performs the witnessed-residue verdict, reducing the full verifier to 27 inputs vs 54 for the plain intratx build. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. The G2 final chunk binds the proof-derived -A/B and C bytes into the fused-Miller genesis input, while the vk_x final chunk binds the GLV result into that same genesis; every later Miller state is forward-bound. Reuses the same validated chunk math as bch-groth16-grouped-residue.',
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-intratx (each chunk is an input whose witness carries its incoming state as a raw byte blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 3 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks with e(alpha,beta) precomputed/skipped (ePrint 2024/640). The three GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding three copies. The final Miller chunk also performs the witnessed-residue verdict, reducing the full verifier to 26 inputs vs 54 for the plain intratx build. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. The G2 final chunk binds the proof-derived -A/B and C bytes into the fused-Miller genesis input, while the vk_x final chunk binds the GLV result into that same genesis; every later Miller state is forward-bound. Reuses the same validated chunk math as bch-groth16-grouped-residue.',
   method: 'intra-tx-linked-residue', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),

@@ -44,12 +44,13 @@ import { GLV_SAFE_BOUNDS, regenGlvSafe } from '../regen_vkx_windows.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
-// Re-plan the GLV vk_x windows to the hash-free SAFE floor (4 chunks, max-density-validated);
+// Re-plan the GLV vk_x windows to the hash-free SAFE floor (3 chunks, max-density-validated);
 // vk_x within-chunks are never at a group seam, so they run hash-free like intratx. See
 // chunked/regen_vkx_windows.mjs.
 // The final GLV input carries the table after its 228-byte state blob: PUSHDATA1(blob)
 // takes 230 bytes, then the table's PUSHDATA2 header places table data at byte 233.
-const GLV_TABLE_SOURCE = { inputIndex: 6, dataOffset: 233 };
+const GLV_COUNT = GLV_SAFE_BOUNDS.length - 1;
+const GLV_TABLE_SOURCE = { inputIndex: 3 + GLV_COUNT - 1, dataOffset: 233 };
 regenGlvSafe(GEN, GLV_SAFE_BOUNDS, true, GLV_TABLE_SOURCE);
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);
@@ -517,8 +518,8 @@ const report = (tag, asm) => {
 };
 
 // ===================== build =====================
-// Exact boundary compilation across all 276 legal three-group partitions selected the
-// balanced 9/9/9 split while preserving standardness for committed, proof #1, and worst-case.
+// Keep the 26-input graph in balanced 9/9/8 groups while preserving standardness for the
+// committed proof, proof #1, and the dense worst-case proof.
 const wcSpecs = buildSpecs(INSTANCES.worst);
 const GROUP_CUTS = [8, 17];
 if (!GROUP_CUTS.every((i) =>
@@ -598,7 +599,7 @@ const invalids = [
 console.error(`  invalid runs rejected: ${invalids.map((r) => r.rejected).join(',')}`);
 
 writeFileSync(verifierPath('src/bch/groth16-grouped-residue-vectors.json'), JSON.stringify({
-  description: 'GROUPED + RESIDUE BN254 Groth16 verifier: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 4 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks (ePrint 2024/640) packed into 3 STANDARD (<100,000 B) transactions. The four GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding four copies. The final Miller chunk also performs the witnessed-residue verdict, eliminating a separate tail input. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The G2 final chunk binds the proof-derived -A/B and C bytes into the Miller genesis input, while the GLV final chunk binds vk_x into that same genesis. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. One fixed set of lockings verifies any proof for the VK.',
+  description: 'GROUPED + RESIDUE BN254 Groth16 verifier: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 3 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks (ePrint 2024/640) packed into 3 STANDARD (<100,000 B) transactions. The three GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding three copies. The final Miller chunk also performs the witnessed-residue verdict, eliminating a separate tail input. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The G2 final chunk binds the proof-derived -A/B and C bytes into the Miller genesis input, while the GLV final chunk binds vk_x into that same genesis. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. One fixed set of lockings verifies any proof for the VK.',
   method: 'grouped-residue', deployment: 'P2SH32', category: binToHex(CATEGORY),
   numInputs: asmCommitted.meta.length, numGroups: GROUPS.length, budgetPerInput: OP_BUDGET,
   groupSizes: GROUPS.map(([lo, hi]) => hi - lo + 1),
