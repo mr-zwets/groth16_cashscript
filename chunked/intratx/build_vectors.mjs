@@ -5,7 +5,7 @@
 // outgoing state, and FORWARD-checks its successor: it `require`s the next input's
 // incoming blob (read via tx.inputs[idx+1].unlockingBytecode) equals its own output.
 // No NFT-commitment hand-off, no hashing, no 128-byte limit — and it all fits one
-// (non-standard, <1MB) transaction instead of 44 sequential transactions.
+// (non-standard, <1MB) transaction instead of 43 sequential transactions.
 //
 // Reuses the validated chunk MATH from chunked/pairing/generated/*.cash verbatim
 // (the same files the covenant build consumes); transform.mjs only swaps the
@@ -19,7 +19,8 @@ import {
   Fp2, bn254, preparedMillerOps, assertPreparedMillerManifest, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileFileBytecode, compileFileBytecodeRaw, ptLimbs, PT_CFG,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace, le40,
-  OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET,
+  OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET, verifierPath, invalidG2Overrides,
+  assertG2StageManifest,
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { transformChunk, headerSize } from './transform.mjs';
@@ -28,13 +29,13 @@ import { regenShamirSafe } from '../regen_vkx_windows.mjs';
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
 // Re-plan the Shamir vk_x windows to the hash-free SAFE floor (6 chunks) into a PRIVATE
-// namespace (manifest_vkxplain / vkxplain_NN.cash) so the covenant build keeps its 8-window
+// namespace (manifest_vkxplain / vkxplain_NN.cash) so the covenant build keeps its 7-window
 // manifest_vkx. specsVkx below reads the private files. See chunked/regen_vkx_windows.mjs.
 regenShamirSafe(GEN);
 const PROBE = join(GEN, '_intratx_probe.cash'); // transformed import-chunks compiled from here
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);
-const W = 40; // BN254 limb width (bytes)
+const W = 32; // canonical BN254 values are < 2^254, so 32-byte signed LE is sufficient
 import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 const standardVm = createVirtualMachineBch2026(true);
@@ -53,7 +54,8 @@ const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)); // OP_
 // numeric-opcode minimal forms — OP_0/OP_1..16/OP_1NEGATE — which encodeDataPush omits) ----
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
-const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le40(((BigInt(l) % P) + P) % P)]));
+const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) =>
+  [...le40(((BigInt(l) % P) + P) % P).slice(0, W)]));
 // trailing all-zero pad that buys op-cost budget (libauth-minimal push; the consensus VM
 // rejects a non-minimal push, so a light chunk needing <256 pad bytes must not use
 // PUSHDATA2). The pad sits at the END of the unlocking, so its size never shifts the front
@@ -95,7 +97,7 @@ function parseProofUnlocking(hex) {
   const d = vals.reverse();
   return { Ax: d[0], Ay: d[1], Bxa: d[2], Bxb: d[3], Bya: d[4], Byb: d[5], Cx: d[6], Cy: d[7], in0: d[8], in1: d[9] };
 }
-const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-singleton-multiproof-vectors.json', 'utf8'));
+const mp = JSON.parse(readFileSync(verifierPath('src/bch/groth16-singleton-multiproof-vectors.json'), 'utf8'));
 const p1 = parseProofUnlocking(mp.proofs[1].unlocking);
 const wcp = parseProofUnlocking(mp.worstCaseProof.unlocking);
 const INSTANCES = {
@@ -114,17 +116,16 @@ const MILLER_IN_LIMBS = dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.t
 // ---- per-stage chunk specs (inLimbs/outLimbs/extras/role) for one instance ----
 const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0])]; // prepared-VK: only the runtime pair's R0
 
-function specsG2check(inst) {
+function specsG2check(inst, bad = {}) {
   const pf = inst.proof ?? proof;
   const Ba = pf.b.toAffine(), Aa = pf.a.negate().toAffine(), Ca = pf.c.toAffine();
-  const Bpair = [[Ba.x.c0, Ba.x.c1], [Ba.y.c0, Ba.y.c1]];
-  const tail = [Aa.x, Aa.y, Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1, Ca.x, Ca.y];
+  const Bx = bad.Bx ?? Ba.x, By = bad.By ?? Ba.y;
+  const Bpair = [[Bx.c0, Bx.c1], [By.c0, By.c1]];
+  const tail = [bad.Ax ?? Aa.x, bad.Ay ?? Aa.y, Bx.c0, Bx.c1, By.c0, By.c1, bad.Cx ?? Ca.x, bad.Cy ?? Ca.y];
   const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
-  if (man.stageBound !== true) {
-    throw new Error('intratx requires STAGE_BOUND_LAYOUT=1 during G2 generation');
-  }
+  assertG2StageManifest(man);
   const zinv = g2checkFastZinv(Bpair); // [zinvA, zinvB] witnessed inverse of [x0]B.Z (last chunk only)
   return man.chunks.map((ch) => ({
     file: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`),
@@ -139,9 +140,15 @@ function specsVkx(inst, crossToMiller) {
   const [in0, in1] = inst.inputs;
   const vkxAff = vkxPoint(inst.inputs).toAffine();
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxplain.json'), 'utf8'));
+  if (man.stageBound !== true) throw new Error('intratx requires a stage-bound vk_x genesis');
+  const genesisSource = readFileSync(join(GEN, 'vkxplain_00.cash'), 'utf8');
+  const genesisSignature = genesisSource.match(/function spend\(([^)]*)\)/)?.[1] ?? '';
+  if (/int r[XYZ]/.test(genesisSignature) || !genesisSource.includes('int rX = 0; int rY = 1; int rZ = 0;')) {
+    throw new Error('vk_x genesis must derive the infinity accumulator in-contract');
+  }
   return man.chunks.map((ch) => {
     const inAcc = vkxStateAt(in0, in1, ch.lo);
-    const inLimbs = [...inAcc, in0, in1];
+    const inLimbs = ch.first ? [in0, in1] : [...inAcc, in0, in1];
     if (ch.final) {
       return {
         file: join(GEN, `vkxplain_${String(ch.idx).padStart(2, '0')}.cash`),
@@ -175,7 +182,7 @@ function specsMiller(inst, crossToFinalexp) {
     inLimbs: ch.opLo === 0 ? genesisPts : [...stateLimbs(states[ch.opLo]), ...ptL],
     outLimbs: [...stateLimbs(states[ch.opHi]), ...ptL],
     extras: [], role: ch.final ? (crossToFinalexp ? 'cross' : 'stage-final') : 'within',
-    cmp: ch.final && crossToFinalexp ? { cmpExpr: 'outBlob.split(480)[0]', nextFullInLen: 12 * W, skip: 0, cmpLen: 12 * W } : null,
+    cmp: ch.final && crossToFinalexp ? { cmpExpr: `outBlob.split(${12 * W})[0]`, nextFullInLen: 12 * W, skip: 0, cmpLen: 12 * W } : null,
     label: `miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' =boundary' : ''}`,
     checkpoint: ch.final ? 'miller-boundary' : undefined,
   }));
@@ -401,7 +408,7 @@ if (!pair0.fits || !pair1.fits || !pairWc.fits || !pairInvalid.every((run) => ru
   throw new Error('pairing valid, worst-case, or invalid fixture failed; refusing to write vectors');
 }
 
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-intratx-vectors.json', JSON.stringify({
+writeFileSync(verifierPath('src/bch/pairing-intratx-vectors.json'), JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED BN254 Groth16 pairing to the Miller boundary. A prepared batched loop shares each fp12Sqr across the three runtime-dependent pairs; the fixed e(alpha,beta) pair is omitted and its precomputed raw Miller value is multiplied into f once at the end. Its chunks are the INPUTS of ONE transaction; each takes its incoming Fp12+G2 state as a raw byte blob and FORWARD-checks its successor via OP_INPUTBYTECODE. No NFT hand-off, hashing, or 128-byte state limit. Reuses the same validated chunk math as bch-pairing-chunked.',
   method: 'intra-tx-linked', deployment: 'P2SH32', numInputs: pair0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(pair0.meta, (m) => m.lockingBytes + m.unlockingBytes),
@@ -422,6 +429,10 @@ report('groth16 committed', full0);
 const full1 = assemble(proof1Specs);
 const fullWc = assemble(worstSpecs);
 report('groth16 proof#1', full1);
+const vkx0Specs = specsVkx(INSTANCES.committed, false);
+const vkx1Specs = specsVkx(INSTANCES.proof1, false);
+const vkxGenesisHybrid = assemble([vkx0Specs[0], ...vkx1Specs.slice(1)], true);
+if (vkxGenesisHybrid.meta[0].accepted) throw new Error('vk_x genesis accepted a different fixture\'s successor state');
 // ---- cross-stage staple fixtures: prove the G2->Miller binding closes the splice hole ----
 const g2FinalIndex = committedSpecs.findIndex((spec) => (spec.externalBindings ?? []).length > 0);
 if (g2FinalIndex < 0) throw new Error('missing G2-final external bindings');
@@ -447,23 +458,31 @@ const bindingMutations = [1 * W, 3 * W, 7 * W].map((offset) => {
   return { steps: toStepArr({ inputs, meta: full0.meta }), rejected: true };
 });
 console.error(
-  `  proof consistency: unbound hybrid accepted=${unboundHybrid.accepted}; ` +
+  `  proof consistency: vk_x genesis splice rejected=${!vkxGenesisHybrid.meta[0].accepted}; ` +
+  `unbound hybrid accepted=${unboundHybrid.accepted}; ` +
   `bound hybrid G2-final rejected=${!boundHybrid.meta[g2FinalIndex].accepted}; ` +
   `-A/B/C mutations rejected=${bindingMutations.map((m) => m.rejected).join(',')}`,
 );
 const fullInvalid = [
   invalidRun(full0, 0),
   invalidRun(full0, Math.floor(full0.inputs.length / 2)),
+  { steps: toStepArr(vkxGenesisHybrid), rejected: true },
   { steps: toStepArr(boundHybrid), rejected: true },
   ...bindingMutations,
 ];
+const invalidInputs = invalidG2Overrides(INSTANCES.committed.proof).map((bad) => {
+  const run = assemble(specsG2check(INSTANCES.committed, bad), true);
+  if (run.accepted) throw new Error('isolated G2 validation accepted an invalid point');
+  return toStepArr(run);
+});
 console.error(`  groth16 invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
-if (!full0.fits || !full1.fits || !fullWc.fits || !fullInvalid.every((run) => run.rejected)) {
+console.error(`  invalid point runs rejected: ${invalidInputs.length}`);
+if (!full0.fits || !full1.fits || !fullWc.fits || !fullInvalid.every((run) => run.rejected) || invalidInputs.length === 0) {
   throw new Error('Groth16 valid, worst-case, or invalid fixture failed; refusing to write vectors');
 }
 
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED full BN254 Groth16 verifier in ONE transaction: validate G2 inputs -> vk_x -> prepared batched Miller (fixed e(alpha,beta) raw Miller value precomputed and multiplied once) -> final exponentiation -> assert product==1. State passes as raw byte blobs through OP_INPUTBYTECODE forward-checks, not NFT commitments. All stages bind one proof tuple: Miller derives f=1 and R0=B in-contract; G2 validation binds -A/B/C into Miller genesis; vk_x binds its result into that genesis; and the Miller boundary binds into final exponentiation. Reuses the validated bch-groth16-chunked math.',
+writeFileSync(verifierPath('src/bch/groth16-intratx-vectors.json'), JSON.stringify({
+  description: 'INTRA-TRANSACTION LINKED full BN254 Groth16 verifier in ONE transaction: validate canonical-coordinate/on-curve/subgroup proof inputs -> vk_x -> prepared batched Miller (fixed e(alpha,beta) raw Miller value precomputed and multiplied once) -> final exponentiation -> assert product==1. State passes as raw byte blobs through OP_INPUTBYTECODE forward-checks, not NFT commitments. The vk_x genesis derives its infinity accumulator in-contract and range-checks both public inputs. All stages bind one proof tuple: Miller derives f=1 and R0=B in-contract; G2 validation binds -A/B/C into Miller genesis; vk_x binds its result into that genesis; and the Miller boundary binds into final exponentiation. Reuses the validated bch-groth16-chunked math.',
   method: 'intra-tx-linked', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
@@ -471,5 +490,6 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-vectors.j
   allFit: full0.fits, allAccept: full0.accepted,
   steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullWc),
   invalid: fullInvalid.map((r) => r.steps),
+  invalidInputs,
 }, null, 2));
 console.error('wrote groth16-intratx-vectors.json');

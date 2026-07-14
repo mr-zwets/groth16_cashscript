@@ -83,6 +83,9 @@ function parseParams(sig) {
  *                    LAST chunk of a non-terminal group (it has no in-tx successor to
  *                    forward-check; it hands state to the NEXT group's tx via a token).
  *                    Undefined => legacy behavior (forward-check / terminal).
+ *   cfg.nextLockingHash optional 32-byte hex hash. With epilogueMode='covout', require
+ *                    output[0]'s locking bytecode to hash to this value, binding a group
+ *                    hand-off to the actual first locking of the successor group.
  *   cfg.externalBindings additional byte-slice bindings from this chunk's inBlob to another
  *                    input's inBlob: [{sourceOffset,targetInputIndex,targetFullInLen,
  *                    targetOffset,length}]. targetInputIndex is transaction-local.
@@ -192,6 +195,10 @@ export function transformChunk(src, cfg) {
         `        require(tx.outputs[0].nftCommitment == hash256(outBlob));`,
         `        require(tx.outputs[0].tokenCategory == tx.inputs[0].tokenCategory);`,
       );
+      if (cfg.nextLockingHash !== undefined) {
+        if (!/^[0-9a-f]{64}$/i.test(cfg.nextLockingHash)) throw new Error('invalid nextLockingHash');
+        epilogue.push(`        require(hash256(tx.outputs[0].lockingBytecode) == 0x${cfg.nextLockingHash});`);
+      }
     } else if (cfg.forward) {
       const f = cfg.forward;
       const cmp = f.cmpExpr ?? 'outBlob';

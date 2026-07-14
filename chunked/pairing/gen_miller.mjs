@@ -7,7 +7,7 @@
 // One batched step is ~8 mul034 (~too coarse for one BCH input), so the loop is a FLAT
 // op list (sqr / double-line / add-line / postPrecompute) chunked at ANY op boundary,
 // carrying state = f (12) + R0 (6) + proof-derived points (per PT_CFG), hash256-
-// committed (40-byte limbs). Field arithmetic is the lazy addFp/subFp already in
+// committed (32-byte limbs). Field arithmetic is the lazy addFp/subFp already in
 // singleton/bn254/miller.cash. Replaces the previous four-single-pair-chains + combine.
 //
 //   node gen_miller.mjs            plan + emit miller_NN.cash + manifest_miller.json
@@ -58,7 +58,7 @@ const FAB_LIMBS = f12limbs(fAB).map(String);
 const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0])];
 const withPts = (limbs) => [...limbs, ...ptL];
 const inState = (i) => STAGE_BOUND && i === 0 ? stagePtL : withPts(stateLimbs(states[i]));
-const outState = (i) => withPts(stateLimbs(states[i]));
+const outState = (i) => STAGE_BOUND && i === ops.length ? f12limbs(states[i].f) : withPts(stateLimbs(states[i]));
 // Genesis f/R0 are derived in-contract under STAGE_BOUND (f = 1, R0 = runtime B); the literal
 // limb strings come from the plan states so the serialization stays canonical.
 const F_ONE_L = f12limbs(states[0].f).map(String);
@@ -132,7 +132,12 @@ function genChunk(opLo, opHi) {
       emitLine(cco, pi);
     }
   }
-  L.push(covOut([...f, ...r0, ...ptParams]));
+  if (STAGE_BOUND && opHi === ops.length) {
+    // The terminal state omits R0, but CashScript requires every tuple result to be
+    // consumed. The point formulas keep these biased representatives non-negative.
+    L.push(`        require(${r0.join(' + ')} >= 0);`);
+  }
+  L.push(covOut(STAGE_BOUND && opHi === ops.length ? f : [...f, ...r0, ...ptParams]));
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
@@ -158,7 +163,16 @@ while (lo < ops.length) {
     const m = measureCovenantFile(src, inL, outL, PROBE);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final: hi === ops.length, outgoing: commit(outL), src, m };
   };
-  const best = planChunk(lo, ops.length, OP_TARGET, tryHi, planState);
+  let best = planChunk(lo, ops.length, OP_TARGET, tryHi, planState);
+  // The terminal layout drops R0 and the proof tuple, so it can be materially cheaper
+  // than the predictor extrapolates from nonterminal candidates. If the greedy result
+  // stops one op short, measure the exact terminal candidate before emitting a needless
+  // one-op transaction.
+  if (STAGE_BOUND && best?.hi === ops.length - 1) {
+    const terminal = tryHi(ops.length);
+    if (!terminal.fits) console.error(`  terminal merge rejected: lock=${terminal.m.lockingBytes} op=${terminal.m.operationCost} accepted=${terminal.m.accepted} error=${terminal.m.error ?? '(none)'}`);
+    if (terminal.fits) best = terminal;
+  }
   if (!best) throw new Error(`no fitting batched window at op ${lo}`);
   const idx = chunks.length;
   writeFileSync(join(GEN, `miller_${String(idx).padStart(2, '0')}.cash`), best.src);
@@ -169,7 +183,7 @@ while (lo < ops.length) {
 for (let i = 1; i < chunks.length; i++) if (chunks[i - 1].outgoing !== chunks[i].incoming) throw new Error('continuity break at ' + i);
 console.error(`batched miller: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.opCost, 0).toLocaleString()}, maxOp=${Math.max(...chunks.map((c) => c.opCost)).toLocaleString()}`);
 writeFileSync(join(GEN, 'manifest_miller.json'), JSON.stringify({
-  batched: true, stageBound: STAGE_BOUND, precomputedPair: trace.precomputedPair, precomputedPairMiller: FAB_LIMBS, numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
+  batched: true, stageBound: STAGE_BOUND, genesisDerived: STAGE_BOUND, emitsBoundaryOnly: STAGE_BOUND, precomputedPair: trace.precomputedPair, precomputedPairMiller: FAB_LIMBS, numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, incoming: c.incoming, outgoing: c.outgoing })),
 }, null, 2));
 console.error('wrote generated/manifest_miller.json');

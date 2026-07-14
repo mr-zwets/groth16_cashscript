@@ -23,7 +23,7 @@
 //
 // The Shamir helper writes a PRIVATE manifest/.cash namespace (manifest_vkxplain.json,
 // vkxplain_NN.cash) so the covenant build (chunked/pairing/build_vectors.mjs), which SHARES
-// manifest_vkx and genuinely needs the 8-window hashing-sized layout, is left untouched.
+// manifest_vkx and genuinely needs the 7-window hashing-sized layout, is left untouched.
 import { writeFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { genCash as glvGenCash } from './pairing/gen_vkx_glv.mjs';
@@ -62,9 +62,9 @@ export function regenShamirSafe(GEN, prefix = 'vkxplain', bounds = SHAMIR_SAFE_B
   for (let i = 0; i < bounds.length - 1; i++) {
     const lo = bounds[i], hi = bounds[i + 1];
     const final = i === bounds.length - 2;
-    writeFileSync(join(GEN, `${prefix}_${String(i).padStart(2, '0')}.cash`), shamirGenCash(lo, hi, final, '00', '00'));
-    chunks.push({ idx: i, lo, hi, final, incoming: null, incomingState: null, zInv: null });
+    writeFileSync(join(GEN, `${prefix}_${String(i).padStart(2, '0')}.cash`), shamirGenCash(lo, hi, final, '00', '00', true));
+    chunks.push({ idx: i, lo, hi, first: i === 0, final, incoming: null, incomingState: null, zInv: null });
   }
-  writeFileSync(join(GEN, `manifest_${prefix}.json`), JSON.stringify({ numChunks: chunks.length, worstCaseSized: true, iters: 254, safeFloor: true, chunks }, null, 2));
+  writeFileSync(join(GEN, `manifest_${prefix}.json`), JSON.stringify({ numChunks: chunks.length, worstCaseSized: true, stageBound: true, iters: 254, safeFloor: true, chunks }, null, 2));
   return chunks.length;
 }

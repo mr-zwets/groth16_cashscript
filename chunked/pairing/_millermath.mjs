@@ -213,22 +213,64 @@ export function assertPreparedMillerManifest(manifest, trace) {
   }
 }
 
-// ---- serialization (matches cash hash256(toPaddedBytes(.,40))) ----
+// ---- serialization -----------------------------------------------------------
+// Canonical BN254 field/scalar values are below 2^254, so their high sign bit is clear
+// in a 32-byte Script number. Wider state encoding only adds hashing and handoff cost.
+export const STATE_BYTES = 32;
 export const f12limbs = (f) => [f.c0.c0.c0, f.c0.c0.c1, f.c0.c1.c0, f.c0.c1.c1, f.c0.c2.c0, f.c0.c2.c1, f.c1.c0.c0, f.c1.c0.c1, f.c1.c1.c0, f.c1.c1.c1, f.c1.c2.c0, f.c1.c2.c1];
 export const r6limbs = (R) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1];
 export const le40 = (n) => binToFixedLength(bigIntToBinUintLE(BigInt(n)), 40);
+export const leState = (n) => binToFixedLength(bigIntToBinUintLE(BigInt(n)), STATE_BYTES);
 const sha256 = (b) => createHash('sha256').update(b).digest();
-export const commit = (limbs) => sha256(sha256(Buffer.concat(limbs.map(le40)))).toString('hex');
+export const commit = (limbs) => sha256(sha256(Buffer.concat(limbs.map(leState)))).toString('hex');
 
 // ---- the committed instance's 4 pairs ----
-const verifierDir = process.env.VERIFIER_DIR || 'C:/Users/mathi/Desktop/verifier';
-export const verifierPath = (...parts) => join(verifierDir, ...parts);
+const verifierDir = process.env.VERIFIER_DIR;
+export const verifierPath = (...parts) => {
+  if (!verifierDir) throw new Error('VERIFIER_DIR must point to the zk-verifier-bench checkout');
+  return join(verifierDir, ...parts);
+};
 export const vec = JSON.parse(readFileSync(verifierPath('src/checkpoints/pairing-vectors.json'), 'utf8'));
 const g1 = (o) => bn254.G1.Point.fromAffine({ x: BigInt(o.x), y: BigInt(o.y) });
 const g2 = (o) => bn254.G2.Point.fromAffine({ x: Fp2.fromBigTuple([BigInt(o.x.c0), BigInt(o.x.c1)]), y: Fp2.fromBigTuple([BigInt(o.y.c0), BigInt(o.y.c1)]) });
 export const vk = { alpha: g1(vec.vk.alpha), beta: g2(vec.vk.beta), gamma: g2(vec.vk.gamma), delta: g2(vec.vk.delta), ic: vec.vk.ic.map(g1) };
 export const proof = { a: g1(vec.proof.a), b: g2(vec.proof.b), c: g1(vec.proof.c) };
 export const vkxPoint = (inputs) => { let x = vk.ic[0]; inputs.map(BigInt).forEach((s, i) => { x = x.add(vk.ic[i + 1].multiply(s)); }); return x; };
+/** Point-limb overrides for isolated input-validation rejection fixtures. */
+export function invalidG2Overrides(proofValue = proof) {
+  const A = proofValue.a.negate().toAffine();
+  const C = proofValue.c.toAffine();
+  const offCurveA = { Ay: (A.y + 1n) % Fp.ORDER };
+  const offCurveC = { Cy: (C.y + 1n) % Fp.ORDER };
+  const b2 = Fp2.div(Fp2.fromBigTuple([3n, 0n]), Fp2.fromBigTuple([9n, 1n]));
+  let offSubgroup;
+  for (let i = 1n; i < 400n && offSubgroup === undefined; i++) {
+    const x = Fp2.fromBigTuple([i, 0n]);
+    const rhs = Fp2.add(Fp2.mul(Fp2.sqr(x), x), b2);
+    let y;
+    try { y = Fp2.sqrt(rhs); } catch { continue; }
+    if (!Fp2.eql(Fp2.sqr(y), rhs)) continue;
+    try { bn254.G2.Point.fromAffine({ x, y }).assertValidity(); } catch { offSubgroup = { Bx: x, By: y }; }
+  }
+  if (offSubgroup === undefined) throw new Error('failed to construct an off-subgroup G2 fixture');
+  return [offCurveA, offCurveC, offSubgroup];
+}
+const G2_STAGE_LAYOUT = ['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy'];
+/** Fail fast when a builder reads G2 chunks generated for a different state layout. */
+export function assertG2StageManifest(manifest, { carriesVkx = false, linkedLayout = false } = {}) {
+  const expectedLayout = carriesVkx ? [...G2_STAGE_LAYOUT, 'vkxX', 'vkxY'] : G2_STAGE_LAYOUT;
+  if (
+    manifest.fastEndo !== true ||
+    manifest.canonicalProofCoordinates !== true ||
+    manifest.stageBound !== true ||
+    manifest.genesisDerived !== true ||
+    manifest.carriesVkx !== carriesVkx ||
+    manifest.linkedLayout !== linkedLayout ||
+    JSON.stringify(manifest.stageLayout) !== JSON.stringify(expectedLayout)
+  ) {
+    throw new Error(`G2 manifest does not match the expected ${expectedLayout.length}-limb stage layout`);
+  }
+}
 export const pairsFor = (inputs, pf = proof) => [
   { name: 'negA_B', P: pf.a.negate(), Q: pf.b },
   { name: 'alpha_beta', P: vk.alpha, Q: vk.beta },
@@ -385,7 +427,7 @@ export function measureChunk(src, stateInts) {
   return { lockingBytes: locking.length, operationCost: st.metrics.operationCost, accepted, error: st.error ?? null };
 }
 export const decl = (names) => names.map((n) => `int ${n}`).join(',');
-export const serExpr = (names) => 'hash256(' + names.map((n) => `toPaddedBytes(${n}, 40)`).join(' + ') + ')';
+export const serExpr = (names) => 'hash256(' + names.map((n) => `toPaddedBytes(${n}, ${STATE_BYTES})`).join(' + ') + ')';
 
 // ---- covenant (token state-threading) helpers ----------------------------------
 // A GENERIC (proof-independent) chunk carries NO baked state: the running-state
@@ -396,16 +438,16 @@ export const serExpr = (names) => 'hash256(' + names.map((n) => `toPaddedBytes($
 export const CATEGORY = new Uint8Array(32).fill(0xcd); // benchmark thread id (32B)
 const sha256d = (b) => sha256(sha256(b));
 /** 32-byte NFT commitment of a state (decl-order limbs), as bytes. */
-export const commitBin = (limbs) => new Uint8Array(sha256d(Buffer.concat(limbs.map(le40))));
+export const commitBin = (limbs) => new Uint8Array(sha256d(Buffer.concat(limbs.map(leState))));
 /** require: the spent token commits hash(incoming state) (decl-order `names`). */
 export const covIn = (names) =>
   `        require(tx.inputs[this.activeInputIndex].nftCommitment == ${serExpr(names)});`;
 /** require: output[0] commits hash(outgoing, reduced) + perpetuates the token thread. */
-export const covOut = (outNames) =>
+export const covOut = (outNames, exactNames = []) =>
   // local name `Pmod` (not `P`) avoids colliding with the global `constant P` that the non-lazy
   // library exports (g2check imports it); the lazy-lib consumers have no global P either way.
   '        int Pmod = 21888242871839275222246405745257275088696311157297823662689037894645226208583;\n' +
-  `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((n) => `toPaddedBytes(${n} % Pmod, 40)`).join(' + ')}));\n` +
+  `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((n) => `toPaddedBytes(${n}${exactNames.includes(n) ? '' : ' % Pmod'}, ${STATE_BYTES})`).join(' + ')}));\n` +
   '        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);';
 
 /** Real-VM measurer for a COVENANT chunk: drives it through a synthetic token tx

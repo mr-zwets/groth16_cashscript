@@ -4,7 +4,7 @@
 // (cyc=cyclotomicSquare, mul, conj, frob1/2/3, inv); the three 63-bit cyclotomic-
 // exp ladders unroll into cyc/mul ops exactly like the Miller NAF loop. Liveness
 // analysis carries only the LIVE Fp12 values across chunk boundaries as
-// hash256-committed state (40-byte LE limbs), and chunks are planned by measured
+// hash256-committed state (32-byte LE limbs), and chunks are planned by measured
 // real-VM op-cost. The last chunk asserts the result == Fp12 ONE (the verdict).
 //
 //   node gen_finalexp.mjs          full plan + emit -> generated/finalexp_NN.cash + manifest_finalexp.json

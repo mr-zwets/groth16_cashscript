@@ -13,7 +13,7 @@ import { dirname, join } from 'node:path';
 import {
   Fp2, f12limbs, r6limbs, pairsFor, vec, commit, millerBatchOps, singlePairMiller,
   measureCovenantFile, planChunk, covIn, covOut, PT_CFG, ptLimbs, decl,
-  commitBin, compileFileBytecodeRaw,
+  commitBin, compileFileBytecodeRaw, STATE_BYTES,
 } from './_millermath.mjs';
 import { millerFusedOps, residueWitness, fp12limbsOf, COSET27 } from './_residuemath.mjs';
 
@@ -176,7 +176,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     L.push('        ' + cNames.map((n) => `require(${n} < P);`).join(' '));
     L.push(`        (${decl(pNames)}) = fp12Mul(${cNames.join(',')}, ${ciNames.join(',')});`);
     L.push('        ' + pNames.map((n, i) => `require(${n} % P == ${ONE_L[i]});`).join(' '));
-    L.push(`        bytes wHash = hash256(${wNames.map((n) => `toPaddedBytes(${n}, 40)`).join(' + ')});`);
+    L.push(`        bytes wHash = hash256(${wNames.map((n) => `toPaddedBytes(${n}, ${STATE_BYTES})`).join(' + ')});`);
     L.push(`        require(wHash == 0x${W_HASHES[0]} || wHash == 0x${W_HASHES[1]} || wHash == 0x${W_HASHES[2]});`);
     L.push(`        (${decl(cqqNames)}) = fp12Frob2(${cNames.join(',')});`);
     L.push(`        (${decl(uNames)}) = fp12Mul(${cNames.join(',')}, ${cqqNames.join(',')});`);

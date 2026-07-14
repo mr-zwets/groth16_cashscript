@@ -7,7 +7,7 @@
 // e(alpha,beta) skipped / witnessed-residue tail). The ONLY difference is the per-input budget:
 //
 //   the BCH op-cost budget an input gets is (41 + unlockingLen) * 800. The flagship residue
-//   build sizes each chunk to a 10 kB unlocking (=> 8,032,800 op/input, ~27 inputs). Here we
+//   build sizes each chunk to a 10 kB unlocking (=> 8,032,800 op/input, 26 inputs). Here we
 //   size to a 100 kB unlocking (=> 88,000,000 op/input, ~11x), which collapses the same
 //   ~178M-op verifier into a HANDFUL of fat inputs — one per stage floor:
 //     fast-G2 subgroup check   1 input
@@ -36,7 +36,7 @@ import { dirname, join } from 'node:path';
 import {
   millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileFileBytecode, compileFileBytecodeRaw, ptLimbs,
-  vkxPoint, le40, OP_DROP,
+  vkxPoint, le40, OP_DROP, verifierPath, invalidG2Overrides, assertG2StageManifest,
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
@@ -78,7 +78,7 @@ regenGlvSafe(GEN, [0, 128], true);
 const PROBE = join(GEN, '_intratx_residue_large_probe.cash'); // transformed import-chunks compiled from here
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);
-const W = 40; // BN254 limb width (bytes)
+const W = 32; // canonical BN254 values are < 2^254, so 32-byte signed LE is sufficient
 import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBchSpec } from '@bitauth/libauth';
 const realVm = createVirtualMachineBchSpec(false); // PROPOSED bch-spec VM (100 kB scripts, 88M-op inputs)
 const standardVm = createVirtualMachineBchSpec(true);
@@ -91,7 +91,8 @@ const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)); // OP_
 
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const pd = encodeDataPush;
-const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le40(((BigInt(l) % P) + P) % P)]));
+const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) =>
+  [...le40(((BigInt(l) % P) + P) % P).slice(0, W)]));
 const padPush = (argLen, target) => {
   const budget = Math.max(2, target - argLen);
   // header size: 1 (<=75), 2 (PUSHDATA1 <=255), 3 (PUSHDATA2 <=65535), 5 (PUSHDATA4). Pick N so
@@ -132,7 +133,7 @@ function parseProofUnlocking(hex) {
   const d = vals.reverse();
   return { Ax: d[0], Ay: d[1], Bxa: d[2], Bxb: d[3], Bya: d[4], Byb: d[5], Cx: d[6], Cy: d[7], in0: d[8], in1: d[9] };
 }
-const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-singleton-multiproof-vectors.json', 'utf8'));
+const mp = JSON.parse(readFileSync(verifierPath('src/bch/groth16-singleton-multiproof-vectors.json'), 'utf8'));
 const p1 = parseProofUnlocking(mp.proofs[1].unlocking);
 const wcp = parseProofUnlocking(mp.worstCaseProof.unlocking);
 const INSTANCES = {
@@ -151,17 +152,16 @@ const MILLER_IN_LIMBS = PTL_LEN + 24; // + c(12) + cInv(12) = 34 (stage-bound ge
 
 // ---- per-stage chunk specs (inLimbs/outLimbs/extras/role) — IDENTICAL to build_vectors_residue.mjs;
 // only the assembly budget below differs (100 kB inputs). ----
-function specsG2check(inst) {
+function specsG2check(inst, bad = {}) {
   const pf = inst.proof ?? proof;
   const Ba = pf.b.toAffine(), Aa = pf.a.negate().toAffine(), Ca = pf.c.toAffine();
-  const Bpair = [[Ba.x.c0, Ba.x.c1], [Ba.y.c0, Ba.y.c1]];
-  const tail = [Aa.x, Aa.y, Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1, Ca.x, Ca.y];
+  const Bx = bad.Bx ?? Ba.x, By = bad.By ?? Ba.y;
+  const Bpair = [[Bx.c0, Bx.c1], [By.c0, By.c1]];
+  const tail = [bad.Ax ?? Aa.x, bad.Ay ?? Aa.y, Bx.c0, Bx.c1, By.c0, By.c1, bad.Cx ?? Ca.x, bad.Cy ?? Ca.y];
   const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
-  if (man.stageBound !== true) {
-    throw new Error('intratx residue-large requires STAGE_BOUND_LAYOUT=1 during G2 generation');
-  }
+  assertG2StageManifest(man);
   const zinv = g2checkFastZinv(Bpair); // [zinvA, zinvB] witnessed inverse of [x0]B.Z (last chunk only)
   return man.chunks.map((ch) => ({
     file: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`),
@@ -448,13 +448,19 @@ const fullInvalid = [
   { steps: toStepArr(boundHybrid), rejected: true },
   ...bindingMutations,
 ];
+const invalidInputs = invalidG2Overrides(INSTANCES.committed.proof).map((bad) => {
+  const run = assemble(specsG2check(INSTANCES.committed, bad), true);
+  if (run.accepted) throw new Error('isolated G2 validation accepted an invalid point');
+  return toStepArr(run);
+});
 console.error(`  invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
-if (!full0.fits || !full1.fits || !fullWc.fits || !fullInvalid.every((run) => run.rejected)) {
+console.error(`  invalid point runs rejected: ${invalidInputs.length}`);
+if (!full0.fits || !full1.fits || !fullWc.fits || !fullInvalid.every((run) => run.rejected) || invalidInputs.length === 0) {
   throw new Error('valid, worst-case, or invalid fixture failed; refusing to write vectors');
 }
 
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-residue-large-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; fast-G2 endo subgroup check + GLV vk_x MSM + c^-(6x+2)-FUSED batched Miller with e(alpha,beta) skipped + witnessed-residue final-exp verdict), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the same ~178M-op verifier therefore collapses to 4 inputs: g2check 1, GLV vk_x 1 (one 128-iter loop window), and c^-(6x+2)-fused Miller 2 with the witnessed-residue final-exp verdict (fF*w*c^q2==c^q*c^q3) FOLDED into the last (terminal) Miller chunk — so the separate residue-tail input disappears. Total op-cost and bytes are conserved (a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the fused verdict. All stages are bound to ONE proof tuple: the fused-Miller genesis derives f=cInv and R0=B in-contract and leads with the contiguous -A/B/C points, the G2 chunk byte-binds that same tuple into the Miller genesis input, the GLV vk_x chunk initializes its accumulator in-contract, range-checks its decomposition witnesses, and binds the computed vk_x point into that same genesis. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
+writeFileSync(verifierPath('src/bch/groth16-intratx-residue-large-vectors.json'), JSON.stringify({
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; canonical-coordinate/on-curve/subgroup fast-G2 endo check + GLV vk_x MSM + c^-(6x+2)-FUSED batched Miller with e(alpha,beta) skipped + witnessed-residue final-exp verdict), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the same ~177M-op verifier therefore collapses to 4 inputs: g2check 1, GLV vk_x 1 (one 128-iter loop window), and c^-(6x+2)-fused Miller 2 with the witnessed-residue final-exp verdict (fF*w*c^q2==c^q*c^q3) FOLDED into the last (terminal) Miller chunk — so the separate residue-tail input disappears. Total op-cost and bytes are conserved (a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the fused verdict. All stages are bound to ONE proof tuple: the fused-Miller genesis derives f=cInv and R0=B in-contract and leads with the contiguous -A/B/C points, the G2 chunk byte-binds that same tuple into the Miller genesis input, the GLV vk_x chunk initializes its accumulator in-contract, range-checks its decomposition witnesses, and binds the computed vk_x point into that same genesis. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
   method: 'intra-tx-linked-residue-large', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: LARGE_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
@@ -462,6 +468,7 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-residue-l
   allFit: full0.fits, allAccept: full0.accepted,
   steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullWc),
   invalid: fullInvalid.map((r) => r.steps),
+  invalidInputs,
 }, null, 2));
 console.error('\nwrote groth16-intratx-residue-large-vectors.json');
 console.error('NOTE: generated/ now holds 100 kB-budget chunks. Regenerate the default-budget chunks before rebuilding a flagship 10 kB build:');
