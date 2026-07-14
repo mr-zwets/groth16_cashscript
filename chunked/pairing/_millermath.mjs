@@ -155,6 +155,64 @@ export function millerBatchOps(pairs, opts = {}) {
   return { ops, states, boundary: f };
 }
 
+// ---- Prepared plain Miller ----------------------------------------------------
+// Pair 1 is e(alpha,beta): both points are fixed by the VK. Folding its 87 op objects
+// (88 line folds; postPrecompute contains two) through the shared loop is therefore
+// equivalent to omitting that pair and multiplying its raw single-pair Miller value
+// into f once after the loop.
+// Keep the raw millerBatchOps trace above for residue/reference math; all plain chunk
+// consumers share this trace so their op indices and states stay aligned.
+const PRECOMPUTED_PAIR = 1;
+export function preparedMillerOps(pairs) {
+  if (pairs.length !== 4 || pairs[PRECOMPUTED_PAIR]?.name !== 'alpha_beta') {
+    throw new Error('prepared Miller requires the four Groth16 pairs with alpha_beta at index 1');
+  }
+  const base = millerBatchOps(pairs, { skipPairs: new Set([PRECOMPUTED_PAIR]) });
+  const fAB = singlePairMiller(pairs[PRECOMPUTED_PAIR]).f;
+  const ops = [...base.ops, { t: 'cmul1' }];
+  const states = base.states.slice();
+  const finalState = base.states[base.states.length - 1];
+  const boundary = Fp12.mul(base.boundary, fAB);
+  const rawBoundary = millerBatchOps(pairs).boundary;
+  if (!Fp12.eql(boundary, rawBoundary)) {
+    throw new Error('prepared Miller boundary does not match the raw four-pair Miller boundary');
+  }
+  states.push({ f: boundary, Rs: finalState.Rs.slice() });
+  return { ops, states, boundary, fAB, precomputedPair: PRECOMPUTED_PAIR };
+}
+
+export function assertPreparedMillerManifest(manifest, trace) {
+  const expectedFAB = f12limbs(trace.fAB).map(String);
+  const manifestFAB = manifest.precomputedPairMiller;
+  const fABMatches = Array.isArray(manifestFAB)
+    && manifestFAB.length === expectedFAB.length
+    && manifestFAB.every((limb, i) => limb === expectedFAB[i]);
+  // `manifest.boundary` records the generator's committed proof, so it must not be
+  // compared here: the same lockings intentionally verify other proofs and boundaries.
+  const chunksCoverTrace = Array.isArray(manifest.chunks)
+    && manifest.chunks.length > 0
+    && manifest.chunks.length === manifest.numChunks
+    && manifest.chunks.every((chunk, i) =>
+      chunk.idx === i
+      && Number.isInteger(chunk.opLo)
+      && Number.isInteger(chunk.opHi)
+      && chunk.opLo === (i === 0 ? 0 : manifest.chunks[i - 1].opHi)
+      && chunk.opHi > chunk.opLo
+      && chunk.opHi <= trace.ops.length
+      && chunk.final === (chunk.opHi === trace.ops.length))
+    && manifest.chunks[manifest.chunks.length - 1].opHi === trace.ops.length;
+  if (
+    manifest.batched !== true
+    || manifest.numPairs !== 4
+    || manifest.numOps !== trace.ops.length
+    || manifest.precomputedPair !== trace.precomputedPair
+    || !fABMatches
+    || !chunksCoverTrace
+  ) {
+    throw new Error('manifest_miller.json does not match the prepared Miller trace; regenerate it with gen_miller.mjs');
+  }
+}
+
 // ---- serialization (matches cash hash256(toPaddedBytes(.,40))) ----
 export const f12limbs = (f) => [f.c0.c0.c0, f.c0.c0.c1, f.c0.c1.c0, f.c0.c1.c1, f.c0.c2.c0, f.c0.c2.c1, f.c1.c0.c0, f.c1.c0.c1, f.c1.c1.c0, f.c1.c1.c1, f.c1.c2.c0, f.c1.c2.c1];
 export const r6limbs = (R) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1];

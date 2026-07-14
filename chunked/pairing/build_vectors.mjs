@@ -10,7 +10,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp12, Fp2, bn254, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
+  Fp12, Fp2, bn254, preparedMillerOps, assertPreparedMillerManifest, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileBytecode, compileFileBytecode, commitBin, CATEGORY, ptLimbs,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace,
   TARGET_UNLOCK, OP_PUSHDATA2, OP_BUDGET, verifierPath,
@@ -140,9 +140,14 @@ const WC_INSTANCE = { tag: 'worst-case', proof: proofFromLimbs(wcp.Ax, wcp.Ay, w
 const stats = { maxLock: 0, maxUnlock: 0, allFit: true, allAccept: true, allInvalid: true };
 function buildPairing(inst) {
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const { ops, states, boundary } = millerBatchOps(pairs);
+  const trace = preparedMillerOps(pairs);
+  const { states, boundary } = trace;
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_miller.json'), 'utf8'));
+  assertPreparedMillerManifest(man, trace);
+  if (man.stageBound !== false) {
+    throw new Error('covenant vectors require the default Miller layout; regenerate without STAGE_BOUND_LAYOUT');
+  }
   const steps = [];
   for (const ch of man.chunks) {
     const inLimbs = [...stateLimbs(states[ch.opLo]), ...ptL];
@@ -205,6 +210,9 @@ function buildG2check(inst, bad) {
   const tail = [...B4, ...A2, ...C2]; // B(4)+A(2)+C(2)
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
+  if (man.stageBound !== false) {
+    throw new Error('covenant vectors require the default G2 layout; regenerate without STAGE_BOUND_LAYOUT');
+  }
   const zinv = g2checkFastZinv(Bpair); // [zinvA, zinvB] for the fast-endo final chunk (uncommitted witness)
   const steps = [];
   for (const ch of man.chunks) {
@@ -219,7 +227,7 @@ function buildG2check(inst, bad) {
   return steps;
 }
 
-// ---- the FULL verifier chain: validate -> vk_x -> batched 4-pair Miller -> final exp ----
+// ---- the FULL verifier chain: validate -> vk_x -> prepared batched Miller -> final exp ----
 function buildGroth16(inst) {
   const g2Steps = buildG2check(inst);
   const vkxSteps = buildVkx(inst);
@@ -251,9 +259,12 @@ const sumOp = (a) => a.reduce((x, s) => x + s.operationCost, 0);
 const maxOpOf = (a) => Math.max(...a.map((s) => s.operationCost));
 console.error(`pairing(boundary): ${pairing0.length} steps/proof, op ${sumOp(pairing0).toLocaleString()}; proof#1 also built (${pairing1.length} steps)`);
 console.error(`max lock ${stats.maxLock}B max unlock ${stats.maxUnlock}B | allFit=${stats.allFit} allAccept=${stats.allAccept} allInvalidRejected=${stats.allInvalid}`);
+if (!stats.allFit || !stats.allAccept || !stats.allInvalid) {
+  throw new Error('valid, worst-case, or invalid fixture failed; refusing to write vectors');
+}
 
 writeFileSync(verifierPath('src/bch/pairing-chunked-vectors.json'), JSON.stringify({
-  description: 'PROOF-AGNOSTIC chunked BN254 Groth16 pairing to the Miller boundary (ONE batched 4-pair optimal-ate Miller loop with a shared fp12Sqr per step; the folded f IS the boundary, no separate combine), multi-tx. Generic covenant: running state in the token NFT commitment, NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct proof under the same VK.',
+  description: 'PROOF-AGNOSTIC chunked BN254 Groth16 pairing to the Miller boundary. ONE batched optimal-ate loop shares each fp12Sqr across the three runtime-dependent pairs; the fixed e(alpha,beta) pair is omitted from that loop and its precomputed raw Miller value is multiplied into f once at the end. The folded f is the exact four-pair boundary, with no separate combine. Generic multi-tx covenant: running state in the token NFT commitment, NO baked proof. One fixed set of lockings verifies multiple proofs under the VK.',
   proofBinding: 'runtime', numSteps: pairing0.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(pairing0), maxStepOperationCost: maxOpOf(pairing0),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
@@ -263,7 +274,7 @@ console.error('wrote src/bch/pairing-chunked-vectors.json (proof-agnostic, 2 pro
 
 console.error(`groth16(full): ${g0.groth16.length} steps/proof, op ${sumOp(g0.groth16).toLocaleString()}; proof#1 also built (${g1.groth16.length} steps)`);
 writeFileSync(verifierPath('src/bch/groth16-chunked-vectors.json'), JSON.stringify({
-  description: 'PROOF-AGNOSTIC full chunked BN254 Groth16 verifier: vk_x (on-chain from public inputs) -> ONE batched 4-pair Miller loop -> final exponentiation -> assert product==1, multi-tx. Generic covenant: state in the token NFT commitment, NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct proof minted under the same VK.',
+  description: 'PROOF-AGNOSTIC full chunked BN254 Groth16 verifier: G2 input validation -> vk_x on-chain from public inputs -> prepared batched Miller loop (fixed e(alpha,beta) raw Miller value precomputed and multiplied once) -> final exponentiation -> assert product==1. Generic multi-tx covenant: state in the token NFT commitment, NO baked proof. One fixed set of lockings verifies multiple proofs under the VK.',
   proofBinding: 'runtime', numSteps: g0.groth16.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(g0.groth16), maxStepOperationCost: maxOpOf(g0.groth16),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,

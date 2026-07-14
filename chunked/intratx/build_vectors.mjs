@@ -5,7 +5,7 @@
 // outgoing state, and FORWARD-checks its successor: it `require`s the next input's
 // incoming blob (read via tx.inputs[idx+1].unlockingBytecode) equals its own output.
 // No NFT-commitment hand-off, no hashing, no 128-byte limit — and it all fits one
-// (non-standard, <1MB) transaction instead of ~60 sequential transactions.
+// (non-standard, <1MB) transaction instead of 44 sequential transactions.
 //
 // Reuses the validated chunk MATH from chunked/pairing/generated/*.cash verbatim
 // (the same files the covenant build consumes); transform.mjs only swaps the
@@ -16,7 +16,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp2, bn254, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
+  Fp2, bn254, preparedMillerOps, assertPreparedMillerManifest, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileFileBytecode, compileFileBytecodeRaw, ptLimbs, PT_CFG,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace, le40,
   OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET,
@@ -160,11 +160,13 @@ function specsVkx(inst, crossToMiller) {
 }
 function specsMiller(inst, crossToFinalexp) {
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const { states, boundary } = millerBatchOps(pairs);
+  const trace = preparedMillerOps(pairs);
+  const { states, boundary } = trace;
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   // STAGE-BOUND genesis: proof tuple first (-A/B, C), then vk_x; f/R0 derived in-contract.
   const genesisPts = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_miller.json'), 'utf8'));
+  assertPreparedMillerManifest(man, trace);
   if (man.stageBound !== true) {
     throw new Error('intratx requires STAGE_BOUND_LAYOUT=1 during Miller generation');
   }
@@ -400,7 +402,7 @@ if (!pair0.fits || !pair1.fits || !pairWc.fits || !pairInvalid.every((run) => ru
 }
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-intratx-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED BN254 Groth16 pairing to the Miller boundary. The batched 4-pair Miller chunks are the INPUTS of ONE transaction; each chunk takes its incoming Fp12+G2 state as a raw byte blob in its witness and FORWARD-checks its successor (require next input\'s blob == its recomputed output, read via OP_INPUTBYTECODE). No NFT-commitment hand-off, no hashing, no 128-byte limit. Reuses the same validated chunk math as bch-pairing-chunked.',
+  description: 'INTRA-TRANSACTION LINKED BN254 Groth16 pairing to the Miller boundary. A prepared batched loop shares each fp12Sqr across the three runtime-dependent pairs; the fixed e(alpha,beta) pair is omitted and its precomputed raw Miller value is multiplied into f once at the end. Its chunks are the INPUTS of ONE transaction; each takes its incoming Fp12+G2 state as a raw byte blob and FORWARD-checks its successor via OP_INPUTBYTECODE. No NFT hand-off, hashing, or 128-byte state limit. Reuses the same validated chunk math as bch-pairing-chunked.',
   method: 'intra-tx-linked', deployment: 'P2SH32', numInputs: pair0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(pair0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(pair0.meta, (m) => m.operationCost),
@@ -461,7 +463,7 @@ if (!full0.fits || !full1.fits || !fullWc.fits || !fullInvalid.every((run) => ru
 }
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED full BN254 Groth16 verifier in ONE transaction: validate G2 inputs -> vk_x -> batched 4-pair Miller -> final exponentiation -> assert product==1, as the inputs of a single tx. State is passed as raw byte blobs through sibling-input introspection (OP_INPUTBYTECODE forward-checks), not NFT commitments — no hashing, arbitrary intermediate size. All stages are bound to ONE proof tuple: the Miller genesis derives f=1 and R0=B in-contract and leads with the contiguous -A/B/C points, the G2 final chunk byte-binds that same tuple into the Miller genesis input, the vk_x final chunk binds the computed vk_x point into it, and the Miller boundary is bound into the final-exponentiation genesis input. Reuses the same validated chunk math as bch-groth16-chunked.',
+  description: 'INTRA-TRANSACTION LINKED full BN254 Groth16 verifier in ONE transaction: validate G2 inputs -> vk_x -> prepared batched Miller (fixed e(alpha,beta) raw Miller value precomputed and multiplied once) -> final exponentiation -> assert product==1. State passes as raw byte blobs through OP_INPUTBYTECODE forward-checks, not NFT commitments. All stages bind one proof tuple: Miller derives f=1 and R0=B in-contract; G2 validation binds -A/B/C into Miller genesis; vk_x binds its result into that genesis; and the Miller boundary binds into final exponentiation. Reuses the validated bch-groth16-chunked math.',
   method: 'intra-tx-linked', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),

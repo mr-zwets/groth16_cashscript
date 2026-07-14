@@ -1,11 +1,11 @@
 // Assemble the GROUPED verifier vectors for BN254 — a hybrid of the intra-tx linked
 // method (chunked/intratx) and the covenant NFT hand-off (chunked/pairing).
 //
-// MOTIVATION. The multi-tx covenant (bch-groth16-chunked / -covenant) is 46 SEQUENTIAL
-// transactions, one chunk each — a 46-deep unconfirmed chain that approaches BCH's default
+// MOTIVATION. The multi-tx covenant (bch-groth16-chunked / -covenant) is 44 SEQUENTIAL
+// transactions, one chunk each — a 44-deep unconfirmed chain that approaches BCH's default
 // mempool ancestor/descendant limit (50). The single-tx intra-tx bundle (bch-groth16-
-// intratx) is one ~0.37 MB transaction — fine at consensus but NON-standard (> 100,000 B,
-// must be mined directly). GROUPED packs the same 46 chunks into 5 STANDARD transactions
+// intratx) is one ~0.33 MB transaction — fine at consensus but NON-standard (> 100,000 B,
+// must be mined directly). GROUPED packs 42 hash-free linked inputs into 5 STANDARD transactions
 // of < 100,000 B each: comfortably under the chain limit AND relayable under standard policy.
 //
 // MECHANISM. Within one group transaction the chunks bind each other exactly as in the
@@ -29,7 +29,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp2, bn254, millerBatchOps, pairsFor, proofFromLimbs, proof, vec,
+  Fp2, bn254, preparedMillerOps, assertPreparedMillerManifest, pairsFor, proofFromLimbs, proof, vec,
   f12limbs, r6limbs, compileBytecode, compileFileBytecode, ptLimbs, PT_CFG,
   compileBytecodeRaw, compileFileBytecodeRaw,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace, le40, CATEGORY, commitBin,
@@ -184,11 +184,13 @@ function specsVkx(inst, crossToMiller) {
 }
 function specsMiller(inst, crossToFinalexp) {
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const { states, boundary } = millerBatchOps(pairs);
+  const trace = preparedMillerOps(pairs);
+  const { states, boundary } = trace;
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   // STAGE-BOUND genesis: proof tuple first (-A/B, C), then vk_x; f/R0 derived in-contract.
   const genesisPts = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_miller.json'), 'utf8'));
+  assertPreparedMillerManifest(man, trace);
   if (man.stageBound !== true) {
     throw new Error('grouped requires STAGE_BOUND_LAYOUT=1 during Miller generation');
   }
@@ -572,7 +574,7 @@ if (!asmCommitted.fits || !asmProof1.fits || !asmWorst.fits || !invalids.every((
 }
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-grouped-vectors.json', JSON.stringify({
-  description: 'GROUPED BN254 Groth16 verifier: the chunked computation packed into a handful of STANDARD (<100,000 B) transactions. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE (intra-tx method); across groups the running state rides a CashToken NFT commitment (covenant method) — a group\'s last chunk commits hash256(outBlob) to output[0], the next group\'s first chunk binds its inBlob via require(tx.inputs[0].nftCommitment == hash256(inBlob)). The token thread chains all groups in order. Group boundaries sit only at within-stage full-state links, so the stage-internal cross/terminal binding is preserved exactly as in the intra-tx build. All stages are bound to ONE proof tuple: the Miller genesis derives f=1 and R0=B in-contract and leads with the contiguous -A/B/C points, the G2 final chunk byte-binds that same tuple into the Miller genesis input (kept in the same group by the packer), the vk_x final chunk binds the computed vk_x point into it, and the Miller boundary is bound into the final-exponentiation genesis input. Same validated chunk math as bch-groth16-chunked / -intratx; one fixed set of lockings verifies any proof for the VK.',
+  description: 'GROUPED BN254 Groth16 verifier: the prepared chunk graph (fixed e(alpha,beta) raw Miller value precomputed and multiplied once) packed into STANDARD (<100,000 B) transactions. Within each group, inputs forward-check via OP_INPUTBYTECODE; across groups, state rides a CashToken NFT commitment. Group boundaries only cut full-state links, preserving the intra-tx stage bindings. Miller derives f=1 and R0=B in-contract; G2 validation binds -A/B/C into Miller genesis; vk_x binds its result into that genesis; and the Miller boundary binds into final exponentiation. One fixed set of lockings verifies any proof for the VK.',
   method: 'grouped', deployment: 'P2SH32', category: binToHex(CATEGORY),
   numInputs: asmCommitted.meta.length, numGroups: GROUPS.length, budgetPerInput: OP_BUDGET,
   groupSizes: GROUPS.map(([lo, hi]) => hi - lo + 1),
