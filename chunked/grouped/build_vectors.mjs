@@ -5,7 +5,7 @@
 // transactions, one chunk each — a 54-deep unconfirmed chain that exceeds BCH's default
 // mempool ancestor/descendant limit (50). The single-tx intra-tx bundle (bch-groth16-
 // intratx) is one ~0.5 MB transaction — fine at consensus but NON-standard (> 100,000 B,
-// must be mined directly). GROUPED packs the same 54 chunks into ~6 STANDARD transactions
+// must be mined directly). GROUPED packs the same 46 chunks into ~6 STANDARD transactions
 // of < 100,000 B each: comfortably under the chain limit AND relayable under standard policy.
 //
 // MECHANISM. Within one group transaction the chunks bind each other exactly as in the
@@ -49,6 +49,7 @@ const P = BigInt(PRIME);
 const W = 40; // BN254 limb width (bytes)
 import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
+const standardVm = createVirtualMachineBch2026(true);
 
 // Deploy each chunk as P2SH (same as intra-tx): the redeem rides in the scriptSig where it
 // counts toward the op-cost budget; the inBlob stays the FIRST scriptSig push (front offset
@@ -68,7 +69,7 @@ const padPush = (argLen, target) => {
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
   return encodeDataPush(new Uint8Array(N));
 };
-const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
+const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41));
 
 // OP_RETURN output (keeps the terminal group's tx well-formed; the verdict chunk ignores it)
 const OP_RETURN = Uint8Array.from([0x6a]);
@@ -79,7 +80,7 @@ const OP_RETURN = Uint8Array.from([0x6a]);
 function tokenOf(t) {
   return t ? { amount: 0n, category: CATEGORY, nft: { capability: t.cap, commitment: t.commit } } : undefined;
 }
-function evalGroup(inputs, index, gm) {
+function evalGroup(inputs, index, gm, vm = realVm) {
   const program = {
     inputIndex: index,
     sourceOutputs: inputs.map((inp, n) => ({
@@ -95,7 +96,7 @@ function evalGroup(inputs, index, gm) {
       locktime: 0,
     },
   };
-  const st = realVm.evaluate(program);
+  const st = vm.evaluate(program);
   const top = st.stack[st.stack.length - 1];
   return { accepted: st.error === undefined && st.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1, operationCost: st.metrics.operationCost, error: st.error ?? null, stackLen: st.stack.length, topHex: top ? binToHex(top) : '' };
 }
@@ -318,7 +319,7 @@ function argBytesOf(spec) {
 // ---- assemble a full run for one instance against a FIXED group partition ----
 // `groups` is the [lo,hi] partition (computed once, shared by all instances so the lockings
 // match). Returns inputs/meta plus per-group token metadata for the harness.
-function assembleGrouped(specs, groups) {
+function assembleGrouped(specs, groups, expectRejected = false) {
   const G = groups.length;
   // role/cfg per chunk
   const cfgs = specs.map((_, i) => {
@@ -359,7 +360,9 @@ function assembleGrouped(specs, groups) {
   const allInputs = specs.map((s, i) => ({ locking: lockings[i], unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const perGroupInputs = groups.map(([lo, hi]) => allInputs.slice(lo, hi + 1));
   const op1 = [];
+  const standardOp1 = [];
   groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) op1[lo + k] = evalGroup(perGroupInputs[gi], k, gmeta[gi]); });
+  groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) standardOp1[lo + k] = evalGroup(perGroupInputs[gi], k, gmeta[gi], standardVm); });
 
   // Per-chunk variant selection (RESCHEDULE only; decided once, on the first assembly):
   // keep whichever redeem yields the smaller TUNED unlocking — see build_vectors_residue.mjs.
@@ -376,18 +379,45 @@ function assembleGrouped(specs, groups) {
       const rawInputs = perGroupInputs[gi].slice();
       rawInputs[i - lo] = { locking: p2shSpk(v.raw), unlocking: rawUnlock };
       const rawOp = evalGroup(rawInputs, i - lo, gmeta[gi]);
-      const tR = tunedLen(argB[i].length + rpush[i].length, op1[i].operationCost);
-      const tB = rawOp.accepted ? tunedLen(argB[i].length + rawRpush.length, rawOp.operationCost) : Infinity;
+      const rawStandardOp = evalGroup(rawInputs, i - lo, gmeta[gi], standardVm);
+      const tR = op1[i].accepted && standardOp1[i].accepted
+        ? tunedLen(argB[i].length + rpush[i].length, Math.max(op1[i].operationCost, standardOp1[i].operationCost))
+        : Infinity;
+      const tB = rawOp.accepted && rawStandardOp.accepted
+        ? tunedLen(argB[i].length + rawRpush.length, Math.max(rawOp.operationCost, rawStandardOp.operationCost))
+        : Infinity;
       chosenCache.set(key, tB < tR ? 'raw' : 'resched');
       if (tB < tR) switched += 1;
     }
-    if (switched) return assembleGrouped(specs, groups); // reassemble with final choices (cached -> recurses once)
+    if (switched) return assembleGrouped(specs, groups, expectRejected); // reassemble with final choices (cached -> recurses once)
   }
-  // pass 2: shrink each pad to just cover its op-cost
-  for (let i = 0; i < specs.length; i++) allInputs[i].unlocking = mkUnlock(i, tunedLen(argB[i].length + rpush[i].length, op1[i].operationCost));
-  const perGroupInputs2 = groups.map(([lo, hi]) => allInputs.slice(lo, hi + 1));
-  const op2 = [];
-  groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) op2[lo + k] = evalGroup(perGroupInputs2[gi], k, gmeta[gi]); });
+  if (!expectRejected && [...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+    throw new Error('chosen full-budget input errored during padding measurement');
+  }
+  let targets = specs.map((_, i) => tunedLen(
+    argB[i].length + rpush[i].length,
+    Math.max(op1[i].operationCost, standardOp1[i].operationCost),
+  ));
+  let op2;
+  let standardOp2;
+  while (true) {
+    for (let i = 0; i < specs.length; i++) allInputs[i].unlocking = mkUnlock(i, targets[i]);
+    const perGroupInputs2 = groups.map(([lo, hi]) => allInputs.slice(lo, hi + 1));
+    op2 = [];
+    standardOp2 = [];
+    groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) op2[lo + k] = evalGroup(perGroupInputs2[gi], k, gmeta[gi]); });
+    groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) standardOp2[lo + k] = evalGroup(perGroupInputs2[gi], k, gmeta[gi], standardVm); });
+    if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) break;
+    const tightened = targets.map((target, i) => Math.min(target, tunedLen(
+      argB[i].length + rpush[i].length,
+      Math.max(op2[i].operationCost, standardOp2[i].operationCost),
+    )));
+    if (tightened.every((target, i) => target === targets[i])) break;
+    targets = tightened;
+  }
+  if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) {
+    throw new Error('tightened input rejected during padding measurement');
+  }
 
   const meta = specs.map((s, i) => ({
     label: s.label, checkpoint: s.checkpoint, group: cfgs[i].group,
@@ -506,7 +536,7 @@ const hybridSpecs = [
 ];
 const unboundHybrid = assembleGrouped(hybridSpecs.map((spec) => ({ ...spec, externalBindings: [] })), GROUPS);
 if (!unboundHybrid.accepted) throw new Error('pre-binding proof0-G2/proof1-remainder hybrid was not accepted');
-const boundHybrid = assembleGrouped(hybridSpecs, GROUPS);
+const boundHybrid = assembleGrouped(hybridSpecs, GROUPS, true);
 if (boundHybrid.meta[g2FinalIndex].accepted) throw new Error('bound hybrid did not reject at G2 final');
 const unrelatedFailure = boundHybrid.meta.find((meta, i) => i !== g2FinalIndex && !meta.accepted);
 if (unrelatedFailure) throw new Error(`bound hybrid also rejected at ${unrelatedFailure.label}`);
@@ -537,6 +567,9 @@ const invalids = [
   ...bindingMutations,
 ];
 console.error(`  invalid runs rejected: ${invalids.map((r) => r.rejected).join(',')}`);
+if (!asmCommitted.fits || !asmProof1.fits || !asmWorst.fits || !invalids.every((run) => run.rejected)) {
+  throw new Error('valid, worst-case, or invalid fixture failed; refusing to write vectors');
+}
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-grouped-vectors.json', JSON.stringify({
   description: 'GROUPED BN254 Groth16 verifier: the chunked computation packed into a handful of STANDARD (<100,000 B) transactions. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE (intra-tx method); across groups the running state rides a CashToken NFT commitment (covenant method) — a group\'s last chunk commits hash256(outBlob) to output[0], the next group\'s first chunk binds its inBlob via require(tx.inputs[0].nftCommitment == hash256(inBlob)). The token thread chains all groups in order. Group boundaries sit only at within-stage full-state links, so the stage-internal cross/terminal binding is preserved exactly as in the intra-tx build. All stages are bound to ONE proof tuple: the Miller genesis derives f=1 and R0=B in-contract and leads with the contiguous -A/B/C points, the G2 final chunk byte-binds that same tuple into the Miller genesis input (kept in the same group by the packer), the vk_x final chunk binds the computed vk_x point into it, and the Miller boundary is bound into the final-exponentiation genesis input. Same validated chunk math as bch-groth16-chunked / -intratx; one fixed set of lockings verifies any proof for the VK.',
