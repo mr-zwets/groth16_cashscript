@@ -7,20 +7,19 @@ locking+unlocking ≤ 10,000 B). The BLS12-381 counterpart of the BN254
 oracle. Three benchmark entries (in the verifier repo) are produced from here:
 
 - **`bch-vkx-bls12381-chunked-covenant`** — the public-input aggregation
-  `vk_x = IC0 + in0·IC1 + in1·IC2` (G1 multi-scalar-mult), 13 chunks.
+  `vk_x = IC0 + in0·IC1 + in1·IC2` (G1 multi-scalar-mult), 11 chunks / 23,036 B / 6.86M op-cost.
 - **`bch-pairing-bls12381-chunked`** — the **Miller loops + final exponentiation**:
   `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)` as ONE batched 4-pair Miller loop →
-  the BLS/Hayashida-Scott final exponentiation → verdict (== Fp12 ONE). 103 chunks.
+  the BLS/Hayashida-Scott final exponentiation → verdict (== Fp12 ONE). 72 chunks / 639,846 B / 506.38M op-cost.
 - **`bch-groth16-bls12381-chunked`** — the **complete verifier**: the vk_x chunks
-  prepended to the pairing. 116 chunks, ~1.47 MB, ~754M op-cost; ranked in the main
+  prepended to the pairing. 86 chunks / 682,962 B / 535.40M op-cost; ranked in the main
   Groth16 leaderboard against nchain (its BLS12-381 reference) — the only BCH-compatible
   full Groth16 verifier on that curve.
 
 ## Optimizations (batched Miller + lazy reduction)
 
-Two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B op to **116 / 1.47 MB
-/ 754 M op** (−41% steps, −36% bytes, −34% op-cost; ≈ parity with the BN254 chunked
-verifier despite the larger field):
+The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B op to
+116 / 1.47 MB / 754 M op; later optimizations produced the current figures above:
 
 - **Batched 4-pair Miller** — instead of four independent single-pair chains (each
   squaring `f` every step), ONE loop squares `f` once per NAF step and folds all four
@@ -84,6 +83,30 @@ node build_vectors.mjs             # -> verifier vkx-bls12381-chunked-covenant-v
 node build_vectors_pairing.mjs     # -> verifier pairing- + groth16-bls12381-chunked-vectors.json
 ```
 
+### Residue-plan ownership
+
+The residue verifier has two deployment-owned chunk plans. They intentionally do not share a
+manifest:
+
+- `generated/manifest_{millerres,finalexpres}.json` is the covenant plan. Its chunks retain the
+  incoming/outgoing NFT commitment hashes and are measured as independent token transactions.
+- `generated/linked-residue/manifest_{millerres,finalexpres}.json` is the hash-free linked plan,
+  consumed only by `chunked/intratx/build_vectors_residue_bls.mjs` and
+  `chunked/grouped/build_vectors_residue_bls.mjs`. Those builders remove the boundary hashes and
+  validate the wider windows in their real sibling-input contexts on both consensus and standard
+  BCH 2026 VMs.
+
+Regenerate the linked namespace before either linked vector:
+
+```
+node gen_miller_residue.mjs linked
+node gen_finalexp_residue.mjs linked
+```
+
+Do not point the covenant or proposed-large builders at `generated/linked-residue/`. Several linked
+windows exceed the covenant density limit before the boundary hashes are removed; the proposed-large
+track has a separate 100 kB/bch-spec plan.
+
 Fast probes (no planner): `node gen_miller.mjs 0 probe`, `node gen_finalexp.mjs probe`,
 `node gen_vkx.mjs probe <lo> <hi>`.
 
@@ -110,6 +133,7 @@ unlike BN254 where 2²⁵⁴−1 exceeds the prime.)
 |------|------|:--------:|
 | `_vkxmath.mjs` | shared Fp/Jacobian math, 48-byte serialization, covenant emitters, real-VM measurer, planner | ✅ |
 | `_pairingmath.mjs` | shared noble Miller/finalExp math, op-DAG trace, instance pairs, fnExtractor | ✅ |
+| `_residue_linked_plan.mjs` | audited hash-free Miller/tail boundaries and stress fixture, shared by grouped + intra-tx | ✅ |
 | `gen_vkx.mjs` | plan + emit the worst-case-sized vk_x chunks | ✅ |
 | `gen_miller.mjs` | plan + emit the batched 4-pair Miller chunks (flat-op, lazy) | ✅ |
 | `gen_finalexp.mjs` | trace + chunk the final exponentiation (op-DAG + liveness, lazy) | ✅ |
@@ -117,6 +141,7 @@ unlike BN254 where 2²⁵⁴−1 exceeds the prime.)
 | `build_vectors_pairing.mjs` | assemble the pairing + full-groth16 vectors | ✅ |
 | `generate.mjs` | one-command orchestrator | ✅ |
 | `generated/` | the ~116 `.cash` chunks + manifests (derived) | ❌ git-ignored |
+| `generated/linked-residue/` | hash-free residue chunks + manifests for grouped/intra-tx only (derived) | ❌ git-ignored |
 
 The instance + IC/VK points come from `../../singleton/bls12-381/bls_instance.mjs`; the
 singleton oracles are `../../singleton/bls12-381/{vkx,miller,finalexp}.cash`.

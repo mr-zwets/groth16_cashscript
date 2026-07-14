@@ -7,10 +7,10 @@
 // Chunk graph (vs the plain BLS grouped's g2check -> vk_x -> 4-pair Miller -> final exp):
 //   GLV vk_x (4-scalar 128-bit Straus, baked table)                -> 5 chunks
 //   c^-|x|-FUSED prepared-VK batched Miller (e(a,b) baked, cmul1),
-//     with G2 validation fused into its first/last chunks           -> 30 chunks
-//   witnessed-residue tail: ((w^|x|)*w)^9 walk + fF*w==frob(c,1)   -> 6 chunks
+//     with G2 validation fused into its first/last chunks           -> 29 chunks
+//   witnessed-residue tail: ((w^|x|)*w)^9 walk + fF*w==frob(c,1)   -> 5 chunks
 //                                                                     ---------
-//                                                                     41 inputs
+//                                                                     39 inputs
 // The hard-part final exponentiation (Hayashida-Scott, 23 chunks in the plain build) collapses to
 // the residue tail. c,cInv thread through every fused-Miller chunk as constant witness; w enters
 // the tail as an uncommitted witness and is re-derived/checked there (see gen_finalexp_residue).
@@ -28,13 +28,14 @@ import { computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecod
 import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
 import {
   glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX,
-  GLV_HIGH_COST_INPUTS, GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
+  GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
 } from '../bls12-381/gen_vkx_glv.mjs';
+import { LINKED_HIGH_COST_INPUTS, LINKED_RESIDUE_NAMESPACE } from '../bls12-381/_residue_linked_plan.mjs';
 import { residueWalkT } from '../bls12-381/gen_finalexp_residue.mjs';
 import { transformChunk, headerSize } from '../intratx/transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const GEN = join(here, '..', 'bls12-381', 'generated');
+const GEN = join(here, '..', 'bls12-381', 'generated', LINKED_RESIDUE_NAMESPACE);
 const W = 48; // BLS12-381 limb width
 const PRIME = P.toString();
 import { hexToBin, binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
@@ -99,7 +100,7 @@ const mkInstance = (inputs) => {
   const A = mod(3n * 5n + vx * 7n + 13n * 11n);
   return { inputs, proof: { a: G1.BASE.multiply(A), b: proof.b, c: proof.c } };
 };
-const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]), stress: mkInstance(GLV_HIGH_COST_INPUTS) };
+const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]), stress: mkInstance(LINKED_HIGH_COST_INPUTS) };
 
 // ---- residue chunk-graph layout constants ----
 // fused-Miller state = f(12) + R_B(6) + runtime points(10) + c(12) + cInv(12) = 52 limbs.
@@ -163,6 +164,13 @@ function specsResidueTail(fF, c, cInv, w) {
   return man.chunks.map((ch) => {
     if (ch.role === 'walk') {
       const first = ch.lo === 0;
+      if (ch.fused) {
+        return {
+          file: join(GEN, `finalexpres_${String(ch.idx).padStart(2, '0')}.cash`),
+          inLimbs: first ? commit36 : state5At(ch.lo), outLimbs: [], extras: first ? wl : [], role: 'terminal',
+          label: `residue walk+finalize[${ch.lo},${ch.hi}) -> verdict`, checkpoint: 'verify',
+        };
+      }
       return {
         file: join(GEN, `finalexpres_${String(ch.idx).padStart(2, '0')}.cash`),
         inLimbs: first ? commit36 : state5At(ch.lo), outLimbs: state5At(ch.hi), extras: first ? wl : [],
@@ -444,7 +452,7 @@ if (!asmCommitted.accepted || !asmProof1.accepted || !asmStress.fits || !invalid
 }
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-grouped-residue-vectors.json', JSON.stringify({
-  description: 'GROUPED + RESIDUE BLS12-381 Groth16 verifier: the residue-optimized chunk graph (G2 validation fused into the Miller stage; 5-chunk GLV 4-scalar vk_x MSM; c^-|x|-FUSED prepared-VK batched Miller with e(alpha,beta) baked and only e(-A,B) running on-chain G2 arithmetic; witnessed-residue final-exp tail collapsing the Hayashida-Scott hard part to a ((w^|x|)*w)^9 mu_(27A) walk + fF*w==frob(c,1) verdict) packed into five STANDARD (<100,000 B) transactions. The five GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding five copies. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The residue witness (c, cInv) threads through every fused-Miller chunk; w enters the tail as an uncommitted witness. One fixed set of lockings verifies any proof for the VK. Deployed P2SH32.',
+  description: 'GROUPED + RESIDUE BLS12-381 Groth16 verifier: the residue-optimized chunk graph (G2 validation fused into the Miller stage; 5-chunk GLV 4-scalar vk_x MSM; 29-chunk c^-|x|-FUSED prepared-VK batched Miller with e(alpha,beta) baked and only e(-A,B) running on-chain G2 arithmetic; 5-chunk witnessed-residue final-exp tail collapsing the Hayashida-Scott hard part to a ((w^|x|)*w)^9 mu_(27A) walk + fF*w==frob(c,1) verdict) packed into five STANDARD (<100,000 B) transactions. The five GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding five copies. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The residue witness (c, cInv) threads through every fused-Miller chunk; w enters the tail as an uncommitted witness. One fixed set of lockings verifies any proof for the VK. Deployed P2SH32.',
   method: 'grouped-residue', deployment: 'P2SH32', curve: 'BLS12-381', category: binToHex(CATEGORY),
   numInputs: asmCommitted.meta.length, numGroups: GROUPS.length, budgetPerInput: OP_BUDGET,
   groupSizes: GROUPS.map(([lo, hi]) => hi - lo + 1),

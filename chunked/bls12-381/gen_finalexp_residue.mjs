@@ -11,18 +11,24 @@
 //                  verdict fF*w == frob(c,1)  (terminal).
 // State from the fused Miller: fF(12), c(12), cInv(12). w(12) enters as an uncommitted witness in
 // the first walk chunk and is committed forward (with t) thereafter. lambda = p + |x|.
-//   node gen_finalexp_residue.mjs   emit finalexpres_NN.cash + manifest_finalexpres.json
-import { writeFileSync } from 'node:fs';
+//   node gen_finalexp_residue.mjs          covenant plan -> generated/
+//   node gen_finalexp_residue.mjs linked   linked plan   -> generated/linked-residue/
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { measureCovenantFile, covIn, covOut, planChunk, commit, P, PUBLIC_INPUTS } from './_vkxmath.mjs';
 import { pairsFor, millerBatchOps, Fp12 } from './_pairingmath.mjs';
 import { residueWitness, millerFusedOps, fp12limbsOf } from './_residuemath.mjs';
+import { LINKED_RESIDUE_NAMESPACE, LINKED_TAIL_BOUNDS } from './_residue_linked_plan.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const GEN = join(here, 'generated');
+const LINKED = process.argv[2] === 'linked';
+const GEN = join(here, 'generated', ...(LINKED ? [LINKED_RESIDUE_NAMESPACE] : []));
+mkdirSync(GEN, { recursive: true });
 const PROBE = join(GEN, '_probe_finalexpres.cash');
-const LIB_IMPORT = '../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash';
+const LIB_IMPORT = LINKED
+  ? '../../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash'
+  : '../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash';
 const Pstr = P.toString();
 const ABS_X = 15132376222941642752n; // |x| MSB-preloaded walk constant (matches the lazy lib)
 const NWALK = 63;
@@ -157,7 +163,11 @@ if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
   const commit36 = [...fFl, ...cl, ...cil];
   const state5At = (upto) => [...fFl, ...cl, ...cil, ...wl, ...fp12limbsOf(residueWalkT(w, upto))];
 
-  console.error(`planning residue tail walk (${NWALK} iters)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
+  if (LINKED && (LINKED_TAIL_BOUNDS[0] !== 0 || LINKED_TAIL_BOUNDS[LINKED_TAIL_BOUNDS.length - 1] !== NWALK ||
+    LINKED_TAIL_BOUNDS.some((bound, i) => i > 0 && bound <= LINKED_TAIL_BOUNDS[i - 1]))) {
+    throw new Error('invalid linked residue-tail boundaries');
+  }
+  console.error(`planning residue tail walk (${NWALK} iters) deployment=${LINKED ? 'linked' : 'covenant'} OP_TARGET=${OP_TARGET.toLocaleString()}`);
   const chunks = []; let lo = 0; const planState = { perUnit: null };
   while (lo < NWALK) {
     const first = lo === 0;
@@ -169,7 +179,9 @@ if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
       const m = measureCovenantFile(src, inPush, inCommit, out, PROBE);
       return { hi, src, m, outgoing: commit(out), fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost };
     };
-    const best = planChunk(lo, NWALK, OP_TARGET, tryHi, planState);
+    const best = LINKED
+      ? tryHi(LINKED_TAIL_BOUNDS[chunks.length + 1])
+      : planChunk(lo, NWALK, OP_TARGET, tryHi, planState);
     if (!best) throw new Error(`no fitting walk window at ${lo}`);
     const idx = chunks.length;
     writeFileSync(join(GEN, `finalexpres_${String(idx).padStart(2, '0')}.cash`), best.src);
@@ -177,7 +189,7 @@ if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
     console.error(`  walk chunk ${idx}: iters[${lo},${best.hi}) op=${best.operationCost.toLocaleString()} lock=${best.m.lockingBytes}B`);
     lo = best.hi;
   }
-  if (process.env.FUSE_FINAL === '1') {
+  if (LINKED || process.env.FUSE_FINAL === '1') {
     // Fold the finalize verdict into the LAST walk chunk (terminal), dropping the separate finalize
     // input. Fits only when the last walk window + ~4M-op verdict stay under OP_TARGET (the LARGE
     // bch-spec budget); errors otherwise so a too-tight fusion is caught, not silently mis-planned.
@@ -187,7 +199,7 @@ if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
     const inPush = first ? [...commit36, ...wl] : state5At(last.lo);
     const inCommit = first ? commit36 : state5At(last.lo);
     const mF = measureCovenantFile(src, inPush, inCommit, [], PROBE); // terminal -> outLimbs []
-    if (!mF.accepted || mF.lockingBytes > BYTE_BUDGET || mF.operationCost > OP_TARGET)
+    if (!LINKED && (!mF.accepted || mF.lockingBytes > BYTE_BUDGET || mF.operationCost > OP_TARGET))
       throw new Error(`FUSE_FINAL: fused walk+finalize does not fit (accepted=${mF.accepted} lock=${mF.lockingBytes} op=${mF.operationCost.toLocaleString()})`);
     writeFileSync(join(GEN, `finalexpres_${String(last.idx).padStart(2, '0')}.cash`), src);
     last.final = true; last.fused = true;
@@ -195,7 +207,7 @@ if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
     // negative: tamper fF -> the verdict fF*w==frob(c,1) fails -> reject
     const badPush = inPush.slice(); badPush[0] = badPush[0] + 1n;
     const badCommit = inCommit.slice(); badCommit[0] = badCommit[0] + 1n;
-    console.error(`  fused finalize (tampered fF): accepted=${measureCovenantFile(src, badPush, badCommit, [], PROBE).accepted} (expect false)`);
+    if (!LINKED) console.error(`  fused finalize (tampered fF): accepted=${measureCovenantFile(src, badPush, badCommit, [], PROBE).accepted} (expect false)`);
   } else {
     // finalize chunk (separate terminal input)
     const fin = genFinalize();
@@ -211,7 +223,7 @@ if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
   }
   for (let i = 1; i < chunks.length; i++) if (chunks[i - 1].outgoing !== chunks[i].incoming) throw new Error('tail continuity break at ' + i);
   writeFileSync(join(GEN, 'manifest_finalexpres.json'), JSON.stringify({
-    residueTail: true, numChunks: chunks.length, nwalk: NWALK,
+    residueTail: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', numChunks: chunks.length, nwalk: NWALK,
     chunks: chunks.map((c) => ({ idx: c.idx, role: c.role, lo: c.lo ?? null, hi: c.hi ?? null, final: c.final, fused: c.fused ?? false })),
   }, null, 2));
   console.error(`residue tail: ${chunks.length} chunks`);

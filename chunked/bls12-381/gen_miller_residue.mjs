@@ -8,7 +8,8 @@
 // cInv [NAF digit +1] or c [-1]). The residue witness (c, cInv) is carried as CONSTANT state.
 // state = f(12) + R_B(6) + runtime points(10) + c(12) + cInv(12) = 52 limbs; the FINAL chunk
 // hands off only [fF, c, cInv] (36 limbs) to the residue tail.
-//   node gen_miller_residue.mjs        plan + emit millerres_NN.cash + manifest_millerres.json
+//   node gen_miller_residue.mjs          covenant plan -> generated/
+//   node gen_miller_residue.mjs linked   linked plan   -> generated/linked-residue/
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -17,11 +18,15 @@ import {
 } from './_pairingmath.mjs';
 import { commit, measureCovenantFile, planChunk, covIn, covOut, PUBLIC_INPUTS } from './_vkxmath.mjs';
 import { millerFusedOps, residueWitness, conj, fp12limbsOf } from './_residuemath.mjs';
+import { LINKED_MILLER_BOUNDS, LINKED_RESIDUE_NAMESPACE } from './_residue_linked_plan.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const GEN = join(here, 'generated');
+const LINKED = process.argv[2] === 'linked';
+const GEN = join(here, 'generated', ...(LINKED ? [LINKED_RESIDUE_NAMESPACE] : []));
 mkdirSync(GEN, { recursive: true });
-const LIB_IMPORT = '../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash';
+const LIB_IMPORT = LINKED
+  ? '../../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash'
+  : '../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash';
 const PROBE = join(GEN, '_probe_millerres.cash');
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_880_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
@@ -155,7 +160,11 @@ if (process.argv[2] === 'probe') {
   process.exit(0);
 }
 
-console.error(`planning FUSED BLS12-381 Miller chunks (${ops.length} flat ops, ${ops.filter((o) => o.t === 'cf').length} c-folds)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
+if (LINKED && (LINKED_MILLER_BOUNDS[0] !== 0 || LINKED_MILLER_BOUNDS[LINKED_MILLER_BOUNDS.length - 1] !== ops.length ||
+  LINKED_MILLER_BOUNDS.some((bound, i) => i > 0 && bound <= LINKED_MILLER_BOUNDS[i - 1]))) {
+  throw new Error('invalid linked Miller boundaries');
+}
+console.error(`planning FUSED BLS12-381 Miller chunks (${ops.length} flat ops, ${ops.filter((o) => o.t === 'cf').length} c-folds)  deployment=${LINKED ? 'linked' : 'covenant'} OP_TARGET=${OP_TARGET.toLocaleString()}`);
 const chunks = []; let lo = 0; const planState = { perUnit: null };
 while (lo < ops.length) {
   const inL = inState(lo);
@@ -165,18 +174,20 @@ while (lo < ops.length) {
     const m = measureCovenantFile(src, inL, inL, outL, PROBE);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final: hi === ops.length, outgoing: commit(outL), src, m };
   };
-  const best = planChunk(lo, ops.length, OP_TARGET, tryHi, planState);
+  const best = LINKED
+    ? tryHi(LINKED_MILLER_BOUNDS[chunks.length + 1])
+    : planChunk(lo, ops.length, OP_TARGET, tryHi, planState);
   if (!best) throw new Error(`no fitting fused window at op ${lo}`);
   const idx = chunks.length;
   writeFileSync(join(GEN, `millerres_${String(idx).padStart(2, '0')}.cash`), best.src);
   chunks.push({ idx, opLo: lo, opHi: best.hi, final: best.final, incoming: commit(inL), outgoing: best.outgoing, opCost: best.operationCost, lockingBytes: best.m.lockingBytes });
-  console.error(`  chunk ${idx}: ops[${lo},${best.hi}) lock=${best.m.lockingBytes}B op=${best.operationCost.toLocaleString()} final=${best.final}`);
+  console.error(`  chunk ${idx}: ops[${lo},${best.hi}) lock=${best.m.lockingBytes}B op=${best.operationCost.toLocaleString()} acceptedAsCovenant=${best.m.accepted} final=${best.final}`);
   lo = best.hi;
 }
 for (let i = 1; i < chunks.length; i++) if (chunks[i - 1].outgoing !== chunks[i].incoming) throw new Error('continuity break at ' + i);
 console.error(`fused miller: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.opCost, 0).toLocaleString()}, maxOp=${Math.max(...chunks.map((c) => c.opCost)).toLocaleString()}`);
 writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
-  fused: true, numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
+  fused: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, incoming: c.incoming, outgoing: c.outgoing })),
 }, null, 2));
-console.error('wrote generated/manifest_millerres.json');
+console.error(`wrote ${join(GEN, 'manifest_millerres.json')}`);
