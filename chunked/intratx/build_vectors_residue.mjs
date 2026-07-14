@@ -77,7 +77,7 @@ const GLV_STATE_WIDTHS = [
 const GLV_GENESIS_WIDTHS = GLV_STATE_WIDTHS.slice(3);
 import {
   hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, sha256,
-  encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026,
+  encodeLockingBytecodeP2sh32, encodeDataPush, encodeTransactionBch, createVirtualMachineBch2026,
 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 const standardVm = createVirtualMachineBch2026(true);
@@ -103,9 +103,8 @@ const padPush = (argLen, target) => {
 const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41));
 
 // ---- multi-input evaluation: build ONE tx from all inputs, evaluate at `index` ----
-function evalInput(inputs, index, vm = realVm) {
-  const program = {
-    inputIndex: index,
+function verificationData(inputs) {
+  return {
     sourceOutputs: inputs.map((i) => ({ lockingBytecode: i.locking, valueSatoshis: 1000n })),
     transaction: {
       version: 2,
@@ -113,6 +112,12 @@ function evalInput(inputs, index, vm = realVm) {
       outputs: [{ lockingBytecode: Uint8Array.from([0x6a]), valueSatoshis: 1000n }],
       locktime: 0,
     },
+  };
+}
+function evalInput(inputs, index, vm = realVm) {
+  const program = {
+    inputIndex: index,
+    ...verificationData(inputs),
   };
   const st = vm.evaluate(program);
   const top = st.stack[st.stack.length - 1];
@@ -537,10 +542,16 @@ const sum = (a, f) => a.reduce((x, m) => x + f(m), 0);
 const report = (tag, asm) => {
   const maxOp = Math.max(...asm.meta.map((m) => m.operationCost));
   const maxL = Math.max(...asm.meta.map((m) => m.lockingBytes)), maxU = Math.max(...asm.meta.map((m) => m.unlockingBytes));
-  console.error(`${tag}: ${asm.meta.length} inputs, accepted=${asm.accepted} fits=${asm.fits} | totalBytes=${sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes).toLocaleString()} totalOp=${sum(asm.meta, (m) => m.operationCost).toLocaleString()} maxOp=${maxOp.toLocaleString()} maxLock=${maxL} maxUnlock=${maxU}`);
+  const data = verificationData(asm.inputs);
+  const wireBytes = encodeTransactionBch(data.transaction).length;
+  const consensusVerified = realVm.verify(data) === true;
+  const standardVerified = standardVm.verify(data) === true;
+  if (asm.accepted && !consensusVerified) throw new Error(`${tag}: independently accepted inputs failed whole-transaction consensus verification`);
+  console.error(`${tag}: ${asm.meta.length} inputs, accepted=${asm.accepted} fits=${asm.fits} | totalBytes=${sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes).toLocaleString()} wireBytes=${wireBytes.toLocaleString()} totalOp=${sum(asm.meta, (m) => m.operationCost).toLocaleString()} maxOp=${maxOp.toLocaleString()} maxLock=${maxL} maxUnlock=${maxU} consensus=${consensusVerified} standard=${standardVerified}`);
   if (process.env.DUMP_OPCOSTS) asm.meta.forEach((m, i) => console.error(`  op[${String(i).padStart(2)}] ${String(m.operationCost).padStart(9)} lock=${m.lockingBytes} unlock=${m.unlockingBytes} ${m.accepted ? '' : 'REJECTED '}${m.label}`));
   const bad = asm.meta.find((m) => !m.accepted);
   if (bad) console.error(`  !! first non-accepting: ${bad.label} :: ${bad.error}`);
+  return { wireBytes, consensusVerified, standardVerified };
 };
 
 // ===================== FULL GROTH16 (residue, single tx) =====================
@@ -556,7 +567,7 @@ if (MILLER_AFFINE_G2) {
 const proof1Specs = buildSpecs(INSTANCES.proof1, millerGenesisLockingHash);
 const worstSpecs = buildSpecs(INSTANCES.worst, millerGenesisLockingHash);
 const full0 = assemble(committedSpecs);
-report('groth16-intratx-residue committed', full0);
+const full0Transaction = report('groth16-intratx-residue committed', full0);
 // The benchmark's dense proof is not the GLV density worst case: its four decomposition
 // witnesses have unrelated bit gaps. Exercise the absolute case explicitly (all 128 bits set
 // in all four bounded witnesses) so a window replan cannot silently exceed the input budget.
@@ -927,6 +938,9 @@ writeFileSync(verifierPath('src/bch/groth16-intratx-residue-vectors.json'), JSON
   description,
   method: 'intra-tx-linked-residue', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
+  serializedTransactionBytes: full0Transaction.wireBytes,
+  consensusTransactionVerified: full0Transaction.consensusVerified,
+  standardTransactionVerified: full0Transaction.standardVerified,
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
   maxStepOperationCost: Math.max(...full0.meta.map((m) => m.operationCost)),
   allFit: full0.fits, allAccept: full0.accepted,
