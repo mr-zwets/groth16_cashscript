@@ -3,7 +3,7 @@
 // op-cost + whether every step fits the per-input budget. Used to gate vk_x replans, since
 // vk_x op is public-input-scalar-density dependent and the plain build doesn't print fullWc.
 //
-//   node check_worstcase_vkx.mjs C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-vectors.json
+//   node check_worstcase_vkx.mjs "$VERIFIER_DIR/src/bch/groth16-intratx-vectors.json"
 import { readFileSync } from 'node:fs';
 import { hexToBin, createVirtualMachineBch2026 } from '@bitauth/libauth';
 

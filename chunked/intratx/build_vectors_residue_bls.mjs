@@ -26,7 +26,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs,
-  le48, P, OP_DROP, TARGET_UNLOCK, OP_BUDGET,
+  le48, P, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
@@ -348,7 +348,7 @@ const fInv = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.le
 console.error(`  invalid runs rejected: ${fInv.map((r) => r.rejected).join(',')}`);
 if (!full0.accepted || !full1.accepted || !fullStress.fits || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-intratx-residue-vectors.json', JSON.stringify({
+writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-vectors.json'), JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-bls12381-intratx (each chunk is an input whose witness carries its incoming state as a raw 48-byte-limb blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: GLV vk_x MSM (5 chunks; the five inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding five copies), c^-|x|-FUSED batched Miller with e(alpha,beta) baked and only e(-A,B) running on-chain G2 arithmetic (29 chunks; the G2 on-curve + prime-order-subgroup validation is FUSED into the first/last Miller chunks, reusing the running R_B=[|x|]B the loop already walks), and a 5-chunk witnessed-residue final-exp TAIL collapsing the Hayashida-Scott hard part to a mu_27A ((w^|x|)*w)^9 walk + fF*w==frob(c,1) verdict (the final walk chunk fuses the verdict). The residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail; w enters the tail as an uncommitted witness. Cross-stage soundness links are bound where layouts allow: vk_x final binds the vk_x point into the fused-Miller genesis input, and the fused-Miller boundary [fF,c,cInv] is bound into the residue tail. Reuses the same validated chunk math as bch-groth16-bls12381-grouped-residue. Deployed P2SH32.',
   method: 'intra-tx-linked-residue', deployment: 'P2SH32', curve: 'BLS12-381', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),

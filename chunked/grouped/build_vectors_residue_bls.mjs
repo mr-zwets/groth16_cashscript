@@ -21,7 +21,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   Fp12, millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs,
-  compileBytecode, commitBin, CATEGORY, le48, P, OP_DROP, TARGET_UNLOCK, OP_BUDGET,
+  compileBytecode, commitBin, CATEGORY, le48, P, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
@@ -451,7 +451,7 @@ if (!asmCommitted.accepted || !asmProof1.accepted || !asmStress.fits || !invalid
   console.error('!! a run failed -- NOT writing vectors'); process.exit(1);
 }
 
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-grouped-residue-vectors.json', JSON.stringify({
+writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-grouped-residue-vectors.json'), JSON.stringify({
   description: 'GROUPED + RESIDUE BLS12-381 Groth16 verifier: the residue-optimized chunk graph (G2 validation fused into the Miller stage; 5-chunk GLV 4-scalar vk_x MSM; 29-chunk c^-|x|-FUSED prepared-VK batched Miller with e(alpha,beta) baked and only e(-A,B) running on-chain G2 arithmetic; 5-chunk witnessed-residue final-exp tail collapsing the Hayashida-Scott hard part to a ((w^|x|)*w)^9 mu_(27A) walk + fF*w==frob(c,1) verdict) packed into five STANDARD (<100,000 B) transactions. The five GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding five copies. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The residue witness (c, cInv) threads through every fused-Miller chunk; w enters the tail as an uncommitted witness. One fixed set of lockings verifies any proof for the VK. Deployed P2SH32.',
   method: 'grouped-residue', deployment: 'P2SH32', curve: 'BLS12-381', category: binToHex(CATEGORY),
   numInputs: asmCommitted.meta.length, numGroups: GROUPS.length, budgetPerInput: OP_BUDGET,

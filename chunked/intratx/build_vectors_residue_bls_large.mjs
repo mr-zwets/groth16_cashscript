@@ -36,7 +36,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs, le48, P, OP_DROP,
+  millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs, le48, P, OP_DROP, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
@@ -339,7 +339,7 @@ const fInv = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.le
 console.error(`  invalid runs rejected: ${fInv.map((r) => r.rejected).join(',')}`);
 if (!full0.accepted || !full1.accepted || !fullStress.fits || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-intratx-residue-large-vectors.json', JSON.stringify({
+writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-large-vectors.json'), JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-bls12381-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; GLV vk_x MSM + c^-|x|-FUSED batched Miller with e(alpha,beta) baked and the G2 on-curve+prime-order-subgroup validation fused into the first/last Miller chunks + witnessed-residue mu_27A final-exp tail), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the current-BCH plan therefore collapses from 39 inputs to 5 (GLV vk_x 1, c^-|x|-fused Miller 3, witnessed-residue walk+finalize 1). The verifier arithmetic is unchanged, while fewer state boundaries remove repeated checks and padding. Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail, w enters the tail as an uncommitted witness. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
   method: 'intra-tx-linked-residue-large', deployment: 'P2SH32', curve: 'BLS12-381', numInputs: full0.inputs.length, budgetPerInput: LARGE_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
