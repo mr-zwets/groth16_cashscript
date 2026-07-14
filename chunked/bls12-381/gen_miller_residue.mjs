@@ -24,6 +24,7 @@ import { LINKED_MILLER_BOUNDS, LINKED_RESIDUE_NAMESPACE } from './_residue_linke
 const here = dirname(fileURLToPath(import.meta.url));
 const LINKED = process.argv[2] === 'linked';
 const STAGE_BOUND = LINKED || process.env.STAGE_BOUND_LAYOUT === '1';
+const COVENANT_RESIDUE = STAGE_BOUND && process.env.COVENANT_RESIDUE_LAYOUT === '1';
 const GEN = join(here, 'generated', ...(LINKED ? [LINKED_RESIDUE_NAMESPACE] : []));
 mkdirSync(GEN, { recursive: true });
 const LIB_IMPORT = LINKED
@@ -50,6 +51,10 @@ const ptL = PAIRS.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
 // Put the hot derived-state sources first at genesis: cInv, c, then B/A/vk_x/C.
 const genesisPtParams = [...ptParams.slice(2, 6), ...ptParams.slice(0, 2), ...ptParams.slice(6)];
 const genesisPtL = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
+// The full-stage GLV predecessor emits [A,B,C,vk_x]. Keep that exact order in the covenant
+// commitment even though the Miller function declares its hot arguments as [cInv,c,B,A,vk_x,C].
+const stagePtParams = [...ptParams.slice(0, 6), ...ptParams.slice(8, 10), ...ptParams.slice(6, 8)];
+const stagePtL = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
 
 // witness for the committed planning instance (chunk math is generic; only window boundaries
 // come from this instance).
@@ -88,12 +93,15 @@ function genChunk(opLo, opHi, isFinal) {
   L.push('// carried witness. cf op folds c^-1/c into f (residue method, ePrint 2024/640).');
   L.push('contract MillerFusedBlsChunk() {');
   L.push(`    function spend(${decl(stateParams)}, bytes unused zeroPadding) {`);
-  L.push(covIn(stateParams));
+  L.push(covIn(COVENANT_RESIDUE && opLo === 0 ? stagePtParams : stateParams));
   // FUSED input validation (was the standalone g2check pass): the first Miller chunk checks the
   // prover's points are on-curve (A=-P0 & C=P3 on G1 y^2=x^3+4; B=Q0 on G2 y^2=x^3+(4+4u)); the
   // final chunk's psi(B)==[|x|]B subgroup test reuses R_B (=[|x|]B) that this loop already walks.
   if (opLo === 0) {
     for (const name of ptParams) L.push(`        require(within(${name}, 0, ${P}));`);
+    if (STAGE_BOUND) {
+      for (const name of [...ciNames, ...cNames]) L.push(`        require(within(${name}, 0, ${P}));`);
+    }
     L.push('        require(mSqr(Py0) == mAdd(mulFp(mSqr(Px0), Px0), 4));'); // A on G1 (-A shares the curve)
     L.push('        require(mSqr(Py3) == mAdd(mulFp(mSqr(Px3), Px3), 4));'); // C on G1
     L.push('        (int bx2a, int bx2b) = r2Sqr(Q0xa, Q0xb);');
@@ -161,7 +169,11 @@ function genChunk(opLo, opHi, isFinal) {
     L.push(`        require(${r0[2]} == eya); require(${r0[3]} == eyb);`);
   }
   // final chunk hands off only [fF, c, cInv] to the residue tail; others carry full state.
-  L.push(isFinal ? covOut([...f, ...cNames, ...ciNames]) : covOut([...f, ...r0, ...ptParams, ...cNames, ...ciNames]));
+  const outNames = isFinal ? [...f, ...cNames, ...ciNames] : [...f, ...r0, ...ptParams, ...cNames, ...ciNames];
+  const exactNames = COVENANT_RESIDUE
+    ? isFinal ? [...cNames, ...ciNames] : [...new Set([...r0, ...ptParams, ...cNames, ...ciNames])]
+    : [];
+  L.push(covOut(outNames, exactNames));
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
@@ -183,10 +195,11 @@ console.error(`planning FUSED BLS12-381 Miller chunks (${ops.length} flat ops, $
 const chunks = []; let lo = 0; const planState = { perUnit: null };
 while (lo < ops.length) {
   const inL = inState(lo);
+  const inCommit = COVENANT_RESIDUE && lo === 0 ? stagePtL : inL;
   const tryHi = (hi) => {
     const outL = outState(hi);
     const src = genChunk(lo, hi, hi === ops.length);
-    const m = measureCovenantFile(src, inL, inL, outL, PROBE);
+    const m = measureCovenantFile(src, inL, inCommit, outL, PROBE);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final: hi === ops.length, outgoing: commit(outL), src, m };
   };
   const best = LINKED
@@ -195,7 +208,7 @@ while (lo < ops.length) {
   if (!best) throw new Error(`no fitting fused window at op ${lo}`);
   const idx = chunks.length;
   writeFileSync(join(GEN, `millerres_${String(idx).padStart(2, '0')}.cash`), best.src);
-  chunks.push({ idx, opLo: lo, opHi: best.hi, final: best.final, incoming: commit(inL), outgoing: best.outgoing, opCost: best.operationCost, lockingBytes: best.m.lockingBytes });
+  chunks.push({ idx, opLo: lo, opHi: best.hi, final: best.final, incoming: commit(inCommit), outgoing: best.outgoing, opCost: best.operationCost, lockingBytes: best.m.lockingBytes });
   console.error(`  chunk ${idx}: ops[${lo},${best.hi}) lock=${best.m.lockingBytes}B op=${best.operationCost.toLocaleString()} acceptedAsCovenant=${best.m.accepted} final=${best.final}`);
   lo = best.hi;
 }
@@ -203,6 +216,7 @@ for (let i = 1; i < chunks.length; i++) if (chunks[i - 1].outgoing !== chunks[i]
 console.error(`fused miller: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.opCost, 0).toLocaleString()}, maxOp=${Math.max(...chunks.map((c) => c.opCost)).toLocaleString()}`);
 writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
   fused: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', stageBound: STAGE_BOUND,
+  covenantResidue: COVENANT_RESIDUE, inputValidationFused: true,
   numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, incoming: c.incoming, outgoing: c.outgoing })),
 }, null, 2));

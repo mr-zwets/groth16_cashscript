@@ -4,7 +4,7 @@ The Groth16 verifier on **BLS12-381** (the same curve as nchain) split across
 transactions so **every step fits one BCH input** (op-cost ≤ 8,032,800,
 locking+unlocking ≤ 10,000 B). The BLS12-381 counterpart of the BN254
 `../pairing/` work, and the chunked form of the monolithic `../../singleton/bls12-381/`
-oracle. Three benchmark entries (in the verifier repo) are produced from here:
+oracle. Four benchmark entries (in the verifier repo) are produced from here:
 
 - **`bch-vkx-bls12381-chunked-covenant`** — the public-input aggregation
   `vk_x = IC0 + in0·IC1 + in1·IC2` (G1 multi-scalar-mult), 11 chunks / 22,277 B / 6,808,579 op-cost.
@@ -16,6 +16,10 @@ oracle. Three benchmark entries (in the verifier repo) are produced from here:
   377,785,509 op-cost; ranked in the main
   Groth16 leaderboard against nchain (its BLS12-381 reference) — the only BCH-compatible
   full Groth16 verifier on that curve.
+- **`bch-groth16-bls12381-chunked-covenant-residue`** — the source-owned standard-VM
+  covenant graph: five full-stage GLV chunks -> input-validation-fused residue Miller -> the
+  current residue walk/finalize tail. It enforces a minting-baton genesis, one mutable state
+  thread, fixed P2SH32 successor pins, and an immutable terminal verdict.
 
 The separate 29-chunk input-unvalidated pairing and input-validated full Miller namespaces
 also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` builders:
@@ -115,6 +119,12 @@ once and **op-cost binds, not size**. Windows are sized by measuring real-VM op-
 VERIFIER_DIR=/path/to/zk-verifier-bench node generate.mjs
 ```
 
+The covenant-residue track has its own one-command source-to-vector path:
+
+```
+VERIFIER_DIR=/path/to/zk-verifier-bench node generate_covenant_residue.mjs
+```
+
 Individual pieces (all reproducible artifacts; only the generators are committed):
 
 ```
@@ -135,6 +145,8 @@ manifest:
 
 - `generated/manifest_{millerres,finalexpres}.json` is the covenant plan. Its chunks retain the
   incoming/outgoing NFT commitment hashes and are measured as independent token transactions.
+  `generate_covenant_residue.mjs` regenerates this namespace in its exact full-stage layout before
+  assembling the lifecycle-bound P2SH32 graph.
 - `generated/linked-residue/manifest_{millerres,finalexpres}.json` is the hash-free linked plan,
   consumed only by `chunked/intratx/build_vectors_residue_bls.mjs` and
   `chunked/grouped/build_vectors_residue_bls.mjs`. Those builders remove the boundary hashes and
@@ -185,6 +197,8 @@ the first chunk rejects negative or out-of-range scalars rather than silently tr
 | `gen_finalexp.mjs` | trace + chunk the final exponentiation (op-DAG + liveness, lazy) | ✅ |
 | `build_vectors.mjs` | assemble the vk_x covenant vectors | ✅ |
 | `build_vectors_pairing.mjs` | assemble the pairing + full-groth16 vectors | ✅ |
+| `build_vectors_covenant_residue.mjs` | assemble and gate the BLS covenant-residue lifecycle | ✅ |
+| `generate_covenant_residue.mjs` | one-command BLS covenant-residue vector reproduction | ✅ |
 | `generate.mjs` | one-command orchestrator | ✅ |
 | `generated/` | generated `.cash` chunks + manifests (derived) | ❌ git-ignored |
 | `generated/linked-residue/` | hash-free residue chunks + manifests for grouped/intra-tx only (derived) | ❌ git-ignored |

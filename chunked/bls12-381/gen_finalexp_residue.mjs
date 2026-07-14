@@ -23,6 +23,7 @@ import { LINKED_RESIDUE_NAMESPACE, LINKED_TAIL_BOUNDS } from './_residue_linked_
 
 const here = dirname(fileURLToPath(import.meta.url));
 const LINKED = process.argv[2] === 'linked';
+const COVENANT_RESIDUE = !LINKED && process.env.COVENANT_RESIDUE_LAYOUT === '1';
 const GEN = join(here, 'generated', ...(LINKED ? [LINKED_RESIDUE_NAMESPACE] : []));
 mkdirSync(GEN, { recursive: true });
 const PROBE = join(GEN, '_probe_finalexpres.cash');
@@ -65,7 +66,7 @@ function genWalk(lo, hi) {
   if (first) { L.push('        ' + canon(wN)); L.push(`        ${tN.map((n, i) => `int ${n}=w${i};`).join(' ')}`); }
   else { L.push(`        ${tN.map((n) => `int ${n}=${n}in;`).join(' ')}`); } // rename param tin -> local t
   L.push(walkLoop(lo, hi));
-  L.push(covOut(STATE5));
+  L.push(covOut(STATE5, COVENANT_RESIDUE ? [...fFn, ...cN, ...ciN, ...wN] : []));
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
@@ -82,7 +83,7 @@ function genWalkNonFirst(lo, hi) {
   L.push(covIn([...fFn, ...cN, ...ciN, ...wN, ...names12('tin')]));
   L.push(`        ${tN.map((n, i) => `int ${n}=tin${i};`).join(' ')}`);
   L.push(walkLoop(lo, hi));
-  L.push(covOut(STATE5));
+  L.push(covOut(STATE5, COVENANT_RESIDUE ? [...fFn, ...cN, ...ciN, ...wN] : []));
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
@@ -223,7 +224,7 @@ if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
   }
   for (let i = 1; i < chunks.length; i++) if (chunks[i - 1].outgoing !== chunks[i].incoming) throw new Error('tail continuity break at ' + i);
   writeFileSync(join(GEN, 'manifest_finalexpres.json'), JSON.stringify({
-    residueTail: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', numChunks: chunks.length, nwalk: NWALK,
+    residueTail: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', covenantResidue: COVENANT_RESIDUE, numChunks: chunks.length, nwalk: NWALK,
     chunks: chunks.map((c) => ({ idx: c.idx, role: c.role, lo: c.lo ?? null, hi: c.hi ?? null, final: c.final, fused: c.fused ?? false })),
   }, null, 2));
   console.error(`residue tail: ${chunks.length} chunks`);
