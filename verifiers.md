@@ -118,7 +118,7 @@ the mempool chain limit, which is why the flagship deployment is
 The **`vk_x`-only** checkpoint (the variable-scalar G1 MSM,
 `IC0 + in0·IC1 + in1·IC2`) is factored out and has its own two implementations kept for
 comparison: [`chunked/twoloop/`](chunked/twoloop/) (simple, 16 chunks) and
-[`chunked/shamir/`](chunked/shamir/) (optimized Shamir/Straus, 3 chunks). GLV `vk_x`
+[`chunked/shamir/`](chunked/shamir/) (optimized Shamir/Straus, 2 chunks). GLV `vk_x`
 (`gen_vkx_glv.mjs`) is the further-optimized form used inside the residue builds.
 
 ## The optimisation variants
