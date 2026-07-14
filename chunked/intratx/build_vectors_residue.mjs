@@ -7,10 +7,10 @@
 // RESIDUE chunk graph instead of the plain one:
 //
 //   fast-G2 endo subgroup check (ePrint 2022/348)            3 chunks
-//   GLV vk_x MSM (4-scalar ~128-bit Straus)                  4 chunks   (was 9, plain)
+//   GLV vk_x MSM (4-scalar ~128-bit Straus)                  3 chunks   (was 9, plain)
 //   c^-(6x+2)-FUSED Miller + terminal residue verdict        20 chunks  (was 12 plain final-exp chunks)
 //                                                            ---------
-//                                                            27 inputs  (plain full build: 54)
+//                                                            26 inputs  (plain full build: 54)
 //
 // The chunk MATH is reused VERBATIM from the same generated/*.cash the grouped-residue
 // build consumes (chunked/grouped/build_vectors_residue.mjs) — only the assembly differs:
@@ -30,18 +30,19 @@ import {
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
-import { GLV_TABLE_HEX, glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
+import { GLV_LAMBDA, GLV_R, GLV_TABLE_HEX, glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
 import { transformChunk } from './transform.mjs';
 import { GLV_SAFE_BOUNDS, regenGlvSafe } from '../regen_vkx_windows.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
-// Re-plan the GLV vk_x windows to the hash-free SAFE floor (4 chunks, max-density-validated)
-// before assembling — the covenant-planned manifest_vkxglv (5 chunks) under-fills this
+// Re-plan the GLV vk_x windows to the hash-free SAFE floor (3 chunks, max-density-validated)
+// before assembling — the covenant-planned manifest_vkxglv (4 chunks) under-fills this
 // hash-free deployment. See chunked/regen_vkx_windows.mjs.
 // The final GLV input carries the table after its 228-byte state blob: PUSHDATA1(blob)
 // takes 230 bytes, then the table's PUSHDATA2 header places table data at byte 233.
-const GLV_TABLE_SOURCE = { inputIndex: 6, dataOffset: 233 };
+const GLV_COUNT = GLV_SAFE_BOUNDS.length - 1;
+const GLV_TABLE_SOURCE = { inputIndex: 3 + GLV_COUNT - 1, dataOffset: 233 };
 regenGlvSafe(GEN, GLV_SAFE_BOUNDS, true, GLV_TABLE_SOURCE);
 const PROBE = join(GEN, '_intratx_residue_probe.cash'); // transformed import-chunks compiled from here
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
@@ -59,6 +60,7 @@ const GLV_STATE_WIDTHS = [
 const GLV_GENESIS_WIDTHS = GLV_STATE_WIDTHS.slice(3);
 import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
+const standardVm = createVirtualMachineBch2026(true);
 const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
 
 // Deploy each chunk as P2SH (same lever as build_vectors.mjs): the redeem rides in the
@@ -78,10 +80,10 @@ const padPush = (argLen, target) => {
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
   return encodeDataPush(new Uint8Array(N));
 };
-const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
+const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41));
 
 // ---- multi-input evaluation: build ONE tx from all inputs, evaluate at `index` ----
-function evalInput(inputs, index) {
+function evalInput(inputs, index, vm = realVm) {
   const program = {
     inputIndex: index,
     sourceOutputs: inputs.map((i) => ({ lockingBytecode: i.locking, valueSatoshis: 1000n })),
@@ -92,7 +94,7 @@ function evalInput(inputs, index) {
       locktime: 0,
     },
   };
-  const st = realVm.evaluate(program);
+  const st = vm.evaluate(program);
   const top = st.stack[st.stack.length - 1];
   return { accepted: st.error === undefined && st.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1, operationCost: st.metrics.operationCost, error: st.error ?? null };
 }
@@ -155,7 +157,7 @@ function specsG2check(inst) {
 // (9 limbs). The genesis chunk binds the GLV witnesses to the public inputs (k1+k2*lambda==in).
 function specsVkx(inst, crossToMiller) {
   const [in0, in1] = inst.inputs.map(BigInt);
-  const [k10, k20] = glvDecompose(in0), [k11, k21] = glvDecompose(in1);
+  const [k10, k20, k11, k21] = inst.glvScalars ?? [...glvDecompose(in0), ...glvDecompose(in1)];
   const vkxAff = vkxPoint(inst.inputs).toAffine();
   const st = (X, Y, Z) => [X, Y, Z, in0, in1, k10, k20, k11, k21];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglv.json'), 'utf8'));
@@ -290,9 +292,18 @@ function assemble(specs) {
     const pad = padPush(0, Math.max(2, target - fixed));
     return P2SH ? Uint8Array.from([...argB[i], ...pad, ...rpush[i]]) : Uint8Array.from([...argB[i], ...pad]);
   };
-  // pass 1: full unlocking -> max budget so the real VM accepts and reports true op-cost
+  // Start from the full unlocking budget so both consensus and standard-policy VMs can
+  // run without a density error and report their complete op-cost before padding shrinks.
+  // A forward check may return false until successor unlockings reach their tuned lengths.
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
+  const standardOp1 = specs.map((_, i) => evalInput(inputs, i, standardVm));
+  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+    const failures = [...op1, ...standardOp1]
+      .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
+      .filter((outcome) => outcome.error !== null);
+    throw new Error(`full-budget input errored during padding measurement: ${JSON.stringify(failures)}`);
+  }
 
   // Per-chunk variant selection (RESCHEDULE only; decided once, first assembly): keep the
   // redeem with the smaller TUNED unlocking — see chunked/grouped/build_vectors_residue.mjs.
@@ -311,16 +322,35 @@ function assemble(specs) {
       const probe = inputs.slice();
       probe[i] = { locking: P2SH ? p2shSpk(v.raw) : v.raw, unlocking: rawUnlock };
       const rawOp = evalInput(probe, i);
-      const tR = tunedLen(argB[i].length + tailLen(i), op1[i].operationCost);
-      const tB = rawOp.accepted ? tunedLen(rawFixed, rawOp.operationCost) : Infinity;
+      const rawStandardOp = evalInput(probe, i, standardVm);
+      const tR = tunedLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost));
+      const tB = rawOp.accepted && rawStandardOp.accepted
+        ? tunedLen(rawFixed, Math.max(rawOp.operationCost, rawStandardOp.operationCost))
+        : Infinity;
       chosenCache.set(key, tB < tR ? 'raw' : 'resched');
       if (tB < tR) switched += 1;
     }
     if (switched) return assemble(specs); // reassemble with final choices (cached -> recurses once)
   }
-  // pass 2: shrink the pad so the unlocking just covers its op-cost
-  inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, tunedLen(argB[i].length + tailLen(i), op1[i].operationCost)) }));
-  const op2 = specs.map((_, i) => evalInput(inputs, i));
+  // Re-measure after each shrink: shorter successor unlockings make forward introspection
+  // cheaper, which can safely expose another byte of density headroom in the predecessor.
+  let targets = specs.map((_, i) => tunedLen(
+    argB[i].length + tailLen(i),
+    Math.max(op1[i].operationCost, standardOp1[i].operationCost),
+  ));
+  let op2;
+  while (true) {
+    inputs = specs.map((_, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, targets[i]) }));
+    op2 = specs.map((_, i) => evalInput(inputs, i));
+    const standardOp2 = specs.map((_, i) => evalInput(inputs, i, standardVm));
+    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    const tightened = targets.map((target, i) => Math.min(
+      target,
+      tunedLen(argB[i].length + tailLen(i), Math.max(op2[i].operationCost, standardOp2[i].operationCost)),
+    ));
+    if (tightened.every((target, i) => target === targets[i])) break;
+    targets = tightened;
+  }
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
   const fits = meta.every((m) => m.lockingBytes <= 10000 && m.unlockingBytes <= 10000 && m.operationCost <= OP_BUDGET) && accepted;
@@ -369,6 +399,28 @@ const proof1Specs = buildSpecs(INSTANCES.proof1);
 const worstSpecs = buildSpecs(INSTANCES.worst);
 const full0 = assemble(committedSpecs);
 report('groth16-intratx-residue committed', full0);
+// The benchmark's dense proof is not the GLV density worst case: its four decomposition
+// witnesses have unrelated bit gaps. Exercise the absolute case explicitly (all 128 bits set
+// in all four bounded witnesses) so a window replan cannot silently exceed the input budget.
+const denseScalar = (1n << 128n) - 1n;
+const denseInput = (denseScalar + denseScalar * GLV_LAMBDA) % GLV_R;
+const densitySpecs = committedSpecs.slice();
+densitySpecs.splice(3, GLV_COUNT, ...specsVkx({
+  inputs: [denseInput, denseInput],
+  glvScalars: [denseScalar, denseScalar, denseScalar, denseScalar],
+}, true));
+const denseVkx = vkxPoint([denseInput, denseInput]).toAffine();
+const millerGenesisIndex = 3 + GLV_COUNT;
+const millerGenesis = densitySpecs[millerGenesisIndex];
+const millerIn = millerGenesis.inLimbs.slice();
+millerIn.splice(VKX_LIMB_OFFSET, 2, denseVkx.x, denseVkx.y);
+densitySpecs[millerGenesisIndex] = { ...millerGenesis, inLimbs: millerIn };
+const densityGlv = assemble(densitySpecs).meta.slice(3, 3 + GLV_COUNT);
+if (densityGlv.some((meta) => !meta.accepted || meta.operationCost > OP_BUDGET || meta.unlockingBytes > TARGET_UNLOCK)) {
+  throw new Error('max-density GLV window exceeds the BCH input budget');
+}
+console.error(`  max-density GLV max op: ${Math.max(...densityGlv.map((meta) => meta.operationCost)).toLocaleString()}`);
+if (process.env.DUMP_OPCOSTS) console.error(`  max-density GLV ops: ${densityGlv.map((meta) => meta.operationCost.toLocaleString()).join(', ')}`);
 const full1 = assemble(proof1Specs);
 const fullWc = assemble(worstSpecs);
 report('groth16-intratx-residue proof#1', full1);
@@ -422,7 +474,7 @@ const fullInvalid = [
 console.error(`  invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
 
 writeFileSync(verifierPath('src/bch/groth16-intratx-residue-vectors.json'), JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-intratx (each chunk is an input whose witness carries its incoming state as a raw byte blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 4 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks with e(alpha,beta) precomputed/skipped (ePrint 2024/640). The four GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding four copies. The final Miller chunk also performs the witnessed-residue verdict, reducing the full verifier to 27 inputs vs 54 for the plain intratx build. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. The G2 final chunk binds the proof-derived -A/B and C bytes into the fused-Miller genesis input, while the vk_x final chunk binds the GLV result into that same genesis; every later Miller state is forward-bound. Reuses the same validated chunk math as bch-groth16-grouped-residue.',
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-intratx (each chunk is an input whose witness carries its incoming state as a raw byte blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 3 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks with e(alpha,beta) precomputed/skipped (ePrint 2024/640). The three GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding three copies. The final Miller chunk also performs the witnessed-residue verdict, reducing the full verifier to 26 inputs vs 54 for the plain intratx build. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. The G2 final chunk binds the proof-derived -A/B and C bytes into the fused-Miller genesis input, while the vk_x final chunk binds the GLV result into that same genesis; every later Miller state is forward-bound. Reuses the same validated chunk math as bch-groth16-grouped-residue.',
   method: 'intra-tx-linked-residue', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),

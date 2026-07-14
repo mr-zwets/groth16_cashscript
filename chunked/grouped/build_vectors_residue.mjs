@@ -44,12 +44,13 @@ import { GLV_SAFE_BOUNDS, regenGlvSafe } from '../regen_vkx_windows.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, '..', 'pairing', 'generated');
-// Re-plan the GLV vk_x windows to the hash-free SAFE floor (4 chunks, max-density-validated);
+// Re-plan the GLV vk_x windows to the hash-free SAFE floor (3 chunks, max-density-validated);
 // vk_x within-chunks are never at a group seam, so they run hash-free like intratx. See
 // chunked/regen_vkx_windows.mjs.
 // The final GLV input carries the table after its 228-byte state blob: PUSHDATA1(blob)
 // takes 230 bytes, then the table's PUSHDATA2 header places table data at byte 233.
-const GLV_TABLE_SOURCE = { inputIndex: 6, dataOffset: 233 };
+const GLV_COUNT = GLV_SAFE_BOUNDS.length - 1;
+const GLV_TABLE_SOURCE = { inputIndex: 3 + GLV_COUNT - 1, dataOffset: 233 };
 regenGlvSafe(GEN, GLV_SAFE_BOUNDS, true, GLV_TABLE_SOURCE);
 const PRIME = '21888242871839275222246405745257275088696311157297823662689037894645226208583';
 const P = BigInt(PRIME);
@@ -66,6 +67,7 @@ const GLV_STATE_WIDTHS = [
 const GLV_GENESIS_WIDTHS = GLV_STATE_WIDTHS.slice(3);
 import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
+const standardVm = createVirtualMachineBch2026(true);
 const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
 
 // Deploy each chunk as P2SH (same as intra-tx): the redeem rides in the scriptSig where it
@@ -89,7 +91,7 @@ const padPush = (argLen, target) => {
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
   return encodeDataPush(new Uint8Array(N));
 };
-const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
+const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41));
 
 // OP_RETURN output (keeps the terminal group's tx well-formed; the verdict chunk ignores it)
 const OP_RETURN = Uint8Array.from([0x6a]);
@@ -100,7 +102,7 @@ const OP_RETURN = Uint8Array.from([0x6a]);
 function tokenOf(t) {
   return t ? { amount: 0n, category: CATEGORY, nft: { capability: t.cap, commitment: t.commit } } : undefined;
 }
-function evalGroup(inputs, index, gm) {
+function evalGroup(inputs, index, gm, vm = realVm) {
   const program = {
     inputIndex: index,
     sourceOutputs: inputs.map((inp, n) => ({
@@ -116,7 +118,7 @@ function evalGroup(inputs, index, gm) {
       locktime: 0,
     },
   };
-  const st = realVm.evaluate(program);
+  const st = vm.evaluate(program);
   const top = st.stack[st.stack.length - 1];
   return { accepted: st.error === undefined && st.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1, operationCost: st.metrics.operationCost, error: st.error ?? null, stackLen: st.stack.length, topHex: top ? binToHex(top) : '' };
 }
@@ -374,11 +376,21 @@ function assembleGrouped(specs, groups) {
     if (a !== b) throw new Error(`group ${gi} hand-off mismatch: ${a} != ${b}`);
   }
 
-  // tune each chunk's pad against its measured op-cost (within its own group's tx)
+  // Start from the full unlocking budget so both consensus and standard-policy VMs can
+  // run without a density error and report their complete op-cost before padding shrinks.
+  // A forward check may return false until successor unlockings reach their tuned lengths.
   const allInputs = specs.map((s, i) => ({ locking: lockings[i], unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const perGroupInputs = groups.map(([lo, hi]) => allInputs.slice(lo, hi + 1));
   const op1 = [];
   groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) op1[lo + k] = evalGroup(perGroupInputs[gi], k, gmeta[gi]); });
+  const standardOp1 = [];
+  groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) standardOp1[lo + k] = evalGroup(perGroupInputs[gi], k, gmeta[gi], standardVm); });
+  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+    const failures = [...op1, ...standardOp1]
+      .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
+      .filter((outcome) => outcome.error !== null);
+    throw new Error(`full-budget input errored during padding measurement: ${JSON.stringify(failures)}`);
+  }
 
   // Per-chunk variant selection (RESCHEDULE only; decided once, on the first assembly):
   // keep whichever redeem yields the smaller TUNED unlocking. Op-cost-bound chunks favor
@@ -399,8 +411,11 @@ function assembleGrouped(specs, groups) {
       const rawInputs = perGroupInputs[gi].slice();
       rawInputs[i - lo] = { locking: p2shSpk(v.raw), unlocking: rawUnlock };
       const rawOp = evalGroup(rawInputs, i - lo, gmeta[gi]);
-      const tR = tunedLen(argB[i].length + rpush[i].length, op1[i].operationCost);
-      const tB = rawOp.accepted ? tunedLen(argB[i].length + rawRpush.length, rawOp.operationCost) : Infinity;
+      const rawStandardOp = evalGroup(rawInputs, i - lo, gmeta[gi], standardVm);
+      const tR = tunedLen(argB[i].length + rpush[i].length, Math.max(op1[i].operationCost, standardOp1[i].operationCost));
+      const tB = rawOp.accepted && rawStandardOp.accepted
+        ? tunedLen(argB[i].length + rawRpush.length, Math.max(rawOp.operationCost, rawStandardOp.operationCost))
+        : Infinity;
       const useRaw = tB < tR;
       chosenCache.set(key, useRaw ? 'raw' : 'resched');
       if (useRaw) switched += 1;
@@ -409,11 +424,27 @@ function assembleGrouped(specs, groups) {
     // complete chosenCache (deterministic -> recurses at most once).
     if (switched) return assembleGrouped(specs, groups);
   }
-  // pass 2: shrink each pad to just cover its op-cost
-  for (let i = 0; i < specs.length; i++) allInputs[i].unlocking = mkUnlock(i, tunedLen(argB[i].length + rpush[i].length, op1[i].operationCost));
-  const perGroupInputs2 = groups.map(([lo, hi]) => allInputs.slice(lo, hi + 1));
+  // Re-measure after each shrink: shorter successor unlockings make forward introspection
+  // cheaper, which can safely expose another byte of density headroom in the predecessor.
+  let targets = specs.map((_, i) => tunedLen(
+    argB[i].length + rpush[i].length,
+    Math.max(op1[i].operationCost, standardOp1[i].operationCost),
+  ));
   const op2 = [];
-  groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) op2[lo + k] = evalGroup(perGroupInputs2[gi], k, gmeta[gi]); });
+  while (true) {
+    for (let i = 0; i < specs.length; i++) allInputs[i].unlocking = mkUnlock(i, targets[i]);
+    const perGroupInputs2 = groups.map(([lo, hi]) => allInputs.slice(lo, hi + 1));
+    groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) op2[lo + k] = evalGroup(perGroupInputs2[gi], k, gmeta[gi]); });
+    const standardOp2 = [];
+    groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) standardOp2[lo + k] = evalGroup(perGroupInputs2[gi], k, gmeta[gi], standardVm); });
+    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    const tightened = targets.map((target, i) => Math.min(
+      target,
+      tunedLen(argB[i].length + rpush[i].length, Math.max(op2[i].operationCost, standardOp2[i].operationCost)),
+    ));
+    if (tightened.every((target, i) => target === targets[i])) break;
+    targets = tightened;
+  }
 
   const meta = specs.map((s, i) => ({
     label: s.label, checkpoint: s.checkpoint, group: cfgs[i].group,
@@ -487,8 +518,8 @@ const report = (tag, asm) => {
 };
 
 // ===================== build =====================
-// Exact boundary compilation across all 276 legal three-group partitions selected the
-// balanced 9/9/9 split while preserving standardness for committed, proof #1, and worst-case.
+// Keep the 26-input graph in balanced 9/9/8 groups while preserving standardness for the
+// committed proof, proof #1, and the dense worst-case proof.
 const wcSpecs = buildSpecs(INSTANCES.worst);
 const GROUP_CUTS = [8, 17];
 if (!GROUP_CUTS.every((i) =>
@@ -568,7 +599,7 @@ const invalids = [
 console.error(`  invalid runs rejected: ${invalids.map((r) => r.rejected).join(',')}`);
 
 writeFileSync(verifierPath('src/bch/groth16-grouped-residue-vectors.json'), JSON.stringify({
-  description: 'GROUPED + RESIDUE BN254 Groth16 verifier: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 4 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks (ePrint 2024/640) packed into 3 STANDARD (<100,000 B) transactions. The four GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding four copies. The final Miller chunk also performs the witnessed-residue verdict, eliminating a separate tail input. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The G2 final chunk binds the proof-derived -A/B and C bytes into the Miller genesis input, while the GLV final chunk binds vk_x into that same genesis. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. One fixed set of lockings verifies any proof for the VK.',
+  description: 'GROUPED + RESIDUE BN254 Groth16 verifier: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 3 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks (ePrint 2024/640) packed into 3 STANDARD (<100,000 B) transactions. The three GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding three copies. The final Miller chunk also performs the witnessed-residue verdict, eliminating a separate tail input. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The G2 final chunk binds the proof-derived -A/B and C bytes into the Miller genesis input, while the GLV final chunk binds vk_x into that same genesis. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. One fixed set of lockings verifies any proof for the VK.',
   method: 'grouped-residue', deployment: 'P2SH32', category: binToHex(CATEGORY),
   numInputs: asmCommitted.meta.length, numGroups: GROUPS.length, budgetPerInput: OP_BUDGET,
   groupSizes: GROUPS.map(([lo, hi]) => hi - lo + 1),

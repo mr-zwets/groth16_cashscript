@@ -25,7 +25,7 @@ const PROBE = join(GEN, '_probe_millerres.cash');
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const LINKED_CUTS = process.env.MILLER_LINKED_LAYOUT === '1'
-  ? [18, 35, 53, 71, 89, 107, 125, 143, 161, 179, 197, 215, 233, 250, 267, 285, 302, 320, 338]
+  ? [18, 32, 50, 68, 86, 104, 122, 140, 158, 176, 194, 212, 230, 249, 266, 285, 303, 320, 338]
   : [];
 const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 

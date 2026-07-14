@@ -5,10 +5,12 @@
 // per-stage chunk graph changes).
 //
 // Chunk graph (vs the plain BLS grouped's g2check -> vk_x -> 4-pair Miller -> final exp):
-//   g2check (EIP-197 G2 subgroup, on-curve A/B/C)                   -> 3 chunks   (reused as-is)
-//   GLV vk_x (4-scalar 128-bit Straus, baked table)                -> ~6 chunks
-//   c^-|x|-FUSED prepared-VK batched Miller (e(a,b) baked, cmul1)   -> ~32 chunks
-//   witnessed-residue tail: ((w^|x|)*w)^9 walk + fF*w==frob(c,1)    -> ~6 chunks  (5 walk + finalize)
+//   GLV vk_x (4-scalar 128-bit Straus, baked table)                -> 5 chunks
+//   c^-|x|-FUSED prepared-VK batched Miller (e(a,b) baked, cmul1),
+//     with G2 validation fused into its first/last chunks           -> 30 chunks
+//   witnessed-residue tail: ((w^|x|)*w)^9 walk + fF*w==frob(c,1)   -> 6 chunks
+//                                                                     ---------
+//                                                                     41 inputs
 // The hard-part final exponentiation (Hayashida-Scott, 23 chunks in the plain build) collapses to
 // the residue tail. c,cInv thread through every fused-Miller chunk as constant witness; w enters
 // the tail as an uncommitted witness and is re-derived/checked there (see gen_finalexp_residue).
@@ -24,7 +26,10 @@ import {
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
 import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
-import { glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX, regenGlvShared } from '../bls12-381/gen_vkx_glv.mjs';
+import {
+  glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX,
+  GLV_HIGH_COST_INPUTS, GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
+} from '../bls12-381/gen_vkx_glv.mjs';
 import { residueWalkT } from '../bls12-381/gen_finalexp_residue.mjs';
 import { transformChunk, headerSize } from '../intratx/transform.mjs';
 
@@ -34,16 +39,16 @@ const W = 48; // BLS12-381 limb width
 const PRIME = P.toString();
 import { hexToBin, binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
+const standardVm = createVirtualMachineBch2026(true);
 const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
 
 // SHARED GLV TABLE: the 1,440-byte Straus table rides ONCE in the final GLV input (right after its
-// 9-limb inBlob push); the five sibling GLV inputs read that exact slice via input-bytecode
+// 9-limb inBlob push); the four sibling GLV inputs read that exact slice via input-bytecode
 // introspection and the carrier pins it with hash256. The GLV chunks lead the graph and the packer
 // blocks cuts inside the span, so the carrier's transaction-local index equals its graph index.
-const GLV_MAN = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglv.json'), 'utf8'));
-const GLV_COUNT = GLV_MAN.numChunks;
+const GLV_COUNT = GLV_SHARED_AUDITED_BOUNDS.length - 1;
 const GLV_STATE_BYTES = 9 * W; // rX,rY,rZ,in0,in1,k10,k20,k11,k21
-regenGlvShared(GEN, {
+regenGlvSharedAudited(GEN, {
   inputIndex: GLV_COUNT - 1,
   dataOffset: headerSize(GLV_STATE_BYTES) + GLV_STATE_BYTES + headerSize(GLV_TABLE_BYTES.length),
 });
@@ -60,15 +65,15 @@ const padPush = (argLen, target) => {
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
   return encodeDataPush(new Uint8Array(N));
 };
-const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
+const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41));
 const OP_RETURN = Uint8Array.from([0x6a]);
 
 // ---- per-group evaluation: one token-carrying tx for the group, evaluate input `index` ----
 function tokenOf(t) {
   return t ? { amount: 0n, category: CATEGORY, nft: { capability: t.cap, commitment: t.commit } } : undefined;
 }
-function evalGroup(inputs, index, gm) {
-  const st = realVm.evaluate({
+function evalGroup(inputs, index, gm, vm = realVm) {
+  const st = vm.evaluate({
     inputIndex: index,
     sourceOutputs: inputs.map((inp, n) => ({ lockingBytecode: inp.locking, valueSatoshis: 1000n, token: n === 0 ? tokenOf(gm.inToken) : undefined })),
     transaction: {
@@ -94,7 +99,7 @@ const mkInstance = (inputs) => {
   const A = mod(3n * 5n + vx * 7n + 13n * 11n);
   return { inputs, proof: { a: G1.BASE.multiply(A), b: proof.b, c: proof.c } };
 };
-const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]) };
+const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]), stress: mkInstance(GLV_HIGH_COST_INPUTS) };
 
 // ---- residue chunk-graph layout constants ----
 // fused-Miller state = f(12) + R_B(6) + runtime points(10) + c(12) + cInv(12) = 52 limbs.
@@ -235,7 +240,7 @@ function compileChunk(spec, cfg) {
   }
   return (chosenCache.get(key) === 'raw' && v.raw) ? v.raw : v.resched;
 }
-const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41 + 96) : Infinity);
+const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41) : Infinity);
 function argBytesOf(spec) {
   const parts = [pd(blob(spec.inLimbs))];
   for (const e of [...spec.extras].reverse()) parts.push(e instanceof Uint8Array ? pd(e) : pushInt(BigInt(e)));
@@ -274,6 +279,14 @@ function assembleGrouped(specs, groups) {
   const allInputs = specs.map((s, i) => ({ locking: lockings[i], unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = [];
   groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) op1[lo + k] = evalGroup(ins, k, gmeta[gi]); });
+  const standardOp1 = [];
+  groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) standardOp1[lo + k] = evalGroup(ins, k, gmeta[gi], standardVm); });
+  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+    const failures = [...op1, ...standardOp1]
+      .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
+      .filter((outcome) => outcome.error !== null);
+    throw new Error(`full-budget input errored during padding measurement: ${JSON.stringify(failures)}`);
+  }
 
   if (RESCHED) {
     let switched = 0;
@@ -289,8 +302,9 @@ function assembleGrouped(specs, groups) {
       const rawInputs = allInputs.slice(lo, groups[gi][1] + 1);
       rawInputs[i - lo] = { locking: p2shSpk(v.raw), unlocking: rawUnlock };
       const rawOp = evalGroup(rawInputs, i - lo, gmeta[gi]);
-      const tR = effLen(argB[i].length + rpush[i].length, op1[i].operationCost, op1[i].accepted);
-      const tB = effLen(rawFixed, rawOp.operationCost, rawOp.accepted);
+      const rawStandardOp = evalGroup(rawInputs, i - lo, gmeta[gi], standardVm);
+      const tR = effLen(argB[i].length + rpush[i].length, Math.max(op1[i].operationCost, standardOp1[i].operationCost), op1[i].accepted && standardOp1[i].accepted);
+      const tB = effLen(rawFixed, Math.max(rawOp.operationCost, rawStandardOp.operationCost), rawOp.accepted && rawStandardOp.accepted);
       if (tR === Infinity && tB === Infinity) continue;
       const useRaw = tB < tR;
       chosenCache.set(key, useRaw ? 'raw' : 'resched');
@@ -298,9 +312,30 @@ function assembleGrouped(specs, groups) {
     }
     if (switched) return assembleGrouped(specs, groups);
   }
-  for (let i = 0; i < specs.length; i++) allInputs[i].unlocking = mkUnlock(i, tunedLen(argB[i].length + rpush[i].length, op1[i].operationCost));
   const op2 = [];
-  groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) op2[lo + k] = evalGroup(ins, k, gmeta[gi]); });
+  let standardOp2;
+  let targets = specs.map((_, i) => tunedLen(argB[i].length + rpush[i].length, Math.max(op1[i].operationCost, standardOp1[i].operationCost)));
+  while (true) {
+    for (let i = 0; i < specs.length; i++) allInputs[i].unlocking = mkUnlock(i, targets[i]);
+    standardOp2 = [];
+    groups.forEach(([lo, hi], gi) => {
+      const ins = allInputs.slice(lo, hi + 1);
+      for (let k = 0; k <= hi - lo; k++) {
+        op2[lo + k] = evalGroup(ins, k, gmeta[gi]);
+        standardOp2[lo + k] = evalGroup(ins, k, gmeta[gi], standardVm);
+      }
+    });
+    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    const tightened = targets.map((target, i) => Math.min(target, tunedLen(
+      argB[i].length + rpush[i].length,
+      Math.max(op2[i].operationCost, standardOp2[i].operationCost),
+    )));
+    if (tightened.every((target, i) => target === targets[i])) break;
+    targets = tightened;
+  }
+  if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) {
+    throw new Error('tightened input rejected during padding measurement');
+  }
 
   const meta = specs.map((s, i) => ({
     label: s.label, checkpoint: s.checkpoint, group: cfgs[i].group,
@@ -357,25 +392,28 @@ const TARGET_GROUP_BYTES = 84000;
 console.error('building residue specs (residueWitness per instance ~seconds)...');
 const cSpecs = buildSpecs(INSTANCES.committed);
 const p1Specs = buildSpecs(INSTANCES.proof1);
+const stressSpecs = buildSpecs(INSTANCES.stress);
 function sizeEstimate(specs) {
   const provisional = packGroups(specs, specs.map(() => 9000), TARGET_GROUP_BYTES);
   return assembleGrouped(specs, provisional).meta.map((m) => m.unlockingBytes);
 }
-const cSizes = sizeEstimate(cSpecs), p1Sizes = sizeEstimate(p1Specs);
-const packSizes = cSizes.map((s, i) => Math.max(s, p1Sizes[i]));
+const cSizes = sizeEstimate(cSpecs), p1Sizes = sizeEstimate(p1Specs), stressSizes = sizeEstimate(stressSpecs);
+const packSizes = cSizes.map((s, i) => Math.max(s, p1Sizes[i], stressSizes[i]));
 const GROUPS = packGroups(cSpecs, packSizes, TARGET_GROUP_BYTES);
 
 const asmCommitted = assembleGrouped(cSpecs, GROUPS);
 report('groth16-bls-grouped-residue committed', asmCommitted);
 const asmProof1 = assembleGrouped(p1Specs, GROUPS);
 report('groth16-bls-grouped-residue proof#1', asmProof1);
+const asmStress = assembleGrouped(stressSpecs, GROUPS);
+report('groth16-bls-grouped-residue all-position stress', asmStress);
 
 if (GROUPS[0][0] !== 0 || GROUPS[0][1] < GLV_COUNT - 1) {
   throw new Error(`shared GLV table span [0,${GLV_COUNT - 1}] not contained in group 0: ${JSON.stringify(GROUPS[0])}`);
 }
 
 // shared-table fixture: flip a middle byte of the carried GLV table -> the carrier's hash256
-// pin must reject (the five sibling readers consume that exact slice).
+// pin must reject (the four sibling readers consume that exact slice).
 function pushBounds(unlocking, opcodeOffset = 0) {
   const op = unlocking[opcodeOffset];
   if (op <= 75) return { dataStart: opcodeOffset + 1, dataLen: op };
@@ -401,12 +439,12 @@ console.error('  shared GLV table mutation rejected at carrier');
 const firstBoundary = GROUPS[1] ? GROUPS[1][0] : 1;
 const invalids = [invalidRun(cSpecs, GROUPS, Math.floor(cSpecs.length / 2)), invalidRun(cSpecs, GROUPS, firstBoundary), tableMutation];
 console.error(`  invalid runs rejected: ${invalids.map((r) => r.rejected).join(',')}`);
-if (!asmCommitted.accepted || !asmProof1.accepted || !invalids.every((r) => r.rejected)) {
+if (!asmCommitted.accepted || !asmProof1.accepted || !asmStress.fits || !invalids.every((r) => r.rejected)) {
   console.error('!! a run failed -- NOT writing vectors'); process.exit(1);
 }
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-grouped-residue-vectors.json', JSON.stringify({
-  description: 'GROUPED + RESIDUE BLS12-381 Groth16 verifier: the residue-optimized chunk graph (g2check EIP-197 G2 subgroup validation; GLV 4-scalar vk_x MSM; c^-|x|-FUSED prepared-VK batched Miller with e(alpha,beta) baked and only e(-A,B) running on-chain G2 arithmetic; witnessed-residue final-exp tail collapsing the Hayashida-Scott hard part to a ((w^|x|)*w)^9 mu_(27A) walk + fF*w==frob(c,1) verdict) packed into a handful of STANDARD (<100,000 B) transactions. The six GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding six copies. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The residue witness (c, cInv) threads through every fused-Miller chunk; w enters the tail as an uncommitted witness. One fixed set of lockings verifies any proof for the VK. Deployed P2SH32.',
+  description: 'GROUPED + RESIDUE BLS12-381 Groth16 verifier: the residue-optimized chunk graph (G2 validation fused into the Miller stage; 5-chunk GLV 4-scalar vk_x MSM; c^-|x|-FUSED prepared-VK batched Miller with e(alpha,beta) baked and only e(-A,B) running on-chain G2 arithmetic; witnessed-residue final-exp tail collapsing the Hayashida-Scott hard part to a ((w^|x|)*w)^9 mu_(27A) walk + fF*w==frob(c,1) verdict) packed into five STANDARD (<100,000 B) transactions. The five GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding five copies. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The residue witness (c, cInv) threads through every fused-Miller chunk; w enters the tail as an uncommitted witness. One fixed set of lockings verifies any proof for the VK. Deployed P2SH32.',
   method: 'grouped-residue', deployment: 'P2SH32', curve: 'BLS12-381', category: binToHex(CATEGORY),
   numInputs: asmCommitted.meta.length, numGroups: GROUPS.length, budgetPerInput: OP_BUDGET,
   groupSizes: GROUPS.map(([lo, hi]) => hi - lo + 1),
@@ -417,6 +455,7 @@ writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-grouped-
   allFit: asmCommitted.fits, allAccept: asmCommitted.accepted,
   valid: toRun(asmCommitted),
   extraValidProofs: [toRun(asmProof1)],
+  worstCaseProof: toRun(asmStress),
   invalid: invalids.map((r) => r.run),
 }, null, 2));
 console.error(`wrote groth16-bls12381-grouped-residue-vectors.json (${GROUPS.length} groups, ${asmCommitted.meta.length} inputs)`);

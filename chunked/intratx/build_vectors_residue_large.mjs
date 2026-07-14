@@ -7,17 +7,17 @@
 // e(alpha,beta) skipped / witnessed-residue tail). The ONLY difference is the per-input budget:
 //
 //   the BCH op-cost budget an input gets is (41 + unlockingLen) * 800. The flagship residue
-//   build sizes each chunk to a 10 kB unlocking (=> 8,032,800 op/input, ~33 inputs). Here we
-//   size to a 100 kB unlocking (=> 80,032,800 op/input, ~10x), which collapses the same
-//   ~202M-op verifier into a HANDFUL of fat inputs — one per stage floor:
+//   build sizes each chunk to a 10 kB unlocking (=> 8,032,800 op/input, ~27 inputs). Here we
+//   size to a 100 kB unlocking (=> 88,000,000 op/input, ~11x), which collapses the same
+//   ~178M-op verifier into a HANDFUL of fat inputs — one per stage floor:
 //     fast-G2 subgroup check   1 input
 //     GLV vk_x MSM             1 input    (one 128-iter loop window)
-//     c^-(6x+2)-fused Miller   3 inputs   (~148M op op-bound; the LAST is terminal, see below)
+//     c^-(6x+2)-fused Miller   2 inputs   (~148M op op-bound; the LAST is terminal, see below)
 //     residue final-exp tail   0 inputs   (verdict FUSED into the final Miller chunk)
 //                              --------
-//                              5 inputs   (still ONE non-standard <1 MB tx)
+//                              4 inputs   (still ONE non-standard <1 MB tx)
 //
-// op-cost and total bytes are CONSERVED (~202M / ~260 kB either way) — this is a STRUCTURAL
+// op-cost and total bytes are CONSERVED (~178M / ~188 kB either way) — this is a STRUCTURAL
 // simplification (fewer, fatter UTXOs in one tx), not a resource reduction. Each 100 kB input
 // exceeds standard relay policy, so the tx is mine-direct — but the single-tx intratx bundle is
 // already non-standard, so nothing new is given up. The chunks are regenerated at startup at the
@@ -59,15 +59,14 @@ const PAIR = join(here, '..', 'pairing');
 const GEN = join(PAIR, 'generated');
 
 // Regenerate the variable-length stages at the 100 kB budget. g2check plans to 1 chunk on its own;
-// fused Miller greedy-plans to 3 chunks (op-bound at ~85M each, then a small boundary/handoff chunk
-// the fork compiler forces separate — merging it hits an UnusedVariableError on the dropped R
-// accumulator, so Miller stays 3 for now). The residue tail is a single fixed chunk — not regenerated.
+// fused Miller greedy-plans to 2 chunks (op-bound at ~86M for the first). The residue-tail verdict
+// is folded into the terminal Miller chunk.
 //
-// Lever 2 (7 inputs -> 6): GLV vk_x as ONE loop window [0,128] via regenGlvSafe. The vk_x codegen
+// GLV vk_x uses ONE loop window [0,128] via regenGlvSafe. The vk_x codegen
 // LOOPS (not unrolled), so a single 128-iter window is only ~2.5 kB / ~21M op; the greedy planner
 // split off a 1-iter zinv/assert final chunk only because that cross-bind final chunk measures
 // accepted=false STANDALONE in the covenant model. regenGlvSafe writes the window directly (no
-// planner) and the assembly below validates it against max-density on the real spec VM.
+// planner) and the assembly below validates it against the dense fixture on the real spec VM.
 const GEN_ENV = { ...process.env, BCH_VM: 'spec', TARGET_UNLOCK: String(LARGE_UNLOCK), OP_COST_TARGET: '86000000', BYTE_BUDGET: '95000', STAGE_BOUND_LAYOUT: '1' };
 console.error('\n== regenerating gen_g2check.mjs at 100 kB budget (stage-bound) ==');
 execFileSync(process.execPath, [join(PAIR, 'gen_g2check.mjs')], { env: GEN_ENV, stdio: 'inherit' });
@@ -82,6 +81,7 @@ const P = BigInt(PRIME);
 const W = 40; // BN254 limb width (bytes)
 import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBchSpec } from '@bitauth/libauth';
 const realVm = createVirtualMachineBchSpec(false); // PROPOSED bch-spec VM (100 kB scripts, 88M-op inputs)
+const standardVm = createVirtualMachineBchSpec(true);
 
 // Deploy each chunk as P2SH (same lever as the flagship build): the redeem rides in the scriptSig
 // where it counts toward the op-cost budget ((41 + unlockingLen) * 800); the inBlob stays the
@@ -99,11 +99,11 @@ const padPush = (argLen, target) => {
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget <= 65538 ? budget - 3 : budget - 5;
   return encodeDataPush(new Uint8Array(N));
 };
-// minimal total unlocking length whose spec budget (10000+len)*800 covers opCost, +96 margin.
-const tunedLen = (argLen, opCost) => Math.min(LARGE_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - DENSITY_BASE + 96));
+// minimal total unlocking length whose spec budget (10000+len)*800 covers opCost.
+const tunedLen = (argLen, opCost) => Math.min(LARGE_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - DENSITY_BASE));
 
 // ---- multi-input evaluation: build ONE tx from all inputs, evaluate at `index` ----
-function evalInput(inputs, index) {
+function evalInput(inputs, index, vm = realVm) {
   const program = {
     inputIndex: index,
     sourceOutputs: inputs.map((i) => ({ lockingBytecode: i.locking, valueSatoshis: 1000n })),
@@ -114,7 +114,7 @@ function evalInput(inputs, index) {
       locktime: 0,
     },
   };
-  const st = realVm.evaluate(program);
+  const st = vm.evaluate(program);
   const top = st.stack[st.stack.length - 1];
   return { accepted: st.error === undefined && st.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1, operationCost: st.metrics.operationCost, error: st.error ?? null };
 }
@@ -292,7 +292,7 @@ function argBytesOf(s) {
   for (const e of [...s.extras].reverse()) parts.push(pushInt(e));
   return Uint8Array.from(parts.flatMap((p) => [...p]));
 }
-function assemble(specs) {
+function assemble(specs, expectRejected = false) {
   const redeems = specs.map((_, i) => compileSpec(specs, i));
   const argB = specs.map(argBytesOf);
   const rpush = redeems.map((r) => encodeDataPush(r));
@@ -306,6 +306,7 @@ function assemble(specs) {
   // pass 1: full unlocking -> max budget so the real VM accepts and reports true op-cost
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, LARGE_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
+  const standardOp1 = specs.map((_, i) => evalInput(inputs, i, standardVm));
 
   if (RESCHED) {
     let switched = 0;
@@ -322,16 +323,39 @@ function assemble(specs) {
       const probe = inputs.slice();
       probe[i] = { locking: P2SH ? p2shSpk(v.raw) : v.raw, unlocking: rawUnlock };
       const rawOp = evalInput(probe, i);
-      const tR = tunedLen(argB[i].length + tailLen(i), op1[i].operationCost);
-      const tB = rawOp.accepted ? tunedLen(rawFixed, rawOp.operationCost) : Infinity;
+      const rawStandardOp = evalInput(probe, i, standardVm);
+      const tR = op1[i].accepted && standardOp1[i].accepted
+        ? tunedLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost))
+        : Infinity;
+      const tB = rawOp.accepted && rawStandardOp.accepted
+        ? tunedLen(rawFixed, Math.max(rawOp.operationCost, rawStandardOp.operationCost))
+        : Infinity;
       chosenCache.set(key, tB < tR ? 'raw' : 'resched');
       if (tB < tR) switched += 1;
     }
-    if (switched) return assemble(specs);
+    if (switched) return assemble(specs, expectRejected);
   }
-  // pass 2: shrink the pad so the unlocking just covers its op-cost
-  inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, tunedLen(argB[i].length + tailLen(i), op1[i].operationCost)) }));
-  const op2 = specs.map((_, i) => evalInput(inputs, i));
+  if (!expectRejected && [...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+    throw new Error('chosen full-budget input errored during padding measurement');
+  }
+  let targets = specs.map((_, i) => tunedLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost)));
+  let op2;
+  let standardOp2;
+  while (true) {
+    inputs = specs.map((_, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, targets[i]) }));
+    op2 = specs.map((_, i) => evalInput(inputs, i));
+    standardOp2 = specs.map((_, i) => evalInput(inputs, i, standardVm));
+    if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) break;
+    const tightened = targets.map((target, i) => Math.min(target, tunedLen(
+      argB[i].length + tailLen(i),
+      Math.max(op2[i].operationCost, standardOp2[i].operationCost),
+    )));
+    if (tightened.every((target, i) => target === targets[i])) break;
+    targets = tightened;
+  }
+  if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) {
+    throw new Error('tightened input rejected during padding measurement');
+  }
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
   // spec caps: locking/unlocking each <= 100 kB; op-cost <= the input's own (10000+unlockingLen)*800.
@@ -400,7 +424,7 @@ const hybridSpecs = [
 ];
 const unboundHybrid = assemble(hybridSpecs.map((spec) => ({ ...spec, externalBindings: [] })));
 if (!unboundHybrid.accepted) throw new Error('pre-binding proof0-G2/proof1-remainder hybrid was not accepted');
-const boundHybrid = assemble(hybridSpecs);
+const boundHybrid = assemble(hybridSpecs, true);
 if (boundHybrid.meta[g2FinalIndex].accepted) throw new Error('bound hybrid did not reject at G2 final');
 const unrelatedFailure = boundHybrid.meta.find((meta, i) => i !== g2FinalIndex && !meta.accepted);
 if (unrelatedFailure) throw new Error(`bound hybrid also rejected at ${unrelatedFailure.label}`);
@@ -425,9 +449,12 @@ const fullInvalid = [
   ...bindingMutations,
 ];
 console.error(`  invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
+if (!full0.fits || !full1.fits || !fullWc.fits || !fullInvalid.every((run) => run.rejected)) {
+  throw new Error('valid, worst-case, or invalid fixture failed; refusing to write vectors');
+}
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-residue-large-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; fast-G2 endo subgroup check + GLV vk_x MSM + c^-(6x+2)-FUSED batched Miller with e(alpha,beta) skipped + witnessed-residue final-exp verdict), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the same ~193M-op verifier therefore collapses from 33 inputs to 5: g2check 1, GLV vk_x 1 (one 128-iter loop window), and c^-(6x+2)-fused Miller 3 with the witnessed-residue final-exp verdict (fF*w*c^q2==c^q*c^q3) FOLDED into the last (terminal) Miller chunk — so the separate residue-tail input disappears. Total op-cost and bytes are conserved (a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the fused verdict. All stages are bound to ONE proof tuple: the fused-Miller genesis derives f=cInv and R0=B in-contract and leads with the contiguous -A/B/C points, the G2 chunk byte-binds that same tuple into the Miller genesis input, the GLV vk_x chunk initializes its accumulator in-contract, range-checks its decomposition witnesses, and binds the computed vk_x point into that same genesis. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; fast-G2 endo subgroup check + GLV vk_x MSM + c^-(6x+2)-FUSED batched Miller with e(alpha,beta) skipped + witnessed-residue final-exp verdict), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the same ~178M-op verifier therefore collapses to 4 inputs: g2check 1, GLV vk_x 1 (one 128-iter loop window), and c^-(6x+2)-fused Miller 2 with the witnessed-residue final-exp verdict (fF*w*c^q2==c^q*c^q3) FOLDED into the last (terminal) Miller chunk — so the separate residue-tail input disappears. Total op-cost and bytes are conserved (a structural simplification, fewer/fatter UTXOs, not a resource reduction). Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the fused verdict. All stages are bound to ONE proof tuple: the fused-Miller genesis derives f=cInv and R0=B in-contract and leads with the contiguous -A/B/C points, the G2 chunk byte-binds that same tuple into the Miller genesis input, the GLV vk_x chunk initializes its accumulator in-contract, range-checks its decomposition witnesses, and binds the computed vk_x point into that same genesis. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
   method: 'intra-tx-linked-residue-large', deployment: 'P2SH32', numInputs: full0.inputs.length, budgetPerInput: LARGE_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),

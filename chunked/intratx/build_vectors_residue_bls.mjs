@@ -8,12 +8,12 @@
 // no NFT commitment, no hashing, arbitrary intermediate size), but it consumes the RESIDUE chunk
 // graph instead of the plain one:
 //
-//   GLV vk_x MSM (4-scalar ~128-bit Straus, baked table)              6 chunks
+//   GLV vk_x MSM (4-scalar ~128-bit Straus, baked table)              5 chunks
 //   c^-|x|-FUSED batched Miller, e(alpha,beta) baked (cmul1); the G2   30 chunks
 //     on-curve + subgroup check is FUSED in (first/last chunks reuse R_B=[|x|]B)
 //   witnessed-residue final-exp TAIL: mu_27A ((w^|x|)*w)^9 walk        6 chunks (5 walk + finalize)
 //                                                                     ---------
-//                                                                     42 inputs
+//                                                                     41 inputs
 //
 // The chunk MATH is reused VERBATIM from the same generated/*.cash the grouped-residue BLS build
 // consumes — only the assembly differs (one non-standard <1 MB tx vs token-threaded standard txs).
@@ -31,7 +31,10 @@ import {
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
 import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
-import { glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX, regenGlvShared } from '../bls12-381/gen_vkx_glv.mjs';
+import {
+  glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX,
+  GLV_HIGH_COST_INPUTS, GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
+} from '../bls12-381/gen_vkx_glv.mjs';
 import { residueWalkT } from '../bls12-381/gen_finalexp_residue.mjs';
 import { transformChunk, headerSize } from './transform.mjs';
 
@@ -42,16 +45,17 @@ const W = 48; // BLS12-381 limb width (bytes)
 const PRIME = P.toString();
 import { hexToBin, binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
+const standardVm = createVirtualMachineBch2026(true);
 const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
 
 // SHARED GLV TABLE: the 1,440-byte Straus table rides ONCE in the final GLV input (right after its
-// 9-limb inBlob push); the five sibling GLV inputs read that exact slice via input-bytecode
-// introspection and the carrier pins it with hash256. Regenerate the six windows in shared mode.
+// 9-limb inBlob push); the four sibling GLV inputs read that exact slice via input-bytecode
+// introspection and the carrier pins it with hash256.
 {
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglv.json'), 'utf8'));
+  const glvCount = GLV_SHARED_AUDITED_BOUNDS.length - 1;
   const GLV_STATE_BYTES = 9 * W; // rX,rY,rZ,in0,in1,k10,k20,k11,k21
-  regenGlvShared(GEN, {
-    inputIndex: man.numChunks - 1,
+  regenGlvSharedAudited(GEN, {
+    inputIndex: glvCount - 1,
     dataOffset: headerSize(GLV_STATE_BYTES) + GLV_STATE_BYTES + headerSize(GLV_TABLE_BYTES.length),
   });
 }
@@ -69,11 +73,11 @@ const padPush = (argLen, target) => {
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
   return encodeDataPush(new Uint8Array(N));
 };
-const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
+const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41));
 
 // ---- multi-input evaluation: build ONE tx from all inputs, evaluate at `index` ----
-function evalInput(inputs, index) {
-  const st = realVm.evaluate({
+function evalInput(inputs, index, vm = realVm) {
+  const st = vm.evaluate({
     inputIndex: index,
     sourceOutputs: inputs.map((i) => ({ lockingBytecode: i.locking, valueSatoshis: 1000n })),
     transaction: { version: 2, inputs: inputs.map((i, n) => ({ outpointTransactionHash: new Uint8Array(32), outpointIndex: n, sequenceNumber: 0, unlockingBytecode: i.unlocking })), outputs: [{ lockingBytecode: Uint8Array.from([0x6a]), valueSatoshis: 1000n }], locktime: 0 },
@@ -92,7 +96,7 @@ const mkInstance = (inputs) => {
   const A = mod(3n * 5n + vx * 7n + 13n * 11n);
   return { inputs, proof: { a: G1.BASE.multiply(A), b: proof.b, c: proof.c } };
 };
-const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]) };
+const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]), stress: mkInstance(GLV_HIGH_COST_INPUTS) };
 
 // ---- residue chunk-graph layout constants (identical to grouped/build_vectors_residue_bls.mjs) ----
 // fused-Miller state = f(12) + R_B(6) + runtime points(10) + c(12) + cInv(12) = 52 limbs.
@@ -207,7 +211,7 @@ function compileSpec(s) {
 // effective unlocking length a chunk needs, UNCAPPED (BLS redeems run close to the 10,000 B script
 // caps, so an over-cap fixed part must lose the comparison rather than saturate); Infinity when the
 // variant does not even accept.
-const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41 + 96) : Infinity);
+const effLen = (fixed, op, ok) => (ok ? Math.max(fixed + 3, Math.ceil(op / 800) - 41) : Infinity);
 function argBytesOf(s) {
   // inBlob is the LAST declared param (pushed FIRST -> front of the unlocking, where siblings'
   // forward-checks read it); extras come before inBlob in the decl, pushed AFTER it in reverse.
@@ -224,6 +228,13 @@ function assemble(specs) {
   const mkUnlock = (i, target) => { const pad = padPush(0, Math.max(2, target - (argB[i].length + tailLen(i)))); return P2SH ? Uint8Array.from([...argB[i], ...pad, ...rpush[i]]) : Uint8Array.from([...argB[i], ...pad]); };
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
+  const standardOp1 = specs.map((_, i) => evalInput(inputs, i, standardVm));
+  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+    const failures = [...op1, ...standardOp1]
+      .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
+      .filter((outcome) => outcome.error !== null);
+    throw new Error(`full-budget input errored during padding measurement: ${JSON.stringify(failures)}`);
+  }
 
   // Per-chunk variant selection (RESCHEDULE only; decided once, first assembly): keep whichever
   // redeem needs the smaller effective unlocking (uncapped effLen; Infinity on non-accept).
@@ -242,8 +253,9 @@ function assemble(specs) {
       const probe = inputs.slice();
       probe[i] = { locking: P2SH ? p2shSpk(v.raw) : v.raw, unlocking: rawUnlock };
       const rawOp = evalInput(probe, i);
-      const tR = effLen(argB[i].length + tailLen(i), op1[i].operationCost, op1[i].accepted);
-      const tB = effLen(rawFixed, rawOp.operationCost, rawOp.accepted);
+      const rawStandardOp = evalInput(probe, i, standardVm);
+      const tR = effLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost), op1[i].accepted && standardOp1[i].accepted);
+      const tB = effLen(rawFixed, Math.max(rawOp.operationCost, rawStandardOp.operationCost), rawOp.accepted && rawStandardOp.accepted);
       // both variants failing usually means a NEIGHBOUR is oversized (the forward-check pushes the
       // successor's whole unlocking) — defer this chunk's decision to the reassembly.
       if (tR === Infinity && tB === Infinity) continue;
@@ -253,8 +265,24 @@ function assemble(specs) {
     }
     if (switched) return assemble(specs); // reassemble with final choices (cached -> recurses once)
   }
-  inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, tunedLen(argB[i].length + tailLen(i), op1[i].operationCost)) }));
-  const op2 = specs.map((_, i) => evalInput(inputs, i));
+  let targets = specs.map((_, i) => tunedLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost)));
+  let op2;
+  let standardOp2;
+  while (true) {
+    inputs = specs.map((_, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, targets[i]) }));
+    op2 = specs.map((_, i) => evalInput(inputs, i));
+    standardOp2 = specs.map((_, i) => evalInput(inputs, i, standardVm));
+    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    const tightened = targets.map((target, i) => Math.min(target, tunedLen(
+      argB[i].length + tailLen(i),
+      Math.max(op2[i].operationCost, standardOp2[i].operationCost),
+    )));
+    if (tightened.every((target, i) => target === targets[i])) break;
+    targets = tightened;
+  }
+  if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) {
+    throw new Error('tightened input rejected during padding measurement');
+  }
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
   const fits = meta.every((m) => m.lockingBytes <= 10000 && m.unlockingBytes <= 10000 && m.operationCost <= OP_BUDGET) && accepted;
@@ -284,8 +312,10 @@ const full0 = buildFull(INSTANCES.committed);
 report('groth16-bls12381-intratx-residue committed', full0);
 const full1 = buildFull(INSTANCES.proof1);
 report('groth16-bls12381-intratx-residue proof#1', full1);
+const fullStress = buildFull(INSTANCES.stress);
+report('groth16-bls12381-intratx-residue all-position stress', fullStress);
 // shared-table fixture: flip a middle byte of the carried GLV table -> the carrier's hash256
-// pin must reject (the five sibling readers consume that exact slice).
+// pin must reject (the four sibling readers consume that exact slice).
 function pushBounds(unlocking, opcodeOffset = 0) {
   const op = unlocking[opcodeOffset];
   if (op <= 75) return { dataStart: opcodeOffset + 1, dataLen: op };
@@ -308,16 +338,16 @@ console.error('  shared GLV table mutation rejected at carrier');
 
 const fInv = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.length / 2)), tableMutation];
 console.error(`  invalid runs rejected: ${fInv.map((r) => r.rejected).join(',')}`);
-if (!full0.accepted || !full1.accepted || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
+if (!full0.accepted || !full1.accepted || !fullStress.fits || !fInv.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-intratx-residue-vectors.json', JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-bls12381-intratx (each chunk is an input whose witness carries its incoming state as a raw 48-byte-limb blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: GLV vk_x MSM (6 chunks; the six inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding six copies), c^-|x|-FUSED batched Miller with e(alpha,beta) baked and only e(-A,B) running on-chain G2 arithmetic (30 chunks; the G2 on-curve + prime-order-subgroup validation is FUSED into the first/last Miller chunks, reusing the running R_B=[|x|]B the loop already walks), and a witnessed-residue final-exp TAIL collapsing the Hayashida-Scott hard part to a mu_27A ((w^|x|)*w)^9 walk + fF*w==frob(c,1) verdict (6 chunks). The residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail; w enters the tail as an uncommitted witness. Cross-stage soundness links are bound where layouts allow: vk_x final binds the vk_x point into the fused-Miller genesis input, and the fused-Miller boundary [fF,c,cInv] is bound into the residue tail. Reuses the same validated chunk math as bch-groth16-bls12381-grouped-residue. Deployed P2SH32.',
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-bls12381-intratx (each chunk is an input whose witness carries its incoming state as a raw 48-byte-limb blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: GLV vk_x MSM (5 chunks; the five inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding five copies), c^-|x|-FUSED batched Miller with e(alpha,beta) baked and only e(-A,B) running on-chain G2 arithmetic (30 chunks; the G2 on-curve + prime-order-subgroup validation is FUSED into the first/last Miller chunks, reusing the running R_B=[|x|]B the loop already walks), and a witnessed-residue final-exp TAIL collapsing the Hayashida-Scott hard part to a mu_27A ((w^|x|)*w)^9 walk + fF*w==frob(c,1) verdict (6 chunks). The residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail; w enters the tail as an uncommitted witness. Cross-stage soundness links are bound where layouts allow: vk_x final binds the vk_x point into the fused-Miller genesis input, and the fused-Miller boundary [fF,c,cInv] is bound into the residue tail. Reuses the same validated chunk math as bch-groth16-bls12381-grouped-residue. Deployed P2SH32.',
   method: 'intra-tx-linked-residue', deployment: 'P2SH32', curve: 'BLS12-381', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
   maxStepOperationCost: Math.max(...full0.meta.map((m) => m.operationCost)),
   allFit: full0.fits, allAccept: full0.accepted,
-  steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)],
+  steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullStress),
   invalid: fInv.map((r) => r.steps),
 }, null, 2));
 console.error('wrote groth16-bls12381-intratx-residue-vectors.json');

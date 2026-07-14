@@ -105,7 +105,7 @@ function jacDoubleG1(int x, int y, int z) returns (int, int, int) {
     int nz = mulFp(2, mulFp(y, z));
     return nx, ny, nz;
 }
-function jacAddG1(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
+function jacAddFullG1(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
     int rx = bX; int ry = bY; int rz = bZ;
     if (aZ != 0) {
         int z1z1 = mSqr(aZ); int z2z2 = mSqr(bZ);
@@ -125,6 +125,25 @@ function jacAddG1(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, 
             int anx = mSub(mSub(mSqr(rr), jj), mulFp(2, vv));
             int any = mSub(mulFp(rr, mSub(vv, anx)), mulFp(2, mulFp(s1, jj)));
             int anz = mulFp(mSub(mSub(mSqr(mAdd(aZ, bZ)), z1z1), z2z2), h);
+            rx = anx; ry = any; rz = anz;
+        }
+    }
+    return rx, ry, rz;
+}
+function jacAddG1(int aX, int aY, int aZ, int bX, int bY) returns (int, int, int) {
+    int rx = bX; int ry = bY; int rz = 1;
+    if (aZ != 0) {
+        int z1z1 = mSqr(aZ);
+        int u2 = mulFp(bX, z1z1);
+        int s2 = mulFp(mulFp(bY, aZ), z1z1);
+        if (aX == u2 && aY == s2) {
+            (rx, ry, rz) = jacDoubleG1(aX, aY, aZ);
+        } else {
+            int h = mSub(u2, aX); int i2 = mSqr(mulFp(2, h)); int jj = mulFp(h, i2);
+            int rr = mulFp(2, mSub(s2, aY)); int vv = mulFp(aX, i2);
+            int anx = mSub(mSub(mSqr(rr), jj), mulFp(2, vv));
+            int any = mSub(mulFp(rr, mSub(vv, anx)), mulFp(2, mulFp(aY, jj)));
+            int anz = mulFp(mSub(mSub(mSqr(mAdd(aZ, 1)), z1z1), 1), h);
             rx = anx; ry = any; rz = anz;
         }
     }

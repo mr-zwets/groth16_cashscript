@@ -14,7 +14,7 @@
 // select over the VK-derived constants {IC1, IC2, T=IC1+IC2}. The .cash contracts bake
 // only VK-derived constants (IC0, IC1, IC2, T and the expected vk_x), never the inputs.
 //
-// The EC ops jacDouble/jacAdd/selectPoint + addFp/subFp/mulFp/sqrFp live ONCE in a shared
+// The EC ops jacDouble/jacAddAffine/selectPoint + addFp/subFp/mulFp/sqrFp live ONCE in a shared
 // lib/ tower (Fp -> G1 -> Vk, see emitLibs()); each chunk just `import "./lib/Vk.cash";`.
 // Import resolution merges deps-first (Fp, then G1, then Vk) + tree-shaking -> each chunk
 // is OP-COST-bound (not size-bound) so it packs many iterations.
@@ -139,18 +139,15 @@ const jacDoubleFn = () => `function jacDouble(int x, int y, int z) returns (int,
     return nx, ny, nz;
 }`;
 
-const jacAddFn = () => `function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
+const jacAddAffineFn = () => `function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int, int) {
     int rx = bX;
     int ry = bY;
-    int rz = bZ;
+    int rz = 1;
     if (aZ != 0) {
         int z1z1 = sqrFp(aZ);
-        int z2z2 = sqrFp(bZ);
-        int u1 = mulFp(aX, z2z2);
         int u2 = mulFp(bX, z1z1);
-        int s1 = mulFp(mulFp(aY, bZ), z2z2);
         int s2 = mulFp(mulFp(bY, aZ), z1z1);
-        if (u1 == u2 && s1 == s2) {
+        if (aX == u2 && aY == s2) {
             int da = sqrFp(aX);
             int db = sqrFp(aY);
             int dc = sqrFp(db);
@@ -162,14 +159,14 @@ const jacAddFn = () => `function jacAdd(int aX, int aY, int aZ, int bX, int bY, 
             int dnz = mulFp(2, mulFp(aY, aZ));
             rx = dnx; ry = dny; rz = dnz;
         } else {
-            int h = subFp(u2, u1);
+            int h = subFp(u2, aX);
             int i2 = sqrFp(mulFp(2, h));
             int jj = mulFp(h, i2);
-            int rr = mulFp(2, subFp(s2, s1));
-            int vv = mulFp(u1, i2);
+            int rr = mulFp(2, subFp(s2, aY));
+            int vv = mulFp(aX, i2);
             int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
-            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
-            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
+            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(aY, jj)));
+            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, 1)), z1z1), 1), h);
             rx = anx; ry = any; rz = anz;
         }
     }
@@ -209,7 +206,7 @@ function emitLibs() {
     'import "./Fp.cash";',
     '',
     jacDoubleFn(),
-    jacAddFn(),
+    jacAddAffineFn(),
     '',
   ].join('\n');
   const vk = [
@@ -253,7 +250,7 @@ function loopLines(lo, hi) {
             int b1 = (input1 >> i) % 2;
             (int aX, int aY, int doAdd) = selectPoint(b0, b1);
             if (doAdd == 1) {
-                (rX, rY, rZ) = jacAdd(rX, rY, rZ, aX, aY, 1);
+                (rX, rY, rZ) = jacAddAffine(rX, rY, rZ, aX, aY);
             }
         }`;
 }
@@ -278,7 +275,7 @@ function genCash(idx, ch) {
   lines.push(loopLines(ch.lo, ch.hi));
   if (ch.final) {
     lines.push('        // fold IC0 (constant term) -- unconditional add of hardcoded VK const');
-    lines.push(`        (rX, rY, rZ) = jacAdd(rX, rY, rZ, ${ic0[0]}, ${ic0[1]}, 1);`);
+    lines.push(`        (rX, rY, rZ) = jacAddAffine(rX, rY, rZ, ${ic0[0]}, ${ic0[1]});`);
     lines.push('        // verified inverse-on-stack: zInv supplied, require rZ*zInv == 1');
     lines.push('        require(mulFp(rZ, zInv) == 1);');
     lines.push('        int zInv2 = sqrFp(zInv);');

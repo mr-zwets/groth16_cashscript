@@ -5,11 +5,11 @@
 // into NON-NEGATIVE k1 + k2*lambda (mod r) with k1,k2 < 2^128, turning the 2-scalar 255-bit MSM
 // into a 4-scalar 128-bit Straus over the FIXED points {IC1, phi(IC1), IC2, phi(IC2)}
 // (phi(x,y)=(beta*x,y)). A baked 16-entry subset-sum table folds all 4 scalars into ONE add per
-// iteration -> ~half the doublings (vkx 12 -> ~6 chunks). Witnesses k10,k20,k11,k21 are gated at
+// iteration -> ~half the doublings (vkx 12 -> 5 shared-table chunks). Witnesses k10,k20,k11,k21 are gated at
 // genesis (k < 2^128, k1 + k2*lambda == in mod r); phi(IC*) and the table are baked.
 // State (committed, 9 limbs): rX,rY,rZ, in0,in1, k10,k20,k11,k21.
 //   node gen_vkx_glv.mjs    plan + emit vkxglv_NN.cash + manifest_vkxglv.json
-import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createHash } from 'node:crypto';
@@ -31,6 +31,16 @@ export const GLV_BETA = 79347939072921551262137970163342144706088674028106049301
 export const GLV_LAMBDA = r - ((X * X) % r); // -x^2 mod r
 export const GLV_R = r;
 export { ITERS as VKXGLV_ITERS };
+// Deterministic all-position stress pair reproduced by find_glv_all_positions.mjs. Its four
+// GLV sub-scalars execute an add at every Straus position. It produced the largest total op-cost
+// among 32 full valid verifier proofs and a heavier maximum step than the previous fixture. A
+// separate 256-pair audit of the exact shared-table lockings observed at most 7,646,311 of the
+// 8,032,800 input budget. These are empirical stress results, not a formal global maximum.
+export const GLV_HIGH_COST_INPUTS = [
+  40792793307691160132937706698213704133054528069427933762012433436987942497952n,
+  20976222017425405296340351928930328963278634447870202382235661951061637561134n,
+];
+export const GLV_SHARED_AUDITED_BOUNDS = [0, 25, 51, 77, 103, 128];
 
 const modP = (v) => ((v % P) + P) % P;
 const phiPt = (Pt) => { const a = Pt.toAffine(); return G1.fromAffine({ x: (a.x * GLV_BETA) % P, y: a.y }); };
@@ -105,13 +115,13 @@ function jacDouble(int x, int y, int z) returns (int, int, int) {
     int nz = mulFp(2, mulFp(y, z));
     return nx, ny, nz;
 }
-function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
-    int rx = bX; int ry = bY; int rz = bZ;
+function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int, int) {
+    int rx = bX; int ry = bY; int rz = 1;
     if (aZ != 0) {
-        int z1z1 = sqrFp(aZ); int z2z2 = sqrFp(bZ);
-        int u1 = mulFp(aX, z2z2); int u2 = mulFp(bX, z1z1);
-        int s1 = mulFp(mulFp(aY, bZ), z2z2); int s2 = mulFp(mulFp(bY, aZ), z1z1);
-        if (u1 == u2 && s1 == s2) {
+        int z1z1 = sqrFp(aZ);
+        int u2 = mulFp(bX, z1z1);
+        int s2 = mulFp(mulFp(bY, aZ), z1z1);
+        if (aX == u2 && aY == s2) {
             int da = sqrFp(aX); int db = sqrFp(aY); int dc = sqrFp(db);
             int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
             int de = mulFp(3, da); int df = sqrFp(de);
@@ -120,11 +130,11 @@ function jacAdd(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, in
             int dnz = mulFp(2, mulFp(aY, aZ));
             rx = dnx; ry = dny; rz = dnz;
         } else {
-            int h = subFp(u2, u1); int i2 = sqrFp(mulFp(2, h)); int jj = mulFp(h, i2);
-            int rr = mulFp(2, subFp(s2, s1)); int vv = mulFp(u1, i2);
+            int h = subFp(u2, aX); int i2 = sqrFp(mulFp(2, h)); int jj = mulFp(h, i2);
+            int rr = mulFp(2, subFp(s2, aY)); int vv = mulFp(aX, i2);
             int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
-            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(s1, jj)));
-            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, bZ)), z1z1), z2z2), h);
+            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(aY, jj)));
+            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, 1)), z1z1), 1), h);
             rx = anx; ry = any; rz = anz;
         }
     }
@@ -175,10 +185,10 @@ export function genCash(lo, hi, first, final, sharedTable = null) {
   L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
   L.push('            int idx = (k10 >> i) % 2 + 2 * ((k20 >> i) % 2) + 4 * ((k11 >> i) % 2) + 8 * ((k21 >> i) % 2);');
   L.push(`            (int aX, int aY, int doAdd) = select16(idx${sharedTable !== null ? ', glvTable' : ''});`);
-  L.push('            if (doAdd == 1) { (int ax, int ay, int az) = jacAdd(rX, rY, rZ, aX, aY, 1); rX = ax; rY = ay; rZ = az; }');
+  L.push('            if (doAdd == 1) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
   L.push('        }');
   if (final) {
-    L.push(`        (int icx, int icy, int icz) = jacAdd(rX, rY, rZ, ${modP(IC0[0])}, ${modP(IC0[1])}, 1);`);
+    L.push(`        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, ${modP(IC0[0])}, ${modP(IC0[1])});`);
     L.push('        rX = icx; rY = icy; rZ = icz;');
     L.push('        require(mulFp(rZ, zInv) == 1);');
     L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
@@ -193,22 +203,29 @@ export function genCash(lo, hi, first, final, sharedTable = null) {
   return (L.join('\n') + '\n');
 }
 
-/** Re-emit the GLV chunks from the existing manifest windows in SHARED-TABLE mode (the 960*1.5-byte
- * Straus table is carried once by the final GLV input and read by siblings via input-bytecode
- * introspection; the carrier pins it with hash256). Window bounds are unchanged (sharing the table
- * barely moves op-cost), so no replanning; the manifest gains sharedTable for builder guards. */
-export function regenGlvShared(GEN_DIR, sharedTable) {
-  const man = JSON.parse(readFileSync(join(GEN_DIR, 'manifest_vkxglv.json'), 'utf8'));
-  for (const ch of man.chunks) {
+/** Emit the empirically audited five-window plan for hash-free, shared-table deployment. */
+export function regenGlvSharedAudited(GEN_DIR, sharedTable) {
+  const chunks = GLV_SHARED_AUDITED_BOUNDS.slice(0, -1).map((lo, idx) => ({
+    idx,
+    lo,
+    hi: GLV_SHARED_AUDITED_BOUNDS[idx + 1],
+    first: idx === 0,
+    final: idx === GLV_SHARED_AUDITED_BOUNDS.length - 2,
+  }));
+  for (const ch of chunks) {
     writeFileSync(join(GEN_DIR, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), genCash(ch.lo, ch.hi, ch.first, ch.final, sharedTable));
   }
-  writeFileSync(join(GEN_DIR, 'manifest_vkxglv.json'), JSON.stringify({ ...man, sharedTable: sharedTable !== null }, null, 2));
-  return man.chunks.length;
+  writeFileSync(join(GEN_DIR, 'manifest_vkxglv.json'), JSON.stringify({
+    curve: 'BLS12-381', numChunks: chunks.length, iters: ITERS, glv: true, chunks,
+    sharedTable: sharedTable !== null,
+  }, null, 2));
+  return chunks.length;
 }
 
-// ---- plan + emit (worst-case planning scalars: dense ~127-bit) ----
+// ---- plan + emit (valid inputs with add coverage at all 128 loop positions) ----
 if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
-  const [wk10, wk20] = glvDecompose(r - 1n), [wk11, wk21] = glvDecompose((1n << 253n) - 1n);
+  const [wk10, wk20] = glvDecompose(GLV_HIGH_COST_INPUTS[0]), [wk11, wk21] = glvDecompose(GLV_HIGH_COST_INPUTS[1]);
+  if ((wk10 | wk20 | wk11 | wk21) !== (1n << 128n) - 1n) throw new Error('GLV all-positions vector does not cover every loop position');
   const win0 = ((wk10 + wk20 * GLV_LAMBDA) % r + r) % r, win1 = ((wk11 + wk21 * GLV_LAMBDA) % r + r) % r;
   const SER_state = (Xj, Yj, Zj) => [Xj, Yj, Zj, win0, win1, wk10, wk20, wk11, wk21];
   console.error(`planning BLS12-381 GLV vk_x chunks (${ITERS}-bit 4-scalar Straus)  OP_TARGET=${OP_TARGET.toLocaleString()}`);

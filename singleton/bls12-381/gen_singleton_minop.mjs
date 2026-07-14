@@ -133,10 +133,10 @@ function emitGlvVkxLazy() {
   L.push('            if (idx != 0) {');
   L.push('                bytes ent = glvTable.split((idx - 1) * 96)[1].split(96)[0];');
   L.push('                int aX = int(ent.split(48)[0]); int aY = int(ent.split(48)[1]);');
-  L.push('                (int gax, int gay, int gaz) = jacAddG1(gX, gY, gZ, aX, aY, 1); gX = gax; gY = gay; gZ = gaz;');
+  L.push('                (int gax, int gay, int gaz) = jacAddG1(gX, gY, gZ, aX, aY); gX = gax; gY = gay; gZ = gaz;');
   L.push('            }');
   L.push('        }');
-  L.push(`        (int icx, int icy, int icz) = jacAddG1(gX, gY, gZ, ${ic0[0]}, ${ic0[1]}, 1);`);
+  L.push(`        (int icx, int icy, int icz) = jacAddG1(gX, gY, gZ, ${ic0[0]}, ${ic0[1]});`);
   L.push('        require(mulFp(icz, vkxZinv) == 1);');
   L.push('        int vz2 = mSqr(vkxZinv); int vz3 = mulFp(vz2, vkxZinv);');
   L.push('        int vkxX = mulFp(icx, vz2);');

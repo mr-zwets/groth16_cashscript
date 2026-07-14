@@ -37,6 +37,7 @@ const P = BigInt(PRIME);
 const W = 40; // BN254 limb width (bytes)
 import { hexToBin, binToHex, vmNumberToBigInt, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
+const standardVm = createVirtualMachineBch2026(true);
 
 // Deploy each chunk as P2SH: the ~4-5 KB redeem script (the field-tower prologue +
 // chunk body) lives in the scriptSig, where it COUNTS toward the op-cost budget
@@ -56,17 +57,16 @@ const blob = (limbs) => Uint8Array.from(limbs.flatMap((l) => [...le40(((BigInt(l
 // trailing all-zero pad that buys op-cost budget (libauth-minimal push; the consensus VM
 // rejects a non-minimal push, so a light chunk needing <256 pad bytes must not use
 // PUSHDATA2). The pad sits at the END of the unlocking, so its size never shifts the front
-// inBlob a sibling's forward-check reads; any 1-byte rounding at a push-size boundary is
-// absorbed by the +96 op-cost margin in tunedLen.
+// inBlob a sibling's forward-check reads.
 const padPush = (argLen, target) => {
   const budget = Math.max(2, target - argLen);
   const N = budget <= 76 ? budget - 1 : budget <= 257 ? budget - 2 : budget - 3;
   return encodeDataPush(new Uint8Array(N));
 };
-const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
+const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41));
 
 // ---- multi-input evaluation: build ONE tx from all inputs, evaluate at `index` ----
-function evalInput(inputs, index) {
+function evalInput(inputs, index, vm = realVm) {
   const program = {
     inputIndex: index,
     sourceOutputs: inputs.map((i) => ({ lockingBytecode: i.locking, valueSatoshis: 1000n })),
@@ -77,7 +77,7 @@ function evalInput(inputs, index) {
       locktime: 0,
     },
   };
-  const st = realVm.evaluate(program);
+  const st = vm.evaluate(program);
   const top = st.stack[st.stack.length - 1];
   return { accepted: st.error === undefined && st.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1, operationCost: st.metrics.operationCost, error: st.error ?? null };
 }
@@ -252,7 +252,7 @@ function argBytesOf(s) {
 //   redeem does not count toward the budget, so the pad must buy the whole budget.
 // Both: the front of the unlocking is [inBlob, extras...], identical, so the
 // forward-check offsets are the same in either model.
-function assemble(specs) {
+function assemble(specs, expectRejected = false) {
   const redeems = specs.map((_, i) => compileSpec(specs, i)); // [OP_DROP, contract]
   const argB = specs.map(argBytesOf);     // [inBlob, extras...]
   const rpush = redeems.map((r) => encodeDataPush(r));
@@ -267,6 +267,7 @@ function assemble(specs) {
   // pass 1: full unlocking -> max budget so the real VM accepts and reports true op-cost
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
+  const standardOp1 = specs.map((_, i) => evalInput(inputs, i, standardVm));
 
   // Per-chunk variant selection (RESCHEDULE only; decided once, first assembly): keep the
   // redeem with the smaller TUNED unlocking — see build_vectors_residue.mjs.
@@ -285,16 +286,39 @@ function assemble(specs) {
       const probe = inputs.slice();
       probe[i] = { locking: P2SH ? p2shSpk(v.raw) : v.raw, unlocking: rawUnlock };
       const rawOp = evalInput(probe, i);
-      const tR = tunedLen(argB[i].length + tailLen(i), op1[i].operationCost);
-      const tB = rawOp.accepted ? tunedLen(rawFixed, rawOp.operationCost) : Infinity;
+      const rawStandardOp = evalInput(probe, i, standardVm);
+      const tR = op1[i].accepted && standardOp1[i].accepted
+        ? tunedLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost))
+        : Infinity;
+      const tB = rawOp.accepted && rawStandardOp.accepted
+        ? tunedLen(rawFixed, Math.max(rawOp.operationCost, rawStandardOp.operationCost))
+        : Infinity;
       chosenCache.set(key, tB < tR ? 'raw' : 'resched');
       if (tB < tR) switched += 1;
     }
-    if (switched) return assemble(specs); // reassemble with final choices (cached -> recurses once)
+    if (switched) return assemble(specs, expectRejected); // reassemble with final choices (cached -> recurses once)
   }
-  // pass 2: shrink the pad so the unlocking just covers its op-cost
-  inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, tunedLen(argB[i].length + tailLen(i), op1[i].operationCost)) }));
-  const op2 = specs.map((_, i) => evalInput(inputs, i));
+  if (!expectRejected && [...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+    throw new Error('chosen full-budget input errored during padding measurement');
+  }
+  let targets = specs.map((_, i) => tunedLen(argB[i].length + tailLen(i), Math.max(op1[i].operationCost, standardOp1[i].operationCost)));
+  let op2;
+  let standardOp2;
+  while (true) {
+    inputs = specs.map((_, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, targets[i]) }));
+    op2 = specs.map((_, i) => evalInput(inputs, i));
+    standardOp2 = specs.map((_, i) => evalInput(inputs, i, standardVm));
+    if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) break;
+    const tightened = targets.map((target, i) => Math.min(target, tunedLen(
+      argB[i].length + tailLen(i),
+      Math.max(op2[i].operationCost, standardOp2[i].operationCost),
+    )));
+    if (tightened.every((target, i) => target === targets[i])) break;
+    targets = tightened;
+  }
+  if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) {
+    throw new Error('tightened input rejected during padding measurement');
+  }
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
   const fits = meta.every((m) => m.lockingBytes <= 10000 && m.unlockingBytes <= 10000 && m.operationCost <= OP_BUDGET) && accepted;
@@ -371,6 +395,10 @@ report('pairing proof#1', pair1);
 const pairInvalid = [invalidRun(pair0, 0), invalidRun(pair0, Math.floor(pair0.inputs.length / 2))];
 console.error(`  pairing invalid runs rejected: ${pairInvalid.map((r) => r.rejected).join(',')}`);
 
+if (!pair0.fits || !pair1.fits || !pairWc.fits || !pairInvalid.every((run) => run.rejected)) {
+  throw new Error('pairing valid, worst-case, or invalid fixture failed; refusing to write vectors');
+}
+
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/pairing-intratx-vectors.json', JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED BN254 Groth16 pairing to the Miller boundary. The batched 4-pair Miller chunks are the INPUTS of ONE transaction; each chunk takes its incoming Fp12+G2 state as a raw byte blob in its witness and FORWARD-checks its successor (require next input\'s blob == its recomputed output, read via OP_INPUTBYTECODE). No NFT-commitment hand-off, no hashing, no 128-byte limit. Reuses the same validated chunk math as bch-pairing-chunked.',
   method: 'intra-tx-linked', deployment: 'P2SH32', numInputs: pair0.inputs.length, budgetPerInput: OP_BUDGET,
@@ -403,7 +431,7 @@ const hybridSpecs = [
 ];
 const unboundHybrid = assemble(hybridSpecs.map((spec) => ({ ...spec, externalBindings: [] })));
 if (!unboundHybrid.accepted) throw new Error('pre-binding proof0-G2/proof1-remainder hybrid was not accepted');
-const boundHybrid = assemble(hybridSpecs);
+const boundHybrid = assemble(hybridSpecs, true);
 if (boundHybrid.meta[g2FinalIndex].accepted) throw new Error('bound hybrid did not reject at G2 final');
 const unrelatedFailure = boundHybrid.meta.find((meta, i) => i !== g2FinalIndex && !meta.accepted);
 if (unrelatedFailure) throw new Error(`bound hybrid also rejected at ${unrelatedFailure.label}`);
@@ -428,6 +456,9 @@ const fullInvalid = [
   ...bindingMutations,
 ];
 console.error(`  groth16 invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
+if (!full0.fits || !full1.fits || !fullWc.fits || !fullInvalid.every((run) => run.rejected)) {
+  throw new Error('Groth16 valid, worst-case, or invalid fixture failed; refusing to write vectors');
+}
 
 writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-intratx-vectors.json', JSON.stringify({
   description: 'INTRA-TRANSACTION LINKED full BN254 Groth16 verifier in ONE transaction: validate G2 inputs -> vk_x -> batched 4-pair Miller -> final exponentiation -> assert product==1, as the inputs of a single tx. State is passed as raw byte blobs through sibling-input introspection (OP_INPUTBYTECODE forward-checks), not NFT commitments — no hashing, arbitrary intermediate size. All stages are bound to ONE proof tuple: the Miller genesis derives f=1 and R0=B in-contract and leads with the contiguous -A/B/C points, the G2 final chunk byte-binds that same tuple into the Miller genesis input, the vk_x final chunk binds the computed vk_x point into it, and the Miller boundary is bound into the final-exponentiation genesis input. Reuses the same validated chunk math as bch-groth16-chunked.',
