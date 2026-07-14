@@ -145,16 +145,22 @@ const INSTANCES = {
 const dummy = pairsFor([1n, 1n]);
 const VKX_LIMB_OFFSET = ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(3, dummy[3].P.toAffine(), dummy[3].Q.toAffine()).length;
 const PTL_LEN = dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())).length; // 10
-const MILLER_IN_LIMBS = PTL_LEN + 24;
+const MILLER_UNIT_NAMES = MILLER_UNIT_LINES
+  ? ['Pu0', 'Pv0', 'Pu2', 'Pv2', 'Pu3', 'Pv3']
+  : [];
+const MILLER_IN_LIMBS = PTL_LEN + 24 + MILLER_UNIT_NAMES.length;
 const MILLER_DYNAMIC_LIMBS = 16; // f(12) + affine runtime R0(4)
 const MILLER_GENESIS_INPUT = G2_COUNT + GLV_COUNT;
 const MILLER_GENESIS_NAMES = [
   'Px0', 'Py0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Px3', 'Py3', 'Px2', 'Py2',
   ...Array.from({ length: 12 }, (_, i) => `c${i}`),
   ...Array.from({ length: 12 }, (_, i) => `ci${i}`),
+  ...MILLER_UNIT_NAMES,
 ];
 const MILLER_STATIC_NAMES = [
-  'Px0', 'Py0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Px2', 'Py2', 'Px3', 'Py3',
+  ...(MILLER_UNIT_LINES
+    ? ['Pu0', 'Pv0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Pu2', 'Pv2', 'Pu3', 'Pv3']
+    : ['Px0', 'Py0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Px2', 'Py2', 'Px3', 'Py3']),
   ...Array.from({ length: 12 }, (_, i) => `c${i}`),
   ...Array.from({ length: 12 }, (_, i) => `ci${i}`),
 ];
@@ -235,7 +241,8 @@ function specsMillerFused(inst, c, cInv, w) {
     : r6limbs(R);
   const full = (s) => [...f12limbs(s.f), ...runtimeRLimbs(s.Rs[0]), ...ptL, ...f12limbs(s.c), ...f12limbs(s.cInv)];
   const genesisPts = [...rawPtL.slice(0, 6), ...rawPtL.slice(8, 10), ...rawPtL.slice(6, 8)];
-  const genesis = [...genesisPts, ...f12limbs(c), ...f12limbs(cInv)];
+  const genesisUnitPoints = MILLER_UNIT_LINES ? [...ptL.slice(0, 2), ...ptL.slice(6, 10)] : [];
+  const genesis = [...genesisPts, ...f12limbs(c), ...f12limbs(cInv), ...genesisUnitPoints];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
   if (man.linkedLayout !== true) {
     throw new Error('intratx residue requires MILLER_LINKED_LAYOUT=1 during Miller generation');
@@ -656,9 +663,9 @@ const fullInvalid = [
 ];
 if (MILLER_AFFINE_G2) {
   const contextMutations = [
-    ['-A/B', 'Px0'],
-    ['C', 'Px3'],
-    ['vk_x', 'Px2'],
+    ['-A/B', MILLER_UNIT_LINES ? 'Pu0' : 'Px0'],
+    ['C', MILLER_UNIT_LINES ? 'Pu3' : 'Px3'],
+    ['vk_x', MILLER_UNIT_LINES ? 'Pu2' : 'Px2'],
     ['c', 'c0'],
     ['cInv', 'ci0'],
   ].map(([label, name]) => {

@@ -86,6 +86,14 @@ const stagePtParams = [...rawPtParams.slice(0, 6), ...rawPtParams.slice(8, 10), 
 const stagePtL = [...rawPtL.slice(0, 6), ...rawPtL.slice(8, 10), ...rawPtL.slice(6, 8)];
 const invYNames = PINFO.filter((pi) => pi.cfg.P).map((pi) => `pyInv${pi.j}`);
 const invYPlan = PAIRS.filter((_, j) => PT_CFG[j].P).map((pair) => Fp.inv(pair.P.toAffine().y));
+const unitPtParams = MILLER_UNIT_LINES
+  ? PINFO.filter((pi) => pi.cfg.P).flatMap((pi) => [`Pu${pi.j}`, `Pv${pi.j}`])
+  : [];
+const unitPtL = MILLER_UNIT_LINES
+  ? PAIRS.flatMap((pair, j) => PT_CFG[j].P
+      ? ptLimbs(j, pair.P.toAffine(), pair.Q.toAffine(), true).slice(0, 2)
+      : [])
+  : [];
 
 // witness for the committed planning instance (the chunk math is generic; only window
 // boundaries come from this instance, like the rest of the generators).
@@ -139,7 +147,7 @@ const slopeLimbs = (opLo, opHi) => MILLER_AFFINE_G2
   ? ops.slice(opLo, opHi).flatMap((op) => op.affineSlopes.flatMap((m) => [m.c0, m.c1]))
   : [];
 const inState = (i) => STAGE_BOUND && i === 0
-  ? [...stagePtL, ...f12limbs(states[i].c), ...f12limbs(states[i].cInv)]
+  ? [...stagePtL, ...f12limbs(states[i].c), ...f12limbs(states[i].cInv), ...unitPtL]
   : withPts(stateLimbs(states[i]));
 // the FINAL chunk hands off only [fF, c, cInv] (36 limbs, contiguous) to the residue tail —
 // R0/pts are done with once the loop ends. Non-final hand-offs carry the full 52-limb state.
@@ -159,7 +167,9 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     ? ['R0xa', 'R0xb', 'R0ya', 'R0yb']
     : ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
   const fullStateParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames];
-  const stateParams = STAGE_BOUND && opLo === 0 ? [...stagePtParams, ...cNames, ...ciNames] : fullStateParams;
+  const stateParams = STAGE_BOUND && opLo === 0
+    ? [...stagePtParams, ...cNames, ...ciNames, ...unitPtParams]
+    : fullStateParams;
   const committedParams = COVENANT_RESIDUE && opLo === 0 ? stagePtParams : stateParams;
   const slopeNamesByOp = new Map();
   for (let i = opLo; i < opHi; i++) {
@@ -197,7 +207,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
       PINFO.filter((pi) => pi.cfg.P).forEach((pi) => {
         const invY = `pyInv${pi.j}`;
         L.push(`        require(within(${invY}, 0, fieldP)); require(mulFp(${pi.rawPye}, ${invY}) == 1);`);
-        L.push(`        int Pu${pi.j} = canonicalFp(0 - mulFp(${pi.rawPxe}, ${invY})); int Pv${pi.j} = canonicalFp(0 - ${invY});`);
+        L.push(`        require(Pu${pi.j} == canonicalFp(0 - mulFp(${pi.rawPxe}, ${invY}))); require(Pv${pi.j} == canonicalFp(0 - ${invY}));`);
       });
     }
   }
@@ -450,6 +460,7 @@ writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
   covenantResidue: COVENANT_RESIDUE, endpointSubgroup: FUSE_G2_ENDPOINT,
   affineG2: MILLER_AFFINE_G2,
   unitLines: MILLER_UNIT_LINES,
+  genesisUnitParams: unitPtParams,
   numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, tailFused: c.tailFused === true, incoming: c.incoming, outgoing: c.outgoing })),
 }, null, 2));
