@@ -52,7 +52,7 @@ comparison. Per-layer status and build commands are in
 | entry | form / variant | headline | notes |
 |---|---|---|---|
 | `bch-groth16-bls12381-singleton` | singleton, baseline | ~24.2 KB / ~1.04–1.48B op-cost | **~21× smaller bytecode than the nChain reference** |
-| `bch-groth16-bls12381-singleton-minop` | singleton, op-optimized | ~68.7 KB / **~318M op-cost** | residue (`λ=p+|x|`, μ₂₇A witness) + GLV; G1 φ-checks |
+| `bch-groth16-bls12381-singleton-minop` | singleton, op-optimized | 67,163 B / **256.6M op-cost** | residue (`λ=p+|x|`, μ₂₇A witness) + GLV; fused G2 ψ-check; A/C on-curve (G1 subgroup checks omitted) |
 | `bch-pairing-bls12381-singleton` | singleton, pairing-only | ~19.8 KB / ~1.38B op-cost | the pairing verdict milestone (`verify.cash`) |
 | `bch-groth16-bls12381-grouped-residue` | chunked, grouped + residue | **47 inputs / 5 standard txs / score 370,686** | the deployable BLS verifier; GLV `vk_x` + fused Miller + μ₂₇A residue tail |
 | `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **5 inputs**, one tx (proposed 100 kB VM) | BLS counterpart of the spec build; targets the proposed `bch-spec` upgrade — see [Target VM](#target-vm-bch-spec) |
