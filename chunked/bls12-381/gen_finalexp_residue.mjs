@@ -39,7 +39,7 @@ const decl = (names) => names.map((n) => `int ${n}`).join(', ');
 const names12 = (p) => Array.from({ length: 12 }, (_, i) => `${p}${i}`);
 const fFn = names12('fF'), cN = names12('c'), ciN = names12('ci'), wN = names12('w'), tN = names12('t');
 const eqOne = (p) => Array.from({ length: 12 }, (_, i) => `require(${p}${i} % P == ${i === 0 ? 1 : 0});`).join(' ');
-const canon = (names) => names.map((n) => `require(${n} < P);`).join(' ');
+const canon = (names) => names.map((n) => `require(within(${n}, 0, P));`).join(' ');
 const STATE5 = [...fFn, ...cN, ...ciN, ...wN, ...tN]; // 60 forwarded limbs (t = running w^partial)
 
 const walkLoop = (lo, hi) =>
