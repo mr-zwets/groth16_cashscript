@@ -156,7 +156,10 @@ export function transformChunk(src, cfg) {
     // on the line before covOut; either way drop that line and the covOut from the body.
     const hasIntP = /^int P(mod)? =/.test(lines[coIdx - 1].trim());
     body = lines.slice(ciIdx + 1, hasIntP ? coIdx - 1 : coIdx);
-    outNames = [...lines[coIdx].matchAll(/toPaddedBytes\((\w+)\s*%\s*P(?:mod)?,\s*\d+\)/g)].map((m) => m[1]);
+    const outMatches = [...lines[coIdx].matchAll(/toPaddedBytes\((\w+)(\s*%\s*P(?:mod)?)?,\s*\d+\)/g)];
+    if (outMatches.length === 0) throw new Error('no covOut limbs');
+    outNames = outMatches.map((match) => match[1]);
+    const exactOutputs = outMatches.map((match) => match[2] === undefined);
     outWidths = outNames.map(widthOf);
     outLen = outWidths.reduce((sum, width) => sum + width, 0);
     // local name `Pmod` (not `P`): chunks that import the shared singleton library inherit a
@@ -178,14 +181,14 @@ export function transformChunk(src, cfg) {
       while (carry > 0 && inNames[carry - 1] === outNames[carry - 1] &&
         inWidths[carry - 1] === outWidths[carry - 1] && !assigned.has(outNames[carry - 1])) carry -= 1;
     }
-    const headExpr = outNames.slice(0, carry).map((n, i) => `toPaddedBytes(${n} % Pmod, ${outWidths[i]})`).join(' + ');
+    const headExpr = outNames.slice(0, carry).map((n, i) =>
+      `toPaddedBytes(${n}${exactOutputs[i] ? '' : ' % Pmod'}, ${outWidths[i]})`).join(' + ');
     const tailOffset = outWidths.slice(0, carry).reduce((sum, width) => sum + width, 0);
     const tailExpr = carry < outNames.length ? `inBlob.split(${tailOffset})[1]` : '';
     const outBlobExpr = [headExpr, tailExpr].filter(Boolean).join(' + ');
     epilogue = [
-      // Pmod is only referenced by the head's `% Pmod` reductions; if the whole suffix is spliced
-      // (carry === 0) it would be an unused variable, so only declare it when the head is non-empty.
-      ...(carry > 0 ? [`        int Pmod = ${cfg.prime};`] : []),
+      // Pmod is only referenced when at least one recomputed head limb still needs reduction.
+      ...(exactOutputs.slice(0, carry).some((exact) => !exact) ? [`        int Pmod = ${cfg.prime};`] : []),
       `        bytes outBlob = ${outBlobExpr};`,
     ];
     if (cfg.epilogueMode === 'covout') {
