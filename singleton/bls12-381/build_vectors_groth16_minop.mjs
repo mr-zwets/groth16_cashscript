@@ -80,6 +80,11 @@ const rangeInvalidUnlockings = [
   { label: 'non-canonical residue c limb', index: 10, value: validArgs[10] - Pm },
   { label: 'non-canonical residue w limb', index: 34, value: validArgs[34] - Pm },
   { label: 'negative GLV decomposition limb', index: 46, value: -1n },
+  ...Array.from({ length: 6 }, (_, upper) => ({
+    label: `non-Fp6 residue w limb ${upper + 6}`,
+    index: 40 + upper,
+    value: 1n,
+  })),
 ].map(({ label, index, value }) => {
   const args = validArgs.slice();
   args[index] = value;
@@ -108,7 +113,7 @@ console.log(`inputsNeeded = ${Math.ceil(opCost / STANDARD_BUDGET)}`);
 
 const out = {
   contract: 'Groth16VerifyMinOp (singleton/bls12-381/groth16_minop.cash)',
-  description: 'op-optimized full BLS12-381 Groth16 verifier: lazy-tower fused Miller (1 runtime G2 pair, lines/e(alpha,beta) baked) + witnessed-residue final-exp (lambda=p+|x|) + G2 subgroup check psi(B)==[-x]B fused into the Miller tail (reuses R_B=[|x|]B; no separate walk) + GLV vk_x. G1 subgroup checks on A,C omitted as redundant (they are only paired against order-r G2 elements, so cofactor components vanish); on-curve checks kept.',
+  description: 'op-optimized full BLS12-381 Groth16 verifier: lazy-tower fused Miller (1 runtime G2 pair, lines/e(alpha,beta) baked) + witnessed-residue final-exp (lambda=p+|x|, w checked in embedded Fp6*) + G2 subgroup check psi(B)==[-x]B fused into the Miller tail (reuses R_B=[|x|]B; no separate walk) + GLV vk_x. G1 subgroup checks on A,C omitted as redundant (they are only paired against order-r G2 elements, so cofactor components vanish); on-curve checks kept.',
   lockingOK: binToHex(template),
   unlocking: binToHex(unlocking),
   invalidUnlocking: binToHex(invalidUnlocking),

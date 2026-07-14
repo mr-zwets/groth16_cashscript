@@ -155,8 +155,9 @@ function jacAddG1(int aX, int aY, int aZ, int bX, int bY) returns (int, int, int
 // product; conj is an automorphism so witnessing g is equivalent to witnessing conj(g)).
 // Verifies  fF * w == c^p  (i.e. c^lambda == g*w, lambda = p + |x|), with
 //   - c canonical + cInv pinned by c*cInv == ONE,
-//   - w in mu_(27A), A = (|x|+1)/3:  ((w^|x|) * w)^9 == ONE   (27A = 9(|x|+1)).
-// Soundness: c^lambda = g*w with ord(w) | 27A | h forces g^h == 1 (h = (p^12-1)/r).
+//   - w in the embedded Fp6* (upper six limbs zero).
+// Soundness: p^6-1 divides h=(p^12-1)/r, so every nonzero Fp6 element has order dividing h.
+// c*cInv == ONE and the tail equality exclude zero.
 function residueVerdict(
     int fF0,int fF1,int fF2,int fF3,int fF4,int fF5,int fF6,int fF7,int fF8,int fF9,int fF10,int fF11,
     int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11,
@@ -168,28 +169,12 @@ function residueVerdict(
     require(within(c6, 0, P)); require(within(c7, 0, P)); require(within(c8, 0, P)); require(within(c9, 0, P)); require(within(c10, 0, P)); require(within(c11, 0, P));
     require(within(w0, 0, P)); require(within(w1, 0, P)); require(within(w2, 0, P)); require(within(w3, 0, P)); require(within(w4, 0, P)); require(within(w5, 0, P));
     require(within(w6, 0, P)); require(within(w7, 0, P)); require(within(w8, 0, P)); require(within(w9, 0, P)); require(within(w10, 0, P)); require(within(w11, 0, P));
+    require(w6 == 0); require(w7 == 0); require(w8 == 0); require(w9 == 0); require(w10 == 0); require(w11 == 0);
     // c * cInv == ONE
     (int p0,int p1,int p2,int p3,int p4,int p5,int p6,int p7,int p8,int p9,int p10,int p11) =
         fp12Mul(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11, ci0,ci1,ci2,ci3,ci4,ci5,ci6,ci7,ci8,ci9,ci10,ci11);
     require(p0 % P == 1); require(p1 % P == 0); require(p2 % P == 0); require(p3 % P == 0); require(p4 % P == 0); require(p5 % P == 0);
     require(p6 % P == 0); require(p7 % P == 0); require(p8 % P == 0); require(p9 % P == 0); require(p10 % P == 0); require(p11 % P == 0);
-    // w^(27A) == ONE via ((w^|x|) * w)^9, |x| = 15132376222941642752 (MSB preloaded)
-    int t0=w0; int t1=w1; int t2=w2; int t3=w3; int t4=w4; int t5=w5;
-    int t6=w6; int t7=w7; int t8=w8; int t9=w9; int t10=w10; int t11=w11;
-    for (int wi = 0; wi < 63; wi = wi + 1) {
-        (t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11) = fp12Sqr(t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11);
-        if (((15132376222941642752 >> (62 - wi)) % 2) == 1) {
-            (t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11) = fp12Mul(t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11, w0,w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11);
-        }
-    }
-    (t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11) = fp12Mul(t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11, w0,w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11);
-    (int s0,int s1,int s2,int s3,int s4,int s5,int s6,int s7,int s8,int s9,int s10,int s11) =
-        fp12Sqr(t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11);
-    (s0,s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11) = fp12Sqr(s0,s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11);
-    (s0,s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11) = fp12Sqr(s0,s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11);
-    (s0,s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11) = fp12Mul(s0,s1,s2,s3,s4,s5,s6,s7,s8,s9,s10,s11, t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11);
-    require(s0 % P == 1); require(s1 % P == 0); require(s2 % P == 0); require(s3 % P == 0); require(s4 % P == 0); require(s5 % P == 0);
-    require(s6 % P == 0); require(s7 % P == 0); require(s8 % P == 0); require(s9 % P == 0); require(s10 % P == 0); require(s11 % P == 0);
     // tail: fF * w == frob1(c)
     (int lhs0,int lhs1,int lhs2,int lhs3,int lhs4,int lhs5,int lhs6,int lhs7,int lhs8,int lhs9,int lhs10,int lhs11) =
         fp12Mul(fF0,fF1,fF2,fF3,fF4,fF5,fF6,fF7,fF8,fF9,fF10,fF11, w0,w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11);

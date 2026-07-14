@@ -3,7 +3,7 @@
 // One fixed P2SH32 locking graph verifies every proof for the configured VK:
 //   five-window full-stage GLV vk_x (minting-baton genesis)
 //     -> input-validation-fused prepared Miller with c^-|x| folded into the loop
-//     -> the current mu_(27A) residue walk and immutable terminal verdict.
+//     -> the one-input Fp6 membership and immutable terminal verdict.
 //
 // Each nonterminal redeem pins its successor locking. The contracts enforce the token
 // lifecycle: minting baton -> mutable thread (plus recreated baton), mutable forward
@@ -18,12 +18,11 @@ import {
 } from './_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { compileFileBytecode, compileFileBytecodeRaw, computeVkx } from './_vkxmath.mjs';
-import { fp12limbsOf, millerFusedOps, mk12, residueWitness } from './_residuemath.mjs';
+import { fp12limbsOf, frob, millerFusedOps, mk12, residueWitness } from './_residuemath.mjs';
 import {
   GLV_HIGH_COST_INPUTS, GLV_SHARED_AUDITED_BOUNDS, GLV_TABLE_HEX,
   glvDecompose, regenGlvSharedAudited, vkxGlvStateAt, vkxGlvZinv,
 } from './gen_vkx_glv.mjs';
-import { residueWalkT } from './gen_finalexp_residue.mjs';
 import {
   bigIntToVmNumber, binToHex, createVirtualMachineBch2026, encodeDataPush,
   encodeLockingBytecodeP2sh32, hash256, hexToBin,
@@ -493,49 +492,23 @@ function tailSpecs(fF, c, cInv, w) {
   const cInvLimbs = fp12limbsOf(cInv);
   const wLimbs = fp12limbsOf(w);
   const handoff = [...fLimbs, ...cLimbs, ...cInvLimbs];
-  const stateAt = (upto) => [...handoff, ...wLimbs, ...fp12limbsOf(residueWalkT(w, upto))];
   const manifest = JSON.parse(readFileSync(join(GEN, 'manifest_finalexpres.json'), 'utf8'));
-  let cursor = 0;
-  let terminalCount = 0;
-  const chunksValid = Array.isArray(manifest.chunks) && manifest.chunks.length === manifest.numChunks &&
-    manifest.chunks.every((chunk, index) => {
-      if (chunk.idx !== index || chunk.final !== (index === manifest.chunks.length - 1)) return false;
-      if (chunk.final) terminalCount++;
-      if (chunk.role === 'walk') {
-        const valid = chunk.lo === cursor && chunk.hi > chunk.lo && chunk.hi <= 63;
-        cursor = chunk.hi;
-        return valid;
-      }
-      return chunk.role === 'finalize' && index === manifest.chunks.length - 1 && cursor === 63;
-    });
-  if (manifest.residueTail !== true || manifest.deployment !== 'covenant' || manifest.covenantResidue !== true || manifest.nwalk !== 63 ||
-    !chunksValid || cursor !== 63 || terminalCount !== 1) {
-    throw new Error('residue-tail manifest is not the canonical covenant walk/finalize layout');
+  const chunk = manifest.chunks?.[0];
+  if (manifest.residueTail !== true || manifest.fp6Membership !== true || manifest.deployment !== 'covenant' ||
+    manifest.covenantResidue !== true || manifest.numChunks !== 1 || manifest.nwalk !== 0 ||
+    chunk?.idx !== 0 || chunk.role !== 'finalize' || chunk.final !== true) {
+    throw new Error('covenant BLS residue requires the one-chunk Fp6 tail');
   }
-  return manifest.chunks.map((chunk) => {
-    if (chunk.role === 'walk') {
-      const first = chunk.lo === 0;
-      return {
-        cashFile: join(GEN, `finalexpres_${String(chunk.idx).padStart(2, '0')}.cash`),
-        commitLimbs: first ? handoff : stateAt(chunk.lo),
-        outLimbs: chunk.final ? [] : stateAt(chunk.hi),
-        allArgs: first ? [...handoff, ...wLimbs] : stateAt(chunk.lo),
-        label: `residue walk[${chunk.lo},${chunk.hi})${chunk.final ? ' + verdict' : ''}`,
-        checkpoint: first ? 'residue-witness' : chunk.final ? 'verify' : undefined,
-        kind: chunk.final ? 'terminal' : 'forward',
-        tailGenesis: first,
-      };
-    }
-    return {
-      cashFile: join(GEN, `finalexpres_${String(chunk.idx).padStart(2, '0')}.cash`),
-      commitLimbs: stateAt(63),
-      outLimbs: [],
-      allArgs: stateAt(63),
-      label: 'residue finalize -> verdict',
-      checkpoint: 'verify',
-      kind: 'terminal',
-    };
-  });
+  return [{
+    cashFile: join(GEN, 'finalexpres_00.cash'),
+    commitLimbs: handoff,
+    outLimbs: [],
+    allArgs: [...handoff, ...wLimbs],
+    label: 'residue Fp6 membership + verdict',
+    checkpoint: 'verify',
+    kind: 'terminal',
+    tailGenesis: true,
+  }];
 }
 
 function fullSpecs(instance) {
@@ -680,13 +653,12 @@ for (const [name, offset, value] of [
 }
 
 const firstTail = committedSpecs.tail[0];
-const secondTailLocking = hexToBin(committedRun.steps[firstTailIndex + 1].locking);
 for (const [name, value] of [['negativeW', -1n], ['largeW', P]]) {
   const mutated = { ...firstTail, allArgs: [...firstTail.allArgs] };
   mutated.allArgs[36] = value;
   invalidInputSteps[name] = buildChain(
     [mutated],
-    { tailLocking: secondTailLocking, rejectAt: 0 },
+    { rejectAt: 0 },
   ).steps;
 }
 
@@ -730,13 +702,26 @@ invalidInputSteps.wrongCanonicalW = buildChain(
   { rejectAt: wrongWTail.length - 1 },
 ).steps;
 
+for (let upper = 0; upper < 6; upper++) {
+  const hi = Array(6).fill(0n);
+  hi[upper] = 1n;
+  const wBad = mk12([1n, 0n, 0n, 0n, 0n, 0n], hi);
+  const rhs = frob(committedSpecs.witness.c, 1);
+  const fFBad = Fp12.mul(rhs, Fp12.inv(wBad));
+  if (!Fp12.eql(Fp12.mul(fFBad, wBad), rhs)) throw new Error('failed to isolate the Fp6 witness gate');
+  invalidInputSteps[`nonFp6W${upper + 6}`] = buildChain(
+    tailSpecs(fFBad, committedSpecs.witness.c, committedSpecs.witness.cInv, wBad),
+    { rejectAt: 0 },
+  ).steps;
+}
+
 // Cross-proof seam mutations must reject at the consumer, after its predecessor state is known
 // to be valid in the complete runs above.
 const secondMillerFirst = { ...secondSpecs.miller[0], commitLimbs: committedSpecs.glv.at(-1).outLimbs };
 const glvMillerSplice = buildStep(secondMillerFirst, secondMillerLocking, { expectValid: false });
 if (glvMillerSplice.accepted) throw new Error('GLV-to-Miller cross-proof seam accepted');
 const secondTailFirst = { ...secondSpecs.tail[0], commitLimbs: committedSpecs.miller.at(-1).outLimbs };
-const millerTailSplice = buildStep(secondTailFirst, secondTailLocking, { expectValid: false });
+const millerTailSplice = buildStep(secondTailFirst, undefined, { expectValid: false });
 if (millerTailSplice.accepted) throw new Error('Miller-to-tail cross-proof seam accepted');
 
 const sum = (steps, key) => steps.reduce((total, step) => total + step[key], 0);
@@ -748,7 +733,7 @@ if (!stats.allFit || !stats.allAccept || !stats.allRejected) {
 
 const output = verifierPath('src', 'bch', 'groth16-bls12381-chunked-covenant-residue-vectors.json');
 writeFileSync(output, JSON.stringify({
-  description: 'Source-reproducible BLS12-381 Groth16 covenant-residue verifier: canonical five-window full-stage GLV vk_x -> input-validation-fused prepared Miller with c^-|x| folded into the loop -> the current mu_(27A) residue walk and verdict. The genesis spends a minting baton, recreates it, and starts one mutable state thread; every nonterminal P2SH32 contract pins its actual successor; the terminal creates an immutable empty-commitment verdict locked to itself. Exact 48-byte stage seams carry (-A,B,C,vk_x), c, and cInv without modular aliasing. Every valid and invalid fixture is evaluated on the standard BCH 2026 VM.',
+  description: 'Source-reproducible BLS12-381 Groth16 covenant-residue verifier: five-window full-stage GLV vk_x, input-validation-fused prepared Miller, and a one-input Fp6 residue verdict. The terminal checks c*cInv==1, fF*w==frob(c,1), and six zero upper limbs of w. This is sound because p^6-1 divides (p^12-1)/r; the equations exclude zero. The genesis spends and recreates a minting baton, every nonterminal P2SH32 contract pins its successor, and the terminal creates an immutable empty-commitment verdict locked to itself. Exact 48-byte stage seams carry (-A,B,C,vk_x), c, and cInv without modular aliasing. Every valid and invalid fixture is evaluated on the standard BCH 2026 VM.',
   generator: 'chunked/bls12-381/generate_covenant_residue.mjs',
   proofBinding: 'runtime',
   curve: 'BLS12-381',

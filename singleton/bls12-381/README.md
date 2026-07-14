@@ -80,19 +80,19 @@ node singleton/bls12-381/build_vectors_optimized.mjs# -> groth16-bls12381-single
 `gen_singleton_minop.mjs` emits the BLS analog of `../bn254/groth16_minop.cash`
 (`bch-groth16-bls12381-singleton-minop`): lazy tower + ONE batched c^-|x|-fused Miller
 (only `(-A,B)` runs on-chain G2; `e(alpha,beta)` and the `(vk_x,gamma)`/`(C,delta)` line
-coefficients baked) + witnessed-residue final exp + GLV vk_x. 65,474-byte locking,
-**~256.6M op-cost (~32 inputs) vs the baseline's ~966M (~121) as currently measured
-by the harness** — ~73% less (~83% vs the 1.48B the baseline measured pre-rescheduler).
+coefficients baked) + witnessed-residue final exp + GLV vk_x. 64,510-byte locking,
+**~153.8M op-cost (~20 inputs) vs the baseline's ~966M (~121) as currently measured
+by the harness** — ~84% less (~90% vs the 1.48B the baseline measured pre-rescheduler).
 
 BLS-specific differences vs the BN254 min-op (see `../../chunked/bls12-381/_residuemath.mjs`):
 
 - residue relation `c^lambda == g*w` with `lambda = p + |x|`; the tail is a single
   Frobenius: `gF*w == frob(c,1)`, on the **unconjugated** boundary (x<0's final
   conjugation is absorbed into the witness — conj is an automorphism);
-- the witness scaling group is `mu_27A`, `A = (|x|+1)/3 = gcd(m'', p^12-1)` (real valid
-  boundaries DO carry an A-part in their order, removed by a one-exponentiation
-  projection); the on-chain membership check is `((w^|x|) * w)^9 == 1` (27A = 9(|x|+1),
-  |x| sparse: 6 bits);
+- the witness construction removes the boundary's nontrivial A-part with one projection and
+  produces `w` in the embedded `Fp6*`; the on-chain membership check is six zero upper limbs.
+  This suffices because `p^6-1` divides `(p^12-1)/r`, while `c*cInv==1` and the terminal
+  relation exclude zero;
 - the G2 subgroup check `psi(B) == [-x]B` is fused into the Miller tail and reuses
   `[|x|]B`;
 - G1 subgroup checks for A and C are omitted as redundant: both points remain checked

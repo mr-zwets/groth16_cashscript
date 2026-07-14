@@ -6,19 +6,19 @@
 // 48-byte-limb blob and require()s the next input's blob — read via tx.inputs[idx+1].unlockingBytecode
 // — equals its recomputed output; no NFT commitment, no hashing) and IDENTICAL residue chunk graph
 // (GLV vk_x MSM / c^-|x|-FUSED batched Miller with e(alpha,beta) baked and the G2 on-curve+subgroup
-// check fused in / witnessed-residue mu_27A final-exp tail). The ONLY difference is the per-input
+// check fused in / one-input witnessed-residue Fp6 final-exp tail). The ONLY difference is the per-input
 // budget:
 //
 //   the BCH op-cost budget an input gets is (densityControlBase + unlockingLen) * 800. The flagship
 //   BLS residue build sizes each chunk to a 10 kB unlocking under BCH_2026 (base 41 => 8,032,800
-//   op/input, 39 inputs). Here we size to a 100 kB unlocking under bch-spec (base 10,000 =>
+//   op/input, 35 inputs). Here we size to a 100 kB unlocking under bch-spec (base 10,000 =>
 //   88,000,000 op/input, ~11x), collapsing the same verifier into a HANDFUL of fat inputs,
 //   one per stage floor:
 //     GLV vk_x MSM             1 input
 //     c^-|x|-fused Miller       3 inputs   (op-bound; the on-curve+subgroup check stays fused in)
-//     witnessed-residue tail    1 input   (mu_27A ((w^|x|)*w)^9 walk + finalize)
+//     witnessed-residue tail    1 input   (Fp6 membership + terminal relation)
 //                              ---------
-//                               5 inputs   (still ONE non-standard <1 MB tx)
+//                               4 inputs   (still ONE non-standard <1 MB tx)
 //
 // The verifier arithmetic is unchanged; fewer state boundaries also remove repeated checks and
 // padding. Each 100 kB input exceeds standard relay policy, so the tx is
@@ -36,13 +36,12 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs, le48Exact, P, OP_DROP, verifierPath,
+  Fp12, millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs, le48Exact, P, OP_DROP, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
-import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
+import { frob, mk12, residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
 import { glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_HIGH_COST_INPUTS } from '../bls12-381/gen_vkx_glv.mjs';
-import { residueWalkT } from '../bls12-381/gen_finalexp_residue.mjs';
 import { transformChunk } from './transform.mjs';
 
 // ---- LARGE per-input budget on the PROPOSED bch-spec VM (100 kB scripts) ----
@@ -65,13 +64,13 @@ const PRIME = P.toString();
 // Regenerate the three variable-length stages at the 100 kB budget. The generators read the budget
 // from env (BCH_VM=spec => densityControlBase 10,000 + spec VM; TARGET_UNLOCK sets the pad target;
 // OP_COST_TARGET / BYTE_BUDGET cap each chunk). The greedy planners collapse 42 chunks into a
-// handful of fat ones (vk_x 1, Miller ~3, tail ~2). BYTE_BUDGET stays under the 100 kB script cap.
+// handful of fat ones (vk_x 1, Miller 2, tail 1). BYTE_BUDGET stays under the 100 kB script cap.
 const GEN_ENV = { ...process.env, BCH_VM: 'spec', TARGET_UNLOCK: String(LARGE_UNLOCK), OP_COST_TARGET: '86000000', BYTE_BUDGET: '95000', STAGE_BOUND_LAYOUT: '1' };
 console.error('\n== regenerating gen_vkx_glv.mjs at 100 kB budget ==');
 execFileSync(process.execPath, [join(BLS, 'gen_vkx_glv.mjs')], { env: GEN_ENV, stdio: 'inherit' });
 console.error('\n== regenerating gen_miller_residue.mjs at 100 kB budget ==');
 execFileSync(process.execPath, [join(BLS, 'gen_miller_residue.mjs')], { env: GEN_ENV, stdio: 'inherit' });
-console.error('\n== regenerating gen_finalexp_residue.mjs at 100 kB budget (FUSE_FINAL -> finalize folded into the last walk chunk) ==');
+console.error('\n== regenerating one-input Fp6 residue verdict at 100 kB budget ==');
 execFileSync(process.execPath, [join(BLS, 'gen_finalexp_residue.mjs')], { env: { ...GEN_ENV, FUSE_FINAL: '1' }, stdio: 'inherit' });
 
 import { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, numberToBinUint16LE, numberToBinUint32LE, createVirtualMachineBchSpec } from '@bitauth/libauth';
@@ -185,32 +184,16 @@ function specsMillerResidue(inst, c, cInv, bad = {}) {
 function specsResidueTail(fF, c, cInv, w) {
   const fFl = f12limbs(fF), cl = f12limbs(c), cil = f12limbs(cInv), wl = f12limbs(w);
   const commit36 = [...fFl, ...cl, ...cil];
-  const state5At = (upto) => [...fFl, ...cl, ...cil, ...wl, ...f12limbs(residueWalkT(w, upto))];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_finalexpres.json'), 'utf8'));
-  return man.chunks.map((ch) => {
-    if (ch.role === 'walk') {
-      const first = ch.lo === 0;
-      if (ch.fused) {
-        // FUSE_FINAL: the last walk chunk also runs the finalize verdict inline and is TERMINAL
-        // (no forward hand-off); the separate finalize input is gone. w is the witness extra.
-        return {
-          file: join(GEN, `finalexpres_${String(ch.idx).padStart(2, '0')}.cash`),
-          inLimbs: first ? commit36 : state5At(ch.lo), outLimbs: [], extras: first ? wl : [], role: 'terminal',
-          label: `residue walk+finalize[${ch.lo},${ch.hi}) -> verdict`, checkpoint: 'verify',
-        };
-      }
-      return {
-        file: join(GEN, `finalexpres_${String(ch.idx).padStart(2, '0')}.cash`),
-        inLimbs: first ? commit36 : state5At(ch.lo), outLimbs: state5At(ch.hi), extras: first ? wl : [],
-        role: 'within', label: `residue walk[${ch.lo},${ch.hi})`, checkpoint: first ? 'residue-witness' : undefined,
-      };
-    }
-    return {
-      file: join(GEN, `finalexpres_${String(ch.idx).padStart(2, '0')}.cash`),
-      inLimbs: state5At(63), outLimbs: [], extras: [], role: 'terminal',
-      label: 'residue finalize -> verdict', checkpoint: 'verify',
-    };
-  });
+  const chunk = man.chunks?.[0];
+  if (man.residueTail !== true || man.fp6Membership !== true || man.deployment !== 'covenant' ||
+    man.numChunks !== 1 || man.nwalk !== 0 || chunk?.idx !== 0 || chunk.role !== 'finalize' || chunk.final !== true) {
+    throw new Error('large-script BLS residue requires the one-chunk Fp6 tail');
+  }
+  return [{
+    file: join(GEN, 'finalexpres_00.cash'), inLimbs: commit36, outLimbs: [], extras: wl, role: 'terminal',
+    label: 'residue Fp6 membership + verdict', checkpoint: 'verify',
+  }];
 }
 function buildSpecs(inst) {
   // g2check is fused into the first/last fused-Miller chunks (see gen_miller_residue.mjs), so the
@@ -449,12 +432,26 @@ const rangeRuns = [
   rangeInvalid(firstRangeTail, { extra: 0 }, -1n, 'reject negative w limb'),
   rangeInvalid(firstRangeTail, { extra: 0 }, P, 'reject w limb at P'),
 ];
-const allInvalid = [...fInv, ...semanticRuns, ...rangeRuns];
+const fp6ShapeRuns = Array.from({ length: 6 }, (_, upper) => {
+  const hi = Array(6).fill(0n);
+  hi[upper] = 1n;
+  const wBad = mk12([1n, 0n, 0n, 0n, 0n, 0n], hi);
+  const rhs = frob(committedC, 1);
+  const fFBad = Fp12.mul(rhs, Fp12.inv(wBad));
+  if (!Fp12.eql(Fp12.mul(fFBad, wBad), rhs)) throw new Error('failed to isolate the Fp6 witness gate');
+  const asm = assemble(specsResidueTail(fFBad, committedC, committedCInv, wBad), true);
+  return { steps: toStepArr(asm), rejected: !asm.accepted };
+});
+const allInvalid = [...fInv, ...semanticRuns, ...rangeRuns, ...fp6ShapeRuns];
 console.error(`  invalid runs rejected: ${allInvalid.map((r) => r.rejected).join(',')}`);
 if (!full0.accepted || !full1.accepted || !fullStress.fits || !allInvalid.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-large-vectors.json'), JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction with LARGE (100 kB) input scripts, targeting the PROPOSED bch-spec upgrade. Identical mechanism and residue chunk graph to bch-groth16-bls12381-intratx-residue (OP_INPUTBYTECODE forward-checking, no NFT commitment, no hashing; GLV vk_x MSM + c^-|x|-FUSED batched Miller with e(alpha,beta) baked and the G2 on-curve+prime-order-subgroup validation fused into the first/last Miller chunks + witnessed-residue mu_27A final-exp tail), but each chunk is sized to a 100 kB unlocking instead of 10 kB. On bch-spec the op-cost budget an input receives is (10000 + unlockingLen) * 800, so a 100 kB input gets 88,000,000 op (~11x the 8,032,800 of a current-BCH 10 kB input); the current-BCH plan therefore collapses from 39 inputs to 5 (GLV vk_x 1, c^-|x|-fused Miller 3, witnessed-residue walk+finalize 1). The verifier arithmetic is unchanged, while fewer state boundaries remove repeated checks and padding. Every input fits its own bch-spec input budget (op-cost <= 88,000,000, scripts <= 100,000 B) and the whole verifier is ONE non-standard (<1 MB) transaction; the residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail, w enters the tail as an uncommitted witness. NOT valid on current BCH (BCH_2026 caps scripts at 10,000 B). Deployed as P2SH32 so each chunk redeem rides in the scriptSig where it counts toward the op-cost budget.',
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier targeting the proposed 100 kB-script VM. ' +
+    'The current-BCH 35-input graph collapses to four inputs: one GLV vk_x input, two input-validation-fused prepared Miller inputs, and one terminal residue input. ' +
+    'The terminal checks c*cInv==1, fF*w==frob(c,1), and w in the embedded Fp6 by requiring its upper six Fp12 limbs to be zero; ' +
+    'p^6-1 divides (p^12-1)/r, and the terminal equations exclude zero. OP_INPUTBYTECODE binds handoffs without hashing. ' +
+    'Every input fits the proposed per-input budget and 100,000-byte script cap, but this one-transaction benchmark is not valid under current BCH 10,000-byte script limits. Deployed P2SH32.',
   method: 'intra-tx-linked-residue-large', deployment: 'P2SH32', curve: 'BLS12-381', numInputs: full0.inputs.length, budgetPerInput: LARGE_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),

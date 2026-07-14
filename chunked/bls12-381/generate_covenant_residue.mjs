@@ -32,7 +32,7 @@ await run('gen_miller_residue.mjs', {
   STAGE_BOUND_LAYOUT: '1',
   COVENANT_RESIDUE_LAYOUT: '1',
 });
-console.log('[2/3] current residue walk and terminal verdict...');
+console.log('[2/3] one-input Fp6 residue verdict...');
 await run('gen_finalexp_residue.mjs', { COVENANT_RESIDUE_LAYOUT: '1' });
 console.log('[3/3] assemble, validate, and write benchmark vectors...');
 await run('build_vectors_covenant_residue.mjs');

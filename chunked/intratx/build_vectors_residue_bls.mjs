@@ -11,9 +11,9 @@
 //   GLV vk_x MSM (4-scalar ~128-bit Straus, baked table)              5 chunks
 //   c^-|x|-FUSED batched Miller, e(alpha,beta) baked (cmul1); the G2   29 chunks
 //     on-curve + subgroup check is FUSED in (first/last chunks reuse R_B=[|x|]B)
-//   witnessed-residue final-exp TAIL: mu_27A ((w^|x|)*w)^9 walk        5 chunks (last fuses finalize)
+//   witnessed-residue final-exp TAIL: w in Fp6* + terminal relation    1 chunk
 //                                                                     ---------
-//                                                                     39 inputs
+//                                                                     35 inputs
 //
 // The chunk MATH is reused VERBATIM from the same generated/*.cash the grouped-residue BLS build
 // consumes — only the assembly differs (one non-standard <1 MB tx vs token-threaded standard txs).
@@ -25,18 +25,17 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs,
+  Fp12, millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs,
   le48Exact, P, OP_DROP, TARGET_UNLOCK, OP_BUDGET, verifierPath,
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
-import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
+import { frob, mk12, residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
 import {
   glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX,
   GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
 } from '../bls12-381/gen_vkx_glv.mjs';
 import { LINKED_HIGH_COST_INPUTS, LINKED_RESIDUE_NAMESPACE } from '../bls12-381/_residue_linked_plan.mjs';
-import { residueWalkT } from '../bls12-381/gen_finalexp_residue.mjs';
 import { transformChunk, headerSize } from './transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -162,30 +161,16 @@ function specsMillerResidue(inst, c, cInv, bad = {}) {
 function specsResidueTail(fF, c, cInv, w) {
   const fFl = f12limbs(fF), cl = f12limbs(c), cil = f12limbs(cInv), wl = f12limbs(w);
   const commit36 = [...fFl, ...cl, ...cil];
-  const state5At = (upto) => [...fFl, ...cl, ...cil, ...wl, ...f12limbs(residueWalkT(w, upto))];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_finalexpres.json'), 'utf8'));
-  return man.chunks.map((ch) => {
-    if (ch.role === 'walk') {
-      const first = ch.lo === 0;
-      if (ch.fused) {
-        return {
-          file: join(GEN, `finalexpres_${String(ch.idx).padStart(2, '0')}.cash`),
-          inLimbs: first ? commit36 : state5At(ch.lo), outLimbs: [], extras: first ? wl : [], role: 'terminal',
-          label: `residue walk+finalize[${ch.lo},${ch.hi}) -> verdict`, checkpoint: 'verify',
-        };
-      }
-      return {
-        file: join(GEN, `finalexpres_${String(ch.idx).padStart(2, '0')}.cash`),
-        inLimbs: first ? commit36 : state5At(ch.lo), outLimbs: state5At(ch.hi), extras: first ? wl : [],
-        role: 'within', label: `residue walk[${ch.lo},${ch.hi})`, checkpoint: first ? 'residue-witness' : undefined,
-      };
-    }
-    return {
-      file: join(GEN, `finalexpres_${String(ch.idx).padStart(2, '0')}.cash`),
-      inLimbs: state5At(63), outLimbs: [], extras: [], role: 'terminal',
-      label: 'residue finalize -> verdict', checkpoint: 'verify',
-    };
-  });
+  const chunk = man.chunks?.[0];
+  if (man.residueTail !== true || man.fp6Membership !== true || man.deployment !== 'linked-hash-free' ||
+    man.numChunks !== 1 || man.nwalk !== 0 || chunk?.idx !== 0 || chunk.role !== 'finalize' || chunk.final !== true) {
+    throw new Error('linked BLS residue requires the one-chunk Fp6 tail');
+  }
+  return [{
+    file: join(GEN, 'finalexpres_00.cash'), inLimbs: commit36, outLimbs: [], extras: wl, role: 'terminal',
+    label: 'residue Fp6 membership + verdict', checkpoint: 'verify',
+  }];
 }
 function buildSpecs(inst) {
   // g2check is fused into the first/last fused-Miller chunks (see gen_miller_residue.mjs), so the
@@ -455,12 +440,26 @@ const rangeRuns = [
   rangeInvalid(firstRangeTail, { extra: 0 }, -1n, 'reject negative w limb'),
   rangeInvalid(firstRangeTail, { extra: 0 }, P, 'reject w limb at P'),
 ];
-const allInvalid = [...fInv, ...semanticRuns, ...rangeRuns];
+const fp6ShapeRuns = Array.from({ length: 6 }, (_, upper) => {
+  const hi = Array(6).fill(0n);
+  hi[upper] = 1n;
+  const wBad = mk12([1n, 0n, 0n, 0n, 0n, 0n], hi);
+  const rhs = frob(committedC, 1);
+  const fFBad = Fp12.mul(rhs, Fp12.inv(wBad));
+  if (!Fp12.eql(Fp12.mul(fFBad, wBad), rhs)) throw new Error('failed to isolate the Fp6 witness gate');
+  const asm = assemble(specsResidueTail(fFBad, committedC, committedCInv, wBad), true);
+  return { steps: toStepArr(asm), rejected: !asm.accepted };
+});
+const allInvalid = [...fInv, ...semanticRuns, ...rangeRuns, ...fp6ShapeRuns];
 console.error(`  invalid runs rejected: ${allInvalid.map((r) => r.rejected).join(',')}`);
 if (!full0.accepted || !full1.accepted || !fullStress.fits || !allInvalid.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-vectors.json'), JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-bls12381-intratx (each chunk is an input whose witness carries its incoming state as a raw 48-byte-limb blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: GLV vk_x MSM (5 chunks; the five inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding five copies), c^-|x|-FUSED batched Miller with e(alpha,beta) baked and only e(-A,B) running on-chain G2 arithmetic (29 chunks; the G2 on-curve + prime-order-subgroup validation is FUSED into the first/last Miller chunks, reusing the running R_B=[|x|]B the loop already walks), and a 5-chunk witnessed-residue final-exp TAIL collapsing the Hayashida-Scott hard part to a mu_27A ((w^|x|)*w)^9 walk + fF*w==frob(c,1) verdict (the final walk chunk fuses the verdict). The residue witness (c, cInv) threads through every fused-Miller chunk and is re-checked in the tail; w enters the tail as an uncommitted witness. Cross-stage soundness links are bound where layouts allow: vk_x final binds the vk_x point into the fused-Miller genesis input, and the fused-Miller boundary [fF,c,cInv] is bound into the residue tail. Reuses the same validated chunk math as bch-groth16-bls12381-grouped-residue. Deployed P2SH32.',
+  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in one transaction. ' +
+    'Its 35-input graph is five shared-table GLV vk_x chunks, 29 input-validation-fused prepared Miller chunks, and one terminal residue chunk. ' +
+    'The terminal checks c*cInv==1, fF*w==frob(c,1), and w in the embedded Fp6 by requiring its upper six Fp12 limbs to be zero. ' +
+    'This is sound because p^6-1 divides (p^12-1)/r; the terminal equations exclude zero. ' +
+    'OP_INPUTBYTECODE binds every intra-transaction handoff without hashing, and the vk_x and Miller stage seams bind the proof-specific state. Deployed P2SH32.',
   method: 'intra-tx-linked-residue', deployment: 'P2SH32', curve: 'BLS12-381', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),

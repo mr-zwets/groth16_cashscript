@@ -18,8 +18,9 @@ oracle. Four benchmark entries (in the verifier repo) are produced from here:
   full Groth16 verifier on that curve.
 - **`bch-groth16-bls12381-chunked-covenant-residue`** — the source-owned standard-VM
   covenant graph: five full-stage GLV chunks -> input-validation-fused residue Miller -> the
-  current residue walk/finalize tail. It enforces a minting-baton genesis, one mutable state
-  thread, fixed P2SH32 successor pins, and an immutable terminal verdict.
+  one-input Fp6 residue verdict. It enforces a minting-baton genesis, one mutable state
+  thread, fixed P2SH32 successor pins, and an immutable terminal verdict. 27 steps /
+  208,340 B / 157,706,001 op-cost.
 
 The separate 29-chunk input-unvalidated pairing and input-validated full Miller namespaces
 also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` builders:
@@ -28,12 +29,11 @@ also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` 
 - `bch-groth16-bls12381-intratx`: 56 inputs / 475,310 B / 377,658,775 op-cost.
 - `bch-groth16-bls12381-grouped`: 56 inputs / 6 standard transactions / 475,292 B /
   377,556,467 op-cost.
-- `bch-groth16-bls12381-intratx-residue`: 39 inputs / 324,228 B / 256,954,915 op-cost.
-- `bch-groth16-bls12381-grouped-residue`: 39 inputs / 5 standard transactions / 324,179 B /
-  256,875,048 op-cost.
-- `bch-groth16-bls12381-intratx-residue-large`: 5 inputs / 270,769 B / 250,833,313 op-cost
-  on the proposed 100 kB-script VM. Versus the prior vector, the GLV step saves 53 B / 5,483 op,
-  while the canonical-coordinate gate adds 10 B / 7,364 op: net −43 B / +1,881 op.
+- `bch-groth16-bls12381-intratx-residue`: 35 inputs / 209,865 B / 158,769,046 op-cost.
+- `bch-groth16-bls12381-grouped-residue`: 35 inputs / 4 standard transactions / 209,937 B /
+  158,744,466 op-cost.
+- `bch-groth16-bls12381-intratx-residue-large`: 4 inputs / 171,166 B / 153,410,183 op-cost
+  on the proposed 100 kB-script VM.
 
 ## Optimizations (prepared batched Miller + lazy reduction)
 
@@ -73,6 +73,10 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
   exactly once their bounds or field operations prove canonicality. The full-stage proof tuple is
   preserved byte-for-byte until the first Miller range gate, so a coordinate encoded as `x+p` is
   rejected rather than silently normalized.
+- **Fp6 residue membership** — the residue construction always produces `w` in the embedded
+  `Fp6*`: its A-part lies in Fp because `A | p-1`, and its root-of-unity corrector lies in Fp6.
+  Since `p^6-1 | (p^12-1)/r`, six zero upper-limb checks replace the 63-step `w^(27A)` walk.
+  The inverse and terminal equations exclude zero.
 
 Since per-step bytes are dominated (~64%) by op-cost-proportional unlocking padding,
 op-cost cuts translate ~1:1 into size.
