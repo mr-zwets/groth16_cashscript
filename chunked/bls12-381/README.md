@@ -10,19 +10,19 @@ oracle. Three benchmark entries (in the verifier repo) are produced from here:
   `vk_x = IC0 + in0·IC1 + in1·IC2` (G1 multi-scalar-mult), 11 chunks / 23,070 B / 6,842,845 op-cost.
 - **`bch-pairing-bls12381-chunked`** — the **Miller loops + final exponentiation**:
   `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)` as one prepared-VK 4-pair Miller product →
-  the BLS/Hayashida-Scott final exponentiation → verdict (== Fp12 ONE). 53 chunks / 472,640 B / 373,094,102 op-cost.
+  the BLS/Hayashida-Scott final exponentiation → verdict (== Fp12 ONE). 52 chunks / 471,750 B / 372,534,833 op-cost.
 - **`bch-groth16-bls12381-chunked`** — the **complete verifier**: the vk_x chunks
-  prepended to the pairing with G1/G2 input validation. 67 chunks / 516,697 B / 402,210,911 op-cost; ranked in the main
+  prepended to the pairing with G1/G2 input validation. 66 chunks / 515,807 B / 401,651,642 op-cost; ranked in the main
   Groth16 leaderboard against nchain (its BLS12-381 reference) — the only BCH-compatible
   full Groth16 verifier on that curve.
 
 The same 30 prepared Miller chunks also feed the linked layouts assembled by the sibling
 `intratx/` and `grouped/` builders:
 
-- `bch-pairing-bls12381-intratx`: 53 inputs / 467,890 B / 372,991,316 op-cost.
-- `bch-groth16-bls12381-intratx`: 67 inputs / 513,115 B / 402,047,052 op-cost.
-- `bch-groth16-bls12381-grouped`: 67 inputs / 7 standard transactions / 513,087 B /
-  401,923,270 op-cost.
+- `bch-pairing-bls12381-intratx`: 52 inputs / 466,959 B / 372,281,197 op-cost.
+- `bch-groth16-bls12381-intratx`: 66 inputs / 512,184 B / 401,336,933 op-cost.
+- `bch-groth16-bls12381-grouped`: 66 inputs / 7 standard transactions / 512,344 B /
+  401,362,248 op-cost.
 
 ## Optimizations (prepared batched Miller + lazy reduction)
 
@@ -43,6 +43,9 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
   `subFp`, and the covOut commitment reduce them back); `subFp` keeps the mod with a big
   `K·p` bias. Applied to the emitted miller + final-exp functions. The dead inverse
   functions (`fp12Inv`/…, replaced by the witness trick) are dropped from the prologue.
+- **Forward final-exp packing** — the planner targets 100,000 op-cost below the per-input
+  budget by default, fitting the final-exponentiation trace into 22 chunks while preserving
+  the existing forward execution order.
 
 Since per-step bytes are dominated (~64%) by op-cost-proportional unlocking padding,
 op-cost cuts translate ~1:1 into size.
