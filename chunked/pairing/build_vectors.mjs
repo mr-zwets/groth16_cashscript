@@ -272,7 +272,8 @@ writeFileSync(verifierPath('src/bch/groth16-chunked-vectors.json'), JSON.stringi
 }, null, 2));
 console.error('wrote src/bch/groth16-chunked-vectors.json (proof-agnostic, 2 proofs + worst-case + adversarial input)');
 
-// standalone vk_x aggregation entry (the first 3 chunks of the full verifier),
+// standalone vk_x aggregation entry (the same 8 vk_x chunks used by the full verifier
+// after its 3 input-validation chunks),
 // PROOF-AGNOSTIC: the public inputs ride in the committed state (NFT commitment),
 // so one fixed set of lockings computes vk_x = IC0+in0*IC1+in1*IC2 for ANY inputs.
 console.error(`vk_x(covenant): ${g0.vkx.length} steps/proof, op ${sumOp(g0.vkx).toLocaleString()}; proof#1 also built (${g1.vkx.length} steps)`);
