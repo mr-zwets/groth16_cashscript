@@ -218,7 +218,7 @@ export function assertPreparedMillerManifest(manifest, trace, { checkReferenceBo
     || (checkReferenceBoundary && !boundaryMatches)
     || !chunksCoverTrace
   ) {
-    throw new Error('manifest_miller.json does not match the prepared Miller trace; regenerate it with gen_miller.mjs');
+    throw new Error('prepared Miller manifest does not match its trace; regenerate it with gen_miller.mjs');
   }
 }
 

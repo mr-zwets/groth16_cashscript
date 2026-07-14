@@ -12,8 +12,8 @@ const run = (script, args = []) => { console.error(`\n=== ${script} ${args.join(
 run('gen_vkx.mjs');                         // standalone vk_x covenant chunks
 run('build_vectors.mjs');                   // -> vkx-bls12381-chunked-covenant-vectors.json
 run('gen_vkx.mjs', ['full']);               // full-verifier vk_x -> (-A,B,C,vk_x)
-run('gen_miller.mjs');                      // prepared-VK 4-pair Miller product (shared fp12Sqr)
+run('gen_miller.mjs');                      // pairing-only prepared Miller (input-unvalidated)
+run('gen_miller.mjs', ['full']);            // full verifier: fuse input validation into Miller
 run('gen_finalexp.mjs');                    // final exponentiation -> verdict
-run('gen_g2check.mjs');                     // G2 input-validation (EIP-197 subgroup) chunks
 run('build_vectors_pairing.mjs');           // -> pairing- + groth16-bls12381-chunked-vectors.json
 console.error('\nall BLS12-381 chunked artifacts + vectors regenerated.');

@@ -7,8 +7,8 @@
 // BLS specifics vs BN254: 48-byte limbs; the prepared-VK Miller carries only the runtime B
 // walk, so the state is f(12)+R_B(6); the final exponentiation's easy-part
 // inverses ride as UNCOMMITTED witnesses (extra args after the inBlob); the Miller boundary
-// is the conjugated f. The chunk graph (vk_x -> g2check -> batched Miller -> final exp)
-// uses exact whole-state seams; g2check is the covenant build's.
+// is the conjugated f. The chunk graph (vk_x -> input-validated batched Miller -> final exp)
+// uses exact whole-state seams; the full Miller namespace is shared with the covenant build.
 //
 //   node build_vectors_bls.mjs -> verifier/src/bch/groth16-bls12381-grouped-vectors.json
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -20,7 +20,6 @@ import {
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode, compileBytecodeRaw, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
-import { g2checkAccAt } from '../bls12-381/gen_g2check.mjs';
 import { transformChunk } from '../intratx/transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -102,23 +101,6 @@ const stageLimbs = (inst, bad = {}) => {
     bad.vkxX ?? vkx.x, bad.vkxY ?? vkx.y,
   ];
 };
-const g2sLimbs = (R, stage) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1, ...stage];
-
-function specsG2check(inst, bad = {}, isolated = false) {
-  const stage = stageLimbs(inst, bad);
-  const Bx = F2.create({ c0: stage[2], c1: stage[3] });
-  const By = F2.create({ c0: stage[4], c1: stage[5] });
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
-  if (man.stageBound !== true || man.genesisDerived !== true || man.carriesVkx !== true) throw new Error('G2 manifest is not stage-bound');
-  return man.chunks.map((ch) => ({
-    file: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`),
-    inLimbs: ch.first ? stage : g2sLimbs(g2checkAccAt(Bx, By, ch.lo), stage),
-    outLimbs: ch.last ? stage : g2sLimbs(g2checkAccAt(Bx, By, ch.hi), stage),
-    extras: [], role: ch.last && isolated ? 'stage-final' : 'within',
-    label: `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' psi(B)==[-x]B' : ''}`,
-    checkpoint: ch.first ? 'validate-inputs' : undefined,
-  }));
-}
 function specsVkx(inst, bad = {}) {
   const [in0, in1] = inst.inputs.map(BigInt);
   const stage = stageLimbs(inst, bad);
@@ -134,22 +116,25 @@ function specsVkx(inst, bad = {}) {
     return { file: join(GEN, `vkxfull_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs: [...vkxStateAt(in0, in1, ch.hi), in0, in1], extras: [], role: 'within', label: `vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined };
   });
 }
-function specsMiller(inst) {
+function specsMiller(inst, validated = false, bad = {}) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const trace = millerPreparedOps(pairs);
   const { ops, states, finalF } = trace;
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
-  const stage = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
-  if (!limbsEqual(stage, stageLimbs(inst))) throw new Error('Miller genesis layout mismatch');
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_miller.json'), 'utf8'));
+  const traceStage = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
+  if (!limbsEqual(traceStage, stageLimbs(inst))) throw new Error('Miller genesis layout mismatch');
+  const stage = stageLimbs(inst, bad);
+  const prefix = validated ? 'millerfull' : 'miller';
+  const man = JSON.parse(readFileSync(join(GEN, `manifest_${prefix}.json`), 'utf8'));
+  if (man.inputValidationFused !== validated) throw new Error(`${prefix} input-validation mode mismatch`);
   assertPreparedMillerManifest(man, trace, { checkReferenceBoundary: inst === INSTANCES.committed });
   const specs = man.chunks.map((ch) => ({
-    file: join(GEN, `miller_${String(ch.idx).padStart(2, '0')}.cash`),
+    file: join(GEN, `${prefix}_${String(ch.idx).padStart(2, '0')}.cash`),
     inLimbs: ch.opLo === 0 ? stage : [...stateLimbs(states[ch.opLo]), ...ptL],
     outLimbs: ch.final ? f12limbs(finalF) : [...stateLimbs(states[ch.opHi]), ...ptL],
     extras: [], role: 'within',
-    label: `miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' +conj=boundary' : ''}`,
-    checkpoint: ch.final ? 'miller-boundary' : undefined,
+    label: `${validated ? 'validated ' : ''}miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' +subgroup+conj=boundary' : ''}`,
+    checkpoint: ch.opLo === 0 && validated ? 'validate-inputs' : ch.final ? 'miller-boundary' : undefined,
   }));
   return { specs, boundary: finalF };
 }
@@ -172,10 +157,9 @@ function specsFinalexp(boundaryVal) {
 }
 function buildSpecs(inst) {
   const vkx = specsVkx(inst);
-  const g2 = specsG2check(inst);
-  const { specs: miller, boundary } = specsMiller(inst);
+  const { specs: miller, boundary } = specsMiller(inst, true);
   const fe = specsFinalexp(boundary);
-  return [...vkx, ...g2, ...miller, ...fe];
+  return [...vkx, ...miller, ...fe];
 }
 
 // ---- grouping (identical logic to the BN254 build) ----------------------------------
@@ -389,7 +373,7 @@ function evaluateMutated(asm) {
     const inputs = asm.inputs.slice(lo, hi + 1);
     for (let k = 0; k <= hi - lo; k++) outcomes[lo + k] = evalGroup(inputs, k, asm.gmeta[gi]);
   });
-  return { run: toRun(asm), rejected: !asm.accepted || outcomes.some((outcome) => !outcome.accepted) };
+  return { run: toRun(asm), rejected: outcomes.some((outcome) => !outcome.accepted) };
 }
 function mutateGroupedInput(asm, inputIndex, byteOffset) {
   const mutated = { ...asm, inputs: asm.inputs.slice() };
@@ -450,11 +434,17 @@ report('groth16-bls-grouped max-density', asmDense);
 const firstBoundary = GROUPS[1] ? GROUPS[1][0] : 1;
 const invalids = [invalidRun(cSpecs, GROUPS, Math.floor(cSpecs.length / 2)), invalidRun(cSpecs, GROUPS, firstBoundary)];
 
-// Isolated semantic validation fixtures keep rejection attributable to the G2 stage.
+// Isolated semantic validation fixtures keep rejection attributable to the fused checks.
 const isolated = (specs) => assembleGrouped(specs, packGroups(specs, specs.map(() => 9000), TARGET_GROUP_BYTES), true);
 const negA = proof.a.negate().toAffine(), C = proof.c.toAffine();
-const offCurveA = isolated(specsG2check(INSTANCES.committed, { Ay: (negA.y + 1n) % P }, true));
-const offCurveC = isolated(specsG2check(INSTANCES.committed, { Cy: (C.y + 1n) % P }, true));
+const isolatedFirstMiller = (bad, forgedPrefix = []) => {
+  const first = specsMiller(INSTANCES.committed, true, bad).specs[0];
+  first.role = 'stage-final';
+  if (forgedPrefix.length > 0) first.inLimbs = [...forgedPrefix, ...first.inLimbs];
+  return isolated([first]);
+};
+const offCurveA = isolatedFirstMiller({ Ay: (negA.y + 1n) % P });
+const offCurveC = isolatedFirstMiller({ Cy: (C.y + 1n) % P });
 const twistB = F2.create({ c0: 4n, c1: 4n });
 let offSub = null;
 for (let i = 1n; i < 800n && !offSub; i++) {
@@ -465,19 +455,29 @@ for (let i = 1n; i < 800n && !offSub; i++) {
   try { G2.fromAffine({ x, y }).assertValidity(); } catch { offSub = { x, y }; }
 }
 if (!offSub) throw new Error('failed to construct off-subgroup B fixture');
-const offSubgroupB = isolated(specsG2check(INSTANCES.committed, { Bx: offSub.x, By: offSub.y }, true));
+const offSubInst = {
+  inputs: INSTANCES.committed.inputs,
+  proof: { ...INSTANCES.committed.proof, b: G2.fromAffine({ x: offSub.x, y: offSub.y }) },
+};
+const offSubSpecs = specsMiller(offSubInst, true).specs;
+offSubSpecs[offSubSpecs.length - 1].role = 'stage-final';
+const offSubgroupB = isolated(offSubSpecs);
 
-const forgedRSpecs = specsG2check(INSTANCES.committed, {}, true);
-forgedRSpecs[0] = { ...forgedRSpecs[0], inLimbs: [9n, 8n, 7n, 6n, 5n, 4n, ...forgedRSpecs[0].inLimbs] };
-const forgedR = isolated(forgedRSpecs);
+const forgedState = isolatedFirstMiller({}, Array.from({ length: 18 }, (_, i) => BigInt(i + 1)));
 const rangeSpec = specsVkx(INSTANCES.committed)[0];
 const outOfRange = isolated([{ ...rangeSpec, inLimbs: [Rord, PUBLIC_INPUTS[1]], role: 'stage-final' }]);
 
 // Exact full-state seams reject proof splices and mutations of each proof component.
 const vkxCount = specsVkx(INSTANCES.committed).length;
-const g2Count = specsG2check(INSTANCES.committed).length;
-const millerGenesisIndex = vkxCount + g2Count;
+const millerGenesisIndex = vkxCount;
 const hybrid = assembleGrouped([...cSpecs.slice(0, millerGenesisIndex), ...p1Specs.slice(millerGenesisIndex)], GROUPS, true);
+const hybridGroup = hybrid.meta[millerGenesisIndex].group;
+if (hybridGroup > 0) {
+  const predecessor = hybrid.gmeta[hybridGroup - 1].outToken;
+  if (!predecessor) throw new Error('proof-splice boundary has no predecessor token');
+  hybrid.gmeta[hybridGroup].inToken.commit = Uint8Array.from(predecessor.commit);
+}
+const hybridInvalid = evaluateMutated(hybrid);
 const proofMutations = [1 * W, 3 * W, 7 * W].map((offset) => mutateGroupedInput(asmCommitted, millerGenesisIndex, offset));
 
 // A group hand-off also pins the actual successor P2SH32 locking, not only its state hash.
@@ -488,10 +488,10 @@ handoff.outLocking = Uint8Array.from(handoff.outLocking);
 handoff.outLocking[handoff.outLocking.length - 1] ^= 0x01;
 const lockTamper = evaluateMutated(lockTamperAsm);
 
-const semantic = [offCurveA, offSubgroupB, offCurveC, forgedR, outOfRange];
+const semantic = [offCurveA, offSubgroupB, offCurveC, forgedState, outOfRange];
 const securityInvalids = [
-  ...semantic.map((asm) => ({ run: toRun(asm), rejected: !asm.accepted })),
-  { run: toRun(hybrid), rejected: !hybrid.accepted },
+  ...semantic.map(evaluateMutated),
+  hybridInvalid,
   ...proofMutations,
   lockTamper,
 ];
@@ -502,7 +502,7 @@ if (!asmCommitted.fits || !asmProof1.fits || !asmDense.fits || !allInvalids.ever
 }
 
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-grouped-vectors.json'), JSON.stringify({
-  description: 'GROUPED BLS12-381 Groth16 verifier: canonical-range-checked vk_x -> exact (-A,B,C,vk_x) state -> G1/G2 on-curve and subgroup validation -> prepared-VK Miller product -> final exponentiation -> verdict, packed into standard transactions. G2 and Miller derive their accumulators from B. Within a group every chunk forward-checks the entire successor blob; across groups a mutable NFT carries hash256(outBlob), and the boundary covenant pins the actual successor P2SH32 locking. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. Negative cases for off-curve, off-subgroup, forged-R, scalar-range, proof-splice, A/B/C mutation, and successor-lock inputs reject.',
+  description: 'GROUPED BLS12-381 Groth16 verifier: canonical-range-checked vk_x -> exact (-A,B,C,vk_x) state -> input-validated prepared-VK Miller product -> final exponentiation -> verdict, packed into standard transactions. The first Miller chunk checks A/C and B on-curve; the final Miller chunk reuses its running R_B=[|x|]B for the guarded psi(B)==[-x]B subgroup check. Miller derives f=1 and R_B=B. Within a group every chunk forward-checks the entire successor blob; across groups a mutable NFT carries hash256(outBlob), and the boundary covenant pins the actual successor P2SH32 locking. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. Negative cases for off-curve, off-subgroup, forged-state, scalar-range, proof-splice, A/B/C mutation, and successor-lock inputs reject.',
   method: 'grouped', deployment: 'P2SH32', curve: 'BLS12-381', category: binToHex(CATEGORY),
   numInputs: asmCommitted.meta.length, numGroups: GROUPS.length, budgetPerInput: OP_BUDGET,
   groupSizes: GROUPS.map(([lo, hi]) => hi - lo + 1),

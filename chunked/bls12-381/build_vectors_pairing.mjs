@@ -18,9 +18,8 @@ import {
   Fp12, millerPreparedOps, assertPreparedMillerManifest, f12limbs, r6limbs, pairsFor, ptLimbs, finalexpTrace, boundaryFor,
   commitBin, CATEGORY, tok, P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, verifierPath,
 } from './_pairingmath.mjs';
-import { PUBLIC_INPUTS, vk, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
+import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode, compileFileBytecodeRaw } from './_vkxmath.mjs';
-import { g2checkAccAt } from './gen_g2check.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -98,7 +97,7 @@ function compiledVariants(cashFile, nextLocking) {
 function buildCovStep(spec, nextLocking, noStats) {
   const { cashFile, commitLimbs, outLimbs, label, checkpoint, allArgs, terminal = false } = spec;
   const pushArgs = allArgs ?? commitLimbs;
-  // compileFile (not compileString) so the g2check chunks' relative library `import` resolves;
+  // compileFile (not compileString) so generated chunks' relative library `import` resolves;
   // it compiles the inlined vkx/miller/finalexp chunks identically. Per-chunk A/B: BLS chunks
   // run close to the 10,000 B caps, so keep whichever of {rescheduled, plain-cashc} redeem
   // yields the smaller fitting step (covenant steps are independent txs, so the choice is local).
@@ -206,7 +205,7 @@ const mkInstance = (inputs, bS = 1n, cS = 13n) => {
 };
 const INSTANCES = [
   { tag: 'committed', inputs: PUBLIC_INPUTS, proof },
-  { tag: 'instance#1', ...mkInstance([135208n, 67633n], 17n, 19n) },
+  { tag: 'dense-instance', ...mkInstance([(1n << 254n) - 1n, (1n << 254n) - 1n], 17n, 19n) },
 ];
 
 // ---- BATCHED Miller replay (flat op list; final chunk conjugates f = boundary) ----
@@ -225,23 +224,26 @@ const stageLimbs = (inst, bad = {}) => {
   ];
 };
 
-function specsPairing(inst) {
+function specsMiller(inst, validated = false, bad = {}) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const trace = millerPreparedOps(pairs);
   const { ops, states, finalF } = trace;
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
-  const stage = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
-  if (!sameLimbs(stage, stageLimbs(inst))) throw new Error(`Miller genesis layout mismatch for ${inst.tag}`);
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_miller.json'), 'utf8'));
+  const traceStage = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
+  if (!sameLimbs(traceStage, stageLimbs(inst))) throw new Error(`Miller genesis layout mismatch for ${inst.tag}`);
+  const stage = stageLimbs(inst, bad);
+  const prefix = validated ? 'millerfull' : 'miller';
+  const man = JSON.parse(readFileSync(join(GEN, `manifest_${prefix}.json`), 'utf8'));
+  if (man.inputValidationFused !== validated) throw new Error(`${prefix} input-validation mode mismatch`);
   assertPreparedMillerManifest(man, trace, { checkReferenceBoundary: inst.tag === 'committed' });
   const specs = [];
   for (const ch of man.chunks) {
     const commitLimbs = ch.opLo === 0 ? stage : [...stateLimbs(states[ch.opLo]), ...ptL];
     const outLimbs = ch.final ? f12limbs(finalF) : [...stateLimbs(states[ch.opHi]), ...ptL];
     specs.push({
-      cashFile: join(GEN, `miller_${String(ch.idx).padStart(2, '0')}.cash`), commitLimbs, outLimbs,
-      label: `miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' +conj=boundary' : ''}`,
-      checkpoint: ch.final ? 'miller-boundary' : undefined,
+      cashFile: join(GEN, `${prefix}_${String(ch.idx).padStart(2, '0')}.cash`), commitLimbs, outLimbs,
+      label: `${validated ? 'validated ' : ''}miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' +subgroup+conj=boundary' : ''}`,
+      checkpoint: ch.opLo === 0 && validated ? 'validate-inputs' : ch.final ? 'miller-boundary' : undefined,
     });
   }
   return { specs, boundaryVal: finalF };
@@ -292,61 +294,44 @@ function specsVkx(inst) {
   return specs;
 }
 
-// ---- G2 input-validation prologue (EIP-197): on-curve A/B/C + psi(B) == [-x]B ----
-// `bad` (optional) overrides the points with negative-case values (off-curve / off-subgroup)
-// and suppresses stats — for an invalidInputs run that MUST reject.
-const F2b = bls12_381.fields.Fp2;
-const g2sLimbs = (R, stage) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1, ...stage];
-function specsG2check(inst, bad) {
-  const stage = stageLimbs(inst, bad);
-  const Bx = F2b.create({ c0: stage[2], c1: stage[3] });
-  const By = F2b.create({ c0: stage[4], c1: stage[5] });
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
-  if (man.stageBound !== true || man.genesisDerived !== true || man.carriesVkx !== true) throw new Error('G2 manifest is not stage-bound');
-  const specs = [];
-  for (const ch of man.chunks) {
-    const commitLimbs = ch.first ? stage : g2sLimbs(g2checkAccAt(Bx, By, ch.lo), stage);
-    const outLimbs = ch.last ? stage : g2sLimbs(g2checkAccAt(Bx, By, ch.hi), stage);
-    specs.push({
-      cashFile: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`), commitLimbs, outLimbs,
-      label: `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' psi(B)==[-x]B' : ''}`,
-      checkpoint: ch.first ? 'validate-inputs' : undefined,
-    });
-  }
-  return specs;
-}
-
 // Build the FULL verifier as one exact token-state chain:
-// public inputs -> vk_x/(-A,B,C) -> G2 validation -> prepared Miller -> final exponentiation.
-// Every nonterminal locking commits the actual successor locking bytecode. The Miller+finalexp
-// suffix doubles as the explicitly input-unvalidated pairing-only milestone.
+// public inputs -> vk_x/(-A,B,C) -> input-validated prepared Miller -> final exponentiation.
+// Pairing-only uses the separate, explicitly input-unvalidated Miller namespace.
 const buildGroth16 = (inst) => {
   const vkx = specsVkx(inst);
-  const g2 = specsG2check(inst);
-  const { specs: miller, boundaryVal } = specsPairing(inst);
+  const { specs: miller, boundaryVal } = specsMiller(inst, true);
   const fe = specsFinalexp(inst, boundaryVal);
-  const all = buildChain([...vkx, ...g2, ...miller, ...fe]);
-  const pairing = all.slice(vkx.length + g2.length);
-  return { all, pairing, vkx, g2, miller, fe };
+  return { all: buildChain([...vkx, ...miller, ...fe]), vkx, miller, fe };
 };
-const run0 = buildGroth16(INSTANCES[0]);
-const run1 = buildGroth16(INSTANCES[1]);
+const buildPairing = (inst) => {
+  const { specs: miller, boundaryVal } = specsMiller(inst);
+  const fe = specsFinalexp(inst, boundaryVal);
+  return { all: buildChain([...miller, ...fe]), miller, fe };
+};
+const run0 = { ...buildGroth16(INSTANCES[0]), pairing: buildPairing(INSTANCES[0]).all };
+const run1 = { ...buildGroth16(INSTANCES[1]), pairing: buildPairing(INSTANCES[1]).all };
 const steps = run0.all;
 const extraValidProofs = [run1.all];
 const sumOp = (a) => a.reduce((x, s) => x + s.operationCost, 0);
 const maxOpOf = (a) => Math.max(...a.map((s) => s.operationCost));
-console.error(`full groth16: ${steps.length} steps (vk_x + g2check + miller + finalexp)`);
+console.error(`full groth16: ${steps.length} steps (vk_x + input-validated miller + finalexp)`);
 console.error(`valid run: allFit=${stats.allFit} allAccept=${stats.allAccept} allInvalidRejected=${stats.allInvalid}`);
 if (!stats.allFit || !stats.allAccept || !stats.allInvalid) { console.error('!! a step did not fit/accept/reject -- NOT writing vectors'); process.exit(1); }
 
 // ---- negative-case INPUT runs (must REJECT) for the harness's input-validation grading ----
-// off-curve A: bump A.y so y^2 != x^3+4 -> the first g2check chunk's G1 cubic require fails.
+// Off-curve A/C fail in the first validated Miller chunk.
 const Aa = proof.a.negate().toAffine();
-const millerTail = hexToBin(run0.pairing[0].locking);
-const buildInvalidG2 = (bad) => buildChain(specsG2check(INSTANCES[0], bad), { noStats: true, tailLocking: millerTail, expectRejected: true });
-const offCurveARun = buildInvalidG2({ Ay: (Aa.y + 1n) % P });
+const millerStart = run0.vkx.length;
+const firstMillerTail = hexToBin(run0.all[millerStart + 1].locking);
+const buildInvalidFirstMiller = (bad, extraArgs = []) => {
+  const first = specsMiller(INSTANCES[0], true, bad).specs[0];
+  if (extraArgs.length > 0) first.allArgs = [...extraArgs, ...first.commitLimbs];
+  return buildChain([first], { noStats: true, tailLocking: firstMillerTail, expectRejected: true });
+};
+const offCurveARun = buildInvalidFirstMiller({ Ay: (Aa.y + 1n) % P });
 // on-curve but OFF-SUBGROUP B: a point on the twist y^2=x^3+(4+4u) outside the order-r
-// subgroup -> psi(B) == [-x]B fails at the last g2check chunk. Search small x.
+// subgroup -> psi(B) == [-x]B fails in the final validated Miller chunk. Search small x.
+const F2b = bls12_381.fields.Fp2;
 const b2 = F2b.create({ c0: 4n, c1: 4n });
 let offSub = null;
 for (let i = 1n; i < 800n && !offSub; i++) {
@@ -357,15 +342,19 @@ for (let i = 1n; i < 800n && !offSub; i++) {
   try { bls12_381.G2.Point.fromAffine({ x, y }).assertValidity(); } catch { offSub = { x, y }; } // on-curve, not torsion-free
 }
 if (!offSub) throw new Error('failed to construct the off-subgroup B fixture; refusing to write vectors');
-const offSubRun = buildInvalidG2({ Bx: offSub.x, By: offSub.y });
+const offSubInst = {
+  tag: 'off-subgroup-B', inputs: INSTANCES[0].inputs,
+  proof: { ...proof, b: G2.fromAffine({ x: offSub.x, y: offSub.y }) },
+};
+const offSubMiller = specsMiller(offSubInst, true).specs;
+const finalexpStart = millerStart + run0.miller.length;
+const offSubRun = buildChain(offSubMiller, { noStats: true, tailLocking: hexToBin(run0.all[finalexpStart].locking), expectRejected: true });
 const Ca = proof.c.toAffine();
-const offCurveCRun = buildInvalidG2({ Cy: (Ca.y + 1n) % P });
+const offCurveCRun = buildInvalidFirstMiller({ Cy: (Ca.y + 1n) % P });
 
-// Legacy forged-R shape: six attacker-chosen accumulator limbs prepended to the exact stage.
-// The derived-genesis first G2 contract has no R parameters, so this must fail clean-stack/arity.
-const forgedSpecs = specsG2check(INSTANCES[0]);
-forgedSpecs[0] = { ...forgedSpecs[0], allArgs: [9n, 8n, 7n, 6n, 5n, 4n, ...forgedSpecs[0].commitLimbs] };
-const forgedRRun = buildChain(forgedSpecs, { noStats: true, tailLocking: millerTail, expectRejected: true });
+// The validated genesis derives both f=1 and R_B=B; a caller-supplied legacy f/R prefix
+// therefore fails clean-stack/arity rather than becoming verifier state.
+const forgedStateRun = buildInvalidFirstMiller({}, Array.from({ length: 18 }, (_, i) => BigInt(i + 1)));
 
 // Public scalars are canonical Fr elements, not values silently truncated to 255 bits.
 const badRangeSpecs = specsVkx(INSTANCES[0]);
@@ -375,22 +364,22 @@ const outOfRangeRun = buildChain([badRangeSpecs[0]], { noStats: true, tailLockin
 // A proof from the second valid instance cannot be spliced onto the first instance's public
 // inputs: all validation stages accept the points, but the final pairing verdict rejects.
 const spliced = { tag: 'proof-splice', inputs: INSTANCES[0].inputs, proof: INSTANCES[1].proof };
-const splicedVkx = specsVkx(spliced), splicedG2 = specsG2check(spliced);
-const { specs: splicedMiller, boundaryVal: splicedBoundary } = specsPairing(spliced);
-const splicedRun = buildChain([...splicedVkx, ...splicedG2, ...splicedMiller, ...specsFinalexp(spliced, splicedBoundary, false)], { noStats: true, expectRejected: true });
+const splicedVkx = specsVkx(spliced);
+const { specs: splicedMiller, boundaryVal: splicedBoundary } = specsMiller(spliced, true);
+const splicedRun = buildChain([...splicedVkx, ...splicedMiller, ...specsFinalexp(spliced, splicedBoundary, false)], { noStats: true, expectRejected: true });
 
 // The vector assembler also refuses a direct cross-proof stage seam before any file is written.
 let seamSpliceRejected = false;
 try {
-  const { specs: wrongMiller, boundaryVal: wrongBoundary } = specsPairing(INSTANCES[1]);
-  buildChain([...specsVkx(INSTANCES[0]), ...specsG2check(INSTANCES[0]), ...wrongMiller, ...specsFinalexp(INSTANCES[1], wrongBoundary)], { noStats: true });
+  const { specs: wrongMiller, boundaryVal: wrongBoundary } = specsMiller(INSTANCES[1], true);
+  buildChain([...specsVkx(INSTANCES[0]), ...wrongMiller, ...specsFinalexp(INSTANCES[1], wrongBoundary)], { noStats: true });
 } catch (error) {
   seamSpliceRejected = String(error?.message ?? error).includes('commitment seam mismatch');
 }
 if (!seamSpliceRejected) throw new Error('cross-proof stage seam was not rejected');
 
-console.error(`negative cases: off-curve A/C, off-subgroup B, forged R, Fr range, and proof splice all rejected`);
-const invalidInputs = [offCurveARun, offSubRun, offCurveCRun, forgedRRun, outOfRangeRun, splicedRun];
+console.error(`negative cases: off-curve A/C, off-subgroup B, forged state, Fr range, and proof splice all rejected`);
+const invalidInputs = [offCurveARun, offSubRun, offCurveCRun, forgedStateRun, outOfRangeRun, splicedRun];
 
 writeFileSync(verifierPath('src', 'bch', 'pairing-bls12381-chunked-vectors.json'), JSON.stringify({
   description: 'PROOF-AGNOSTIC chunked BLS12-381 Groth16 pairing: a prepared-VK 4-pair optimal-ate Miller product -> Miller boundary (the conjugated f; no separate combine), then final exponentiation -> verdict (== Fp12 ONE), multi-tx. Pairing-only intentionally does not validate G1/G2 inputs; the full Groth16 track does. Miller genesis accepts only (-A,B,C,vk_x), derives f=1 and R_B=B, and every nonterminal token state pins the actual successor locking. Fixed gamma/delta G2 trajectories use manifest-bound baked line coefficients, and fixed e(alpha,beta) is folded as one dense multiplication. Lazy field reduction (addFp deferred). One fixed set of lockings verifies multiple proofs under the same VK. The 381-iter Fermat inverse in the easy part is supplied as an unlocking witness and verified by fp12Mul(f, f^-1)==ONE.',
@@ -402,7 +391,7 @@ writeFileSync(verifierPath('src', 'bch', 'pairing-bls12381-chunked-vectors.json'
 console.error(`wrote src/bch/pairing-bls12381-chunked-vectors.json (${run0.pairing.length} steps)`);
 
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-chunked-vectors.json'), JSON.stringify({
-  description: 'PROOF-AGNOSTIC full chunked BLS12-381 Groth16 verifier with EIP-197 input validation: public inputs -> canonical-range-checked vk_x -> committed (-A,B,C,vk_x) -> on-curve/subgroup validation -> prepared-VK Miller product -> final exponentiation -> verdict. G2 and Miller derive their initial accumulators from the committed B; callers cannot supply R or f. Every stage emits the exact next-stage state, and every nonterminal covenant pins the actual successor locking, forming one cryptographically continuous mutable-NFT token chain. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. One fixed locking chain verifies multiple proofs. Negative cases for off-curve, off-subgroup, forged-R, out-of-range, and cross-proof splice inputs must reject.',
+  description: 'PROOF-AGNOSTIC full chunked BLS12-381 Groth16 verifier with EIP-197 input validation: public inputs -> canonical-range-checked vk_x -> committed (-A,B,C,vk_x) -> input-validated prepared-VK Miller product -> final exponentiation -> verdict. The first Miller chunk checks A/C and B on-curve; the final Miller chunk reuses its running R_B=[|x|]B for the guarded psi(B)==[-x]B subgroup check. Miller derives f=1 and R_B=B; callers cannot supply either accumulator. Every stage emits the exact next-stage state, and every nonterminal covenant pins the actual successor locking, forming one cryptographically continuous mutable-NFT token chain. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. One fixed locking chain verifies multiple proofs. Negative cases for off-curve, off-subgroup, forged-state, out-of-range, and cross-proof splice inputs must reject.',
   proofBinding: 'runtime', curve: 'BLS12-381', numSteps: steps.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(steps), maxStepOperationCost: maxOpOf(steps),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
