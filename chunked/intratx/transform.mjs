@@ -89,6 +89,12 @@ function parseParams(sig) {
  *   cfg.externalBindings additional byte-slice bindings from this chunk's inBlob to another
  *                    input's inBlob: [{sourceOffset,targetInputIndex,targetFullInLen,
  *                    targetOffset,length}]. targetInputIndex is transaction-local.
+ *   cfg.externalParams incoming-state parameters loaded from another input's first witness
+ *                    push instead of this chunk's inBlob. Each entry has
+ *                    {name,targetInputIndex,targetFullInLen,targetOffset,width,
+ *                    targetLockingHash}. The optional locking hash pins the carrier UTXO.
+ *   cfg.outputCount  emit only this many leading covOut limbs. Used when immutable state is
+ *                    supplied independently and only a dynamic prefix is forwarded.
  *   cfg.enforceExactInputLength when true, reject inBlob values with trailing/legacy
  *                    state limbs instead of parsing only the declared prefix.
  * Returns { src, inNames, outNames|null, extras, isTerminal, inLen, outLen }.
@@ -104,9 +110,27 @@ export function transformChunk(src, cfg) {
   // covIn: the single line binding incoming state to the spent NFT commitment.
   const ciIdx = lines.findIndex((l) => l.includes('activeInputIndex].nftCommitment'));
   if (ciIdx < 0) throw new Error('no covIn');
-  const inNames = [...lines[ciIdx].matchAll(/toPaddedBytes\((\w+),\s*\d+\)/g)].map((m) => m[1]);
+  const allInNames = [...lines[ciIdx].matchAll(/toPaddedBytes\((\w+),\s*\d+\)/g)].map((m) => m[1]);
+  const allInSet = new Set(allInNames);
+  const externalParams = (cfg.externalParams ?? []).map((param) => ({
+    ...param,
+    width: param.width ?? widthOf(param.name),
+  }));
+  const externalParamNames = new Set();
+  for (const param of externalParams) {
+    const { name, targetInputIndex, targetFullInLen, targetOffset, width, targetLockingHash } = param;
+    const values = [targetInputIndex, targetFullInLen, targetOffset, width];
+    if (!allInSet.has(name) || externalParamNames.has(name) ||
+      !values.every(Number.isSafeInteger) || values.some((value) => value < 0) ||
+      targetFullInLen === 0 || width === 0 || targetOffset + width > targetFullInLen ||
+      (targetLockingHash !== undefined && !/^[0-9a-f]{64}$/i.test(targetLockingHash))) {
+      throw new Error(`invalid external param: ${JSON.stringify(param)}`);
+    }
+    externalParamNames.add(name);
+  }
+  const inNames = allInNames.filter((name) => !externalParamNames.has(name));
   const inWidths = inNames.map(widthOf);
-  const inSet = new Set(inNames);
+  const inSet = allInSet;
   const externalBindings = cfg.externalBindings ?? [];
   const externalChecks = externalBindings.map((binding) => {
     const { sourceOffset, targetInputIndex, targetFullInLen, targetOffset, length } = binding;
@@ -156,8 +180,14 @@ export function transformChunk(src, cfg) {
     // on the line before covOut; either way drop that line and the covOut from the body.
     const hasIntP = /^int P(mod)? =/.test(lines[coIdx - 1].trim());
     body = lines.slice(ciIdx + 1, hasIntP ? coIdx - 1 : coIdx);
-    const outMatches = [...lines[coIdx].matchAll(/toPaddedBytes\((\w+)(\s*%\s*P(?:mod)?)?,\s*\d+\)/g)];
+    let outMatches = [...lines[coIdx].matchAll(/toPaddedBytes\((\w+)(\s*%\s*P(?:mod)?)?,\s*\d+\)/g)];
     if (outMatches.length === 0) throw new Error('no covOut limbs');
+    if (cfg.outputCount !== undefined) {
+      if (!Number.isSafeInteger(cfg.outputCount) || cfg.outputCount <= 0 || cfg.outputCount > outMatches.length) {
+        throw new Error(`invalid outputCount: ${cfg.outputCount}`);
+      }
+      outMatches = outMatches.slice(0, cfg.outputCount);
+    }
     outNames = outMatches.map((match) => match[1]);
     const exactOutputs = outMatches.map((match) => match[2] === undefined);
     outWidths = outNames.map(widthOf);
@@ -250,6 +280,44 @@ export function transformChunk(src, cfg) {
       prologue.push(`        bytes rr${p} = ${cur}.split(${width})[1];`);
       cur = `rr${p}`;
     }
+  }
+
+  const usedExternalParams = externalParams.filter(({ name }) => new RegExp(`\\b${name}\\b`).test(usedText));
+  if (usedExternalParams.length > 0) {
+    usedExternalParams.sort((a, b) => a.targetOffset - b.targetOffset);
+    const { targetInputIndex, targetFullInLen, targetLockingHash } = usedExternalParams[0];
+    for (let p = 0; p < usedExternalParams.length; p++) {
+      const param = usedExternalParams[p];
+      if (param.targetInputIndex !== targetInputIndex || param.targetFullInLen !== targetFullInLen ||
+        param.targetLockingHash !== targetLockingHash ||
+        (p > 0 && usedExternalParams[p - 1].targetOffset + usedExternalParams[p - 1].width > param.targetOffset)) {
+        throw new Error(`external params must share one non-overlapping carrier: ${JSON.stringify(usedExternalParams)}`);
+      }
+    }
+    if (targetLockingHash !== undefined) {
+      prologue.push(`        require(hash256(tx.inputs[${targetInputIndex}].lockingBytecode) == 0x${targetLockingHash});`);
+    }
+    prologue.push(
+      `        bytes linkedCarrier = tx.inputs[${targetInputIndex}].unlockingBytecode.split(${headerSize(targetFullInLen)})[1].split(${targetFullInLen})[0];`,
+    );
+    let carrierTail = 'linkedCarrier';
+    let carrierOffset = 0;
+    usedExternalParams.forEach((param, p) => {
+      if (param.targetOffset > carrierOffset) {
+        prologue.push(`        bytes linkedGap${p} = ${carrierTail}.split(${param.targetOffset - carrierOffset})[1];`);
+        carrierTail = `linkedGap${p}`;
+        carrierOffset = param.targetOffset;
+      }
+      if (p === usedExternalParams.length - 1) {
+        prologue.push(`        int ${param.name} = int(${carrierTail}.split(${param.width})[0]);`);
+      } else {
+        prologue.push(
+          `        bytes linkedValue${p}, bytes linkedTail${p} = ${carrierTail}.split(${param.width}); int ${param.name} = int(linkedValue${p});`,
+        );
+        carrierTail = `linkedTail${p}`;
+      }
+      carrierOffset += param.width;
+    });
   }
 
   const out = [...header, newSig, ...prologue, ...body, ...epilogue, '    }', ...tail].join('\n');

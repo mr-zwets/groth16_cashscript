@@ -143,6 +143,19 @@ const dummy = pairsFor([1n, 1n]);
 const VKX_LIMB_OFFSET = ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length + ptLimbs(3, dummy[3].P.toAffine(), dummy[3].Q.toAffine()).length;
 const PTL_LEN = dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())).length; // 10
 const MILLER_IN_LIMBS = PTL_LEN + 24;
+const MILLER_DYNAMIC_LIMBS = 16; // f(12) + affine runtime R0(4)
+const MILLER_GENESIS_INPUT = G2_COUNT + GLV_COUNT;
+const MILLER_GENESIS_NAMES = [
+  'Px0', 'Py0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Px3', 'Py3', 'Px2', 'Py2',
+  ...Array.from({ length: 12 }, (_, i) => `c${i}`),
+  ...Array.from({ length: 12 }, (_, i) => `ci${i}`),
+];
+const MILLER_STATIC_NAMES = [
+  'Px0', 'Py0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Px2', 'Py2', 'Px3', 'Py3',
+  ...Array.from({ length: 12 }, (_, i) => `c${i}`),
+  ...Array.from({ length: 12 }, (_, i) => `ci${i}`),
+];
+const MILLER_GENESIS_OFFSETS = new Map(MILLER_GENESIS_NAMES.map((name, i) => [name, i * W]));
 
 // ---- per-stage chunk specs (inLimbs/outLimbs/extras/role) — IDENTICAL to the grouped-residue
 // build (chunked/grouped/build_vectors_residue.mjs); only the assembly below differs (single tx).
@@ -253,7 +266,7 @@ function specsMillerFused(inst, c, cInv, w) {
     };
   });
 }
-function buildSpecs(inst) {
+function buildSpecs(inst, staticContextLockingHash) {
   const g2 = FUSE_G2_ENDPOINT ? [] : specsG2check(inst);
   const vkx = specsVkx(inst, true);
   const pairs = pairsFor(inst.inputs, inst.proof);
@@ -267,6 +280,28 @@ function buildSpecs(inst) {
     : millerBatchOps(pairs).boundary;
   const { c, cInv, w } = residueWitness(fRaw);
   const miller = specsMillerFused(inst, c, cInv, w);
+  if (MILLER_AFFINE_G2) {
+    if (MILLER_GENESIS_INPUT !== 3 || g2.length !== 0 || miller.length === 0) {
+      throw new Error('affine Miller static context requires genesis at absolute input 3');
+    }
+    miller.forEach((spec, i) => {
+      spec.enforceExactInputLength = true;
+      if (i > 0) {
+        spec.inLimbs = spec.inLimbs.slice(0, MILLER_DYNAMIC_LIMBS);
+        spec.externalParams = MILLER_STATIC_NAMES.map((name) => ({
+          name,
+          targetSpecIndex: MILLER_GENESIS_INPUT,
+          targetOffset: MILLER_GENESIS_OFFSETS.get(name),
+          width: W,
+          targetLockingHash: staticContextLockingHash,
+        }));
+      }
+      if (spec.role !== 'terminal') {
+        spec.outLimbs = spec.outLimbs.slice(0, MILLER_DYNAMIC_LIMBS);
+        spec.outputCount = MILLER_DYNAMIC_LIMBS;
+      }
+    });
+  }
   if (!FUSE_G2_ENDPOINT) {
     const millerGenesisIndex = g2.length + vkx.length;
     g2[g2.length - 1].externalBindings = [
@@ -302,17 +337,41 @@ const specConfig = (specs, i) => {
       length: binding.length,
     };
   });
-  const key = `${s.file}|${s.role}|${JSON.stringify(forward)}|${JSON.stringify(externalBindings)}`;
-  return { key, forward, externalBindings };
+  const externalParams = (s.externalParams ?? []).map((param) => {
+    const target = specs[param.targetSpecIndex];
+    if (!target) throw new Error(`external param target ${param.targetSpecIndex} is not a verifier input`);
+    return {
+      name: param.name,
+      targetInputIndex: param.targetSpecIndex,
+      targetFullInLen: byteLengthOf(target, 'in'),
+      targetOffset: param.targetOffset,
+      width: param.width,
+      targetLockingHash: param.targetLockingHash,
+    };
+  });
+  const key = `${s.file}|${s.role}|output=${s.outputCount ?? 'all'}|` +
+    `exact=${s.enforceExactInputLength === true}|${JSON.stringify(forward)}|` +
+    `${JSON.stringify(externalBindings)}|${JSON.stringify(externalParams)}`;
+  return {
+    key,
+    forward,
+    externalBindings,
+    externalParams,
+    outputCount: s.outputCount,
+    enforceExactInputLength: s.enforceExactInputLength,
+  };
 };
 function compileSpec(specs, i) {
   const s = specs[i];
-  const { key, forward, externalBindings } = specConfig(specs, i);
+  const {
+    key, forward, externalBindings, externalParams, outputCount, enforceExactInputLength,
+  } = specConfig(specs, i);
   let v = compileCache.get(key);
   if (!v) {
     // compile from a file (probe in generated/) so the chunk's relative library import resolves
     writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), {
       W, widthsByName: GLV_WIDTHS_BY_NAME, prime: PRIME, forward, externalBindings,
+      externalParams, outputCount, enforceExactInputLength,
     }).src);
     const resched = compileFileBytecode(PROBE);
     const raw = RESCHED ? compileFileBytecodeRaw(PROBE) : resched;
@@ -475,9 +534,17 @@ const report = (tag, asm) => {
 };
 
 // ===================== FULL GROTH16 (residue, single tx) =====================
-const committedSpecs = buildSpecs(INSTANCES.committed);
-const proof1Specs = buildSpecs(INSTANCES.proof1);
-const worstSpecs = buildSpecs(INSTANCES.worst);
+let committedSpecs = buildSpecs(INSTANCES.committed);
+let millerGenesisLockingHash;
+if (MILLER_AFFINE_G2) {
+  // Resolve the proof-independent genesis locking after redeem selection, then pin every
+  // static-context reader to that exact UTXO script before producing the measured vectors.
+  const carrierProbe = assemble(committedSpecs);
+  millerGenesisLockingHash = binToHex(hash256(carrierProbe.inputs[MILLER_GENESIS_INPUT].locking));
+  committedSpecs = buildSpecs(INSTANCES.committed, millerGenesisLockingHash);
+}
+const proof1Specs = buildSpecs(INSTANCES.proof1, millerGenesisLockingHash);
+const worstSpecs = buildSpecs(INSTANCES.worst, millerGenesisLockingHash);
 const full0 = assemble(committedSpecs);
 report('groth16-intratx-residue committed', full0);
 // The benchmark's dense proof is not the GLV density worst case: its four decomposition
@@ -584,6 +651,72 @@ const fullInvalid = [
   ...proofMutations,
   tableMutation,
 ];
+if (MILLER_AFFINE_G2) {
+  const contextMutations = [
+    ['-A/B', 'Px0'],
+    ['C', 'Px3'],
+    ['vk_x', 'Px2'],
+    ['c', 'c0'],
+    ['cInv', 'ci0'],
+  ].map(([label, name]) => {
+    const byteOffset = MILLER_GENESIS_OFFSETS.get(name);
+    if (byteOffset === undefined) throw new Error(`missing Miller genesis offset for ${name}`);
+    const inputs = mutateInputBlob(full0.inputs, MILLER_GENESIS_INPUT, byteOffset);
+    let readerIndex = -1;
+    for (let i = MILLER_GENESIS_INPUT + 1; i < committedSpecs.length; i++) {
+      if (!evalInput(inputs, i).accepted && !evalInput(inputs, i, standardVm).accepted) {
+        readerIndex = i;
+        break;
+      }
+    }
+    if (readerIndex < 0) {
+      throw new Error(`Miller reader accepted mutated ${label} static context`);
+    }
+    return { steps: toStepArr({ inputs, meta: full0.meta }), rejected: true };
+  });
+
+  const lockingInputs = full0.inputs.map((input) => ({ ...input }));
+  const locking = Uint8Array.from(lockingInputs[MILLER_GENESIS_INPUT].locking);
+  locking[0] ^= 0x01;
+  lockingInputs[MILLER_GENESIS_INPUT] = { ...lockingInputs[MILLER_GENESIS_INPUT], locking };
+  const firstReaderIndex = MILLER_GENESIS_INPUT + 1;
+  if (evalInput(lockingInputs, firstReaderIndex).accepted || evalInput(lockingInputs, firstReaderIndex, standardVm).accepted) {
+    throw new Error('Miller reader accepted a redirected static-context carrier');
+  }
+
+  const seamInputIndex = MILLER_GENESIS_INPUT + 2;
+  const seamInputs = mutateInputBlob(full0.inputs, seamInputIndex, 5 * W);
+  if (evalInput(seamInputs, seamInputIndex - 1).accepted || evalInput(seamInputs, seamInputIndex - 1, standardVm).accepted) {
+    throw new Error('Miller predecessor accepted a mutated dynamic-state seam');
+  }
+
+  const trailingInputIndex = MILLER_GENESIS_INPUT + 1;
+  const trailingInputs = full0.inputs.slice();
+  const baseUnlocking = trailingInputs[trailingInputIndex].unlocking;
+  const inBlob = pushBounds(baseUnlocking);
+  const longerInBlob = Uint8Array.from([
+    ...baseUnlocking.slice(inBlob.dataStart, inBlob.dataStart + inBlob.dataLen),
+    0,
+  ]);
+  trailingInputs[trailingInputIndex] = {
+    ...trailingInputs[trailingInputIndex],
+    unlocking: Uint8Array.from([
+      ...pd(longerInBlob),
+      ...baseUnlocking.slice(inBlob.dataStart + inBlob.dataLen),
+    ]),
+  };
+  if (evalInput(trailingInputs, trailingInputIndex).accepted || evalInput(trailingInputs, trailingInputIndex, standardVm).accepted) {
+    throw new Error('Miller reader accepted trailing bytes in dynamic state');
+  }
+
+  fullInvalid.push(
+    ...contextMutations,
+    { steps: toStepArr({ inputs: lockingInputs, meta: full0.meta }), rejected: true },
+    { steps: toStepArr({ inputs: seamInputs, meta: full0.meta }), rejected: true },
+    { steps: toStepArr({ inputs: trailingInputs, meta: full0.meta }), rejected: true },
+  );
+  console.error('  static context mutations: -A/B, C, vk_x, c, cInv, carrier locking, dynamic seam, and trailing state rejected');
+}
 let endpointSpecIndex = -1;
 if (FUSE_G2_ENDPOINT) {
   const manifest = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
@@ -623,7 +756,10 @@ const invalidPointRuns = invalidG2Overrides(
     b: bn254.G2.Point.fromAffine({ x: bad.Bx ?? baseB.x, y: bad.By ?? baseB.y }),
     c: bn254.G1.Point.fromAffine({ x: bad.Cx ?? baseC.x, y: bad.Cy ?? baseC.y }),
   };
-  const run = assemble(buildSpecs({ proof: badProof, inputs: INSTANCES.committed.inputs }), true);
+  const run = assemble(buildSpecs(
+    { proof: badProof, inputs: INSTANCES.committed.inputs },
+    millerGenesisLockingHash,
+  ), true);
   const expectedFailure = bad.Bx === undefined ? millerGenesisIndex : endpointSpecIndex;
   if (run.meta[expectedFailure]?.accepted !== false) {
     throw new Error('fused Miller input validation accepted an invalid point');
@@ -734,7 +870,10 @@ if (FUSE_G2_ENDPOINT && ENDPOINT_VM_CASES > 1) {
       b: proof.b.multiply(scalar),
       c: proof.c,
     };
-    const run = assemble(buildSpecs({ proof: scaledProof, inputs: INSTANCES.committed.inputs }));
+    const run = assemble(buildSpecs(
+      { proof: scaledProof, inputs: INSTANCES.committed.inputs },
+      millerGenesisLockingHash,
+    ));
     if (!run.accepted || !run.fits) throw new Error(`subgroup-scaled valid pairing failed for scalar ${scalar}`);
   }
 
@@ -747,7 +886,10 @@ if (FUSE_G2_ENDPOINT && ENDPOINT_VM_CASES > 1) {
     { a: wrapPoint.negate(), b: proof.b, c: proof.c },
     { a: proof.a, b: proof.b, c: wrapPoint },
   ]) {
-    const run = assemble(buildSpecs({ proof: wrapProof, inputs: INSTANCES.committed.inputs }), true);
+    const run = assemble(buildSpecs(
+      { proof: wrapProof, inputs: INSTANCES.committed.inputs },
+      millerGenesisLockingHash,
+    ), true);
     if (!run.meta[millerGenesisIndex].accepted) throw new Error('valid G1 wraparound point rejected at Miller genesis');
   }
   console.error(`  extended endpoint VM cases: ${ENDPOINT_VM_CASES} off-subgroup points, 3 subgroup scalings, 2 G1 wraparound points`);
@@ -766,8 +908,8 @@ if (!full0.fits || !full1.fits || !fullWc.fits || !fullInvalid.every((run) => ru
 const description = FUSE_G2_ENDPOINT
   ? MILLER_AFFINE_G2
     ? MILLER_UNIT_LINES
-      ? `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates, checks all three proof points on their curves, and binds canonical inverse-Y witnesses for the three runtime G1 points. Each G1 point is carried as (-x/y,-1/y), and every fixed line is normalized offline to c2=1, making the sparse multiplier's o0 coefficient one. Runtime B uses a four-limb affine accumulator; every tangent/chord carries a two-limb canonical slope witness, rejects a zero denominator, and checks the slope equation. These normalizations change the Miller value only by an Fp2 scale, which vanishes in final exponentiation. Exact G2 subgroup membership is fused into B's post-processing by requiring R+psi(B)-psi^2(B)=-psi^3(B). prove_miller_unit_lines.mjs proves the line-scale equivalence and all fixed-line denominators; unit_line_bound_analysis.mjs proves the specialized integer bounds; the affine and endpoint proof scripts retain their original completeness guarantees. The GLV result is cross-bound into Miller genesis and every later state is forward-bound with OP_INPUTBYTECODE.`
-      : `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates and checks all three proof points on their curves. Runtime B uses a four-limb affine accumulator; every tangent/chord carries a two-limb canonical slope witness, rejects a zero denominator, and checks the slope equation before emitting a normalized line. The normalized line differs only by an Fp2 scale, which vanishes in final exponentiation. Exact G2 subgroup membership is fused into B's post-processing by requiring R+psi(B)-psi^2(B)=-psi^3(B). prove_miller_affine.mjs proves valid-subgroup completeness and line-scale equivalence; prove_miller_endpoint_subgroup.mjs proves the endpoint relation has exactly the r-torsion kernel on the full rational twist group. The GLV result is cross-bound into Miller genesis and every later state is forward-bound with OP_INPUTBYTECODE.`
+      ? `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates, checks all three proof points on their curves, and binds canonical inverse-Y witnesses for the three runtime G1 points. Each G1 point is carried as (-x/y,-1/y), and every fixed line is normalized offline to c2=1, making the sparse multiplier's o0 coefficient one. Runtime B uses a four-limb affine accumulator; every tangent/chord carries a two-limb canonical slope witness, rejects a zero denominator, and checks the slope equation. These normalizations change the Miller value only by an Fp2 scale, which vanishes in final exponentiation. Exact G2 subgroup membership is fused into B's post-processing by requiring R+psi(B)-psi^2(B)=-psi^3(B). prove_miller_unit_lines.mjs proves the line-scale equivalence and all fixed-line denominators; unit_line_bound_analysis.mjs proves the specialized integer bounds; the affine and endpoint proof scripts retain their original completeness guarantees. Miller genesis at absolute input 3 carries the immutable normalized proof points, vk_x, c, and cInv once; every later Miller input pins that locking, reads the static values by explicit genesis offsets, and forward-binds only its exact 512-byte f/R state.`
+      : `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates and checks all three proof points on their curves. Runtime B uses a four-limb affine accumulator; every tangent/chord carries a two-limb canonical slope witness, rejects a zero denominator, and checks the slope equation before emitting a normalized line. The normalized line differs only by an Fp2 scale, which vanishes in final exponentiation. Exact G2 subgroup membership is fused into B's post-processing by requiring R+psi(B)-psi^2(B)=-psi^3(B). prove_miller_affine.mjs proves valid-subgroup completeness and line-scale equivalence; prove_miller_endpoint_subgroup.mjs proves the endpoint relation has exactly the r-torsion kernel on the full rational twist group. Miller genesis at absolute input 3 carries the immutable proof points, vk_x, c, and cInv once; every later Miller input pins that locking, reads the static values by explicit genesis offsets, and forward-binds only its exact 512-byte f/R state.`
     : `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates, checks A and C on G1, and reuses runtime B's first doubling coefficients for its twist-curve equation. Exact G2 subgroup membership is fused into B's existing Miller post-processing: for R=[6x+2]B, the second-add line through R+psi(B) and -psi^2(B) must also contain psi^3(B), equivalent to R+psi(B)-psi^2(B)+psi^3(B)=O. prove_miller_endpoint_subgroup.mjs proves this condition has exactly the r-torsion kernel on the full rational twist group. The GLV result is cross-bound into Miller genesis and every later state is forward-bound with OP_INPUTBYTECODE.`
   : 'INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction. Same OP_INPUTBYTECODE forward-checking as bch-groth16-intratx (each chunk is an input whose witness carries its incoming state as a raw byte blob and require()s the next input\'s blob == its recomputed output — no NFT commitment, no hashing, arbitrary intermediate size), but it runs the residue-optimized chunk graph: 3 canonical-coordinate/on-curve/subgroup fast-G2 endomorphism chunks (ePrint 2022/348), 3 GLV vk_x chunks, and c^-(6x+2)-FUSED batched Miller chunks with e(alpha,beta) precomputed/skipped (ePrint 2024/640). The three GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding three copies. The final Miller chunk also performs the witnessed-residue verdict. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. The G2 final chunk binds the proof-derived -A/B and C bytes into the fused-Miller genesis input, while the vk_x final chunk binds the GLV result into that same genesis; every later Miller state is forward-bound.';
 
