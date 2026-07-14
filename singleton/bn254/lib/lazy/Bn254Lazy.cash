@@ -28,10 +28,21 @@ function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
     }
 
 function fp2MulRaw(int a0, int a1, int b0, int b1) returns (int, int) {
-        // Unreduced Karatsuba product, consumed only inside mul034 before its final normalization.
+        // Unreduced Karatsuba product, consumed only inside mul034 and fp12Sqr before
+        // their final normalization.
         int v0 = a0 * b0;
         int v1 = a1 * b1;
         return v0 - v1, (a0 + a1) * (b0 + b1) - v0 - v1;
+    }
+
+// One field reduction followed by sign normalization. Script remainder is in
+// (-p,p), so the conditional add maps it canonically into [0,p) without a second
+// modulo operation.
+function canonicalFp(int x) returns (int) {
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int r = x % p;
+        if (r < 0) { r = r + p; }
+        return r;
     }
 
 function fp2Sqr(int a0, int a1) returns (int, int) {
@@ -141,19 +152,66 @@ function fp12Mul(
 function fp12Sqr(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        // t0 = c0 * c1
-        (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) = fp6Mul(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
-        // t1 = (c0 + c1) * (c0 + v*c1)   -- vc multiplies the carried input c1 (64p bias, mul-consumed)
-        (int s0,int s1,int s2,int s3,int s4,int s5) = fp6Add(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
-        (int vc0,int vc1,int vc2,int vc3,int vc4,int vc5) = fp6MulByV(A6,A7,A8,A9,A10,A11, 64);
-        (int u0,int u1,int u2,int u3,int u4,int u5) = fp6Add(A0,A1,A2,A3,A4,A5, vc0,vc1,vc2,vc3,vc4,vc5);
-        (int t1_0,int t1_1,int t1_2,int t1_3,int t1_4,int t1_5) = fp6Mul(s0,s1,s2,s3,s4,s5, u0,u1,u2,u3,u4,u5);
-        // c1' = 2 t0
-        (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Add(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
-        // c0' = t1 - t0 - v t0   -- vt0 = 12p, d = 12p, C0 = 13p
-        (int vt0,int vt1,int vt2,int vt3,int vt4,int vt5) = fp6MulByV(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, 12);
-        (int d0,int d1,int d2,int d3,int d4,int d5) = fp6Sub(t1_0,t1_1,t1_2,t1_3,t1_4,t1_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, 12);
-        (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Sub(d0,d1,d2,d3,d4,d5, vt0,vt1,vt2,vt3,vt4,vt5, 13);
+        // Exact tower identity over Z:
+        //   t0=c0*c1; t1=(c0+c1)*(c0+v*c1)
+        //   square=(t1-t0-v*t0, 2*t0).
+        // Each Fp2 product uses three raw integer multiplies. No component is reduced
+        // until the final twelve limbs, so this square performs exactly twelve mod-p
+        // reductions instead of reducing every base-field product.
+
+        // t0 = c0*c1, expanded through the Fp6 Karatsuba formula without reduction.
+        (int t00a,int t00b) = fp2MulRaw(A0,A1, A6,A7);
+        (int t01a,int t01b) = fp2MulRaw(A2,A3, A8,A9);
+        (int t02a,int t02b) = fp2MulRaw(A4,A5, A10,A11);
+        (int t0p1a,int t0p1b) = fp2MulRaw(A2+A4,A3+A5, A8+A10,A9+A11);
+        int t0d2a = t0p1a - t01a - t02a;
+        int t0d2b = t0p1b - t01b - t02b;
+        int t0c0a = t00a + 9*t0d2a - t0d2b;
+        int t0c0b = t00b + t0d2a + 9*t0d2b;
+        (int t0p2a,int t0p2b) = fp2MulRaw(A0+A2,A1+A3, A6+A8,A7+A9);
+        int t0d4a = t0p2a - t00a - t01a;
+        int t0d4b = t0p2b - t00b - t01b;
+        int t0c1a = t0d4a + 9*t02a - t02b;
+        int t0c1b = t0d4b + t02a + 9*t02b;
+        (int t0p3a,int t0p3b) = fp2MulRaw(A0+A4,A1+A5, A6+A10,A7+A11);
+        int t0c2a = t0p3a - t00a - t02a + t01a;
+        int t0c2b = t0p3b - t00b - t02b + t01b;
+
+        // t1 = (c0+c1)*(c0+v*c1). Multiplication by v maps
+        // (y0,y1,y2) to (xi*y2,y0,y1), xi=9+i, using only linear operations.
+        int s0=A0+A6; int s1=A1+A7; int s2=A2+A8;
+        int s3=A3+A9; int s4=A4+A10; int s5=A5+A11;
+        int u0=A0+9*A10-A11; int u1=A1+A10+9*A11;
+        int u2=A2+A6; int u3=A3+A7; int u4=A4+A8; int u5=A5+A9;
+        (int t10a,int t10b) = fp2MulRaw(s0,s1, u0,u1);
+        (int t11a,int t11b) = fp2MulRaw(s2,s3, u2,u3);
+        (int t12a,int t12b) = fp2MulRaw(s4,s5, u4,u5);
+        (int t1p1a,int t1p1b) = fp2MulRaw(s2+s4,s3+s5, u2+u4,u3+u5);
+        int t1d2a = t1p1a - t11a - t12a;
+        int t1d2b = t1p1b - t11b - t12b;
+        int t1c0a = t10a + 9*t1d2a - t1d2b;
+        int t1c0b = t10b + t1d2a + 9*t1d2b;
+        (int t1p2a,int t1p2b) = fp2MulRaw(s0+s2,s1+s3, u0+u2,u1+u3);
+        int t1d4a = t1p2a - t10a - t11a;
+        int t1d4b = t1p2b - t10b - t11b;
+        int t1c1a = t1d4a + 9*t12a - t12b;
+        int t1c1b = t1d4b + t12a + 9*t12b;
+        (int t1p3a,int t1p3b) = fp2MulRaw(s0+s4,s1+s5, u0+u4,u1+u5);
+        int t1c2a = t1p3a - t10a - t12a + t11a;
+        int t1c2b = t1p3b - t10b - t12b + t11b;
+
+        // With M=64p, every raw variable above has magnitude <1026M^2;
+        // use the conservative bound 2048M^2 < 2^531 (at most 67 signed bytes).
+        // The twelve possibly-negative results are each reduced once and normalized.
+        int C0 = canonicalFp(t1c0a - t0c0a - (9*t0c2a - t0c2b));
+        int C1 = canonicalFp(t1c0b - t0c0b - (t0c2a + 9*t0c2b));
+        int C2 = canonicalFp(t1c1a - t0c1a - t0c0a);
+        int C3 = canonicalFp(t1c1b - t0c1b - t0c0b);
+        int C4 = canonicalFp(t1c2a - t0c2a - t0c1a);
+        int C5 = canonicalFp(t1c2b - t0c2b - t0c1b);
+        int C6 = canonicalFp(2*t0c0a); int C7 = canonicalFp(2*t0c0b);
+        int C8 = canonicalFp(2*t0c1a); int C9 = canonicalFp(2*t0c1b);
+        int C10 = canonicalFp(2*t0c2a); int C11 = canonicalFp(2*t0c2b);
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
 
