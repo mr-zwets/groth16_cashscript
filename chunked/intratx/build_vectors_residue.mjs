@@ -269,6 +269,18 @@ function compileSpec(specs, i) {
     if (RESCHED && binToHex(raw) !== binToHex(resched)) v.raw = Uint8Array.from([OP_DROP, ...raw]);
     compileCache.set(key, v);
   }
+  // The later tuned-size A/B requires one successful full-budget VM pass. If the
+  // rescheduled redeem cannot be pushed within that budget but the plain compile
+  // can, select raw before the bootstrap pass; when both fit, leave selection to
+  // the existing measured comparison below.
+  if (!chosenCache.has(key) && P2SH && v.raw) {
+    const argBytes = argBytesOf(s).length;
+    const rescheduledFixedBytes = argBytes + encodeDataPush(v.resched).length;
+    const rawFixedBytes = argBytes + encodeDataPush(v.raw).length;
+    if (rescheduledFixedBytes > TARGET_UNLOCK && rawFixedBytes <= TARGET_UNLOCK) {
+      chosenCache.set(key, 'raw');
+    }
+  }
   return (chosenCache.get(key) === 'raw' && v.raw) ? v.raw : v.resched;
 }
 function argBytesOf(s) {
