@@ -32,8 +32,6 @@ const f2scale = () => [1, 1];
 let maxFp2MulInput = 0;
 let maxFp2MulNegative = 0;
 const f2mul = (a, b) => {
-  record('fp2Mul.c0', 1);
-  record('fp2Mul.c1', 2);
   maxFp2MulInput = Math.max(maxFp2MulInput, ...a, ...b);
   maxFp2MulNegative = Math.max(maxFp2MulNegative, a[1] * b[1]);
   return [2, 3];
@@ -375,8 +373,6 @@ const expectedBiases = new Map(Object.entries({
   'fp12Sqr.d': 20,
   'fp12Sqr.vc': 62,
   'fp12Sqr.vt0': 12,
-  'fp2Mul.c0': 1,
-  'fp2Mul.c1': 2,
   'fp2MulByB.c0': 1,
   'fp2Sqr.diff': 124,
   'fp4Square.s0': 1,
