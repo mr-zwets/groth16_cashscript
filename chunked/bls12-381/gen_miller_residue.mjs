@@ -6,8 +6,9 @@
 // value fAB is multiplied in once via the 'cmul1' op. The loop also folds c^-|x| into the shared
 // f so the boundary fF = fRaw * c^-|x| (genesis f = cInv folds the 2^63 MSB term; op 'cf' folds
 // cInv [NAF digit +1] or c [-1]). The residue witness (c, cInv) is carried as CONSTANT state.
-// state = f(12) + R_B(6) + runtime points(10) + c(12) + cInv(12) = 52 limbs; the FINAL chunk
-// hands off only [fF, c, cInv] (36 limbs) to the residue tail.
+// state = f(12) + R_B(6) + runtime points(10) + c(12) + cInv(12) = 52 limbs; stage-bound
+// genesis carries only cInv+c+points (34 limbs) and derives f=cInv, R_B=B in-contract. The
+// FINAL chunk hands off only [fF, c, cInv] (36 limbs) to the residue tail.
 //   node gen_miller_residue.mjs          covenant plan -> generated/
 //   node gen_miller_residue.mjs linked   linked plan   -> generated/linked-residue/
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -22,6 +23,7 @@ import { LINKED_MILLER_BOUNDS, LINKED_RESIDUE_NAMESPACE } from './_residue_linke
 
 const here = dirname(fileURLToPath(import.meta.url));
 const LINKED = process.argv[2] === 'linked';
+const STAGE_BOUND = LINKED || process.env.STAGE_BOUND_LAYOUT === '1';
 const GEN = join(here, 'generated', ...(LINKED ? [LINKED_RESIDUE_NAMESPACE] : []));
 mkdirSync(GEN, { recursive: true });
 const LIB_IMPORT = LINKED
@@ -45,6 +47,9 @@ const PINFO = PAIRS.map((pair, j) => {
 const ptParams = [];
 PINFO.forEach((pi, j) => { if (pi.cfg.P) ptParams.push(`Px${j}`, `Py${j}`); if (pi.cfg.Q) ptParams.push(`Q${j}xa`, `Q${j}xb`, `Q${j}ya`, `Q${j}yb`); });
 const ptL = PAIRS.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
+// Put the hot derived-state sources first at genesis: cInv, c, then B/A/vk_x/C.
+const genesisPtParams = [...ptParams.slice(2, 6), ...ptParams.slice(0, 2), ...ptParams.slice(6)];
+const genesisPtL = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
 
 // witness for the committed planning instance (chunk math is generic; only window boundaries
 // come from this instance).
@@ -60,7 +65,9 @@ const ciNames = Array.from({ length: 12 }, (_, i) => `ci${i}`);
 // state = f(12) + R_B(6) + runtime points + c(12) + cInv(12)
 const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...f12limbs(s.c), ...f12limbs(s.cInv)];
 const withPts = (limbs) => { const fr = limbs.slice(0, 18); const rest = limbs.slice(18); return [...fr, ...ptL, ...rest]; };
-const inState = (i) => withPts(stateLimbs(states[i]));
+const inState = (i) => STAGE_BOUND && i === 0
+  ? [...f12limbs(states[i].cInv), ...f12limbs(states[i].c), ...genesisPtL]
+  : withPts(stateLimbs(states[i]));
 // the FINAL chunk hands off only [fF, c, cInv] (36 limbs, contiguous) to the residue tail —
 // R_B/pts are done with once the loop ends. Non-final hand-offs carry the full 52-limb state.
 const outState = (i) => i === states.length - 1
@@ -71,7 +78,8 @@ const bakedCoeffs = (triple) => triple.flatMap((c) => [`${c.c0}`, `${c.c1}`]);
 function genChunk(opLo, opHi, isFinal) {
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
-  const allParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames];
+  const fullStateParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames];
+  const stateParams = STAGE_BOUND && opLo === 0 ? [...ciNames, ...cNames, ...genesisPtParams] : fullStateParams;
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
@@ -79,8 +87,8 @@ function genChunk(opLo, opHi, isFinal) {
   L.push('// state = f(12) + R_B(6) [+ runtime points] + c(12) + cInv(12); c,cInv are constant');
   L.push('// carried witness. cf op folds c^-1/c into f (residue method, ePrint 2024/640).');
   L.push('contract MillerFusedBlsChunk() {');
-  L.push(`    function spend(${decl(allParams)}, bytes unused zeroPadding) {`);
-  L.push(covIn(allParams));
+  L.push(`    function spend(${decl(stateParams)}, bytes unused zeroPadding) {`);
+  L.push(covIn(stateParams));
   // FUSED input validation (was the standalone g2check pass): the first Miller chunk checks the
   // prover's points are on-curve (A=-P0 & C=P3 on G1 y^2=x^3+4; B=Q0 on G2 y^2=x^3+(4+4u)); the
   // final chunk's psi(B)==[|x|]B subgroup test reuses R_B (=[|x|]B) that this loop already walks.
@@ -100,7 +108,13 @@ function genChunk(opLo, opHi, isFinal) {
     if (needs) { L.push(`        (int nq${pi.j}a, int nq${pi.j}b) = fp2Neg(${pi.Qyae}, ${pi.Qybe});`); return [`nq${pi.j}a`, `nq${pi.j}b`]; }
     return [pi.Qyae, pi.Qybe];
   });
-  let f = inF.slice(); let r0 = inR0.slice(); let uid = 0;
+  // Stage-bound genesis derives the fused MSB state from inputs already needed by the loop:
+  // f starts at cInv and R_B starts at the proof's B point.
+  let f = STAGE_BOUND && opLo === 0 ? ciNames.slice() : inF.slice();
+  let r0 = STAGE_BOUND && opLo === 0
+    ? [PINFO[0].Qxae, PINFO[0].Qxbe, PINFO[0].Qyae, PINFO[0].Qybe, '1', '0']
+    : inR0.slice();
+  let uid = 0;
   const fresh = (n) => Array.from({ length: n }, () => `v${uid++}`);
   const emitLine = (coeffs, pi) => { const g = fresh(12); L.push(`        (${decl(g)}) = line(${f.join(',')}, ${coeffs.join(',')}, ${pi.Pxe}, ${pi.Pye});`); f = g; };
   for (let i = opLo; i < opHi; i++) {
@@ -187,7 +201,8 @@ while (lo < ops.length) {
 for (let i = 1; i < chunks.length; i++) if (chunks[i - 1].outgoing !== chunks[i].incoming) throw new Error('continuity break at ' + i);
 console.error(`fused miller: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.opCost, 0).toLocaleString()}, maxOp=${Math.max(...chunks.map((c) => c.opCost)).toLocaleString()}`);
 writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
-  fused: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
+  fused: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', stageBound: STAGE_BOUND,
+  numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, incoming: c.incoming, outgoing: c.outgoing })),
 }, null, 2));
 console.error(`wrote ${join(GEN, 'manifest_millerres.json')}`);

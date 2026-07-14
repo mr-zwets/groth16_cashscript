@@ -48,17 +48,17 @@ import { hexToBin, binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2s
 const realVm = createVirtualMachineBch2026(false);
 const standardVm = createVirtualMachineBch2026(true);
 const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
+const GLV_COUNT = GLV_SHARED_AUDITED_BOUNDS.length - 1;
 
 // SHARED GLV TABLE: the 1,440-byte Straus table rides ONCE in the final GLV input (right after its
 // 9-limb inBlob push); the four sibling GLV inputs read that exact slice via input-bytecode
 // introspection and the carrier pins it with hash256.
 {
-  const glvCount = GLV_SHARED_AUDITED_BOUNDS.length - 1;
   const GLV_STATE_BYTES = 9 * W; // rX,rY,rZ,in0,in1,k10,k20,k11,k21
   regenGlvSharedAudited(GEN, {
-    inputIndex: glvCount - 1,
+    inputIndex: GLV_COUNT - 1,
     dataOffset: headerSize(GLV_STATE_BYTES) + GLV_STATE_BYTES + headerSize(GLV_TABLE_BYTES.length),
-  });
+  }, true);
 }
 
 // Deploy as P2SH so the ~4-5 KB redeem (in the scriptSig) counts toward the op-cost budget and
@@ -100,12 +100,12 @@ const mkInstance = (inputs) => {
 const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]), stress: mkInstance(LINKED_HIGH_COST_INPUTS) };
 
 // ---- residue chunk-graph layout constants (identical to grouped/build_vectors_residue_bls.mjs) ----
-// fused-Miller state = f(12) + R_B(6) + runtime points(10) + c(12) + cInv(12) = 52 limbs.
-const MILLER_STATE_LIMBS = 12 + 6; // f + R_B
+// Stage-bound Miller genesis = cInv(12) + c(12) + runtime points(10) = 34 limbs.
+// f=cInv and R_B=B are derived in-contract; later Miller states still carry all 52 limbs.
 const dummy = pairsFor(PUBLIC_INPUTS, proof);
 const ptLof = (inst) => { const pr = pairsFor(inst.inputs, inst.proof); return pr.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())); };
-const VKX_LIMB_OFFSET = MILLER_STATE_LIMBS + ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length; // vk_x = pair2 P, at 18+6 = 24
-const MILLER_IN_LIMBS = MILLER_STATE_LIMBS + ptLof(INSTANCES.committed).length; // 18 + 10 = 52
+const VKX_LIMB_OFFSET = 24 + ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length;
+const MILLER_IN_LIMBS = ptLof(INSTANCES.committed).length + 24;
 const TAIL_HANDOFF_LIMBS = 36; // [fF, c, cInv]
 
 // ---- per-stage specs (inLimbs/outLimbs/extras/role) — same graph as the grouped-residue BLS
@@ -119,9 +119,11 @@ function specsVkxGlv(inst) {
   const vkxAff = computeVkx([in0, in1]).toAffine();
   const scal = [in0, in1, k10, k20, k11, k21];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglv.json'), 'utf8'));
+  if (man.stageBound !== true) throw new Error('intratx BLS residue requires stage-bound GLV generation');
   if (man.sharedTable !== true) throw new Error('intratx BLS residue requires shared-table GLV generation');
   return man.chunks.map((ch) => {
-    const inLimbs = [...vkxGlvStateAt(k10, k20, k11, k21, ch.lo), ...scal];
+    const fullIn = [...vkxGlvStateAt(k10, k20, k11, k21, ch.lo), ...scal];
+    const inLimbs = ch.first ? fullIn.slice(3) : fullIn;
     if (ch.final) return {
       file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs,
       outLimbs: [vkxAff.x, vkxAff.y], extras: [vkxGlvZinv(k10, k20, k11, k21), GLV_TABLE_BYTES], role: 'cross',
@@ -136,8 +138,11 @@ function specsMillerResidue(inst, c, cInv) {
   const { states, boundary } = millerFusedOps(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
+  if (man.stageBound !== true) throw new Error('intratx BLS residue requires stage-bound Miller generation');
+  const genesisPts = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
+  const genesis = [...f12limbs(cInv), ...f12limbs(c), ...genesisPts];
   const specs = man.chunks.map((ch) => {
-    const inLimbs = withPtsR(stateLimbsR(states[ch.opLo]), ptL);
+    const inLimbs = ch.opLo === 0 ? genesis : withPtsR(stateLimbsR(states[ch.opLo]), ptL);
     if (ch.final) {
       const s = states[ch.opHi];
       return {
@@ -296,8 +301,6 @@ function assemble(specs) {
   const fits = meta.every((m) => m.lockingBytes <= 10000 && m.unlockingBytes <= 10000 && m.operationCost <= OP_BUDGET) && accepted;
   return { inputs, meta, fits, accepted };
 }
-function buildFull(inst) { return assemble(buildSpecs(inst)); }
-
 const toStepArr = (asm) => asm.inputs.map((inp, i) => ({ label: asm.meta[i].label, locking: binToHex(inp.locking), unlocking: binToHex(inp.unlocking), checkpoint: asm.meta[i].checkpoint }));
 // corrupt one input's inBlob (a MIDDLE limb, so it is a live value the chunk uses); the
 // predecessor's forward-check (and/or this chunk's own) then fails -> the run is rejected.
@@ -316,12 +319,46 @@ const report = (tag, asm) => {
 };
 
 // ===================== FULL GROTH16 (residue, single tx) =====================
-const full0 = buildFull(INSTANCES.committed);
+const committedSpecs = buildSpecs(INSTANCES.committed);
+const proof1Specs = buildSpecs(INSTANCES.proof1);
+const stressSpecs = buildSpecs(INSTANCES.stress);
+const limbsEqual = (a, b) => a.length === b.length && a.every((x, i) => BigInt(x) === BigInt(b[i]));
+function requireStageGenesis(specs, inst, label) {
+  const [in0, in1] = inst.inputs.map(BigInt);
+  const [k10, k20] = glvDecompose(in0), [k11, k21] = glvDecompose(in1);
+  if (!limbsEqual(specs[0].inLimbs, [in0, in1, k10, k20, k11, k21])) {
+    throw new Error(`${label} GLV genesis still exposes accumulator state`);
+  }
+  const pairs = pairsFor(inst.inputs, inst.proof);
+  const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
+  const expectedPoints = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
+  if (specs[GLV_COUNT].inLimbs.length !== MILLER_IN_LIMBS || !limbsEqual(specs[GLV_COUNT].inLimbs.slice(24, 34), expectedPoints)) {
+    throw new Error(`${label} Miller genesis still exposes f/R_B state or misorders proof points`);
+  }
+}
+[
+  ['committed', committedSpecs, INSTANCES.committed],
+  ['proof#1', proof1Specs, INSTANCES.proof1],
+  ['stress', stressSpecs, INSTANCES.stress],
+].forEach(([label, specs, inst]) => requireStageGenesis(specs, inst, label));
+
+const full0 = assemble(committedSpecs);
 report('groth16-bls12381-intratx-residue committed', full0);
-const full1 = buildFull(INSTANCES.proof1);
+const full1 = assemble(proof1Specs);
 report('groth16-bls12381-intratx-residue proof#1', full1);
-const fullStress = buildFull(INSTANCES.stress);
+const fullStress = assemble(stressSpecs);
 report('groth16-bls12381-intratx-residue all-position stress', fullStress);
+for (const [label, otherSpecs, otherRun] of [['proof#1', proof1Specs, full1], ['stress', stressSpecs, fullStress]]) {
+  const hybridSpecs = [...committedSpecs.slice(0, GLV_COUNT), ...otherSpecs.slice(GLV_COUNT)];
+  const unboundSpecs = hybridSpecs.map((spec, i) => i === GLV_COUNT - 1 ? { ...spec, role: 'stage-final', cmp: null } : spec);
+  if (!assemble(unboundSpecs).accepted) throw new Error(`${label} unbound valid-fixture hybrid was not accepted`);
+  const boundInputs = [...full0.inputs.slice(0, GLV_COUNT), ...otherRun.inputs.slice(GLV_COUNT)];
+  const outcomes = boundInputs.map((_, i) => evalInput(boundInputs, i));
+  if (outcomes[GLV_COUNT - 1].accepted) throw new Error(`${label} hybrid did not reject at the vk_x boundary`);
+  const unrelated = outcomes.find((outcome, i) => i !== GLV_COUNT - 1 && !outcome.accepted);
+  if (unrelated) throw new Error(`${label} hybrid also rejected outside the vk_x boundary`);
+}
+console.error('  stage genesis layouts and proof#1/stress vk_x boundaries verified');
 // shared-table fixture: flip a middle byte of the carried GLV table -> the carrier's hash256
 // pin must reject (the four sibling readers consume that exact slice).
 function pushBounds(unlocking, opcodeOffset = 0) {
