@@ -561,7 +561,40 @@ offSubSpecs[offSubSpecs.length - 1].role = 'stage-final';
 offSubSpecs[offSubSpecs.length - 1].cmp = null;
 const offSubgroupB = isolated(offSubSpecs);
 const semanticInvalids = [offCurveA, offSubgroupB, plusPRange].map((asm) => ({ run: toRun(asm), rejected: !asm.accepted }));
-const allInvalids = [...invalids, ...semanticInvalids];
+
+function rangeInvalid(spec, location, value, label) {
+  const candidate = { ...spec, extras: [...spec.extras], role: 'stage-final', cmp: null, label };
+  if (location.extra !== undefined) candidate.extras[location.extra] = value;
+  const asm = assembleGrouped([candidate], [[0, 0]], location.extra !== undefined);
+  if (location.limb !== undefined) {
+    const unlocking = Uint8Array.from(asm.inputs[0].unlocking);
+    const pushed = pushBounds(unlocking);
+    if (pushed.dataLen !== candidate.inLimbs.length * W) throw new Error(`${label} has an unexpected input blob length`);
+    const encoded = le48Exact(value < 0n ? -value : value);
+    if (value < 0n) encoded[W - 1] |= 0x80;
+    unlocking.set(encoded, pushed.dataStart + location.limb * W);
+    asm.inputs[0] = { ...asm.inputs[0], unlocking };
+  }
+  const consensusOutcome = evalGroup(asm.inputs, 0, asm.gmeta[0]);
+  const standardOutcome = evalGroup(asm.inputs, 0, asm.gmeta[0], standardVm);
+  if (consensusOutcome.accepted || standardOutcome.accepted) {
+    throw new Error(`${label} passed a residue witness range gate`);
+  }
+  return { run: toRun(asm), rejected: true };
+}
+
+const firstRangeMiller = cSpecs[GLV_COUNT];
+const firstRangeTail = cSpecs.find((spec) => spec.file.includes('finalexpres_'));
+if (!firstRangeMiller || !firstRangeTail) throw new Error('missing residue witness range fixture stage');
+const rangeInvalids = [
+  rangeInvalid(firstRangeMiller, { limb: 0 }, -1n, 'reject negative cInv limb'),
+  rangeInvalid(firstRangeMiller, { limb: 0 }, P, 'reject cInv limb at P'),
+  rangeInvalid(firstRangeMiller, { limb: 12 }, -1n, 'reject negative c limb'),
+  rangeInvalid(firstRangeMiller, { limb: 12 }, P, 'reject c limb at P'),
+  rangeInvalid(firstRangeTail, { extra: 0 }, -1n, 'reject negative w limb'),
+  rangeInvalid(firstRangeTail, { extra: 0 }, P, 'reject w limb at P'),
+];
+const allInvalids = [...invalids, ...semanticInvalids, ...rangeInvalids];
 console.error(`  invalid runs rejected: ${allInvalids.map((r) => r.rejected).join(',')}`);
 if (!asmCommitted.accepted || !asmProof1.accepted || !asmStress.fits || !allInvalids.every((r) => r.rejected)) {
   console.error('!! a run failed -- NOT writing vectors'); process.exit(1);

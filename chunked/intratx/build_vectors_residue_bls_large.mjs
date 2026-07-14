@@ -411,7 +411,45 @@ offSubSpecs[offSubSpecs.length - 1].role = 'stage-final';
 offSubSpecs[offSubSpecs.length - 1].cmp = null;
 const offSubgroupB = assemble(offSubSpecs, true);
 const semanticRuns = [offCurveA, offSubgroupB, plusPRange].map((asm) => ({ steps: toStepArr(asm), rejected: !asm.accepted }));
-const allInvalid = [...fInv, ...semanticRuns];
+
+function rangeInvalid(spec, location, value, label) {
+  const candidate = { ...spec, extras: [...spec.extras], role: 'stage-final', cmp: null, label };
+  if (location.extra !== undefined) candidate.extras[location.extra] = value;
+  const asm = assemble([candidate], location.extra !== undefined);
+  if (location.limb !== undefined) {
+    const unlocking = Uint8Array.from(asm.inputs[0].unlocking);
+    const op = unlocking[0];
+    if (op > 75 && op !== 0x4c && op !== 0x4d && op !== 0x4e) throw new Error(`${label} has an unsupported input push`);
+    const dataStart = op <= 75 ? 1 : op === 0x4c ? 2 : op === 0x4d ? 3 : 5;
+    const dataLen = op <= 75 ? op : op === 0x4c ? unlocking[1] : op === 0x4d
+      ? unlocking[1] | (unlocking[2] << 8)
+      : unlocking[1] | (unlocking[2] << 8) | (unlocking[3] << 16) | (unlocking[4] << 24);
+    if (dataLen !== candidate.inLimbs.length * W) throw new Error(`${label} has an unexpected input blob length`);
+    const encoded = le48Exact(value < 0n ? -value : value);
+    if (value < 0n) encoded[W - 1] |= 0x80;
+    unlocking.set(encoded, dataStart + location.limb * W);
+    asm.inputs[0] = { ...asm.inputs[0], unlocking };
+  }
+  const consensusOutcome = evalInput(asm.inputs, 0);
+  const standardOutcome = evalInput(asm.inputs, 0, standardVm);
+  if (consensusOutcome.accepted || standardOutcome.accepted) {
+    throw new Error(`${label} passed a residue witness range gate`);
+  }
+  return { steps: toStepArr(asm), rejected: true };
+}
+
+const firstRangeMiller = committedSpecs[GLV_COUNT];
+const firstRangeTail = committedSpecs.find((spec) => spec.file.includes('finalexpres_'));
+if (!firstRangeMiller || !firstRangeTail) throw new Error('missing residue witness range fixture stage');
+const rangeRuns = [
+  rangeInvalid(firstRangeMiller, { limb: 0 }, -1n, 'reject negative cInv limb'),
+  rangeInvalid(firstRangeMiller, { limb: 0 }, P, 'reject cInv limb at P'),
+  rangeInvalid(firstRangeMiller, { limb: 12 }, -1n, 'reject negative c limb'),
+  rangeInvalid(firstRangeMiller, { limb: 12 }, P, 'reject c limb at P'),
+  rangeInvalid(firstRangeTail, { extra: 0 }, -1n, 'reject negative w limb'),
+  rangeInvalid(firstRangeTail, { extra: 0 }, P, 'reject w limb at P'),
+];
+const allInvalid = [...fInv, ...semanticRuns, ...rangeRuns];
 console.error(`  invalid runs rejected: ${allInvalid.map((r) => r.rejected).join(',')}`);
 if (!full0.accepted || !full1.accepted || !fullStress.fits || !allInvalid.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
 
