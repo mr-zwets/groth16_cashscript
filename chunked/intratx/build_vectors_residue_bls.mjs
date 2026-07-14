@@ -245,7 +245,9 @@ function assemble(specs, expectRejected = false) {
   let inputs = specs.map((s, i) => ({ locking: lockingOf(i), unlocking: mkUnlock(i, TARGET_UNLOCK) }));
   const op1 = specs.map((_, i) => evalInput(inputs, i));
   const standardOp1 = specs.map((_, i) => evalInput(inputs, i, standardVm));
-  if (!expectRejected && [...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+  // With stack rescheduling enabled, a candidate may exceed a byte/op limit while its raw
+  // compilation still fits. Let the selector below compare both variants before failing.
+  if (!expectRejected && !RESCHED && [...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
     const failures = [...op1, ...standardOp1]
       .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
       .filter((outcome) => outcome.error !== null);

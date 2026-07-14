@@ -312,7 +312,9 @@ function assembleGrouped(specs, groups, expectRejected = false) {
   groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) op1[lo + k] = evalGroup(ins, k, gmeta[gi]); });
   const standardOp1 = [];
   groups.forEach(([lo, hi], gi) => { const ins = allInputs.slice(lo, hi + 1); for (let k = 0; k <= hi - lo; k++) standardOp1[lo + k] = evalGroup(ins, k, gmeta[gi], standardVm); });
-  if (!expectRejected && [...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+  // A rescheduled candidate can exceed a limit while the raw compilation still fits; defer the
+  // failure until the selector below has evaluated both forms.
+  if (!expectRejected && !RESCHED && [...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
     const failures = [...op1, ...standardOp1]
       .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
       .filter((outcome) => outcome.error !== null);
