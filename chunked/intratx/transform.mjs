@@ -89,6 +89,8 @@ function parseParams(sig) {
  *   cfg.externalBindings additional byte-slice bindings from this chunk's inBlob to another
  *                    input's inBlob: [{sourceOffset,targetInputIndex,targetFullInLen,
  *                    targetOffset,length}]. targetInputIndex is transaction-local.
+ *   cfg.enforceExactInputLength when true, reject inBlob values with trailing/legacy
+ *                    state limbs instead of parsing only the declared prefix.
  * Returns { src, inNames, outNames|null, extras, isTerminal, inLen, outLen }.
  */
 export function transformChunk(src, cfg) {
@@ -226,7 +228,8 @@ export function transformChunk(src, cfg) {
   const used = inNames.map((nm) => new RegExp(`\\b${nm}\\b`).test(usedText));
   let maxUsed = -1;
   used.forEach((u, p) => { if (u) maxUsed = p; });
-  const prologue = [];
+  const inLen = inWidths.reduce((sum, width) => sum + width, 0);
+  const prologue = cfg.enforceExactInputLength ? [`        require(inBlob.length == ${inLen});`] : [];
   // GROUPED: a non-genesis group's first chunk binds its incoming blob to the spent token's
   // NFT commitment (= hash256 of the same full state the previous group committed via covout).
   if (cfg.covInHash) prologue.push(`        require(tx.inputs[0].nftCommitment == hash256(inBlob));`);
@@ -253,7 +256,7 @@ export function transformChunk(src, cfg) {
     outNames,
     extras: extras.map((e) => e.name),
     isTerminal,
-    inLen: inWidths.reduce((sum, width) => sum + width, 0),
+    inLen,
     outLen,
   };
 }

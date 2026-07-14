@@ -7,27 +7,38 @@ locking+unlocking ≤ 10,000 B). The BLS12-381 counterpart of the BN254
 oracle. Three benchmark entries (in the verifier repo) are produced from here:
 
 - **`bch-vkx-bls12381-chunked-covenant`** — the public-input aggregation
-  `vk_x = IC0 + in0·IC1 + in1·IC2` (G1 multi-scalar-mult), 11 chunks / 23,036 B / 6.86M op-cost.
+  `vk_x = IC0 + in0·IC1 + in1·IC2` (G1 multi-scalar-mult), 11 chunks / 23,070 B / 6,842,845 op-cost.
 - **`bch-pairing-bls12381-chunked`** — the **Miller loops + final exponentiation**:
-  `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)` as ONE batched 4-pair Miller loop →
-  the BLS/Hayashida-Scott final exponentiation → verdict (== Fp12 ONE). 72 chunks / 639,846 B / 506.38M op-cost.
+  `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)` as one prepared-VK 4-pair Miller product →
+  the BLS/Hayashida-Scott final exponentiation → verdict (== Fp12 ONE). 53 chunks / 472,640 B / 373,094,102 op-cost.
 - **`bch-groth16-bls12381-chunked`** — the **complete verifier**: the vk_x chunks
-  prepended to the pairing. 86 chunks / 682,962 B / 535.40M op-cost; ranked in the main
+  prepended to the pairing with G1/G2 input validation. 67 chunks / 516,697 B / 402,210,911 op-cost; ranked in the main
   Groth16 leaderboard against nchain (its BLS12-381 reference) — the only BCH-compatible
   full Groth16 verifier on that curve.
 
-## Optimizations (batched Miller + lazy reduction)
+The same 30 prepared Miller chunks also feed the linked layouts assembled by the sibling
+`intratx/` and `grouped/` builders:
+
+- `bch-pairing-bls12381-intratx`: 53 inputs / 467,890 B / 372,991,316 op-cost.
+- `bch-groth16-bls12381-intratx`: 67 inputs / 513,115 B / 402,047,052 op-cost.
+- `bch-groth16-bls12381-grouped`: 67 inputs / 7 standard transactions / 513,087 B /
+  401,923,270 op-cost.
+
+## Optimizations (prepared batched Miller + lazy reduction)
 
 The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B op to
 116 / 1.47 MB / 754 M op; later optimizations produced the current figures above:
 
 - **Batched 4-pair Miller** — instead of four independent single-pair chains (each
   squaring `f` every step), ONE loop squares `f` once per NAF step and folds all four
-  pairs' lines into the shared `f` (each pair's `R` evolves independently). Eliminates 3
+  pairs' lines into the shared `f`. Eliminates 3
   of every 4 `fp12Sqr`, and the conjugated `f` after the loop IS the boundary, so there
-  is **no separate combine step**. One batched step is ~8 `mul014` (too coarse for one
-  input), so the loop is chunked as a FLAT op list (sqr / double-line / add-line) at any
-  op boundary, carrying `f + 4 R + points`.
+  is **no separate combine step**.
+- **Prepared VK pairs** — only `B` is a proof-derived G2 point, so only its `R_B` walk is
+  performed on-chain. The fixed `γ`/`δ` trajectories contribute baked line coefficients;
+  the fully fixed `e(α,β)` contributes one baked dense Miller value rather than 69 line
+  folds. The flat trace falls from 340 to 272 ops and each interior hand-off carries
+  `f + R_B + runtime points` (28 limbs rather than 46).
 - **Lazy reduction** — `addFp` drops its `% p` (values only grow inside a chunk; `mulFp`,
   `subFp`, and the covOut commitment reduce them back); `subFp` keeps the mod with a big
   `K·p` bias. Applied to the emitted miller + final-exp functions. The dead inverse
@@ -41,14 +52,19 @@ for **two** distinct instances under the same VK (runtime-general).
 
 ## How it works
 
-A GENERIC (proof-agnostic) covenant: each chunk carries **no baked proof**. The
+A GENERIC (proof-agnostic) covenant: each chunk carries **no baked proof**; only VK
+constants are prepared. The
 running state — vk_x's Jacobian accumulator, the Miller `f` (Fp12, 12 limbs) + running
 G2 point `R` (6 limbs), or the live final-exp Fp12 values — plus the proof-derived
 points ride in the spent/created token's **NFT commitment** as `hash256` of their
 **48-byte** little-endian limbs (a 381-bit BLS field element needs 48 bytes, vs 40 for
 BN254's 254-bit field). Each chunk verifies the incoming commitment, recomputes its
 window, and re-commits the outgoing state under the same token category, so one fixed
-set of lockings verifies any proof. Within a chunk the work is **unrolled straight-line
+set of lockings verifies any proof. The full chain is sequential: public inputs → vk_x →
+`(-A,B,C,vk_x)` → G2 validation → Miller → final exponentiation. vk_x range-checks
+canonical Fr inputs; G2 derives `R=B`; Miller derives `f=1` and `R=B`. Every stage emits
+the exact next-stage state, and every nonterminal covenant pins the actual successor
+locking bytecode. Within a chunk the work is **unrolled straight-line
 with fresh SSA variables** (the NAF digit baked per Miller step), so the body compiles
 once and **op-cost binds, not size**. Windows are sized by measuring real-VM op-cost.
 
@@ -70,14 +86,15 @@ once and **op-cost binds, not size**. Windows are sized by measuring real-VM op-
 ## Regenerating (everything in `generated/` is git-ignored)
 
 ```
-node generate.mjs            # vk_x + 4 Miller chains + combine + final exp + all vectors
+VERIFIER_DIR=/path/to/zk-verifier-bench node generate.mjs
 ```
 
 Individual pieces (all reproducible artifacts; only the generators are committed):
 
 ```
-node gen_vkx.mjs                    # vk_x covenant chunks (worst-case / full-width)
-node gen_miller.mjs                 # batched 4-pair Miller loop (flat-op, lazy)
+node gen_vkx.mjs                    # standalone vk_x covenant chunks
+node gen_vkx.mjs full               # full-stage vk_x -> (-A,B,C,vk_x)
+node gen_miller.mjs                 # prepared-VK 4-pair Miller product (flat-op, lazy)
 node gen_finalexp.mjs               # final exponentiation -> verdict
 node build_vectors.mjs             # -> verifier vkx-bls12381-chunked-covenant-vectors.json
 node build_vectors_pairing.mjs     # -> verifier pairing- + groth16-bls12381-chunked-vectors.json
@@ -122,10 +139,10 @@ op-cost. `build_vectors*` then re-compiles, pads, and evaluates every chunk twic
 ## vk_x is full-width / magnitude-independent
 
 The vk_x MSM tiles **all 255 scalar-field bit positions** and the windows are sized
-against a **worst-case all-bits-set input**, so one fixed locking aggregates **any**
-public input < r (EVM ecMul-equivalent), not just small inputs. (The 255-bit scalar is
-far below the 381-bit field, so the worst-case value reduces cleanly — no off-by-one,
-unlike BN254 where 2²⁵⁴−1 exceeds the prime.)
+against two **canonical complementary Fr scalars** whose bitwise union sets every
+position, so every planning iteration executes its add path. One fixed locking therefore
+aggregates **any** public input in `[0,r)` (EVM ecMul-equivalent), not just small inputs;
+the first chunk rejects negative or out-of-range scalars rather than silently truncating them.
 
 ## Files
 
@@ -135,12 +152,12 @@ unlike BN254 where 2²⁵⁴−1 exceeds the prime.)
 | `_pairingmath.mjs` | shared noble Miller/finalExp math, op-DAG trace, instance pairs, fnExtractor | ✅ |
 | `_residue_linked_plan.mjs` | audited hash-free Miller/tail boundaries and stress fixture, shared by grouped + intra-tx | ✅ |
 | `gen_vkx.mjs` | plan + emit the worst-case-sized vk_x chunks | ✅ |
-| `gen_miller.mjs` | plan + emit the batched 4-pair Miller chunks (flat-op, lazy) | ✅ |
+| `gen_miller.mjs` | plan + emit the prepared-VK 4-pair Miller chunks (flat-op, lazy) | ✅ |
 | `gen_finalexp.mjs` | trace + chunk the final exponentiation (op-DAG + liveness, lazy) | ✅ |
 | `build_vectors.mjs` | assemble the vk_x covenant vectors | ✅ |
 | `build_vectors_pairing.mjs` | assemble the pairing + full-groth16 vectors | ✅ |
 | `generate.mjs` | one-command orchestrator | ✅ |
-| `generated/` | the ~116 `.cash` chunks + manifests (derived) | ❌ git-ignored |
+| `generated/` | generated `.cash` chunks + manifests (derived) | ❌ git-ignored |
 | `generated/linked-residue/` | hash-free residue chunks + manifests for grouped/intra-tx only (derived) | ❌ git-ignored |
 
 The instance + IC/VK points come from `../../singleton/bls12-381/bls_instance.mjs`; the

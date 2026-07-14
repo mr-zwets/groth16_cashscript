@@ -10,9 +10,16 @@
 // formulas are b-independent, so they are identical to BN254.
 import { writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
+import { join } from 'node:path';
 import { vk, PUBLIC_INPUTS, computeVkx, Fp, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 
 export { vk, PUBLIC_INPUTS, computeVkx, bls12_381 };
+
+const verifierDir = process.env.VERIFIER_DIR;
+export const verifierPath = (...parts) => {
+  if (!verifierDir) throw new Error('VERIFIER_DIR must point to the zk-verifier-bench checkout');
+  return join(verifierDir, ...parts);
+};
 
 // ---- curve constants ----
 export const P = Fp.ORDER; // BLS12-381 base-field prime (381-bit)

@@ -7,16 +7,16 @@
 // singleton/bls12-381/bls_instance.mjs) through identical lockings.
 //
 // Emits TWO files:
-//   pairing-bls12381-chunked-vectors.json  — Miller loops + combine + final exp ->
+//   pairing-bls12381-chunked-vectors.json  — prepared Miller product + final exp ->
 //     verdict (== Fp12 ONE): the "Miller loops + final exponentiation" milestone.
 //   groth16-bls12381-chunked-vectors.json  — the FULL verifier: vk_x (the chunks from
 //     gen_vkx) prepended to the pairing, i.e. the complete BCH-native BLS Groth16.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import {
-  Fp12, millerBatchOps, f12limbs, r6limbs, pairsFor, ptLimbs, finalexpTrace, boundaryFor,
-  compileBytecode, commitBin, CATEGORY, tok, covIn, P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2,
+  Fp12, millerPreparedOps, assertPreparedMillerManifest, f12limbs, r6limbs, pairsFor, ptLimbs, finalexpTrace, boundaryFor,
+  commitBin, CATEGORY, tok, P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, verifierPath,
 } from './_pairingmath.mjs';
 import { PUBLIC_INPUTS, vk, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { vkxStateAt, vkxFinalZinv, computeVkx, compileFileBytecode, compileFileBytecodeRaw } from './_vkxmath.mjs';
@@ -24,7 +24,7 @@ import { g2checkAccAt } from './gen_g2check.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
-import { binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, numberToBinUint16LE, createVirtualMachineBch2026 } from '@bitauth/libauth';
+import { binToHex, hexToBin, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, numberToBinUint16LE, createVirtualMachineBch2026 } from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
@@ -40,10 +40,10 @@ const P2SH = process.env.CHUNKED_BARE !== '1';
 const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)); // OP_HASH256 <h> OP_EQUAL (35 B)
 const padBytes = (total) => { const b = Math.max(2, total); const n = b <= 76 ? b - 1 : b <= 257 ? b - 2 : b - 3; return encodeDataPush(new Uint8Array(n)); };
 
-function evalCov(locking, unlocking, inCommit, outCommit, terminal) {
+function evalCov(locking, unlocking, inCommit, outCommit, terminal, outLocking = locking, outputToken = tok(outCommit)) {
   const outputs = terminal
     ? [{ lockingBytecode: locking, valueSatoshis: 1000n }] // verdict chunk: no token thread continues
-    : [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(outCommit) }];
+    : [{ lockingBytecode: outLocking, valueSatoshis: 1000n, token: outputToken }];
   const program = {
     inputIndex: 0,
     sourceOutputs: [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(inCommit) }],
@@ -58,40 +58,63 @@ function evalCov(locking, unlocking, inCommit, outCommit, terminal) {
   return { accepted: st.error === undefined && st.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1, operationCost: st.metrics.operationCost, error: st.error ?? null };
 }
 
-const compileCache = new Map();
 const stats = { maxLock: 0, maxUnlock: 0, allFit: true, allAccept: true, allInvalid: true };
 // commitLimbs = committed carried state (NFT commitment, decl order). allArgs = everything
 // the unlocking pushes (== commitLimbs except final-exp inv chunks append f^-1 witnesses).
 // terminal = the verdict chunk (asserts ==ONE, produces no output token).
 const RESCHED = process.env.RESCHEDULE !== 'off';
-const chosenCache = new Map(); // cashFile -> chosen contract bytes (fixed on first use so
+const compileCache = new Map();
+const chosenCache = new Map(); // source+successor -> chosen contract bytes (fixed on first use so
                                // both instances share identical lockings)
-function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArgs, terminal, noStats) {
+const bindSuccessor = (cashFile, nextLocking) => {
+  const src = readFileSync(cashFile, 'utf8');
+  if (nextLocking === undefined) return { path: cashFile, cleanup: false };
+  const expected = binToHex(hash256(nextLocking));
+  const marker = '\n    }\n}\n';
+  if (!src.endsWith(marker)) throw new Error(`cannot bind successor locking in ${cashFile}`);
+  const bound = src.slice(0, -marker.length) + `\n        require(hash256(tx.outputs[0].lockingBytecode) == 0x${expected});${marker}`;
+  const temp = join(dirname(cashFile), `._bound_${basename(cashFile, '.cash')}_${expected.slice(0, 16)}.cash`);
+  writeFileSync(temp, bound);
+  return { path: temp, cleanup: true };
+};
+
+function compiledVariants(cashFile, nextLocking) {
+  const key = `${cashFile}|${nextLocking === undefined ? 'terminal' : binToHex(nextLocking)}`;
+  let variants = compileCache.get(key);
+  if (variants) return { key, variants };
+  const bound = bindSuccessor(cashFile, nextLocking);
+  try {
+    const resched = compileFileBytecode(bound.path);
+    const raw = RESCHED ? compileFileBytecodeRaw(bound.path) : resched;
+    variants = { resched };
+    if (RESCHED && binToHex(raw) !== binToHex(resched)) variants.raw = raw;
+    compileCache.set(key, variants);
+    return { key, variants };
+  } finally {
+    if (bound.cleanup) unlinkSync(bound.path);
+  }
+}
+
+function buildCovStep(spec, nextLocking, noStats) {
+  const { cashFile, commitLimbs, outLimbs, label, checkpoint, allArgs, terminal = false } = spec;
   const pushArgs = allArgs ?? commitLimbs;
   // compileFile (not compileString) so the g2check chunks' relative library `import` resolves;
   // it compiles the inlined vkx/miller/finalexp chunks identically. Per-chunk A/B: BLS chunks
   // run close to the 10,000 B caps, so keep whichever of {rescheduled, plain-cashc} redeem
   // yields the smaller fitting step (covenant steps are independent txs, so the choice is local).
-  let contract = chosenCache.get(cashFile);
+  const { key, variants: v } = compiledVariants(cashFile, terminal ? undefined : nextLocking);
+  let contract = chosenCache.get(key);
   if (contract === undefined) {
-    let v = compileCache.get(cashFile);
-    if (!v) {
-      const resched = compileFileBytecode(cashFile);
-      const raw = RESCHED ? compileFileBytecodeRaw(cashFile) : resched;
-      v = { resched };
-      if (RESCHED && binToHex(raw) !== binToHex(resched)) v.raw = raw;
-      compileCache.set(cashFile, v);
-    }
     if (!v.raw) contract = v.resched;
     else {
-      const a = evalStepWith(v.resched, commitLimbs, outLimbs, pushArgs, terminal);
-      const b = evalStepWith(v.raw, commitLimbs, outLimbs, pushArgs, terminal);
+      const a = evalStepWith(v.resched, commitLimbs, outLimbs, pushArgs, terminal, nextLocking);
+      const b = evalStepWith(v.raw, commitLimbs, outLimbs, pushArgs, terminal, nextLocking);
       const score = (r) => (r.fits ? r.step.lockingBytes + r.step.unlockingBytes : Infinity);
       contract = score(b) < score(a) ? v.raw : v.resched;
     }
-    chosenCache.set(cashFile, contract);
+    chosenCache.set(key, contract);
   }
-  const r = evalStepWith(contract, commitLimbs, outLimbs, pushArgs, terminal, label, checkpoint);
+  const r = evalStepWith(contract, commitLimbs, outLimbs, pushArgs, terminal, nextLocking, label, checkpoint);
   if (!noStats) {
     stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
     stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
@@ -99,12 +122,12 @@ function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArg
       console.error(`  !! ${label}: lock=${r.step.lockingBytes} unlock=${r.step.unlockingBytes} op=${r.step.operationCost.toLocaleString()} accepted=${r.accepted} invalidRejected=${r.invalidRejected} err=${r.error ?? '(none)'}`);
     }
   }
-  return r.step;
+  return r;
 }
 
 // assemble + evaluate one covenant step for a given compiled contract: P2SH envelope,
 // pad tuned to the measured op-cost, tamper check. Pure function of its arguments.
-function evalStepWith(contract, commitLimbs, outLimbs, pushArgs, terminal, label = '', checkpoint = undefined) {
+function evalStepWith(contract, commitLimbs, outLimbs, pushArgs, terminal, nextLocking, label = '', checkpoint = undefined) {
   const redeem = Uint8Array.from([...contract]); // trailing `bytes unused zeroPadding` param absorbs the pad (no OP_DROP)
   const rpush = encodeDataPush(redeem);                   // pushed LAST in the scriptSig (P2SH)
   const locking = P2SH ? p2shSpk(redeem) : redeem;        // P2SH scriptPubKey (35 B) or bare contract
@@ -113,65 +136,123 @@ function evalStepWith(contract, commitLimbs, outLimbs, pushArgs, terminal, label
   const argBytes = Uint8Array.from([...pushArgs].reverse().flatMap((c) => [...pushInt(BigInt(c))]));
   // `zeroPadding` is the LAST spend param -> pushed FIRST -> pad leads: [pad][args][redeem push (P2SH)].
   const mkUnlock = (target) => { const pad = padBytes(target - argBytes.length - tail); return P2SH ? Uint8Array.from([...pad, ...argBytes, ...rpush]) : Uint8Array.from([...pad, ...argBytes]); };
-  const probe = evalCov(locking, mkUnlock(TARGET_UNLOCK), inCommit, outCommit, terminal);
+  const outLocking = terminal ? locking : nextLocking;
+  if (!terminal && outLocking === undefined) throw new Error(`missing successor locking for ${label}`);
+  const probe = evalCov(locking, mkUnlock(TARGET_UNLOCK), inCommit, outCommit, terminal, outLocking);
   let target = tunedLen(argBytes.length + tail, probe.operationCost);
   let unlocking = mkUnlock(target);
-  let real = evalCov(locking, unlocking, inCommit, outCommit, terminal);
-  while (!real.accepted && target < TARGET_UNLOCK) { target = Math.min(TARGET_UNLOCK, target + 256); unlocking = mkUnlock(target); real = evalCov(locking, unlocking, inCommit, outCommit, terminal); }
+  let real = evalCov(locking, unlocking, inCommit, outCommit, terminal, outLocking);
+  while (!real.accepted && target < TARGET_UNLOCK) { target = Math.min(TARGET_UNLOCK, target + 256); unlocking = mkUnlock(target); real = evalCov(locking, unlocking, inCommit, outCommit, terminal, outLocking); }
   // tamper a state limb: args follow the leading pad, so the first arg push payload is at padLen + 1.
   const invalid = Uint8Array.from(unlocking); const padLen = unlocking.length - argBytes.length - tail; invalid[padLen + 1] ^= 0x01;
-  const invReal = evalCov(locking, invalid, inCommit, outCommit, terminal);
+  const invReal = evalCov(locking, invalid, inCommit, outCommit, terminal, outLocking);
+  const wrongLocking = terminal ? outLocking : Uint8Array.from(outLocking);
+  if (!terminal) wrongLocking[wrongLocking.length - 1] ^= 0x01;
+  const wrongLockReal = terminal ? { accepted: false } : evalCov(locking, unlocking, inCommit, outCommit, false, wrongLocking);
+  const wrongCategory = tok(outCommit);
+  wrongCategory.category = Uint8Array.from(wrongCategory.category);
+  wrongCategory.category[0] ^= 0x01;
+  const wrongCategoryReal = terminal ? { accepted: false } : evalCov(locking, unlocking, inCommit, outCommit, false, outLocking, wrongCategory);
+  const strippedCapability = tok(outCommit);
+  strippedCapability.nft.capability = 'none';
+  const strippedCapabilityReal = terminal ? { accepted: false } : evalCov(locking, unlocking, inCommit, outCommit, false, outLocking, strippedCapability);
   return {
     step: {
       label, locking: binToHex(locking), unlocking: binToHex(unlocking), invalidUnlocking: binToHex(invalid), checkpoint,
-      covenant: { category: binToHex(CATEGORY), capability: 'mutable', inCommitment: binToHex(inCommit), outCommitment: binToHex(outCommit), outLockingBytecode: binToHex(locking) },
+      covenant: { category: binToHex(CATEGORY), capability: 'mutable', inCommitment: binToHex(inCommit), outCommitment: binToHex(outCommit), outLockingBytecode: binToHex(outLocking) },
       lockingBytes: locking.length, unlockingBytes: unlocking.length, operationCost: real.operationCost,
     },
-    accepted: real.accepted, invalidRejected: !invReal.accepted, error: real.error,
+    accepted: real.accepted,
+    invalidRejected: !invReal.accepted && !wrongLockReal.accepted && !wrongCategoryReal.accepted && !strippedCapabilityReal.accepted,
+    error: real.error,
     fits: locking.length <= 10000 && unlocking.length <= 10000 && real.operationCost <= OP_BUDGET && real.accepted,
   };
 }
 
+function buildChain(specs, { noStats = false, tailLocking, expectRejected = false } = {}) {
+  const built = new Array(specs.length);
+  const results = new Array(specs.length);
+  let nextLocking = tailLocking;
+  for (let i = specs.length - 1; i >= 0; i--) {
+    const spec = specs[i];
+    if (!spec.terminal && nextLocking === undefined) throw new Error(`nonterminal tail has no successor: ${spec.label}`);
+    const result = buildCovStep(spec, nextLocking, noStats);
+    results[i] = result;
+    built[i] = result.step;
+    nextLocking = hexToBin(result.step.locking);
+  }
+  for (let i = 0; i + 1 < built.length; i++) {
+    if (built[i].covenant.outCommitment !== built[i + 1].covenant.inCommitment) throw new Error(`commitment seam mismatch at ${built[i].label}`);
+    if (built[i].covenant.outLockingBytecode !== built[i + 1].locking) throw new Error(`locking seam mismatch at ${built[i].label}`);
+  }
+  const accepted = results.every((r) => r.accepted);
+  if (expectRejected ? accepted : !accepted) throw new Error(expectRejected ? 'invalid chain unexpectedly accepted' : 'valid chain rejected');
+  return built;
+}
+
 // ---- the two instances: #0 committed, #1 a distinct valid instance (same VK) ----
-// Build a valid instance the same deterministic way as bls_instance.mjs: only A and
-// vk_x change with the public inputs (B = G2 base, C = cS*G1 stay fixed).
+// Build a second valid instance under the same VK with distinct A, B, C, and vk_x.
 const G1 = bls12_381.G1.Point;
+const G2 = bls12_381.G2.Point;
+const Fr = bls12_381.fields.Fr;
 const Rord = 52435875175126190479447740508185965837690552500527637822603658699938581184513n;
 const mod = (x) => ((x % Rord) + Rord) % Rord;
-const mkInstance = (inputs) => {
+const mkInstance = (inputs, bS = 1n, cS = 13n) => {
   const [s0, s1] = inputs.map(BigInt);
   const vx = mod(2n + s0 * 4n + s1 * 6n);          // ic = [2,4,6]
-  const A = mod(3n * 5n + vx * 7n + 13n * 11n);    // a*b + vx*g + cS*d ; a,b,g,d,cS = 3,5,7,11,13
-  return { inputs, proof: { a: G1.BASE.multiply(A), b: proof.b, c: proof.c } };
+  const rhs = mod(3n * 5n + vx * 7n + cS * 11n);   // alpha*beta + vk_x*gamma + C*delta
+  const A = Fr.mul(rhs, Fr.inv(bS));                 // A*B = rhs
+  return { inputs, proof: { a: G1.BASE.multiply(A), b: G2.BASE.multiply(bS), c: G1.BASE.multiply(cS) } };
 };
 const INSTANCES = [
   { tag: 'committed', inputs: PUBLIC_INPUTS, proof },
-  { tag: 'instance#1', ...mkInstance([135208n, 67633n]) },
+  { tag: 'instance#1', ...mkInstance([135208n, 67633n], 17n, 19n) },
 ];
 
 // ---- BATCHED Miller replay (flat op list; final chunk conjugates f = boundary) ----
-const stateLimbs = (s) => [...f12limbs(s.f), ...s.Rs.flatMap(r6limbs)];
-function buildPairing(inst) {
+const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0])];
+const sameLimbs = (a, b) => a.length === b.length && a.every((v, i) => BigInt(v) === BigInt(b[i]));
+const stageLimbs = (inst, bad = {}) => {
+  const pf = inst.proof ?? proof;
+  const A = pf.a.negate().toAffine(), B = pf.b.toAffine(), C = pf.c.toAffine();
+  const vkx = computeVkx(inst.inputs.map(BigInt)).toAffine();
+  return [
+    bad.Ax ?? A.x, bad.Ay ?? A.y,
+    bad.Bx?.c0 ?? B.x.c0, bad.Bx?.c1 ?? B.x.c1,
+    bad.By?.c0 ?? B.y.c0, bad.By?.c1 ?? B.y.c1,
+    bad.Cx ?? C.x, bad.Cy ?? C.y,
+    bad.vkxX ?? vkx.x, bad.vkxY ?? vkx.y,
+  ];
+};
+
+function specsPairing(inst) {
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const { ops, states, finalF } = millerBatchOps(pairs);
+  const trace = millerPreparedOps(pairs);
+  const { ops, states, finalF } = trace;
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
-  const finalLimbs = [...f12limbs(finalF), ...states[ops.length].Rs.flatMap(r6limbs), ...ptL];
+  const stage = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
+  if (!sameLimbs(stage, stageLimbs(inst))) throw new Error(`Miller genesis layout mismatch for ${inst.tag}`);
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_miller.json'), 'utf8'));
-  const steps = [];
+  assertPreparedMillerManifest(man, trace, { checkReferenceBoundary: inst.tag === 'committed' });
+  const specs = [];
   for (const ch of man.chunks) {
-    const inLimbs = [...stateLimbs(states[ch.opLo]), ...ptL];
-    const outLimbs = ch.final ? finalLimbs : [...stateLimbs(states[ch.opHi]), ...ptL];
-    steps.push(buildCovStep(join(GEN, `miller_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs, `miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' +conj=boundary' : ''}`, ch.final ? 'miller-boundary' : undefined));
+    const commitLimbs = ch.opLo === 0 ? stage : [...stateLimbs(states[ch.opLo]), ...ptL];
+    const outLimbs = ch.final ? f12limbs(finalF) : [...stateLimbs(states[ch.opHi]), ...ptL];
+    specs.push({
+      cashFile: join(GEN, `miller_${String(ch.idx).padStart(2, '0')}.cash`), commitLimbs, outLimbs,
+      label: `miller ops[${ch.opLo},${ch.opHi})${ch.final ? ' +conj=boundary' : ''}`,
+      checkpoint: ch.final ? 'miller-boundary' : undefined,
+    });
   }
-  return { steps, boundaryVal: finalF };
+  return { specs, boundaryVal: finalF };
 }
 
-function buildFinalexp(inst, boundaryVal) {
+function specsFinalexp(inst, boundaryVal, expectOne = true) {
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_finalexp.json'), 'utf8'));
   const tr = finalexpTrace(boundaryVal);
-  if (!Fp12.eql(tr.result, Fp12.ONE)) throw new Error(`finalExp(boundary) != ONE for ${inst.tag}`);
+  if (expectOne && !Fp12.eql(tr.result, Fp12.ONE)) throw new Error(`finalExp(boundary) != ONE for ${inst.tag}`);
   const liveLimbs = (cut) => tr.liveAt(cut).flatMap((id) => tr.limbs12(id));
-  const steps = [];
+  const specs = [];
   for (const ch of man.chunks) {
     const inLimbs = liveLimbs(ch.opLo);
     const outLimbs = ch.final ? [] : liveLimbs(ch.opHi);
@@ -179,63 +260,74 @@ function buildFinalexp(inst, boundaryVal) {
     const witnesses = [];
     for (let i = ch.opLo; i < ch.opHi; i++) if (tr.ops[i].op === 'inv') witnesses.push(...tr.limbs12(tr.ops[i].id));
     const allArgs = witnesses.length ? [...inLimbs, ...witnesses] : inLimbs;
-    steps.push(buildCovStep(join(GEN, `finalexp_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs, `finalexp ops[${ch.opLo},${ch.opHi})${ch.final ? ' verdict==1' : ''}`, ch.final ? 'verify' : undefined, allArgs, ch.final));
+    specs.push({
+      cashFile: join(GEN, `finalexp_${String(ch.idx).padStart(2, '0')}.cash`), commitLimbs: inLimbs, outLimbs,
+      label: `finalexp ops[${ch.opLo},${ch.opHi})${ch.final ? ' verdict==1' : ''}`,
+      checkpoint: ch.final ? 'verify' : undefined, allArgs, terminal: ch.final,
+    });
   }
-  return steps;
+  return specs;
 }
 
 // ---- vk_x chunks (for the full groth16 verifier; from gen_vkx's manifest) ----
-function buildVkx(inst) {
+function specsVkx(inst) {
   const [in0, in1] = inst.inputs.map(BigInt);
-  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkx.json'), 'utf8'));
-  const vkxAff = computeVkx([in0, in1]).toAffine();
-  const steps = [];
+  const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxfull.json'), 'utf8'));
+  if (man.genesisDerived !== true || man.fullStageBound !== true) throw new Error('full vk_x manifest is not stage-bound');
+  const stage = stageLimbs(inst);
+  const proofTuple = stage.slice(0, 8);
+  const specs = [];
   for (const ch of man.chunks) {
     const inAcc = vkxStateAt(in0, in1, ch.lo);
-    const commitLimbs = [...inAcc, in0, in1];
+    const commitLimbs = ch.lo === 0 ? [in0, in1] : [...inAcc, in0, in1];
     let outLimbs, allArgs;
-    if (ch.final) { outLimbs = [vkxAff.x, vkxAff.y]; allArgs = [...commitLimbs, vkxFinalZinv(in0, in1)]; }
+    if (ch.final) { outLimbs = stage; allArgs = [...commitLimbs, vkxFinalZinv(in0, in1), ...proofTuple]; }
     else { outLimbs = [...vkxStateAt(in0, in1, ch.hi), in0, in1]; allArgs = commitLimbs; }
-    steps.push(buildCovStep(join(GEN, `vkx_${String(ch.idx).padStart(2, '0')}.cash`), commitLimbs, outLimbs, `vk_x [${ch.lo},${ch.hi})${ch.final ? ' assemble vk_x' : ''}`, ch.final ? 'vk_x' : undefined, allArgs));
+    specs.push({
+      cashFile: join(GEN, `vkxfull_${String(ch.idx).padStart(2, '0')}.cash`), commitLimbs, outLimbs,
+      label: `vk_x [${ch.lo},${ch.hi})${ch.final ? ' bind (-A,B,C,vk_x)' : ''}`,
+      checkpoint: ch.final ? 'vk_x' : undefined, allArgs,
+    });
   }
-  return steps;
+  return specs;
 }
 
 // ---- G2 input-validation prologue (EIP-197): on-curve A/B/C + psi(B) == [-x]B ----
-// `bad` (optional) overrides the points with adversarial values (off-curve / off-subgroup)
+// `bad` (optional) overrides the points with negative-case values (off-curve / off-subgroup)
 // and suppresses stats — for an invalidInputs run that MUST reject.
 const F2b = bls12_381.fields.Fp2;
-const g2sLimbs = (R, Bx, By, Ax, Ay, Cx, Cy) =>
-  [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1, Bx.c0, Bx.c1, By.c0, By.c1, Ax, Ay, Cx, Cy];
-function buildG2check(inst, bad) {
-  const pf = inst.proof ?? proof;
-  const Ba = pf.b.toAffine(), Aa = pf.a.toAffine(), Ca = pf.c.toAffine();
-  const Bx = bad?.Bx ?? Ba.x, By = bad?.By ?? Ba.y;
-  const Ax = Aa.x, Ay = bad?.Ay ?? Aa.y; // off-curve A bumps Ay off the G1 curve
-  const Cx = Ca.x, Cy = Ca.y;
+const g2sLimbs = (R, stage) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1, ...stage];
+function specsG2check(inst, bad) {
+  const stage = stageLimbs(inst, bad);
+  const Bx = F2b.create({ c0: stage[2], c1: stage[3] });
+  const By = F2b.create({ c0: stage[4], c1: stage[5] });
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
-  const steps = [];
+  if (man.stageBound !== true || man.genesisDerived !== true || man.carriesVkx !== true) throw new Error('G2 manifest is not stage-bound');
+  const specs = [];
   for (const ch of man.chunks) {
-    const inLimbs = g2sLimbs(g2checkAccAt(Bx, By, ch.lo), Bx, By, Ax, Ay, Cx, Cy);
-    const outLimbs = ch.last ? [] : g2sLimbs(g2checkAccAt(Bx, By, ch.hi), Bx, By, Ax, Ay, Cx, Cy);
-    steps.push(buildCovStep(join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs,
-      `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' psi(B)==[-x]B' : ''}`, ch.first ? 'validate-inputs' : undefined, undefined, ch.last, bad !== undefined));
+    const commitLimbs = ch.first ? stage : g2sLimbs(g2checkAccAt(Bx, By, ch.lo), stage);
+    const outLimbs = ch.last ? stage : g2sLimbs(g2checkAccAt(Bx, By, ch.hi), stage);
+    specs.push({
+      cashFile: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`), commitLimbs, outLimbs,
+      label: `g2check bits[${ch.lo},${ch.hi})${ch.last ? ' psi(B)==[-x]B' : ''}`,
+      checkpoint: ch.first ? 'validate-inputs' : undefined,
+    });
   }
-  return steps;
+  return specs;
 }
 
-// Build the FULL groth16 verifier FRESH, in spend order: g2check (EIP-197 input validation) ->
-// vk_x -> batched Miller -> final exp. (Previously this reused the COMMITTED baseline to keep the
-// miller's lazy-arithmetic optimization; now the miller imports the lazy LIBRARY Bls12381Lazy.cash,
-// so a fresh rebuild preserves it — no stale baseline to read.) The miller+finalexp slice doubles
-// as the pairing-only milestone (pairing-bls12381-chunked-vectors.json).
-const OUT = 'C:/Users/mathi/Desktop/verifier/src/bch';
+// Build the FULL verifier as one exact token-state chain:
+// public inputs -> vk_x/(-A,B,C) -> G2 validation -> prepared Miller -> final exponentiation.
+// Every nonterminal locking commits the actual successor locking bytecode. The Miller+finalexp
+// suffix doubles as the explicitly input-unvalidated pairing-only milestone.
 const buildGroth16 = (inst) => {
-  const g2 = buildG2check(inst);
-  const vkx = buildVkx(inst);
-  const { steps: pair, boundaryVal } = buildPairing(inst);
-  const fe = buildFinalexp(inst, boundaryVal);
-  return { all: [...g2, ...vkx, ...pair, ...fe], pairing: [...pair, ...fe] };
+  const vkx = specsVkx(inst);
+  const g2 = specsG2check(inst);
+  const { specs: miller, boundaryVal } = specsPairing(inst);
+  const fe = specsFinalexp(inst, boundaryVal);
+  const all = buildChain([...vkx, ...g2, ...miller, ...fe]);
+  const pairing = all.slice(vkx.length + g2.length);
+  return { all, pairing, vkx, g2, miller, fe };
 };
 const run0 = buildGroth16(INSTANCES[0]);
 const run1 = buildGroth16(INSTANCES[1]);
@@ -243,14 +335,16 @@ const steps = run0.all;
 const extraValidProofs = [run1.all];
 const sumOp = (a) => a.reduce((x, s) => x + s.operationCost, 0);
 const maxOpOf = (a) => Math.max(...a.map((s) => s.operationCost));
-console.error(`full groth16: ${steps.length} steps (g2check + vk_x + miller + finalexp)`);
+console.error(`full groth16: ${steps.length} steps (vk_x + g2check + miller + finalexp)`);
 console.error(`valid run: allFit=${stats.allFit} allAccept=${stats.allAccept} allInvalidRejected=${stats.allInvalid}`);
 if (!stats.allFit || !stats.allAccept || !stats.allInvalid) { console.error('!! a step did not fit/accept/reject -- NOT writing vectors'); process.exit(1); }
 
-// ---- adversarial INPUT runs (must REJECT) for the harness's input-validation grading ----
+// ---- negative-case INPUT runs (must REJECT) for the harness's input-validation grading ----
 // off-curve A: bump A.y so y^2 != x^3+4 -> the first g2check chunk's G1 cubic require fails.
-const Aa = proof.a.toAffine();
-const offCurveARun = buildG2check(INSTANCES[0], { Ay: (Aa.y + 1n) % P });
+const Aa = proof.a.negate().toAffine();
+const millerTail = hexToBin(run0.pairing[0].locking);
+const buildInvalidG2 = (bad) => buildChain(specsG2check(INSTANCES[0], bad), { noStats: true, tailLocking: millerTail, expectRejected: true });
+const offCurveARun = buildInvalidG2({ Ay: (Aa.y + 1n) % P });
 // on-curve but OFF-SUBGROUP B: a point on the twist y^2=x^3+(4+4u) outside the order-r
 // subgroup -> psi(B) == [-x]B fails at the last g2check chunk. Search small x.
 const b2 = F2b.create({ c0: 4n, c1: 4n });
@@ -262,12 +356,44 @@ for (let i = 1n; i < 800n && !offSub; i++) {
   if (!F2b.eql(F2b.sqr(y), rhs)) continue;
   try { bls12_381.G2.Point.fromAffine({ x, y }).assertValidity(); } catch { offSub = { x, y }; } // on-curve, not torsion-free
 }
-const offSubRun = offSub ? buildG2check(INSTANCES[0], { Bx: offSub.x, By: offSub.y }) : null;
-console.error(`adversarial: off-curve A (${offCurveARun.length} steps), off-subgroup B (${offSubRun ? offSubRun.length + ' steps' : 'NONE'})`);
-const invalidInputs = [offCurveARun, ...(offSubRun ? [offSubRun] : [])];
+if (!offSub) throw new Error('failed to construct the off-subgroup B fixture; refusing to write vectors');
+const offSubRun = buildInvalidG2({ Bx: offSub.x, By: offSub.y });
+const Ca = proof.c.toAffine();
+const offCurveCRun = buildInvalidG2({ Cy: (Ca.y + 1n) % P });
 
-writeFileSync(`${OUT}/pairing-bls12381-chunked-vectors.json`, JSON.stringify({
-  description: 'PROOF-AGNOSTIC chunked BLS12-381 Groth16 pairing: a BATCHED 4-pair optimal-ate Miller loop (one shared fp12Sqr per step) -> Miller boundary (the conjugated f; no separate combine), then final exponentiation -> verdict (== Fp12 ONE), multi-tx. Generic covenant: Miller f + 4 R / live final-exp values + proof-derived points ride in the token NFT commitment (48-byte limbs), NO baked proof. Lazy field reduction (addFp deferred). One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct instance under the same VK. The 381-iter Fermat inverse in the easy part is supplied as an unlocking witness and verified by fp12Mul(f, f^-1)==ONE (it would alone exceed one input op-cost budget).',
+// Legacy forged-R shape: six attacker-chosen accumulator limbs prepended to the exact stage.
+// The derived-genesis first G2 contract has no R parameters, so this must fail clean-stack/arity.
+const forgedSpecs = specsG2check(INSTANCES[0]);
+forgedSpecs[0] = { ...forgedSpecs[0], allArgs: [9n, 8n, 7n, 6n, 5n, 4n, ...forgedSpecs[0].commitLimbs] };
+const forgedRRun = buildChain(forgedSpecs, { noStats: true, tailLocking: millerTail, expectRejected: true });
+
+// Public scalars are canonical Fr elements, not values silently truncated to 255 bits.
+const badRangeSpecs = specsVkx(INSTANCES[0]);
+badRangeSpecs[0] = { ...badRangeSpecs[0], commitLimbs: [Rord, PUBLIC_INPUTS[1]], allArgs: [Rord, PUBLIC_INPUTS[1]] };
+const outOfRangeRun = buildChain([badRangeSpecs[0]], { noStats: true, tailLocking: hexToBin(run0.all[1].locking), expectRejected: true });
+
+// A proof from the second valid instance cannot be spliced onto the first instance's public
+// inputs: all validation stages accept the points, but the final pairing verdict rejects.
+const spliced = { tag: 'proof-splice', inputs: INSTANCES[0].inputs, proof: INSTANCES[1].proof };
+const splicedVkx = specsVkx(spliced), splicedG2 = specsG2check(spliced);
+const { specs: splicedMiller, boundaryVal: splicedBoundary } = specsPairing(spliced);
+const splicedRun = buildChain([...splicedVkx, ...splicedG2, ...splicedMiller, ...specsFinalexp(spliced, splicedBoundary, false)], { noStats: true, expectRejected: true });
+
+// The vector assembler also refuses a direct cross-proof stage seam before any file is written.
+let seamSpliceRejected = false;
+try {
+  const { specs: wrongMiller, boundaryVal: wrongBoundary } = specsPairing(INSTANCES[1]);
+  buildChain([...specsVkx(INSTANCES[0]), ...specsG2check(INSTANCES[0]), ...wrongMiller, ...specsFinalexp(INSTANCES[1], wrongBoundary)], { noStats: true });
+} catch (error) {
+  seamSpliceRejected = String(error?.message ?? error).includes('commitment seam mismatch');
+}
+if (!seamSpliceRejected) throw new Error('cross-proof stage seam was not rejected');
+
+console.error(`negative cases: off-curve A/C, off-subgroup B, forged R, Fr range, and proof splice all rejected`);
+const invalidInputs = [offCurveARun, offSubRun, offCurveCRun, forgedRRun, outOfRangeRun, splicedRun];
+
+writeFileSync(verifierPath('src', 'bch', 'pairing-bls12381-chunked-vectors.json'), JSON.stringify({
+  description: 'PROOF-AGNOSTIC chunked BLS12-381 Groth16 pairing: a prepared-VK 4-pair optimal-ate Miller product -> Miller boundary (the conjugated f; no separate combine), then final exponentiation -> verdict (== Fp12 ONE), multi-tx. Pairing-only intentionally does not validate G1/G2 inputs; the full Groth16 track does. Miller genesis accepts only (-A,B,C,vk_x), derives f=1 and R_B=B, and every nonterminal token state pins the actual successor locking. Fixed gamma/delta G2 trajectories use manifest-bound baked line coefficients, and fixed e(alpha,beta) is folded as one dense multiplication. Lazy field reduction (addFp deferred). One fixed set of lockings verifies multiple proofs under the same VK. The 381-iter Fermat inverse in the easy part is supplied as an unlocking witness and verified by fp12Mul(f, f^-1)==ONE.',
   proofBinding: 'runtime', curve: 'BLS12-381', numSteps: run0.pairing.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(run0.pairing), maxStepOperationCost: maxOpOf(run0.pairing),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
@@ -275,12 +401,12 @@ writeFileSync(`${OUT}/pairing-bls12381-chunked-vectors.json`, JSON.stringify({
 }, null, 2));
 console.error(`wrote src/bch/pairing-bls12381-chunked-vectors.json (${run0.pairing.length} steps)`);
 
-writeFileSync(`${OUT}/groth16-bls12381-chunked-vectors.json`, JSON.stringify({
-  description: 'PROOF-AGNOSTIC full chunked BLS12-381 Groth16 verifier with EIP-197 input validation: a G2 prologue (on-curve A/B/C + the prime-order-subgroup test psi(B) == [-x]B) -> vk_x (on-chain from public inputs) -> a BATCHED 4-pair Miller loop -> final exponentiation -> assert verdict == Fp12 ONE, multi-tx. Generic covenant: all state + proof-derived points in the token NFT commitment (48-byte limbs), NO baked proof. One fixed set of lockings verifies multiple proofs (runtime-general): proof #0 = committed instance, extraValidProofs = a distinct instance under the same VK. invalidInputs (off-curve A, off-subgroup B) must each REJECT.',
+writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-chunked-vectors.json'), JSON.stringify({
+  description: 'PROOF-AGNOSTIC full chunked BLS12-381 Groth16 verifier with EIP-197 input validation: public inputs -> canonical-range-checked vk_x -> committed (-A,B,C,vk_x) -> on-curve/subgroup validation -> prepared-VK Miller product -> final exponentiation -> verdict. G2 and Miller derive their initial accumulators from the committed B; callers cannot supply R or f. Every stage emits the exact next-stage state, and every nonterminal covenant pins the actual successor locking, forming one cryptographically continuous mutable-NFT token chain. Fixed gamma/delta lines and e(alpha,beta) are manifest-bound VK constants. One fixed locking chain verifies multiple proofs. Negative cases for off-curve, off-subgroup, forged-R, out-of-range, and cross-proof splice inputs must reject.',
   proofBinding: 'runtime', curve: 'BLS12-381', numSteps: steps.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(steps), maxStepOperationCost: maxOpOf(steps),
   allFit: stats.allFit, allAccept: stats.allAccept, allInvalidRejected: stats.allInvalid,
   steps, extraValidProofs,
-  invalidInputs, // off-curve A + off-subgroup B; the harness requires each REJECTS (input validation)
+  invalidInputs,
 }, null, 2));
 console.error('wrote src/bch/groth16-bls12381-chunked-vectors.json');
