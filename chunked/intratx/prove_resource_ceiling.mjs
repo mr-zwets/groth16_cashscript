@@ -51,11 +51,11 @@ const DEFAULT_MIN_RELAY_FEE_SATOSHIS_PER_BYTE = 1n;
 const TRANSACTION_OUTPUT_SATOSHIS = 1000n;
 const DENSITY_BASE = 41;
 const DENSITY_MULTIPLIER = 800;
-const LOCKING_GRAPH_HASH = 'f997efcb6ae47b70aea017220d53097669dc53218715bd3343950334425a6638';
+const LOCKING_GRAPH_HASH = '356c903265c0b741e9ab84ee656541fa3bfccaa8898ca1a6d2675526385e7d22';
 const GLV_TABLE_HASH = '4dedc6a77ffe1f14a1faa12a533a2975e8d7304c8e740a82d8a5c9c41e490028';
 const GLV_EVENT_ALLOCATIONS = [[4, 5], [3, 6]];
 const EXPECTED_EXTRA_COUNTS = [0, 1, 20, 20, 20, 20, 20, 18, 20, 22, 16];
-const EXPECTED_FIXED_FLOORS = [2_376, 5_079, 8_119, 8_243, 8_123, 8_109, 8_105, 7_880, 8_109, 7_961, 8_729];
+const EXPECTED_FIXED_FLOORS = [2_383, 5_086, 8_119, 8_243, 8_123, 8_109, 8_105, 7_880, 8_109, 7_961, 8_729];
 
 const extraValidProofs = vectors.extraValidProofs ?? [];
 const resourceFixtureProof = vectors.resourceFixtureProof;
@@ -377,7 +377,7 @@ results.forEach((result) => {
 const universalWireBytes = Math.max(...results.map((result) => result.wireBytes));
 const universalTotalOperationCost = Math.max(...results.map((result) =>
   result.costs.reduce((sum, cost) => sum + cost, 0)));
-if (universalWireBytes !== 99_284 || universalTotalOperationCost !== 79_387_771) {
+if (universalWireBytes !== 99_285 || universalTotalOperationCost !== 79_389_147) {
   throw new Error('certified universal envelope changed');
 }
 console.log(`proved universal envelope: ${universalWireBytes} wire bytes, ` +

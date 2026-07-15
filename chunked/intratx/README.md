@@ -30,8 +30,8 @@ arithmetic for the linked layout. In either case, every chunk is an input of one
 of one of many sequential transactions, with no per-step hashing and no 128-byte state cap. The
 plain graphs remain larger non-standard transactions. The optimized BN254 quotient-torus graph is
 11 inputs: the committed, alternate, density, resource, and all nine identity/special fixtures are
-standard and fund the default 1 sat/byte relay fee. The committed proof is 90,550 serialized bytes,
-and the proof-independent resource certificate bounds every accepted witness at 99,284 bytes. The
+standard and fund the default 1 sat/byte relay fee. The committed proof is 90,564 serialized bytes,
+and the proof-independent resource certificate bounds every accepted witness at 99,285 bytes. The
 BLS12-381 quotient-torus graph is 34 inputs in one current-BCH consensus-valid 195,705-byte
 transaction, non-standard only by total size.
 
@@ -129,7 +129,7 @@ sibling's forward-check.
 A 100 kB input exceeds standard relay policy (the *tx* exceeds `maximumStandardTransactionSize` =
 100,000), so the transaction is non-standard and must be mined directly. The plain and BLS
 current-BCH intra-tx bundles are also non-standard; the BN254 quotient-torus verifier is the
-standard-policy-valid exception, with a certified 99,284-byte universal envelope.
+standard-policy-valid exception, with a certified 99,285-byte universal envelope.
 
 ## Files
 
@@ -200,20 +200,20 @@ VERIFIER_DIR=/absolute/path/to/zk-verifier-bench pnpm vectors:intratx:torus
 ```
 
 The generated verifier uses 11 inputs. Exact full-valid serialized transaction measurements are
-90,550 bytes / 70,662,495 op-cost for the committed proof, 90,558 / 70,510,266 for the alternate
-proof, 98,380 / 78,523,195 for the all-lanes density proof, and 98,461 / 78,588,198 for the
-asymmetric resource fixture. The nine identity/special fixtures range from 83,609 to 90,567 bytes.
+90,564 bytes / 70,663,907 op-cost for the committed proof, 90,572 / 70,511,678 for the alternate
+proof, 98,381 / 78,524,566 for the all-lanes density proof, and 98,462 / 78,589,573 for the
+asymmetric resource fixture. The nine identity/special fixtures range from 83,623 to 90,581 bytes.
 All are consensus-valid, standard, and fund the default 1 sat/byte relay fee.
 
 Three byte metrics are intentionally kept distinct. The benchmark leaderboard's `total B` is the
-sum of locking and unlocking programs (90,442 for the committed proof). The serialized transaction
-is 90,550 bytes because it contains the unlockings and transaction framing, but not the spent
-outputs. The verifier.cash on-chain score is 90,935 bytes: serialized transaction bytes plus the
+sum of locking and unlocking programs (90,456 for the committed proof). The serialized transaction
+is 90,564 bytes because it contains the unlockings and transaction framing, but not the spent
+outputs. The verifier.cash on-chain score is 90,949 bytes: serialized transaction bytes plus the
 11 × 35-byte spent P2SH32 locking programs.
 
 The concrete fixtures are regression evidence, not the universal claim:
-`prove_resource_ceiling.mjs` separately proves a 99,284-serialized-byte,
-79,387,771-op-cost envelope for every accepted witness, leaving 716 bytes below the 100,000-byte
+`prove_resource_ceiling.mjs` separately proves a 99,285-serialized-byte,
+79,389,147-op-cost envelope for every accepted witness, leaving 715 bytes below the 100,000-byte
 standard transaction limit. The two componentwise-maximal GLV event allocations are checked on the
 standard BCH2026 VM, and the certificate refuses a changed locking graph or lookup table.
 

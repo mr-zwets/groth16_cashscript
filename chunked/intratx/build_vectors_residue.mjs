@@ -304,6 +304,7 @@ function specsVkx(inst, crossToMiller) {
         inLimbs, inWidths: ch.first ? GLV_GENESIS_WIDTHS : GLV_STATE_WIDTHS,
         outLimbs, outWidths: outLimbs.map(() => W),
         extras: [...(PROJECTIVE_VKX ? [] : [vkxGlvSplitZinv(k10, k20, k11, k21)]), GLV_TABLE_BYTES],
+        enforceExactInputLength: true,
         role: crossToMiller ? 'cross' : 'stage-final',
         cmp: crossToMiller ? { cmpExpr: 'outBlob', nextFullInLen: MILLER_IN_LIMBS * W, skip: VKX_LIMB_OFFSET * W, cmpLen: outLimbs.length * W } : null,
         label: PROJECTIVE_VKX ? 'GLV MSM final -> bind projective state' : 'GLV vk_x final -> assert vk_x', checkpoint: 'vk_x',
@@ -314,6 +315,7 @@ function specsVkx(inst, crossToMiller) {
       file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`),
       inLimbs, inWidths: ch.first ? GLV_GENESIS_WIDTHS : GLV_STATE_WIDTHS,
       outLimbs: st(X1, Y1, Z1), outWidths: GLV_STATE_WIDTHS,
+      enforceExactInputLength: true,
       extras: [], role: 'within',
       label: `GLV vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined,
     };
@@ -875,12 +877,39 @@ tableUnlocking[tablePush.dataStart + Math.floor(tablePush.dataLen / 2)] ^= 0x01;
 tableInputs[tableCarrierIndex] = { ...tableInputs[tableCarrierIndex], unlocking: tableUnlocking };
 if (evalInput(tableInputs, tableCarrierIndex).accepted) throw new Error('GLV carrier accepted a mutated shared table');
 const tableMutation = { steps: toStepArr({ inputs: tableInputs, meta: full0.meta }), rejected: true };
+
+// Regression: the carrier's first push must be exactly the declared 228-byte GLV state. Without
+// this gate, appending a zero preserves the final scalar's numeric value and the predecessor's
+// 228-byte comparison, but shifts the table one byte past the fixed offset read by input 0.
+const shiftedTableInputs = full0.inputs.slice();
+const shiftedUnlocking = shiftedTableInputs[tableCarrierIndex].unlocking;
+const shiftedBlob = pushBounds(shiftedUnlocking);
+const oversizedStatePush = pd(Uint8Array.from([
+  ...shiftedUnlocking.slice(shiftedBlob.dataStart, shiftedBlob.dataStart + shiftedBlob.dataLen),
+  0,
+]));
+shiftedTableInputs[tableCarrierIndex] = {
+  ...shiftedTableInputs[tableCarrierIndex],
+  unlocking: Uint8Array.from([
+    ...oversizedStatePush,
+    ...shiftedUnlocking.slice(shiftedBlob.dataStart + shiftedBlob.dataLen),
+  ]),
+};
+if (evalInput(shiftedTableInputs, tableCarrierIndex).accepted ||
+  evalInput(shiftedTableInputs, tableCarrierIndex, standardVm).accepted) {
+  throw new Error('GLV carrier accepted an oversized state push that shifts the shared table');
+}
+const shiftedTableMutation = {
+  steps: toStepArr({ inputs: shiftedTableInputs, meta: full0.meta }),
+  rejected: true,
+};
 const fullInvalid = [
   invalidRun(full0, 0),
   invalidRun(full0, Math.floor(full0.inputs.length / 2)),
   proofConsistency,
   ...proofMutations,
   tableMutation,
+  shiftedTableMutation,
   ...infinityAlteredRuns,
   ...infinityMalformedRuns,
 ];
