@@ -9,6 +9,7 @@
 // Run: node singleton/bls12-381/bound_analysis.mjs
 
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { bigIntToVmNumber } from '@bitauth/libauth';
 
 const P = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787n;
@@ -150,9 +151,9 @@ const f6frobEven = (x) => {
   const X = split6(x);
   return join6(X[0], f2mul(X[1], [1, 1]), f2mul(X[2], [1, 1]));
 };
-const f6mulByFp2 = (x) => {
+const f6mulByFp2 = (x, scalar = [1, 1]) => {
   const X = split6(x);
-  return join6(f2mul(X[0], [1, 1]), f2mul(X[1], [1, 1]), f2mul(X[2], [1, 1]));
+  return join6(f2mul(X[0], scalar), f2mul(X[1], scalar), f2mul(X[2], scalar));
 };
 const f12frobOdd = (a, prefix) => {
   const [a0, a1] = split12(a);
@@ -256,6 +257,46 @@ function mul014(f, o0, o1, o4) {
 }
 const line = (f, c0) => mul014(f, c0, [1, 1], [1, 1]);
 
+let maxUnitMulFpInput = 0;
+const unitProduct = (site, subtrahendBound, bias, productInputBound = bias) => {
+  assert(subtrahendBound <= bias, `${site} source exceeds its ${bias}p subtraction bias`);
+  record(site, bias);
+  maxUnitMulFpInput = Math.max(maxUnitMulFpInput, productInputBound);
+  return 1;
+};
+function lineUnitScaled(f, coeffs) {
+  const [c0, c1, c2] = coeffs;
+  const o4 = [
+    unitProduct('lineUnitScaled.o4a', c0[0] + c0[1], 128),
+    unitProduct('lineUnitScaled.o4b', c0[1], 64, c0[0] + 64),
+  ];
+  const o5 = [
+    unitProduct('lineUnitScaled.o5a', c1[0] + c1[1], 128),
+    unitProduct('lineUnitScaled.o5b', c1[1], 64, c1[0] + 64),
+  ];
+  const [f0, f1] = split12(f);
+  const t0 = f6mulByFp2(f0, c2);
+  const Y = split6(f1);
+  const p1 = f2mul(Y[1], o4);
+  const p2 = f2mul(Y[2], o5);
+  const pcross = f2mul(f2add(Y[1], Y[2]), f2add(o4, o5));
+  const dcross = f2sub('lineUnitScaled.dcross', pcross, p1);
+  const cross = f2sub('lineUnitScaled.cross', dcross, p2);
+  const q0 = f2mulXi('lineUnitScaled.q0', cross);
+  const ps01 = f2mul(f2add(Y[0], Y[1]), o4);
+  const b0s1 = f2sub('lineUnitScaled.b0s1', ps01, p1);
+  const xp2 = f2mulXi('lineUnitScaled.xp2', p2);
+  const q1 = f2add(b0s1, xp2);
+  const ps02 = f2mul(f2add(Y[0], Y[2]), o5);
+  const b0s2 = f2sub('lineUnitScaled.b0s2', ps02, p2);
+  const q2 = f2add(b0s2, p1);
+  const q = join6(q0, q1, q2);
+  const c0out = f6add(t0, f6mulByV('lineUnitScaled.vq0', q));
+  const pr = f6mul(f6add(f0, f1), join6(c2, o4, o5));
+  const d = f6sub('lineUnitScaled.d', pr, t0);
+  return [...c0out, ...f6sub('lineUnitScaled.C6', d, q)];
+}
+
 function pointDouble(X, Y, Z) {
   const t0 = f2sqr('fp2Sqr.diff', Y), t1 = f2sqr('fp2Sqr.diff', Z);
   const t2 = f2mulByB(f2scale(t1)), t3 = f2scale(t2);
@@ -295,14 +336,18 @@ let f = ONE12.slice();
 let R = [[1, 1], [1, 1], [1, 1]];
 let millerConverged = false;
 for (let iteration = 0; iteration < 200; iteration += 1) {
-  let next = f12sqr(f);
-  next = f12mul(next, ONE12);
+  const common = f12mul(f12sqr(f), ONE12);
   const doubled = pointDouble(R[0], R[1], R[2]);
-  next = line(next, doubled.coeffs[0]);
-  next = line(next, [1, 1]);
-  next = line(next, [1, 1]);
+  let legacy = line(common, doubled.coeffs[0]);
+  legacy = line(legacy, [1, 1]);
+  legacy = line(legacy, [1, 1]);
+  let unit = lineUnitScaled(common, doubled.coeffs);
+  unit = lineUnitScaled(unit, [[1, 1], [1, 1], [1, 1]]);
+  unit = lineUnitScaled(unit, [[1, 1], [1, 1], [1, 1]]);
   const added = pointAdd(doubled.R[0], doubled.R[1], doubled.R[2], [1, 1], [1, 1]);
-  next = line(next, added.coeffs[0]);
+  legacy = line(legacy, added.coeffs[0]);
+  unit = lineUnitScaled(unit, added.coeffs);
+  const next = legacy.map((bound, index) => Math.max(bound, unit[index]));
   const before = JSON.stringify([f, R]);
   f = next;
   R = added.R;
@@ -393,6 +438,19 @@ const expectedBiases = new Map(Object.entries({
   'generator.finalConj': 62,
   'generator.negPsiY': 1,
   'generator.negY': 1,
+  'lineUnitScaled.C6': 17,
+  'lineUnitScaled.b0s1': 3,
+  'lineUnitScaled.b0s2': 3,
+  'lineUnitScaled.cross': 3,
+  'lineUnitScaled.d': 3,
+  'lineUnitScaled.dcross': 3,
+  'lineUnitScaled.o4a': 128,
+  'lineUnitScaled.o4b': 64,
+  'lineUnitScaled.o5a': 128,
+  'lineUnitScaled.o5b': 64,
+  'lineUnitScaled.q0': 9,
+  'lineUnitScaled.vq0': 9,
+  'lineUnitScaled.xp2': 3,
   'mul014.C6': 5,
   'mul014.G.r1': 3,
   'mul014.G.u0': 3,
@@ -428,10 +486,26 @@ assert.equal(2 * maxFp2SqrInput * maxFp2SqrInput, 30752);
 assert.equal(maxMul014Input, 60);
 assert.equal(maxMul014Negative, 1931);
 assert.equal(maxMul014Positive, 2190);
+assert.equal(maxUnitMulFpInput, 128);
 assert.equal(76880n * P * P, 1231562419205459752070235395775242614848400833236532888490220123203481892424015537184642439376752630896474493160328325763231266643412666928375071562129281185156830842074816964836301444694877978129857433900347334309803230379471635168720n);
 assert.equal(1931n * P * P, 30933234020366061150463378632179936124769276911807297186194264540919921101336810643906666889132535513281636918478069680655561601046174035362802590875021357551220608169178870435729683789097416438199202716721783331844823593428196247539n);
 assert.equal(bigIntToVmNumber(30752n * P * P).length, 98);
 assert.equal(bigIntToVmNumber(76880n * P * P).length, 98);
+assert.equal(bigIntToVmNumber(128n * P * P).length, 97);
+
+const lazySource = readFileSync(new URL('./lib/lazy/Bls12381Lazy.cash', import.meta.url), 'utf8');
+for (const formula of [
+  'subFp(0, addFp(c0a, c0b), 128)',
+  'subFp(c0a, c0b, 64)',
+  'subFp(0, addFp(c1a, c1b), 128)',
+  'subFp(c1a, c1b, 64)',
+  'fp2MulXi(crossa,crossb,9)',
+  'fp6MulByV(q0a,q0b,q1a,q1b,q2a,q2b,9)',
+  'fp6Sub(pr0,pr1,pr2,pr3,pr4,pr5, t0a,t0b,t1a,t1b,t2a,t2b,3)',
+  'fp6Sub(d0,d1,d2,d3,d4,d5, q0a,q0b,q1a,q1b,q2a,q2b,17)',
+]) {
+  assert(lazySource.includes(formula), `lineUnitScaled source bias changed: ${formula}`);
+}
 
 console.log(`max fp2Mul input: ${maxFp2MulInput}p`);
 console.log(`max fp2Mul negative term: ${maxFp2MulNegative}p^2`);
@@ -440,6 +514,7 @@ console.log(`max fp2Sqr direct imaginary product: ${2 * maxFp2SqrInput * maxFp2S
 console.log(`max mul014 input: ${maxMul014Input}p`);
 console.log(`max mul014 negative output: ${maxMul014Negative}p^2`);
 console.log(`max mul014 positive output: ${maxMul014Positive}p^2`);
+console.log(`max lineUnitScaled mulFp input: ${maxUnitMulFpInput}p (97 signed product bytes)`);
 console.log('\nsubtraction bias table:');
 for (const [site, bias] of [...sites].sort(([a], [b]) => a.localeCompare(b))) {
   console.log(`  ${site.padEnd(24)} ${bias}p`);

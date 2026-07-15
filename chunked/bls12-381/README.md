@@ -29,9 +29,8 @@ also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` 
 - `bch-groth16-bls12381-intratx`: 56 inputs / 475,310 B / 377,658,775 op-cost.
 - `bch-groth16-bls12381-grouped`: 56 inputs / 6 standard transactions / 475,292 B /
   377,556,467 op-cost.
-- `bch-groth16-bls12381-intratx-residue`: quotient-torus frontier, 34 inputs / 195,413 B /
-  153,091,714 op-cost. The unchanged default Fp6-tail path remains reproducible at 35 inputs /
-  209,216 B / 157,700,169 op-cost.
+- `bch-groth16-bls12381-intratx-residue`: fixed-VK quotient-torus frontier, 12 inputs /
+  97,455 B / 77,865,802 op-cost in one 97,571-byte standard-policy transaction.
 - `bch-groth16-bls12381-grouped-residue`: 35 inputs / 4 standard transactions / 209,937 B /
   158,744,466 op-cost.
 - `bch-groth16-bls12381-intratx-residue-large`: 3 inputs / 164,426 B / 149,814,405 op-cost
@@ -47,12 +46,13 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
   pairs' lines into the shared `f`. Eliminates 3
   of every 4 `fp12Sqr`, and the conjugated `f` after the loop IS the boundary, so there
   is **no separate combine step**.
-- **Prepared VK pairs** — only `B` is a proof-derived G2 point, so only its `R_B` walk is
+- **Default prepared VK pairs** — in the four-pair tracks, only `B` is a proof-derived G2 point,
+  so only its `R_B` walk is
   performed on-chain. The fixed `γ`/`δ` trajectories contribute baked line coefficients;
   the fully fixed `e(α,β)` contributes one baked dense Miller value rather than 69 line
   folds. The flat trace falls from 340 to 272 ops and each interior hand-off carries
   `f + R_B + runtime points` (28 limbs rather than 46).
-- **Fused input validation for full Groth16** — the first full-Miller chunk checks A/C
+- **Default-path fused input validation for full Groth16** — the first full-Miller chunk checks A/C
   and B on-curve after requiring canonical `[0,p)` encodings for all ten stage coordinates.
   The last reuses its existing homogeneous `R_B=[|x|]B` walk for the
   guarded `psi(B)==[-x]B` subgroup relation. This removes the separate three-input G2
@@ -64,7 +64,7 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
 - **Forward final-exp packing** — the planner targets 100,000 op-cost below the per-input
   budget by default, fitting the final-exponentiation trace into 22 chunks while preserving
   the existing forward execution order.
-- **GLV full-verifier aggregation** — the full verifier decomposes each canonical Fr input
+- **Default full-verifier GLV aggregation** — the prepared four-pair verifier decomposes each canonical Fr input
   into two non-negative 128-bit scalars and uses a four-scalar Straus walk over the fixed
   endomorphism table. The covenant form embeds the exact VK table; the intra/grouped forms
   carry it once in the fifth GLV input, hash-pin it there, and let the four siblings read it
@@ -80,7 +80,11 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
   Since `p^6-1 | (p^12-1)/r`, the terminal witnesses only the six Fp6 limbs and fixes the upper
   Fp12 half to zero, replacing the 63-step `w^(27A)` walk. The inverse and terminal equations
   exclude zero.
-- **Quotient-torus residue frontier** — the opt-in intra-transaction build works in
+- **Fixed-key collapse and comb** — bilinearity rewrites the four-pair equation to
+  `e(-A,B)·e(D,G2.BASE)=1`, where `D=5α+7vk_x+11C`. Two width-six fixed-comb inputs
+  assemble `D`; the 6,048-byte fixed table is hash-pinned across three Miller witnesses.
+  Affine G2 walks and half-normalized G1 lines then evaluate the two-pair trace in ten inputs.
+- **Quotient-torus residue frontier** — the fixed-key intra-transaction build works in
   `Fp12*/Fp6*`, a cyclic group of order `p^6+1`. For `lambda=p+|x|`,
   `gcd(lambda,p^6+1)=r`, so the lambda-power image is exactly the final-exponent kernel in the
   quotient. A canonical six-limb `u` carries the finite class `[c]=[1+u*W]`; the Fp6 correction
@@ -91,8 +95,9 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
 Since per-step bytes are dominated (~64%) by op-cost-proportional unlocking padding,
 op-cost cuts translate ~1:1 into size.
 
-Every chunk is validated on the real BCH 2026 VM, against `@noble/curves` bls12-381,
-for **two** distinct instances under the same VK (runtime-general).
+Every chunk is validated on the real BCH 2026 VM against `@noble/curves` bls12-381. The fixed-key
+one-transaction path covers 15 valid instances, 23 rejection runs, all A/B/C identity combinations,
+the `vk_x` identity, and three isolated point-validation cases under the same locking graph.
 
 ## How it works
 
@@ -139,16 +144,6 @@ The covenant-residue track has its own one-command source-to-vector path:
 VERIFIER_DIR=/path/to/zk-verifier-bench node generate_covenant_residue.mjs
 ```
 
-The current-BCH intra-transaction quotient frontier has a deterministic one-command path. It
-also runs the quotient-group proof and full valid/invalid dual-VM gates before writing the vector:
-
-```
-VERIFIER_DIR=/path/to/zk-verifier-bench pnpm vectors:intratx:torus:bls
-```
-
-The quotient path is opt-in. Running the original four unflagged GLV, Miller, final-residue, and
-builder commands still reproduces the 35-input artifact byte-for-byte.
-
 Individual pieces (all reproducible artifacts; only the generators are committed):
 
 ```
@@ -177,12 +172,32 @@ manifest:
   validate the wider windows in their real sibling-input contexts on both consensus and standard
   BCH 2026 VMs.
 
-Regenerate the linked namespace before either linked vector:
+Regenerate the grouped/default linked namespace with:
 
 ```
 node gen_miller_residue.mjs linked
 node gen_finalexp_residue.mjs linked
 ```
+
+The fixed-VK one-transaction verifier uses the specialized one-command path below instead. It
+regenerates the collapsed quotient-torus Miller stage with the required flags, proves the quotient
+and half-normalized line identities, checks the lazy-integer bounds, executes the full dual-VM
+vector builder, and then certifies the all-canonical-input resource envelope:
+
+```
+VERIFIER_DIR=/path/to/zk-verifier-bench pnpm vectors:intratx:torus:bls
+```
+
+The orchestrator resolves the linked `cashc` package, requires a clean compiler checkout at commit
+`1c707c1dbf87396b30ba5e0704b1db44475ce893`, and rebuilds `@cashscript/utils` plus `cashc` from that
+source before generating bytecode.
+
+The final certificate recompiles the exact transformed contracts, pins every source and redeem
+hash plus the control and numeric program counters, covers every finite conditional mode, and
+propagates integer intervals through the BCH 2026 VM. Its proof-independent envelope is a
+98,570-byte transaction (1,430 bytes below the standard limit), with every unlocking at most
+9,172 bytes and every standard-policy input op-cost at most 7,369,952. The largest concrete
+portfolio fixture remains the 97,571-byte transaction reported above.
 
 Do not point the covenant or proposed-large builders at `generated/linked-residue/`. Several linked
 windows exceed the covenant density limit before the boundary hashes are removed; the proposed-large
@@ -223,6 +238,7 @@ the first chunk rejects negative or out-of-range scalars rather than silently tr
 | `build_vectors_pairing.mjs` | assemble the pairing + full-groth16 vectors | ✅ |
 | `build_vectors_covenant_residue.mjs` | assemble and gate the BLS covenant-residue lifecycle | ✅ |
 | `generate_covenant_residue.mjs` | one-command BLS covenant-residue vector reproduction | ✅ |
+| `prove_resource_bounds.mjs` | source-pinned BCH 2026 resource certificate for the one-transaction verifier | ✅ |
 | `generate.mjs` | one-command orchestrator | ✅ |
 | `generated/` | generated `.cash` chunks + manifests (derived) | ❌ git-ignored |
 | `generated/linked-residue/` | hash-free residue chunks + manifests for grouped/intra-tx only (derived) | ❌ git-ignored |

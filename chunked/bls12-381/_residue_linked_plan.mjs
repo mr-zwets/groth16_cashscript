@@ -8,6 +8,13 @@ export const LINKED_MILLER_BOUNDS = [
   143, 153, 162, 172, 181, 191, 200, 209, 219, 228, 238, 248, 258, 268, 277,
 ];
 
+// The fixed-VK quotient construction has 207 operations. Its terminal quotient check fits with
+// the preceding one-operation window after intra-transaction transformation, removing a whole
+// input while keeping every transformed redeem and unlocking bytecode within standard limits.
+export const LINKED_COLLAPSED_TORUS_MILLER_BOUNDS = [
+  0, 19, 40, 60, 81, 102, 123, 144, 165, 186, 207,
+];
+
 export const LINKED_TAIL_BOUNDS = [0, 13, 28, 43, 57, 63];
 
 // Highest standard-VM step cost in the deterministic 32-proof all-position audit for this plan.

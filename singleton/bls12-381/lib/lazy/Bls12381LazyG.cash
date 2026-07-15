@@ -7,7 +7,7 @@ pragma cashscript ^0.14.0;
 //
 // The HOT path (Miller f-loop) uses the pure lazy ops in Bls12381Lazy.cash (no per-op
 // reduction). The G2/G1 helpers here are CANONICAL (reduce after every +/-): they are not
-// the bottleneck, so reducing eagerly stays bias-free and safe for adversarial inputs.
+// the bottleneck, so reducing eagerly stays bias-free and safe for all canonical inputs.
 import "./Bls12381Lazy.cash";
 
 // ---- canonical Fp / Fp2 helpers (everything stays in (-P,P), matched by integer equality) ----
@@ -15,6 +15,12 @@ function redFp(int x) returns (int) { return x % 4002409555221667393417789825735
 function mAdd(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
 function mSub(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
 function mSqr(int x) returns (int) { return (x * x) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+function canonicalFp(int x) returns (int) {
+    int p = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
+    int r = x % p;
+    if (r < 0) { r = r + p; }
+    return r;
+}
 
 function r2Add(int a0, int a1, int b0, int b1) returns (int, int) { return mAdd(a0, b0), mAdd(a1, b1); }
 function r2Sub(int a0, int a1, int b0, int b1) returns (int, int) { return mSub(a0, b0), mSub(a1, b1); }
@@ -28,6 +34,51 @@ function r2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
 function r2Sqr(int a0, int a1) returns (int, int) {
     (int m0, int m1) = fp2Sqr(a0, a1);
     return redFp(m0), redFp(m1);
+}
+
+// Affine runtime-G2 Miller steps with canonical slope witnesses. The explicit
+// denominator gates make each tangent/chord unique. Returned line coefficients
+// are divided by c2, so the implicit third Fp2 coefficient is one.
+function pointDoubleAffine(int Xa,int Xb,int Ya,int Yb,int ma,int mb)
+    returns (int,int,int,int, int,int,int,int) {
+    int p = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
+    require(within(ma, 0, p)); require(within(mb, 0, p));
+    require(Ya != 0 || Yb != 0);
+    int twoYa = Ya + Ya; int twoYb = Yb + Yb;
+    (int slopeLhsA,int slopeLhsB) = fp2Mul(ma, mb, twoYa, twoYb);
+    (int x2a,int x2b) = fp2Sqr(Xa, Xb);
+    int slopeRhsA = x2a + x2a + x2a; int slopeRhsB = x2b + x2b + x2b;
+    require((slopeLhsA - slopeRhsA) % p == 0);
+    require((slopeLhsB - slopeRhsB) % p == 0);
+    (int m2a,int m2b) = fp2Sqr(ma, mb);
+    int nXa = canonicalFp(m2a - Xa - Xa); int nXb = canonicalFp(m2b - Xb - Xb);
+    (int xdnXa,int xdnXb) = fp2Sub(Xa, Xb, nXa, nXb, 1);
+    (int mxdnXa,int mxdnXb) = fp2Mul(ma, mb, xdnXa, xdnXb);
+    int nYa = canonicalFp(mxdnXa - Ya); int nYb = canonicalFp(mxdnXb - Yb);
+    (int mxA,int mxB) = fp2Mul(ma, mb, Xa, Xb);
+    int c0a = mxA - Ya + p; int c0b = mxB - Yb + p;
+    int c1a = p - ma; int c1b = p - mb;
+    return c0a,c0b,c1a,c1b, nXa,nXb,nYa,nYb;
+}
+
+function pointAddAffine(int Xa,int Xb,int Ya,int Yb, int Qxa,int Qxb,int Qya,int Qyb, int ma,int mb)
+    returns (int,int,int,int, int,int,int,int) {
+    int p = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
+    require(within(ma, 0, p)); require(within(mb, 0, p));
+    (int dxa,int dxb) = fp2Sub(Xa, Xb, Qxa, Qxb, 1);
+    require(dxa % p != 0 || dxb % p != 0);
+    (int dya,int dyb) = fp2Sub(Ya, Yb, Qya, Qyb, 1);
+    (int slopeLhsA,int slopeLhsB) = fp2Mul(ma, mb, dxa, dxb);
+    require((slopeLhsA - dya) % p == 0); require((slopeLhsB - dyb) % p == 0);
+    (int m2a,int m2b) = fp2Sqr(ma, mb);
+    int nXa = canonicalFp(m2a - Xa - Qxa); int nXb = canonicalFp(m2b - Xb - Qxb);
+    (int xdnXa,int xdnXb) = fp2Sub(Xa, Xb, nXa, nXb, 1);
+    (int mxdnXa,int mxdnXb) = fp2Mul(ma, mb, xdnXa, xdnXb);
+    int nYa = canonicalFp(mxdnXa - Ya); int nYb = canonicalFp(mxdnXb - Yb);
+    (int mxA,int mxB) = fp2Mul(ma, mb, Xa, Xb);
+    int c0a = mxA - Ya + p; int c0b = mxB - Yb + p;
+    int c1a = p - ma; int c1b = p - mb;
+    return c0a,c0b,c1a,c1b, nXa,nXb,nYa,nYb;
 }
 
 // ---- G2 subgroup membership: Jacobian group law over Fp2 (a=0), for the psi(B)==[-x]B walk ----

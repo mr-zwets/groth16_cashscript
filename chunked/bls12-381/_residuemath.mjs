@@ -26,7 +26,7 @@
 // rather than exponentiating w. residueWitness verifies both the relation and this shape before
 // returning, so a construction regression fails loudly at build time.
 import {
-  Fp, Fp2, Fp6, Fp12, ATE_NAF, pairsFor, millerBatchOps, singlePairMiller,
+  Fp, Fp2, Fp6, Fp12, ATE_NAF, pairsFor, millerBatchOps, millerCollapsedAffineOps, singlePairMiller,
 } from './_pairingmath.mjs';
 import { bls12_381 } from '@noble/curves/bls12-381.js';
 
@@ -151,9 +151,17 @@ export function residueTorusWitness(g) {
 // GENESIS f = cInv (the loop's squarings carry it to c^-2^63). Pair 1 = e(alpha,beta) is a VK
 // constant: its line-folds are dropped (skipPairs) and its UNCONJUGATED single-pair Miller
 // value fAB is multiplied in once via a final 'cmul1' op. states[i] = {f, Rs, c, cInv}.
-export function millerFusedOps(pairs, c, cInv) {
-  const base = millerBatchOps(pairs, { skipPairs: new Set([1]) });
-  const fAB = conj(singlePairMiller(pairs[1]).f); // baked UNCONJUGATED e(alpha,beta) Miller value
+export function millerFusedOps(pairs, c, cInv, opts = {}) {
+  const preparedPair = pairs.length === 4 ? 1 : null;
+  if (preparedPair === null && pairs.length !== 2) throw new Error('fused Miller requires four Groth16 pairs or two collapsed pairs');
+  const base = opts.affineG2 === true
+    ? millerCollapsedAffineOps(pairs)
+    : millerBatchOps(pairs, {
+        skipPairs: preparedPair === null ? new Set() : new Set([preparedPair]),
+        unitLines: opts.unitLines === true,
+        ptCfg: opts.ptCfg,
+      });
+  const fAB = preparedPair === null ? null : conj(singlePairMiller(pairs[preparedPair]).f);
   const ops = []; const states = [];
   let cpow = cInv; let k = 0;
   for (let bi = 0; bi < base.ops.length; bi++) {
@@ -171,10 +179,14 @@ export function millerFusedOps(pairs, c, cInv) {
       k++;
     }
   }
-  // f after the loop = (f0*f2*f3) * c^-|x|; multiply in the baked fAB (one constant fp12Mul).
+  // Four-pair mode multiplies in the baked alpha/beta value once. The collapsed
+  // two-pair mode has no omitted pair and ends directly at base*c^-|x|.
   const preF1 = mul(base.boundary, cpow);
   states.push({ f: preF1, Rs: base.states[base.states.length - 1].Rs.slice(), c, cInv });
-  ops.push({ t: 'cmul1' }); // f *= fAB (baked constant)
+  if (fAB === null) {
+    return { ops, states, boundary: preF1, baseBoundary: base.boundary, cpowFinal: cpow, fAB };
+  }
+  ops.push({ t: 'cmul1' });
   const boundary = mul(preF1, fAB);
   states.push({ f: boundary, Rs: base.states[base.states.length - 1].Rs.slice(), c, cInv });
   return { ops, states, boundary, baseBoundary: mul(base.boundary, fAB), cpowFinal: cpow, fAB };
@@ -190,12 +202,18 @@ const torusMul = (value, u) => Fp12.create({
 // coordinate u for [c]=[1+u*W], so [c^-1]=[1-u*W]. c-folds and the fixed alpha/beta fold use
 // two Fp6 products rather than a full three-product Fp12 multiplication. Ordinary line folds
 // stay unchanged; their Fp6 scaling is immaterial in Q.
-export function millerFusedTorusOps(pairs, c, cInv, u) {
-  const exact = millerFusedOps(pairs, c, cInv);
-  if (Fp6.eql(exact.fAB.c0, Fp6.ZERO)) {
+export function millerFusedTorusOps(pairs, c, cInv, u, opts = {}) {
+  const ptCfg = pairs.length === 2
+    ? [{ P: true, Q: true }, { P: true, Q: false }]
+    : undefined;
+  const exact = millerFusedOps(pairs, c, cInv, {
+    ...opts,
+    ptCfg: opts.ptCfg ?? ptCfg,
+  });
+  if (exact.fAB !== null && Fp6.eql(exact.fAB.c0, Fp6.ZERO)) {
     throw new Error('fixed BLS12-381 alpha/beta Miller value has no finite torus coordinate');
   }
-  const fAbU = Fp6.mul(exact.fAB.c1, Fp6.inv(exact.fAB.c0));
+  const fAbU = exact.fAB === null ? null : Fp6.mul(exact.fAB.c1, Fp6.inv(exact.fAB.c0));
   const ops = exact.ops;
   const states = [];
   let f = torusRepresentative(Fp6.neg(u));

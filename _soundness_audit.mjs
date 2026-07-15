@@ -1,8 +1,8 @@
-// Adversarial soundness audit for the min-op BLS12-381 singleton's omitted G1 subgroup
-// checks (and the fused psi G2 check), using the repo's own verified math modules.
-// Run: node _soundness_audit.mjs   (delete after review — not part of the repo)
+// Soundness checks for the min-op BLS12-381 singleton's omitted G1 subgroup checks and
+// fused psi G2 check, using the repository's verified math modules.
+// Run: node _soundness_audit.mjs
 import {
-  Fp, Fp2, Fp12, pairsFor, millerBatchOps,
+  ATE_NAF, Fp, Fp2, Fp12, pairsFor, millerBatchOps,
 } from './chunked/bls12-381/_pairingmath.mjs';
 import * as R from './chunked/bls12-381/_residuemath.mjs';
 import { bls12_381 } from './chunked/bls12-381/_vkxmath.mjs';
@@ -110,17 +110,33 @@ check('constructed T2 on E\'(Fp2), pure h2-torsion', T2 !== null && mulAny(T2, h
 const Bpolluted = B.add(T2);
 check('B + cofactor-torsion: psi(B\') != -[|x|]B\' (fused check REJECTS)', !psi(Bpolluted).equals(mulAny(Bpolluted, X).negate()));
 
+let thirteenPower = 1n;
+while ((h2 / thirteenPower) % 13n === 0n) thirteenPower *= 13n;
+const cofactorTo13Sylow = (h2 * r) / thirteenPower;
+let order13 = null;
+for (let xi = 1n; xi < 400n && !order13; xi++) {
+  const xF = Fp2.fromBigTuple([xi, 1n]);
+  const rhs = Fp2.add(Fp2.mul(Fp2.mul(xF, xF), xF), Fp2.fromBigTuple([4n, 4n]));
+  const y = Fp2sqrt(rhs); if (y === null) continue;
+  let candidate = mulAny(G2.fromAffine({ x: xF, y }), cofactorTo13Sylow);
+  if (candidate.is0()) continue;
+  while (!mulAny(candidate, 13n).is0()) candidate = mulAny(candidate, 13n);
+  if (!candidate.is0()) order13 = candidate;
+}
+check('constructed exact order-13 point on E\'(Fp2)', order13 !== null && mulAny(order13, 13n).is0());
+check('order-13 point fails the affine psi endpoint relation',
+  order13 !== null && !psi(order13).equals(mulAny(order13, X).negate()));
+
 // ---------- 5. mid-walk degeneracy closure ----------
-// R_B = [k]B can only hit O mid-loop if ord(B) | gcd(k, h2*r) for some NAF prefix k of |x|.
-// r is 255-bit and every prefix k < 2^64, so it reduces to gcd(k, h2). If every prefix is
-// coprime to h2, no representable on-curve B can degenerate the walk before the psi compare.
-import('./chunked/bls12-381/_pairingmath.mjs').then(({ ATE_NAF }) => {
-  let k = 1n; const prefixes = [k];
-  for (let i = 0; i < ATE_NAF.length; i++) {
-    k = 2n * k; prefixes.push(k);
-    if (ATE_NAF[i] !== 0) { k += BigInt(ATE_NAF[i]); prefixes.push(k); }
-  }
-  check('NAF walk reconstructs |x|', k === X);
-  check('every NAF prefix of |x| coprime to h2 (mid-walk O unreachable)', prefixes.every((v) => gcd(v, h2) === 1n));
-  console.log(process.exitCode ? '\n*** AUDIT FOUND FAILURES ***' : '\nall audit checks passed');
-});
+// Prefix 13 can send an order-13 point to O during the walk. The projective implementation needs
+// an explicit nonzero-Z guard before its cross-multiplied endpoint relation. The affine verifier's
+// nonzero-dX requirement stops at the inverse-point addition before that O endpoint is produced.
+let k = 1n; const prefixes = [k];
+for (let i = 0; i < ATE_NAF.length; i++) {
+  k = 2n * k; prefixes.push(k);
+  if (ATE_NAF[i] !== 0) { k += BigInt(ATE_NAF[i]); prefixes.push(k); }
+}
+check('NAF walk reconstructs |x|', k === X);
+check('NAF prefix 13 reaches O for the exact order-13 regression',
+  prefixes.includes(13n) && h2 % 13n === 0n && order13 !== null && mulAny(order13, 13n).is0());
+console.log(process.exitCode ? '\n*** AUDIT FOUND FAILURES ***' : '\nall audit checks passed');

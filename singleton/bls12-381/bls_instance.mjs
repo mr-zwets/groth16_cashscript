@@ -4,7 +4,7 @@
 // Using the standard exponent trick: with all points as scalar multiples of the
 // generators (B = 1*G2), the product is e(g1,g2)^(-A + a*b + vx*g + c*d); choosing
 // A = a*b + vx*g + c*d (mod r) makes the exponent 0, so the product is ONE and
-// finalExp == 1. Tampering any public input changes vx -> verdict != 1.
+// finalExp == 1. A different public input changes vx -> verdict != 1.
 
 import { bls12_381 } from '@noble/curves/bls12-381.js';
 export { bls12_381 };
@@ -15,20 +15,42 @@ const G1 = bls12_381.G1.Point, G2 = bls12_381.G2.Point;
 const R = 52435875175126190479447740508185965837690552500527637822603658699938581184513n;
 const mod = (x) => ((x % R) + R) % R;
 
-// fixed nonzero scalars + public inputs (deterministic)
-const a = 3n, b = 5n, g = 7n, d = 11n, cS = 13n;
-const ic = [2n, 4n, 6n];
+// Fixed nonzero scalars + public inputs (deterministic). This descriptor is the source of truth
+// for both the verification key and the fixed-key specialization used by the chunked verifier.
+const alphaG1Scalar = 3n;
+const betaG2Scalar = 5n;
+const gammaG2Scalar = 7n;
+const deltaG2Scalar = 11n;
+const icG1Scalars = Object.freeze([2n, 4n, 6n]);
+const collapseCommonFactor = 2n;
+export const FIXED_VK_SPECIALIZATION = Object.freeze({
+  alphaG1Scalar,
+  betaG2Scalar,
+  gammaG2Scalar,
+  deltaG2Scalar,
+  icG1Scalars,
+  collapseCommonFactor,
+  collapsedPublicBaseG1Scalar: gammaG2Scalar * collapseCommonFactor,
+  collapsedInputScalars: Object.freeze(icG1Scalars.slice(1).map((scalar) => scalar / collapseCommonFactor)),
+});
+const S = FIXED_VK_SPECIALIZATION;
+const cS = 13n;
 export const PUBLIC_INPUTS = [123n, 456n];
 
-const vx = mod(ic[0] + PUBLIC_INPUTS[0] * ic[1] + PUBLIC_INPUTS[1] * ic[2]);
-const Ascalar = mod(a * b + vx * g + cS * d);
+if (S.icG1Scalars.slice(1).some((scalar) => scalar % S.collapseCommonFactor !== 0n)) {
+  throw new Error('public-input bases do not share the configured collapse factor');
+}
+const vx = mod(S.icG1Scalars[0] + PUBLIC_INPUTS[0] * S.icG1Scalars[1] + PUBLIC_INPUTS[1] * S.icG1Scalars[2]);
+const Ascalar = mod(
+  S.alphaG1Scalar * S.betaG2Scalar + vx * S.gammaG2Scalar + cS * S.deltaG2Scalar,
+);
 
 export const vk = {
-  alpha: G1.BASE.multiply(a),
-  beta: G2.BASE.multiply(b),
-  gamma: G2.BASE.multiply(g),
-  delta: G2.BASE.multiply(d),
-  ic: ic.map((k) => G1.BASE.multiply(k)),
+  alpha: G1.BASE.multiply(S.alphaG1Scalar),
+  beta: G2.BASE.multiply(S.betaG2Scalar),
+  gamma: G2.BASE.multiply(S.gammaG2Scalar),
+  delta: G2.BASE.multiply(S.deltaG2Scalar),
+  ic: S.icG1Scalars.map((scalar) => G1.BASE.multiply(scalar)),
 };
 export const proof = {
   a: G1.BASE.multiply(Ascalar),
@@ -39,7 +61,9 @@ export const proof = {
 // vkx = IC0 + s0*IC1 + s1*IC2  (== vx * G1)
 export function computeVkx(inputs) {
   let acc = vk.ic[0];
-  inputs.forEach((s, i) => { acc = acc.add(vk.ic[i + 1].multiply(s)); });
+  inputs.forEach((s, i) => {
+    if (s !== 0n) acc = acc.add(vk.ic[i + 1].multiply(s));
+  });
   return acc;
 }
 export const vkx = computeVkx(PUBLIC_INPUTS);

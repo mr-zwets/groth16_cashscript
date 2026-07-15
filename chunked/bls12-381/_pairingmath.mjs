@@ -17,9 +17,11 @@ import {
   le48, le48Exact, commit, CATEGORY, commitBin, commitBinExact, covIn, covOut, planChunk, tok, verifierPath,
   measureCovenant as _measureCov, bls12_381,
 } from './_vkxmath.mjs';
-import { vk, proof, computeVkx, boundaryFor } from '../../singleton/bls12-381/bls_instance.mjs';
+import {
+  FIXED_VK_SPECIALIZATION, vk, proof, computeVkx, boundaryFor,
+} from '../../singleton/bls12-381/bls_instance.mjs';
 
-export { P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, le48, le48Exact, commit, CATEGORY, commitBin, commitBinExact, covIn, covOut, planChunk, tok, verifierPath, compileBytecode, vk, proof, computeVkx, boundaryFor };
+export { P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, le48, le48Exact, commit, CATEGORY, commitBin, commitBinExact, covIn, covOut, planChunk, tok, verifierPath, compileBytecode, FIXED_VK_SPECIALIZATION, vk, proof, computeVkx, boundaryFor };
 export const { Fp, Fp2, Fp6, Fp12 } = bls12_381.fields;
 
 // ---- miller-step math (noble, M-twist) ----
@@ -55,7 +57,33 @@ function mul014(f, o0, o1, o4) {
     c1: Fp6.sub(Fp6.sub(Fp6.mul01(Fp6.add(f.c1, f.c0), o0, Fp2.add(o1, o4)), t0), t1),
   });
 }
-const lineFn = (f, c0, c1, c2, Px, Py) => mul014(f, c0, scalarFp2(c1, Px), scalarFp2(c2, Py));
+export const lineFn = (f, c0, c1, c2, Px, Py) => mul014(f, c0, scalarFp2(c1, Px), scalarFp2(c2, Py));
+
+// Identity-complete G1 line coordinates for the BLS M-twist. For a finite
+// P=(x,y), u=-x/(2y) and v=-1/(2y). The curve equation becomes
+// v=4u^3+16v^3, with the unique v=0 solution (u,v)=(0,0) encoding infinity.
+//
+// A raw mul014 line is c0 + c1*x*V + c2*y*W*V. Multiplying it by
+// -2v/(W*V) gives the sparse (0,4,5) value
+//   c2 - (2*c0*v/xi)*W*V - (2*c1*u/xi)*W*V^2,
+// where V^3=xi. The removed factor is killed by final exponentiation;
+// at (u,v)=(0,0), accepted G2 walks leave a nonzero Fp2 value c2, also killed there.
+const XI_INV = Fp2.inv(Fp2.fromBigTuple([1n, 1n]));
+export function unitG1(point) {
+  if (point.is0()) return { u: 0n, v: 0n };
+  const { x, y } = point.toAffine();
+  const yInv = Fp.inv(Fp.mul(2n, y));
+  return { u: Fp.neg(Fp.mul(x, yInv)), v: Fp.neg(yInv) };
+}
+export const lineUnitScaledFn = (f, c0, c1, c2, u, v) => {
+  const o4 = Fp2.neg(Fp2.mul(scalarFp2(c0, Fp.mul(2n, v)), XI_INV));
+  const o5 = Fp2.neg(Fp2.mul(scalarFp2(c1, Fp.mul(2n, u)), XI_INV));
+  const sparse = Fp12.create({
+    c0: Fp6.create({ c0: c2, c1: Fp2.ZERO, c2: Fp2.ZERO }),
+    c1: Fp6.create({ c0: Fp2.ZERO, c1: o4, c2: o5 }),
+  });
+  return Fp12.mul(f, sparse);
+};
 
 // ---- ate loop NAF of |x| (BLS_X), 64 digits, MSB-first ----
 const BLS_X = 0xd201000000010000n;
@@ -117,11 +145,19 @@ export function millerBatchOps(pairs, opts = {}) {
   // Miller value is baked and multiplied in once instead). Default = skip none, so every other
   // consumer is unaffected. f then = product over the NON-skipped pairs (pre-conjugate).
   const skip = opts.skipPairs ?? new Set();
-  const pds = pairData(pairs);
+  const unitLines = opts.unitLines === true;
+  const ptCfg = opts.ptCfg ?? PT_CFG;
+  if (ptCfg.length !== pairs.length) throw new Error('Miller point configuration does not match the pair count');
+  const pds = pairData(pairs).map((pd, j) => unitLines && ptCfg[j].P
+    ? { ...pd, ...unitG1(pairs[j].P) }
+    : pd);
+  const foldLine = (value, coeffs, pd) => unitLines && pd.u !== undefined
+    ? lineUnitScaledFn(value, coeffs[0], coeffs[1], coeffs[2], pd.u, pd.v)
+    : lineFn(value, coeffs[0], coeffs[1], coeffs[2], pd.Px, pd.Py);
   const ops = [];
   for (let k = 0; k < ATE_NAF.length; k++) {
     ops.push({ t: 'sqr' });
-    for (let j = 0; j < 4; j++) { if (skip.has(j)) continue; ops.push({ t: 'dl', j }); if (ATE_NAF[k]) ops.push({ t: 'al', j, neg: ATE_NAF[k] === -1 }); }
+    for (let j = 0; j < pds.length; j++) { if (skip.has(j)) continue; ops.push({ t: 'dl', j }); if (ATE_NAF[k]) ops.push({ t: 'al', j, neg: ATE_NAF[k] === -1 }); }
   }
   const states = [];
   let f = Fp12.ONE; const Rs = pds.map((pd) => ({ x: pd.Qx, y: pd.Qy, z: Fp2.ONE }));
@@ -131,11 +167,72 @@ export function millerBatchOps(pairs, opts = {}) {
   for (const op of ops) {
     states.push({ f, Rs: Rs.slice() });
     if (op.t === 'sqr') f = Fp12.sqr(f);
-    else if (op.t === 'dl') { const d = pointDouble(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z); Rs[op.j] = d.R; op.coeffs = d.coeffs; f = lineFn(f, d.coeffs[0], d.coeffs[1], d.coeffs[2], pds[op.j].Px, pds[op.j].Py); }
-    else { const pd = pds[op.j]; const a = pointAdd(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z, pd.Qx, op.neg ? pd.negQy : pd.Qy); Rs[op.j] = a.R; op.coeffs = a.coeffs; f = lineFn(f, a.coeffs[0], a.coeffs[1], a.coeffs[2], pd.Px, pd.Py); }
+    else if (op.t === 'dl') { const d = pointDouble(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z); Rs[op.j] = d.R; op.coeffs = d.coeffs; f = foldLine(f, d.coeffs, pds[op.j]); }
+    else { const pd = pds[op.j]; const a = pointAdd(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z, pd.Qx, op.neg ? pd.negQy : pd.Qy); Rs[op.j] = a.R; op.coeffs = a.coeffs; f = foldLine(f, a.coeffs, pd); }
   }
   states.push({ f, Rs: Rs.slice() });
   return { ops, states, boundary: f, finalF: Fp12.conjugate(f) };
+}
+
+// Two-pair fixed-VK trace with affine G2 walks. Each supplied slope is uniquely
+// determined because the accepted prime-order walk has no zero doubling/addition
+// denominator. Dividing the line coefficients by c2 makes every sparse factor's
+// Fp2 constant one; the removed Fp2 factors lie in the final-exponent kernel.
+export function pointDoubleAffine(Rx, Ry) {
+  const denominator = scalarFp2(Ry, 2n);
+  if (Fp2.eql(denominator, Fp2.ZERO)) throw new Error('affine G2 double has zero denominator');
+  const slope = Fp2.div(scalarFp2(Fp2.sqr(Rx), 3n), denominator);
+  const nx = Fp2.sub(Fp2.sqr(slope), scalarFp2(Rx, 2n));
+  const ny = Fp2.sub(Fp2.mul(slope, Fp2.sub(Rx, nx)), Ry);
+  return {
+    coeffs: [Fp2.sub(Fp2.mul(slope, Rx), Ry), Fp2.neg(slope), Fp2.ONE],
+    slope,
+    R: { x: nx, y: ny },
+  };
+}
+export function pointAddAffine(Rx, Ry, Qx, Qy) {
+  const denominator = Fp2.sub(Rx, Qx);
+  if (Fp2.eql(denominator, Fp2.ZERO)) throw new Error('affine G2 add has zero denominator');
+  const slope = Fp2.div(Fp2.sub(Ry, Qy), denominator);
+  const nx = Fp2.sub(Fp2.sub(Fp2.sqr(slope), Rx), Qx);
+  const ny = Fp2.sub(Fp2.mul(slope, Fp2.sub(Rx, nx)), Ry);
+  return {
+    coeffs: [Fp2.sub(Fp2.mul(slope, Rx), Ry), Fp2.neg(slope), Fp2.ONE],
+    slope,
+    R: { x: nx, y: ny },
+  };
+}
+export function millerCollapsedAffineOps(pairs, opts = {}) {
+  if (pairs.length !== 2) throw new Error('affine collapsed Miller requires two pairs');
+  const pds = pairData(pairs).map((pd, j) => ({ ...pd, ...unitG1(pairs[j].P) }));
+  const ops = [];
+  for (let k = 0; k < ATE_NAF.length; k++) {
+    ops.push({ t: 'sqr' });
+    for (let j = 0; j < pds.length; j++) {
+      ops.push({ t: 'dl', j });
+      if (ATE_NAF[k]) ops.push({ t: 'al', j, neg: ATE_NAF[k] === -1 });
+    }
+  }
+  const states = [];
+  let f = Fp12.ONE;
+  const Rs = pds.map((pd) => ({ x: pd.Qx, y: pd.Qy }));
+  for (const op of ops) {
+    states.push({ f, Rs: Rs.slice() });
+    if (op.t === 'sqr') {
+      f = Fp12.sqr(f);
+      continue;
+    }
+    const pd = pds[op.j];
+    const step = op.t === 'dl'
+      ? pointDoubleAffine(Rs[op.j].x, Rs[op.j].y)
+      : pointAddAffine(Rs[op.j].x, Rs[op.j].y, pd.Qx, op.neg ? pd.negQy : pd.Qy);
+    Rs[op.j] = step.R;
+    op.coeffs = step.coeffs;
+    op.slope = step.slope;
+    f = lineUnitScaledFn(f, step.coeffs[0], step.coeffs[1], Fp2.ONE, pd.u, pd.v);
+  }
+  states.push({ f, Rs: Rs.slice() });
+  return { ops, states, boundary: f, finalF: Fp12.conjugate(f), affineG2: true };
 }
 
 // Plain prepared-VK Miller trace. Pair 1 = e(alpha,beta) is wholly fixed, so replace its
@@ -234,6 +331,53 @@ export const pairsFor = (inputs, pf = proof) => [
   { name: 'vkx_gamma', P: vkxPoint(inputs), Q: vk.gamma },
   { name: 'C_delta', P: pf.c, Q: vk.delta },
 ];
+// This repository's verification key is a scalar-multiple fixture over the standard G1/G2
+// bases. Check the specialization descriptor against the concrete key before using it.
+const G1_BASE = bls12_381.G1.Point.BASE;
+const G2_BASE = bls12_381.G2.Point.BASE;
+const S = FIXED_VK_SPECIALIZATION;
+if (!vk.alpha.equals(G1_BASE.multiply(S.alphaG1Scalar)) ||
+    !vk.beta.equals(G2_BASE.multiply(S.betaG2Scalar)) ||
+    !vk.gamma.equals(G2_BASE.multiply(S.gammaG2Scalar)) ||
+    !vk.delta.equals(G2_BASE.multiply(S.deltaG2Scalar)) ||
+    vk.ic.length !== S.icG1Scalars.length ||
+    !vk.ic.every((point, index) => point.equals(G1_BASE.multiply(S.icG1Scalars[index])))) {
+  throw new Error('fixed-key specialization does not match the verification key');
+}
+export const FIXED_VK_COLLAPSED_PUBLIC_BASE = G1_BASE.multiply(S.collapsedPublicBaseG1Scalar);
+export const FIXED_VK_COLLAPSED_PROOF_OFFSET = vk.alpha.multiply(S.betaG2Scalar)
+  .add(vk.ic[0].multiply(S.gammaG2Scalar));
+if (!vk.ic[1].multiply(S.gammaG2Scalar)
+  .equals(FIXED_VK_COLLAPSED_PUBLIC_BASE.multiply(S.collapsedInputScalars[0])) ||
+    !vk.ic[2].multiply(S.gammaG2Scalar)
+      .equals(FIXED_VK_COLLAPSED_PUBLIC_BASE.multiply(S.collapsedInputScalars[1]))) {
+  throw new Error('collapsed public-input basis does not match the verification key');
+}
+const modR = (value) => {
+  const r = bls12_381.fields.Fr.ORDER;
+  return ((value % r) + r) % r;
+};
+export const fixedVkDScalar = (inputs, cScalar) => {
+  if (inputs.length !== 2) throw new Error('fixed-key specialization requires two public inputs');
+  const vkxScalar = S.icG1Scalars[0] +
+    BigInt(inputs[0]) * S.icG1Scalars[1] +
+    BigInt(inputs[1]) * S.icG1Scalars[2];
+  return modR(
+    S.alphaG1Scalar * S.betaG2Scalar +
+    vkxScalar * S.gammaG2Scalar +
+    BigInt(cScalar) * S.deltaG2Scalar,
+  );
+};
+export const collapsedDPoint = (inputs, pf = proof) => vk.alpha.multiply(S.betaG2Scalar)
+  .add(vkxPoint(inputs).multiply(S.gammaG2Scalar))
+  .add(pf.c.multiply(S.deltaG2Scalar));
+export const collapsedPairsFor = (inputs, pf = proof) => [
+  { name: 'negA_B', P: pf.a.negate(), Q: pf.b },
+  { name: 'fixed_g2_sum', P: collapsedDPoint(inputs, pf), Q: G2_BASE },
+];
+// A canonical B identity is evaluated as e(O,Q*) so the Miller walk remains defined. Q* only
+// needs to be fixed, nonzero, and order-r; the certificate pins those properties for this base.
+export const B_IDENTITY_SUBSTITUTE = G2_BASE;
 // build a proof object {a,b,c} (curve points) from raw limb bigints (replay proof#1)
 export const proofFromLimbs = (Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy) => ({
   a: bls12_381.G1.Point.fromAffine({ x: Ax, y: Ay }),
@@ -245,6 +389,7 @@ export const proofFromLimbs = (Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy) => ({
 // pair0 e(-A,B): both proof. pair1 e(alpha,beta): both VK. pair2 e(vk_x,gamma):
 // P=vk_x runtime, Q=gamma VK. pair3 e(C,delta): P=C runtime, Q=delta VK.
 export const PT_CFG = [{ P: true, Q: true }, { P: false, Q: false }, { P: true, Q: false }, { P: true, Q: false }];
+export const COLLAPSED_PT_CFG = [{ P: true, Q: true }, { P: true, Q: false }];
 export const ptLimbs = (pairIdx, P_, Q_) => {
   const o = [], c = PT_CFG[pairIdx];
   if (c.P) o.push(P_.x, P_.y);

@@ -86,6 +86,10 @@ function parseParams(sig) {
  *   cfg.nextLockingHash optional 32-byte hex hash. With epilogueMode='covout', require
  *                    output[0]'s locking bytecode to hash to this value, binding a group
  *                    hand-off to the actual first locking of the successor group.
+ *   cfg.forward.nextLockingHash optional SHA-256 of the immediate successor's locking bytecode.
+ *                    Pins an intra-transaction hand-off to the expected successor program.
+ *   cfg.expectedInputIndex / cfg.expectedInputCount optional paired transaction-layout gate.
+ *                    Require this program at the declared index in an exact-size input graph.
  *   cfg.externalBindings additional byte-slice bindings from this chunk's inBlob to another
  *                    input's inBlob: [{sourceOffset,targetInputIndex,targetFullInLen,
  *                    targetOffset,length}]. targetInputIndex is transaction-local.
@@ -97,6 +101,9 @@ function parseParams(sig) {
  *                    supplied independently and only a dynamic prefix is forwarded.
  *   cfg.enforceExactInputLength when true, reject inBlob values with trailing/legacy
  *                    state limbs instead of parsing only the declared prefix.
+ *   cfg.linkedDataLength optional exact length for one opaque bytes argument placed immediately
+ *                    after inBlob in the unlocking bytecode. Its contents can be read by sibling
+ *                    inputs while this contract only enforces the carrier length.
  * Returns { src, inNames, outNames|null, extras, isTerminal, inLen, outLen }.
  */
 export function transformChunk(src, cfg) {
@@ -152,6 +159,10 @@ export function transformChunk(src, cfg) {
   // extras = real spend params that are neither incoming-state limbs nor the dropped budget
   // pad (e.g. vk_x's zInv). The `unused` budget pad is stripped — we supply our own pad.
   const extras = params.filter((p) => !inSet.has(p.name) && !p.unused);
+  const linkedDataLength = cfg.linkedDataLength;
+  if (linkedDataLength !== undefined && (!Number.isSafeInteger(linkedDataLength) || linkedDataLength <= 0)) {
+    throw new Error(`invalid linkedDataLength: ${linkedDataLength}`);
+  }
 
   // locate the spend function's closing brace (track depth from the signature line).
   let depth = 0, closeIdx = -1;
@@ -170,7 +181,11 @@ export function transformChunk(src, cfg) {
 
   // new signature: extras first (pushed last), inBlob last (pushed FIRST -> front of
   // the unlocking bytecode, so a sibling's forward-check reads it at a fixed offset).
-  const newSig = `    function spend(${[...extras.map((e) => `${e.type} ${e.name}`), 'bytes inBlob'].join(', ')}) {`;
+  const newSig = `    function spend(${[
+    ...extras.map((e) => `${e.type} ${e.name}`),
+    ...(linkedDataLength === undefined ? [] : ['bytes linkedData']),
+    'bytes inBlob',
+  ].join(', ')}) {`;
 
   let outNames = null, outWidths = null, outLen = 0;
   let body, epilogue;
@@ -244,6 +259,12 @@ export function transformChunk(src, cfg) {
       epilogue.push(
         `        require(${cmp} == tx.inputs[this.activeInputIndex + 1].unlockingBytecode.split(${off + f.cmpLen})[0].split(${off})[1]);`,
       );
+      if (f.nextLockingHash !== undefined) {
+        if (!/^[0-9a-f]{64}$/i.test(f.nextLockingHash)) throw new Error('invalid forward nextLockingHash');
+        epilogue.push(
+          `        require(sha256(tx.inputs[this.activeInputIndex + 1].lockingBytecode) == 0x${f.nextLockingHash});`,
+        );
+      }
     } else {
       // stage-final: no successor with a matching layout. Consume outBlob (the boundary
       // / vk_x result) with an always-true size check so the recomputation still runs.
@@ -265,7 +286,22 @@ export function transformChunk(src, cfg) {
   let maxUsed = -1;
   used.forEach((u, p) => { if (u) maxUsed = p; });
   const inLen = inWidths.reduce((sum, width) => sum + width, 0);
-  const prologue = cfg.enforceExactInputLength ? [`        require(inBlob.length == ${inLen});`] : [];
+  const expectedInputIndex = cfg.expectedInputIndex;
+  const expectedInputCount = cfg.expectedInputCount;
+  if ((expectedInputIndex === undefined) !== (expectedInputCount === undefined) ||
+    (expectedInputIndex !== undefined &&
+      (!Number.isSafeInteger(expectedInputIndex) || expectedInputIndex < 0 ||
+       !Number.isSafeInteger(expectedInputCount) || expectedInputCount <= expectedInputIndex))) {
+    throw new Error(`invalid expected input layout: ${expectedInputIndex}/${expectedInputCount}`);
+  }
+  const prologue = expectedInputIndex === undefined
+    ? []
+    : [
+        `        require(tx.inputs.length == ${expectedInputCount});`,
+        `        require(this.activeInputIndex == ${expectedInputIndex});`,
+      ];
+  if (cfg.enforceExactInputLength) prologue.push(`        require(inBlob.length == ${inLen});`);
+  if (linkedDataLength !== undefined) prologue.push(`        require(linkedData.length == ${linkedDataLength});`);
   // GROUPED: a non-genesis group's first chunk binds its incoming blob to the spent token's
   // NFT commitment (= hash256 of the same full state the previous group committed via covout).
   if (cfg.covInHash) prologue.push(`        require(tx.inputs[0].nftCommitment == hash256(inBlob));`);
@@ -332,7 +368,7 @@ export function transformChunk(src, cfg) {
     src: out,
     inNames,
     outNames,
-    extras: extras.map((e) => e.name),
+    extras: [...extras.map((e) => e.name), ...(linkedDataLength === undefined ? [] : ['linkedData'])],
     isTerminal,
     inLen,
     outLen,
