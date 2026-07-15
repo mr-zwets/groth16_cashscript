@@ -122,7 +122,10 @@ const trace = MILLER_AFFINE_G2
     })
   : millerFusedOps(PAIRS, C_PLAN, CINV_PLAN);
 const { ops, states, boundary } = trace;
-if (LINKED_CUTS.some((cut, i) => !Number.isInteger(cut) || cut <= (LINKED_CUTS[i - 1] ?? 0) || cut >= ops.length)) {
+// A terminal cut equal to ops.length is allowed so a large-budget plan can spell out its
+// final window explicitly (e.g. MILLER_LINKED_CUTS=348 = ONE chunk covering the whole loop);
+// interior cuts stay strictly inside the op range as before.
+if (LINKED_CUTS.some((cut, i) => !Number.isInteger(cut) || cut <= (LINKED_CUTS[i - 1] ?? 0) || cut > ops.length)) {
   throw new Error('MILLER_LINKED_CUTS must be strictly increasing integer boundaries inside the op range');
 }
 
