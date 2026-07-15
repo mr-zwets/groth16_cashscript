@@ -205,20 +205,29 @@ function fp12SqrSigned(
         // reductions instead of reducing every base-field product.
 
         // t0 = c0*c1, expanded through the Fp6 Karatsuba formula without reduction.
-        (int t00a,int t00b) = fp2MulRaw(A0,A1, A6,A7);
-        (int t01a,int t01b) = fp2MulRaw(A2,A3, A8,A9);
-        (int t02a,int t02b) = fp2MulRaw(A4,A5, A10,A11);
-        (int t0p1a,int t0p1b) = fp2MulRaw(A2+A4,A3+A5, A8+A10,A9+A11);
+        int t00v0=A0*A6; int t00v1=A1*A7;
+        int t00a=t00v0-t00v1; int t00b=(A0+A1)*(A6+A7)-t00v0-t00v1;
+        int t01v0=A2*A8; int t01v1=A3*A9;
+        int t01a=t01v0-t01v1; int t01b=(A2+A3)*(A8+A9)-t01v0-t01v1;
+        int t02v0=A4*A10; int t02v1=A5*A11;
+        int t02a=t02v0-t02v1; int t02b=(A4+A5)*(A10+A11)-t02v0-t02v1;
+        int t0p1x0=A2+A4; int t0p1x1=A3+A5; int t0p1y0=A8+A10; int t0p1y1=A9+A11;
+        int t0p1v0=t0p1x0*t0p1y0; int t0p1v1=t0p1x1*t0p1y1;
+        int t0p1a=t0p1v0-t0p1v1; int t0p1b=(t0p1x0+t0p1x1)*(t0p1y0+t0p1y1)-t0p1v0-t0p1v1;
         int t0d2a = t0p1a - t01a - t02a;
         int t0d2b = t0p1b - t01b - t02b;
         int t0c0a = t00a + 9*t0d2a - t0d2b;
         int t0c0b = t00b + t0d2a + 9*t0d2b;
-        (int t0p2a,int t0p2b) = fp2MulRaw(A0+A2,A1+A3, A6+A8,A7+A9);
+        int t0p2x0=A0+A2; int t0p2x1=A1+A3; int t0p2y0=A6+A8; int t0p2y1=A7+A9;
+        int t0p2v0=t0p2x0*t0p2y0; int t0p2v1=t0p2x1*t0p2y1;
+        int t0p2a=t0p2v0-t0p2v1; int t0p2b=(t0p2x0+t0p2x1)*(t0p2y0+t0p2y1)-t0p2v0-t0p2v1;
         int t0d4a = t0p2a - t00a - t01a;
         int t0d4b = t0p2b - t00b - t01b;
         int t0c1a = t0d4a + 9*t02a - t02b;
         int t0c1b = t0d4b + t02a + 9*t02b;
-        (int t0p3a,int t0p3b) = fp2MulRaw(A0+A4,A1+A5, A6+A10,A7+A11);
+        int t0p3x0=A0+A4; int t0p3x1=A1+A5; int t0p3y0=A6+A10; int t0p3y1=A7+A11;
+        int t0p3v0=t0p3x0*t0p3y0; int t0p3v1=t0p3x1*t0p3y1;
+        int t0p3a=t0p3v0-t0p3v1; int t0p3b=(t0p3x0+t0p3x1)*(t0p3y0+t0p3y1)-t0p3v0-t0p3v1;
         int t0c2a = t0p3a - t00a - t02a + t01a;
         int t0c2b = t0p3b - t00b - t02b + t01b;
 
@@ -228,20 +237,29 @@ function fp12SqrSigned(
         int s3=A3+A9; int s4=A4+A10; int s5=A5+A11;
         int u0=A0+9*A10-A11; int u1=A1+A10+9*A11;
         int u2=A2+A6; int u3=A3+A7; int u4=A4+A8; int u5=A5+A9;
-        (int t10a,int t10b) = fp2MulRaw(s0,s1, u0,u1);
-        (int t11a,int t11b) = fp2MulRaw(s2,s3, u2,u3);
-        (int t12a,int t12b) = fp2MulRaw(s4,s5, u4,u5);
-        (int t1p1a,int t1p1b) = fp2MulRaw(s2+s4,s3+s5, u2+u4,u3+u5);
+        int t10v0=s0*u0; int t10v1=s1*u1;
+        int t10a=t10v0-t10v1; int t10b=(s0+s1)*(u0+u1)-t10v0-t10v1;
+        int t11v0=s2*u2; int t11v1=s3*u3;
+        int t11a=t11v0-t11v1; int t11b=(s2+s3)*(u2+u3)-t11v0-t11v1;
+        int t12v0=s4*u4; int t12v1=s5*u5;
+        int t12a=t12v0-t12v1; int t12b=(s4+s5)*(u4+u5)-t12v0-t12v1;
+        int t1p1x0=s2+s4; int t1p1x1=s3+s5; int t1p1y0=u2+u4; int t1p1y1=u3+u5;
+        int t1p1v0=t1p1x0*t1p1y0; int t1p1v1=t1p1x1*t1p1y1;
+        int t1p1a=t1p1v0-t1p1v1; int t1p1b=(t1p1x0+t1p1x1)*(t1p1y0+t1p1y1)-t1p1v0-t1p1v1;
         int t1d2a = t1p1a - t11a - t12a;
         int t1d2b = t1p1b - t11b - t12b;
         int t1c0a = t10a + 9*t1d2a - t1d2b;
         int t1c0b = t10b + t1d2a + 9*t1d2b;
-        (int t1p2a,int t1p2b) = fp2MulRaw(s0+s2,s1+s3, u0+u2,u1+u3);
+        int t1p2x0=s0+s2; int t1p2x1=s1+s3; int t1p2y0=u0+u2; int t1p2y1=u1+u3;
+        int t1p2v0=t1p2x0*t1p2y0; int t1p2v1=t1p2x1*t1p2y1;
+        int t1p2a=t1p2v0-t1p2v1; int t1p2b=(t1p2x0+t1p2x1)*(t1p2y0+t1p2y1)-t1p2v0-t1p2v1;
         int t1d4a = t1p2a - t10a - t11a;
         int t1d4b = t1p2b - t10b - t11b;
         int t1c1a = t1d4a + 9*t12a - t12b;
         int t1c1b = t1d4b + t12a + 9*t12b;
-        (int t1p3a,int t1p3b) = fp2MulRaw(s0+s4,s1+s5, u0+u4,u1+u5);
+        int t1p3x0=s0+s4; int t1p3x1=s1+s5; int t1p3y0=u0+u4; int t1p3y1=u1+u5;
+        int t1p3v0=t1p3x0*t1p3y0; int t1p3v1=t1p3x1*t1p3y1;
+        int t1p3a=t1p3v0-t1p3v1; int t1p3b=(t1p3x0+t1p3x1)*(t1p3y0+t1p3y1)-t1p3v0-t1p3v1;
         int t1c2a = t1p3a - t10a - t12a + t11a;
         int t1c2b = t1p3b - t10b - t12b + t11b;
 
@@ -478,6 +496,58 @@ function lineUnitDirect(
         (int xm3a,int xm3b) = fp2MulRaw(F4,F5, o4a,o4b);
         (int xmpa,int xmpb) = fp2MulRaw(F0+F2+F4,F1+F3+F5, opa,opb);
         (int xmma,int xmmb) = fp2MulRaw(F0-F2+F4,F1-F3+F5, oma,omb);
+        int xt0 = xm0a+9*xm3a-xm3b; int xt1 = xm0b+xm3a+9*xm3b;
+        int xt2 = ((xmpa-xmma)>>1)-xm3a; int xt3 = ((xmpb-xmmb)>>1)-xm3b;
+        int xt4 = ((xmpa+xmma)>>1)-xm0a; int xt5 = ((xmpb+xmmb)>>1)-xm0b;
+
+        return (F0 + 9*yt4 - yt5) % p, (F1 + yt4 + 9*yt5) % p,
+               (F2 + yt0) % p, (F3 + yt1) % p,
+               (F4 + yt2) % p, (F5 + yt3) % p,
+               (F6 + xt0) % p, (F7 + xt1) % p,
+               (F8 + xt2) % p, (F9 + xt3) % p,
+               (F10 + xt4) % p, (F11 + xt5) % p;
+    }
+
+// The same sparse unit-line multiplication with its eight Fp2 Karatsuba products
+// inlined. This exposes the complete line DAG to the stack scheduler and removes
+// eight OP_INVOKE boundaries per line; the differential probe decides whether the
+// larger body is cheaper under the byte-sensitive VM cost model.
+function lineUnitDirectInline(
+        int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
+        int c0a,int c0b,int c1a,int c1b, int u, int v
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int o3a = (c1a * u) % p;
+        int o3b = (c1b * u) % p;
+        int o4a = (c0a * v) % p;
+        int o4b = (c0b * v) % p;
+        int opa = o3a + o4a; int opb = o3b + o4b;
+        int oma = o3a - o4a; int omb = o3b - o4b;
+
+        int ym0v0=F6*o3a; int ym0v1=F7*o3b;
+        int ym0a=ym0v0-ym0v1; int ym0b=(F6+F7)*(o3a+o3b)-ym0v0-ym0v1;
+        int ym3v0=F10*o4a; int ym3v1=F11*o4b;
+        int ym3a=ym3v0-ym3v1; int ym3b=(F10+F11)*(o4a+o4b)-ym3v0-ym3v1;
+        int ympx0=F6+F8+F10; int ympx1=F7+F9+F11;
+        int ympv0=ympx0*opa; int ympv1=ympx1*opb;
+        int ympa=ympv0-ympv1; int ympb=(ympx0+ympx1)*(opa+opb)-ympv0-ympv1;
+        int ymmx0=F6-F8+F10; int ymmx1=F7-F9+F11;
+        int ymmv0=ymmx0*oma; int ymmv1=ymmx1*omb;
+        int ymma=ymmv0-ymmv1; int ymmb=(ymmx0+ymmx1)*(oma+omb)-ymmv0-ymmv1;
+        int yt0 = ym0a+9*ym3a-ym3b; int yt1 = ym0b+ym3a+9*ym3b;
+        int yt2 = ((ympa-ymma)>>1)-ym3a; int yt3 = ((ympb-ymmb)>>1)-ym3b;
+        int yt4 = ((ympa+ymma)>>1)-ym0a; int yt5 = ((ympb+ymmb)>>1)-ym0b;
+
+        int xm0v0=F0*o3a; int xm0v1=F1*o3b;
+        int xm0a=xm0v0-xm0v1; int xm0b=(F0+F1)*(o3a+o3b)-xm0v0-xm0v1;
+        int xm3v0=F4*o4a; int xm3v1=F5*o4b;
+        int xm3a=xm3v0-xm3v1; int xm3b=(F4+F5)*(o4a+o4b)-xm3v0-xm3v1;
+        int xmpx0=F0+F2+F4; int xmpx1=F1+F3+F5;
+        int xmpv0=xmpx0*opa; int xmpv1=xmpx1*opb;
+        int xmpa=xmpv0-xmpv1; int xmpb=(xmpx0+xmpx1)*(opa+opb)-xmpv0-xmpv1;
+        int xmmx0=F0-F2+F4; int xmmx1=F1-F3+F5;
+        int xmmv0=xmmx0*oma; int xmmv1=xmmx1*omb;
+        int xmma=xmmv0-xmmv1; int xmmb=(xmmx0+xmmx1)*(oma+omb)-xmmv0-xmmv1;
         int xt0 = xm0a+9*xm3a-xm3b; int xt1 = xm0b+xm3a+9*xm3b;
         int xt2 = ((xmpa-xmma)>>1)-xm3a; int xt3 = ((xmpb-xmmb)>>1)-xm3b;
         int xt4 = ((xmpa+xmma)>>1)-xm0a; int xt5 = ((xmpb+xmmb)>>1)-xm0b;

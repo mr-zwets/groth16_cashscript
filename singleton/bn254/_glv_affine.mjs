@@ -17,8 +17,10 @@ const IC0 = G.GLV_IC0.map((x) => ((x % P) + P) % P);
 const le32 = (v) => { v = ((v % P) + P) % P; let s = ''; for (let b = 0; b < 32; b++) s += Number((v >> BigInt(8 * b)) & 0xffn).toString(16).padStart(2, '0'); return s; };
 
 export function glvAffineWitness(in0, in1) {
-  const [k10, k20] = G.glvDecompose(BigInt(in0));
-  const [k11, k21] = G.glvDecompose(BigInt(in1));
+  // Exhaustively choose congruent bounded representatives jointly, minimizing the union
+  // popcount processed by the four-scalar Straus loop. This changes only the witness: the
+  // contract still checks both GLV congruences and every affine slope.
+  const [k10, k20, k11, k21] = G.glvDecomposeJoint(BigInt(in0), BigInt(in1));
   const nb = Math.max(0, ...[k10, k20, k11, k21].map((k) => (k === 0n ? 0 : k.toString(2).length - 1)));
   const slopes = [];
   let acc = null;

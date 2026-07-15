@@ -220,6 +220,7 @@ function emitGlvVkxLazy({ nbLoop = false } = {}) {
   L.push('        int vkxY = mulFp(icy, vz3);');
   return L;
 }
+
 // Batched c^-(6x+2)-fused Miller (lazy). Only the runtime pair (-A, B) runs on-chain G2 point
 // arithmetic; the fixed-VK pairs (vk_x,gamma) and (C,delta) have proof-independent line
 // coefficients, so they are BAKED (per-step blobs) and only their line eval at the runtime G1
@@ -340,10 +341,12 @@ function emitTorusMillerLazy(trace, FABT) {
   L.push('        int Rxa=Bxa; int Rxb=Bxb; int Rya=Bya; int Ryb=Byb;');
   if (needsNegB) L.push('        (int nBya,int nByb) = fp2Neg(Bya, Byb, 64);');
   const unitLine = (triple, pu, pv) =>
-    L.push(`        (${F}) = lineUnitDirect(${F}, ${triple[0].c0}, ${triple[0].c1}, ${triple[1].c0}, ${triple[1].c1}, ${pu}, ${pv});`);
+    L.push(`        (${F}) = lineUnitDirectInline(${F}, ${triple[0].c0}, ${triple[0].c1}, ${triple[1].c0}, ${triple[1].c1}, ${pu}, ${pv});`);
   for (const op of trace.ops) {
     if (op.t === 'sqr') {
-      L.push(`        (${F}) = fp12Sqr(${F});`);
+      // Match the proved chunked torus hot path: signed representatives avoid the
+      // canonicalization branch on all twelve limbs at every Miller square.
+      L.push(`        (${F}) = fp12SqrSigned(${F});`);
     } else if (op.t === 'cf') {
       // fold c^-(6x+2): digit +1 -> x [cInv] = [1-u*W], digit -1 -> x [c] = [1+u*W]
       L.push(`        (${F}) = fp12MulTorus(${F}, ${op.neg ? uL : nuL});`);
@@ -357,20 +360,20 @@ function emitTorusMillerLazy(trace, FABT) {
       const c = N(4).map((k) => `d${uid}_${k}`), r = N(4).map((k) => `dr${uid}_${k}`); uid++;
       L.push(`        (${c.map((n) => 'int ' + n).join(',')}, ${r.map((n) => 'int ' + n).join(',')}) = pointDoubleAffine(Rxa,Rxb,Rya,Ryb, ${sa}, ${sb});`);
       L.push(`        Rxa=${r[0]}; Rxb=${r[1]}; Rya=${r[2]}; Ryb=${r[3]};`);
-      L.push(`        (${F}) = lineUnitDirect(${F}, ${c.join(',')}, Pu0, Pv0);`);
+      L.push(`        (${F}) = lineUnitDirectInline(${F}, ${c.join(',')}, Pu0, Pv0);`);
     } else if (op.t === 'al') {
       const [sa, sb] = slope();
       const c = N(4).map((k) => `a${uid}_${k}`), r = N(4).map((k) => `ar${uid}_${k}`); uid++;
       const Y = op.neg ? 'nBya, nByb' : 'Bya, Byb';
       L.push(`        (${c.map((n) => 'int ' + n).join(',')}, ${r.map((n) => 'int ' + n).join(',')}) = pointAddAffine(Rxa,Rxb,Rya,Ryb, Bxa, Bxb, ${Y}, ${sa}, ${sb});`);
       L.push(`        Rxa=${r[0]}; Rxb=${r[1]}; Rya=${r[2]}; Ryb=${r[3]};`);
-      L.push(`        (${F}) = lineUnitDirect(${F}, ${c.join(',')}, Pu0, Pv0);`);
+      L.push(`        (${F}) = lineUnitDirectInline(${F}, ${c.join(',')}, Pu0, Pv0);`);
     } else { // pp j=0: the runtime Miller endpoint; fuses the EXACT G2 subgroup check
       const [s1a, s1b] = slope(); const [s2a, s2b] = slope();
       L.push('        (int q1xa,int q1xb,int q1ya,int q1yb) = psi(Bxa, Bxb, Bya, Byb);');
       L.push(`        (int h1_0,int h1_1,int h1_2,int h1_3, int er0,int er1,int er2,int er3) = pointAddAffine(Rxa,Rxb,Rya,Ryb, q1xa,q1xb,q1ya,q1yb, ${s1a}, ${s1b});`);
       L.push('        Rxa=er0; Rxb=er1; Rya=er2; Ryb=er3;');
-      L.push(`        (${F}) = lineUnitDirect(${F}, h1_0,h1_1,h1_2,h1_3, Pu0, Pv0);`);
+      L.push(`        (${F}) = lineUnitDirectInline(${F}, h1_0,h1_1,h1_2,h1_3, Pu0, Pv0);`);
       L.push('        (int q2xa,int q2xb,int q2ya,int q2yb) = psi(q1xa, q1xb, q1ya, q1yb);');
       L.push('        (int q2nya,int q2nyb) = fp2Neg(q2ya, q2yb, 64);');
       L.push(`        (int h2_0,int h2_1,int h2_2,int h2_3, int fr0,int fr1,int fr2,int fr3) = pointAddAffine(Rxa,Rxb,Rya,Ryb, q2xa,q2xb,q2nya,q2nyb, ${s2a}, ${s2b});`);
@@ -381,7 +384,7 @@ function emitTorusMillerLazy(trace, FABT) {
       L.push(`        (int q3xa,int q3xb) = fp2Scale(q1xa, q1xb, ${KX});`);
       L.push('        require((Rxa - q3xa) % fieldP == 0); require((Rxb - q3xb) % fieldP == 0);');
       L.push('        require((Rya - q1ya) % fieldP == 0); require((Ryb - q1yb) % fieldP == 0);');
-      L.push(`        (${F}) = lineUnitDirect(${F}, h2_0,h2_1,h2_2,h2_3, Pu0, Pv0);`);
+      L.push(`        (${F}) = lineUnitDirectInline(${F}, h2_0,h2_1,h2_2,h2_3, Pu0, Pv0);`);
     }
   }
   // terminal verdict: [F * c^(p^2)] == [c^p * c^(p^3)] via projective cross-multiplication
