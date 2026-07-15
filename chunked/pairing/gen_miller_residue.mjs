@@ -44,6 +44,7 @@ const LINKED_CUTS = !LINKED_LAYOUT || linkedCutsOverride === 'auto'
     : linkedCutsOverride.split(',').map(Number);
 const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 const COVENANT_RESIDUE = STAGE_BOUND && process.env.COVENANT_RESIDUE_LAYOUT === '1';
+const COVENANT_TOKEN_CHAIN = process.env.COVENANT_TOKEN_CHAIN === '1';
 if (FUSE_G2_ENDPOINT && !STAGE_BOUND) {
   throw new Error('FUSE_G2_ENDPOINT requires STAGE_BOUND_LAYOUT=1');
 }
@@ -56,6 +57,9 @@ if (MILLER_UNIT_LINES && !MILLER_AFFINE_G2) {
 if (MILLER_TORUS && (!FUSE_G2_ENDPOINT || !MILLER_AFFINE_G2 || !MILLER_UNIT_LINES ||
     !STAGE_BOUND || !COVENANT_RESIDUE || !LINKED_LAYOUT)) {
   throw new Error('MILLER_TORUS requires endpoint, affine, unit-line, stage-bound, covenant-residue, and linked layouts');
+}
+if (COVENANT_TOKEN_CHAIN && !COVENANT_RESIDUE) {
+  throw new Error('COVENANT_TOKEN_CHAIN requires the stage-bound covenant-residue layout');
 }
 
 const PAIRS = pairsFor(vec.publicInputs);
@@ -199,7 +203,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     ? [...stagePtParams, ...rootNames, ...unitPtParams]
     : fullStateParams;
   const committedParams = COVENANT_RESIDUE && opLo === 0
-    ? MILLER_TORUS ? stateParams : stagePtParams
+    ? MILLER_TORUS && !COVENANT_TOKEN_CHAIN ? stateParams : stagePtParams
     : stateParams;
   const slopeNamesByOp = new Map();
   for (let i = opLo; i < opHi; i++) {
@@ -475,7 +479,7 @@ if (process.argv[2] === 'probe') {
       ...(withTail && !MILLER_TORUS ? fp12limbsOf(W_PLAN) : []),
     ];
     const committedIn = COVENANT_RESIDUE && a === 0
-      ? MILLER_TORUS ? inL : stagePtL
+      ? MILLER_TORUS && !COVENANT_TOKEN_CHAIN ? inL : stagePtL
       : inL;
     const m = measureCovenantFile(genChunk(a, b, final, withTail), args, withTail ? [] : outState(b), PROBE, true, committedIn);
     console.error(`ops [${a},${b}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`);
@@ -488,7 +492,7 @@ const chunks = []; let lo = 0; const planState = { perUnit: null };
 while (lo < ops.length) {
   const inL = inState(lo);
   const committedIn = COVENANT_RESIDUE && lo === 0
-    ? MILLER_TORUS ? inL : stagePtL
+    ? MILLER_TORUS && !COVENANT_TOKEN_CHAIN ? inL : stagePtL
     : inL;
   const tryHi = (hi) => {
     const final = hi === ops.length;
@@ -542,6 +546,7 @@ if (process.env.FUSE_TAIL === '1' && chunks[chunks.length - 1].tailFused !== tru
 writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
   fused: true, linkedLayout: LINKED_LAYOUT, stageBound: STAGE_BOUND,
   covenantResidue: COVENANT_RESIDUE, endpointSubgroup: FUSE_G2_ENDPOINT,
+  covenantTokenChain: COVENANT_TOKEN_CHAIN,
   affineG2: MILLER_AFFINE_G2,
   unitLines: MILLER_UNIT_LINES,
   quotientTorus: MILLER_TORUS,

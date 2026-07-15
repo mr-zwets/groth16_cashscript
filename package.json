@@ -14,6 +14,7 @@
     "gen:shamir": "node chunked/shamir/gen_chunks.mjs",
     "gen:chunked:bls": "node chunked/bls12-381/generate.mjs",
     "gen:chunked:pairing": "node chunked/pairing/generate.mjs",
+    "vectors:covenant:torus": "MILLER_TORUS=1 node chunked/pairing/generate_covenant_residue.mjs",
     "vectors:intratx:torus": "node chunked/intratx/generate_torus.mjs",
     "vectors:twoloop": "node chunked/twoloop/gen_chunks.mjs && node chunked/twoloop/build_vectors.mjs",
     "vectors:shamir": "node chunked/shamir/build_vectors.mjs"

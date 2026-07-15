@@ -16,22 +16,29 @@ Three benchmark entries (in the verifier repo) are produced from here:
   prepared Miller chunks → final exponentiation → a final step asserting the product
   == Fp12 ONE. 43 inputs.
 
-The source-owned covenant-residue deployment is reproduced separately:
+The current source-owned covenant frontier is reproduced separately:
 
 ```sh
-VERIFIER_DIR=/path/to/zk-verifier-bench node generate_covenant_residue.mjs
+VERIFIER_DIR=/path/to/zk-verifier-bench pnpm vectors:covenant:torus
 ```
 
 It writes exactly
 `$VERIFIER_DIR/src/bch/groth16-chunked-covenant-residue-vectors.json`.
-The graph uses a fast-G2 minting-baton genesis, a four-chunk GLV `vk_x` stage that
-carries the validated `(-A,B,C)` tuple, and a stage-bound fused Miller loop whose
-final chunk also performs the witnessed-residue verdict. State limbs use canonical
-32-byte BN254 serialization. Every nonterminal covenant pins its successor P2SH32
-locking; the mutable thread terminates as an immutable NFT. The writer refuses to
-emit vectors unless the committed, second, and dense proofs all pass the same locking
-graph and the point, residue-range, state, successor-locking, token-lifecycle, and
-stage-splice negative cases reject on the standard BCH 2026 VM.
+The 14-transaction graph uses a four-chunk GLV `vk_x` stage followed by ten
+quotient-torus Miller chunks. Its GLV minting-baton genesis commits `(-A,B,C)`; the
+first Miller step checks those canonical points, derives its normalized line state,
+and the runtime-B endpoint proves exact G2 subgroup membership. The six-limb finite
+residue root is introduced at that GLV-to-Miller seam, then every later state is
+committed by a canonical NFT commitment. Every nonterminal covenant pins its
+successor P2SH32 locking, and the mutable thread terminates as an immutable NFT.
+
+The reproduction command also runs the affine, unit-line, integer-bound, endpoint,
+and quotient-torus proof scripts. The writer refuses to emit vectors unless the
+committed, second, and dense proofs all pass the same locking graph on both BCH 2026
+consensus and standard-policy VMs, and its point, residue-range, state,
+successor-locking, token-lifecycle, quotient, and stage-seam negative cases reject.
+The legacy 20-transaction non-quotient residue graph remains reproducible by running
+`generate_covenant_residue.mjs` without `MILLER_TORUS=1`.
 
 Every chunk is validated on the real BCH 2026 VM.
 
@@ -125,8 +132,8 @@ Run a single piece directly if needed: `node gen_miller.mjs`, `node gen_finalexp
 | `build_vectors.mjs` | assemble all chunks → the pairing, full-verifier, and vk_x vectors | ✅ |
 | `generate.mjs` | one-command orchestrator (runs all of the above) | ✅ |
 | `generated/` | the 43 full-verifier `.cash` chunks + manifests (derived) | ❌ git-ignored |
-| `build_vectors_covenant_residue.mjs` | assemble and gate the covenant-residue lifecycle | ✅ |
-| `generate_covenant_residue.mjs` | one-command covenant-residue vector reproduction | ✅ |
+| `build_vectors_covenant_residue.mjs` | assemble and gate legacy or quotient-torus covenant lifecycles | ✅ |
+| `generate_covenant_residue.mjs` | one-command proof, vector, and VM reproduction for either covenant mode | ✅ |
 | `generated/` | the 43 full-verifier `.cash` chunks + manifests (derived) | ❌ git-ignored |
 
 The committed instance lives in the verifier repo
