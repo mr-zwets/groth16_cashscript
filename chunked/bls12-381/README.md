@@ -29,7 +29,7 @@ also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` 
 - `bch-groth16-bls12381-intratx`: 56 inputs / 475,310 B / 377,658,775 op-cost.
 - `bch-groth16-bls12381-grouped`: 56 inputs / 6 standard transactions / 475,292 B /
   377,556,467 op-cost.
-- `bch-groth16-bls12381-intratx-residue`: 35 inputs / 209,865 B / 158,769,046 op-cost.
+- `bch-groth16-bls12381-intratx-residue`: 35 inputs / 209,216 B / 157,700,169 op-cost.
 - `bch-groth16-bls12381-grouped-residue`: 35 inputs / 4 standard transactions / 209,937 B /
   158,744,466 op-cost.
 - `bch-groth16-bls12381-intratx-residue-large`: 4 inputs / 171,166 B / 153,410,183 op-cost
@@ -75,8 +75,9 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
   rejected rather than silently normalized.
 - **Fp6 residue membership** — the residue construction always produces `w` in the embedded
   `Fp6*`: its A-part lies in Fp because `A | p-1`, and its root-of-unity corrector lies in Fp6.
-  Since `p^6-1 | (p^12-1)/r`, six zero upper-limb checks replace the 63-step `w^(27A)` walk.
-  The inverse and terminal equations exclude zero.
+  Since `p^6-1 | (p^12-1)/r`, the terminal witnesses only the six Fp6 limbs and fixes the upper
+  Fp12 half to zero, replacing the 63-step `w^(27A)` walk. The inverse and terminal equations
+  exclude zero.
 
 Since per-step bytes are dominated (~64%) by op-cost-proportional unlocking padding,
 op-cost cuts translate ~1:1 into size.
