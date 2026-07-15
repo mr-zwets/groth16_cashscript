@@ -178,7 +178,7 @@ function millerSingle(int Qxa,int Qxb,int Qya,int Qyb, int Px, int Py)
     return j0,j1,j2,j3,j4,j5,j6,j7,j8,j9,j10,j11;
 }
 
-// ---- witnessed-residue final-exp verdict (ePrint 2024/640), lazy: compare mod P ----
+// ---- witnessed-residue final-exp verdict (ePrint 2024/640) ----
 // fF is the lazy (unreduced) product fRaw*c^-(6x+2); c,cInv,w are gated witnesses.
 function residueVerdict(
     int fF0,int fF1,int fF2,int fF3,int fF4,int fF5,int fF6,int fF7,int fF8,int fF9,int fF10,int fF11,
@@ -192,8 +192,9 @@ function residueVerdict(
     // c * cInv == ONE
     (int p0,int p1,int p2,int p3,int p4,int p5,int p6,int p7,int p8,int p9,int p10,int p11) =
         fp12Mul(c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11, ci0,ci1,ci2,ci3,ci4,ci5,ci6,ci7,ci8,ci9,ci10,ci11);
-    require(p0 % P == 1); require(p1 % P == 0); require(p2 % P == 0); require(p3 % P == 0); require(p4 % P == 0); require(p5 % P == 0);
-    require(p6 % P == 0); require(p7 % P == 0); require(p8 % P == 0); require(p9 % P == 0); require(p10 % P == 0); require(p11 % P == 0);
+    // fp12Mul canonicalizes every returned limb to [0,P), so direct equality is field equality.
+    require(p0 == 1); require(p1 == 0); require(p2 == 0); require(p3 == 0); require(p4 == 0); require(p5 == 0);
+    require(p6 == 0); require(p7 == 0); require(p8 == 0); require(p9 == 0); require(p10 == 0); require(p11 == 0);
     // w in {1, ROOT27, ROOT27^2}
     require(
         (w0==1 && w1==0 && w2==0 && w3==0 && w4==0 && w5==0 && w6==0 && w7==0 && w8==0 && w9==0 && w10==0 && w11==0) ||
@@ -212,7 +213,7 @@ function residueVerdict(
         fp12Mul(t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11, cqq0,cqq1,cqq2,cqq3,cqq4,cqq5,cqq6,cqq7,cqq8,cqq9,cqq10,cqq11);
     (int rhs0,int rhs1,int rhs2,int rhs3,int rhs4,int rhs5,int rhs6,int rhs7,int rhs8,int rhs9,int rhs10,int rhs11) =
         fp12Mul(cq0,cq1,cq2,cq3,cq4,cq5,cq6,cq7,cq8,cq9,cq10,cq11, cr0,cr1,cr2,cr3,cr4,cr5,cr6,cr7,cr8,cr9,cr10,cr11);
-    return lhs0 % P == rhs0 % P && lhs1 % P == rhs1 % P && lhs2 % P == rhs2 % P && lhs3 % P == rhs3 % P
-        && lhs4 % P == rhs4 % P && lhs5 % P == rhs5 % P && lhs6 % P == rhs6 % P && lhs7 % P == rhs7 % P
-        && lhs8 % P == rhs8 % P && lhs9 % P == rhs9 % P && lhs10 % P == rhs10 % P && lhs11 % P == rhs11 % P;
+    return lhs0 == rhs0 && lhs1 == rhs1 && lhs2 == rhs2 && lhs3 == rhs3
+        && lhs4 == rhs4 && lhs5 == rhs5 && lhs6 == rhs6 && lhs7 == rhs7
+        && lhs8 == rhs8 && lhs9 == rhs9 && lhs10 == rhs10 && lhs11 == rhs11;
 }

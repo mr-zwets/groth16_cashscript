@@ -3,16 +3,15 @@
 // verifier). Ports the shamir Shamir/Straus approach: a single MSB-first
 // double-and-add over one accumulator R, per bit adding one of {IC1, IC2,
 // T=IC1+IC2} chosen in-script from (bit_i(in0), bit_i(in1)); IC0 folded at the
-// end, then a verified-inverse-on-stack -> affine, asserting == the baked vk_x
-// (the same point the pairing's pair-2 bakes). Public inputs in0,in1 are RUNTIME
+// end, then a verified-inverse-on-stack -> affine. Public inputs in0,in1 are RUNTIME
 // (carried, hash256-committed state = rX,rY,rZ,in0,in1). EC ops are reusable
 // functions; the per-chunk loop body compiles once (op-cost binds). Windows are
-// sized by measured real-VM op-cost.  node gen_vkx.mjs
-import { writeFileSync, mkdirSync } from 'node:fs';
-import { execFileSync } from 'node:child_process';
+// sized by measured real-VM op-cost. The `full` namespace additionally commits the
+// runtime (-A,B,C) tuple beside vk_x for the validation stage. node gen_vkx.mjs [full]
+import { writeFileSync, mkdirSync, existsSync, unlinkSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { bn254, vec, commit, measureCovenant, covIn, covOut } from './_millermath.mjs';
+import { bn254, vec, proof, commit, measureCovenant, covIn, covOut } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -20,6 +19,7 @@ mkdirSync(GEN, { recursive: true });
 const PROBE = join(GEN, `_probe_${process.pid}.cash`);
 const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const Pstr = P.toString();
+const FRstr = bn254.fields.Fr.ORDER.toString();
 // Slightly conservative target (vs 7.9M elsewhere): the worst-case planning value
 // below leaves position 253 un-set, so a real input with bit 253 set turns the
 // accumulator non-zero one step earlier -> at most one extra jacDouble (~150k) in
@@ -27,6 +27,9 @@ const Pstr = P.toString();
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const ITERS = 254;
+const FULL_STAGE = process.argv[2] === 'full';
+const PREFIX = FULL_STAGE ? 'vkxfull' : 'vkx';
+const MANIFEST = `manifest_${PREFIX}.json`;
 
 // ---- instance constants ----
 const g1 = (o) => bn254.G1.Point.fromAffine({ x: BigInt(o.x), y: BigInt(o.y) });
@@ -34,6 +37,10 @@ const IC = vec.vk.ic.map(g1);
 const ic0 = IC[0].toAffine(), ic1 = IC[1].toAffine(), ic2 = IC[2].toAffine();
 const Ta = IC[1].add(IC[2]).toAffine();
 const IC0 = [ic0.x, ic0.y], IC1 = [ic1.x, ic1.y], IC2 = [ic2.x, ic2.y], T = [Ta.x, Ta.y];
+const proofA = proof.a.negate().toAffine(), proofB = proof.b.toAffine(), proofC = proof.c.toAffine();
+const PROOF_NAMES = ['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy'];
+const PROOF_LIMBS = [proofA.x, proofA.y, proofB.x.c0, proofB.x.c1, proofB.y.c0, proofB.y.c1, proofC.x, proofC.y];
+if ([IC1, IC2, T].some(([x]) => x === 0n)) throw new Error('x=0 is reserved for the Shamir no-add sentinel');
 // WORST-CASE planning inputs: all low bits set, so the planner costs (nearly) every
 // of the 254 positions as a doubling AND an add. Sizing the chunk windows against
 // this makes the deployed covenant aggregate ANY public inputs < r (magnitude-
@@ -125,29 +132,40 @@ function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int,
     }
     return rx, ry, rz;
 }
-function selectPoint(int b0, int b1) returns (int, int, int) {
-    int aX = 0; int aY = 0; int doAdd = 0;
-    if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; doAdd = 1; }
-    else { if (b0 == 1) { aX = ${IC1[0]}; aY = ${IC1[1]}; doAdd = 1; }
-           else { if (b1 == 1) { aX = ${IC2[0]}; aY = ${IC2[1]}; doAdd = 1; } } }
-    return aX, aY, doAdd;
+// x=0 denotes no add; every fixed-table x-coordinate is nonzero.
+function selectPoint(int b0, int b1) returns (int, int) {
+    int aX = 0; int aY = 0;
+    if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; }
+    else { if (b0 == 1) { aX = ${IC1[0]}; aY = ${IC1[1]}; }
+           else { if (b1 == 1) { aX = ${IC2[0]}; aY = ${IC2[1]}; } } }
+    return aX, aY;
 }`;
-export function genCash(lo, hi, final, incoming, outgoing) {
+export function genCash(lo, hi, final, incoming, outgoing, stageBound = false, fullStage = false) {
   const count = hi - lo, hiBit = 253 - lo;
+  const first = stageBound && lo === 0;
+  const stateParams = first ? ['input0', 'input1'] : ['rX', 'rY', 'rZ', 'input0', 'input1'];
+  const extras = [...(final ? ['zInv'] : []), ...(final && fullStage ? PROOF_NAMES : [])];
+  const spendParams = [...stateParams, ...extras].map((name) => `int ${name}`);
+  spendParams.push('bytes unused zeroPadding');
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
   L.push(`// vk_x (pairing instance) chunk: Shamir window [${lo},${hi}), final=${final}.`);
   L.push(prologue());
   L.push('contract VkxChunk() {');
-  L.push(final ? '    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv, bytes unused zeroPadding) {' : '    function spend(int rX, int rY, int rZ, int input0, int input1, bytes unused zeroPadding) {');
-  L.push(covIn(['rX', 'rY', 'rZ', 'input0', 'input1'])); // incoming accumulator+inputs == spent token commitment
+  L.push(`    function spend(${spendParams.join(', ')}) {`);
+  L.push(covIn(stateParams));
+  if (first) {
+    L.push('        require(input0 >= 0); require(input0 < ' + FRstr + ');');
+    L.push('        require(input1 >= 0); require(input1 < ' + FRstr + ');');
+    L.push('        int rX = 0; int rY = 1; int rZ = 0;');
+  }
   L.push(`        for (int k = 0; k < ${count}; k = k + 1) {`);
   L.push(`            int i = ${hiBit} - k;`);
   L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
   L.push('            int b0 = (input0 >> i) % 2;');
   L.push('            int b1 = (input1 >> i) % 2;');
-  L.push('            (int aX, int aY, int doAdd) = selectPoint(b0, b1);');
-  L.push('            if (doAdd == 1) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
+  L.push('            (int aX, int aY) = selectPoint(b0, b1);');
+  L.push('            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
   L.push('        }');
   if (final) {
     L.push(`        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, ${IC0[0]}, ${IC0[1]});`);
@@ -158,9 +176,13 @@ export function genCash(lo, hi, final, incoming, outgoing) {
     L.push('        int vkxY = mulFp(rY, zInv3);');
     // commit the computed vk_x to output[0] (consumed by the pairing's pair-2);
     // NOT compared to a baked point, so this verifies any instance's public inputs.
-    L.push(covOut(['vkxX', 'vkxY']));
+    const finalState = fullStage ? [...PROOF_NAMES, 'vkxX', 'vkxY'] : ['vkxX', 'vkxY'];
+    L.push(covOut(finalState, finalState));
   } else {
-    L.push(covOut(['rX', 'rY', 'rZ', 'input0', 'input1']));
+    const nextState = ['rX', 'rY', 'rZ', 'input0', 'input1'];
+    // Stage genesis bounds the inputs and derives the accumulator. In the legacy layout,
+    // the first output performs the one required normalization; later seams are exact.
+    L.push(covOut(nextState, stageBound || lo > 0 ? nextState : []));
   }
   L.push('    }');
   L.push('}');
@@ -180,35 +202,37 @@ function modpow(b, e, m) { let r = 1n; b %= m; while (e > 0n) { if (e & 1n) r = 
 // guard: only run the planner when invoked directly (`node gen_vkx.mjs`), so `genCash` can be
 // imported by the intratx/grouped replan tools without triggering a file-writing replan.
 if (process.argv[1] && process.argv[1].endsWith('gen_vkx.mjs')) {
-console.error(`planning vk_x chunks  WORST-CASE all-bits-set (${ITERS} positions, magnitude-independent)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
+console.error(`planning ${FULL_STAGE ? 'full-stage ' : ''}vk_x chunks  WORST-CASE all-bits-set (${ITERS} positions, magnitude-independent)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
 const commitState = (st) => commit(st.map(String)); // st = [rX,rY,rZ,in0,in1]
 const chunks = []; let lo = 0; let state = [0n, 1n, 0n, in0, in1];
 while (lo < ITERS) {
-  const incoming = commitState(state);
   const [rX0, rY0, rZ0] = state;
+  const first = lo === 0;
+  const incomingState = first ? [in0, in1] : state;
+  const incoming = commitState(incomingState);
   const tryHi = (hi) => {
     const final = hi === ITERS;
     const [rX, rY, rZ] = runWindow(lo, hi, rX0, rY0, rZ0);
     let outgoing = null, zInv = null, outLimbs;
-    if (final) { const [fx, fy, fz] = jacAdd(rX, rY, rZ, IC0[0], IC0[1], 1n); zInv = (fz === 0n ? 0n : modpow(fz, P - 2n, P)); outLimbs = EXP; }
+    if (final) { const [fx, fy, fz] = jacAdd(rX, rY, rZ, IC0[0], IC0[1], 1n); zInv = (fz === 0n ? 0n : modpow(fz, P - 2n, P)); outLimbs = FULL_STAGE ? [...PROOF_LIMBS, ...EXP] : EXP; }
     else { outgoing = commitState([rX, rY, rZ, in0, in1]); outLimbs = [rX, rY, rZ, in0, in1]; }
-    const src = genCash(lo, hi, final, incoming, outgoing ?? '00');
-    const stateInts = final ? [rX0, rY0, rZ0, in0, in1, zInv] : [rX0, rY0, rZ0, in0, in1];
-    const m = measureCovenant(src, stateInts, outLimbs);
+    const committedState = first ? [in0, in1] : [rX0, rY0, rZ0, in0, in1];
+    const src = genCash(lo, hi, final, incoming, outgoing ?? '00', true, FULL_STAGE);
+    const stateInts = final ? [...committedState, zInv, ...(FULL_STAGE ? PROOF_LIMBS : [])] : committedState;
+    const m = measureCovenant(src, stateInts, outLimbs, committedState);
     return { hi, final, src, m, outgoing, zInv, fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET };
   };
   let best = tryHi(lo + 1);
   for (let hi = lo + 2; hi <= ITERS; hi++) { const c = tryHi(hi); if (c.fits) best = c; else break; }
   const idx = chunks.length;
-  writeFileSync(join(GEN, `vkx_${String(idx).padStart(2, '0')}.cash`), best.src);
-  const inc = commitState(state);
-  chunks.push({ idx, lo, hi: best.hi, final: best.final, incoming: inc, incomingState: state.map(String), zInv: best.zInv?.toString() ?? null, operationCost: best.m.operationCost, lockingBytes: best.m.lockingBytes });
+  writeFileSync(join(GEN, `${PREFIX}_${String(idx).padStart(2, '0')}.cash`), best.src);
+  chunks.push({ idx, lo, hi: best.hi, final: best.final, incoming, incomingState: incomingState.map(String), zInv: best.zInv?.toString() ?? null, operationCost: best.m.operationCost, lockingBytes: best.m.lockingBytes });
   console.error(`  vkx chunk ${idx}: [${lo},${best.hi}) iters=${best.hi - lo} lock=${best.m.lockingBytes}B op=${best.m.operationCost.toLocaleString()} final=${best.final}`);
   const [rX, rY, rZ] = runWindow(lo, best.hi, rX0, rY0, rZ0);
   state = [rX, rY, rZ, in0, in1];
   lo = best.hi;
 }
-try { execFileSync('rm', [PROBE]); } catch {}
+if (existsSync(PROBE)) unlinkSync(PROBE);
 console.error(`vk_x: ${chunks.length} chunks, total op=${chunks.reduce((a, c) => a + c.operationCost, 0).toLocaleString()}`);
-writeFileSync(join(GEN, 'manifest_vkx.json'), JSON.stringify({ numChunks: chunks.length, worstCaseSized: true, iters: ITERS, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, final: c.final, incoming: c.incoming, incomingState: c.incomingState, zInv: c.zInv })) }, null, 2));
+writeFileSync(join(GEN, MANIFEST), JSON.stringify({ numChunks: chunks.length, worstCaseSized: true, genesisDerived: true, stageBound: true, fullStageBound: FULL_STAGE, exactProofHandoff: FULL_STAGE, iters: ITERS, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.lo === 0, final: c.final, incoming: c.incoming, incomingState: c.incomingState, zInv: c.zInv })) }, null, 2));
 }

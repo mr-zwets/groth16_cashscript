@@ -17,7 +17,6 @@ const G = await import('./gen_singleton_minop.mjs');
 const { bls12_381 } = await import('../../chunked/bls12-381/_vkxmath.mjs');
 
 const EXTRA = Number(process.env.EXTRA_PROOFS ?? 3);
-const VDIR = 'C:/Users/mathi/Desktop/verifier/';
 const G1P = bls12_381.G1.Point, G2P = bls12_381.G2.Point;
 const r = 52435875175126190479447740508185965837690552500527637822603658699938581184513n;
 const Pm = bls12_381.fields.Fp.ORDER;
@@ -50,7 +49,7 @@ const alpha_s = 3n, beta_s = 5n, gamma_s = 7n, delta_s = 11n;
 const ic_s = [2n, 4n, 6n];
 
 // --- the committed minop locking ---
-const single = JSON.parse(readFileSync(VDIR + 'src/bch/groth16-bls12381-singleton-minop-vectors.json', 'utf8'));
+const single = JSON.parse(readFileSync(C.verifierPath('src/bch/groth16-bls12381-singleton-minop-vectors.json'), 'utf8'));
 const locking = hexToBin(single.lockingOK);
 
 const g1aff = (p) => { const a = p.toAffine(); return [a.x, a.y]; };
@@ -117,6 +116,6 @@ const out = {
   proofs,
   worstCaseProof: { publicInputs: wcm.inputs.map(String), unlocking: binToHex(wcUnlocking), invalidUnlocking: binToHex(wcInvalid) },
 };
-const outPath = VDIR + 'src/bch/groth16-bls12381-singleton-minop-multiproof-vectors.json';
+const outPath = C.verifierPath('src/bch/groth16-bls12381-singleton-minop-multiproof-vectors.json');
 writeFileSync(outPath, JSON.stringify(out, null, 2));
 console.log(`wrote ${outPath} (${proofs.length} proofs)`);

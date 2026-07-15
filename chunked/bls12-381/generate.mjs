@@ -9,10 +9,11 @@ import { dirname, join } from 'node:path';
 const here = dirname(fileURLToPath(import.meta.url));
 const run = (script, args = []) => { console.error(`\n=== ${script} ${args.join(' ')} ===`); execFileSync('node', [join(here, script), ...args], { stdio: 'inherit' }); };
 
-run('gen_vkx.mjs');                         // vk_x covenant chunks
-run('gen_miller.mjs');                      // batched 4-pair Miller loop (shared fp12Sqr; no combine)
-run('gen_finalexp.mjs');                    // final exponentiation -> verdict
-run('gen_g2check.mjs');                     // G2 input-validation (EIP-197 subgroup) chunks
+run('gen_vkx.mjs');                         // standalone vk_x covenant chunks
 run('build_vectors.mjs');                   // -> vkx-bls12381-chunked-covenant-vectors.json
+run('gen_vkx.mjs', ['full']);               // full-verifier vk_x -> (-A,B,C,vk_x)
+run('gen_miller.mjs');                      // pairing-only prepared Miller (input-unvalidated)
+run('gen_miller.mjs', ['full']);            // full verifier: fuse input validation into Miller
+run('gen_finalexp.mjs');                    // final exponentiation -> verdict
 run('build_vectors_pairing.mjs');           // -> pairing- + groth16-bls12381-chunked-vectors.json
 console.error('\nall BLS12-381 chunked artifacts + vectors regenerated.');

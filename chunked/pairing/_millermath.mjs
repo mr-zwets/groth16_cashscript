@@ -91,8 +91,9 @@ function mul034(f, o0, o3, o4) {
   const E = Fp6.mul01(Fp6.add(f.c0, f.c1), Fp2.add(o0, o3), o4);
   return Fp12.create({ c0: Fp6.add(Fp6.mulByNonresidue(B), A), c1: Fp6.sub(E, Fp6.add(A, B)) });
 }
-const lineFn = (f, c0, c1, c2, Px, Py) => mul034(f, scalarFp2(c2, Py), scalarFp2(c1, Px), c0);
-const psi = (x, y) => [Fp2.mul(Fp2.frobeniusMap(x, 1), PSI_X), Fp2.mul(Fp2.frobeniusMap(y, 1), PSI_Y)];
+export const lineFn = (f, c0, c1, c2, Px, Py) => mul034(f, scalarFp2(c2, Py), scalarFp2(c1, Px), c0);
+export const lineUnitFn = (f, c0, c1, u, v) => mul034(f, Fp2.ONE, scalarFp2(c1, u), scalarFp2(c0, v));
+export const psi = (x, y) => [Fp2.mul(Fp2.frobeniusMap(x, 1), PSI_X), Fp2.mul(Fp2.frobeniusMap(y, 1), PSI_Y)];
 
 export function millerStep(f, R, k, Qx, Qy, negQy, Px, Py) {
   f = Fp12.sqr(f);
@@ -155,22 +156,130 @@ export function millerBatchOps(pairs, opts = {}) {
   return { ops, states, boundary: f };
 }
 
-// ---- serialization (matches cash hash256(toPaddedBytes(.,40))) ----
+// ---- Prepared plain Miller ----------------------------------------------------
+// Pair 1 is e(alpha,beta): both points are fixed by the VK. Folding its 87 op objects
+// (88 line folds; postPrecompute contains two) through the shared loop is therefore
+// equivalent to omitting that pair and multiplying its raw single-pair Miller value
+// into f once after the loop.
+// Keep the raw millerBatchOps trace above for residue/reference math; all plain chunk
+// consumers share this trace so their op indices and states stay aligned.
+const PRECOMPUTED_PAIR = 1;
+export function preparedMillerOps(pairs) {
+  if (pairs.length !== 4 || pairs[PRECOMPUTED_PAIR]?.name !== 'alpha_beta') {
+    throw new Error('prepared Miller requires the four Groth16 pairs with alpha_beta at index 1');
+  }
+  const base = millerBatchOps(pairs, { skipPairs: new Set([PRECOMPUTED_PAIR]) });
+  const fAB = singlePairMiller(pairs[PRECOMPUTED_PAIR]).f;
+  const ops = [...base.ops, { t: 'cmul1' }];
+  const states = base.states.slice();
+  const finalState = base.states[base.states.length - 1];
+  const boundary = Fp12.mul(base.boundary, fAB);
+  const rawBoundary = millerBatchOps(pairs).boundary;
+  if (!Fp12.eql(boundary, rawBoundary)) {
+    throw new Error('prepared Miller boundary does not match the raw four-pair Miller boundary');
+  }
+  states.push({ f: boundary, Rs: finalState.Rs.slice() });
+  return { ops, states, boundary, fAB, precomputedPair: PRECOMPUTED_PAIR };
+}
+
+export function assertPreparedMillerManifest(manifest, trace) {
+  const expectedFAB = f12limbs(trace.fAB).map(String);
+  const manifestFAB = manifest.precomputedPairMiller;
+  const fABMatches = Array.isArray(manifestFAB)
+    && manifestFAB.length === expectedFAB.length
+    && manifestFAB.every((limb, i) => limb === expectedFAB[i]);
+  // `manifest.boundary` records the generator's committed proof, so it must not be
+  // compared here: the same lockings intentionally verify other proofs and boundaries.
+  const chunksCoverTrace = Array.isArray(manifest.chunks)
+    && manifest.chunks.length > 0
+    && manifest.chunks.length === manifest.numChunks
+    && manifest.chunks.every((chunk, i) =>
+      chunk.idx === i
+      && Number.isInteger(chunk.opLo)
+      && Number.isInteger(chunk.opHi)
+      && chunk.opLo === (i === 0 ? 0 : manifest.chunks[i - 1].opHi)
+      && chunk.opHi > chunk.opLo
+      && chunk.opHi <= trace.ops.length
+      && chunk.final === (chunk.opHi === trace.ops.length))
+    && manifest.chunks[manifest.chunks.length - 1].opHi === trace.ops.length;
+  if (
+    manifest.batched !== true
+    || manifest.numPairs !== 4
+    || manifest.numOps !== trace.ops.length
+    || manifest.precomputedPair !== trace.precomputedPair
+    || !fABMatches
+    || !chunksCoverTrace
+  ) {
+    throw new Error('manifest_miller.json does not match the prepared Miller trace; regenerate it with gen_miller.mjs');
+  }
+}
+
+// ---- serialization -----------------------------------------------------------
+// Canonical BN254 field/scalar values are below 2^254, so their high sign bit is clear
+// in a 32-byte Script number. Wider state encoding only adds hashing and handoff cost.
+export const STATE_BYTES = 32;
 export const f12limbs = (f) => [f.c0.c0.c0, f.c0.c0.c1, f.c0.c1.c0, f.c0.c1.c1, f.c0.c2.c0, f.c0.c2.c1, f.c1.c0.c0, f.c1.c0.c1, f.c1.c1.c0, f.c1.c1.c1, f.c1.c2.c0, f.c1.c2.c1];
 export const r6limbs = (R) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1];
 export const le40 = (n) => binToFixedLength(bigIntToBinUintLE(BigInt(n)), 40);
+export const leState = (n) => binToFixedLength(bigIntToBinUintLE(BigInt(n)), STATE_BYTES);
 const sha256 = (b) => createHash('sha256').update(b).digest();
-export const commit = (limbs) => sha256(sha256(Buffer.concat(limbs.map(le40)))).toString('hex');
+export const commit = (limbs) => sha256(sha256(Buffer.concat(limbs.map(leState)))).toString('hex');
 
 // ---- the committed instance's 4 pairs ----
-const verifierDir = process.env.VERIFIER_DIR || 'C:/Users/mathi/Desktop/verifier';
-export const verifierPath = (...parts) => join(verifierDir, ...parts);
+const verifierDir = process.env.VERIFIER_DIR;
+export const verifierPath = (...parts) => {
+  if (!verifierDir) throw new Error('VERIFIER_DIR must point to the zk-verifier-bench checkout');
+  return join(verifierDir, ...parts);
+};
 export const vec = JSON.parse(readFileSync(verifierPath('src/checkpoints/pairing-vectors.json'), 'utf8'));
 const g1 = (o) => bn254.G1.Point.fromAffine({ x: BigInt(o.x), y: BigInt(o.y) });
 const g2 = (o) => bn254.G2.Point.fromAffine({ x: Fp2.fromBigTuple([BigInt(o.x.c0), BigInt(o.x.c1)]), y: Fp2.fromBigTuple([BigInt(o.y.c0), BigInt(o.y.c1)]) });
 export const vk = { alpha: g1(vec.vk.alpha), beta: g2(vec.vk.beta), gamma: g2(vec.vk.gamma), delta: g2(vec.vk.delta), ic: vec.vk.ic.map(g1) };
 export const proof = { a: g1(vec.proof.a), b: g2(vec.proof.b), c: g1(vec.proof.c) };
 export const vkxPoint = (inputs) => { let x = vk.ic[0]; inputs.map(BigInt).forEach((s, i) => { x = x.add(vk.ic[i + 1].multiply(s)); }); return x; };
+/** Point-limb overrides for isolated input-validation rejection fixtures. */
+export function invalidG2Overrides(proofValue = proof, offSubgroupCount = 1) {
+  if (!Number.isInteger(offSubgroupCount) || offSubgroupCount < 1) {
+    throw new Error('offSubgroupCount must be a positive integer');
+  }
+  const A = proofValue.a.negate().toAffine();
+  const C = proofValue.c.toAffine();
+  const B = proofValue.b.toAffine();
+  const offCurveA = { Ay: (A.y + 1n) % Fp.ORDER };
+  const offCurveC = { Cy: (C.y + 1n) % Fp.ORDER };
+  const offCurveB = { By: Fp2.create({ c0: (B.y.c0 + 1n) % Fp.ORDER, c1: B.y.c1 }) };
+  const b2 = Fp2.div(Fp2.fromBigTuple([3n, 0n]), Fp2.fromBigTuple([9n, 1n]));
+  const offSubgroups = [];
+  for (let i = 1n; i < 10_000n && offSubgroups.length < offSubgroupCount; i++) {
+    const x = Fp2.fromBigTuple([i, 0n]);
+    const rhs = Fp2.add(Fp2.mul(Fp2.sqr(x), x), b2);
+    let y;
+    try { y = Fp2.sqrt(rhs); } catch { continue; }
+    if (!Fp2.eql(Fp2.sqr(y), rhs)) continue;
+    try { bn254.G2.Point.fromAffine({ x, y }).assertValidity(); }
+    catch { offSubgroups.push({ Bx: x, By: y }); }
+  }
+  if (offSubgroups.length !== offSubgroupCount) {
+    throw new Error(`failed to construct ${offSubgroupCount} off-subgroup G2 fixtures`);
+  }
+  return [offCurveA, offCurveC, offCurveB, ...offSubgroups];
+}
+const G2_STAGE_LAYOUT = ['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy'];
+/** Fail fast when a builder reads G2 chunks generated for a different state layout. */
+export function assertG2StageManifest(manifest, { carriesVkx = false, linkedLayout = false } = {}) {
+  const expectedLayout = carriesVkx ? [...G2_STAGE_LAYOUT, 'vkxX', 'vkxY'] : G2_STAGE_LAYOUT;
+  if (
+    manifest.fastEndo !== true ||
+    manifest.canonicalProofCoordinates !== true ||
+    manifest.stageBound !== true ||
+    manifest.genesisDerived !== true ||
+    manifest.carriesVkx !== carriesVkx ||
+    manifest.linkedLayout !== linkedLayout ||
+    JSON.stringify(manifest.stageLayout) !== JSON.stringify(expectedLayout)
+  ) {
+    throw new Error(`G2 manifest does not match the expected ${expectedLayout.length}-limb stage layout`);
+  }
+}
 export const pairsFor = (inputs, pf = proof) => [
   { name: 'negA_B', P: pf.a.negate(), Q: pf.b },
   { name: 'alpha_beta', P: vk.alpha, Q: vk.beta },
@@ -192,9 +301,12 @@ export const proofFromLimbs = (Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy) => ({
 // VK points stay literals. This is what makes the chunks proof-agnostic.
 export const PT_CFG = [{ P: true, Q: true }, { P: false, Q: false }, { P: true, Q: false }, { P: true, Q: false }];
 /** runtime point limbs (declaration order) for a pair's affine P (G1) and Q (G2). */
-export const ptLimbs = (pairIdx, P, Q) => {
+export const ptLimbs = (pairIdx, P, Q, unitLines = false) => {
   const o = [], c = PT_CFG[pairIdx];
-  if (c.P) o.push(P.x, P.y);
+  if (c.P && unitLines) {
+    const invY = Fp.inv(P.y);
+    o.push(Fp.neg(Fp.mul(P.x, invY)), Fp.neg(invY));
+  } else if (c.P) o.push(P.x, P.y);
   if (c.Q) o.push(Q.x.c0, Q.x.c1, Q.y.c0, Q.y.c1);
   return o;
 };
@@ -327,7 +439,7 @@ export function measureChunk(src, stateInts) {
   return { lockingBytes: locking.length, operationCost: st.metrics.operationCost, accepted, error: st.error ?? null };
 }
 export const decl = (names) => names.map((n) => `int ${n}`).join(',');
-export const serExpr = (names) => 'hash256(' + names.map((n) => `toPaddedBytes(${n}, 40)`).join(' + ') + ')';
+export const serExpr = (names) => 'hash256(' + names.map((n) => `toPaddedBytes(${n}, ${STATE_BYTES})`).join(' + ') + ')';
 
 // ---- covenant (token state-threading) helpers ----------------------------------
 // A GENERIC (proof-independent) chunk carries NO baked state: the running-state
@@ -338,17 +450,25 @@ export const serExpr = (names) => 'hash256(' + names.map((n) => `toPaddedBytes($
 export const CATEGORY = new Uint8Array(32).fill(0xcd); // benchmark thread id (32B)
 const sha256d = (b) => sha256(sha256(b));
 /** 32-byte NFT commitment of a state (decl-order limbs), as bytes. */
-export const commitBin = (limbs) => new Uint8Array(sha256d(Buffer.concat(limbs.map(le40))));
+export const commitBin = (limbs) => new Uint8Array(sha256d(Buffer.concat(limbs.map(leState))));
 /** require: the spent token commits hash(incoming state) (decl-order `names`). */
 export const covIn = (names) =>
   `        require(tx.inputs[this.activeInputIndex].nftCommitment == ${serExpr(names)});`;
-/** require: output[0] commits hash(outgoing, reduced) + perpetuates the token thread. */
-export const covOut = (outNames) =>
+/** require: output[0] commits hash(outgoing) + perpetuates the token thread. */
+export const covOut = (outNames, exactNames = []) => {
+  const exact = new Set(exactNames);
+  if (exact.size !== exactNames.length || exactNames.some((name) => !outNames.includes(name))) {
+    throw new Error('exact covenant outputs must be unique members of the outgoing state');
+  }
   // local name `Pmod` (not `P`) avoids colliding with the global `constant P` that the non-lazy
   // library exports (g2check imports it); the lazy-lib consumers have no global P either way.
-  '        int Pmod = 21888242871839275222246405745257275088696311157297823662689037894645226208583;\n' +
-  `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((n) => `toPaddedBytes(${n} % Pmod, 40)`).join(' + ')}));\n` +
-  '        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);';
+  const modulus = outNames.some((name) => !exact.has(name))
+    ? '        int Pmod = 21888242871839275222246405745257275088696311157297823662689037894645226208583;\n'
+    : '';
+  return modulus +
+    `        require(tx.outputs[0].nftCommitment == hash256(${outNames.map((name) => `toPaddedBytes(${name}${exact.has(name) ? '' : ' % Pmod'}, ${STATE_BYTES})`).join(' + ')}));\n` +
+    '        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);';
+};
 
 /** Real-VM measurer for a COVENANT chunk: drives it through a synthetic token tx
  * (spent UTXO = hash(incoming), output[0] = hash(outgoing)) so the introspection

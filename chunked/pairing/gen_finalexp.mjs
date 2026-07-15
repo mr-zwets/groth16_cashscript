@@ -4,7 +4,7 @@
 // (cyc=cyclotomicSquare, mul, conj, frob1/2/3, inv); the three 63-bit cyclotomic-
 // exp ladders unroll into cyc/mul ops exactly like the Miller NAF loop. Liveness
 // analysis carries only the LIVE Fp12 values across chunk boundaries as
-// hash256-committed state (40-byte LE limbs), and chunks are planned by measured
+// hash256-committed state (32-byte LE limbs), and chunks are planned by measured
 // real-VM op-cost. The last chunk asserts the result == Fp12 ONE (the verdict).
 //
 //   node gen_finalexp.mjs          full plan + emit -> generated/finalexp_NN.cash + manifest_finalexp.json
@@ -111,8 +111,12 @@ function buildChunkSrc(s, e) {
     L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
     L.push(`        require(${rv[0]} % P == 1); ` + Array.from({ length: 11 }, (_, j) => `require(${rv[j + 1]} % P == 0);`).join(' '));
   } else {
-    // outgoing live state (lazy, reduced %P) committed to output[0]'s NFT commitment
-    L.push(covOut(liveOut.flatMap((id) => name.get(id))));
+    // Unchanged live inputs already match the canonical incoming commitment. Newly computed
+    // lazy limbs still normalize once at this seam.
+    const exactState = liveOut
+      .filter((id) => liveIn.includes(id))
+      .flatMap((id) => name.get(id));
+    L.push(covOut(liveOut.flatMap((id) => name.get(id)), exactState));
   }
   L.push('    }');
   L.push('}');

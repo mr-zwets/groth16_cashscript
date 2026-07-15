@@ -6,8 +6,8 @@
 // lockings: instance #0 = the committed singleton instance, extraValidProofs[0] =
 // a distinct pair from the BLS multiproof vectors.
 //
-// Windows are WORST-CASE sized (gen_vkx planned against an all-bits-set input), so
-// every step here -- with small real inputs -- has op-cost headroom and fits.
+// Windows are worst-case sized against two canonical Fr scalars whose bitwise union
+// exercises the add path at every position, so these smaller real inputs fit.
 //
 // Writes verifier/src/bch/vkx-bls12381-chunked-covenant-vectors.json for the
 // bch-vkx-bls12381-chunked-covenant milestone entry.
@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
   P, PUBLIC_INPUTS, computeVkx, compileBytecode, commitBin, CATEGORY, tok,
-  vkxStateAt, vkxFinalZinv, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, OP_BUDGET,
+  vkxStateAt, vkxFinalZinv, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, OP_BUDGET, verifierPath,
 } from './_vkxmath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -79,14 +79,12 @@ function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArg
 
 // ---- the two public-input instances: #0 committed, #1 from the BLS multiproof ----
 function secondInputs() {
-  try {
-    const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-singleton-multiproof-vectors.json', 'utf8'));
-    for (const pr of mp.proofs ?? []) if (Array.isArray(pr.publicInputs) && pr.publicInputs.length >= 2) {
-      const pi = pr.publicInputs.map(BigInt);
-      if (pi[0] !== PUBLIC_INPUTS[0] || pi[1] !== PUBLIC_INPUTS[1]) return [pi[0], pi[1]];
-    }
-  } catch { /* fall through */ }
-  return [135208n, 67633n];
+  const mp = JSON.parse(readFileSync(verifierPath('src', 'bch', 'groth16-bls12381-singleton-multiproof-vectors.json'), 'utf8'));
+  for (const pr of mp.proofs ?? []) if (Array.isArray(pr.publicInputs) && pr.publicInputs.length >= 2) {
+    const pi = pr.publicInputs.map(BigInt);
+    if (pi[0] !== PUBLIC_INPUTS[0] || pi[1] !== PUBLIC_INPUTS[1]) return [pi[0], pi[1]];
+  }
+  throw new Error('multiproof vectors do not contain distinct BLS12-381 public inputs');
 }
 const INSTANCES = [
   { tag: 'committed', inputs: PUBLIC_INPUTS },
@@ -94,6 +92,7 @@ const INSTANCES = [
 ];
 
 const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkx.json'), 'utf8'));
+if (man.genesisDerived !== true || man.fullStageBound !== false) throw new Error('standalone vk_x manifest is not derived-genesis/default namespace');
 const stats = { maxLock: 0, maxUnlock: 0, allFit: true, allAccept: true, allInvalid: true };
 function buildVkx(inst) {
   const [in0, in1] = inst.inputs;
@@ -101,7 +100,7 @@ function buildVkx(inst) {
   const steps = [];
   for (const ch of man.chunks) {
     const inAcc = vkxStateAt(in0, in1, ch.lo);
-    const commitLimbs = [...inAcc, in0, in1];
+    const commitLimbs = ch.lo === 0 ? [in0, in1] : [...inAcc, in0, in1];
     let outLimbs, allArgs;
     if (ch.final) { outLimbs = [vkxAff.x, vkxAff.y]; allArgs = [...commitLimbs, vkxFinalZinv(in0, in1)]; }
     else { outLimbs = [...vkxStateAt(in0, in1, ch.hi), in0, in1]; allArgs = commitLimbs; }
@@ -121,8 +120,8 @@ console.error(`vk_x(BLS12-381 covenant): ${v0.length} steps/instance, op ${sumOp
 console.error(`max lock ${stats.maxLock}B max unlock ${stats.maxUnlock}B | allFit=${stats.allFit} allAccept=${stats.allAccept} allInvalidRejected=${stats.allInvalid}`);
 if (!stats.allFit || !stats.allAccept || !stats.allInvalid) { console.error('!! a step did not fit/accept/reject -- NOT writing vectors'); process.exit(1); }
 
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/vkx-bls12381-chunked-covenant-vectors.json', JSON.stringify({
-  description: 'PROOF-AGNOSTIC chunked BLS12-381 vk_x = IC0 + in0*IC1 + in1*IC2 (Shamir/Straus, G1), multi-tx. Generic covenant: the Jacobian accumulator + public inputs live in the token NFT commitment, NO baked instance. The MSM tiles all 255 scalar-field bit positions and the chunk windows are WORST-CASE sized (every input bit set), so one fixed set of lockings aggregates ANY public inputs < r (magnitude-independent, EVM ecMul-equivalent). Runtime-general: instance #0 = committed singleton instance, extraValidProofs = distinct public inputs under the same VK.',
+writeFileSync(verifierPath('src', 'bch', 'vkx-bls12381-chunked-covenant-vectors.json'), JSON.stringify({
+  description: 'PROOF-AGNOSTIC chunked BLS12-381 vk_x = IC0 + in0*IC1 + in1*IC2 (Shamir/Straus, G1), multi-tx. Generic covenant: the Jacobian accumulator + public inputs live in the token NFT commitment, NO baked instance. The MSM tiles all 255 scalar-field bit positions, and the windows are worst-case sized against two canonical complementary Fr scalars whose union exercises the add path at every position. One fixed set of lockings therefore aggregates ANY public inputs < r (magnitude-independent, EVM ecMul-equivalent). Runtime-general: instance #0 = committed singleton instance, extraValidProofs = distinct public inputs under the same VK.',
   proofBinding: 'runtime', curve: 'BLS12-381', scalarBits: 255, worstCaseSized: true,
   numSteps: v0.length, budgetPerInput: OP_BUDGET,
   totalOperationCost: sumOp(v0), maxStepOperationCost: maxOpOf(v0),

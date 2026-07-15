@@ -7,7 +7,8 @@
 // (phi(x,y)=(beta*x,y)). A baked 16-entry subset-sum table folds all 4 scalars into ONE add per
 // iteration -> ~half the doublings (vkx 12 -> 5 shared-table chunks). Witnesses k10,k20,k11,k21 are gated at
 // genesis (k < 2^128, k1 + k2*lambda == in mod r); phi(IC*) and the table are baked.
-// State (committed, 9 limbs): rX,rY,rZ, in0,in1, k10,k20,k11,k21.
+// State (committed, 9 limbs): rX,rY,rZ, in0,in1, k10,k20,k11,k21. A stage-bound
+// genesis commits only the six scalar limbs and derives the infinity accumulator in-contract.
 //   node gen_vkx_glv.mjs    plan + emit vkxglv_NN.cash + manifest_vkxglv.json
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -24,6 +25,7 @@ const r = 5243587517512619047944774050818596583769055250052763782260365869993858
 const X = 0xd201000000010000n; // |x|
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
+const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 const ITERS = 128; // GLV sub-scalars are < 2^128; 128 MSB-first positions
 
 // ---- GLV constants (same as the singleton minop; proof-independent) ----
@@ -53,6 +55,7 @@ for (let idx = 1; idx < 16; idx++) {
   for (let i = 0; i < 4; i++) if (idx & (1 << i)) acc = acc.add(BP[i]);
   const a = acc.toAffine(); TABLE[idx] = [a.x, a.y];
 }
+if (TABLE.slice(1).some(([x]) => x === 0n)) throw new Error('x=0 is reserved for the GLV no-add sentinel');
 // 15-entry blob: entry (idx-1) = x(LE48) || y(LE48); split() reads an entry in O(1).
 // 48-byte LE is sign-safe: p < 2^382 -> top byte <= 0x1a -> int() recovers positive.
 const le48hex = (v) => { v = modP(v); let s = ''; for (let b = 0; b < 48; b++) s += Number((v >> BigInt(8 * b)) & 0xffn).toString(16).padStart(2, '0'); return s; };
@@ -102,6 +105,8 @@ export const GLV_IC0 = IC0;
 
 // ---- contract template ----
 const STATE = ['rX', 'rY', 'rZ', 'in0', 'in1', 'k10', 'k20', 'k11', 'k21'];
+const GENESIS_STATE = STATE.slice(3);
+const PROOF_NAMES = ['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy'];
 const prologue = (sharedTable) => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
 function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
@@ -140,19 +145,19 @@ function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int,
     }
     return rx, ry, rz;
 }
-function select16(int idx${sharedTable ? ', bytes table' : ''}) returns (int, int, int) {
-    int aX = 0; int aY = 0; int doAdd = 0;
+function select16(int idx${sharedTable ? ', bytes table' : ''}) returns (int, int) {
+    // idx=0 keeps aX=0; every fixed affine table entry has nonzero x.
+    int aX = 0; int aY = 0;
     if (idx != 0) {
         ${sharedTable ? '' : `bytes table = ${GLV_TABLE_HEX};`}
         bytes ent = table.split((idx - 1) * 96)[1].split(96)[0];
         aX = int(ent.split(48)[0]);
         aY = int(ent.split(48)[1]);
-        doAdd = 1;
     }
-    return aX, aY, doAdd;
+    return aX, aY;
 }`;
 
-export function genCash(lo, hi, first, final, sharedTable = null) {
+export function genCash(lo, hi, first, final, stageBound = false, sharedTable = null, fullStageBound = false) {
   if (sharedTable !== null && (!Number.isSafeInteger(sharedTable.inputIndex) || sharedTable.inputIndex < 0 ||
     !Number.isSafeInteger(sharedTable.dataOffset) || sharedTable.dataOffset < 0)) {
     throw new Error(`invalid shared GLV table source: ${JSON.stringify(sharedTable)}`);
@@ -163,16 +168,27 @@ export function genCash(lo, hi, first, final, sharedTable = null) {
   L.push(`// BLS12-381 GLV vk_x chunk: 4-scalar Straus window [${lo},${hi}), first=${first} final=${final}.`);
   L.push(prologue(sharedTable !== null));
   L.push('contract VkxGlvBlsChunk() {');
-  const extraParams = [final ? 'int zInv' : null, sharedTable !== null && final ? 'bytes glvTable' : null]
+  if (fullStageBound && !stageBound) throw new Error('full-stage GLV generation requires a stage-bound genesis');
+  const extraParams = [
+    final ? 'int zInv' : null,
+    ...(final && fullStageBound ? PROOF_NAMES.map((name) => `int ${name}`) : []),
+    sharedTable !== null && final ? 'bytes glvTable' : null,
+  ]
     .filter(Boolean);
-  L.push(`    function spend(${[...STATE.map((s) => `int ${s}`), ...extraParams, 'bytes unused zeroPadding'].join(', ')}) {`);
-  L.push(covIn(STATE));
+  const stateParams = stageBound && first ? GENESIS_STATE : STATE;
+  L.push(`    function spend(${[...stateParams.map((s) => `int ${s}`), ...extraParams, 'bytes unused zeroPadding'].join(', ')}) {`);
+  L.push(covIn(stateParams));
   if (sharedTable !== null) {
     if (final) L.push(`        require(hash256(glvTable) == ${TABLE_HASH_HEX});`);
     else L.push(`        bytes glvTable = tx.inputs[${sharedTable.inputIndex}].unlockingBytecode.split(${sharedTable.dataOffset})[1].split(${tableBytes.length})[0];`);
   }
   if (first) {
-    // bind the GLV witnesses to the committed public inputs: k1 + k2*lambda == in (mod r),
+    if (stageBound) {
+      L.push('        int rX = 0; int rY = 1; int rZ = 0;');
+      L.push(`        require(in0 >= 0 && in0 < ${r}); require(in1 >= 0 && in1 < ${r});`);
+      L.push('        require(k10 >= 0); require(k20 >= 0); require(k11 >= 0); require(k21 >= 0);');
+    }
+    // Bind the GLV witnesses to the committed public inputs: k1 + k2*lambda == in (mod r),
     // AND bound their magnitude to < 2^128 so the 128-iteration MSM processes every bit (else a
     // prover could add r to a scalar -> same residue mod r but bits above 127 silently dropped).
     const BOUND = 1n << 128n;
@@ -184,8 +200,8 @@ export function genCash(lo, hi, first, final, sharedTable = null) {
   L.push(`            int i = ${hiBit} - k;`);
   L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
   L.push('            int idx = (k10 >> i) % 2 + 2 * ((k20 >> i) % 2) + 4 * ((k11 >> i) % 2) + 8 * ((k21 >> i) % 2);');
-  L.push(`            (int aX, int aY, int doAdd) = select16(idx${sharedTable !== null ? ', glvTable' : ''});`);
-  L.push('            if (doAdd == 1) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
+  L.push(`            (int aX, int aY) = select16(idx${sharedTable !== null ? ', glvTable' : ''});`);
+  L.push('            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
   L.push('        }');
   if (final) {
     L.push(`        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, ${modP(IC0[0])}, ${modP(IC0[1])});`);
@@ -194,17 +210,36 @@ export function genCash(lo, hi, first, final, sharedTable = null) {
     L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
     L.push('        int vkxX = mulFp(rX, zInv2);');
     L.push('        int vkxY = mulFp(rY, zInv3);');
-    L.push(covOut(['vkxX', 'vkxY']));
+    // Preserve the proof tuple exactly for the downstream range gate. mulFp makes vk_x canonical.
+    const outputs = fullStageBound ? [...PROOF_NAMES, 'vkxX', 'vkxY'] : ['vkxX', 'vkxY'];
+    L.push(covOut(outputs, outputs));
   } else {
-    L.push(covOut(STATE));
+    // A stage-bound genesis derives the accumulator and bounds every scalar. Otherwise only the
+    // first caller-supplied accumulator needs normalization; every later state is predecessor-bound.
+    L.push(covOut(STATE, stageBound ? STATE : first ? [] : STATE));
   }
   L.push('    }');
   L.push('}');
   return (L.join('\n') + '\n');
 }
 
-/** Emit the empirically audited five-window plan for hash-free, shared-table deployment. */
-export function regenGlvSharedAudited(GEN_DIR, sharedTable) {
+// Legacy non-stage-bound genesis accepts a caller-supplied accumulator, so its first handoff must
+// normalize every limb. Stage-bound genesis derives the accumulator and bounds all six scalars.
+{
+  const legacyFirst = genCash(0, 1, true, false, false);
+  if (!STATE.every((name) => legacyFirst.includes(`toPaddedBytes(${name} % Pmod, 48)`))) {
+    throw new Error('legacy GLV genesis emitted an exact caller-supplied state');
+  }
+  const stageBoundFirst = genCash(0, 1, true, false, true);
+  if (stageBoundFirst.includes('int Pmod =') || !STATE.every((name) => stageBoundFirst.includes(`toPaddedBytes(${name}, 48)`))) {
+    throw new Error('stage-bound GLV genesis did not emit its proven-exact state');
+  }
+}
+
+/** Emit the empirically audited five-window plan. Linked callers provide one shared-table
+ * carrier; a covenant caller passes null and embeds the same fixed table in each locking. */
+export function regenGlvSharedAudited(GEN_DIR, sharedTable, stageBound = false, fullStageBound = false) {
+  const prefix = fullStageBound ? 'vkxglvfull' : 'vkxglv';
   const chunks = GLV_SHARED_AUDITED_BOUNDS.slice(0, -1).map((lo, idx) => ({
     idx,
     lo,
@@ -213,11 +248,11 @@ export function regenGlvSharedAudited(GEN_DIR, sharedTable) {
     final: idx === GLV_SHARED_AUDITED_BOUNDS.length - 2,
   }));
   for (const ch of chunks) {
-    writeFileSync(join(GEN_DIR, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), genCash(ch.lo, ch.hi, ch.first, ch.final, sharedTable));
+    writeFileSync(join(GEN_DIR, `${prefix}_${String(ch.idx).padStart(2, '0')}.cash`), genCash(ch.lo, ch.hi, ch.first, ch.final, stageBound, sharedTable, fullStageBound));
   }
-  writeFileSync(join(GEN_DIR, 'manifest_vkxglv.json'), JSON.stringify({
+  writeFileSync(join(GEN_DIR, `manifest_${prefix}.json`), JSON.stringify({
     curve: 'BLS12-381', numChunks: chunks.length, iters: ITERS, glv: true, chunks,
-    sharedTable: sharedTable !== null,
+    sharedTable: sharedTable !== null, stageBound, fullStageBound,
   }, null, 2));
   return chunks.length;
 }
@@ -235,16 +270,17 @@ if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
     const inSt = SER_state(X0, Y0, Z0);
     const tryHi = (hi) => {
       const final = hi === ITERS, first = lo === 0;
+      const committedIn = STAGE_BOUND && first ? inSt.slice(3) : inSt;
       let outLimbs, args;
       if (final) {
         const zinv = vkxGlvZinv(wk10, wk20, wk11, wk21);
         const acc = vkxGlvStateAt(wk10, wk20, wk11, wk21, ITERS);
         const [fx, fy] = jacAdd(acc[0], acc[1], acc[2], modP(IC0[0]), modP(IC0[1]), 1n);
         const z2 = qF(zinv), z3 = mF(z2, zinv);
-        outLimbs = [mF(fx, z2), mF(fy, z3)]; args = [...inSt, zinv];
-      } else { outLimbs = SER_state(...vkxGlvStateAt(wk10, wk20, wk11, wk21, hi)); args = inSt; }
-      const src = genCash(lo, hi, first, final);
-      const m = measureCovenant(src, args.map(BigInt), inSt.map(BigInt), outLimbs.map(BigInt));
+        outLimbs = [mF(fx, z2), mF(fy, z3)]; args = [...committedIn, zinv];
+      } else { outLimbs = SER_state(...vkxGlvStateAt(wk10, wk20, wk11, wk21, hi)); args = committedIn; }
+      const src = genCash(lo, hi, first, final, STAGE_BOUND);
+      const m = measureCovenant(src, args.map(BigInt), committedIn.map(BigInt), outLimbs.map(BigInt));
       return { hi, final, src, m, operationCost: m.operationCost, lockingBytes: m.lockingBytes, fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET };
     };
     const best = planChunk(lo, ITERS, OP_TARGET, tryHi, planState);
@@ -255,6 +291,6 @@ if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
     console.error(`  vkxglv chunk ${idx}: [${lo},${best.hi}) lock=${best.m.lockingBytes}B op=${best.m.operationCost.toLocaleString()} accepted=${best.m.accepted} final=${best.final}`);
     lo = best.hi;
   }
-  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ curve: 'BLS12-381', numChunks: chunks.length, iters: ITERS, glv: true, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, final: c.final })) }, null, 2));
+  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ curve: 'BLS12-381', numChunks: chunks.length, iters: ITERS, glv: true, stageBound: STAGE_BOUND, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, final: c.final })) }, null, 2));
   console.error(`GLV vk_x: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.operationCost, 0).toLocaleString()}`);
 }

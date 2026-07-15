@@ -1,0 +1,20 @@
+pragma cashscript ^0.14.0;
+
+import "./lib/lazy/Bn254LazyG.cash";
+
+contract ResidueVerdictProbe() {
+    function spend(
+        int fF0,int fF1,int fF2,int fF3,int fF4,int fF5,int fF6,int fF7,int fF8,int fF9,int fF10,int fF11,
+        int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11,
+        int ci0,int ci1,int ci2,int ci3,int ci4,int ci5,int ci6,int ci7,int ci8,int ci9,int ci10,int ci11,
+        int w0,int w1,int w2,int w3,int w4,int w5,int w6,int w7,int w8,int w9,int w10,int w11,
+        bytes unused zeroPadding
+    ) {
+        require(residueVerdict(
+            fF0,fF1,fF2,fF3,fF4,fF5,fF6,fF7,fF8,fF9,fF10,fF11,
+            c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11,
+            ci0,ci1,ci2,ci3,ci4,ci5,ci6,ci7,ci8,ci9,ci10,ci11,
+            w0,w1,w2,w3,w4,w5,w6,w7,w8,w9,w10,w11
+        ));
+    }
+}

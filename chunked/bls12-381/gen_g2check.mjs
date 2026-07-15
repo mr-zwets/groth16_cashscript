@@ -5,11 +5,14 @@
 // endomorphism psi(B). GENERIC covenant: the running accumulator R + the points A,B,C live
 // in the token NFT commitment, so one fixed set of lockings validates ANY proof. The G2
 // math comes from the shared lib (lib/G2Check.cash + lib/Fp2.cash), so the chunks IMPORT it.
+// The first chunk consumes only the exact (-A,B,C,vk_x) stage tuple and derives R=B;
+// intermediate chunks carry (R,-A,B,C,vk_x), and the final chunk emits the original
+// stage tuple unchanged for the prepared Miller genesis.
 //   node gen_g2check.mjs   plan + emit generated/g2check_NN.cash + manifest_g2check.json
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { covIn, covOut, commit, planChunk, measureCovenantFile, P, OP_BUDGET, TARGET_UNLOCK, bls12_381 } from './_vkxmath.mjs';
+import { covIn, covOut, planChunk, measureCovenantFile, bls12_381, PUBLIC_INPUTS, computeVkx } from './_vkxmath.mjs';
 import { proof } from '../../singleton/bls12-381/bls_instance.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -53,17 +56,19 @@ function g2checkAccAt(Bx, By, upto) {
 }
 
 // ---- the committed instance's points — the reference run for chunk planning ----
-const Baff = proof.b.toAffine(), Aaff = proof.a.toAffine(), Caff = proof.c.toAffine();
+const Baff = proof.b.toAffine(), Aaff = proof.a.negate().toAffine(), Caff = proof.c.toAffine();
+const vkxAff = computeVkx(PUBLIC_INPUTS).toAffine();
 const Bx = Baff.x, By = Baff.y;
 const f2 = (v) => [v.c0, v.c1];
 const rLimbs = (R) => [...f2(R.x), ...f2(R.y), ...f2(R.z)];
 const Blimbs = [...f2(Bx), ...f2(By)];
-const AClimbs = [Aaff.x, Aaff.y, Caff.x, Caff.y];
-const stateLimbs = (R) => [...rLimbs(R), ...Blimbs, ...AClimbs]; // R(6)+B(4)+A(2)+C(2)=14
+const STAGE_LIMBS = [Aaff.x, Aaff.y, ...Blimbs, Caff.x, Caff.y, vkxAff.x, vkxAff.y];
+const stateLimbs = (R) => [...rLimbs(R), ...STAGE_LIMBS]; // R(6)+(-A,B,C,vk_x)(10)=16
 
 // ---- contract emitter (imports the shared BLS lib) ----
-const RN = ['RXa', 'RXb', 'RYa', 'RYb', 'RZa', 'RZb'], BN = ['Bxa', 'Bxb', 'Bya', 'Byb'], ACN = ['Ax', 'Ay', 'Cx', 'Cy'];
-const ALL = [...RN, ...BN, ...ACN];
+const RN = ['RXa', 'RXb', 'RYa', 'RYb', 'RZa', 'RZb'];
+const STAGE = ['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy', 'vkxX', 'vkxY'];
+const BN = STAGE.slice(2, 6);
 const decl = (names) => names.map((n) => `int ${n}`).join(',');
 
 function genChunk(lo, hi, isFirst, isLast) {
@@ -74,9 +79,11 @@ function genChunk(lo, hi, isFirst, isLast) {
   L.push(`import "${LIB}/G2Check.cash";`);
   L.push(`// BLS12-381 G2 input-validation chunk: [x]B double-and-add bits [${lo},${hi}); first=${isFirst} last=${isLast}.`);
   L.push('contract G2CheckBls() {');
-  L.push(`    function spend(${decl(ALL)}, bytes unused zeroPadding) {`);
-  L.push(covIn(ALL));
+  const inNames = isFirst ? STAGE : [...RN, ...STAGE];
+  L.push(`    function spend(${decl(inNames)}, bytes unused zeroPadding) {`);
+  L.push(covIn(inNames));
   if (isFirst) {
+    for (const name of STAGE) L.push(`        require(within(${name}, 0, ${Fp.ORDER}));`);
     L.push('        require(mulFp(Ay, Ay) == addFp(mulFp(mulFp(Ax, Ax), Ax), 4));'); // A on G1 (b=4)
     L.push('        require(mulFp(Cy, Cy) == addFp(mulFp(mulFp(Cx, Cx), Cx), 4));'); // C on G1
     L.push('        (int bx2a,int bx2b) = fp2Sqr(Bxa, Bxb);'); // B on G2: y^2 == x^3 + (4+4u)
@@ -84,6 +91,9 @@ function genChunk(lo, hi, isFirst, isLast) {
     L.push('        (int rhsa,int rhsb) = fp2Add(bx3a, bx3b, 4, 4);');
     L.push('        (int by2a,int by2b) = fp2Sqr(Bya, Byb);');
     L.push('        require(by2a == rhsa); require(by2b == rhsb);');
+    L.push('        int RXa = Bxa; int RXb = Bxb;');
+    L.push('        int RYa = Bya; int RYb = Byb;');
+    L.push('        int RZa = 1; int RZb = 0;');
   }
   let r = RN.slice(), uid = 0;
   const fresh = () => Array.from({ length: 6 }, () => `v${uid++}`);
@@ -101,9 +111,8 @@ function genChunk(lo, hi, isFirst, isLast) {
     L.push('        (int cxa,int cxb) = fp2Mul(psxa, psxb, z2a, z2b);');
     L.push('        (int cya,int cyb) = fp2Mul(npya, npyb, z3a, z3b);');
     L.push(`        require(${r[0]} == cxa); require(${r[1]} == cxb); require(${r[2]} == cya); require(${r[3]} == cyb);`);
-  } else {
-    L.push(covOut([...r, ...BN, ...ACN])); // carry (R', B, A, C) forward
-  }
+    L.push(covOut(STAGE, STAGE)); // validated tuple becomes the exact Miller genesis state
+  } else L.push(covOut([...r, ...STAGE], [...r, ...STAGE]));
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
@@ -114,11 +123,12 @@ if (process.argv[1] && process.argv[1].endsWith('gen_g2check.mjs')) {
 console.error(`planning BLS G2-check chunks (${NBITS}-bit [x]B)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
 const chunks = []; let lo = 1; const planState = { perUnit: null }; // start at bit 1 (R=B init)
 while (lo < NBITS) {
-  const inLimbs = stateLimbs(g2checkAccAt(Bx, By, lo));
+  const first = lo === 1;
+  const inLimbs = first ? STAGE_LIMBS : stateLimbs(g2checkAccAt(Bx, By, lo));
   const tryHi = (hi) => {
     const last = hi === NBITS;
-    const outLimbs = last ? [] : stateLimbs(g2checkAccAt(Bx, By, hi));
-    const src = genChunk(lo, hi, lo === 1, last);
+    const outLimbs = last ? STAGE_LIMBS : stateLimbs(g2checkAccAt(Bx, By, hi));
+    const src = genChunk(lo, hi, first, last);
     const m = measureCovenantFile(src, inLimbs, inLimbs, outLimbs, PROBE);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, last, src, m };
   };
@@ -130,10 +140,14 @@ while (lo < NBITS) {
   console.error(`  g2check chunk ${idx}: bits[${lo},${best.hi}) lock=${best.m.lockingBytes}B op=${best.operationCost.toLocaleString()} last=${best.last}`);
   lo = best.hi;
 }
-writeFileSync(join(GEN, 'manifest_g2check.json'), JSON.stringify({ numChunks: chunks.length, nbits: NBITS, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, last: c.last })) }, null, 2));
+writeFileSync(join(GEN, 'manifest_g2check.json'), JSON.stringify({
+  numChunks: chunks.length, nbits: NBITS, stageBound: true, genesisDerived: true,
+  carriesVkx: true, stageLayout: STAGE,
+  chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, last: c.last })),
+}, null, 2));
 console.error(`BLS G2-check: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.operationCost, 0).toLocaleString()}`);
 }
 
 // exported for build_vectors_pairing (build the per-chunk in/out state for ANY proof's B)
-export { g2checkAccAt, NBITS };
+export { g2checkAccAt, NBITS, STAGE };
 export const g2Fp2 = Fp2;

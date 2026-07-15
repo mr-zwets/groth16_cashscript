@@ -4,7 +4,7 @@
 //
 //   lambda = p + |x|   (p == x mod r and x = -|x| < 0, so r | lambda)
 //   lambda = 3 * m'' * r  with  gcd(m'', r) = 1, v3(lambda/r) = 1  (asserted below)
-//   witness (c, w):  c^lambda == g * w,  w in {1, ROOT27, ROOT27^2}
+//   witness (c, w):  c^lambda == g * w,  w in Fp6*
 //
 // g here is the UNCONJUGATED batched Miller boundary. The true pairing boundary is
 // conj(g) (x < 0), but conj is a field automorphism, so conj(g)^h == 1 <=> g^h == 1
@@ -13,25 +13,27 @@
 //   verifier relation (terminal tail):   gF * w == c^p == frob(c, 1)
 //   where gF = g * c^-|x| (folded into the Miller loop over NAF(|x|)).
 //   Proof: gF*w == c^p  <=>  g*w == c^(p+|x|) = c^lambda. Soundness: c^lambda = g*w
-//   => g^h = c^(lambda*h) * w^-h = 1 (lambda*h = 3*m''*(p^12-1); ord(w) | 27 | h).
+//   => g^h = c^(lambda*h) * w^-h = 1 because lambda is a multiple of r and every nonzero
+//   Fp6 element has order dividing p^6-1, which divides h=(p^12-1)/r.
 //
 // KEY difference vs BN254: gcd(m'', p^12-1) = A = (|x|+1)/3 = 11*10177*859267*52437899
 // (each prime with multiplicity exactly 1 in p^12-1), and REAL valid boundaries carry a
 // nontrivial A-part in their order — so the witness scaling group must be extended from
 // mu_27 to mu_(27A). The A-part of g is computable by ONE exponentiation (projection
 // g^(alpha*(p^12-1)/A), alpha = ((p^12-1)/A)^-1 mod A) and its inverse joins w. The
-// verdict's "w in {1,R27,R27^2}" set-membership becomes the subgroup check
-//   w^(27A) == 1   <=>   ((w^|x|) * w)^9 == 1     (27A = 9(|x|+1); |x| is sparse)
-// Soundness is unchanged: c^lambda = g*w with ord(w) | 27A | h still forces g^h == 1
-// (lambda*h = 3*m''*(p^12-1)). residueWitness VERIFIES c^lambda == g*w before returning,
-// so any boundary outside the construction's range fails loudly at build time.
+// Both factors used by the construction live in Fp6: mu_A is contained in Fp because A | p-1,
+// and ROOT27 has a zero upper Fp6 half. The verdict can therefore check the six upper limbs of w
+// rather than exponentiating w. residueWitness verifies both the relation and this shape before
+// returning, so a construction regression fails loudly at build time.
 import {
   Fp, Fp2, Fp6, Fp12, ATE_NAF, pairsFor, millerBatchOps, singlePairMiller,
 } from './_pairingmath.mjs';
+import { bls12_381 } from '@noble/curves/bls12-381.js';
 
 const p = Fp.ORDER;
 const r = 52435875175126190479447740508185965837690552500527637822603658699938581184513n; // Fr
 const P12 = p ** 12n - 1n;
+const H = P12 / r;
 export const BLS_X = 0xd201000000010000n; // |x|, x negative
 export const LAMBDA = p + BLS_X;
 
@@ -49,6 +51,9 @@ export const conj = (a) => Fp12.conjugate(a);
 
 // ---- parameter facts (asserted once at import) ----
 if (LAMBDA % r !== 0n) throw new Error('lambda not divisible by r');
+if ((p ** 6n + 1n) % r !== 0n) throw new Error('r does not divide p^6+1');
+if (P12 % r !== 0n) throw new Error('r does not divide p^12-1');
+if (H % (p ** 6n - 1n) !== 0n) throw new Error('p^6-1 does not divide the final-exponent cofactor');
 const m = LAMBDA / r;
 if (m % 3n !== 0n || (m / 3n) % 3n === 0n) throw new Error('v3(lambda/r) != 1');
 const m_ = m / 3n; // m''
@@ -59,6 +64,9 @@ export const ROOT27 = mk12([0n, 0n, 0n, 0n, 0n,
   3023453454954651717291509996123911173014040409555280456829364348568359506157058966733147683919288067575841272260945n],
   [0n, 0n, 0n, 0n, 0n, 0n]);
 if (!isOne(powExact(ROOT27, 27n)) || isOne(powExact(ROOT27, 9n))) throw new Error('ROOT27 order != 27');
+if (tup(ROOT27).slice(6).some((x) => x !== 0n) || tup(sqr(ROOT27)).slice(6).some((x) => x !== 0n)) {
+  throw new Error('ROOT27 coset generators are not embedded in Fp6');
+}
 // the baked 27-coset {ROOT27^j : j=0..26} used by the cube-root corrector
 export const COSET27 = (() => { const a = []; let x = Fp12.ONE; for (let i = 0; i < 27; i++) { a.push(x); x = mul(x, ROOT27); } return a; })();
 
@@ -72,6 +80,7 @@ const rInv = modinv(r, P12 / r);
 // A-part of any element is the clean projection x -> x^(ALPHA*(P12/A)).
 export const A_COFACTOR = gcd(m_, P12);
 if (A_COFACTOR !== (BLS_X + 1n) / 3n) throw new Error('unexpected gcd(m\'\', p^12-1)');
+if ((p - 1n) % A_COFACTOR !== 0n) throw new Error('A does not divide p-1');
 for (const q of [11n, 10177n, 859267n, 52437899n]) {
   if (A_COFACTOR % q !== 0n || (P12 / q) % q === 0n) throw new Error(`A-part prime ${q}: wrong multiplicity`);
 }
@@ -90,7 +99,7 @@ function cubeRoot(Y) {
   return mul(powExact(Y, cubeExp), COSET27[Number(corr)]);
 }
 /** given the RAW (unconjugated) Miller boundary g, return { c, cInv, w } with
- *  c^lambda == g*w and w^(27A) == 1 (w = A-part-killer * cubic-residue scaling). */
+ *  c^lambda == g*w and w in Fp6* (w = A-part-killer * cubic-residue scaling). */
 export function residueWitness(g) {
   // kill the A-part of g: wA = (A-part of g)^-1, an element of mu_A
   const wA = inv(powExact(g, ALPHA * M)); // g^(ALPHA*(P12/A)) is the A-part projection
@@ -107,7 +116,32 @@ export function residueWitness(g) {
   if (!eq12(powExact(c, LAMBDA), target)) throw new Error('residue witness failed verification');
   const w = mul(wA, w27);
   if (!isOne(powExact(w, 27n * A_COFACTOR))) throw new Error('w outside mu_(27A)');
+  if (tup(w).slice(6).some((x) => x !== 0n)) throw new Error('w is not embedded in Fp6');
   return { c, cInv: inv(c), w };
+}
+
+// A nontrivial r-th root has k^lambda=1 because r divides lambda. If a valid residue root is
+// the quotient torus's unique infinity point, multiplying it by k preserves its lambda power
+// and moves it into the finite chart because k.c1 is nonzero. Every accepting quotient class
+// therefore has one six-limb representative [1+u*W].
+const TORUS_KERNEL_SHIFT = bls12_381.pairing(
+  bls12_381.G1.Point.BASE,
+  bls12_381.G2.Point.BASE,
+);
+if (Fp6.eql(TORUS_KERNEL_SHIFT.c1, Fp6.ZERO) ||
+  !eq12(powExact(TORUS_KERNEL_SHIFT, LAMBDA), Fp12.ONE)) {
+  throw new Error('invalid BLS12-381 quotient-torus kernel shift');
+}
+export function residueTorusWitness(g) {
+  const witness = residueWitness(g);
+  const c = Fp6.eql(witness.c.c0, Fp6.ZERO)
+    ? mul(witness.c, TORUS_KERNEL_SHIFT)
+    : witness.c;
+  if (Fp6.eql(c.c0, Fp6.ZERO)) {
+    throw new Error('failed to move BLS12-381 residue root into the finite torus chart');
+  }
+  const u = Fp6.mul(c.c1, Fp6.inv(c.c0));
+  return { ...witness, c, cInv: inv(c), u };
 }
 
 // ---- c^-|x|-FUSED batched Miller ----------------------------------------------------
@@ -146,6 +180,43 @@ export function millerFusedOps(pairs, c, cInv) {
   return { ops, states, boundary, baseBoundary: mul(base.boundary, fAB), cpowFinal: cpow, fAB };
 }
 
+const torusRepresentative = (u) => Fp12.create({ c0: Fp6.ONE, c1: u });
+const torusMul = (value, u) => Fp12.create({
+  c0: Fp6.add(value.c0, Fp6.mulByNonresidue(Fp6.mul(value.c1, u))),
+  c1: Fp6.add(value.c1, Fp6.mul(value.c0, u)),
+});
+
+// Replay the same fixed Miller trace in Q=Fp12*/Fp6*. The residue root is the immutable finite
+// coordinate u for [c]=[1+u*W], so [c^-1]=[1-u*W]. c-folds and the fixed alpha/beta fold use
+// two Fp6 products rather than a full three-product Fp12 multiplication. Ordinary line folds
+// stay unchanged; their Fp6 scaling is immaterial in Q.
+export function millerFusedTorusOps(pairs, c, cInv, u) {
+  const exact = millerFusedOps(pairs, c, cInv);
+  if (Fp6.eql(exact.fAB.c0, Fp6.ZERO)) {
+    throw new Error('fixed BLS12-381 alpha/beta Miller value has no finite torus coordinate');
+  }
+  const fAbU = Fp6.mul(exact.fAB.c1, Fp6.inv(exact.fAB.c0));
+  const ops = exact.ops;
+  const states = [];
+  let f = torusRepresentative(Fp6.neg(u));
+  for (let i = 0; i < ops.length; i++) {
+    states.push({ f, Rs: exact.states[i].Rs.slice(), u });
+    const op = ops[i];
+    if (op.t === 'sqr') {
+      f = sqr(f);
+    } else if (op.t === 'cf') {
+      f = torusMul(f, op.neg ? u : Fp6.neg(u));
+    } else if (op.t === 'cmul1') {
+      f = torusMul(f, fAbU);
+    } else {
+      const factor = mul(exact.states[i + 1].f, inv(exact.states[i].f));
+      f = mul(f, factor);
+    }
+  }
+  states.push({ f, Rs: exact.states[ops.length].Rs.slice(), u });
+  return { ops, states, boundary: f, fAB: exact.fAB, fAbU };
+}
+
 // self-test when run directly
 if (process.argv[1] && process.argv[1].endsWith('_residuemath.mjs')) {
   const { bls12_381 } = await import('./_vkxmath.mjs');
@@ -177,6 +248,7 @@ if (process.argv[1] && process.argv[1].endsWith('_residuemath.mjs')) {
     const { c, cInv, w } = residueWitness(g);
     console.log('c*cInv == 1 ?', isOne(mul(c, cInv)));
     console.log('w^(27A) == 1 ?', isOne(powExact(w, 27n * A_COFACTOR)));
+    console.log('w upper Fp6 half == 0 ?', fp12limbsOf(w).slice(6).every((x) => x === 0n));
     // the on-chain form of the same check: ((w^|x|) * w)^9 == 1
     console.log('((w^x)*w)^9 == 1 ?', isOne(powExact(mul(powExact(w, BLS_X), w), 9n)));
     console.log('c^lambda == g*w ?', eq12(powExact(c, LAMBDA), mul(g, w)));

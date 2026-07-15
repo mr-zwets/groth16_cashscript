@@ -14,11 +14,12 @@
 import { readFileSync } from 'node:fs';
 import {
   P, compileBytecode, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2,
-  le48, commit, CATEGORY, commitBin, covIn, covOut, planChunk, tok, measureCovenant as _measureCov, bls12_381,
+  le48, le48Exact, commit, CATEGORY, commitBin, commitBinExact, covIn, covOut, planChunk, tok, verifierPath,
+  measureCovenant as _measureCov, bls12_381,
 } from './_vkxmath.mjs';
 import { vk, proof, computeVkx, boundaryFor } from '../../singleton/bls12-381/bls_instance.mjs';
 
-export { P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, le48, commit, CATEGORY, commitBin, covIn, covOut, planChunk, tok, compileBytecode, vk, proof, computeVkx, boundaryFor };
+export { P, OP_BUDGET, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, le48, le48Exact, commit, CATEGORY, commitBin, commitBinExact, covIn, covOut, planChunk, tok, verifierPath, compileBytecode, vk, proof, computeVkx, boundaryFor };
 export const { Fp, Fp2, Fp6, Fp12 } = bls12_381.fields;
 
 // ---- miller-step math (noble, M-twist) ----
@@ -135,6 +136,90 @@ export function millerBatchOps(pairs, opts = {}) {
   }
   states.push({ f, Rs: Rs.slice() });
   return { ops, states, boundary: f, finalF: Fp12.conjugate(f) };
+}
+
+// Plain prepared-VK Miller trace. Pair 1 = e(alpha,beta) is wholly fixed, so replace its
+// 69 sparse line folds with one dense multiplication by its pre-conjugate Miller value.
+// Pairs 2 and 3 retain their line folds (their G1 points are runtime), but their fixed-G2
+// trajectories expose baked coefficients through `op.coeffs`; only pair 0 needs a runtime R.
+const PRECOMPUTED_PAIR = 1;
+const PREPARED_G2_PAIRS = [2, 3];
+export function millerPreparedOps(pairs) {
+  if (pairs.length !== 4 || pairs.map((pair) => pair.name).join(',') !== 'negA_B,alpha_beta,vkx_gamma,C_delta') {
+    throw new Error('prepared Miller requires the four ordered Groth16 pairs');
+  }
+  const base = millerBatchOps(pairs, { skipPairs: new Set([PRECOMPUTED_PAIR]) });
+  const fAB = Fp12.conjugate(singlePairMiller(pairs[PRECOMPUTED_PAIR]).f);
+  const preparedG2Points = PREPARED_G2_PAIRS.map((pairIndex) => {
+    const Q = pairs[pairIndex].Q.toAffine();
+    return [Q.x.c0, Q.x.c1, Q.y.c0, Q.y.c1];
+  });
+  const boundary = Fp12.mul(base.boundary, fAB);
+  const finalF = Fp12.conjugate(boundary);
+  if (!Fp12.eql(finalF, millerBatchOps(pairs).finalF)) {
+    throw new Error('prepared Miller boundary does not match the raw four-pair boundary');
+  }
+  const tail = base.states[base.states.length - 1];
+  return {
+    ops: [...base.ops, { t: 'cmul1' }],
+    states: [...base.states, { f: boundary, Rs: tail.Rs.slice() }],
+    boundary,
+    finalF,
+    fAB,
+    precomputedPair: PRECOMPUTED_PAIR,
+    preparedG2Pairs: PREPARED_G2_PAIRS,
+    preparedG2Points,
+  };
+}
+
+export function assertPreparedMillerManifest(manifest, trace, { checkReferenceBoundary = true } = {}) {
+  const expectedFAB = f12limbs(trace.fAB).map(String);
+  const fABMatches = Array.isArray(manifest.precomputedPairMiller)
+    && manifest.precomputedPairMiller.length === expectedFAB.length
+    && manifest.precomputedPairMiller.every((limb, i) => limb === expectedFAB[i]);
+  const preparedG2Matches = Array.isArray(manifest.preparedG2Pairs)
+    && manifest.preparedG2Pairs.length === trace.preparedG2Pairs.length
+    && manifest.preparedG2Pairs.every((pair, i) => pair === trace.preparedG2Pairs[i]);
+  const preparedG2PointsMatch = Array.isArray(manifest.preparedG2Points)
+    && manifest.preparedG2Points.length === trace.preparedG2Points.length
+    && manifest.preparedG2Points.every((point, i) =>
+      Array.isArray(point)
+      && point.length === trace.preparedG2Points[i].length
+      && point.every((limb, j) => limb === String(trace.preparedG2Points[i][j])));
+  const boundary = f12limbs(trace.finalF).map(String);
+  const boundaryMatches = Array.isArray(manifest.boundary)
+    && manifest.boundary.length === boundary.length
+    && manifest.boundary.every((limb, i) => limb === boundary[i]);
+  const chunksCoverTrace = Array.isArray(manifest.chunks)
+    && manifest.chunks.length > 0
+    && manifest.chunks.length === manifest.numChunks
+    && manifest.chunks.every((chunk, i) =>
+      chunk.idx === i
+      && Number.isInteger(chunk.opLo)
+      && Number.isInteger(chunk.opHi)
+      && chunk.opLo === (i === 0 ? 0 : manifest.chunks[i - 1].opHi)
+      && chunk.opHi > chunk.opLo
+      && chunk.opHi <= trace.ops.length
+      && chunk.final === (chunk.opHi === trace.ops.length))
+    && manifest.chunks[manifest.chunks.length - 1].opHi === trace.ops.length;
+  if (
+    manifest.batched !== true
+    || manifest.preparedVk !== true
+    || manifest.stageBound !== true
+    || manifest.genesisDerived !== true
+    || manifest.numPairs !== 4
+    || manifest.runtimeRs !== 1
+    || manifest.numOps !== trace.ops.length
+    || manifest.precomputedPair !== trace.precomputedPair
+    || trace.ops[trace.ops.length - 1]?.t !== 'cmul1'
+    || !fABMatches
+    || !preparedG2Matches
+    || !preparedG2PointsMatch
+    || (checkReferenceBoundary && !boundaryMatches)
+    || !chunksCoverTrace
+  ) {
+    throw new Error('prepared Miller manifest does not match its trace; regenerate it with gen_miller.mjs');
+  }
 }
 
 // ---- state serialization (matches the .cash hash256(toPaddedBytes(.,48))) ----

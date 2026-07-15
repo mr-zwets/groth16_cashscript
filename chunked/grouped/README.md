@@ -27,8 +27,9 @@ A THIRD chunking method for the BN254 Groth16 verifier, a hybrid of the other tw
 ## Files
 
 - `build_vectors_bls.mjs` — the BLS12-381 counterpart (W=48). Same grouping/assembly logic;
-  swaps in the BLS spec builders (g2check + vk_x + batched 4-R Miller + final exponentiation with
-  uncommitted easy-part-inverse witnesses) and emits `groth16-bls12381-grouped-vectors.json`.
+  swaps in the BLS spec builders (five-chunk shared-table GLV vk_x + input-validated prepared Miller +
+  final exponentiation with uncommitted easy-part-inverse witnesses) and emits
+  `groth16-bls12381-grouped-vectors.json`.
 - `build_vectors.mjs` — packs the chunks into groups (target 90 KB, cut only between within
   chunks), assigns the grouped role per chunk (covInHash / covout / forward / terminal), compiles
   + tunes each group's per-input pad, and emits `verifier/src/bch/groth16-grouped-vectors.json`
@@ -46,5 +47,10 @@ every step ≤ 8,032,800 op / ≤ 10 KB, every group < 100,000 B. PASS, **standa
 runtime-general (2/2 proofs), invalid runs rejected. The only full Groth16 verifier that is both
 standard-relayable and within the mempool chain limit.
 
-The BLS12-381 entry (`bch-groth16-bls12381-grouped`) is 87 inputs / **9 transactions**, ~711 KB
-total, op-cost 552 M, every group < 100,000 B — likewise standard-relayable and ~9 deep.
+The BLS12-381 entry (`bch-groth16-bls12381-grouped`) is 56 inputs / **6 transactions**,
+475,292 B total, op-cost 377,556,467, every group < 100,000 B — likewise standard-relayable
+and six deep. Its five GLV inputs remain together in group 0 so four siblings can read the one
+hash-bound VK table carried by the fifth.
+
+The residue entry (`bch-groth16-bls12381-grouped-residue`) is 39 inputs / **5 transactions**,
+324,179 B total, op-cost 256,875,048, with the same standard-relayable group handoffs.

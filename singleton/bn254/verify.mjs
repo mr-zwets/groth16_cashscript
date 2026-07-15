@@ -10,8 +10,10 @@ import { compileTemplate, evalArgs } from './_harness.mjs';
 import { bn254 } from '@noble/curves/bn254.js';
 const { Fp2 } = bn254.fields;
 const here = dirname(fileURLToPath(import.meta.url));
+const verifierDir = process.env.VERIFIER_DIR;
+if (!verifierDir) throw new Error('VERIFIER_DIR must point to the zk-verifier-bench checkout');
 
-const vec = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/checkpoints/pairing-vectors.json', 'utf8'));
+const vec = JSON.parse(readFileSync(join(verifierDir, 'src', 'checkpoints', 'pairing-vectors.json'), 'utf8'));
 const g1 = (o) => bn254.G1.Point.fromAffine({ x: BigInt(o.x), y: BigInt(o.y) });
 const g2 = (o) => bn254.G2.Point.fromAffine({ x: Fp2.fromBigTuple([BigInt(o.x.c0), BigInt(o.x.c1)]), y: Fp2.fromBigTuple([BigInt(o.y.c0), BigInt(o.y.c1)]) });
 const vk = { alpha: g1(vec.vk.alpha), beta: g2(vec.vk.beta), gamma: g2(vec.vk.gamma), delta: g2(vec.vk.delta), ic: vec.vk.ic.map(g1) };

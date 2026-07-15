@@ -4,7 +4,7 @@
 // ePrint 2022/348):
 //     B in G2  <=>  [x0+1]B + psi([x0]B) + psi^2([x0]B) == psi^3([2x0]B)
 // This walks only |x0| (BN_X, ~63 bits) in the double-and-add instead of 6*x0^2 (~128
-// bits, the old `[6x^2]B == psi(B)` test), roughly HALVING the scalar-mult work (8 -> 4
+// bits, the old `[6x^2]B == psi(B)` test), more than halving the scalar-mult work (8 -> 3
 // chunks). The Frobenius map psi is cheap (conjugation + constant mul). The final chunk
 // finishes [x0]B (Jacobian), affine-izes it with a WITNESS Fp2 inverse zinv of R.Z
 // (gated by fp2Mul(R.Z, zinv) == 1, exactly the pattern vk_x uses for its 1/Z), builds
@@ -14,15 +14,17 @@
 // g2AddAffine / psi from the shared singleton library.
 //
 // GENERIC covenant: the running accumulator R + the points A,B,C live in the token NFT
-// commitment (no baked instance), so one fixed set of lockings validates ANY proof. The
-// final chunk additionally consumes the per-proof witness zinv (2 limbs) from the
-// unlocking — supplied by build_vectors via the chunk `extras`.
+// commitment (no baked instance), so one fixed set of lockings validates ANY proof. In
+// stage-bound mode, the first chunk consumes only (-A,B,C), derives R=B, and the final
+// chunk emits that exact tuple. G2_CARRIES_VKX=1 adds vk_x to the carried tuple for the
+// continuously bound covenant graph and writes a separate g2checkfull namespace. The
+// final chunk additionally consumes the per-proof witness zinv (2 limbs).
 //   node gen_g2check.mjs        plan + emit generated/g2check_NN.cash + manifest_g2check.json
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { createVirtualMachineBch2026, createVirtualMachineBchSpec, encodeDataPush, bigIntToVmNumber, numberToBinUint16LE, numberToBinUint32LE } from '@bitauth/libauth';
-import { measureCovenantFile, compileFileBytecode, planChunk, covIn, covOut, decl, proof, commitBin, CATEGORY, TARGET_UNLOCK, OP_PUSHDATA2 } from './_millermath.mjs';
+import { measureCovenantFile, compileFileBytecode, planChunk, covIn, covOut, decl, proof, vec, vkxPoint, commitBin, CATEGORY, TARGET_UNLOCK, OP_PUSHDATA2 } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -32,6 +34,8 @@ const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_900_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const LINKED_CUTS = process.env.G2_LINKED_LAYOUT === '1' ? [25, 51] : [];
 const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
+const CARRIES_VKX = STAGE_BOUND && process.env.G2_CARRIES_VKX === '1';
+const PREFIX = CARRIES_VKX ? 'g2checkfull' : 'g2check';
 const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const BN_X = 4965661367192848881n; // BN254 seed |x0|
 const NBITS = 63; // bitlength of BN_X (MSB at index 62)
@@ -94,10 +98,11 @@ const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
 const Baff = proof.b.toAffine();
 const Aaff = (STAGE_BOUND ? proof.a.negate() : proof.a).toAffine();
 const Caff = proof.c.toAffine();
+const vkxAff = vkxPoint(vec.publicInputs).toAffine();
 const B = [[Baff.x.c0, Baff.x.c1], [Baff.y.c0, Baff.y.c1]];
 const Blimbs = [B[0][0], B[0][1], B[1][0], B[1][1]];
 const proofLimbs = STAGE_BOUND
-  ? [Aaff.x, Aaff.y, ...Blimbs, Caff.x, Caff.y]
+  ? [Aaff.x, Aaff.y, ...Blimbs, Caff.x, Caff.y, ...(CARRIES_VKX ? [vkxAff.x, vkxAff.y] : [])]
   : [...Blimbs, Aaff.x, Aaff.y, Caff.x, Caff.y];
 const stateLimbs = (R) => [...rLimbs(R), ...proofLimbs];
 const B2 = [19485874751759354771024239261021720505790618469301721065564631296452457478373n,
@@ -106,8 +111,8 @@ const B2 = [19485874751759354771024239261021720505790618469301721065564631296452
 // ---- contract emitter (reuses verified groth16 tower via the shared singleton library) ----
 const LIB_IMPORT = '../../../singleton/bn254/lib/Miller.cash';
 const RN = ['RXa', 'RXb', 'RYa', 'RYb', 'RZa', 'RZb'];
-const AN = ['Ax', 'Ay'], BN = ['Bxa', 'Bxb', 'Bya', 'Byb'], CN = ['Cx', 'Cy'];
-const PROOF = STAGE_BOUND ? [...AN, ...BN, ...CN] : [...BN, ...AN, ...CN];
+const AN = ['Ax', 'Ay'], BN = ['Bxa', 'Bxb', 'Bya', 'Byb'], CN = ['Cx', 'Cy'], VKN = ['vkxX', 'vkxY'];
+const PROOF = STAGE_BOUND ? [...AN, ...BN, ...CN, ...(CARRIES_VKX ? VKN : [])] : [...BN, ...AN, ...CN];
 const ALL = [...RN, ...PROOF];
 
 function genChunk(lo, hi, isFirst, isLast) {
@@ -123,6 +128,10 @@ function genChunk(lo, hi, isFirst, isLast) {
   L.push(sig);
   L.push(covIn(stateParams));
   if (isFirst) {
+    L.push('        int fieldP = P;');
+    for (const name of [...AN, ...BN, ...CN]) {
+      L.push(`        require(within(${name}, 0, fieldP));`);
+    }
     L.push('        require(mulFp(Ay, Ay) == addFp(mulFp(mulFp(Ax, Ax), Ax), 3));'); // A on G1
     L.push('        require(mulFp(Cy, Cy) == addFp(mulFp(mulFp(Cx, Cx), Cx), 3));'); // C on G1
     L.push('        (int oxa,int oxb) = fp2Sqr(Bxa, Bxb);'); // B on G2: y^2 == x^3 + b2
@@ -131,7 +140,7 @@ function genChunk(lo, hi, isFirst, isLast) {
     L.push('        (int oba,int obb) = fp2Sqr(Bya, Byb);');
     L.push('        require(oba == ora); require(obb == orb);');
   }
-  let r = STAGE_BOUND && isFirst ? ['0', '0', '1', '0', '0', '0'] : RN.slice(), uid = 0;
+  let r = STAGE_BOUND && isFirst ? ['Bxa', 'Bxb', 'Bya', 'Byb', '1', '0'] : RN.slice(), uid = 0;
   const fresh = () => Array.from({ length: 6 }, () => `v${uid++}`);
   for (let k = lo; k < hi; k++) {
     const d = fresh();
@@ -170,8 +179,10 @@ function genChunk(lo, hi, isFirst, isLast) {
     L.push('        require(xl_a == xr_a); require(xl_b == xr_b);');
     L.push('        (int yl_a,int yl_b) = fp2Mul(lya, lyb, rz3a, rz3b); (int yr_a,int yr_b) = fp2Mul(rya, ryb, lz3a, lz3b);');
     L.push('        require(yl_a == yr_a); require(yl_b == yr_b);');
+    if (STAGE_BOUND) L.push(covOut(PROOF, PROOF));
   } else {
-    L.push(covOut([...r, ...PROOF]));
+    // Genesis bounds the proof tuple, and all Fp2 helpers return reduced limbs.
+    L.push(covOut([...r, ...PROOF], [...r, ...PROOF]));
   }
   L.push('    }');
   L.push('}');
@@ -190,22 +201,24 @@ const padPush = (argLen, target) => {
   if (budget - 3 <= 0xffff) { const N = budget - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); }
   const N = budget - 5; return Uint8Array.from([OP_PUSHDATA4, ...numberToBinUint32LE(N), ...new Uint8Array(N)]);
 };
-function measureFinalEndo(src, stateLimbs14, witness, probePath) {
+function measureFinalEndo(src, committedState, witness, outLimbs, probePath) {
   let raw;
   try { writeFileSync(probePath, src); raw = compileFileBytecode(probePath); }
   catch (e) { return { lockingBytes: Infinity, operationCost: Infinity, accepted: false, error: String(e?.message ?? e) }; }
   const locking = Uint8Array.from([...raw]);
-  const pushInts = [...stateLimbs14, ...witness]; // decl order: 14 state, then zinvA, zinvB
+  const pushInts = [...committedState, ...witness];
   const argBytes = Uint8Array.from([...pushInts].reverse().flatMap((c) => [...pushInt(c)]));
   const unlocking = Uint8Array.from([...padPush(argBytes.length, TARGET_UNLOCK), ...argBytes]);
   const tok = (commitment) => ({ amount: 0n, category: CATEGORY, nft: { capability: 'mutable', commitment } });
   const program = {
     inputIndex: 0,
-    sourceOutputs: [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(commitBin(stateLimbs14)) }],
+    sourceOutputs: [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(commitBin(committedState)) }],
     transaction: {
       version: 2,
       inputs: [{ outpointTransactionHash: new Uint8Array(32), outpointIndex: 0, sequenceNumber: 0, unlockingBytecode: unlocking }],
-      outputs: [{ lockingBytecode: locking, valueSatoshis: 1000n }],
+      outputs: STAGE_BOUND
+        ? [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(commitBin(outLimbs)) }]
+        : [{ lockingBytecode: locking, valueSatoshis: 1000n }],
       locktime: 0,
     },
   };
@@ -219,14 +232,15 @@ function measureFinalEndo(src, stateLimbs14, witness, probePath) {
 if (process.argv[1] && process.argv[1].endsWith('gen_g2check.mjs')) {
 console.error(`planning G2-check chunks (fast-endo, ${NBITS}-bit [x0]B)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
 const witness = g2checkFastZinv(B);
-const chunks = []; let lo = 0; const planState = { perUnit: null };
+const chunks = []; let lo = STAGE_BOUND ? 1 : 0; const planState = { perUnit: null };
 while (lo < NBITS) {
-  const inLimbs = STAGE_BOUND && lo === 0 ? proofLimbs : stateLimbs(g2checkAccAt(B, lo));
+  const first = chunks.length === 0;
+  const inLimbs = STAGE_BOUND && first ? proofLimbs : stateLimbs(g2checkAccAt(B, lo));
   const tryHi = (hi) => {
     const last = hi === NBITS;
-    const src = genChunk(lo, hi, lo === 0, last);
+    const src = genChunk(lo, hi, first, last);
     const m = last
-      ? measureFinalEndo(src, inLimbs, witness, PROBE)
+      ? measureFinalEndo(src, inLimbs, witness, STAGE_BOUND ? proofLimbs : [], PROBE)
       : measureCovenantFile(src, inLimbs, stateLimbs(g2checkAccAt(B, hi)), PROBE, true);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, last, src, m };
   };
@@ -237,11 +251,11 @@ while (lo < NBITS) {
     ? planChunk(lo, NBITS, OP_TARGET, tryHi, planState)
     : tryHi(linkedHi);
   const idx = chunks.length;
-  writeFileSync(join(GEN, `g2check_${String(idx).padStart(2, '0')}.cash`), best.src);
-  chunks.push({ idx, lo, hi: best.hi, first: lo === 0, last: best.last, lockingBytes: best.m.lockingBytes, operationCost: best.m.operationCost });
+  writeFileSync(join(GEN, `${PREFIX}_${String(idx).padStart(2, '0')}.cash`), best.src);
+  chunks.push({ idx, lo, hi: best.hi, first, last: best.last, lockingBytes: best.m.lockingBytes, operationCost: best.m.operationCost });
   console.error(`  g2check chunk ${idx}: bits[${lo},${best.hi}) lock=${best.m.lockingBytes}B op=${best.m.operationCost.toLocaleString()} accepted=${best.m.accepted} last=${best.last}`);
   lo = best.hi;
 }
-writeFileSync(join(GEN, 'manifest_g2check.json'), JSON.stringify({ numChunks: chunks.length, nbits: NBITS, fastEndo: true, linkedLayout: LINKED_CUTS.length > 0, stageBound: STAGE_BOUND, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, last: c.last })) }, null, 2));
+writeFileSync(join(GEN, `manifest_${PREFIX}.json`), JSON.stringify({ numChunks: chunks.length, nbits: NBITS, fastEndo: true, canonicalProofCoordinates: true, linkedLayout: LINKED_CUTS.length > 0, stageBound: STAGE_BOUND, genesisDerived: STAGE_BOUND, carriesVkx: CARRIES_VKX, stageLayout: STAGE_BOUND ? PROOF : undefined, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, last: c.last })) }, null, 2));
 console.error(`G2-check: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.operationCost, 0).toLocaleString()}`);
 }

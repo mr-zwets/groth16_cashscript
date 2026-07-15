@@ -1,218 +1,138 @@
-// Generator for the witnessed-residue final-exponentiation TAIL (BLS12-381, ePrint 2024/640
-// adapted) — replaces the 23-chunk hard-part final exponentiation with a HANDFUL of cheap chunks.
-// The fused Miller already folded c^-|x| and multiplied in fAB, so the boundary handed off is the
-// UNCONJUGATED fF = g * c^-|x|. The tail reproduces the verified lazy-lib `residueVerdict` body
-// (singleton/bls12-381/lib/lazy/Bls12381LazyG.cash). Each lazy fp12 op is ~235K op-cost, so the
-// 63-iteration ((w^|x|)*w)^9 mu_(27A) walk (~15M) plus the verdict cannot fit one 8.03M-budget
-// input; it is op-budget-planned into WALK chunks (each forwarding the running accumulator t)
-// followed by a terminal FINALIZE chunk:
-//   walk chunk k:  w^|x| walk iters [lo,hi); forwards [fF,c,cInv,w,t].
-//   finalize:      t=w^|x| -> ((t)*w)^9 == ONE, then c canonical + c*cInv == ONE +
-//                  verdict fF*w == frob(c,1)  (terminal).
-// State from the fused Miller: fF(12), c(12), cInv(12). w(12) enters as an uncommitted witness in
-// the first walk chunk and is committed forward (with t) thereafter. lambda = p + |x|.
-//   node gen_finalexp_residue.mjs   emit finalexpres_NN.cash + manifest_finalexpres.json
-import { writeFileSync } from 'node:fs';
+// Generator for the witnessed-residue final-exponentiation tail (BLS12-381,
+// ePrint 2024/640 adapted). The fused Miller boundary is
+//
+//   fF = g * c^-|x|,
+//
+// so the terminal relation is fF*w == frob(c, 1). The witness construction
+// produces w in the embedded Fp6*: only its six Fp6 limbs are witnessed, and its
+// upper six Fp12 limbs are implicit zeros. This is sufficient for soundness
+// because p^6-1 divides h=(p^12-1)/r, so every
+// nonzero Fp6 element has order dividing h. c*cInv == ONE and the terminal
+// equality exclude zero without a separate w inverse.
+//
+//   node gen_finalexp_residue.mjs          covenant layout -> generated/
+//   node gen_finalexp_residue.mjs linked   linked layout   -> generated/linked-residue/
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { measureCovenantFile, covIn, covOut, planChunk, commit, P, PUBLIC_INPUTS } from './_vkxmath.mjs';
+import { measureCovenantFile, covIn, P, PUBLIC_INPUTS } from './_vkxmath.mjs';
 import { pairsFor, millerBatchOps, Fp12 } from './_pairingmath.mjs';
-import { residueWitness, millerFusedOps, fp12limbsOf } from './_residuemath.mjs';
+import {
+  frob, mk12, residueWitness, millerFusedOps, fp12limbsOf,
+} from './_residuemath.mjs';
+import { LINKED_RESIDUE_NAMESPACE } from './_residue_linked_plan.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const GEN = join(here, 'generated');
+const LINKED = process.argv[2] === 'linked';
+const COVENANT_RESIDUE = !LINKED && process.env.COVENANT_RESIDUE_LAYOUT === '1';
+const GEN = join(here, 'generated', ...(LINKED ? [LINKED_RESIDUE_NAMESPACE] : []));
+mkdirSync(GEN, { recursive: true });
 const PROBE = join(GEN, '_probe_finalexpres.cash');
-const LIB_IMPORT = '../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash';
-const Pstr = P.toString();
-const ABS_X = 15132376222941642752n; // |x| MSB-preloaded walk constant (matches the lazy lib)
-const NWALK = 63;
+const LIB_IMPORT = LINKED
+  ? '../../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash'
+  : '../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash';
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_880_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 
-const decl = (names) => names.map((n) => `int ${n}`).join(', ');
-const names12 = (p) => Array.from({ length: 12 }, (_, i) => `${p}${i}`);
-const fFn = names12('fF'), cN = names12('c'), ciN = names12('ci'), wN = names12('w'), tN = names12('t');
-const eqOne = (p) => Array.from({ length: 12 }, (_, i) => `require(${p}${i} % P == ${i === 0 ? 1 : 0});`).join(' ');
-const canon = (names) => names.map((n) => `require(${n} < P);`).join(' ');
-const STATE5 = [...fFn, ...cN, ...ciN, ...wN, ...tN]; // 60 forwarded limbs (t = running w^partial)
+const decl = (names) => names.map((name) => `int ${name}`).join(', ');
+const names12 = (prefix) => Array.from({ length: 12 }, (_, i) => `${prefix}${i}`);
+const names6 = (prefix) => Array.from({ length: 6 }, (_, i) => `${prefix}${i}`);
+const fFn = names12('fF');
+const cN = names12('c');
+const ciN = names12('ci');
+const wN = names6('w');
+const canon = (names) => names.map((name) => `require(within(${name}, 0, P));`).join(' ');
+const eqOne = (prefix) => Array.from(
+  { length: 12 },
+  (_, i) => `require(${prefix}${i} % P == ${i === 0 ? 1 : 0});`,
+).join(' ');
 
-const walkLoop = (lo, hi) =>
-  `        for (int wi = ${lo}; wi < ${hi}; wi = wi + 1) {\n` +
-  `            (${tN.join(',')}) = fp12Sqr(${tN.join(',')});\n` +
-  `            if (((${ABS_X} >> (62 - wi)) % 2) == 1) {\n` +
-  `                (${tN.join(',')}) = fp12Mul(${tN.join(',')}, ${wN.join(',')});\n` +
-  '            }\n' +
-  '        }';
-
-// walk chunk [lo,hi). first (lo==0): covIn [fF,c,cInv] (36) + w witness, t=w. else: covIn STATE5 (60).
-function genWalk(lo, hi) {
-  const first = lo === 0;
-  const L = [];
-  L.push('pragma cashscript ^0.14.0;');
-  L.push(`import "${LIB_IMPORT}";`);
-  L.push(`// residue tail walk: w^|x| iterations [${lo},${hi}); forwards [fF,c,cInv,w,t].`);
-  L.push('contract ResidueWalkBls() {');
-  const params = first ? [...fFn, ...cN, ...ciN, ...wN] : STATE5;
-  L.push(`    function spend(${decl(params)}, bytes unused zeroPadding) {`);
-  L.push(covIn(first ? [...fFn, ...cN, ...ciN] : STATE5));
-  L.push(`        int P = ${Pstr};`);
-  if (first) { L.push('        ' + canon(wN)); L.push(`        ${tN.map((n, i) => `int ${n}=w${i};`).join(' ')}`); }
-  else { L.push(`        ${tN.map((n) => `int ${n}=${n}in;`).join(' ')}`); } // rename param tin -> local t
-  L.push(walkLoop(lo, hi));
-  L.push(covOut(STATE5));
-  L.push('    }');
-  L.push('}');
-  return L.join('\n') + '\n';
-}
-// non-first walk chunks take t as `tin` params (params can't be reassigned in the loop)
-function genWalkNonFirst(lo, hi) {
-  const params = [...fFn, ...cN, ...ciN, ...wN, ...names12('tin')];
-  const L = [];
-  L.push('pragma cashscript ^0.14.0;');
-  L.push(`import "${LIB_IMPORT}";`);
-  L.push(`// residue tail walk: w^|x| iterations [${lo},${hi}); forwards [fF,c,cInv,w,t].`);
-  L.push('contract ResidueWalkBls() {');
-  L.push(`    function spend(${decl(params)}, bytes unused zeroPadding) {`);
-  L.push(covIn([...fFn, ...cN, ...ciN, ...wN, ...names12('tin')]));
-  L.push(`        ${tN.map((n, i) => `int ${n}=tin${i};`).join(' ')}`);
-  L.push(walkLoop(lo, hi));
-  L.push(covOut(STATE5));
-  L.push('    }');
-  L.push('}');
-  return L.join('\n') + '\n';
-}
-
-// The finalize verdict body (assumes t/w/c/ci/fF locals in scope and `int P` declared): from the
-// t=w^|x| accumulator, check ((t)*w)^9 == ONE, then c canonical + c*cInv == ONE + fF*w == frob(c,1).
-// Shared by the standalone finalize chunk and the FUSE_FINAL walk+finalize chunk (byte-identical).
-const finalizeLines = () => [
-  `        (${tN.join(',')}) = fp12Mul(${tN.join(',')}, ${wN.join(',')});`,
-  `        (${decl(names12('s'))}) = fp12Sqr(${tN.join(',')});`,
-  `        (${names12('s').join(',')}) = fp12Sqr(${names12('s').join(',')});`,
-  `        (${names12('s').join(',')}) = fp12Sqr(${names12('s').join(',')});`,
-  `        (${names12('s').join(',')}) = fp12Mul(${names12('s').join(',')}, ${tN.join(',')});`,
-  '        ' + eqOne('s'),
-  '        ' + canon(cN),
-  `        (${decl(names12('p'))}) = fp12Mul(${cN.join(',')}, ${ciN.join(',')});`,
-  '        ' + eqOne('p'),
-  `        (${decl(names12('lhs'))}) = fp12Mul(${fFn.join(',')}, ${wN.join(',')});`,
-  `        (${decl(names12('rhs'))}) = fp12Frob1(${cN.join(',')});`,
-  '        ' + Array.from({ length: 12 }, (_, i) => `require(lhs${i} % P == rhs${i} % P);`).join(' '),
-];
-
-// finalize: t=w^|x| in, ((t)*w)^9 == ONE, then c*cInv==ONE + verdict fF*w==frob(c,1). terminal.
 function genFinalize() {
-  const params = [...fFn, ...cN, ...ciN, ...wN, ...names12('tin')];
-  const L = [];
-  L.push('pragma cashscript ^0.14.0;');
-  L.push(`import "${LIB_IMPORT}";`);
-  L.push('// residue tail finalize: ((w^|x|)*w)^9 == ONE, c*cInv == ONE, fF*w == frob(c,1).');
-  L.push('contract ResidueFinalizeBls() {');
-  L.push(`    function spend(${decl(params)}, bytes unused zeroPadding) {`);
-  L.push(covIn([...fFn, ...cN, ...ciN, ...wN, ...names12('tin')]));
-  L.push(`        int P = ${Pstr};`);
-  L.push(`        ${tN.map((n, i) => `int ${n}=tin${i};`).join(' ')}`);
-  for (const ln of finalizeLines()) L.push(ln);
-  L.push('    }');
-  L.push('}');
-  return L.join('\n') + '\n';
-}
-
-// FUSE_FINAL: one TERMINAL chunk that does the w^|x| walk [lo,hi=NWALK) AND the finalize verdict
-// inline (no covOut / no forward hand-off), collapsing the separate finalize input. Byte-identical
-// walk loop + finalize body to the split path. Used by the LARGE (bch-spec) build where the whole
-// walk fits one 88M-op input with the ~4M-op verdict to spare.
-function genWalkFinal(lo, hi, first) {
-  const params = first ? [...fFn, ...cN, ...ciN, ...wN] : [...fFn, ...cN, ...ciN, ...wN, ...names12('tin')];
-  const L = [];
-  L.push('pragma cashscript ^0.14.0;');
-  L.push(`import "${LIB_IMPORT}";`);
-  L.push(`// residue tail walk+finalize (FUSED, terminal): w^|x| iters [${lo},${hi}) then ((t)*w)^9==ONE, c*cInv==ONE, fF*w==frob(c,1).`);
-  L.push('contract ResidueWalkFinalBls() {');
-  L.push(`    function spend(${decl(params)}, bytes unused zeroPadding) {`);
-  L.push(covIn(first ? [...fFn, ...cN, ...ciN] : [...fFn, ...cN, ...ciN, ...wN, ...names12('tin')]));
-  L.push(`        int P = ${Pstr};`);
-  if (first) { L.push('        ' + canon(wN)); L.push(`        ${tN.map((n, i) => `int ${n}=w${i};`).join(' ')}`); }
-  else { L.push(`        ${tN.map((n, i) => `int ${n}=tin${i};`).join(' ')}`); }
-  L.push(walkLoop(lo, hi));
-  for (const ln of finalizeLines()) L.push(ln);
-  L.push('    }');
-  L.push('}');
-  return L.join('\n') + '\n';
-}
-
-// JS replay of the walk accumulator t after `upto` iterations (for planning + build vectors).
-export function residueWalkT(w, upto) {
-  let t = w;
-  for (let wi = 0; wi < upto; wi++) { t = Fp12.sqr(t); if (((ABS_X >> BigInt(62 - wi)) & 1n) === 1n) t = Fp12.mul(t, w); }
-  return t;
+  const lines = [
+    'pragma cashscript ^0.14.0;',
+    `import "${LIB_IMPORT}";`,
+    '// Terminal residue verdict: w in Fp6*, c*cInv == ONE, fF*w == frob(c,1).',
+    'contract ResidueFinalizeBls() {',
+    `    function spend(${decl([...fFn, ...cN, ...ciN, ...wN])}, bytes unused zeroPadding) {`,
+    covIn([...fFn, ...cN, ...ciN]),
+    `        int P = ${P};`,
+    `        ${canon(cN)}`,
+    `        ${canon(wN)}`,
+    `        (${decl(names12('p'))}) = fp12Mul(${cN.join(',')}, ${ciN.join(',')});`,
+    `        ${eqOne('p')}`,
+    `        (${decl(names12('lhs'))}) = fp12Mul(${fFn.join(',')}, ${wN.join(',')}, 0,0,0,0,0,0);`,
+    `        (${decl(names12('rhs'))}) = fp12Frob1(${cN.join(',')});`,
+    `        ${Array.from({ length: 12 }, (_, i) => `require(lhs${i} % P == rhs${i} % P);`).join(' ')}`,
+    '    }',
+    '}',
+  ];
+  return `${lines.join('\n')}\n`;
 }
 
 if (process.argv[1] && process.argv[1].endsWith('gen_finalexp_residue.mjs')) {
   const pairs = pairsFor(PUBLIC_INPUTS);
   const { boundary: fRaw } = millerBatchOps(pairs);
   const { c, cInv, w } = residueWitness(fRaw);
-  const fused = millerFusedOps(pairs, c, cInv);
-  const fFl = fp12limbsOf(fused.boundary), cl = fp12limbsOf(c), cil = fp12limbsOf(cInv), wl = fp12limbsOf(w);
+  const fF = millerFusedOps(pairs, c, cInv).boundary;
+  const fFl = fp12limbsOf(fF);
+  const cl = fp12limbsOf(c);
+  const cil = fp12limbsOf(cInv);
+  const w12 = fp12limbsOf(w);
+  if (w12.slice(6).some((limb) => limb !== 0n)) throw new Error('residue witness is not in the embedded Fp6');
+  const wl = w12.slice(0, 6);
   const commit36 = [...fFl, ...cl, ...cil];
-  const state5At = (upto) => [...fFl, ...cl, ...cil, ...wl, ...fp12limbsOf(residueWalkT(w, upto))];
+  const source = genFinalize();
+  const measurement = measureCovenantFile(
+    source,
+    [...commit36, ...wl],
+    commit36,
+    [],
+    PROBE,
+  );
+  if (!measurement.accepted || measurement.lockingBytes > BYTE_BUDGET || measurement.operationCost > OP_TARGET) {
+    throw new Error(
+      `residue Fp6 verdict does not fit (accepted=${measurement.accepted} ` +
+      `lock=${measurement.lockingBytes} op=${measurement.operationCost.toLocaleString()})`,
+    );
+  }
 
-  console.error(`planning residue tail walk (${NWALK} iters)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
-  const chunks = []; let lo = 0; const planState = { perUnit: null };
-  while (lo < NWALK) {
-    const first = lo === 0;
-    const inPush = first ? [...commit36, ...wl] : state5At(lo);
-    const inCommit = first ? commit36 : state5At(lo);
-    const tryHi = (hi) => {
-      const src = first ? genWalk(lo, hi) : genWalkNonFirst(lo, hi);
-      const out = state5At(hi);
-      const m = measureCovenantFile(src, inPush, inCommit, out, PROBE);
-      return { hi, src, m, outgoing: commit(out), fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost };
-    };
-    const best = planChunk(lo, NWALK, OP_TARGET, tryHi, planState);
-    if (!best) throw new Error(`no fitting walk window at ${lo}`);
-    const idx = chunks.length;
-    writeFileSync(join(GEN, `finalexpres_${String(idx).padStart(2, '0')}.cash`), best.src);
-    chunks.push({ idx, role: 'walk', lo, hi: best.hi, final: false, incoming: commit(inCommit), outgoing: best.outgoing });
-    console.error(`  walk chunk ${idx}: iters[${lo},${best.hi}) op=${best.operationCost.toLocaleString()} lock=${best.m.lockingBytes}B`);
-    lo = best.hi;
-  }
-  if (process.env.FUSE_FINAL === '1') {
-    // Fold the finalize verdict into the LAST walk chunk (terminal), dropping the separate finalize
-    // input. Fits only when the last walk window + ~4M-op verdict stay under OP_TARGET (the LARGE
-    // bch-spec budget); errors otherwise so a too-tight fusion is caught, not silently mis-planned.
-    const last = chunks[chunks.length - 1];
-    const first = last.lo === 0;
-    const src = genWalkFinal(last.lo, last.hi, first);
-    const inPush = first ? [...commit36, ...wl] : state5At(last.lo);
-    const inCommit = first ? commit36 : state5At(last.lo);
-    const mF = measureCovenantFile(src, inPush, inCommit, [], PROBE); // terminal -> outLimbs []
-    if (!mF.accepted || mF.lockingBytes > BYTE_BUDGET || mF.operationCost > OP_TARGET)
-      throw new Error(`FUSE_FINAL: fused walk+finalize does not fit (accepted=${mF.accepted} lock=${mF.lockingBytes} op=${mF.operationCost.toLocaleString()})`);
-    writeFileSync(join(GEN, `finalexpres_${String(last.idx).padStart(2, '0')}.cash`), src);
-    last.final = true; last.fused = true;
-    console.error(`  FUSED walk+finalize chunk ${last.idx}: iters[${last.lo},${last.hi}) op=${mF.operationCost.toLocaleString()} lock=${mF.lockingBytes}B (finalize folded in, terminal)`);
-    // negative: tamper fF -> the verdict fF*w==frob(c,1) fails -> reject
-    const badPush = inPush.slice(); badPush[0] = badPush[0] + 1n;
-    const badCommit = inCommit.slice(); badCommit[0] = badCommit[0] + 1n;
-    console.error(`  fused finalize (tampered fF): accepted=${measureCovenantFile(src, badPush, badCommit, [], PROBE).accepted} (expect false)`);
-  } else {
-    // finalize chunk (separate terminal input)
-    const fin = genFinalize();
-    const fidx = chunks.length;
-    writeFileSync(join(GEN, `finalexpres_${String(fidx).padStart(2, '0')}.cash`), fin);
-    const inFin = state5At(NWALK);
-    const mF = measureCovenantFile(fin, inFin, inFin, [], PROBE);
-    chunks.push({ idx: fidx, role: 'finalize', final: true, incoming: commit(inFin) });
-    console.error(`  finalize chunk ${fidx}: op=${mF.operationCost.toLocaleString()} lock=${mF.lockingBytes}B accepted=${mF.accepted} ${mF.error ?? ''}`);
-    // negative: tamper fF in finalize verdict -> reject
-    const badF = inFin.slice(); badF[0] = badF[0] + 1n;
-    console.error(`finalize (tampered fF): accepted=${measureCovenantFile(fin, badF, badF, [], PROBE).accepted} (expect false)`);
-  }
-  for (let i = 1; i < chunks.length; i++) if (chunks[i - 1].outgoing !== chunks[i].incoming) throw new Error('tail continuity break at ' + i);
+  const file = join(GEN, 'finalexpres_00.cash');
+  writeFileSync(file, source);
+  console.error(
+    `  Fp6 residue verdict: op=${measurement.operationCost.toLocaleString()} ` +
+    `lock=${measurement.lockingBytes}B accepted=${measurement.accepted}`,
+  );
+
+  const badF = [...commit36];
+  badF[0] += 1n;
+  const badFMeasurement = measureCovenantFile(source, [...badF, ...wl], badF, [], PROBE);
+  if (badFMeasurement.accepted) throw new Error('tampered fF passed the residue verdict');
+  console.error('  tampered fF rejected');
+
+  const alternateW = mk12([1n, 2n, 3n, 4n, 5n, 6n], Array(6).fill(0n));
+  const alternateF = Fp12.mul(frob(c, 1), Fp12.inv(alternateW));
+  const alternateCommit = [...fp12limbsOf(alternateF), ...cl, ...cil];
+  const alternateMeasurement = measureCovenantFile(
+    source,
+    [...alternateCommit, ...fp12limbsOf(alternateW).slice(0, 6)],
+    alternateCommit,
+    [],
+    PROBE,
+  );
+  if (!alternateMeasurement.accepted) throw new Error('arbitrary embedded Fp6 witness rejected');
+  console.error('  arbitrary embedded Fp6 witness accepted');
+
   writeFileSync(join(GEN, 'manifest_finalexpres.json'), JSON.stringify({
-    residueTail: true, numChunks: chunks.length, nwalk: NWALK,
-    chunks: chunks.map((c) => ({ idx: c.idx, role: c.role, lo: c.lo ?? null, hi: c.hi ?? null, final: c.final, fused: c.fused ?? false })),
+    residueTail: true,
+    fp6Membership: true,
+    deployment: LINKED ? 'linked-hash-free' : 'covenant',
+    covenantResidue: COVENANT_RESIDUE,
+    numChunks: 1,
+    nwalk: 0,
+    chunks: [{
+      idx: 0, role: 'finalize', final: true,
+      witnessLimbs: [0, 1, 2, 3, 4, 5], implicitZeroLimbs: [6, 7, 8, 9, 10, 11],
+    }],
   }, null, 2));
-  console.error(`residue tail: ${chunks.length} chunks`);
+  console.error('residue tail: 1 chunk');
 }

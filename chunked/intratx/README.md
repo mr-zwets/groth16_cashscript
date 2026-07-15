@@ -24,11 +24,13 @@ chunk of a stage is genesis (nothing binds its input); the last asserts the verd
 (`finalExp == 1`). Cross-stage links are bound where byte layouts line up: **vk_x** into
 the Miller genesis input, the **Miller boundary** into the final-exp genesis input.
 
-Each input still fits one BCH budget (op-cost ≤ 8,032,800, script ≤ 10,000 B), so the
-chunking — and the chunk math, reused verbatim — is identical to the covenant version.
-What changes is packaging: ~60–84 inputs in one **non-standard (< 1 MB) transaction**
-instead of that many sequential transactions, with no per-step hashing and no 128-byte
-state cap.
+Each input still fits one BCH budget (op-cost ≤ 8,032,800, script ≤ 10,000 B). The plain and BLS
+graphs reuse the covenant chunks verbatim; the BN254 quotient-torus graph instead specializes its
+arithmetic for the linked layout. In either case, every chunk is an input of one transaction instead
+of one of many sequential transactions, with no per-step hashing and no 128-byte state cap. The
+plain graphs remain larger non-standard transactions. The optimized BN254 quotient-torus graph is
+13 inputs in one standard 99,993-byte transaction; the BLS12-381 quotient-torus graph is 34 inputs
+in one current-BCH consensus-valid 195,705-byte transaction, non-standard only by total size.
 
 ### P2SH deployment
 
@@ -122,8 +124,9 @@ sibling's forward-check.
 ### Standardness
 
 A 100 kB input exceeds standard relay policy (the *tx* exceeds `maximumStandardTransactionSize` =
-100,000), so the transaction is non-standard and must be mined directly — but the single-tx intratx
-bundle was already non-standard (< 1 MB), so nothing new is given up.
+100,000), so the transaction is non-standard and must be mined directly. The plain and BLS
+current-BCH intra-tx bundles are also non-standard; the 99,993-byte BN254 quotient-torus fixture is
+the standard-policy-valid exception.
 
 ## Files
 
@@ -135,11 +138,12 @@ bundle was already non-standard (< 1 MB), so nothing new is given up.
   the full verifier (`bch-groth16-intratx`) into one-transaction vectors, evaluates every
   input on the real BCH 2026 VM, and writes `verifier/src/bch/{pairing,groth16}-intratx-vectors.json`.
 - `build_vectors_bls.mjs` — BLS12-381 counterpart (`bch-pairing-bls12381-intratx`,
-  `bch-groth16-bls12381-intratx`); 48-byte limbs, the easy-part inverse rides as an
-  uncommitted witness.
+  `bch-groth16-bls12381-intratx`); the full track uses five stage-bound GLV vk_x inputs
+  sharing one hash-bound VK table, 48-byte limbs, and an uncommitted easy-part inverse.
 - `build_vectors_residue.mjs` / `build_vectors_residue_bls.mjs` — the residue-optimized chunk graph
-  (GLV `vk_x` + fused Miller + witnessed-residue tail) assembled as one tx, current-BCH 10 kB budget
-  (`bch-groth16-intratx-residue`, `bch-groth16-bls12381-intratx-residue`).
+  (GLV `vk_x` + fused Miller + residue verdict) assembled as one tx under the current-BCH 10 kB
+  budget (`bch-groth16-intratx-residue`, `bch-groth16-bls12381-intratx-residue`). Their opt-in
+  quotient modes carry six-limb classes in `Fp12*/Fp6*` and fuse the verdict into Miller.
 - `build_vectors_residue_large.mjs` / `build_vectors_residue_bls_large.mjs` — the same residue graph
   sized to 100 kB inputs for the proposed `bch-spec` VM (see "Large scripts" above);
   `bch-groth16-intratx-residue-large`, `bch-groth16-bls12381-intratx-residue-large`.
@@ -166,6 +170,32 @@ STAGE_BOUND_LAYOUT=1 MILLER_LINKED_LAYOUT=1 node chunked/pairing/gen_miller_resi
 node chunked/intratx/build_vectors_residue.mjs
 node chunked/grouped/build_vectors_residue.mjs
 ```
+
+The quotient-torus frontier has a separate deterministic entry point. It enables the endpoint,
+affine-G2, unit-line, stage-bound, covenant-residue, and linked layouts together; uses the frozen
+measured cuts; proves the affine steps, normalized lines, raw-integer bounds, endpoint subgroup
+equivalence, and quotient algebra; and refuses to write a vector unless the committed and second
+proof transactions pass both whole current-BCH consensus and standard-policy VMs.
+
+```
+VERIFIER_DIR=/absolute/path/to/zk-verifier-bench pnpm vectors:intratx:torus
+```
+
+For the committed fixture this produces 13 inputs and a 99,993-byte serialized transaction. The
+second valid proof is 99,675 bytes and also standard. The deliberately dense worst-case fixture is
+117,563 bytes: it remains current-BCH consensus-valid but exceeds the standard transaction-size
+policy, so the benchmark reports that distinction explicitly.
+
+The BLS12-381 quotient frontier has the same proof-before-write workflow and a separate opt-in
+entry point; the unflagged BLS commands continue to generate the legacy Fp6-tail construction.
+
+```
+VERIFIER_DIR=/absolute/path/to/zk-verifier-bench pnpm vectors:intratx:torus:bls
+```
+
+It produces 34 inputs, 195,413 script bytes, 153,091,714 total op-cost, and a 195,705-byte
+serialized transaction. The committed, alternate, and dense fixtures all pass current-BCH
+consensus; each is non-standard only because the full transaction exceeds 100,000 bytes.
 
 ## Harness support
 

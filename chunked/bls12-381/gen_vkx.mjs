@@ -2,13 +2,16 @@
 // BLS12-381 port of chunked/pairing/gen_vkx.mjs: a single MSB-first double-and-add
 // over one Jacobian accumulator R, per bit adding one of {IC1, IC2, T=IC1+IC2}
 // chosen in-script from (bit_i(in0), bit_i(in1)); IC0 folded at the end, then a
-// verified-inverse-on-stack -> affine, COMMITTING the computed vk_x to output[0]
-// (proof-agnostic: no baked instance). Public inputs in0,in1 are RUNTIME (carried,
-// committed state = rX,rY,rZ,in0,in1 in the token NFT commitment).
+// verified-inverse-on-stack -> affine. The first chunk accepts only the public inputs,
+// range-checks them, and derives the infinity accumulator in-contract.
+//
+// Default output is the standalone vk_x point. `node gen_vkx.mjs full` writes a
+// separate vkxfull namespace whose final chunk additionally accepts the runtime
+// (-A,B,C) tuple and commits (-A,B,C,vk_x), the exact G2-validation genesis state.
 //
 // MAGNITUDE-INDEPENDENT: the loop tiles ALL 255 scalar-field bit positions, and the
-// chunk windows are sized against a WORST-CASE planning input with every bit set (so
-// every position executes both a doubling and an add). One fixed set of lockings
+// chunk windows are sized against two canonical complementary scalars whose union sets
+// every bit (so every position executes both a doubling and an add). One fixed set of lockings
 // therefore aggregates ANY public inputs < r, exactly like the EVM ecMul precompile
 // (flat cost, no small-input optimization) -- not a small-input-only aggregator.
 //
@@ -21,6 +24,7 @@ import {
   P, ITERS, MSBASE, IC0, IC1, IC2, T, covIn, covOut, measureCovenant,
   vkxStateAt, vkxFinalZinv, jacAdd, planChunk, OP_BUDGET,
 } from './_vkxmath.mjs';
+import { proof } from '../../singleton/bls12-381/bls_instance.mjs';
 
 // outgoing limbs of the FINAL chunk: fold IC0 into acc, invert, -> affine vk_x.
 const finalOut = (acc, zInv) => {
@@ -35,10 +39,22 @@ mkdirSync(GEN, { recursive: true });
 const Pstr = P.toString();
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_900_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
+const FULL_STAGE = process.argv[2] === 'full';
+const PREFIX = FULL_STAGE ? 'vkxfull' : 'vkx';
+const MANIFEST = `manifest_${PREFIX}.json`;
+const FR_ORDER = 52435875175126190479447740508185965837690552500527637822603658699938581184513n;
+if ([IC1, IC2, T].some(([x]) => x === 0n)) throw new Error('x=0 is reserved for the Shamir no-add sentinel');
 
-// WORST-CASE planning input: every bit set -> every position does double + add.
-// Sizing windows against this makes the covenant work for ANY input < r.
-const PLAN = (1n << BigInt(ITERS)) - 1n;
+// WORST-CASE arithmetic planning inputs: both are canonical Fr scalars, and their
+// bitwise union has every one of the 255 positions set, so every position executes
+// a doubling + add without bypassing the contract's canonical-range checks.
+const BIT_MASK = (1n << BigInt(ITERS)) - 1n;
+const PLAN0 = FR_ORDER - 1n;
+const PLAN1 = BIT_MASK ^ PLAN0;
+if (PLAN1 >= FR_ORDER || (PLAN0 | PLAN1) !== BIT_MASK) throw new Error('invalid worst-case vk_x planning scalars');
+const PROOF_NAMES = ['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy'];
+const proofA = proof.a.negate().toAffine(), proofB = proof.b.toAffine(), proofC = proof.c.toAffine();
+const PROOF_LIMBS = [proofA.x, proofA.y, proofB.x.c0, proofB.x.c1, proofB.y.c0, proofB.y.c1, proofC.x, proofC.y];
 
 // ---- contract template (loop-based, runtime-input committed state) ----
 const prologue = () => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
@@ -79,30 +95,39 @@ function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int,
     }
     return rx, ry, rz;
 }
-function selectPoint(int b0, int b1) returns (int, int, int) {
-    int aX = 0; int aY = 0; int doAdd = 0;
-    if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; doAdd = 1; }
-    else { if (b0 == 1) { aX = ${IC1[0]}; aY = ${IC1[1]}; doAdd = 1; }
-           else { if (b1 == 1) { aX = ${IC2[0]}; aY = ${IC2[1]}; doAdd = 1; } } }
-    return aX, aY, doAdd;
+// x=0 denotes no add; every fixed-table x-coordinate is nonzero.
+function selectPoint(int b0, int b1) returns (int, int) {
+    int aX = 0; int aY = 0;
+    if (b0 == 1 && b1 == 1) { aX = ${T[0]}; aY = ${T[1]}; }
+    else { if (b0 == 1) { aX = ${IC1[0]}; aY = ${IC1[1]}; }
+           else { if (b1 == 1) { aX = ${IC2[0]}; aY = ${IC2[1]}; } } }
+    return aX, aY;
 }`;
 
 function genCash(lo, hi, final) {
   const count = hi - lo, hiBit = MSBASE - lo;
+  const first = lo === 0;
+  const stateNames = first ? ['input0', 'input1'] : ['rX', 'rY', 'rZ', 'input0', 'input1'];
+  const extras = [...(final ? ['zInv'] : []), ...(final && FULL_STAGE ? PROOF_NAMES : [])];
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
   L.push(`// BLS12-381 vk_x chunk: Shamir window [${lo},${hi}), final=${final}.`);
   L.push(prologue());
   L.push('contract VkxBlsChunk() {');
-  L.push(final ? '    function spend(int rX, int rY, int rZ, int input0, int input1, int zInv, bytes unused zeroPadding) {' : '    function spend(int rX, int rY, int rZ, int input0, int input1, bytes unused zeroPadding) {');
-  L.push(covIn(['rX', 'rY', 'rZ', 'input0', 'input1'])); // incoming accumulator+inputs == spent token commitment
+  L.push(`    function spend(${[...stateNames, ...extras].map((name) => `int ${name}`).join(', ')}, bytes unused zeroPadding) {`);
+  L.push(covIn(stateNames));
+  if (first) {
+    L.push(`        require(input0 >= 0); require(input0 < ${FR_ORDER});`);
+    L.push(`        require(input1 >= 0); require(input1 < ${FR_ORDER});`);
+    L.push('        int rX = 0; int rY = 1; int rZ = 0;');
+  }
   L.push(`        for (int k = 0; k < ${count}; k = k + 1) {`);
   L.push(`            int i = ${hiBit} - k;`);
   L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
   L.push('            int b0 = (input0 >> i) % 2;');
   L.push('            int b1 = (input1 >> i) % 2;');
-  L.push('            (int aX, int aY, int doAdd) = selectPoint(b0, b1);');
-  L.push('            if (doAdd == 1) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
+  L.push('            (int aX, int aY) = selectPoint(b0, b1);');
+  L.push('            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
   L.push('        }');
   if (final) {
     L.push(`        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, ${IC0[0]}, ${IC0[1]});`);
@@ -111,11 +136,15 @@ function genCash(lo, hi, final) {
     L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
     L.push('        int vkxX = mulFp(rX, zInv2);');
     L.push('        int vkxY = mulFp(rY, zInv3);');
-    // commit the computed vk_x to output[0] (consumed by the pairing's pair-2);
-    // NOT compared to a baked point, so this aggregates any instance's inputs.
-    L.push(covOut(['vkxX', 'vkxY']));
+    // The full-stage namespace commits the proof tuple beside vk_x so G2 validation
+    // and Miller consume one exact, sequential token state.
+    // Preserve the proof tuple exactly for the downstream range gate. mulFp makes vk_x canonical.
+    const outputs = FULL_STAGE ? [...PROOF_NAMES, 'vkxX', 'vkxY'] : ['vkxX', 'vkxY'];
+    L.push(covOut(outputs, outputs));
   } else {
-    L.push(covOut(['rX', 'rY', 'rZ', 'input0', 'input1']));
+    // Genesis bounds the scalars and derives infinity; fixed-point Jacobian helpers are reduced.
+    const outputs = ['rX', 'rY', 'rZ', 'input0', 'input1'];
+    L.push(covOut(outputs, outputs));
   }
   L.push('    }');
   L.push('}');
@@ -125,30 +154,35 @@ function genCash(lo, hi, final) {
 // ---- fast probe (no planner): one fixed window, report op-cost ----
 if (process.argv[2] === 'probe') {
   const lo = Number(process.argv[3] ?? 0), hi = Number(process.argv[4] ?? lo + 1), final = hi === ITERS;
-  const [rX0, rY0, rZ0] = vkxStateAt(PLAN, PLAN, lo);
-  const [rX, rY, rZ] = vkxStateAt(PLAN, PLAN, hi);
-  const acc = vkxStateAt(PLAN, PLAN, hi);
-  const commitInts = [rX0, rY0, rZ0, PLAN, PLAN];
-  const zInv = final ? vkxFinalZinv(PLAN, PLAN) : null;
+  const [rX0, rY0, rZ0] = vkxStateAt(PLAN0, PLAN1, lo);
+  const [rX, rY, rZ] = vkxStateAt(PLAN0, PLAN1, hi);
+  const acc = vkxStateAt(PLAN0, PLAN1, hi);
+  const commitInts = lo === 0 ? [PLAN0, PLAN1] : [rX0, rY0, rZ0, PLAN0, PLAN1];
+  const zInv = final ? vkxFinalZinv(PLAN0, PLAN1) : null;
   const stateInts = final ? [...commitInts, zInv] : commitInts;
-  const outLimbs = final ? finalOut(acc, zInv) : [acc[0], acc[1], acc[2], PLAN, PLAN];
+  const outLimbs = final ? finalOut(acc, zInv) : [acc[0], acc[1], acc[2], PLAN0, PLAN1];
   const m = measureCovenant(genCash(lo, hi, final), stateInts, commitInts, outLimbs);
   console.error(`probe [${lo},${hi}) final=${final}: lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted}${m.error ? ' err=' + m.error : ''}`);
   process.exit(0);
 }
 
-// ---- plan + emit (worst-case windows; predict-and-adjust greedy growth) ----
-console.error(`planning BLS12-381 vk_x chunks (WORST-CASE all-bits-set, ${ITERS} positions)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
+// ---- plan + emit (worst-case arithmetic windows; predict-and-adjust greedy growth) ----
+console.error(`planning BLS12-381 ${FULL_STAGE ? 'full-stage ' : ''}vk_x chunks (in-range add-at-every-position fixture, ${ITERS} positions)  OP_TARGET=${OP_TARGET.toLocaleString()}`);
 const chunks = []; let lo = 0; const planState = { perUnit: null };
 while (lo < ITERS) {
-  const [rX0, rY0, rZ0] = vkxStateAt(PLAN, PLAN, lo);
-  const commitInts = [rX0, rY0, rZ0, PLAN, PLAN];
+  const [rX0, rY0, rZ0] = vkxStateAt(PLAN0, PLAN1, lo);
+  const commitInts = lo === 0 ? [PLAN0, PLAN1] : [rX0, rY0, rZ0, PLAN0, PLAN1];
   const tryAt = (hi) => {
     const final = hi === ITERS;
-    const acc = vkxStateAt(PLAN, PLAN, hi);
+    const acc = vkxStateAt(PLAN0, PLAN1, hi);
     let outLimbs, zInv = null, stateInts;
-    if (final) { zInv = vkxFinalZinv(PLAN, PLAN); outLimbs = finalOut(acc, zInv); stateInts = [...commitInts, zInv]; }
-    else { outLimbs = [acc[0], acc[1], acc[2], PLAN, PLAN]; stateInts = commitInts; }
+    if (final) {
+      zInv = vkxFinalZinv(PLAN0, PLAN1);
+      const vkx = finalOut(acc, zInv);
+      outLimbs = FULL_STAGE ? [...PROOF_LIMBS, ...vkx] : vkx;
+      stateInts = [...commitInts, zInv, ...(FULL_STAGE ? PROOF_LIMBS : [])];
+    }
+    else { outLimbs = [acc[0], acc[1], acc[2], PLAN0, PLAN1]; stateInts = commitInts; }
     const src = genCash(lo, hi, final);
     const m = measureCovenant(src, stateInts, commitInts, outLimbs);
     return { src, final, zInv, operationCost: m.operationCost, lockingBytes: m.lockingBytes, fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET };
@@ -156,15 +190,16 @@ while (lo < ITERS) {
   const best = planChunk(lo, ITERS, OP_TARGET, tryAt, planState);
   if (!best) throw new Error(`no fitting window at lo=${lo} (single step exceeds budget?)`);
   const idx = chunks.length;
-  writeFileSync(join(GEN, `vkx_${String(idx).padStart(2, '0')}.cash`), best.src);
+  writeFileSync(join(GEN, `${PREFIX}_${String(idx).padStart(2, '0')}.cash`), best.src);
   chunks.push({ idx, lo, hi: best.hi, final: best.final, operationCost: best.operationCost, lockingBytes: best.lockingBytes });
   console.error(`  vkx chunk ${idx}: [${lo},${best.hi}) iters=${best.hi - lo} lock=${best.lockingBytes}B op=${best.operationCost.toLocaleString()} final=${best.final}`);
   lo = best.hi;
 }
 const totalOp = chunks.reduce((a, c) => a + c.operationCost, 0);
 console.error(`vk_x: ${chunks.length} chunks, total op=${totalOp.toLocaleString()} (worst-case sizing)`);
-writeFileSync(join(GEN, 'manifest_vkx.json'), JSON.stringify({
-  curve: 'BLS12-381', iters: ITERS, worstCaseSized: true, numChunks: chunks.length, totalOperationCost: totalOp,
+writeFileSync(join(GEN, MANIFEST), JSON.stringify({
+  curve: 'BLS12-381', iters: ITERS, worstCaseSized: true, genesisDerived: true,
+  fullStageBound: FULL_STAGE, numChunks: chunks.length, totalOperationCost: totalOp,
   chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, final: c.final })),
 }, null, 2));
-console.error('wrote generated/manifest_vkx.json');
+console.error(`wrote generated/${MANIFEST}`);

@@ -5,13 +5,15 @@
 // folds all 4 scalars into ONE add per iteration -> ~half the doublings (vkx ~9 -> ~4 chunks).
 // The decomposition witnesses k10,k20,k11,k21 are checked on-chain at genesis
 // (k1 + k2*lambda == in mod r); phi(IC1),phi(IC2) and the table are baked (proof-independent).
-// State (committed, 9 limbs): rX,rY,rZ, in0,in1, k10,k20,k11,k21.
+// State (committed, 9 limbs): rX,rY,rZ, in0,in1, k10,k20,k11,k21. The
+// covenant-residue layout carries the validated (-A,B,C) tuple beside this state
+// and emits (-A,B,C,vk_x) for the Miller stage.
 //   node gen_vkx_glv.mjs    plan + emit vkxglv_NN.cash + manifest_vkxglv.json
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { bn254, vk, measureCovenant, covIn, covOut } from './_millermath.mjs';
+import { bn254, vk, proof, measureCovenant, covIn, covOut } from './_millermath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -23,6 +25,7 @@ const Pstr = P.toString();
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
+const COVENANT_RESIDUE = STAGE_BOUND && process.env.COVENANT_RESIDUE_LAYOUT === '1';
 const ITERS = 128; // GLV sub-scalars are <= 127 bits; 128 MSB-first positions
 
 // ---- GLV constants (computed; proof-independent) ----
@@ -66,6 +69,7 @@ for (let idx = 1; idx < 16; idx++) {
   for (let i = 0; i < 4; i++) if (idx & (1 << i)) acc = acc.add(BP[i]);
   const a = acc.toAffine(); TABLE[idx] = [a.x, a.y];
 }
+if (TABLE.slice(1).some(([x]) => x === 0n)) throw new Error('x=0 is reserved for the GLV no-add sentinel');
 // Encode the 15-entry table as a single 960-byte blob: entry (idx-1) = x(LE32) || y(LE32).
 // A runtime `split` reads entry idx in O(1) (one indexed slice) — ~74% cheaper op-cost than the
 // 15-deep if/else dispatch, which costs ~3.5M op in branch comparisons over the 128-iter Straus.
@@ -79,9 +83,13 @@ const tableBytes = Buffer.from(TABLE_HEX.slice(2), 'hex');
 const TABLE_HASH_HEX = '0x' + createHash('sha256').update(tableBytes).digest('hex');
 
 // ---- contract template ----
-const SER = 'hash256(toPaddedBytes(rX, 40) + toPaddedBytes(rY, 40) + toPaddedBytes(rZ, 40) + toPaddedBytes(in0, 40) + toPaddedBytes(in1, 40) + toPaddedBytes(k10, 40) + toPaddedBytes(k20, 40) + toPaddedBytes(k11, 40) + toPaddedBytes(k21, 40))';
 const STATE = ['rX', 'rY', 'rZ', 'in0', 'in1', 'k10', 'k20', 'k11', 'k21'];
 const GENESIS_STATE = STATE.slice(3);
+const PROOF_STATE = ['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy'];
+const proofA = proof.a.negate().toAffine();
+const proofB = proof.b.toAffine();
+const proofC = proof.c.toAffine();
+const PROOF_LIMBS = [proofA.x, proofA.y, proofB.x.c0, proofB.x.c1, proofB.y.c0, proofB.y.c1, proofC.x, proofC.y];
 const prologue = (sharedTable) => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
 function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
@@ -120,19 +128,19 @@ function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int,
     }
     return rx, ry, rz;
 }
-function select16(int idx${sharedTable ? ', bytes table' : ''}) returns (int, int, int) {
-    int aX = 0; int aY = 0; int doAdd = 0;
+function select16(int idx${sharedTable ? ', bytes table' : ''}) returns (int, int) {
+    // idx=0 keeps aX=0; every fixed affine table entry has nonzero x.
+    int aX = 0; int aY = 0;
     if (idx != 0) {
         ${sharedTable ? '' : `bytes table = ${TABLE_HEX};`}
         bytes ent = table.split((idx - 1) * 64)[1].split(64)[0];
         aX = int(ent.split(32)[0]);
         aY = int(ent.split(32)[1]);
-        doAdd = 1;
     }
-    return aX, aY, doAdd;
+    return aX, aY;
 }`;
 
-export function genCash(lo, hi, first, final, stageBound = false, sharedTable = null) {
+export function genCash(lo, hi, first, final, stageBound = false, sharedTable = null, covenantResidue = false) {
   if (sharedTable !== null && (!Number.isSafeInteger(sharedTable.inputIndex) || sharedTable.inputIndex < 0 ||
     !Number.isSafeInteger(sharedTable.dataOffset) || sharedTable.dataOffset < 0)) {
     throw new Error(`invalid shared GLV table source: ${JSON.stringify(sharedTable)}`);
@@ -143,11 +151,14 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
   L.push(`// GLV vk_x chunk: 4-scalar Straus window [${lo},${hi}), first=${first} final=${final}.`);
   L.push(prologue(sharedTable !== null));
   L.push('contract VkxGlvChunk() {');
-  const stateParams = stageBound && first ? GENESIS_STATE : STATE;
+  const stateParams = covenantResidue
+    ? (first ? [...PROOF_STATE, ...GENESIS_STATE] : [...STATE, ...PROOF_STATE])
+    : stageBound && first ? GENESIS_STATE : STATE;
+  const committedParams = covenantResidue && first ? PROOF_STATE : stateParams;
   const extraParams = [final ? 'int zInv' : null, sharedTable !== null && final ? 'bytes glvTable' : null]
     .filter(Boolean);
   L.push(`    function spend(${[...stateParams.map((s) => `int ${s}`), ...extraParams, 'bytes unused zeroPadding'].join(', ')}) {`);
-  L.push(covIn(stateParams));
+  L.push(covIn(committedParams));
   if (sharedTable !== null) {
     if (final) L.push(`        require(sha256(glvTable) == ${TABLE_HASH_HEX});`);
     else L.push(`        bytes glvTable = tx.inputs[${sharedTable.inputIndex}].unlockingBytecode.split(${sharedTable.dataOffset})[1].split(${tableBytes.length})[0];`);
@@ -159,6 +170,10 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
     // prover could add r to a scalar — same residue mod r, but bits above 127 would be silently
     // dropped, computing the wrong vk_x).
     const BOUND = 1n << 128n;
+    if (covenantResidue) {
+      L.push(`        require(in0 >= 0); require(in0 < ${r});`);
+      L.push(`        require(in1 >= 0); require(in1 < ${r});`);
+    }
     L.push('        require(k10 >= 0 && k20 >= 0 && k11 >= 0 && k21 >= 0);');
     L.push(`        require(k10 < ${BOUND}); require(k20 < ${BOUND}); require(k11 < ${BOUND}); require(k21 < ${BOUND});`);
     L.push(`        require((k10 + k20 * ${LAM}) % ${r} == in0);`);
@@ -168,8 +183,8 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
   L.push(`            int i = ${hiBit} - k;`);
   L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
   L.push('            int idx = (k10 >> i) % 2 + 2 * ((k20 >> i) % 2) + 4 * ((k11 >> i) % 2) + 8 * ((k21 >> i) % 2);');
-  L.push(`            (int aX, int aY, int doAdd) = select16(idx${sharedTable !== null ? ', glvTable' : ''});`);
-  L.push('            if (doAdd == 1) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
+  L.push(`            (int aX, int aY) = select16(idx${sharedTable !== null ? ', glvTable' : ''});`);
+  L.push('            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
   L.push('        }');
   if (final) {
     L.push(`        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, ${IC0[0]}, ${IC0[1]});`);
@@ -177,9 +192,16 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
     L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
     L.push('        int vkxX = mulFp(icx, zInv2);');
     L.push('        int vkxY = mulFp(icy, zInv3);');
-    L.push(covOut(['vkxX', 'vkxY']));
+    const finalState = covenantResidue
+      ? [...PROOF_STATE, 'vkxX', 'vkxY']
+      : ['vkxX', 'vkxY'];
+    L.push(covOut(finalState, finalState));
   } else {
-    L.push(covOut(STATE));
+    // Upstream G2 bounds the proof tuple and its exact commitment seam carries it here; this
+    // genesis bounds inputs/GLV witnesses, and the Jacobian helpers reduce derived coordinates.
+    // Legacy layouts still reduce here.
+    const nextState = covenantResidue ? [...STATE, ...PROOF_STATE] : STATE;
+    L.push(covOut(nextState, covenantResidue || stageBound || !first ? nextState : []));
   }
   L.push('    }');
   L.push('}');
@@ -227,12 +249,17 @@ if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
     const tryHi = (hi) => {
       const final = hi === ITERS, first = lo === 0;
       const fullIn = SER_state(X0, Y0, Z0).map(String);
-      const inSt = STAGE_BOUND && first ? fullIn.slice(3) : fullIn;
+      const proofState = PROOF_LIMBS.map(String);
+      const inSt = COVENANT_RESIDUE
+        ? (first ? proofState : [...fullIn, ...proofState])
+        : STAGE_BOUND && first ? fullIn.slice(3) : fullIn;
+      const firstArgs = COVENANT_RESIDUE && first ? [...proofState, ...fullIn.slice(3)] : inSt;
       let outLimbs, args;
-      if (final) { const zinv = vkxGlvZinv(wk10, wk20, wk11, wk21); const acc = vkxGlvStateAt(wk10, wk20, wk11, wk21, ITERS); const ic0 = [((IC0[0] % P) + P) % P, ((IC0[1] % P) + P) % P]; const [fx, fy, fz] = jacAdd(acc[0], acc[1], acc[2], ic0[0], ic0[1], 1n); const z2 = qF(zinv), z3 = mF(z2, zinv); outLimbs = [mF(fx, z2), mF(fy, z3)].map(String); args = [...inSt, String(zinv)]; }
-      else { const [X, Y, Z] = vkxGlvStateAt(wk10, wk20, wk11, wk21, hi); outLimbs = SER_state(X, Y, Z).map(String); args = inSt; }
-      const src = genCash(lo, hi, first, final, STAGE_BOUND);
-      const m = measureCovenant(src, args.map(BigInt), outLimbs.map(BigInt), inSt.map(BigInt));
+      if (final) { const zinv = vkxGlvZinv(wk10, wk20, wk11, wk21); const acc = vkxGlvStateAt(wk10, wk20, wk11, wk21, ITERS); const ic0 = [((IC0[0] % P) + P) % P, ((IC0[1] % P) + P) % P]; const [fx, fy, fz] = jacAdd(acc[0], acc[1], acc[2], ic0[0], ic0[1], 1n); const z2 = qF(zinv), z3 = mF(z2, zinv); const vkx = [mF(fx, z2), mF(fy, z3)].map(String); outLimbs = COVENANT_RESIDUE ? [...proofState, ...vkx] : vkx; args = [...firstArgs, String(zinv)]; }
+      else { const [X, Y, Z] = vkxGlvStateAt(wk10, wk20, wk11, wk21, hi); const next = SER_state(X, Y, Z).map(String); outLimbs = COVENANT_RESIDUE ? [...next, ...proofState] : next; args = firstArgs; }
+      const src = genCash(lo, hi, first, final, STAGE_BOUND, null, COVENANT_RESIDUE);
+      const committed = COVENANT_RESIDUE && first ? proofState : inSt;
+      const m = measureCovenant(src, args.map(BigInt), outLimbs.map(BigInt), committed.map(BigInt));
       return { hi, final, src, m, fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET };
     };
     let best = tryHi(lo + 1);
@@ -243,6 +270,6 @@ if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
     console.error(`  vkxglv chunk ${idx}: [${lo},${best.hi}) lock=${best.m.lockingBytes}B op=${best.m.operationCost.toLocaleString()} accepted=${best.m.accepted} final=${best.final}`);
     lo = best.hi;
   }
-  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ numChunks: chunks.length, iters: ITERS, glv: true, stageBound: STAGE_BOUND, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, final: c.final })) }, null, 2));
+  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ numChunks: chunks.length, iters: ITERS, glv: true, stageBound: STAGE_BOUND, covenantResidue: COVENANT_RESIDUE, genesisDerived: STAGE_BOUND, exactProofHandoff: COVENANT_RESIDUE, stageLayout: COVENANT_RESIDUE ? [...PROOF_STATE, 'vkxX', 'vkxY'] : undefined, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, final: c.final })) }, null, 2));
   console.error(`GLV vk_x: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.operationCost, 0).toLocaleString()}`);
 }

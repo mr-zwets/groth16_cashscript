@@ -16,14 +16,38 @@ function fp2Sub(int a0, int a1, int b0, int b1, int k) returns (int, int) { retu
 function fp2Neg(int a0, int a1, int k) returns (int, int) { return subFp(0, a0, k), subFp(0, a1, k); }
 
 function fp2Mul(int a0, int a1, int b0, int b1) returns (int, int) {
-        int v0 = mulFp(a0, b0);
-        int v1 = mulFp(a1, b1);
-        return subFp(v0, v1, 1),
-               subFp(mulFp(addFp(a0, a1), addFp(b0, b1)), addFp(v0, v1), 2);
+        // bound_analysis.mjs proves every operand is nonnegative and < 149*p without relying on
+        // this function's canonical output. Thus v0-v1 > -149^2*p^2, while the second Karatsuba
+        // limb expands to a0*b1+a1*b0 and is already nonnegative. 22,201*p^2 is a multiple of p.
+        int v0 = a0 * b0;
+        int v1 = a1 * b1;
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int nonnegativeBias = 10636392002745043725054576591855484724484200679306969358911577657842610149931283249579519191443340195632349945621165638913026711333532969846898571500690003689;
+        return (v0 - v1 + nonnegativeBias) % p,
+               ((a0 + a1) * (b0 + b1) - v0 - v1) % p;
+    }
+
+function fp2MulRaw(int a0, int a1, int b0, int b1) returns (int, int) {
+        // Unreduced Karatsuba product, consumed only inside mul034, fp12Mul, and fp12Sqr before
+        // their final normalization.
+        int v0 = a0 * b0;
+        int v1 = a1 * b1;
+        return v0 - v1, (a0 + a1) * (b0 + b1) - v0 - v1;
+    }
+
+// One field reduction followed by sign normalization. Script remainder is in
+// (-p,p), so the conditional add maps it canonically into [0,p) without a second
+// modulo operation.
+function canonicalFp(int x) returns (int) {
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int r = x % p;
+        if (r < 0) { r = r + p; }
+        return r;
     }
 
 function fp2Sqr(int a0, int a1) returns (int, int) {
-        return mulFp(addFp(a0, a1), subFp(a0, a1, 64)), mulFp(2, mulFp(a0, a1));
+        // Global lazy bound is <36p, so (2*a0)*a1 is <2592p^2 before the one reduction.
+        return mulFp(addFp(a0, a1), subFp(a0, a1, 64)), mulFp(a0 + a0, a1);
     }
 
 function fp2Scale(int a0, int a1, int k) returns (int, int) { return mulFp(a0, k), mulFp(a1, k); }
@@ -90,6 +114,29 @@ function fp6Mul(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,
         return c0a, c0b, c1a, c1b, c2a, c2b;
     }
 
+function fp6MulRaw(int a0a,int a0b,int a1a,int a1b,int a2a,int a2b,int b0a,int b0b,int b1a,int b1b,int b2a,int b2b) returns (int,int,int,int,int,int) {
+        (int t0a, int t0b) = fp2MulRaw(a0a, a0b, b0a, b0b);
+        (int t1a, int t1b) = fp2MulRaw(a1a, a1b, b1a, b1b);
+        (int t2a, int t2b) = fp2MulRaw(a2a, a2b, b2a, b2b);
+
+        (int p1a, int p1b) = fp2MulRaw(a1a + a2a, a1b + a2b, b1a + b2a, b1b + b2b);
+        int d2a = p1a - t1a - t2a;
+        int d2b = p1b - t1b - t2b;
+        int c0a = t0a + 9*d2a - d2b;
+        int c0b = t0b + d2a + 9*d2b;
+
+        (int p2a, int p2b) = fp2MulRaw(a0a + a1a, a0b + a1b, b0a + b1a, b0b + b1b);
+        int d4a = p2a - t0a - t1a;
+        int d4b = p2b - t0b - t1b;
+        int c1a = d4a + 9*t2a - t2b;
+        int c1b = d4b + t2a + 9*t2b;
+
+        (int p3a, int p3b) = fp2MulRaw(a0a + a2a, a0b + a2b, b0a + b2a, b0b + b2b);
+        int c2a = p3a - t0a - t2a + t1a;
+        int c2b = p3b - t0b - t2b + t1b;
+        return c0a, c0b, c1a, c1b, c2a, c2b;
+    }
+
 function fp6Mul01(int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int b0a,int b0b,int b1a,int b1b) returns (int,int,int,int,int,int) {
         (int t0a,int t0b) = fp2Mul(c0a, c0b, b0a, b0b);
         (int t1a,int t1b) = fp2Mul(c1a, c1b, b1a, b1b);
@@ -114,53 +161,274 @@ function fp12Mul(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11,
         int B0,int B1,int B2,int B3,int B4,int B5, int B6,int B7,int B8,int B9,int B10,int B11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) = fp6Mul(A0,A1,A2,A3,A4,A5, B0,B1,B2,B3,B4,B5);
-        (int t1_0,int t1_1,int t1_2,int t1_3,int t1_4,int t1_5) = fp6Mul(A6,A7,A8,A9,A10,A11, B6,B7,B8,B9,B10,B11);
-        (int vt_0,int vt_1,int vt_2,int vt_3,int vt_4,int vt_5) = fp6MulByV(t1_0,t1_1,t1_2,t1_3,t1_4,t1_5, 12);
-        (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Add(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, vt_0,vt_1,vt_2,vt_3,vt_4,vt_5);
-        (int sa_0,int sa_1,int sa_2,int sa_3,int sa_4,int sa_5) = fp6Add(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
-        (int sb_0,int sb_1,int sb_2,int sb_3,int sb_4,int sb_5) = fp6Add(B0,B1,B2,B3,B4,B5, B6,B7,B8,B9,B10,B11);
-        (int pr_0,int pr_1,int pr_2,int pr_3,int pr_4,int pr_5) = fp6Mul(sa_0,sa_1,sa_2,sa_3,sa_4,sa_5, sb_0,sb_1,sb_2,sb_3,sb_4,sb_5);
-        (int qq_0,int qq_1,int qq_2,int qq_3,int qq_4,int qq_5) = fp6Sub(pr_0,pr_1,pr_2,pr_3,pr_4,pr_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, 12);
-        (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(qq_0,qq_1,qq_2,qq_3,qq_4,qq_5, t1_0,t1_1,t1_2,t1_3,t1_4,t1_5, 12);
+        // Tower Karatsuba over Z: c0=a0*b0+v*a1*b1 and
+        // c1=(a0+a1)*(b0+b1)-a0*b0-a1*b1. The three Fp6 products remain
+        // unreduced until the final twelve limbs.
+        (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) =
+            fp6MulRaw(A0,A1,A2,A3,A4,A5, B0,B1,B2,B3,B4,B5);
+        (int t1_0,int t1_1,int t1_2,int t1_3,int t1_4,int t1_5) =
+            fp6MulRaw(A6,A7,A8,A9,A10,A11, B6,B7,B8,B9,B10,B11);
+        (int pr_0,int pr_1,int pr_2,int pr_3,int pr_4,int pr_5) =
+            fp6MulRaw(A0+A6,A1+A7,A2+A8,A3+A9,A4+A10,A5+A11,
+                      B0+B6,B1+B7,B2+B8,B3+B9,B4+B10,B5+B11);
+
+        int C0 = canonicalFp(t0_0 + 9*t1_4 - t1_5);
+        int C1 = canonicalFp(t0_1 + t1_4 + 9*t1_5);
+        int C2 = canonicalFp(t0_2 + t1_0);
+        int C3 = canonicalFp(t0_3 + t1_1);
+        int C4 = canonicalFp(t0_4 + t1_2);
+        int C5 = canonicalFp(t0_5 + t1_3);
+        int C6 = canonicalFp(pr_0 - t0_0 - t1_0);
+        int C7 = canonicalFp(pr_1 - t0_1 - t1_1);
+        int C8 = canonicalFp(pr_2 - t0_2 - t1_2);
+        int C9 = canonicalFp(pr_3 - t0_3 - t1_3);
+        int C10 = canonicalFp(pr_4 - t0_4 - t1_4);
+        int C11 = canonicalFp(pr_5 - t0_5 - t1_5);
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
 
 function fp12Sqr(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        // t0 = c0 * c1
-        (int t0_0,int t0_1,int t0_2,int t0_3,int t0_4,int t0_5) = fp6Mul(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
-        // t1 = (c0 + c1) * (c0 + v*c1)   -- vc multiplies the carried input c1 (64p bias, mul-consumed)
-        (int s0,int s1,int s2,int s3,int s4,int s5) = fp6Add(A0,A1,A2,A3,A4,A5, A6,A7,A8,A9,A10,A11);
-        (int vc0,int vc1,int vc2,int vc3,int vc4,int vc5) = fp6MulByV(A6,A7,A8,A9,A10,A11, 64);
-        (int u0,int u1,int u2,int u3,int u4,int u5) = fp6Add(A0,A1,A2,A3,A4,A5, vc0,vc1,vc2,vc3,vc4,vc5);
-        (int t1_0,int t1_1,int t1_2,int t1_3,int t1_4,int t1_5) = fp6Mul(s0,s1,s2,s3,s4,s5, u0,u1,u2,u3,u4,u5);
-        // c1' = 2 t0
-        (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Add(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5);
-        // c0' = t1 - t0 - v t0   -- vt0 = 12p, d = 12p, C0 = 13p
-        (int vt0,int vt1,int vt2,int vt3,int vt4,int vt5) = fp6MulByV(t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, 12);
-        (int d0,int d1,int d2,int d3,int d4,int d5) = fp6Sub(t1_0,t1_1,t1_2,t1_3,t1_4,t1_5, t0_0,t0_1,t0_2,t0_3,t0_4,t0_5, 12);
-        (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Sub(d0,d1,d2,d3,d4,d5, vt0,vt1,vt2,vt3,vt4,vt5, 13);
+        // Exact tower identity over Z:
+        //   t0=c0*c1; t1=(c0+c1)*(c0+v*c1)
+        //   square=(t1-t0-v*t0, 2*t0).
+        // Each Fp2 product uses three raw integer multiplies. No component is reduced
+        // until the final twelve limbs, so this square performs exactly twelve mod-p
+        // reductions instead of reducing every base-field product.
+
+        // t0 = c0*c1, expanded through the Fp6 Karatsuba formula without reduction.
+        (int t00a,int t00b) = fp2MulRaw(A0,A1, A6,A7);
+        (int t01a,int t01b) = fp2MulRaw(A2,A3, A8,A9);
+        (int t02a,int t02b) = fp2MulRaw(A4,A5, A10,A11);
+        (int t0p1a,int t0p1b) = fp2MulRaw(A2+A4,A3+A5, A8+A10,A9+A11);
+        int t0d2a = t0p1a - t01a - t02a;
+        int t0d2b = t0p1b - t01b - t02b;
+        int t0c0a = t00a + 9*t0d2a - t0d2b;
+        int t0c0b = t00b + t0d2a + 9*t0d2b;
+        (int t0p2a,int t0p2b) = fp2MulRaw(A0+A2,A1+A3, A6+A8,A7+A9);
+        int t0d4a = t0p2a - t00a - t01a;
+        int t0d4b = t0p2b - t00b - t01b;
+        int t0c1a = t0d4a + 9*t02a - t02b;
+        int t0c1b = t0d4b + t02a + 9*t02b;
+        (int t0p3a,int t0p3b) = fp2MulRaw(A0+A4,A1+A5, A6+A10,A7+A11);
+        int t0c2a = t0p3a - t00a - t02a + t01a;
+        int t0c2b = t0p3b - t00b - t02b + t01b;
+
+        // t1 = (c0+c1)*(c0+v*c1). Multiplication by v maps
+        // (y0,y1,y2) to (xi*y2,y0,y1), xi=9+i, using only linear operations.
+        int s0=A0+A6; int s1=A1+A7; int s2=A2+A8;
+        int s3=A3+A9; int s4=A4+A10; int s5=A5+A11;
+        int u0=A0+9*A10-A11; int u1=A1+A10+9*A11;
+        int u2=A2+A6; int u3=A3+A7; int u4=A4+A8; int u5=A5+A9;
+        (int t10a,int t10b) = fp2MulRaw(s0,s1, u0,u1);
+        (int t11a,int t11b) = fp2MulRaw(s2,s3, u2,u3);
+        (int t12a,int t12b) = fp2MulRaw(s4,s5, u4,u5);
+        (int t1p1a,int t1p1b) = fp2MulRaw(s2+s4,s3+s5, u2+u4,u3+u5);
+        int t1d2a = t1p1a - t11a - t12a;
+        int t1d2b = t1p1b - t11b - t12b;
+        int t1c0a = t10a + 9*t1d2a - t1d2b;
+        int t1c0b = t10b + t1d2a + 9*t1d2b;
+        (int t1p2a,int t1p2b) = fp2MulRaw(s0+s2,s1+s3, u0+u2,u1+u3);
+        int t1d4a = t1p2a - t10a - t11a;
+        int t1d4b = t1p2b - t10b - t11b;
+        int t1c1a = t1d4a + 9*t12a - t12b;
+        int t1c1b = t1d4b + t12a + 9*t12b;
+        (int t1p3a,int t1p3b) = fp2MulRaw(s0+s4,s1+s5, u0+u4,u1+u5);
+        int t1c2a = t1p3a - t10a - t12a + t11a;
+        int t1c2b = t1p3b - t10b - t12b + t11b;
+
+        // With M=64p, every raw variable above has magnitude <1026M^2;
+        // use the conservative bound 2048M^2 < 2^531 (at most 67 signed bytes).
+        // The twelve possibly-negative results are each reduced once and normalized.
+        int C0 = canonicalFp(t1c0a - t0c0a - (9*t0c2a - t0c2b));
+        int C1 = canonicalFp(t1c0b - t0c0b - (t0c2a + 9*t0c2b));
+        int C2 = canonicalFp(t1c1a - t0c1a - t0c0a);
+        int C3 = canonicalFp(t1c1b - t0c1b - t0c0b);
+        int C4 = canonicalFp(t1c2a - t0c2a - t0c1a);
+        int C5 = canonicalFp(t1c2b - t0c2b - t0c1b);
+        int C6 = canonicalFp(2*t0c0a); int C7 = canonicalFp(2*t0c0b);
+        int C8 = canonicalFp(2*t0c1a); int C9 = canonicalFp(2*t0c1b);
+        int C10 = canonicalFp(2*t0c2a); int C11 = canonicalFp(2*t0c2b);
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
+    }
+
+// Multiply an Fp12 value X + Y*W by the finite quotient-torus representative
+// 1 + T*W, where X,Y,T are in Fp6 and W^2=v. The discarded Fp6 scale means
+// the inverse class is represented by 1-T*W, so the same kernel handles both
+// c and cInv folds. Two Fp6 products replace fp12Mul's three.
+function fp12MulTorus(
+        int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
+        int T0,int T1,int T2,int T3,int T4,int T5
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        (int yt0,int yt1,int yt2,int yt3,int yt4,int yt5) =
+            fp6MulRaw(F6,F7,F8,F9,F10,F11, T0,T1,T2,T3,T4,T5);
+        (int xt0,int xt1,int xt2,int xt3,int xt4,int xt5) =
+            fp6MulRaw(F0,F1,F2,F3,F4,F5, T0,T1,T2,T3,T4,T5);
+        return canonicalFp(F0 + 9*yt4 - yt5), canonicalFp(F1 + yt4 + 9*yt5),
+               canonicalFp(F2 + yt0), canonicalFp(F3 + yt1),
+               canonicalFp(F4 + yt2), canonicalFp(F5 + yt3),
+               canonicalFp(F6 + xt0), canonicalFp(F7 + xt1),
+               canonicalFp(F8 + xt2), canonicalFp(F9 + xt3),
+               canonicalFp(F10 + xt4), canonicalFp(F11 + xt5);
     }
 
 function mul034(
         int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
         int o0a,int o0b, int o3a,int o3b, int o4a,int o4b
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int A0,int A1) = fp2Mul(F0, F1, o0a, o0b);
-        (int A2,int A3) = fp2Mul(F2, F3, o0a, o0b);
-        (int A4,int A5) = fp2Mul(F4, F5, o0a, o0b);
-        (int B0,int B1,int B2,int B3,int B4,int B5) = fp6Mul01(F6,F7,F8,F9,F10,F11, o3a,o3b, o4a,o4b);
-        (int S0,int S1,int S2,int S3,int S4,int S5) = fp6Add(F0,F1,F2,F3,F4,F5, F6,F7,F8,F9,F10,F11);
-        (int qa,int qb) = fp2Add(o0a, o0b, o3a, o3b);
-        (int G0,int G1,int G2,int G3,int G4,int G5) = fp6Mul01(S0,S1,S2,S3,S4,S5, qa,qb, o4a,o4b);
-        (int VB0,int VB1,int VB2,int VB3,int VB4,int VB5) = fp6MulByV(B0,B1,B2,B3,B4,B5, 9);
-        (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Add(VB0,VB1,VB2,VB3,VB4,VB5, A0,A1,A2,A3,A4,A5);
-        (int AB0,int AB1,int AB2,int AB3,int AB4,int AB5) = fp6Add(A0,A1,A2,A3,A4,A5, B0,B1,B2,B3,B4,B5);
-        (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(G0,G1,G2,G3,G4,G5, AB0,AB1,AB2,AB3,AB4,AB5, 12);
-        return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
+        // A = F.c0 * o0.
+        (int A0,int A1) = fp2MulRaw(F0, F1, o0a, o0b);
+        (int A2,int A3) = fp2MulRaw(F2, F3, o0a, o0b);
+        (int A4,int A5) = fp2MulRaw(F4, F5, o0a, o0b);
+
+        // B = F.c1 * (o3 + o4*v).
+        (int bt0a,int bt0b) = fp2MulRaw(F6, F7, o3a, o3b);
+        (int bt1a,int bt1b) = fp2MulRaw(F8, F9, o4a, o4b);
+        (int bm12a,int bm12b) = fp2MulRaw(F8 + F10, F9 + F11, o4a, o4b);
+        int bu0a = bm12a - bt1a;
+        int bu0b = bm12b - bt1b;
+        int B0 = 9 * bu0a - bu0b + bt0a;
+        int B1 = bu0a + 9 * bu0b + bt0b;
+        (int bm1a,int bm1b) = fp2MulRaw(o3a + o4a, o3b + o4b, F6 + F8, F7 + F9);
+        int B2 = bm1a - bt0a - bt1a;
+        int B3 = bm1b - bt0b - bt1b;
+        (int bm2a,int bm2b) = fp2MulRaw(F6 + F10, F7 + F11, o3a, o3b);
+        int B4 = bm2a - bt0a + bt1a;
+        int B5 = bm2b - bt0b + bt1b;
+
+        // G = (F.c0 + F.c1) * (o0 + o3 + o4*v).
+        int S0 = F0 + F6;
+        int S1 = F1 + F7;
+        int S2 = F2 + F8;
+        int S3 = F3 + F9;
+        int S4 = F4 + F10;
+        int S5 = F5 + F11;
+        int qa = o0a + o3a;
+        int qb = o0b + o3b;
+        (int gt0a,int gt0b) = fp2MulRaw(S0, S1, qa, qb);
+        (int gt1a,int gt1b) = fp2MulRaw(S2, S3, o4a, o4b);
+        (int gm12a,int gm12b) = fp2MulRaw(S2 + S4, S3 + S5, o4a, o4b);
+        int gu0a = gm12a - gt1a;
+        int gu0b = gm12b - gt1b;
+        int G0 = 9 * gu0a - gu0b + gt0a;
+        int G1 = gu0a + 9 * gu0b + gt0b;
+        (int gm1a,int gm1b) = fp2MulRaw(qa + o4a, qb + o4b, S0 + S2, S1 + S3);
+        int G2 = gm1a - gt0a - gt1a;
+        int G3 = gm1b - gt0b - gt1b;
+        (int gm2a,int gm2b) = fp2MulRaw(S0 + S4, S1 + S5, qa, qb);
+        int G4 = gm2a - gt0a + gt1a;
+        int G5 = gm2b - gt0b + gt1b;
+
+        // The interval derivation in bound_analysis.mjs proves all inputs are < 37*p and each
+        // combined limb is > -97*(37*p)^2. Add exactly 132,793*p^2, then reduce canonically.
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int rawBias = 63620485708775397116398918488458420026955112869114471513803213004724729950895225285411156794258613332669998933780976023070021894424298169671600468685695583977;
+        return (9 * B4 - B5 + A0 + rawBias) % p, (B4 + 9 * B5 + A1 + rawBias) % p,
+               (B0 + A2 + rawBias) % p, (B1 + A3 + rawBias) % p,
+               (B2 + A4 + rawBias) % p, (B3 + A5 + rawBias) % p,
+               (G0 - A0 - B0 + rawBias) % p, (G1 - A1 - B1 + rawBias) % p,
+               (G2 - A2 - B2 + rawBias) % p, (G3 - A3 - B3 + rawBias) % p,
+               (G4 - A4 - B4 + rawBias) % p, (G5 - A5 - B5 + rawBias) % p;
+    }
+
+// Sparse Fp12 multiply specialized for o0=1. A=F.c0 is free, and the G-side constant
+// becomes (1+o3), removing three fp2MulRaw calls from every Miller line.
+function mul034Unit(
+        int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
+        int o3a,int o3b, int o4a,int o4b
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        (int bt0a,int bt0b) = fp2MulRaw(F6, F7, o3a, o3b);
+        (int bt1a,int bt1b) = fp2MulRaw(F8, F9, o4a, o4b);
+        (int bm12a,int bm12b) = fp2MulRaw(F8 + F10, F9 + F11, o4a, o4b);
+        int bu0a = bm12a - bt1a;
+        int bu0b = bm12b - bt1b;
+        int B0 = 9 * bu0a - bu0b + bt0a;
+        int B1 = bu0a + 9 * bu0b + bt0b;
+        (int bm1a,int bm1b) = fp2MulRaw(o3a + o4a, o3b + o4b, F6 + F8, F7 + F9);
+        int B2 = bm1a - bt0a - bt1a;
+        int B3 = bm1b - bt0b - bt1b;
+        (int bm2a,int bm2b) = fp2MulRaw(F6 + F10, F7 + F11, o3a, o3b);
+        int B4 = bm2a - bt0a + bt1a;
+        int B5 = bm2b - bt0b + bt1b;
+
+        int S0 = F0 + F6;
+        int S1 = F1 + F7;
+        int S2 = F2 + F8;
+        int S3 = F3 + F9;
+        int S4 = F4 + F10;
+        int S5 = F5 + F11;
+        int qa = 1 + o3a;
+        int qb = o3b;
+        (int gt0a,int gt0b) = fp2MulRaw(S0, S1, qa, qb);
+        (int gt1a,int gt1b) = fp2MulRaw(S2, S3, o4a, o4b);
+        (int gm12a,int gm12b) = fp2MulRaw(S2 + S4, S3 + S5, o4a, o4b);
+        int gu0a = gm12a - gt1a;
+        int gu0b = gm12b - gt1b;
+        int G0 = 9 * gu0a - gu0b + gt0a;
+        int G1 = gu0a + 9 * gu0b + gt0b;
+        (int gm1a,int gm1b) = fp2MulRaw(qa + o4a, qb + o4b, S0 + S2, S1 + S3);
+        int G2 = gm1a - gt0a - gt1a;
+        int G3 = gm1b - gt0b - gt1b;
+        (int gm2a,int gm2b) = fp2MulRaw(S0 + S4, S1 + S5, qa, qb);
+        int G4 = gm2a - gt0a + gt1a;
+        int G5 = gm2b - gt0b + gt1b;
+
+        // unit_line_bound_analysis.mjs proves the same 132,793*p^2 bias is positive for canonical
+        // F/o3/o4 limbs (the derived qa is in [1,p]); the shared multiple of p preserves residues.
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int rawBias = 63620485708775397116398918488458420026955112869114471513803213004724729950895225285411156794258613332669998933780976023070021894424298169671600468685695583977;
+        return (9 * B4 - B5 + F0 + rawBias) % p, (B4 + 9 * B5 + F1 + rawBias) % p,
+               (B0 + F2 + rawBias) % p, (B1 + F3 + rawBias) % p,
+               (B2 + F4 + rawBias) % p, (B3 + F5 + rawBias) % p,
+               (G0 - F0 - B0 + rawBias) % p, (G1 - F1 - B1 + rawBias) % p,
+               (G2 - F2 - B2 + rawBias) % p, (G3 - F3 - B3 + rawBias) % p,
+               (G4 - F4 - B4 + rawBias) % p, (G5 - F5 - B5 + rawBias) % p;
+    }
+
+// Direct quotient-product form for a normalized line 1+(o3+o4*v)W.
+// It computes X'=X+v*Y*l and Y'=Y+X*l directly. This has the same ten
+// Fp2 products as mul034Unit but avoids its Karatsuba reconstruction of Y'.
+function mul034UnitDirect(
+        int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
+        int o3a,int o3b, int o4a,int o4b
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        (int yt0a,int yt0b) = fp2MulRaw(F6, F7, o3a, o3b);
+        (int yt1a,int yt1b) = fp2MulRaw(F8, F9, o4a, o4b);
+        (int ytm12a,int ytm12b) = fp2MulRaw(F8 + F10, F9 + F11, o4a, o4b);
+        int ytu0a = ytm12a - yt1a;
+        int ytu0b = ytm12b - yt1b;
+        int yt0 = 9 * ytu0a - ytu0b + yt0a;
+        int yt1 = ytu0a + 9 * ytu0b + yt0b;
+        (int ytm1a,int ytm1b) = fp2MulRaw(o3a + o4a, o3b + o4b, F6 + F8, F7 + F9);
+        int yt2 = ytm1a - yt0a - yt1a;
+        int yt3 = ytm1b - yt0b - yt1b;
+        (int ytm2a,int ytm2b) = fp2MulRaw(F6 + F10, F7 + F11, o3a, o3b);
+        int yt4 = ytm2a - yt0a + yt1a;
+        int yt5 = ytm2b - yt0b + yt1b;
+
+        (int xt0a,int xt0b) = fp2MulRaw(F0, F1, o3a, o3b);
+        (int xt1a,int xt1b) = fp2MulRaw(F2, F3, o4a, o4b);
+        (int xtm12a,int xtm12b) = fp2MulRaw(F2 + F4, F3 + F5, o4a, o4b);
+        int xtu0a = xtm12a - xt1a;
+        int xtu0b = xtm12b - xt1b;
+        int xt0 = 9 * xtu0a - xtu0b + xt0a;
+        int xt1 = xtu0a + 9 * xtu0b + xt0b;
+        (int xtm1a,int xtm1b) = fp2MulRaw(o3a + o4a, o3b + o4b, F0 + F2, F1 + F3);
+        int xt2 = xtm1a - xt0a - xt1a;
+        int xt3 = xtm1b - xt0b - xt1b;
+        (int xtm2a,int xtm2b) = fp2MulRaw(F0 + F4, F1 + F5, o3a, o3b);
+        int xt4 = xtm2a - xt0a + xt1a;
+        int xt5 = xtm2b - xt0b + xt1b;
+
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int rawBias = 63620485708775397116398918488458420026955112869114471513803213004724729950895225285411156794258613332669998933780976023070021894424298169671600468685695583977;
+        return (F0 + 9*yt4 - yt5 + rawBias) % p, (F1 + yt4 + 9*yt5 + rawBias) % p,
+               (F2 + yt0 + rawBias) % p, (F3 + yt1 + rawBias) % p,
+               (F4 + yt2 + rawBias) % p, (F5 + yt3 + rawBias) % p,
+               (F6 + xt0 + rawBias) % p, (F7 + xt1 + rawBias) % p,
+               (F8 + xt2 + rawBias) % p, (F9 + xt3 + rawBias) % p,
+               (F10 + xt4 + rawBias) % p, (F11 + xt5 + rawBias) % p;
     }
 
 function line(
@@ -174,6 +442,79 @@ function line(
         (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7,int r8,int r9,int r10,int r11) =
             mul034(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, o0a,o0b, o3a,o3b, c0a,c0b);
         return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
+    }
+
+function lineUnit(
+        int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
+        int c0a,int c0b,int c1a,int c1b, int u, int v
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        int o3a = mulFp(c1a, u);
+        int o3b = mulFp(c1b, u);
+        int o4a = mulFp(c0a, v);
+        int o4b = mulFp(c0b, v);
+        (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7,int r8,int r9,int r10,int r11) =
+            mul034Unit(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, o3a,o3b, o4a,o4b);
+        return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
+    }
+
+function lineUnitDirect(
+        int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
+        int c0a,int c0b,int c1a,int c1b, int u, int v
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        int o3a = mulFp(c1a, u);
+        int o3b = mulFp(c1b, u);
+        int o4a = mulFp(c0a, v);
+        int o4b = mulFp(c0b, v);
+        (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7,int r8,int r9,int r10,int r11) =
+            mul034UnitDirect(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, o3a,o3b, o4a,o4b);
+        return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
+    }
+
+// Runtime-G2 affine Miller steps. Each caller supplies a canonical slope witness. The explicit
+// nonzero-denominator gates exclude the equal/inverse exceptional cases, so the slope equation
+// uniquely binds the tangent/chord. New affine state is canonical; normalized lines use c2=-1.
+function pointDoubleAffine(int Xa,int Xb,int Ya,int Yb,int ma,int mb)
+    returns (int,int,int,int, int,int,int,int) {
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require(within(ma, 0, p)); require(within(mb, 0, p));
+        require(Ya % p != 0 || Yb % p != 0);
+        // Affine state is canonical: these additions stay below 2p/3p, and each consumer reduces.
+        int twoYa = Ya + Ya; int twoYb = Yb + Yb;
+        (int slopeLhsA,int slopeLhsB) = fp2Mul(ma, mb, twoYa, twoYb);
+        (int x2a,int x2b) = fp2Sqr(Xa, Xb);
+        int slopeRhsA = x2a + x2a + x2a; int slopeRhsB = x2b + x2b + x2b;
+        require((slopeLhsA - slopeRhsA) % p == 0);
+        require((slopeLhsB - slopeRhsB) % p == 0);
+        (int m2a,int m2b) = fp2Sqr(ma, mb);
+        int twoXa = Xa + Xa; int twoXb = Xb + Xb;
+        int nXa = canonicalFp(m2a - twoXa); int nXb = canonicalFp(m2b - twoXb);
+        (int xdnXa,int xdnXb) = fp2Sub(Xa, Xb, nXa, nXb, 1);
+        (int mxdnXa,int mxdnXb) = fp2Mul(ma, mb, xdnXa, xdnXb);
+        int nYa = canonicalFp(mxdnXa - Ya); int nYb = canonicalFp(mxdnXb - Yb);
+        (int mxA,int mxB) = fp2Mul(ma, mb, Xa, Xb);
+        (int c0a,int c0b) = fp2Sub(Ya, Yb, mxA, mxB, 1);
+        return c0a,c0b,ma,mb, nXa,nXb,nYa,nYb;
+    }
+
+function pointAddAffine(int Xa,int Xb,int Ya,int Yb, int Qxa,int Qxb,int Qya,int Qyb, int ma,int mb)
+    returns (int,int,int,int, int,int,int,int) {
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require(within(ma, 0, p)); require(within(mb, 0, p));
+        (int dxa,int dxb) = fp2Sub(Qxa, Qxb, Xa, Xb, 1);
+        require(dxa % p != 0 || dxb % p != 0);
+        (int dya,int dyb) = fp2Sub(Qya, Qyb, Ya, Yb, 1);
+        (int slopeLhsA,int slopeLhsB) = fp2Mul(ma, mb, dxa, dxb);
+        require((slopeLhsA - dya) % p == 0); require((slopeLhsB - dyb) % p == 0);
+        (int m2a,int m2b) = fp2Sqr(ma, mb);
+        (int txa,int txb) = fp2Sub(m2a, m2b, Xa, Xb, 1);
+        (int nxRawA,int nxRawB) = fp2Sub(txa, txb, Qxa, Qxb, 1);
+        int nXa = canonicalFp(nxRawA); int nXb = canonicalFp(nxRawB);
+        (int xdnXa,int xdnXb) = fp2Sub(Xa, Xb, nXa, nXb, 1);
+        (int mxdnXa,int mxdnXb) = fp2Mul(ma, mb, xdnXa, xdnXb);
+        int nYa = canonicalFp(mxdnXa - Ya); int nYb = canonicalFp(mxdnXb - Yb);
+        (int mxA,int mxB) = fp2Mul(ma, mb, Xa, Xb);
+        (int c0a,int c0b) = fp2Sub(Ya, Yb, mxA, mxB, 1);
+        return c0a,c0b,ma,mb, nXa,nXb,nYa,nYb;
     }
 
 function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
@@ -379,6 +720,30 @@ function fp12Frob3(int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int 
         (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(g0,g1,g2,g3,g4,g5,
             11697423496358154304825782922584725312912383441159505038794027105778954184319, 303847389135065887422783454877609941456349188919719272345083954437860409601);
         return c0,c1,c2,c3,c4,c5,f0,f1,f2,f3,f4,f5;
+    }
+
+// Frobenius maps of the finite quotient representative 1+U*W. Only the
+// six-limb high coordinate changes; the low coordinate remains exactly ONE.
+function torusFrob1(int U0,int U1,int U2,int U3,int U4,int U5)
+        returns (int,int,int,int,int,int) {
+        (int g0,int g1,int g2,int g3,int g4,int g5) = fp6FrobOdd(U0,U1,U2,U3,U4,U5,
+            21575463638280843010398324269430826099269044274347216827212613867836435027261, 10307601595873709700152284273816112264069230130616436755625194854815875713954,
+            2581911344467009335267311115468803099551665605076196740867805258568234346338, 19937756971775647987995932169929341994314640652964949448313374472400716661030);
+        (int f0,int f1,int f2,int f3,int f4,int f5) = fp6MulByFp2(g0,g1,g2,g3,g4,g5,
+            8376118865763821496583973867626364092589906065868298776909617916018768340080, 16469823323077808223889137241176536799009286646108169935659301613961712198316);
+        return f0,f1,f2,f3,f4,f5;
+    }
+
+function torusFrob2(int U0,int U1,int U2,int U3,int U4,int U5)
+        returns (int,int,int,int,int,int) {
+        // Compose each Fp6 and W Frobenius coefficient offline. The middle
+        // coefficient is exactly -1, so it needs no field multiplication.
+        (int f0,int f1) = fp2Scale(U0,U1,
+            21888242871839275220042445260109153167277707414472061641714758635765020556617);
+        (int f2,int f3) = fp2Neg(U2,U3, 64);
+        (int f4,int f5) = fp2Scale(U4,U5,
+            2203960485148121921418603742825762020974279258880205651967);
+        return f0,f1,f2,f3,f4,f5;
     }
 
 function fp4Square(int a0,int a1,int b0,int b1) returns (int,int,int,int) {

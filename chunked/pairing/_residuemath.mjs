@@ -5,7 +5,10 @@
 //   where fF = fRaw * c^-(6x+2) (folded into the Miller loop), c,w the residue witness.
 //   Equivalent to c^lambda == fRaw*w with lambda = 6x+2 + q - q^2 + q^3, i.e. the pairing
 //   product finalExp == 1. Witness from gnark's finalExpWitness (scaling + r,m,cube roots).
-import { bn254, Fp, Fp2, Fp6, Fp12, BN_X, ATE_NAF, pairsFor, millerBatchOps, singlePairMiller, pointDouble, pointAdd } from './_millermath.mjs';
+import {
+  bn254, Fp, Fp2, Fp6, Fp12, BN_X, ATE_NAF,
+  pairsFor, millerBatchOps, singlePairMiller, pointDouble, pointAdd, lineFn, lineUnitFn, psi,
+} from './_millermath.mjs';
 
 const p = Fp.ORDER;
 const r = bn254.fields.Fr.ORDER;
@@ -24,6 +27,7 @@ const mul = (a, b) => Fp12.mul(a, b), inv = (a) => Fp12.inv(a), sqr = (a) => Fp1
 export const fp12limbsOf = tup;
 const powExact = (a, e) => { let res = Fp12.ONE, base = a; while (e > 0n) { if (e & 1n) res = mul(res, base); base = sqr(base); e >>= 1n; } return res; };
 export const frob = (a, n) => Fp12.frobeniusMap(a, n);
+const isZero6 = (a) => Fp6.eql(a, Fp6.ZERO);
 
 // ---- 27th root of unity (noble tower), cubic non-residue in Fp6 (only c0.c2 nonzero) ----
 export const ROOT27 = mk12([0n, 0n, 0n, 0n,
@@ -57,6 +61,23 @@ export function residueWitness(fRaw) {
   rw = powExact(rw, mInv);
   const c = cubeRoot(rw);
   return { c, cInv: inv(c), w };
+}
+
+// A nontrivial r-th root has k^lambda=1 because r divides lambda. If the
+// residue root returned above is the quotient torus's unique infinity point,
+// multiplying by k preserves the witness relation and moves it to the finite
+// chart because k.c1 is nonzero. Thus every accepting quotient class has a
+// complete six-limb representative [1 + u*W], without a fixture assumption.
+const TORUS_KERNEL_SHIFT = bn254.pairing(bn254.G1.Point.BASE, bn254.G2.Point.BASE);
+if (isZero6(TORUS_KERNEL_SHIFT.c1) || !eq12(powExact(TORUS_KERNEL_SHIFT, LAMBDA), Fp12.ONE)) {
+  throw new Error('invalid BN254 quotient-torus kernel shift');
+}
+export function residueTorusWitness(fRaw) {
+  const witness = residueWitness(fRaw);
+  const c = isZero6(witness.c.c0) ? mul(witness.c, TORUS_KERNEL_SHIFT) : witness.c;
+  if (isZero6(c.c0)) throw new Error('failed to move residue root into the finite torus chart');
+  const u = Fp6.mul(c.c1, Fp6.inv(c.c0));
+  return { c, cInv: inv(c), u };
 }
 
 // ---- c^-(6x+2)-FUSED batched Miller ----------------------------------------------------
@@ -101,6 +122,132 @@ export function millerFusedOps(pairs, c, cInv) {
   const boundary = mul(preF1, fAB);
   states.push({ f: boundary, Rs: base.states[base.states.length - 1].Rs.slice(), c, cInv });
   return { ops, states, boundary, baseBoundary: base.boundary, cpowFinal: cpow, fAB };
+}
+
+// ---- affine runtime-G2 variant -------------------------------------------------------
+// Only pair 0 has a runtime G2 point. Keep its Miller accumulator affine and witness each
+// tangent/chord slope; pairs 2 and 3 retain their baked projective line coefficients. Every
+// normalized runtime line has c2=-1, an Fp2 line scaling that disappears in final exponentiation.
+const affineDouble = (point) => {
+  const denominator = Fp2.mul(point.y, 2n);
+  if (Fp2.eql(denominator, Fp2.ZERO)) throw new Error('affine Miller doubling denominator is zero');
+  const slope = Fp2.div(Fp2.mul(Fp2.sqr(point.x), 3n), denominator);
+  const x = Fp2.sub(Fp2.sqr(slope), Fp2.mul(point.x, 2n));
+  const y = Fp2.sub(Fp2.mul(slope, Fp2.sub(point.x, x)), point.y);
+  return {
+    R: { x, y }, slope,
+    coeffs: [Fp2.sub(point.y, Fp2.mul(slope, point.x)), slope, Fp2.neg(Fp2.ONE)],
+  };
+};
+const affineAdd = (point, addend) => {
+  const denominator = Fp2.sub(addend.x, point.x);
+  if (Fp2.eql(denominator, Fp2.ZERO)) throw new Error('affine Miller addition denominator is zero');
+  const slope = Fp2.div(Fp2.sub(addend.y, point.y), denominator);
+  const x = Fp2.sub(Fp2.sub(Fp2.sqr(slope), point.x), addend.x);
+  const y = Fp2.sub(Fp2.mul(slope, Fp2.sub(point.x, x)), point.y);
+  return {
+    R: { x, y }, slope,
+    coeffs: [Fp2.sub(point.y, Fp2.mul(slope, point.x)), slope, Fp2.neg(Fp2.ONE)],
+  };
+};
+
+export function millerFusedAffineOps(pairs, c, cInv, { unitLines = false, torusU = null } = {}) {
+  const raw = millerFusedOps(pairs, c, cInv);
+  const pairData = pairs.map((pair) => {
+    const P = pair.P.toAffine();
+    const invY = unitLines ? Fp.inv(P.y) : null;
+    return {
+      P, Q: pair.Q.toAffine(),
+      u: unitLines ? Fp.neg(Fp.mul(P.x, invY)) : null,
+      v: unitLines ? Fp.neg(invY) : null,
+    };
+  });
+  const lineCoeffs = (coeffs) => {
+    if (!unitLines) return coeffs;
+    if (Fp2.eql(coeffs[2], Fp2.ZERO)) throw new Error('unit Miller line has zero c2');
+    const scale = Fp2.neg(Fp2.inv(coeffs[2]));
+    return [Fp2.mul(coeffs[0], scale), Fp2.mul(coeffs[1], scale), Fp2.ONE];
+  };
+  const foldLine = (value, coeffs, j) => {
+    const normalized = lineCoeffs(coeffs);
+    return {
+      coeffs: normalized,
+      f: unitLines
+        ? lineUnitFn(value, normalized[0], normalized[1], pairData[j].u, pairData[j].v)
+        : lineFn(value, normalized[0], normalized[1], normalized[2], pairData[j].P.x, pairData[j].P.y),
+    };
+  };
+  const ops = [];
+  const states = [];
+  const fAbTorus = isZero6(raw.fAB.c0) ? null : Fp6.mul(raw.fAB.c1, Fp6.inv(raw.fAB.c0));
+  if (torusU !== null && fAbTorus === null) {
+    throw new Error('the fixed alpha/beta Miller value has no finite quotient-torus coordinate');
+  }
+  let f = torusU === null ? cInv : Fp12.create({ c0: Fp6.ONE, c1: Fp6.neg(torusU) });
+  let runtimeR = { ...pairData[0].Q };
+  for (const rawOp of raw.ops) {
+    states.push({ f, Rs: [runtimeR], c, cInv });
+    const op = { ...rawOp, affineSlopes: [] };
+    if (op.t === 'sqr') f = Fp12.sqr(f);
+    else if (op.t === 'cf') {
+      if (torusU === null) {
+        f = Fp12.mul(f, op.neg ? c : cInv);
+      } else {
+        const foldU = op.neg ? torusU : Fp6.neg(torusU);
+        f = Fp12.create({
+          c0: Fp6.add(f.c0, Fp6.mulByNonresidue(Fp6.mul(f.c1, foldU))),
+          c1: Fp6.add(f.c1, Fp6.mul(f.c0, foldU)),
+        });
+      }
+    } else if (op.t === 'cmul1') {
+      if (torusU === null) {
+        f = Fp12.mul(f, raw.fAB);
+      } else {
+        f = Fp12.create({
+          c0: Fp6.add(f.c0, Fp6.mulByNonresidue(Fp6.mul(f.c1, fAbTorus))),
+          c1: Fp6.add(f.c1, Fp6.mul(f.c0, fAbTorus)),
+        });
+      }
+    } else if (op.j !== 0) {
+      const triples = op.t === 'pp' ? op.coeffs : [op.coeffs];
+      const normalized = [];
+      for (const coeffs of triples) {
+        const folded = foldLine(f, coeffs, op.j);
+        f = folded.f;
+        normalized.push(folded.coeffs);
+      }
+      op.coeffs = op.t === 'pp' ? normalized : normalized[0];
+    } else if (op.t === 'dl') {
+      const step = affineDouble(runtimeR);
+      runtimeR = step.R;
+      op.affineSlopes.push(step.slope);
+      f = foldLine(f, step.coeffs, 0).f;
+    } else if (op.t === 'al') {
+      const step = affineAdd(runtimeR, {
+        x: pairData[0].Q.x,
+        y: op.neg ? Fp2.neg(pairData[0].Q.y) : pairData[0].Q.y,
+      });
+      runtimeR = step.R;
+      op.affineSlopes.push(step.slope);
+      f = foldLine(f, step.coeffs, 0).f;
+    } else {
+      const [q1x, q1y] = psi(pairData[0].Q.x, pairData[0].Q.y);
+      const q1 = { x: q1x, y: q1y };
+      const first = affineAdd(runtimeR, q1);
+      runtimeR = first.R;
+      op.affineSlopes.push(first.slope);
+      f = foldLine(f, first.coeffs, 0).f;
+      const [q2x, q2y] = psi(q1.x, q1.y);
+      const q2 = { x: q2x, y: q2y };
+      const second = affineAdd(runtimeR, { x: q2.x, y: Fp2.neg(q2.y) });
+      runtimeR = second.R;
+      op.affineSlopes.push(second.slope);
+      f = foldLine(f, second.coeffs, 0).f;
+    }
+    ops.push(op);
+  }
+  states.push({ f, Rs: [runtimeR], c, cInv });
+  return { ops, states, boundary: f, fAB: raw.fAB };
 }
 
 // ---- cInv-ONLY fused Miller (binary of 6x+2, threads only cInv) -----------------------

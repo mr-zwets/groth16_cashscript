@@ -29,19 +29,18 @@ axes; this doc is the map. Individual folders have the authoritative per-verifie
 |---|---|---|---|
 | `bch-groth16-singleton` | singleton, baseline | ~14.4 KB source; size-scored recompile **8,874 B** | correctness oracle; over per-input limits |
 | `bch-groth16-singleton-minop` | singleton, op-optimized | ~66.5 KB / ~195M op-cost | residue + GLV, still single-input (oracle) |
-| `bch-groth16-chunked` | chunked, covenant chain | score **381,549** | the original ~54-tx NFT-commitment chain |
-| `bch-groth16-intratx` | chunked, intra-tx linked | score **378,323** | whole verifier in one (non-standard) tx |
-| `bch-groth16-grouped` | chunked, grouped | score **378,538** | standard-relayable, 5 txs |
-| `bch-groth16-intratx-residue` | chunked, intra-tx + residue | score **241,518** | smallest single-tx BN254 verifier |
-| **`bch-groth16-grouped-residue`** | **chunked, grouped + residue** | **score 241,628 — flagship** | standard-relayable in a few txs (residue tail collapses the packing below the non-residue 5) |
-| `bch-groth16-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **5 inputs**, one tx (proposed 100 kB VM) | targets the proposed `bch-spec` upgrade, not current BCH; structural (fewest UTXOs), own leaderboard category — see [Target VM](#target-vm-bch-spec) |
-| `bch-pairing-chunked` | chunked pairing-only, covenant | score **217,562** | Miller + final-exp milestone |
-| `bch-pairing-intratx` | chunked pairing-only, intra-tx | score **215,429** | |
-| `bch-vkx-chunked-covenant` | chunked `vk_x`-only | score **13,950** | the G1 MSM checkpoint (see `chunked/shamir/`, `chunked/twoloop/`) |
+| `bch-groth16-chunked` | chunked, covenant chain | **44 inputs / 334,578 B / 262.82M op** | NFT-commitment chain |
+| `bch-groth16-intratx` | chunked, intra-tx linked | **42 inputs / 330,580 B / 262.68M op** | whole verifier in one (non-standard) tx |
+| `bch-groth16-grouped` | chunked, grouped | **42 inputs / 330,501 B / 262.59M op** | standard-relayable in 5 txs |
+| `bch-groth16-intratx-residue` | chunked, intra-tx + quotient-torus residue | **13 inputs / 100,448 B score / 99,993 B tx wire / 78.42M op** | current-BCH standard; smallest single-tx BN254 verifier |
+| `bch-groth16-grouped-residue` | chunked, grouped + residue | **26 inputs / 224,830 B / 179.59M op** | standard-relayable in 3 txs |
+| `bch-groth16-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **4 inputs / 187,792 B / 177.33M op** | targets the proposed `bch-spec` upgrade, not current BCH; structural (fewest UTXOs), own leaderboard category — see [Target VM](#target-vm-bch-spec) |
+| `bch-pairing-chunked` | chunked pairing-only, covenant | **20 inputs / 175,788 B / 138.94M op**; score **178,368** | Miller-boundary milestone |
+| `bch-pairing-intratx` | chunked pairing-only, intra-tx | **20 inputs / 174,134 B / 138.80M op**; score **175,014** | Miller-boundary milestone |
+| `bch-vkx-chunked-covenant` | chunked `vk_x`-only | **8 inputs / 11,306 B / 7.07M op** | the G1 MSM checkpoint (see `chunked/shamir/`, `chunked/twoloop/`) |
 
-Scores are the current, post-`rescheduleStacks` figures from
-[chunked/rescheduler/README.md](chunked/rescheduler/README.md) (committed-proof benchmark;
-lower is better).
+Headline values are the current committed-proof benchmark totals after `rescheduleStacks`;
+lower is better.
 
 ## BLS12-381 verifiers
 
@@ -54,8 +53,9 @@ comparison. Per-layer status and build commands are in
 | `bch-groth16-bls12381-singleton` | singleton, baseline | ~24.2 KB / ~1.04–1.48B op-cost | **~21× smaller bytecode than the nChain reference** |
 | `bch-groth16-bls12381-singleton-minop` | singleton, op-optimized | 67,163 B / **256.6M op-cost** | residue (`λ=p+|x|`, μ₂₇A witness) + GLV; fused G2 ψ-check; A/C on-curve (G1 subgroup checks omitted) |
 | `bch-pairing-bls12381-singleton` | singleton, pairing-only | ~19.8 KB / ~1.38B op-cost | the pairing verdict milestone (`verify.cash`) |
-| `bch-groth16-bls12381-grouped-residue` | chunked, grouped + residue | **47 inputs / 5 standard txs / score 370,686** | the deployable BLS verifier; GLV `vk_x` + fused Miller + μ₂₇A residue tail |
-| `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **5 inputs**, one tx (proposed 100 kB VM) | BLS counterpart of the spec build; targets the proposed `bch-spec` upgrade — see [Target VM](#target-vm-bch-spec) |
+| `bch-groth16-bls12381-intratx-residue` | chunked, intra-tx + residue | **39 inputs / 324,469 B / 256,960,795 op** | one non-standard transaction on current BCH |
+| `bch-groth16-bls12381-grouped-residue` | chunked, grouped + residue | **39 inputs / 5 standard txs / 324,420 B / 256,880,928 op** | deployable BLS verifier; group hand-offs pin state and the successor P2SH32 locking |
+| `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **5 inputs / 270,812 B / 250,831,432 op** | BLS counterpart of the spec build; targets the proposed `bch-spec` upgrade — see [Target VM](#target-vm-bch-spec) |
 
 The BLS chunked pairing/Miller/final-exp families also exist in
 [chunked/bls12-381/](chunked/bls12-381/) (plain and residue generators); the
@@ -84,8 +84,9 @@ Extra considerations for spec-targeting verifiers (full detail in
 - **Intra-tx introspection is ~free.** Reading a sibling's unlocking costs the reader 1 op/byte while
   those bytes grant the sibling 800 op of budget (800 : 1); pad is serialized once, so it is not
   double-counted in the score.
-- **Non-standard.** A 100 kB input makes the tx exceed the 100 kB standard size, so it is mined
-  directly (the intra-tx bundle was already non-standard).
+- **Non-standard.** A 100 kB input makes the spec-targeting transaction exceed the 100 kB standard
+  size, so it is mined directly. This differs from the current-BCH BN254 quotient-torus fixture,
+  which is 99,993 bytes and standard-policy valid.
 
 ## The forms in one paragraph each
 
@@ -108,12 +109,12 @@ Extra considerations for spec-targeting verifiers (full detail in
 | method | how state crosses | deployability | folder |
 |---|---|---|---|
 | **covenant chain** | NFT `hash256` commitment, one chunk per tx | ~54–87 tx chain (at the 50-deep mempool edge) | `chunked/pairing`, `chunked/bls12-381` |
-| **intra-tx linked** | next input's unlocking bytecode (`OP_INPUTBYTECODE` forward-check), one tx | a single ~0.25–0.7 MB non-standard tx | `chunked/intratx` |
+| **intra-tx linked** | next input's unlocking bytecode (`OP_INPUTBYTECODE` forward-check), one tx | one tx; 99,993 B and standard for the BN254 quotient-torus frontier, larger builds non-standard | `chunked/intratx` |
 | **grouped** | intra-tx *within* a tx + NFT hand-off *across* txs | **standard-relayable, a handful of <100 KB txs, under the 50-tx limit** | `chunked/grouped` |
 
-Grouped is the only full-verifier form that is **both** standard-relayable **and** within
-the mempool chain limit, which is why the flagship deployment is
-`bch-groth16-grouped-residue`.
+The BN254 quotient-torus intra-tx verifier is standard-relayable as one transaction. Grouped remains
+the standard-relayable form for larger graphs, including the current BLS12-381 construction, by
+splitting them into a handful of transactions within the mempool chain limit.
 
 The **`vk_x`-only** checkpoint (the variable-scalar G1 MSM,
 `IC0 + in0·IC1 + in1·IC2`) is factored out and has its own two implementations kept for
@@ -131,9 +132,10 @@ comparison: [`chunked/twoloop/`](chunked/twoloop/) (simple, 16 chunks) and
 
 - **`residue` chunked** (`*-intratx-residue`, `*-grouped-residue`) — the same residue
   math packed into a deployable chunk graph. The hard-part final exponentiation
-  (dozens of chunks in the plain build) collapses to a short witnessed-residue tail,
-  cutting inputs/bytes/op by roughly a third — which is what turns the multi-transaction
-  grouped verifier into the compact flagship.
+  (dozens of chunks in the plain build) collapses to a short witnessed-residue tail.
+  BN254 additionally evaluates the Miller accumulator in `Fp12*/Fp6*`, reducing the
+  graph to a standard 13-input transaction; grouped packing remains available for
+  constructions whose complete graph exceeds standard transaction policy.
 
 The op-cost win that these share at the *codegen* level — the `rescheduleStacks` compile
 mode — is documented separately in

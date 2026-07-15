@@ -12,7 +12,7 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  P, finalexpTrace, boundaryFor, pairsFor, planChunk,
+  P, OP_BUDGET, finalexpTrace, boundaryFor, pairsFor, planChunk,
   commit, f12limbs, decl, covIn, covOut,
 } from './_pairingmath.mjs';
 import { measureCovenantFile } from './_vkxmath.mjs';
@@ -22,7 +22,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
 mkdirSync(GEN, { recursive: true });
 const PROBE = join(GEN, `_probe_finalexp_${process.pid}.cash`); // compile candidates from file so the lib import resolves
-const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
+const OP_TARGET = Number(process.env.OP_COST_TARGET ?? OP_BUDGET - 100_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 
 // The lazy tower comes from the shared lazy library (imported per chunk; cashc tree-shakes the

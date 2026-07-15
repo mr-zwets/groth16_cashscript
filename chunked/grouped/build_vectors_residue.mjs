@@ -1,11 +1,11 @@
 // Assemble the GROUPED verifier vectors for BN254 — a hybrid of the intra-tx linked
 // method (chunked/intratx) and the covenant NFT hand-off (chunked/pairing).
 //
-// MOTIVATION. The multi-tx covenant (bch-groth16-chunked / -covenant) is 54 SEQUENTIAL
-// transactions, one chunk each — a 54-deep unconfirmed chain that exceeds BCH's default
+// MOTIVATION. The plain multi-tx covenant is 43 SEQUENTIAL transactions, one chunk each —
+// a 43-deep unconfirmed chain that approaches BCH's default
 // mempool ancestor/descendant limit (50). The single-tx intra-tx bundle (bch-groth16-
 // intratx) is one ~0.5 MB transaction — fine at consensus but NON-standard (> 100,000 B,
-// must be mined directly). GROUPED packs the same 54 chunks into ~6 STANDARD transactions
+// must be mined directly). GROUPED packs the 26-input residue graph into 3 STANDARD transactions
 // of < 100,000 B each: comfortably under the chain limit AND relayable under standard policy.
 //
 // MECHANISM. Within one group transaction the chunks bind each other exactly as in the
@@ -33,7 +33,8 @@ import {
   f12limbs, r6limbs, compileBytecode, compileFileBytecode, ptLimbs, PT_CFG,
   compileBytecodeRaw, compileFileBytecodeRaw,
   vkxStateAt, vkxFinalZinv, vkxPoint, finalexpTrace, le40, CATEGORY,
-  OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET, verifierPath,
+  OP_DROP, OP_PUSHDATA2, TARGET_UNLOCK, OP_BUDGET, verifierPath, invalidG2Overrides,
+  assertG2StageManifest,
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
 import { millerFusedOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
@@ -100,7 +101,7 @@ const OP_RETURN = Uint8Array.from([0x6a]);
 // input[0] optionally spends the incoming-state token (covInHash binds it); output[0]
 // optionally carries the outgoing-state token (covout commits it). Other inputs are plain.
 function tokenOf(t) {
-  return t ? { amount: 0n, category: CATEGORY, nft: { capability: t.cap, commitment: t.commit } } : undefined;
+  return t ? { amount: 0n, category: t.category ?? CATEGORY, nft: { capability: t.cap, commitment: t.commit } } : undefined;
 }
 function evalGroup(inputs, index, gm, vm = realVm) {
   const program = {
@@ -159,20 +160,16 @@ const MILLER_IN_LIMBS = PTL_LEN + 24;
 // only the runtime pair's R0, so the state is f(12)+R0(6), NOT four R's.
 const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0])];
 
-function specsG2check(inst) {
+function specsG2check(inst, bad = {}) {
   const pf = inst.proof ?? proof;
   const Ba = pf.b.toAffine(), Aa = pf.a.negate().toAffine(), Ca = pf.c.toAffine();
-  const Bpair = [[Ba.x.c0, Ba.x.c1], [Ba.y.c0, Ba.y.c1]];
-  const tail = [Aa.x, Aa.y, Ba.x.c0, Ba.x.c1, Ba.y.c0, Ba.y.c1, Ca.x, Ca.y];
+  const Bx = bad.Bx ?? Ba.x, By = bad.By ?? Ba.y;
+  const Bpair = [[Bx.c0, Bx.c1], [By.c0, By.c1]];
+  const tail = [bad.Ax ?? Aa.x, bad.Ay ?? Aa.y, Bx.c0, Bx.c1, By.c0, By.c1, bad.Cx ?? Ca.x, bad.Cy ?? Ca.y];
   const rLimbs = (R) => [R[0][0], R[0][1], R[1][0], R[1][1], R[2][0], R[2][1]];
   const sLimbs = (R) => [...rLimbs(R), ...tail];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_g2check.json'), 'utf8'));
-  if (man.linkedLayout !== true) {
-    throw new Error('grouped residue requires G2_LINKED_LAYOUT=1 during G2 generation');
-  }
-  if (man.stageBound !== true) {
-    throw new Error('grouped residue requires STAGE_BOUND_LAYOUT=1 during G2 generation');
-  }
+  assertG2StageManifest(man, { linkedLayout: true });
   const zinv = g2checkFastZinv(Bpair); // [zinvA, zinvB] witnessed inverse of [x0]B.Z (last chunk only)
   return man.chunks.map((ch) => ({
     file: join(GEN, `g2check_${String(ch.idx).padStart(2, '0')}.cash`),
@@ -303,6 +300,7 @@ const cfgKey = (spec, cfg) => [
   spec.file,
   cfg.covInHash ? 'ci' : '',
   cfg.epilogueMode ?? '',
+  cfg.nextLockingHash ?? '',
   JSON.stringify(cfg.forward),
   JSON.stringify(cfg.externalBindings),
 ].join('|');
@@ -317,6 +315,7 @@ function compileChunk(spec, cfg) {
       forward: cfg.forward,
       covInHash: cfg.covInHash,
       epilogueMode: cfg.epilogueMode,
+      nextLockingHash: cfg.nextLockingHash,
       externalBindings: cfg.externalBindings,
     });
     let resched, raw;
@@ -337,15 +336,27 @@ function argBytesOf(spec) {
 // ---- assemble a full run for one instance against a FIXED group partition ----
 // `groups` is the [lo,hi] partition (computed once, shared by all instances so the lockings
 // match). Returns inputs/meta plus per-group token metadata for the harness.
-function assembleGrouped(specs, groups) {
+function assembleGrouped(specs, groups, expectRejected = false) {
   const G = groups.length;
   // role/cfg per chunk
   const cfgs = specs.map((_, i) => {
     const gi = groups.findIndex(([lo, hi]) => i >= lo && i <= hi);
     return { ...groupedCfg(specs, i, groups[gi][0], groups[gi][1], gi, G), group: gi };
   });
-  const redeems = specs.map((s, i) => compileChunk(s, cfgs[i]));
-  const lockings = redeems.map((r) => p2shSpk(r));
+  // Compile from the terminal group backward. A nonterminal group's last contract
+  // embeds the hash of the already-known first locking of its successor group.
+  const redeems = new Array(specs.length);
+  const lockings = new Array(specs.length);
+  for (let gi = G - 1; gi >= 0; gi--) {
+    const [lo, hi] = groups[gi];
+    for (let i = lo; i <= hi; i++) {
+      if (cfgs[i].epilogueMode === 'covout') {
+        cfgs[i].nextLockingHash = binToHex(hash256(lockings[groups[gi + 1][0]]));
+      }
+      redeems[i] = compileChunk(specs[i], cfgs[i]);
+      lockings[i] = p2shSpk(redeems[i]);
+    }
+  }
   const rpush = redeems.map((r) => encodeDataPush(r));
   const argB = specs.map(argBytesOf);
   const mkUnlock = (i, target) => {
@@ -385,7 +396,7 @@ function assembleGrouped(specs, groups) {
   groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) op1[lo + k] = evalGroup(perGroupInputs[gi], k, gmeta[gi]); });
   const standardOp1 = [];
   groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) standardOp1[lo + k] = evalGroup(perGroupInputs[gi], k, gmeta[gi], standardVm); });
-  if ([...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
+  if (!expectRejected && [...op1, ...standardOp1].some((outcome) => outcome.error !== null)) {
     const failures = [...op1, ...standardOp1]
       .map((outcome, i) => ({ vm: i < specs.length ? 'consensus' : 'standard', index: i % specs.length, ...outcome }))
       .filter((outcome) => outcome.error !== null);
@@ -422,7 +433,7 @@ function assembleGrouped(specs, groups) {
     }
     // a switch invalidates the lockings/op-costs computed above; reassemble with the now-
     // complete chosenCache (deterministic -> recurses at most once).
-    if (switched) return assembleGrouped(specs, groups);
+    if (switched) return assembleGrouped(specs, groups, expectRejected);
   }
   // Re-measure after each shrink: shorter successor unlockings make forward introspection
   // cheaper, which can safely expose another byte of density headroom in the predecessor.
@@ -431,19 +442,22 @@ function assembleGrouped(specs, groups) {
     Math.max(op1[i].operationCost, standardOp1[i].operationCost),
   ));
   const op2 = [];
+  const standardOp2 = [];
   while (true) {
     for (let i = 0; i < specs.length; i++) allInputs[i].unlocking = mkUnlock(i, targets[i]);
     const perGroupInputs2 = groups.map(([lo, hi]) => allInputs.slice(lo, hi + 1));
     groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) op2[lo + k] = evalGroup(perGroupInputs2[gi], k, gmeta[gi]); });
-    const standardOp2 = [];
     groups.forEach(([lo, hi], gi) => { for (let k = 0; k <= hi - lo; k++) standardOp2[lo + k] = evalGroup(perGroupInputs2[gi], k, gmeta[gi], standardVm); });
-    if (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted)) break;
+    if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) break;
     const tightened = targets.map((target, i) => Math.min(
       target,
       tunedLen(argB[i].length + rpush[i].length, Math.max(op2[i].operationCost, standardOp2[i].operationCost)),
     ));
     if (tightened.every((target, i) => target === targets[i])) break;
     targets = tightened;
+  }
+  if (!expectRejected && (op2.some((outcome) => !outcome.accepted) || standardOp2.some((outcome) => !outcome.accepted))) {
+    throw new Error('tightened input rejected during padding measurement');
   }
 
   const meta = specs.map((s, i) => ({
@@ -541,6 +555,32 @@ report('groth16-grouped proof#1', asmProof1);
 const asmWorst = assembleGrouped(wcSpecs, GROUPS);
 report('groth16-grouped worst-case', asmWorst);
 
+const wrongLockAsm = {
+  ...asmCommitted,
+  gmeta: asmCommitted.gmeta.map((group) => ({ ...group })),
+};
+const firstHandoffIndex = GROUPS[0][1];
+wrongLockAsm.gmeta[0].outLocking = Uint8Array.from(wrongLockAsm.gmeta[0].outLocking);
+wrongLockAsm.gmeta[0].outLocking[wrongLockAsm.gmeta[0].outLocking.length - 1] ^= 0x01;
+const firstGroupInputs = wrongLockAsm.inputs.slice(GROUPS[0][0], GROUPS[0][1] + 1);
+const handoffLocalIndex = firstHandoffIndex - GROUPS[0][0];
+const wrongLockAcceptances = firstGroupInputs.map((_, index) => evalGroup(firstGroupInputs, index, wrongLockAsm.gmeta[0]).accepted);
+const wrongLockRejected = !wrongLockAcceptances[handoffLocalIndex];
+if (!wrongLockRejected || wrongLockAcceptances.some((accepted, index) => index !== handoffLocalIndex && !accepted)) {
+  throw new Error('successor-lock mutation did not isolate to the group hand-off contract');
+}
+const wrongCategory = Uint8Array.from(CATEGORY);
+wrongCategory[0] ^= 0x01;
+[
+  { label: 'category', gm: { ...asmCommitted.gmeta[0], outToken: { ...asmCommitted.gmeta[0].outToken, category: wrongCategory } } },
+  { label: 'capability', gm: { ...asmCommitted.gmeta[0], outToken: { ...asmCommitted.gmeta[0].outToken, cap: 'none' } } },
+].forEach(({ label, gm }) => {
+  const acceptances = firstGroupInputs.map((_, index) => evalGroup(firstGroupInputs, index, gm).accepted);
+  if (acceptances[handoffLocalIndex] || acceptances.some((accepted, index) => index !== handoffLocalIndex && !accepted)) {
+    throw new Error(`wrong output-token ${label} did not isolate to the group hand-off contract`);
+  }
+});
+
 // invalid runs: corrupt a chunk that is a group's FIRST (covInHash boundary) and a generic middle one
 const firstBoundary = GROUPS[1] ? GROUPS[1][0] : 1; // first chunk of group 1 (a covInHash chunk)
 const g2FinalIndex = committedSpecs.findIndex((spec) => (spec.externalBindings ?? []).length > 0);
@@ -552,7 +592,7 @@ const hybridSpecs = [
 ];
 const unboundHybrid = assembleGrouped(hybridSpecs.map((spec) => ({ ...spec, externalBindings: [] })), GROUPS);
 if (!unboundHybrid.accepted) throw new Error('pre-binding proof0-G2/proof1-remainder hybrid was not accepted');
-const boundHybrid = assembleGrouped(hybridSpecs, GROUPS);
+const boundHybrid = assembleGrouped(hybridSpecs, GROUPS, true);
 if (boundHybrid.meta[g2FinalIndex].accepted) throw new Error('bound hybrid did not reject at G2 final');
 const unrelatedFailure = boundHybrid.meta.find((meta, i) => i !== g2FinalIndex && !meta.accepted);
 if (unrelatedFailure) throw new Error(`bound hybrid also rejected at ${unrelatedFailure.label}`);
@@ -596,10 +636,20 @@ const invalids = [
   ...bindingMutations,
   tableMutation,
 ];
+const invalidInputs = invalidG2Overrides(INSTANCES.committed.proof).map((bad) => {
+  const specs = specsG2check(INSTANCES.committed, bad);
+  const run = assembleGrouped(specs, [[0, specs.length - 1]], true);
+  if (run.accepted) throw new Error('isolated G2 validation accepted an invalid point');
+  return toRun(run);
+});
 console.error(`  invalid runs rejected: ${invalids.map((r) => r.rejected).join(',')}`);
+console.error(`  invalid point runs rejected: ${invalidInputs.length}`);
+if (!asmCommitted.fits || !asmProof1.fits || !asmWorst.fits || !invalids.every((run) => run.rejected) || invalidInputs.length === 0) {
+  throw new Error('valid, worst-case, or invalid fixture failed; refusing to write vectors');
+}
 
 writeFileSync(verifierPath('src/bch/groth16-grouped-residue-vectors.json'), JSON.stringify({
-  description: 'GROUPED + RESIDUE BN254 Groth16 verifier: 3 fast-G2 endomorphism chunks (ePrint 2022/348), 3 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks (ePrint 2024/640) packed into 3 STANDARD (<100,000 B) transactions. The three GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding three copies. The final Miller chunk also performs the witnessed-residue verdict, eliminating a separate tail input. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment. The G2 final chunk binds the proof-derived -A/B and C bytes into the Miller genesis input, while the GLV final chunk binds vk_x into that same genesis. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. One fixed set of lockings verifies any proof for the VK.',
+  description: 'GROUPED + RESIDUE BN254 Groth16 verifier: 3 canonical-coordinate/on-curve/subgroup fast-G2 endomorphism chunks (ePrint 2022/348), 3 GLV vk_x chunks, and 20 c^-(6x+2)-FUSED batched Miller chunks (ePrint 2024/640) packed into 3 STANDARD (<100,000 B) transactions. The three GLV inputs share one hash-bound fixed lookup table carried by the final GLV input rather than embedding three copies. The final Miller chunk also performs the witnessed-residue verdict, eliminating a separate tail input. Within each group tx the chunks forward-check each other via OP_INPUTBYTECODE; across groups the running state rides a CashToken NFT commitment, and every hand-off contract pins the actual first locking of its successor group. The G2 final chunk binds the proof-derived -A/B and C bytes into the Miller genesis input, while the GLV final chunk binds vk_x into that same genesis. The residue witness (c, cInv) threads through every Miller chunk; the terminal chunk checks c canonical, c*cInv==ONE, the exact w serialization in {1,w27,w27^2}, and fF*(w*c^q2)==(c*c^q2)^q. One fixed set of lockings verifies any proof for the VK.',
   method: 'grouped-residue', deployment: 'P2SH32', category: binToHex(CATEGORY),
   numInputs: asmCommitted.meta.length, numGroups: GROUPS.length, budgetPerInput: OP_BUDGET,
   groupSizes: GROUPS.map(([lo, hi]) => hi - lo + 1),
@@ -613,5 +663,6 @@ writeFileSync(verifierPath('src/bch/groth16-grouped-residue-vectors.json'), JSON
   extraValidProofs: [toRun(asmProof1)],
   worstCaseProof: toRun(asmWorst),
   invalid: invalids.map((r) => r.run),
+  invalidInputs,
 }, null, 2));
 console.error(`wrote groth16-grouped-residue-vectors.json (${GROUPS.length} groups, ${asmCommitted.meta.length} inputs)`);
