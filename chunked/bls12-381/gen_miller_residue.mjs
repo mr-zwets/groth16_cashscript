@@ -5,10 +5,12 @@
 // (fixed VK G2 point); pair 1 = e(alpha,beta) is skipped and its UNCONJUGATED single-pair Miller
 // value fAB is multiplied in once via the 'cmul1' op. The loop also folds c^-|x| into the shared
 // f so the boundary fF = fRaw * c^-|x| (genesis f = cInv folds the 2^63 MSB term; op 'cf' folds
-// cInv [NAF digit +1] or c [-1]). The residue witness (c, cInv) is carried as CONSTANT state.
+// cInv [NAF digit +1] or c [-1]). The default path carries (c,cInv) as constant state.
 // state = f(12) + R_B(6) + runtime points(10) + c(12) + cInv(12) = 52 limbs; stage-bound
 // genesis carries only cInv+c+points (34 limbs) and derives f=cInv, R_B=B in-contract. The
 // FINAL chunk hands off only [fF, c, cInv] (36 limbs) to the residue tail.
+// BLS_QUOTIENT_TORUS=1 instead carries the six-limb finite class [c]=[1+u*W] modulo Fp6,
+// specializes constant folds, and fuses the projective residue verdict into the final chunk.
 //   node gen_miller_residue.mjs          covenant plan -> generated/
 //   node gen_miller_residue.mjs linked   linked plan   -> generated/linked-residue/
 import { writeFileSync, mkdirSync } from 'node:fs';
@@ -18,18 +20,25 @@ import {
   P, Fp2, f12limbs, r6limbs, pairsFor, singlePairMiller, millerBatchOps, PT_CFG, ptLimbs,
 } from './_pairingmath.mjs';
 import { commit, measureCovenantFile, planChunk, covIn, covOut, PUBLIC_INPUTS } from './_vkxmath.mjs';
-import { millerFusedOps, residueWitness, conj, fp12limbsOf } from './_residuemath.mjs';
+import {
+  millerFusedOps, millerFusedTorusOps, residueTorusWitness, residueWitness,
+  conj, fp12limbsOf,
+} from './_residuemath.mjs';
 import { LINKED_MILLER_BOUNDS, LINKED_RESIDUE_NAMESPACE } from './_residue_linked_plan.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const LINKED = process.argv[2] === 'linked';
+const QUOTIENT_TORUS = process.env.BLS_QUOTIENT_TORUS === '1';
+if (QUOTIENT_TORUS && !LINKED) {
+  throw new Error('BLS_QUOTIENT_TORUS is linked-only; pass the linked layout explicitly');
+}
 const STAGE_BOUND = LINKED || process.env.STAGE_BOUND_LAYOUT === '1';
 const COVENANT_RESIDUE = STAGE_BOUND && process.env.COVENANT_RESIDUE_LAYOUT === '1';
 const GEN = join(here, 'generated', ...(LINKED ? [LINKED_RESIDUE_NAMESPACE] : []));
 mkdirSync(GEN, { recursive: true });
 const LIB_IMPORT = LINKED
-  ? '../../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash'
-  : '../../../singleton/bls12-381/lib/lazy/Bls12381LazyG.cash';
+  ? `../../../../singleton/bls12-381/lib/lazy/Bls12381Lazy${QUOTIENT_TORUS ? 'Torus' : 'G'}.cash`
+  : `../../../singleton/bls12-381/lib/lazy/Bls12381Lazy${QUOTIENT_TORUS ? 'Torus' : 'G'}.cash`;
 const PROBE = join(GEN, '_probe_millerres.cash');
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_880_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
@@ -59,39 +68,78 @@ const stagePtL = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
 // witness for the committed planning instance (chunk math is generic; only window boundaries
 // come from this instance).
 const { boundary: fRawPlan } = millerBatchOps(PAIRS);
-const { c: C_PLAN, cInv: CINV_PLAN } = residueWitness(fRawPlan);
-const { ops, states, boundary, fAB } = millerFusedOps(PAIRS, C_PLAN, CINV_PLAN);
+const rootPlan = QUOTIENT_TORUS ? residueTorusWitness(fRawPlan) : residueWitness(fRawPlan);
+const { c: C_PLAN, cInv: CINV_PLAN } = rootPlan;
+const U_PLAN = QUOTIENT_TORUS ? rootPlan.u : null;
+const trace = QUOTIENT_TORUS
+  ? millerFusedTorusOps(PAIRS, C_PLAN, CINV_PLAN, U_PLAN)
+  : millerFusedOps(PAIRS, C_PLAN, CINV_PLAN);
+const { ops, states, boundary, fAB } = trace;
 
 // baked constant f_{alpha,beta} (pair 1's UNCONJUGATED single-pair Miller value; VK-only),
 // multiplied in once by 'cmul1' instead of folding pair 1's lines through the loop.
 const FAB_LIMBS = fp12limbsOf(fAB).map(String);
+const FAB_TORUS = QUOTIENT_TORUS
+  ? trace.fAbU
+  : null;
+const FAB_TORUS_LIMBS = FAB_TORUS === null
+  ? []
+  : [
+      FAB_TORUS.c0.c0, FAB_TORUS.c0.c1,
+      FAB_TORUS.c1.c0, FAB_TORUS.c1.c1,
+      FAB_TORUS.c2.c0, FAB_TORUS.c2.c1,
+    ].map(String);
 const cNames = Array.from({ length: 12 }, (_, i) => `c${i}`);
 const ciNames = Array.from({ length: 12 }, (_, i) => `ci${i}`);
-// state = f(12) + R_B(6) + runtime points + c(12) + cInv(12)
-const stateLimbs = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...f12limbs(s.c), ...f12limbs(s.cInv)];
+const torusNames = Array.from({ length: 6 }, (_, i) => `u${i}`);
+const rootNames = QUOTIENT_TORUS ? torusNames : [...cNames, ...ciNames];
+const rootPlanLimbs = QUOTIENT_TORUS
+  ? [U_PLAN.c0.c0, U_PLAN.c0.c1, U_PLAN.c1.c0, U_PLAN.c1.c1, U_PLAN.c2.c0, U_PLAN.c2.c1]
+  : [...f12limbs(C_PLAN), ...f12limbs(CINV_PLAN)];
+// state = f(12) + R_B(6) + runtime points + residue root. Quotient mode carries one
+// immutable six-limb u for [c]=[1+u*W], while the legacy path carries c+cInv (24 limbs).
+const stateLimbs = (s) => [
+  ...f12limbs(s.f), ...r6limbs(s.Rs[0]),
+  ...(QUOTIENT_TORUS ? rootPlanLimbs : [...f12limbs(s.c), ...f12limbs(s.cInv)]),
+];
 const withPts = (limbs) => { const fr = limbs.slice(0, 18); const rest = limbs.slice(18); return [...fr, ...ptL, ...rest]; };
 const inState = (i) => STAGE_BOUND && i === 0
-  ? [...f12limbs(states[i].cInv), ...f12limbs(states[i].c), ...genesisPtL]
+  ? QUOTIENT_TORUS
+    ? [...rootPlanLimbs, ...genesisPtL]
+    : [...f12limbs(states[i].cInv), ...f12limbs(states[i].c), ...genesisPtL]
   : withPts(stateLimbs(states[i]));
 // the FINAL chunk hands off only [fF, c, cInv] (36 limbs, contiguous) to the residue tail —
 // R_B/pts are done with once the loop ends. Non-final hand-offs carry the full 52-limb state.
 const outState = (i) => i === states.length - 1
-  ? [...f12limbs(states[i].f), ...f12limbs(states[i].c), ...f12limbs(states[i].cInv)]
+  ? QUOTIENT_TORUS
+    ? []
+    : [...f12limbs(states[i].f), ...f12limbs(states[i].c), ...f12limbs(states[i].cInv)]
   : withPts(stateLimbs(states[i]));
 
 const bakedCoeffs = (triple) => triple.flatMap((c) => [`${c.c0}`, `${c.c1}`]);
 function genChunk(opLo, opHi, isFinal) {
   const inF = Array.from({ length: 12 }, (_, i) => `f${i}`);
   const inR0 = ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
-  const fullStateParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames];
-  const stateParams = STAGE_BOUND && opLo === 0 ? [...ciNames, ...cNames, ...genesisPtParams] : fullStateParams;
+  const fullStateParams = [...inF, ...inR0, ...ptParams, ...rootNames];
+  const stateParams = STAGE_BOUND && opLo === 0
+    ? QUOTIENT_TORUS
+      ? [...torusNames, ...genesisPtParams]
+      : [...ciNames, ...cNames, ...genesisPtParams]
+    : fullStateParams;
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
-  L.push(`// c^-|x|-fused prepared-VK batched BLS12-381 Miller chunk: ops [${opLo},${opHi}).`);
-  L.push('// state = f(12) + R_B(6) [+ runtime points] + c(12) + cInv(12); c,cInv are constant');
-  L.push('// carried witness. cf op folds c^-1/c into f (residue method, ePrint 2024/640).');
-  L.push('contract MillerFusedBlsChunk() {');
+  if (QUOTIENT_TORUS) {
+    L.push(`// c^-|x|-fused prepared-VK batched BLS12-381 Miller chunk: ops [${opLo},${opHi}).${isFinal ? ' Includes the quotient terminal verdict.' : ''}`);
+    L.push('// state = f(12) + R_B(6) [+ runtime points] + torus u(6); root data is constant.');
+    L.push('// cf folds c^-1/c into f modulo Fp6 scaling (residue method, ePrint 2024/640).');
+    L.push(`contract MillerFusedBls${isFinal ? 'TorusTerminal' : 'Chunk'}() {`);
+  } else {
+    L.push(`// c^-|x|-fused prepared-VK batched BLS12-381 Miller chunk: ops [${opLo},${opHi}).`);
+    L.push('// state = f(12) + R_B(6) [+ runtime points] + c(12) + cInv(12); c,cInv are constant');
+    L.push('// carried witness. cf op folds c^-1/c into f (residue method, ePrint 2024/640).');
+    L.push('contract MillerFusedBlsChunk() {');
+  }
   L.push(`    function spend(${decl(stateParams)}, bytes unused zeroPadding) {`);
   L.push(covIn(COVENANT_RESIDUE && opLo === 0 ? stagePtParams : stateParams));
   // FUSED input validation (was the standalone g2check pass): the first Miller chunk checks the
@@ -100,7 +148,8 @@ function genChunk(opLo, opHi, isFinal) {
   if (opLo === 0) {
     for (const name of ptParams) L.push(`        require(within(${name}, 0, ${P}));`);
     if (STAGE_BOUND) {
-      for (const name of [...ciNames, ...cNames]) L.push(`        require(within(${name}, 0, ${P}));`);
+      const canonicalRoots = QUOTIENT_TORUS ? rootNames : [...ciNames, ...cNames];
+      for (const name of canonicalRoots) L.push(`        require(within(${name}, 0, ${P}));`);
     }
     L.push('        require(mSqr(Py0) == mAdd(mulFp(mSqr(Px0), Px0), 4));'); // A on G1 (-A shares the curve)
     L.push('        require(mSqr(Py3) == mAdd(mulFp(mSqr(Px3), Px3), 4));'); // C on G1
@@ -117,9 +166,21 @@ function genChunk(opLo, opHi, isFinal) {
     if (needs) { L.push(`        (int nq${pi.j}a, int nq${pi.j}b) = fp2Neg(${pi.Qyae}, ${pi.Qybe}, 1);`); return [`nq${pi.j}a`, `nq${pi.j}b`]; }
     return [pi.Qyae, pi.Qybe];
   });
-  // Stage-bound genesis derives the fused MSB state from inputs already needed by the loop:
-  // f starts at cInv and R_B starts at the proof's B point.
-  let f = STAGE_BOUND && opLo === 0 ? ciNames.slice() : inF.slice();
+  // Stage-bound genesis derives the fused MSB state from inputs already needed by the loop.
+  // In quotient mode [cInv]=[1-u*W], so its high coordinate is the canonical negation of u.
+  const negTorusNames = Array.from({ length: 6 }, (_, i) => `nu${i}`);
+  const needsNegTorus = QUOTIENT_TORUS && (STAGE_BOUND && opLo === 0 ||
+    ops.slice(opLo, opHi).some((op) => op.t === 'cf' && !op.neg));
+  if (needsNegTorus) {
+    const negRaw = Array.from({ length: 6 }, (_, i) => `nur${i}`);
+    L.push(`        (${decl(negRaw)}) = fp6Neg(${torusNames.join(',')}, 1);`);
+    negTorusNames.forEach((name, i) => L.push(`        int ${name} = mulFp(${negRaw[i]}, 1);`));
+  }
+  let f = STAGE_BOUND && opLo === 0
+    ? QUOTIENT_TORUS
+      ? ['1', '0', '0', '0', '0', '0', ...negTorusNames]
+      : ciNames.slice()
+    : inF.slice();
   let r0 = STAGE_BOUND && opLo === 0
     ? [PINFO[0].Qxae, PINFO[0].Qxbe, PINFO[0].Qyae, PINFO[0].Qybe, '1', '0']
     : inR0.slice();
@@ -131,11 +192,21 @@ function genChunk(opLo, opHi, isFinal) {
     const fixed = pi !== null && !pi.cfg.Q;
     if (op.t === 'sqr') { const sf = fresh(12); L.push(`        (${decl(sf)}) = fp12Sqr(${f.join(',')});`); f = sf; }
     else if (op.t === 'cf') { // c-fold: f *= (neg ? c : cInv)
-      const g = fresh(12); const m = op.neg ? cNames : ciNames;
-      L.push(`        (${decl(g)}) = fp12Mul(${f.join(',')}, ${m.join(',')});`); f = g;
+      const g = fresh(12);
+      if (QUOTIENT_TORUS) {
+        const m = op.neg ? torusNames : negTorusNames;
+        L.push(`        (${decl(g)}) = fp12MulTorus(${f.join(',')}, ${m.join(',')});`);
+      } else {
+        const m = op.neg ? cNames : ciNames;
+        L.push(`        (${decl(g)}) = fp12Mul(${f.join(',')}, ${m.join(',')});`);
+      }
+      f = g;
     } else if (op.t === 'cmul1') { // f *= baked f_{alpha,beta} (VK constant)
       const g = fresh(12);
-      L.push(`        (${decl(g)}) = fp12Mul(${f.join(',')}, ${FAB_LIMBS.join(',')});`); f = g;
+      L.push(QUOTIENT_TORUS
+        ? `        (${decl(g)}) = fp12MulTorus(${f.join(',')}, ${FAB_TORUS_LIMBS.join(',')});`
+        : `        (${decl(g)}) = fp12Mul(${f.join(',')}, ${FAB_LIMBS.join(',')});`);
+      f = g;
     } else if (op.t === 'dl') {
       if (fixed) { emitLine(bakedCoeffs(op.coeffs), pi); continue; }
       const dco = fresh(6), dr = fresh(6);
@@ -168,15 +239,31 @@ function genChunk(opLo, opHi, isFinal) {
     L.push(`        (int eya, int eyb) = r2Mul(npya, npyb, ${r0[4]}, ${r0[5]});`);
     L.push(`        require(redFp(${r0[2]}) == eya); require(redFp(${r0[3]}) == eyb);`);
   }
-  // final chunk hands off only [fF, c, cInv] to the residue tail; others carry full state.
-  const outNames = isFinal ? [...f, ...cNames, ...ciNames] : [...f, ...r0, ...ptParams, ...cNames, ...ciNames];
-  // Lazy point arithmetic can leave R_B above p, so every computed f/R limb is reduced exactly
-  // once at this ownership boundary. Proof coordinates and c/cInv are range-gated at genesis and
-  // never reassigned; carrying those byte-for-byte preserves their canonical encoding.
-  const exactNames = COVENANT_RESIDUE
-    ? isFinal ? [...cNames, ...ciNames] : [...new Set([...ptParams, ...cNames, ...ciNames])]
-    : [];
-  L.push(covOut(outNames, exactNames));
+  if (QUOTIENT_TORUS && isFinal) {
+    const canonicalF = Array.from({ length: 12 }, (_, i) => `tailF${i}`);
+    const frobeniusU = Array.from({ length: 6 }, (_, i) => `tailU${i}`);
+    const product = Array.from({ length: 6 }, (_, i) => `tailP${i}`);
+    canonicalF.forEach((name, i) => L.push(`        int ${name} = mulFp(${f[i]}, 1);`));
+    L.push('        // Reject the vacuous projective value [0:0] before the cross-product test.');
+    L.push(`        require(${canonicalF.join(' + ')} != 0);`);
+    L.push(`        (${decl(frobeniusU)}) = torusFrob1(${torusNames.join(',')});`);
+    L.push(`        (${decl(product)}) = fp6Mul(${canonicalF.slice(0, 6).join(',')}, ${frobeniusU.join(',')});`);
+    L.push('        // [fX:fY] == [1:frob1(u)] iff fX*frob1(u) == fY in Fp6.');
+    L.push('        ' + product.map((name, i) => `require(mulFp(${name} - ${canonicalF[i + 6]}, 1) == 0);`).join(' '));
+  } else {
+    // The legacy final chunk hands off [fF,c,cInv] to the separate residue tail; non-final
+    // chunks carry the full state. Quotient mode instead verifies inline above.
+    const outNames = isFinal
+      ? [...f, ...cNames, ...ciNames]
+      : [...f, ...r0, ...ptParams, ...rootNames];
+    // Lazy point arithmetic can leave R_B above p, so every computed f/R limb is reduced exactly
+    // once at this ownership boundary. Proof coordinates and roots are range-gated at genesis and
+    // never reassigned; carrying those byte-for-byte preserves their canonical encoding.
+    const exactNames = COVENANT_RESIDUE
+      ? isFinal ? [...cNames, ...ciNames] : [...new Set([...ptParams, ...rootNames])]
+      : [];
+    L.push(covOut(outNames, exactNames));
+  }
   L.push('    }');
   L.push('}');
   return L.join('\n') + '\n';
@@ -203,12 +290,22 @@ while (lo < ops.length) {
     const outL = outState(hi);
     const src = genChunk(lo, hi, hi === ops.length);
     const m = measureCovenantFile(src, inL, inCommit, outL, PROBE);
-    return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final: hi === ops.length, outgoing: commit(outL), src, m };
+    return {
+      fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET,
+      operationCost: m.operationCost,
+      hi,
+      final: hi === ops.length,
+      outgoing: QUOTIENT_TORUS && hi === ops.length ? null : commit(outL),
+      src,
+      m,
+    };
   };
   const best = LINKED
     ? tryHi(LINKED_MILLER_BOUNDS[chunks.length + 1])
     : planChunk(lo, ops.length, OP_TARGET, tryHi, planState);
-  if (!best) throw new Error(`no fitting fused window at op ${lo}`);
+  if (!best || (QUOTIENT_TORUS && !best.fits)) {
+    throw new Error(`no fitting quotient-torus window at op ${lo}`);
+  }
   const idx = chunks.length;
   writeFileSync(join(GEN, `millerres_${String(idx).padStart(2, '0')}.cash`), best.src);
   chunks.push({ idx, opLo: lo, opHi: best.hi, final: best.final, incoming: commit(inCommit), outgoing: best.outgoing, opCost: best.operationCost, lockingBytes: best.m.lockingBytes });
@@ -217,10 +314,25 @@ while (lo < ops.length) {
 }
 for (let i = 1; i < chunks.length; i++) if (chunks[i - 1].outgoing !== chunks[i].incoming) throw new Error('continuity break at ' + i);
 console.error(`fused miller: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.opCost, 0).toLocaleString()}, maxOp=${Math.max(...chunks.map((c) => c.opCost)).toLocaleString()}`);
-writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
-  fused: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', stageBound: STAGE_BOUND,
-  covenantResidue: COVENANT_RESIDUE, inputValidationFused: true,
-  numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
-  chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, incoming: c.incoming, outgoing: c.outgoing })),
-}, null, 2));
+const manifest = QUOTIENT_TORUS
+  ? {
+      fused: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', stageBound: STAGE_BOUND,
+      covenantResidue: COVENANT_RESIDUE, inputValidationFused: true,
+      quotientTorus: true, terminalFused: true, genesisRootParams: rootNames,
+      numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
+      chunks: chunks.map((c) => ({
+        idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final,
+        terminalFused: c.final, incoming: c.incoming, outgoing: c.outgoing,
+      })),
+    }
+  : {
+      fused: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', stageBound: STAGE_BOUND,
+      covenantResidue: COVENANT_RESIDUE, inputValidationFused: true,
+      numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
+      chunks: chunks.map((c) => ({
+        idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final,
+        incoming: c.incoming, outgoing: c.outgoing,
+      })),
+    };
+writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify(manifest, null, 2));
 console.error(`wrote ${join(GEN, 'manifest_millerres.json')}`);

@@ -5,8 +5,8 @@
 // Same single-transaction forward-checking mechanism as build_vectors_bls.mjs (each chunk is an
 // INPUT whose witness carries its incoming state as a raw 48-byte-limb blob and require()s the
 // next input's blob — read via tx.inputs[idx+1].unlockingBytecode — equals its recomputed output;
-// no NFT commitment, no hashing, arbitrary intermediate size), but it consumes the RESIDUE chunk
-// graph instead of the plain one:
+// no NFT commitment, no hashing, arbitrary intermediate size), but it consumes an optimized
+// residue graph instead of the plain one. The default path remains the 35-input Fp6-tail graph:
 //
 //   GLV vk_x MSM (4-scalar ~128-bit Straus, baked table)              5 chunks
 //   c^-|x|-FUSED batched Miller, e(alpha,beta) baked (cmul1); the G2   29 chunks
@@ -15,12 +15,14 @@
 //                                                                     ---------
 //                                                                     35 inputs
 //
-// The chunk MATH is reused VERBATIM from the same generated/*.cash the grouped-residue BLS build
-// consumes — only the assembly differs (one non-standard <1 MB tx vs token-threaded standard txs).
-// The residue witness (c, cInv) threads through every fused-Miller chunk; w enters the tail as an
-// uncommitted witness. One fixed set of lockings verifies any proof for the VK.
+// With BLS_QUOTIENT_TORUS=1, the same 29 Miller windows instead carry the six-limb finite class
+// [c]=[1+u*W] in Fp12*/Fp6*. The final Miller input performs the projective terminal check, so
+// the correction w and separate tail disappear: five GLV + 29 Miller = 34 inputs. The opt-in
+// generator proves the quotient construction before this builder writes its vector. One fixed
+// set of lockings verifies any proof for the VK in either mode.
 //
 //   node build_vectors_residue_bls.mjs -> verifier/src/bch/groth16-bls12381-intratx-residue-vectors.json
+//   VERIFIER_DIR=/path/to/verifier pnpm vectors:intratx:torus:bls  # quotient frontier
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -30,7 +32,9 @@ import {
 } from '../bls12-381/_pairingmath.mjs';
 import { PUBLIC_INPUTS, proof, bls12_381 } from '../../singleton/bls12-381/bls_instance.mjs';
 import { computeVkx, compileFileBytecode, compileFileBytecodeRaw } from '../bls12-381/_vkxmath.mjs';
-import { residueWitness, millerFusedOps } from '../bls12-381/_residuemath.mjs';
+import {
+  millerFusedOps, millerFusedTorusOps, residueTorusWitness, residueWitness,
+} from '../bls12-381/_residuemath.mjs';
 import {
   glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX,
   GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
@@ -39,6 +43,7 @@ import { LINKED_HIGH_COST_INPUTS, LINKED_RESIDUE_NAMESPACE } from '../bls12-381/
 import { transformChunk, headerSize } from './transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
+const QUOTIENT_TORUS = process.env.BLS_QUOTIENT_TORUS === '1';
 const GEN = join(here, '..', 'bls12-381', 'generated', LINKED_RESIDUE_NAMESPACE);
 const PROBE = join(GEN, '_intratx_residue_bls_probe.cash'); // transformed import-chunks compiled from here
 const W = 48; // BLS12-381 limb width (bytes)
@@ -99,17 +104,22 @@ const mkInstance = (inputs) => {
 const INSTANCES = { committed: { inputs: PUBLIC_INPUTS, proof }, proof1: mkInstance([135208n, 67633n]), stress: mkInstance(LINKED_HIGH_COST_INPUTS) };
 
 // ---- residue chunk-graph layout constants (identical to grouped/build_vectors_residue_bls.mjs) ----
-// Stage-bound Miller genesis = cInv(12) + c(12) + runtime points(10) = 34 limbs.
-// f=cInv and R_B=B are derived in-contract; later Miller states still carry all 52 limbs.
+// Stage-bound Miller genesis carries the residue root plus ten runtime-point limbs. Quotient
+// mode uses u(6), while the legacy path uses cInv+c(24). f and R_B are derived in-contract.
 const dummy = pairsFor(PUBLIC_INPUTS, proof);
 const ptLof = (inst) => { const pr = pairsFor(inst.inputs, inst.proof); return pr.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine())); };
-const VKX_LIMB_OFFSET = 24 + ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length;
-const MILLER_IN_LIMBS = ptLof(INSTANCES.committed).length + 24;
+const ROOT_LIMBS = QUOTIENT_TORUS ? 6 : 24;
+const VKX_LIMB_OFFSET = ROOT_LIMBS + ptLimbs(0, dummy[0].P.toAffine(), dummy[0].Q.toAffine()).length;
+const MILLER_IN_LIMBS = ptLof(INSTANCES.committed).length + ROOT_LIMBS;
 const TAIL_HANDOFF_LIMBS = 36; // [fF, c, cInv]
 
 // ---- per-stage specs (inLimbs/outLimbs/extras/role) — same graph as the grouped-residue BLS
 // build; only the assembly below differs (single tx, forward-checks, no token). ----
-const stateLimbsR = (s) => [...f12limbs(s.f), ...r6limbs(s.Rs[0]), ...f12limbs(s.c), ...f12limbs(s.cInv)]; // 42
+const uLimbs = (u) => [u.c0.c0, u.c0.c1, u.c1.c0, u.c1.c1, u.c2.c0, u.c2.c1];
+const stateLimbsR = (s) => [
+  ...f12limbs(s.f), ...r6limbs(s.Rs[0]),
+  ...(QUOTIENT_TORUS ? uLimbs(s.u) : [...f12limbs(s.c), ...f12limbs(s.cInv)]),
+];
 const withPtsR = (limbs, ptL) => [...limbs.slice(0, 18), ...ptL, ...limbs.slice(18)]; // insert ptL after f+R_B
 
 function specsVkxGlv(inst) {
@@ -132,20 +142,38 @@ function specsVkxGlv(inst) {
     return { file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs: [...vkxGlvStateAt(k10, k20, k11, k21, ch.hi), ...scal], extras: [], role: 'within', label: `GLV vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined };
   });
 }
-function specsMillerResidue(inst, c, cInv, bad = {}) {
+function specsMillerResidue(inst, c, cInv, u = null, bad = {}) {
   const pairs = pairsFor(inst.inputs, inst.proof);
-  const { states, boundary } = millerFusedOps(pairs, c, cInv);
+  const { states, boundary } = QUOTIENT_TORUS
+    ? millerFusedTorusOps(pairs, c, cInv, u)
+    : millerFusedOps(pairs, c, cInv);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
   if (man.stageBound !== true) throw new Error('intratx BLS residue requires stage-bound Miller generation');
+  if ((man.quotientTorus === true) !== QUOTIENT_TORUS ||
+    (man.terminalFused === true) !== QUOTIENT_TORUS) {
+    throw new Error('BLS residue Miller mode does not match the generated manifest');
+  }
   const genesisPts = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
   if (bad.Ax !== undefined) genesisPts[4] = bad.Ax;
   if (bad.Ay !== undefined) genesisPts[5] = bad.Ay;
   if (bad.Cy !== undefined) genesisPts[9] = bad.Cy;
-  const genesis = [...f12limbs(cInv), ...f12limbs(c), ...genesisPts];
+  const genesis = QUOTIENT_TORUS
+    ? [...uLimbs(u), ...genesisPts]
+    : [...f12limbs(cInv), ...f12limbs(c), ...genesisPts];
   const specs = man.chunks.map((ch) => {
     const inLimbs = ch.opLo === 0 ? genesis : withPtsR(stateLimbsR(states[ch.opLo]), ptL);
     if (ch.final) {
+      if (QUOTIENT_TORUS) {
+        if (ch.terminalFused !== true || ch.outgoing !== null) {
+          throw new Error('quotient-torus final Miller chunk is not terminal');
+        }
+        return {
+          file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`),
+          inLimbs, outLimbs: [], extras: [], role: 'terminal',
+          label: `miller ops[${ch.opLo},${ch.opHi}) + quotient verdict`, checkpoint: 'verify',
+        };
+      }
       const s = states[ch.opHi];
       return {
         file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`),
@@ -179,8 +207,10 @@ function buildSpecs(inst) {
   const vkx = specsVkxGlv(inst);
   const pairs = pairsFor(inst.inputs, inst.proof);
   const { boundary: fRaw } = millerBatchOps(pairs);
-  const { c, cInv, w } = residueWitness(fRaw);
-  const { specs: miller, boundary: fF } = specsMillerResidue(inst, c, cInv);
+  const root = QUOTIENT_TORUS ? residueTorusWitness(fRaw) : residueWitness(fRaw);
+  const { c, cInv, w, u } = root;
+  const { specs: miller, boundary: fF } = specsMillerResidue(inst, c, cInv, u);
+  if (QUOTIENT_TORUS) return [...vkx, ...miller];
   const tail = specsResidueTail(fF, c, cInv, w);
   return [...vkx, ...miller, ...tail];
 }
@@ -289,17 +319,24 @@ function assemble(specs, expectRejected = false) {
   }
   const meta = specs.map((s, i) => ({ label: s.label, checkpoint: s.checkpoint, lockingBytes: inputs[i].locking.length, unlockingBytes: inputs[i].unlocking.length, operationCost: op2[i].operationCost, accepted: op2[i].accepted, error: op2[i].error }));
   const accepted = op2.every((o) => o.accepted);
-  if (expectRejected && accepted) throw new Error('invalid intra-transaction residue fixture unexpectedly accepted');
-  const fits = meta.every((m) => m.lockingBytes <= 10000 && m.unlockingBytes <= 10000 && m.operationCost <= OP_BUDGET) && accepted;
-  return { inputs, meta, fits, accepted };
+  const standardAccepted = standardOp2.every((o) => o.accepted);
+  if (expectRejected && (accepted || standardAccepted)) {
+    throw new Error('invalid intra-transaction residue fixture unexpectedly accepted by a BCH VM');
+  }
+  const fits = meta.every((m) => m.lockingBytes <= 10000 && m.unlockingBytes <= 10000 && m.operationCost <= OP_BUDGET) && accepted && standardAccepted;
+  return { inputs, meta, fits, accepted, standardAccepted };
 }
 const toStepArr = (asm) => asm.inputs.map((inp, i) => ({ label: asm.meta[i].label, locking: binToHex(inp.locking), unlocking: binToHex(inp.unlocking), checkpoint: asm.meta[i].checkpoint }));
 // corrupt one input's inBlob (a MIDDLE limb, so it is a live value the chunk uses); the
 // predecessor's forward-check (and/or this chunk's own) then fails -> the run is rejected.
 function invalidRun(asm, idx) {
   const inputs = asm.inputs.map((inp, i) => (i === idx ? { ...inp, unlocking: (() => { const u = Uint8Array.from(inp.unlocking); const op = u[0]; const ds = op <= 75 ? 1 : op === 0x4c ? 2 : 3; const dl = op <= 75 ? op : op === 0x4c ? u[1] : u[1] | (u[2] << 8); u[ds + Math.floor(dl / 2)] ^= 0x01; return u; })() } : inp));
-  const meta = inputs.map((_, i) => evalInput(inputs, i));
-  return { steps: inputs.map((inp, i) => ({ label: asm.meta[i].label, locking: binToHex(inp.locking), unlocking: binToHex(inp.unlocking), checkpoint: asm.meta[i].checkpoint })), rejected: meta.some((m) => !m.accepted) };
+  const consensus = inputs.map((_, i) => evalInput(inputs, i));
+  const standard = inputs.map((_, i) => evalInput(inputs, i, standardVm));
+  return {
+    steps: inputs.map((inp, i) => ({ label: asm.meta[i].label, locking: binToHex(inp.locking), unlocking: binToHex(inp.unlocking), checkpoint: asm.meta[i].checkpoint })),
+    rejected: consensus.some((outcome) => !outcome.accepted) && standard.some((outcome) => !outcome.accepted),
+  };
 }
 
 const sum = (a, f) => a.reduce((x, m) => x + f(m), 0);
@@ -324,7 +361,8 @@ function requireStageGenesis(specs, inst, label) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const expectedPoints = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
-  if (specs[GLV_COUNT].inLimbs.length !== MILLER_IN_LIMBS || !limbsEqual(specs[GLV_COUNT].inLimbs.slice(24, 34), expectedPoints)) {
+  if (specs[GLV_COUNT].inLimbs.length !== MILLER_IN_LIMBS ||
+    !limbsEqual(specs[GLV_COUNT].inLimbs.slice(ROOT_LIMBS, ROOT_LIMBS + 10), expectedPoints)) {
     throw new Error(`${label} Miller genesis still exposes f/R_B state or misorders proof points`);
   }
 }
@@ -343,12 +381,19 @@ report('groth16-bls12381-intratx-residue all-position stress', fullStress);
 for (const [label, otherSpecs, otherRun] of [['proof#1', proof1Specs, full1], ['stress', stressSpecs, fullStress]]) {
   const hybridSpecs = [...committedSpecs.slice(0, GLV_COUNT), ...otherSpecs.slice(GLV_COUNT)];
   const unboundSpecs = hybridSpecs.map((spec, i) => i === GLV_COUNT - 1 ? { ...spec, role: 'stage-final', cmp: null } : spec);
-  if (!assemble(unboundSpecs).accepted) throw new Error(`${label} unbound valid-fixture hybrid was not accepted`);
+  const unbound = assemble(unboundSpecs);
+  if (!unbound.accepted || !unbound.standardAccepted) {
+    throw new Error(`${label} unbound valid-fixture hybrid was not accepted by both BCH VMs`);
+  }
   const boundInputs = [...full0.inputs.slice(0, GLV_COUNT), ...otherRun.inputs.slice(GLV_COUNT)];
-  const outcomes = boundInputs.map((_, i) => evalInput(boundInputs, i));
-  if (outcomes[GLV_COUNT - 1].accepted) throw new Error(`${label} hybrid did not reject at the vk_x boundary`);
-  const unrelated = outcomes.find((outcome, i) => i !== GLV_COUNT - 1 && !outcome.accepted);
-  if (unrelated) throw new Error(`${label} hybrid also rejected outside the vk_x boundary`);
+  for (const [vmLabel, vm] of [['consensus', realVm], ['standard', standardVm]]) {
+    const outcomes = boundInputs.map((_, i) => evalInput(boundInputs, i, vm));
+    if (outcomes[GLV_COUNT - 1].accepted) {
+      throw new Error(`${label} hybrid did not reject at the vk_x boundary on the ${vmLabel} VM`);
+    }
+    const unrelated = outcomes.find((outcome, i) => i !== GLV_COUNT - 1 && !outcome.accepted);
+    if (unrelated) throw new Error(`${label} hybrid also rejected outside the vk_x boundary on the ${vmLabel} VM`);
+  }
 }
 console.error('  stage genesis layouts and proof#1/stress vk_x boundaries verified');
 // shared-table fixture: flip a middle byte of the carried GLV table -> the carrier's hash256
@@ -369,7 +414,9 @@ const tablePush = pushBounds(tableUnlocking, carrierBlob.dataStart + carrierBlob
 if (tablePush.dataLen !== GLV_TABLE_BYTES.length) throw new Error('shared GLV table push has unexpected length');
 tableUnlocking[tablePush.dataStart + Math.floor(tablePush.dataLen / 2)] ^= 0x01;
 tableInputs[tableCarrierIndex] = { ...tableInputs[tableCarrierIndex], unlocking: tableUnlocking };
-if (evalInput(tableInputs, tableCarrierIndex).accepted) throw new Error('GLV carrier accepted a mutated shared table');
+if (evalInput(tableInputs, tableCarrierIndex).accepted || evalInput(tableInputs, tableCarrierIndex, standardVm).accepted) {
+  throw new Error('GLV carrier accepted a mutated shared table on a BCH VM');
+}
 const tableMutation = { steps: toStepArr({ inputs: tableInputs, meta: full0.meta }), rejected: true };
 console.error('  shared GLV table mutation rejected at carrier');
 
@@ -380,12 +427,21 @@ const fInv = [invalidRun(full0, 0), invalidRun(full0, Math.floor(full0.inputs.le
 // psi(B)==[-x]B check for an on-curve point outside the order-r subgroup.
 const committedPairs = pairsFor(INSTANCES.committed.inputs, INSTANCES.committed.proof);
 const { boundary: committedRawBoundary } = millerBatchOps(committedPairs);
-const { c: committedC, cInv: committedCInv } = residueWitness(committedRawBoundary);
+const committedRoot = QUOTIENT_TORUS
+  ? residueTorusWitness(committedRawBoundary)
+  : residueWitness(committedRawBoundary);
+const { c: committedC, cInv: committedCInv, u: committedU } = committedRoot;
 const negA = proof.a.negate().toAffine();
-const firstMiller = specsMillerResidue(INSTANCES.committed, committedC, committedCInv, { Ay: (negA.y + 1n) % P }).specs[0];
+const firstMiller = specsMillerResidue(
+  INSTANCES.committed, committedC, committedCInv, committedU,
+  { Ay: (negA.y + 1n) % P },
+).specs[0];
 firstMiller.role = 'stage-final'; firstMiller.cmp = null;
 const offCurveA = assemble([firstMiller], true);
-const plusPFirstMiller = specsMillerResidue(INSTANCES.committed, committedC, committedCInv, { Ax: negA.x + P }).specs[0];
+const plusPFirstMiller = specsMillerResidue(
+  INSTANCES.committed, committedC, committedCInv, committedU,
+  { Ax: negA.x + P },
+).specs[0];
 plusPFirstMiller.role = 'stage-final'; plusPFirstMiller.cmp = null;
 const plusPRange = assemble([plusPFirstMiller], true);
 if (plusPRange.meta[0].accepted) throw new Error('+P proof encoding passed residue Miller input validation');
@@ -403,7 +459,7 @@ const offSubInst = {
   inputs: INSTANCES.committed.inputs,
   proof: { ...INSTANCES.committed.proof, b: G2.fromAffine({ x: offSub.x, y: offSub.y }) },
 };
-const offSubSpecs = specsMillerResidue(offSubInst, committedC, committedCInv).specs;
+const offSubSpecs = specsMillerResidue(offSubInst, committedC, committedCInv, committedU).specs;
 offSubSpecs[offSubSpecs.length - 1].role = 'stage-final';
 offSubSpecs[offSubSpecs.length - 1].cmp = null;
 const offSubgroupB = assemble(offSubSpecs, true);
@@ -432,25 +488,70 @@ function rangeInvalid(spec, location, value, label) {
 
 const firstRangeMiller = committedSpecs[GLV_COUNT];
 const firstRangeTail = committedSpecs.find((spec) => spec.file.includes('finalexpres_'));
-if (!firstRangeMiller || !firstRangeTail) throw new Error('missing residue witness range fixture stage');
-const rangeRuns = [
-  rangeInvalid(firstRangeMiller, { limb: 0 }, -1n, 'reject negative cInv limb'),
-  rangeInvalid(firstRangeMiller, { limb: 0 }, P, 'reject cInv limb at P'),
-  rangeInvalid(firstRangeMiller, { limb: 12 }, -1n, 'reject negative c limb'),
-  rangeInvalid(firstRangeMiller, { limb: 12 }, P, 'reject c limb at P'),
-  rangeInvalid(firstRangeTail, { extra: 0 }, -1n, 'reject negative w limb'),
-  rangeInvalid(firstRangeTail, { extra: 0 }, P, 'reject w limb at P'),
-];
-const allInvalid = [...fInv, ...semanticRuns, ...rangeRuns];
-console.error(`  invalid runs rejected: ${allInvalid.map((r) => r.rejected).join(',')}`);
-if (!full0.accepted || !full1.accepted || !fullStress.fits || !allInvalid.every((r) => r.rejected)) { console.error('!! a run failed -- NOT writing vectors'); process.exit(1); }
+if (!firstRangeMiller || (!QUOTIENT_TORUS && !firstRangeTail)) {
+  throw new Error('missing residue witness range fixture stage');
+}
+const rangeRuns = QUOTIENT_TORUS
+  ? [
+      rangeInvalid(firstRangeMiller, { limb: 0 }, -1n, 'reject negative quotient-root limb'),
+      rangeInvalid(firstRangeMiller, { limb: 0 }, P, 'reject quotient-root limb at P'),
+    ]
+  : [
+      rangeInvalid(firstRangeMiller, { limb: 0 }, -1n, 'reject negative cInv limb'),
+      rangeInvalid(firstRangeMiller, { limb: 0 }, P, 'reject cInv limb at P'),
+      rangeInvalid(firstRangeMiller, { limb: 12 }, -1n, 'reject negative c limb'),
+      rangeInvalid(firstRangeMiller, { limb: 12 }, P, 'reject c limb at P'),
+      rangeInvalid(firstRangeTail, { extra: 0 }, -1n, 'reject negative w limb'),
+      rangeInvalid(firstRangeTail, { extra: 0 }, P, 'reject w limb at P'),
+    ];
 
-writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-vectors.json'), JSON.stringify({
-  description: 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in one transaction. ' +
+const torusRuns = [];
+if (QUOTIENT_TORUS) {
+  const terminalSpec = committedSpecs[committedSpecs.length - 1];
+  const terminalInvalid = (mutate, label) => {
+    const inLimbs = terminalSpec.inLimbs.slice();
+    mutate(inLimbs);
+    const candidate = { ...terminalSpec, inLimbs, label };
+    const asm = assemble([candidate], true);
+    if (asm.accepted) throw new Error(`${label} passed the quotient terminal`);
+    return { steps: toStepArr(asm), rejected: true };
+  };
+  torusRuns.push(
+    terminalInvalid((limbs) => {
+      for (let i = 0; i < 12; i++) limbs[i] = 0n;
+    }, 'reject projective zero quotient state'),
+    terminalInvalid((limbs) => {
+      limbs[0] = (BigInt(limbs[0]) + 1n) % P;
+    }, 'reject wrong nonzero quotient class'),
+    terminalInvalid((limbs) => {
+      const rootOffset = limbs.length - 6;
+      limbs[rootOffset] = (BigInt(limbs[rootOffset]) + 1n) % P;
+    }, 'reject wrong quotient root'),
+  );
+}
+
+const allInvalid = [...fInv, ...semanticRuns, ...rangeRuns, ...torusRuns];
+console.error(`  invalid runs rejected: ${allInvalid.map((r) => r.rejected).join(',')}`);
+if (!full0.fits || !full1.fits || !fullStress.fits || !allInvalid.every((r) => r.rejected)) {
+  console.error('!! a run failed the consensus/standard dual-VM gates -- NOT writing vectors');
+  process.exit(1);
+}
+
+const description = QUOTIENT_TORUS
+  ? 'INTRA-TRANSACTION LINKED + QUOTIENT-TORUS RESIDUE full BLS12-381 Groth16 verifier in one transaction. ' +
+    'Its 34-input graph is five shared-table GLV vk_x chunks followed by 29 input-validation-fused prepared Miller chunks; the final Miller input also executes the terminal verdict. ' +
+    'The Miller accumulator lives in Fp12*/Fp6*, and the immutable six-limb canonical u represents the finite residue-root class [c]=[1+u*W], with inverse [1-u*W]. ' +
+    'Because gcd(p+|x|,p^6+1)=r, the lambda-power image is exactly the final-exponent kernel in the quotient; the legacy correction w is in Fp6 and disappears. ' +
+    'The terminal checks [fF]=[frob(c,1)] by a projective cross-product and explicitly rejects [0:0]. ' +
+    'OP_INPUTBYTECODE binds every state, the root, and both stage seams without hashing. Deployed P2SH32.'
+  : 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in one transaction. ' +
     'Its 35-input graph is five shared-table GLV vk_x chunks, 29 input-validation-fused prepared Miller chunks, and one terminal residue chunk. ' +
     'The terminal checks c*cInv==1 and fF*w==frob(c,1), with w supplied directly as six Fp6 limbs and its Fp12 upper half fixed to zero. ' +
     'This is sound because p^6-1 divides (p^12-1)/r; the terminal equations exclude zero. ' +
-    'OP_INPUTBYTECODE binds every intra-transaction handoff without hashing, and the vk_x and Miller stage seams bind the proof-specific state. Deployed P2SH32.',
+    'OP_INPUTBYTECODE binds every intra-transaction handoff without hashing, and the vk_x and Miller stage seams bind the proof-specific state. Deployed P2SH32.';
+
+writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-vectors.json'), JSON.stringify({
+  description,
   method: 'intra-tx-linked-residue', deployment: 'P2SH32', curve: 'BLS12-381', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),

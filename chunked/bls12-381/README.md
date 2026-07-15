@@ -29,7 +29,9 @@ also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` 
 - `bch-groth16-bls12381-intratx`: 56 inputs / 475,310 B / 377,658,775 op-cost.
 - `bch-groth16-bls12381-grouped`: 56 inputs / 6 standard transactions / 475,292 B /
   377,556,467 op-cost.
-- `bch-groth16-bls12381-intratx-residue`: 35 inputs / 209,216 B / 157,700,169 op-cost.
+- `bch-groth16-bls12381-intratx-residue`: quotient-torus frontier, 34 inputs / 195,413 B /
+  153,091,714 op-cost. The unchanged default Fp6-tail path remains reproducible at 35 inputs /
+  209,216 B / 157,700,169 op-cost.
 - `bch-groth16-bls12381-grouped-residue`: 35 inputs / 4 standard transactions / 209,937 B /
   158,744,466 op-cost.
 - `bch-groth16-bls12381-intratx-residue-large`: 4 inputs / 171,166 B / 153,410,183 op-cost
@@ -78,6 +80,13 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
   Since `p^6-1 | (p^12-1)/r`, the terminal witnesses only the six Fp6 limbs and fixes the upper
   Fp12 half to zero, replacing the 63-step `w^(27A)` walk. The inverse and terminal equations
   exclude zero.
+- **Quotient-torus residue frontier** — the opt-in intra-transaction build works in
+  `Fp12*/Fp6*`, a cyclic group of order `p^6+1`. For `lambda=p+|x|`,
+  `gcd(lambda,p^6+1)=r`, so the lambda-power image is exactly the final-exponent kernel in the
+  quotient. A canonical six-limb `u` carries the finite class `[c]=[1+u*W]`; the Fp6 correction
+  disappears, constant folds use two Fp6 products instead of three, and the final Miller input
+  checks `[fF]=[frob(c,1)]` by a nonzero projective cross-product. This removes the separate tail.
+  A fixed r-torsion shift makes a finite root available for every accepting class.
 
 Since per-step bytes are dominated (~64%) by op-cost-proportional unlocking padding,
 op-cost cuts translate ~1:1 into size.
@@ -129,6 +138,16 @@ The covenant-residue track has its own one-command source-to-vector path:
 ```
 VERIFIER_DIR=/path/to/zk-verifier-bench node generate_covenant_residue.mjs
 ```
+
+The current-BCH intra-transaction quotient frontier has a deterministic one-command path. It
+also runs the quotient-group proof and full valid/invalid dual-VM gates before writing the vector:
+
+```
+VERIFIER_DIR=/path/to/zk-verifier-bench pnpm vectors:intratx:torus:bls
+```
+
+The quotient path is opt-in. Running the original four unflagged GLV, Miller, final-residue, and
+builder commands still reproduces the 35-input artifact byte-for-byte.
 
 Individual pieces (all reproducible artifacts; only the generators are committed):
 

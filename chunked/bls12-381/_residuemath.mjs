@@ -28,6 +28,7 @@
 import {
   Fp, Fp2, Fp6, Fp12, ATE_NAF, pairsFor, millerBatchOps, singlePairMiller,
 } from './_pairingmath.mjs';
+import { bls12_381 } from '@noble/curves/bls12-381.js';
 
 const p = Fp.ORDER;
 const r = 52435875175126190479447740508185965837690552500527637822603658699938581184513n; // Fr
@@ -119,6 +120,30 @@ export function residueWitness(g) {
   return { c, cInv: inv(c), w };
 }
 
+// A nontrivial r-th root has k^lambda=1 because r divides lambda. If a valid residue root is
+// the quotient torus's unique infinity point, multiplying it by k preserves its lambda power
+// and moves it into the finite chart because k.c1 is nonzero. Every accepting quotient class
+// therefore has one six-limb representative [1+u*W].
+const TORUS_KERNEL_SHIFT = bls12_381.pairing(
+  bls12_381.G1.Point.BASE,
+  bls12_381.G2.Point.BASE,
+);
+if (Fp6.eql(TORUS_KERNEL_SHIFT.c1, Fp6.ZERO) ||
+  !eq12(powExact(TORUS_KERNEL_SHIFT, LAMBDA), Fp12.ONE)) {
+  throw new Error('invalid BLS12-381 quotient-torus kernel shift');
+}
+export function residueTorusWitness(g) {
+  const witness = residueWitness(g);
+  const c = Fp6.eql(witness.c.c0, Fp6.ZERO)
+    ? mul(witness.c, TORUS_KERNEL_SHIFT)
+    : witness.c;
+  if (Fp6.eql(c.c0, Fp6.ZERO)) {
+    throw new Error('failed to move BLS12-381 residue root into the finite torus chart');
+  }
+  const u = Fp6.mul(c.c1, Fp6.inv(c.c0));
+  return { ...witness, c, cInv: inv(c), u };
+}
+
 // ---- c^-|x|-FUSED batched Miller ----------------------------------------------------
 // Same flat op list as millerBatchOps, but after each NAF-step squaring we fold one factor
 // of c^-1 (digit +1) or c (digit -1) into the shared f, so that across the loop f accumulates
@@ -153,6 +178,43 @@ export function millerFusedOps(pairs, c, cInv) {
   const boundary = mul(preF1, fAB);
   states.push({ f: boundary, Rs: base.states[base.states.length - 1].Rs.slice(), c, cInv });
   return { ops, states, boundary, baseBoundary: mul(base.boundary, fAB), cpowFinal: cpow, fAB };
+}
+
+const torusRepresentative = (u) => Fp12.create({ c0: Fp6.ONE, c1: u });
+const torusMul = (value, u) => Fp12.create({
+  c0: Fp6.add(value.c0, Fp6.mulByNonresidue(Fp6.mul(value.c1, u))),
+  c1: Fp6.add(value.c1, Fp6.mul(value.c0, u)),
+});
+
+// Replay the same fixed Miller trace in Q=Fp12*/Fp6*. The residue root is the immutable finite
+// coordinate u for [c]=[1+u*W], so [c^-1]=[1-u*W]. c-folds and the fixed alpha/beta fold use
+// two Fp6 products rather than a full three-product Fp12 multiplication. Ordinary line folds
+// stay unchanged; their Fp6 scaling is immaterial in Q.
+export function millerFusedTorusOps(pairs, c, cInv, u) {
+  const exact = millerFusedOps(pairs, c, cInv);
+  if (Fp6.eql(exact.fAB.c0, Fp6.ZERO)) {
+    throw new Error('fixed BLS12-381 alpha/beta Miller value has no finite torus coordinate');
+  }
+  const fAbU = Fp6.mul(exact.fAB.c1, Fp6.inv(exact.fAB.c0));
+  const ops = exact.ops;
+  const states = [];
+  let f = torusRepresentative(Fp6.neg(u));
+  for (let i = 0; i < ops.length; i++) {
+    states.push({ f, Rs: exact.states[i].Rs.slice(), u });
+    const op = ops[i];
+    if (op.t === 'sqr') {
+      f = sqr(f);
+    } else if (op.t === 'cf') {
+      f = torusMul(f, op.neg ? u : Fp6.neg(u));
+    } else if (op.t === 'cmul1') {
+      f = torusMul(f, fAbU);
+    } else {
+      const factor = mul(exact.states[i + 1].f, inv(exact.states[i].f));
+      f = mul(f, factor);
+    }
+  }
+  states.push({ f, Rs: exact.states[ops.length].Rs.slice(), u });
+  return { ops, states, boundary: f, fAB: exact.fAB, fAbU };
 }
 
 // self-test when run directly
