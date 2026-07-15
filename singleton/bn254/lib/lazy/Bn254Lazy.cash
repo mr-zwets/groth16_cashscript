@@ -45,6 +45,10 @@ function canonicalFp(int x) returns (int) {
         return r;
     }
 
+function signedFp(int x) returns (int) {
+        return x % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    }
+
 function fp2Sqr(int a0, int a1) returns (int, int) {
         // Global lazy bound is <36p, so (2*a0)*a1 is <2592p^2 before the one reduction.
         return mulFp(addFp(a0, a1), subFp(a0, a1, 64)), mulFp(a0 + a0, a1);
@@ -187,7 +191,10 @@ function fp12Mul(
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
 
-function fp12Sqr(
+// Signed square used only by the chunked residue Miller hot path. Its outputs
+// are field-equivalent representatives in (-p,p); callers must not serialize
+// them before canonicalizing at the transaction seam.
+function fp12SqrSigned(
         int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
         // Exact tower identity over Z:
@@ -238,18 +245,80 @@ function fp12Sqr(
         int t1c2a = t1p3a - t10a - t12a + t11a;
         int t1c2b = t1p3b - t10b - t12b + t11b;
 
-        // With M=64p, every raw variable above has magnitude <1026M^2;
-        // use the conservative bound 2048M^2 < 2^531 (at most 67 signed bytes).
-        // The twelve possibly-negative results are each reduced once and normalized.
+        // Keep the hot-path representative in (-p,p). Each chunk canonicalizes
+        // its twelve outgoing limbs once at the transaction seam.
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int C0 = (t1c0a - t0c0a - (9*t0c2a - t0c2b)) % p;
+        int C1 = (t1c0b - t0c0b - (t0c2a + 9*t0c2b)) % p;
+        int C2 = (t1c1a - t0c1a - t0c0a) % p;
+        int C3 = (t1c1b - t0c1b - t0c0b) % p;
+        int C4 = (t1c2a - t0c2a - t0c1a) % p;
+        int C5 = (t1c2b - t0c2b - t0c1b) % p;
+        int C6 = (2*t0c0a) % p;
+        int C7 = (2*t0c0b) % p;
+        int C8 = (2*t0c1a) % p;
+        int C9 = (2*t0c1b) % p;
+        int C10 = (2*t0c2a) % p;
+        int C11 = (2*t0c2b) % p;
+        return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
+    }
+
+// Public field operation: preserve the library's canonical [0,p) result
+// contract for every other consumer. The integer kernel is deliberately
+// repeated so compiler DCE preserves both artifacts' established costs.
+function fp12Sqr(
+        int A0,int A1,int A2,int A3,int A4,int A5, int A6,int A7,int A8,int A9,int A10,int A11
+    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+        (int t00a,int t00b) = fp2MulRaw(A0,A1, A6,A7);
+        (int t01a,int t01b) = fp2MulRaw(A2,A3, A8,A9);
+        (int t02a,int t02b) = fp2MulRaw(A4,A5, A10,A11);
+        (int t0p1a,int t0p1b) = fp2MulRaw(A2+A4,A3+A5, A8+A10,A9+A11);
+        int t0d2a = t0p1a - t01a - t02a;
+        int t0d2b = t0p1b - t01b - t02b;
+        int t0c0a = t00a + 9*t0d2a - t0d2b;
+        int t0c0b = t00b + t0d2a + 9*t0d2b;
+        (int t0p2a,int t0p2b) = fp2MulRaw(A0+A2,A1+A3, A6+A8,A7+A9);
+        int t0d4a = t0p2a - t00a - t01a;
+        int t0d4b = t0p2b - t00b - t01b;
+        int t0c1a = t0d4a + 9*t02a - t02b;
+        int t0c1b = t0d4b + t02a + 9*t02b;
+        (int t0p3a,int t0p3b) = fp2MulRaw(A0+A4,A1+A5, A6+A10,A7+A11);
+        int t0c2a = t0p3a - t00a - t02a + t01a;
+        int t0c2b = t0p3b - t00b - t02b + t01b;
+
+        int s0=A0+A6; int s1=A1+A7; int s2=A2+A8;
+        int s3=A3+A9; int s4=A4+A10; int s5=A5+A11;
+        int u0=A0+9*A10-A11; int u1=A1+A10+9*A11;
+        int u2=A2+A6; int u3=A3+A7; int u4=A4+A8; int u5=A5+A9;
+        (int t10a,int t10b) = fp2MulRaw(s0,s1, u0,u1);
+        (int t11a,int t11b) = fp2MulRaw(s2,s3, u2,u3);
+        (int t12a,int t12b) = fp2MulRaw(s4,s5, u4,u5);
+        (int t1p1a,int t1p1b) = fp2MulRaw(s2+s4,s3+s5, u2+u4,u3+u5);
+        int t1d2a = t1p1a - t11a - t12a;
+        int t1d2b = t1p1b - t11b - t12b;
+        int t1c0a = t10a + 9*t1d2a - t1d2b;
+        int t1c0b = t10b + t1d2a + 9*t1d2b;
+        (int t1p2a,int t1p2b) = fp2MulRaw(s0+s2,s1+s3, u0+u2,u1+u3);
+        int t1d4a = t1p2a - t10a - t11a;
+        int t1d4b = t1p2b - t10b - t11b;
+        int t1c1a = t1d4a + 9*t12a - t12b;
+        int t1c1b = t1d4b + t12a + 9*t12b;
+        (int t1p3a,int t1p3b) = fp2MulRaw(s0+s4,s1+s5, u0+u4,u1+u5);
+        int t1c2a = t1p3a - t10a - t12a + t11a;
+        int t1c2b = t1p3b - t10b - t12b + t11b;
+
         int C0 = canonicalFp(t1c0a - t0c0a - (9*t0c2a - t0c2b));
         int C1 = canonicalFp(t1c0b - t0c0b - (t0c2a + 9*t0c2b));
         int C2 = canonicalFp(t1c1a - t0c1a - t0c0a);
         int C3 = canonicalFp(t1c1b - t0c1b - t0c0b);
         int C4 = canonicalFp(t1c2a - t0c2a - t0c1a);
         int C5 = canonicalFp(t1c2b - t0c2b - t0c1b);
-        int C6 = canonicalFp(2*t0c0a); int C7 = canonicalFp(2*t0c0b);
-        int C8 = canonicalFp(2*t0c1a); int C9 = canonicalFp(2*t0c1b);
-        int C10 = canonicalFp(2*t0c2a); int C11 = canonicalFp(2*t0c2b);
+        int C6 = canonicalFp(2*t0c0a);
+        int C7 = canonicalFp(2*t0c0b);
+        int C8 = canonicalFp(2*t0c1a);
+        int C9 = canonicalFp(2*t0c1b);
+        int C10 = canonicalFp(2*t0c2a);
+        int C11 = canonicalFp(2*t0c2b);
         return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
     }
 
@@ -265,12 +334,12 @@ function fp12MulTorus(
             fp6MulRaw(F6,F7,F8,F9,F10,F11, T0,T1,T2,T3,T4,T5);
         (int xt0,int xt1,int xt2,int xt3,int xt4,int xt5) =
             fp6MulRaw(F0,F1,F2,F3,F4,F5, T0,T1,T2,T3,T4,T5);
-        return canonicalFp(F0 + 9*yt4 - yt5), canonicalFp(F1 + yt4 + 9*yt5),
-               canonicalFp(F2 + yt0), canonicalFp(F3 + yt1),
-               canonicalFp(F4 + yt2), canonicalFp(F5 + yt3),
-               canonicalFp(F6 + xt0), canonicalFp(F7 + xt1),
-               canonicalFp(F8 + xt2), canonicalFp(F9 + xt3),
-               canonicalFp(F10 + xt4), canonicalFp(F11 + xt5);
+        return signedFp(F0 + 9*yt4 - yt5), signedFp(F1 + yt4 + 9*yt5),
+               signedFp(F2 + yt0), signedFp(F3 + yt1),
+               signedFp(F4 + yt2), signedFp(F5 + yt3),
+               signedFp(F6 + xt0), signedFp(F7 + xt1),
+               signedFp(F8 + xt2), signedFp(F9 + xt3),
+               signedFp(F10 + xt4), signedFp(F11 + xt5);
     }
 
 function mul034(
@@ -386,49 +455,39 @@ function mul034Unit(
                (G4 - F4 - B4 + rawBias) % p, (G5 - F5 - B5 + rawBias) % p;
     }
 
-// Direct quotient-product form for a normalized line 1+(o3+o4*v)W.
-// It computes X'=X+v*Y*l and Y'=Y+X*l directly. This has the same ten
-// Fp2 products as mul034Unit but avoids its Karatsuba reconstruction of Y'.
-function mul034UnitDirect(
+function lineUnitDirect(
         int F0,int F1,int F2,int F3,int F4,int F5, int F6,int F7,int F8,int F9,int F10,int F11,
-        int o3a,int o3b, int o4a,int o4b
+        int c0a,int c0b,int c1a,int c1b, int u, int v
     ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        (int yt0a,int yt0b) = fp2MulRaw(F6, F7, o3a, o3b);
-        (int yt1a,int yt1b) = fp2MulRaw(F8, F9, o4a, o4b);
-        (int ytm12a,int ytm12b) = fp2MulRaw(F8 + F10, F9 + F11, o4a, o4b);
-        int ytu0a = ytm12a - yt1a;
-        int ytu0b = ytm12b - yt1b;
-        int yt0 = 9 * ytu0a - ytu0b + yt0a;
-        int yt1 = ytu0a + 9 * ytu0b + yt0b;
-        (int ytm1a,int ytm1b) = fp2MulRaw(o3a + o4a, o3b + o4b, F6 + F8, F7 + F9);
-        int yt2 = ytm1a - yt0a - yt1a;
-        int yt3 = ytm1b - yt0b - yt1b;
-        (int ytm2a,int ytm2b) = fp2MulRaw(F6 + F10, F7 + F11, o3a, o3b);
-        int yt4 = ytm2a - yt0a + yt1a;
-        int yt5 = ytm2b - yt0b + yt1b;
-
-        (int xt0a,int xt0b) = fp2MulRaw(F0, F1, o3a, o3b);
-        (int xt1a,int xt1b) = fp2MulRaw(F2, F3, o4a, o4b);
-        (int xtm12a,int xtm12b) = fp2MulRaw(F2 + F4, F3 + F5, o4a, o4b);
-        int xtu0a = xtm12a - xt1a;
-        int xtu0b = xtm12b - xt1b;
-        int xt0 = 9 * xtu0a - xtu0b + xt0a;
-        int xt1 = xtu0a + 9 * xtu0b + xt0b;
-        (int xtm1a,int xtm1b) = fp2MulRaw(o3a + o4a, o3b + o4b, F0 + F2, F1 + F3);
-        int xt2 = xtm1a - xt0a - xt1a;
-        int xt3 = xtm1b - xt0b - xt1b;
-        (int xtm2a,int xtm2b) = fp2MulRaw(F0 + F4, F1 + F5, o3a, o3b);
-        int xt4 = xtm2a - xt0a + xt1a;
-        int xt5 = xtm2b - xt0b + xt1b;
-
         int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
-        int rawBias = 63620485708775397116398918488458420026955112869114471513803213004724729950895225285411156794258613332669998933780976023070021894424298169671600468685695583977;
-        return (F0 + 9*yt4 - yt5 + rawBias) % p, (F1 + yt4 + 9*yt5 + rawBias) % p,
-               (F2 + yt0 + rawBias) % p, (F3 + yt1 + rawBias) % p,
-               (F4 + yt2 + rawBias) % p, (F5 + yt3 + rawBias) % p,
-               (F6 + xt0 + rawBias) % p, (F7 + xt1 + rawBias) % p,
-               (F8 + xt2 + rawBias) % p, (F9 + xt3 + rawBias) % p,
-               (F10 + xt4 + rawBias) % p, (F11 + xt5 + rawBias) % p;
+        int o3a = (c1a * u) % p;
+        int o3b = (c1b * u) % p;
+        int o4a = (c0a * v) % p;
+        int o4b = (c0b * v) % p;
+        int opa = o3a + o4a; int opb = o3b + o4b;
+        int oma = o3a - o4a; int omb = o3b - o4b;
+        (int ym0a,int ym0b) = fp2MulRaw(F6,F7, o3a,o3b);
+        (int ym3a,int ym3b) = fp2MulRaw(F10,F11, o4a,o4b);
+        (int ympa,int ympb) = fp2MulRaw(F6+F8+F10,F7+F9+F11, opa,opb);
+        (int ymma,int ymmb) = fp2MulRaw(F6-F8+F10,F7-F9+F11, oma,omb);
+        int yt0 = ym0a+9*ym3a-ym3b; int yt1 = ym0b+ym3a+9*ym3b;
+        int yt2 = ((ympa-ymma)>>1)-ym3a; int yt3 = ((ympb-ymmb)>>1)-ym3b;
+        int yt4 = ((ympa+ymma)>>1)-ym0a; int yt5 = ((ympb+ymmb)>>1)-ym0b;
+
+        (int xm0a,int xm0b) = fp2MulRaw(F0,F1, o3a,o3b);
+        (int xm3a,int xm3b) = fp2MulRaw(F4,F5, o4a,o4b);
+        (int xmpa,int xmpb) = fp2MulRaw(F0+F2+F4,F1+F3+F5, opa,opb);
+        (int xmma,int xmmb) = fp2MulRaw(F0-F2+F4,F1-F3+F5, oma,omb);
+        int xt0 = xm0a+9*xm3a-xm3b; int xt1 = xm0b+xm3a+9*xm3b;
+        int xt2 = ((xmpa-xmma)>>1)-xm3a; int xt3 = ((xmpb-xmmb)>>1)-xm3b;
+        int xt4 = ((xmpa+xmma)>>1)-xm0a; int xt5 = ((xmpb+xmmb)>>1)-xm0b;
+
+        return (F0 + 9*yt4 - yt5) % p, (F1 + yt4 + 9*yt5) % p,
+               (F2 + yt0) % p, (F3 + yt1) % p,
+               (F4 + yt2) % p, (F5 + yt3) % p,
+               (F6 + xt0) % p, (F7 + xt1) % p,
+               (F8 + xt2) % p, (F9 + xt3) % p,
+               (F10 + xt4) % p, (F11 + xt5) % p;
     }
 
 function line(
@@ -454,19 +513,6 @@ function lineUnit(
         int o4b = mulFp(c0b, v);
         (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7,int r8,int r9,int r10,int r11) =
             mul034Unit(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, o3a,o3b, o4a,o4b);
-        return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
-    }
-
-function lineUnitDirect(
-        int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
-        int c0a,int c0b,int c1a,int c1b, int u, int v
-    ) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
-        int o3a = mulFp(c1a, u);
-        int o3b = mulFp(c1b, u);
-        int o4a = mulFp(c0a, v);
-        int o4b = mulFp(c0b, v);
-        (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7,int r8,int r9,int r10,int r11) =
-            mul034UnitDirect(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, o3a,o3b, o4a,o4b);
         return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
     }
 

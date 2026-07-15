@@ -8,13 +8,19 @@
 // grouped builders call the helpers below at startup so re-running a builder reproduces the
 // replanned count instead of inheriting the covenant-planned manifest.
 //
-// SAFE FLOORS — GLV revalidated 2026-07-14 against the all-ones max-branch-density witness
-// and a deterministic 10,000 accepted-witness search; Shamir validated 2026-07-09. These are
-// NOT based merely on the "worst-case proof" (which is maximal for Shamir but NOT for GLV,
-// whose raw inputs decompose into 4 sub-scalars that a denser witness can pack fuller):
+// SAFE FLOORS — grouped GLV revalidated 2026-07-15 with named full-valid density
+// and asymmetric-resource fixtures plus an exhaustive equal-point event certificate;
+// Shamir validated 2026-07-09. These floors are not based merely on a convenient
+// proof vector: GLV's raw inputs decompose into four independently bounded witnesses.
 //   GLV (128-iter, 4-scalar Straus): 3 windows [0,43)[43,86)[86,128)F — revalidated
 //     after specializing fixed-table additions for affine second operands in
 //     gen_vkx_glv.mjs. Builder max-density peak: 7,659,296 of 8,032,800.
+//   GLV grouped 3x43 (up to three fixed-table additions per position): 2 windows
+//     [0,21)[21,43)F. The concrete full-valid resource fixture peaks at 6,337,040
+//     op-cost. prove_vkx_glv_resource_bound.mjs proves at most 4/6 equal-point
+//     events per input and 9 total; prove_resource_ceiling.mjs combines both
+//     maximal allocations with the Miller ceilings and proves a 99,284-byte
+//     universal transaction envelope.
 //   Shamir (254-iter, 2-scalar): 6 windows [0,43)[43,86)[86,129)[129,172)[172,215)[215,254)F
 //     — 95.4% of budget; the worst-case proof (in0,in1 popcount 253/254) already saturates
 //     the binding windows, verified worst case. (5 windows > budget.)
@@ -30,6 +36,7 @@ import { genCash as glvGenCash } from './pairing/gen_vkx_glv.mjs';
 import { genCash as shamirGenCash } from './pairing/gen_vkx.mjs';
 
 export const GLV_SAFE_BOUNDS = [0, 43, 86, 128];
+export const GLV_GROUPED_BOUNDS = [0, 21, 43];
 export const SHAMIR_SAFE_BOUNDS = [0, 43, 86, 129, 172, 215, 254];
 
 const clearPrefix = (GEN, prefix) => {
@@ -41,16 +48,27 @@ const clearPrefix = (GEN, prefix) => {
 
 /** Regenerate the GLV vk_x windows (manifest_vkxglv.json + vkxglv_NN.cash) at the safe floor.
  * Shared by intratx-residue and grouped-residue (the only consumers of manifest_vkxglv). */
-export function regenGlvSafe(GEN, bounds = GLV_SAFE_BOUNDS, stageBound = false, sharedTable = null) {
+export function regenGlvSafe(
+  GEN,
+  bounds = GLV_SAFE_BOUNDS,
+  stageBound = false,
+  sharedTable = null,
+  grouped = false,
+  projectiveOutput = false,
+) {
   clearPrefix(GEN, 'vkxglv');
   const chunks = [];
   for (let i = 0; i < bounds.length - 1; i++) {
     const lo = bounds[i], hi = bounds[i + 1];
     const first = i === 0, final = i === bounds.length - 2;
-    writeFileSync(join(GEN, `vkxglv_${String(i).padStart(2, '0')}.cash`), glvGenCash(lo, hi, first, final, stageBound, sharedTable));
+    writeFileSync(join(GEN, `vkxglv_${String(i).padStart(2, '0')}.cash`),
+      glvGenCash(lo, hi, first, final, stageBound, sharedTable, false, grouped, projectiveOutput));
     chunks.push({ idx: i, lo, hi, first, final });
   }
-  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ numChunks: chunks.length, iters: 128, glv: true, safeFloor: true, stageBound, sharedTable: sharedTable !== null, chunks }, null, 2));
+  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ numChunks: chunks.length,
+    iters: grouped ? bounds.at(-1) : 128, glv: true, ...(grouped ? { grouped: true } : {}),
+    safeFloor: true, stageBound, sharedTable: sharedTable !== null,
+    ...(projectiveOutput ? { projectiveOutput: true } : {}), chunks }, null, 2));
   return chunks.length;
 }
 

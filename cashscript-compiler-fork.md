@@ -3,8 +3,10 @@
 The verifiers in this repo are compiled with a local fork of `cashc`, not the
 released compiler.
 
-- Fork: `C:\Users\mathi\Desktop\cashscript`, branch `compiler-optimizations`, a patch
-  series on top of upstream's `next` branch (v0.14.0-next.0). It began as the five
+- Fork: [`mr-zwets/cashscript`](https://github.com/mr-zwets/cashscript), branch
+  `compiler-optimizations`. The current verifier artifacts pin compiler commit
+  `1c707c1dbf87396b30ba5e0704b1db44475ce893`, a patch series on top of upstream's
+  `next` branch (v0.14.0-next.0). It began as the five
   custom-feature commits of `feat/multi-returns` and has since grown an op-cost
   optimisation suite: the `optimizeFor` objective, definition-sinking, and the
   `rescheduleStacks` DAG scheduler. The features below are grouped as language
@@ -12,7 +14,7 @@ released compiler.
 - CLI used by the graders and `_harness.mjs`: `packages/cashc/dist/cashc-cli.js`,
   rebuilt with `yarn build` in `packages/utils` and `packages/cashc` after any compiler
   edit (`node_modules/cashc` in this repo symlinks to the fork).
-- Status: local-only, not yet upstreamed. The intent is to propose the remaining
+- Status: public fork, not yet upstreamed. The intent is to propose the remaining
   patches upstream and, over time, compile this repo with stock CashScript.
 
 ## Alignment with upstream
