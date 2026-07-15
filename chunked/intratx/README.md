@@ -46,9 +46,11 @@ same amount.
 Two variants target the **proposed `bch-spec` upgrade** instead of current BCH:
 `build_vectors_residue_large.mjs` (BN254 → `bch-groth16-intratx-residue-large`) and
 `build_vectors_residue_bls_large.mjs` (BLS12-381 → `bch-groth16-bls12381-intratx-residue-large`).
-Same forward-checking mechanism and residue chunk graph as the 10 kB builds — only the per-input
-budget changes. They are graded against libauth's `createVirtualMachineBchSpec`, are **not valid on
-current BCH** (`createVirtualMachineBch2026`), and the harness marks them `vm: 'bch-spec'` and files
+Same forward-checking mechanism as the 10 kB builds; the BN254 build consumes the same
+quotient-torus graph as the 13-input frontier, re-planned to 2 inputs at the 100 kB budget,
+while the BLS build keeps its residue graph — only the per-input budget changes. They are
+graded against libauth's `createVirtualMachineBchSpec`, are **not valid on current BCH**
+(`createVirtualMachineBch2026`), and the harness marks them `vm: 'bch-spec'` and files
 them in their own leaderboard category (so a spec entry can't hijack the current-BCH frontier).
 
 ```

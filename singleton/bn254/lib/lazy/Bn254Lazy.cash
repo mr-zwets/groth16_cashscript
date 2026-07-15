@@ -867,3 +867,31 @@ function finalExp(int A0,int A1,int A2,int A3,int A4,int A5,int A6,int A7,int A8
             fp12Mul(L0,L1,L2,L3,L4,L5,L6,L7,L8,L9,La,Lb, RT0,RT1,RT2,RT3,RT4,RT5,RT6,RT7,RT8,RT9,RTa,RTb);
         return O0,O1,O2,O3,O4,O5,O6,O7,O8,O9,O10,O11;
     }
+
+// Affine G1 group ops with prover-witnessed slopes: the Fp analogues of pointDoubleAffine /
+// pointAddAffine above. The verified tangent/chord equation uniquely binds the witnessed
+// slope (m is range-gated canonical here; X,Y[,Qx,Qy] must be canonical, as baked table
+// entries and these kernels' own outputs are), the affine representation makes the point at
+// infinity unrepresentable, and the zero-denominator exceptional cases are rejected
+// (Y == 0 has no solution on E(Fp): #E(Fp) = r is odd, so E has no 2-torsion).
+// Products stay below p^2 for canonical operands, well inside the proven lazy domain.
+function g1DoubleAffine(int X, int Y, int m) returns (int, int) {
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require(within(m, 0, p));
+        require(Y % p != 0);
+        require((m * (Y + Y) - 3 * (X * X)) % p == 0);
+        int nX = canonicalFp(m * m - X - X);
+        int nY = canonicalFp(m * (X - nX) - Y);
+        return nX, nY;
+    }
+
+function g1AddAffine(int X, int Y, int Qx, int Qy, int m) returns (int, int) {
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require(within(m, 0, p));
+        int dx = Qx - X;
+        require(dx % p != 0);
+        require((m * dx - Qy + Y) % p == 0);
+        int nX = canonicalFp(m * m - X - Qx);
+        int nY = canonicalFp(m * (X - nX) - Y);
+        return nX, nY;
+    }

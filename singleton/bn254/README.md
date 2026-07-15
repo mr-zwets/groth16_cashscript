@@ -46,14 +46,16 @@ in the on-chain `vk_x` (also standalone in `vkx.cash`) for the complete Groth16 
   `pnpm benchmark`: `PASS`, 15,867 B scored, 888,690,550 op-cost, ~111 inputs.
   Same BN254 curve as scrypt-bn256 → **~734× smaller bytecode** (15.9 KB vs 11.7 MB).
 - `bch-groth16-singleton-minop` — the **op-optimized** variant: an unrolled batched
-  c^-(6x+2)-fused Miller (lazy tower, fixed-VK line coeffs baked so only `(-A,B)` runs on-chain
-  G2 arithmetic), witnessed-residue final-exp (2024/640), fast-endo 63-bit G2 check (2022/348),
-  GLV `vk_x` — all extra inputs gated witnesses. Build: `node singleton/bn254/gen_singletons.mjs`,
+  c^-(6x+2)-fused Miller evaluated in the quotient torus Fp12*/Fp6* (6-limb canonical root,
+  lazy tower, fixed-VK line coeffs baked so only `(-A,B)` runs on-chain G2 arithmetic),
+  affine runtime B with witnessed slopes, the exact G2 subgroup check fused into the psi
+  endpoint, and affine witnessed-slope GLV `vk_x` — all gated witnesses.
+  Build: `node singleton/bn254/gen_singletons.mjs`,
   then `build_vectors_groth16_minop.mjs` + `VARIANT=minop node gen_multiproof_opt.mjs`.
-  `pnpm benchmark`: `PASS`, **191,574,525 op-cost (−78%)**, ~24 inputs, 67,632 B — matches the
-  chunked verifier's op-cost in ONE tx; beats scrypt on both bytes and op. The unroll (needed to
-  bake coeffs as literals; runtime blob indexing is ~100 op/byte for OP_SPLIT) makes the script
-  large and needs the cashc fork's large-contract compile fix (`COMPILER_FIX_NOTE.md` Fix 2).
+  `pnpm benchmark`: `PASS`, **74,243,892 op-cost (−92%)**, ~10 inputs, 58,832 B — below the
+  13-input chunked verifier's total op-cost; beats scrypt on both bytes and op. The unroll
+  (needed to bake coeffs as literals; runtime blob indexing is ~100 op/byte for OP_SPLIT) makes
+  the script large and needs the cashc fork's large-contract compile fix (`COMPILER_FIX_NOTE.md` Fix 2).
 - `bch-pairing-singleton` — the pairing-only milestone (leaderboard "Groth16 pairing
   (BCH-native)"). Build: `node singleton/bn254/build_vectors.mjs`. 20,735 B, ~1.21B, ~151 inputs.
   The standalone `vk_x` baseline (`bch-vkx-singleton`) builds with `node singleton/bn254/build_vectors_vkx.mjs`.

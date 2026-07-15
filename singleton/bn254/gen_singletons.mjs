@@ -10,11 +10,16 @@
 //
 // min-op stacks every op-lowering optimization ported from the chunked verifier:
 //   - LAZY field tower for the Miller loop (deferred reductions; ~31% cheaper than reduced);
-//   - witnessed-residue final exponentiation (ePrint 2024/640): drops the hard-part final-exp
-//     for a Frobenius tail (c,cInv,w supplied as gated witnesses);
-//   - e(alpha,beta) baked as a constant (only 3 runtime single-pair Miller loops);
-//   - fast-endo 63-bit G2 subgroup check (ePrint 2022/348) with a gated witness inverse;
+//   - QUOTIENT-TORUS residue final exponentiation (ePrint 2024/640 in Fp12*/Fp6*): the root is
+//     ONE gated 6-limb witness u ([c]=[1+u*W]); c-folds are 2-Fp6-product fp12MulTorus; the
+//     terminal verdict is a projective cross-multiplication with explicit [0:0] rejection;
+//   - AFFINE runtime-B Miller steps with prover-witnessed slopes (verified mod p) and
+//     normalized UNIT lines through the sparse direct kernel;
+//   - the Miller-endpoint endomorphism relation doubles as the EXACT G2 subgroup check
+//     (the standalone fast-endo walk is gone);
+//   - e(alpha,beta) baked as a torus constant; (vk_x,gamma)/(C,delta) lines baked;
 //   - GLV vk_x: 4-scalar ~128-bit Straus over a baked subset-sum table (gated witnesses).
+// MODE=staged additionally emits the older pre-torus comparison variants.
 //
 // All field/curve arithmetic comes from the verified lazy lib (lib/lazy/Bn254LazyG.cash, which
 // imports Bn254Lazy.cash); this generator only bakes the instance constants and stitches calls.
@@ -57,7 +62,13 @@ const lits = (arr) => list(arr);
 // ---- shared lazy blocks ----
 function emitInputValidationLazy() {
   return [
-    '        // ---- validate spender-supplied proof points (EIP-197) ----',
+    '        // ---- validate spender-supplied proof points (EIP-197; canonical limbs required',
+    '        // by the affine slope-verified walk and the unit-line kernels) ----',
+    `        int fieldP = ${P};`,
+    '        require(within(Ax, 0, fieldP)); require(within(Ay, 0, fieldP));',
+    '        require(within(Cx, 0, fieldP)); require(within(Cy, 0, fieldP));',
+    '        require(within(Bxa, 0, fieldP)); require(within(Bxb, 0, fieldP));',
+    '        require(within(Bya, 0, fieldP)); require(within(Byb, 0, fieldP));',
     '        require(mulFp(Ay, Ay) == mAdd(mulFp(mulFp(Ax, Ax), Ax), 3)); // A on G1',
     '        require(mulFp(Cy, Cy) == mAdd(mulFp(mulFp(Cx, Cx), Cx), 3)); // C on G1',
     '        (int bx2a,int bx2b) = r2Sqr(Bxa, Bxb);                       // B on G2',
@@ -135,18 +146,63 @@ function emitPlainVkxLazy() {
   ];
 }
 // GLV vk_x: 4-scalar ~128-bit Straus over baked {IC1,phi(IC1),IC2,phi(IC2)} + baked 16-entry
-// blob table. Witnesses k10,k20,k11,k21 (gated k<2^128, k1+k2*lambda==in mod r) + vkxZinv.
-function emitGlvVkxLazy() {
+// blob table. Witnesses k10,k20,k11,k21 (k1+k2*lambda==in mod r) + vkxZinv. `nbLoop` upgrades
+// this to the op-optimal form:
+//   - witnessed top-bit index nb: every k is gated to < 2^(nb+1) (subsumes the old 2^128
+//     bound; the arithmetic >> keeps negative k's negative, so the ==0 gate also enforces
+//     k >= 0) and the Straus loop runs only nb+1 iterations — sound for ANY prover-chosen nb
+//     because skipped leading iterations act on gated-zero bits, and op-cost then scales with
+//     the ACTUAL scalar size (the fork compiles runtime-bound loops via BCH2026 native loops);
+//   - AFFINE accumulator with prover-witnessed slopes (g1DoubleAffine/g1AddAffine: the
+//     tangent/chord equation verified mod p uniquely binds each slope; O is unrepresentable
+//     and zero-denominator cases are rejected), consumed 32B-LE at a time from the glvSlopes
+//     bytes witness. This replaces the canonical Jacobian ops AND the final vkxZinv
+//     affinization. vk_x is uniquely determined by (in0,in1); all failure paths reject.
+function emitGlvVkxLazy({ nbLoop = false } = {}) {
   const LAM = G.GLV_LAMBDA.toString(), r = G.GLV_R.toString(), iters = G.VKXGLV_ITERS;
   const BOUND = (1n << 128n).toString();
   const ic0 = G.GLV_IC0.map((x) => (((x % BigInt(P)) + BigInt(P)) % BigInt(P)).toString());
   const L = [];
   L.push('        // ---- vk_x via GLV 4-scalar Straus (baked table) ----');
-  L.push(`        require(k10 < ${BOUND}); require(k20 < ${BOUND}); require(k11 < ${BOUND}); require(k21 < ${BOUND});`);
+  if (nbLoop) {
+    L.push('        require(within(nb, 0, 128));');
+    L.push('        require((k10 >> (nb + 1)) == 0); require((k20 >> (nb + 1)) == 0);');
+    L.push('        require((k11 >> (nb + 1)) == 0); require((k21 >> (nb + 1)) == 0);');
+  } else {
+    L.push(`        require(k10 < ${BOUND}); require(k20 < ${BOUND}); require(k11 < ${BOUND}); require(k21 < ${BOUND});`);
+  }
   L.push(`        require((k10 + k20 * ${LAM}) % ${r} == in0);`);
   L.push(`        require((k11 + k21 * ${LAM}) % ${r} == in1);`);
-  L.push('        int gX = 0; int gY = 1; int gZ = 0;');
   L.push(`        bytes glvTable = ${G.GLV_TABLE_HEX};`);
+  if (nbLoop) {
+    L.push('        bytes gs = glvSlopes;');
+    L.push('        int gInit = 0; int gX = 0; int gY = 0;');
+    L.push('        for (int gk = 0; gk <= nb; gk = gk + 1) {');
+    L.push('            int gidx = nb - gk;');
+    L.push('            if (gInit != 0) {');
+    L.push('                (bytes sdb, bytes gsd) = gs.split(32); gs = gsd;');
+    L.push('                (int gdx, int gdy) = g1DoubleAffine(gX, gY, int(sdb)); gX = gdx; gY = gdy;');
+    L.push('            }');
+    L.push('            int idx = (k10 >> gidx) % 2 + 2 * ((k20 >> gidx) % 2) + 4 * ((k11 >> gidx) % 2) + 8 * ((k21 >> gidx) % 2);');
+    L.push('            if (idx != 0) {');
+    L.push('                bytes ent = glvTable.split((idx - 1) * 64)[1].split(64)[0];');
+    L.push('                int aX = int(ent.split(32)[0]); int aY = int(ent.split(32)[1]);');
+    L.push('                if (gInit == 0) { gX = aX; gY = aY; gInit = 1; }');
+    L.push('                else {');
+    L.push('                    (bytes sab, bytes gsa) = gs.split(32); gs = gsa;');
+    L.push('                    (int gax, int gay) = g1AddAffine(gX, gY, aX, aY, int(sab)); gX = gax; gY = gay;');
+    L.push('                }');
+    L.push('            }');
+    L.push('        }');
+    // vk_x = acc + IC0 (affine, witnessed chord); if all digits were zero, vk_x = IC0.
+    L.push(`        int vkxX = ${ic0[0]}; int vkxY = ${ic0[1]};`);
+    L.push('        if (gInit != 0) {');
+    L.push(`            (int fX, int fY) = g1AddAffine(gX, gY, ${ic0[0]}, ${ic0[1]}, int(gs.split(32)[0]));`);
+    L.push('            vkxX = fX; vkxY = fY;');
+    L.push('        }');
+    return L;
+  }
+  L.push('        int gX = 0; int gY = 1; int gZ = 0;');
   L.push(`        for (int gk = 0; gk < ${iters}; gk = gk + 1) {`);
   L.push(`            int gidx = ${iters - 1} - gk;`);
   L.push('            if (gZ != 0) { (int gdx, int gdy, int gdz) = jacDoubleG1(gX, gY, gZ); gX = gdx; gY = gdy; gZ = gdz; }');
@@ -243,6 +299,150 @@ function emitMillerTailLazy() {
   L.push(`        require(residueVerdict(${use12('F')}, ${use12('c')}, ${use12('ci')}, ${use12('w')}));`);
   return L;
 }
+// ---- QUOTIENT-TORUS construction (ports the chunked MILLER_TORUS track into ONE contract) ----
+// The Miller accumulator lives in Q = Fp12*/Fp6*: the residue root is carried as the SIX-limb
+// canonical witness u with [c]=[1+uW] and [cInv]=[1-uW] (W^2=v), so the 36-limb c/cInv/w
+// witness disappears and every c-fold is a 2-Fp6-product fp12MulTorus. Runtime B walks in
+// AFFINE coordinates with prover-witnessed slopes (tangent/chord equations verified mod p;
+// O is unrepresentable and the zero-denominator cases are rejected inside the kernels), all
+// lines are normalized UNIT lines folded with the sparse direct kernel, and the Miller-endpoint
+// endomorphism relation R+psi(B)-psi^2(B) == -psi^3(B) doubles as the EXACT G2 subgroup check
+// (prove_miller_endpoint_subgroup.mjs) — the standalone fast-endo 63-bit walk disappears.
+// Terminal verdict: [F*c^(p^2)] == [c^p*c^(p^3)] by projective cross-multiplication with an
+// explicit [0:0] rejection on canonical limbs. Every accepting quotient class has a finite
+// six-limb representative thanks to the fixed r-torsion kernel shift (_residuemath.mjs).
+// Mirrors chunked/pairing/gen_miller_residue.mjs (MILLER_TORUS=1) unrolled with baked literals.
+const KX = '21888242871839275220042445260109153167277707414472061641714758635765020556616'; // psi^2 x-coeff
+function buildTorusTrace() {
+  const lp = C.pairsFor(C.vec.publicInputs.map(BigInt));
+  const fRawPlan = R.millerFusedAffineOps(lp, C.Fp12.ONE, C.Fp12.ONE, { unitLines: true }).boundary;
+  const rootPlan = R.residueTorusWitness(fRawPlan);
+  const trace = R.millerFusedAffineOps(lp, rootPlan.c, rootPlan.cInv, { unitLines: true, torusU: rootPlan.u });
+  const fABq = C.Fp6.mul(trace.fAB.c1, C.Fp6.inv(trace.fAB.c0)); // baked e(alpha,beta) torus coordinate
+  const FABT = [fABq.c0.c0, fABq.c0.c1, fABq.c1.c0, fABq.c1.c1, fABq.c2.c0, fABq.c2.c1].map(String);
+  return { trace, FABT };
+}
+function emitTorusMillerLazy(trace, FABT) {
+  const F = use12('F');
+  const uL = list(N(6).map((i) => `u${i}`));
+  const nuL = list(N(6).map((i) => `nu${i}`));
+  const Puv = { 0: ['Pu0', 'Pv0'], 2: ['Pu2', 'Pv2'], 3: ['Pu3', 'Pv3'] };
+  const L = [];
+  const slopeParams = [];
+  let sIdx = 0, uid = 0;
+  const slope = () => { const n = [`s${sIdx}a`, `s${sIdx}b`]; sIdx++; slopeParams.push(...n); return n; };
+  const needsNegB = trace.ops.some((op) => op.t === 'al' && op.j === 0 && op.neg);
+  L.push('        // ---- torus-fused Miller (unrolled): genesis F = [cInv] = [1 - u*W]; runtime (-A,B)');
+  L.push('        // walks affine with witnessed slopes; (vk_x,gamma)/(C,delta) unit lines baked ----');
+  L.push('        (int nu0,int nu1,int nu2,int nu3,int nu4,int nu5) = fp6Neg(u0,u1,u2,u3,u4,u5, 64);');
+  L.push('        int F0=1; int F1=0; int F2=0; int F3=0; int F4=0; int F5=0;');
+  L.push('        int F6=nu0; int F7=nu1; int F8=nu2; int F9=nu3; int F10=nu4; int F11=nu5;');
+  L.push('        int Rxa=Bxa; int Rxb=Bxb; int Rya=Bya; int Ryb=Byb;');
+  if (needsNegB) L.push('        (int nBya,int nByb) = fp2Neg(Bya, Byb, 64);');
+  const unitLine = (triple, pu, pv) =>
+    L.push(`        (${F}) = lineUnitDirect(${F}, ${triple[0].c0}, ${triple[0].c1}, ${triple[1].c0}, ${triple[1].c1}, ${pu}, ${pv});`);
+  for (const op of trace.ops) {
+    if (op.t === 'sqr') {
+      L.push(`        (${F}) = fp12Sqr(${F});`);
+    } else if (op.t === 'cf') {
+      // fold c^-(6x+2): digit +1 -> x [cInv] = [1-u*W], digit -1 -> x [c] = [1+u*W]
+      L.push(`        (${F}) = fp12MulTorus(${F}, ${op.neg ? uL : nuL});`);
+    } else if (op.t === 'cmul1') {
+      L.push(`        (${F}) = fp12MulTorus(${F}, ${list(FABT)}); // baked e(alpha,beta)`);
+    } else if (op.j !== 0) {
+      const [pu, pv] = Puv[op.j];
+      for (const t of (op.t === 'pp' ? op.coeffs : [op.coeffs])) unitLine(t, pu, pv);
+    } else if (op.t === 'dl') {
+      const [sa, sb] = slope();
+      const c = N(4).map((k) => `d${uid}_${k}`), r = N(4).map((k) => `dr${uid}_${k}`); uid++;
+      L.push(`        (${c.map((n) => 'int ' + n).join(',')}, ${r.map((n) => 'int ' + n).join(',')}) = pointDoubleAffine(Rxa,Rxb,Rya,Ryb, ${sa}, ${sb});`);
+      L.push(`        Rxa=${r[0]}; Rxb=${r[1]}; Rya=${r[2]}; Ryb=${r[3]};`);
+      L.push(`        (${F}) = lineUnitDirect(${F}, ${c.join(',')}, Pu0, Pv0);`);
+    } else if (op.t === 'al') {
+      const [sa, sb] = slope();
+      const c = N(4).map((k) => `a${uid}_${k}`), r = N(4).map((k) => `ar${uid}_${k}`); uid++;
+      const Y = op.neg ? 'nBya, nByb' : 'Bya, Byb';
+      L.push(`        (${c.map((n) => 'int ' + n).join(',')}, ${r.map((n) => 'int ' + n).join(',')}) = pointAddAffine(Rxa,Rxb,Rya,Ryb, Bxa, Bxb, ${Y}, ${sa}, ${sb});`);
+      L.push(`        Rxa=${r[0]}; Rxb=${r[1]}; Rya=${r[2]}; Ryb=${r[3]};`);
+      L.push(`        (${F}) = lineUnitDirect(${F}, ${c.join(',')}, Pu0, Pv0);`);
+    } else { // pp j=0: the runtime Miller endpoint; fuses the EXACT G2 subgroup check
+      const [s1a, s1b] = slope(); const [s2a, s2b] = slope();
+      L.push('        (int q1xa,int q1xb,int q1ya,int q1yb) = psi(Bxa, Bxb, Bya, Byb);');
+      L.push(`        (int h1_0,int h1_1,int h1_2,int h1_3, int er0,int er1,int er2,int er3) = pointAddAffine(Rxa,Rxb,Rya,Ryb, q1xa,q1xb,q1ya,q1yb, ${s1a}, ${s1b});`);
+      L.push('        Rxa=er0; Rxb=er1; Rya=er2; Ryb=er3;');
+      L.push(`        (${F}) = lineUnitDirect(${F}, h1_0,h1_1,h1_2,h1_3, Pu0, Pv0);`);
+      L.push('        (int q2xa,int q2xb,int q2ya,int q2yb) = psi(q1xa, q1xb, q1ya, q1yb);');
+      L.push('        (int q2nya,int q2nyb) = fp2Neg(q2ya, q2yb, 64);');
+      L.push(`        (int h2_0,int h2_1,int h2_2,int h2_3, int fr0,int fr1,int fr2,int fr3) = pointAddAffine(Rxa,Rxb,Rya,Ryb, q2xa,q2xb,q2nya,q2nyb, ${s2a}, ${s2b});`);
+      L.push('        Rxa=fr0; Rxb=fr1; Rya=fr2; Ryb=fr3;');
+      L.push('        // The two checked affine additions compute R+psi(B)-psi^2(B). Requiring the');
+      L.push('        // result to equal -psi^3(B) proves EXACT G2 membership for the runtime B');
+      L.push('        // chained through the slope-verified walk from genesis R=B.');
+      L.push(`        (int q3xa,int q3xb) = fp2Scale(q1xa, q1xb, ${KX});`);
+      L.push('        require((Rxa - q3xa) % fieldP == 0); require((Rxb - q3xb) % fieldP == 0);');
+      L.push('        require((Rya - q1ya) % fieldP == 0); require((Ryb - q1yb) % fieldP == 0);');
+      L.push(`        (${F}) = lineUnitDirect(${F}, h2_0,h2_1,h2_2,h2_3, Pu0, Pv0);`);
+    }
+  }
+  // terminal verdict: [F * c^(p^2)] == [c^p * c^(p^3)] via projective cross-multiplication
+  L.push('        // ---- terminal verdict: [F*c^(p^2)] == [c^p*c^(p^3)] (residue method, quotient torus) ----');
+  L.push('        (int t10,int t11,int t12,int t13,int t14,int t15) = torusFrob1(u0,u1,u2,u3,u4,u5);');
+  L.push('        (int t20,int t21,int t22,int t23,int t24,int t25) = torusFrob2(u0,u1,u2,u3,u4,u5);');
+  L.push('        (int t30,int t31,int t32,int t33,int t34,int t35) = torusFrob2(t10,t11,t12,t13,t14,t15);');
+  L.push(`        (${F}) = fp12MulTorus(${F}, t20,t21,t22,t23,t24,t25);`);
+  L.push('        // These limbs are canonical and nonnegative, so their integer sum is zero');
+  L.push('        // exactly for the vacuous projective representative [0:0].');
+  L.push(`        require(${N(12).map((i) => `F${i}`).join(' + ')} != 0);`);
+  L.push('        (int q0,int q1,int q2,int q3,int q4,int q5) = fp6MulRaw(t10,t11,t12,t13,t14,t15, t30,t31,t32,t33,t34,t35);');
+  L.push('        (int cl0,int cl1,int cl2,int cl3,int cl4,int cl5) = fp6MulRaw(F0,F1,F2,F3,F4,F5, t10+t30,t11+t31,t12+t32,t13+t33,t14+t34,t15+t35);');
+  L.push('        (int cr0,int cr1,int cr2,int cr3,int cr4,int cr5) = fp6MulRaw(F6,F7,F8,F9,F10,F11, 1+9*q4-q5, q4+9*q5, q0, q1, q2, q3);');
+  L.push('        ' + N(6).map((i) => `require(mulFp(cl${i} - cr${i}, 1) == 0);`).join(' '));
+  return { lines: L, slopeParams };
+}
+function emitUnitCoordsLazy() {
+  return [
+    '        // ---- unit-line coordinates (u,v) = (-P.x/P.y, -1/P.y) from gated witness inverses:',
+    '        // P0 = -A (so u=Ax/Ay, v=1/Ay), P2 = vk_x (runtime, from GLV), P3 = C ----',
+    '        require(within(iAy, 0, fieldP)); require(mulFp(Ay, iAy) == 1);',
+    '        int Pu0 = mulFp(Ax, iAy); int Pv0 = iAy;',
+    '        require(within(iVy, 0, fieldP)); require(mulFp(vkxY, iVy) == 1);',
+    '        int Pu2 = canonicalFp(0 - mulFp(vkxX, iVy)); int Pv2 = canonicalFp(0 - iVy);',
+    '        require(within(iCy, 0, fieldP)); require(mulFp(Cy, iCy) == 1);',
+    '        int Pu3 = canonicalFp(0 - mulFp(Cx, iCy)); int Pv3 = canonicalFp(0 - iCy);',
+  ];
+}
+function emitMinOpTorus() {
+  const { trace, FABT } = buildTorusTrace();
+  const { lines: millerLines, slopeParams } = emitTorusMillerLazy(trace, FABT);
+  const L = [];
+  L.push('pragma cashscript ^0.14.0;');
+  L.push('');
+  L.push('// GENERATED by gen_singletons.mjs — op-optimized BN254 Groth16 singleton (quotient torus).');
+  L.push('// ONE torus-fused Miller (UNROLLED): accumulator in Fp12*/Fp6* with the 6-limb residue root');
+  L.push('// witness u ([c]=[1+u*W]); runtime (-A,B) in AFFINE coords with witnessed slopes and unit');
+  L.push('// lines; e(alpha,beta) + (vk_x,gamma)/(C,delta) lines baked; the Miller-endpoint endomorphism');
+  L.push('// relation IS the exact G2 subgroup check; terminal projective cross-multiplied verdict');
+  L.push('// replaces the final exponentiation; GLV vk_x. Mirrors the chunked quotient-torus verifier.');
+  L.push('// Large by design — bytes are not this variant\'s axis; needs the cashc fork large-contract');
+  L.push('// compile fix (COMPILER_FIX_NOTE.md Fix 2). Regenerate: node gen_singletons.mjs.');
+  L.push('import "./lib/lazy/Bn254LazyG.cash";');
+  L.push('');
+  L.push('contract Groth16VerifyMinOp() {');
+  const sig = ['int Ax', 'int Ay', 'int Bxa', 'int Bxb', 'int Bya', 'int Byb', 'int Cx', 'int Cy', 'int in0', 'int in1',
+    ...N(6).map((i) => `int u${i}`), 'int iAy', 'int iVy', 'int iCy',
+    ...slopeParams.map((n) => `int ${n}`),
+    'int k10', 'int k20', 'int k11', 'int k21', 'int nb', 'bytes glvSlopes'].join(', ');
+  L.push(`    function spend(${sig}) {`);
+  for (const ln of emitInputValidationLazy()) L.push(ln);
+  L.push('        // residue-root witness: canonical limbs only (rejects u+p aliases)');
+  L.push('        ' + N(6).map((i) => `require(within(u${i}, 0, fieldP));`).join(' '));
+  for (const ln of emitGlvVkxLazy({ nbLoop: true })) L.push(ln);
+  for (const ln of emitUnitCoordsLazy()) L.push(ln);
+  for (const ln of millerLines) L.push(ln);
+  L.push('    }');
+  L.push('}');
+  return L.join('\n') + '\n';
+}
 function emitMinOp({ fastG2, glv }) {
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
@@ -277,5 +477,5 @@ if (MODE === 'staged') {
   writeFileSync(join(here, 'groth16_minop_lazy.cash'), emitMinOp({ fastG2: false, glv: false }));
   writeFileSync(join(here, 'groth16_minop_fastg2.cash'), emitMinOp({ fastG2: true, glv: false }));
 }
-writeFileSync(join(here, 'groth16_minop.cash'), emitMinOp({ fastG2: true, glv: true }));
+writeFileSync(join(here, 'groth16_minop.cash'), emitMinOpTorus());
 console.log('wrote groth16_minop.cash (MODE=' + MODE + ')');

@@ -1,8 +1,10 @@
 // Build + measure the OP-OPTIMIZED Groth16 singleton (groth16_minop.cash): lazy tower +
-// residue tail + fast-endo G2 check + GLV vk_x. Reuses the verified chunked witness
-// generators. Writes verifier/src/bch/groth16-singleton-minop-vectors.json.
-//   node build_vectors_groth16_minop.mjs            (full: fast-G2 + GLV)
-//   CASH=groth16_minop_lazy   STAGE=lazy   node build_vectors_groth16_minop.mjs   (staged)
+// QUOTIENT-TORUS residue Miller (6-limb u root, affine witnessed-slope runtime B, unit lines,
+// endpoint-fused exact G2 subgroup check) + GLV vk_x. Reuses the verified chunked witness
+// generators. FAIL-CLOSED: refuses to write unless the valid/worst proofs ACCEPT and every
+// tamper fixture REJECTS. Writes verifier/src/bch/groth16-singleton-minop-vectors.json.
+//   node build_vectors_groth16_minop.mjs            (full: torus)
+//   CASH=groth16_minop_lazy   STAGE=lazy   node build_vectors_groth16_minop.mjs   (staged, legacy layout)
 import { compileFile } from 'cashc';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -17,6 +19,7 @@ const C = await import('../../chunked/pairing/_millermath.mjs');
 const R = await import('../../chunked/pairing/_residuemath.mjs');
 const G2 = await import('../../chunked/pairing/gen_g2check.mjs');
 const GLV = await import('../../chunked/pairing/gen_vkx_glv.mjs');
+const GA = await import('./_glv_affine.mjs');
 
 const here = dirname(fileURLToPath(import.meta.url));
 const STANDARD_BUDGET = (41 + 10_000) * 800;
@@ -45,7 +48,8 @@ const evalPair = (vm, locking, unlocking) => {
   return { accepted, error: state.error, operationCost: state.metrics.operationCost };
 };
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
-const unlockingFor = (args) => Uint8Array.from(args.slice().reverse().flatMap((a) => [...pushInt(a)]));
+const unlockingFor = (args) => Uint8Array.from(args.slice().reverse().flatMap((a) =>
+  a instanceof Uint8Array ? [...encodeDataPush(a)] : [...pushInt(a)]));
 const canon = (x) => ((x % Pm) + Pm) % Pm;
 
 const vec = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/checkpoints/pairing-vectors.json', 'utf8'));
@@ -62,18 +66,49 @@ function residueWit(publicInputs, pf) {
   const { c, cInv, w } = R.residueWitness(fRaw);
   return [...R.fp12limbsOf(c), ...R.fp12limbsOf(cInv), ...R.fp12limbsOf(w)].map(canon);
 }
-// spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1, c[12],ci[12],w[12], [zinvA,zinvB], [k10,k20,k11,k21,vkxZinv])
+// QUOTIENT-TORUS witnesses: the 6-limb canonical residue root u ([c]=[1+u*W]) and the affine
+// runtime-B slope witnesses (op order, one Fp2 per double/add, two for the endpoint). Slopes
+// depend only on the PROOF (B walk), never on the public inputs; u depends on both.
+const u6 = (u) => [u.c0.c0, u.c0.c1, u.c1.c0, u.c1.c1, u.c2.c0, u.c2.c1].map(canon);
+function torusWit(publicInputs, pf) {
+  const pairs = C.pairsFor(publicInputs.map(BigInt), pf);
+  const { boundary: fRaw } = C.millerBatchOps(pairs);
+  const root = R.residueTorusWitness(fRaw);
+  const trace = R.millerFusedAffineOps(pairs, root.c, root.cInv, { unitLines: true, torusU: root.u });
+  const slopes = trace.ops.flatMap((op) => (op.affineSlopes ?? []).flatMap((m) => [canon(m.c0), canon(m.c1)]));
+  return { u: u6(root.u), slopes };
+}
+// spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1, u[6], iAy,iVy,iCy, slopes[176], k10,k20,k11,k21,vkxZinv)
+// (torus/full). The staged legacy layout keeps the old c/ci/w + zinv shape.
 // `limbs`={Ax..Cy} are the proof's affine coords (unlocking), `Bpair`=[[Bxa,Bxb],[Bya,Byb]] for zinv.
-function argsFor(publicInputs, resWit, limbs, Bpair) {
+function argsFor(publicInputs, wit, limbs, Bpair, pf = C.proof) {
   const base = [
     BigInt(limbs.Ax), BigInt(limbs.Ay),
     BigInt(limbs.Bxa), BigInt(limbs.Bxb), BigInt(limbs.Bya), BigInt(limbs.Byb),
     BigInt(limbs.Cx), BigInt(limbs.Cy),
     ...publicInputs.map(BigInt),
-    ...resWit,
   ];
-  if (useFastG2) { const [za, zb] = G2.g2checkFastZinv(Bpair); base.push(canon(za), canon(zb)); }
-  if (useGlv) {
+  if (STAGE === 'full') {
+    // iVy inverts the y of the vk_x the CONTRACT computes for THESE public inputs, so tampered
+    // inputs still pass the inverse gate and are rejected by the pairing verdict itself.
+    const vkx = C.pairsFor(publicInputs.map(BigInt), pf)[2].P.toAffine();
+    base.push(...wit.u);
+    base.push(C.Fp.inv(BigInt(limbs.Ay)), C.Fp.inv(vkx.y), C.Fp.inv(BigInt(limbs.Cy)));
+    base.push(...wit.slopes);
+  } else {
+    base.push(...wit);
+    if (useFastG2) { const [za, zb] = G2.g2checkFastZinv(Bpair); base.push(canon(za), canon(zb)); }
+  }
+  if (STAGE === 'full') {
+    // affine GLV witness: k-decomposition + top-bit index nb + witnessed slope blob.
+    // Fail-closed sanity: the replay must land exactly on the pairing-side vk_x.
+    const gw = GA.glvAffineWitness(BigInt(publicInputs[0]), BigInt(publicInputs[1]));
+    const vkx = C.pairsFor(publicInputs.map(BigInt), pf)[2].P.toAffine();
+    if (gw.vkx[0] !== vkx.x || gw.vkx[1] !== vkx.y) {
+      throw new Error('fail-closed: affine GLV replay disagrees with the pairing-side vk_x');
+    }
+    base.push(gw.k10, gw.k20, gw.k11, gw.k21, gw.nb, hexToBin(gw.blobHex));
+  } else if (useGlv) {
     const [k10, k20] = GLV.glvDecompose(BigInt(publicInputs[0]));
     const [k11, k21] = GLV.glvDecompose(BigInt(publicInputs[1]));
     const z = GLV.vkxGlvZinv(k10, k20, k11, k21);
@@ -105,11 +140,14 @@ const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/grot
 const wc = parseProofUnlocking(mp.worstCaseProof.unlocking);
 
 const template = hexToBin(compileFile(join(here, `${CASH}.cash`), { rescheduleStacks: true }).debug.bytecode);
-const rwValid = residueWit(vec.publicInputs);
+const rwValid = STAGE === 'full' ? torusWit(vec.publicInputs) : residueWit(vec.publicInputs);
 const unlocking = unlockingFor(argsFor(vec.publicInputs, rwValid, cLimbs, B));
+// invalid fixture: valid proof + valid witnesses, TAMPERED public inputs -> the pairing verdict
+// itself must reject (every gate passes; iVy/GLV recomputed for the tampered inputs).
 const invalidUnlocking = unlockingFor(argsFor(vec.invalid.publicInputs, rwValid, cLimbs, B));
 // worst-case: the same dense proof the chunked entries use, through the SAME locking.
-const wcUnlocking = unlockingFor(argsFor(wc.publicInputs, residueWit(wc.publicInputs, wc.proof), wc.limbs, wc.Bpair));
+const wcWit = STAGE === 'full' ? torusWit(wc.publicInputs, wc.proof) : residueWit(wc.publicInputs, wc.proof);
+const wcUnlocking = unlockingFor(argsFor(wc.publicInputs, wcWit, wc.limbs, wc.Bpair, wc.proof));
 const wcAccept = evalPair(looseVm, template, wcUnlocking);
 
 const looseAccept = evalPair(looseVm, template, unlocking);
@@ -117,7 +155,44 @@ const looseRejectInvalid = evalPair(looseVm, template, invalidUnlocking);
 const realAccept = evalPair(realVm, template, unlocking);
 const opCost = looseAccept.operationCost;
 
-console.log(`=== Groth16VerifyMinOp [${CASH}, stage=${STAGE}] (lazy tower${useFastG2 ? ' + fast-G2' : ''}${useGlv ? ' + GLV' : ''}) ===`);
+// ---- extra tamper fixtures (torus/full only): each MUST reject or the build refuses to write ----
+const tamperChecks = [];
+if (STAGE === 'full' && CASH === 'groth16_minop') {
+  const validArgs = argsFor(vec.publicInputs, rwValid, cLimbs, B);
+  const tweak = (idx, delta) => { const a = validArgs.slice(); a[idx] = a[idx] + delta; return a; };
+  // arg indices: 0..7 proof limbs, 8..9 inputs, 10..15 u, 16..18 inverses, 19.. slopes
+  tamperChecks.push(['off-curve B (Bya+1)', tweak(4, 1n)]);
+  tamperChecks.push(['u alias (u0+p)', tweak(10, Pm)]);
+  tamperChecks.push(['tampered slope (s0a+1)', tweak(19, 1n)]);
+  tamperChecks.push(['tampered iAy (+1)', tweak(16, 1n)]);
+  tamperChecks.push(['tampered GLV slope blob', (() => {
+    const a = validArgs.slice();
+    const blob = a[a.length - 1].slice();
+    if (blob.length > 0) blob[0] = blob[0] ^ 1;
+    a[a.length - 1] = blob;
+    return a;
+  })()]);
+  // OFF-SUBGROUP B (on-curve, outside G2): honest generic-twist slope witnesses for the tampered
+  // walk, so every slope gate passes and rejection happens at the ENDPOINT endomorphism relation
+  // (the fused exact subgroup check).
+  const offSub = C.invalidG2Overrides(C.proof, 1)[3];
+  const osLimbs = { ...cLimbs, Bxa: offSub.Bx.c0, Bxb: offSub.Bx.c1, Bya: offSub.By.c0, Byb: offSub.By.c1 };
+  const osProof = C.proofFromLimbs(...['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy'].map((k) => BigInt(osLimbs[k])));
+  const osPairs = C.pairsFor(vec.publicInputs.map(BigInt), osProof);
+  let osRoot;
+  try { osRoot = R.residueTorusWitness(C.millerBatchOps(osPairs).boundary); }
+  catch { osRoot = R.residueTorusWitness(C.millerBatchOps(C.pairsFor(vec.publicInputs.map(BigInt))).boundary); }
+  const osTrace = R.millerFusedAffineOps(osPairs, osRoot.c, osRoot.cInv, { unitLines: true, torusU: osRoot.u });
+  const osWit = { u: u6(osRoot.u), slopes: osTrace.ops.flatMap((op) => (op.affineSlopes ?? []).flatMap((m) => [canon(m.c0), canon(m.c1)])) };
+  tamperChecks.push(['off-subgroup B (endpoint relation)', argsFor(vec.publicInputs, osWit, osLimbs, null, osProof)]);
+}
+const tamperResults = tamperChecks.map(([label, args]) => {
+  const res = evalPair(looseVm, template, unlockingFor(args));
+  console.log(`loosened: REJECT ${label} = ${!res.accepted}`);
+  return res.accepted;
+});
+
+console.log(`=== Groth16VerifyMinOp [${CASH}, stage=${STAGE}] (${STAGE === 'full' ? 'lazy tower + quotient torus + affine/unit lines + endpoint-G2 + GLV' : `lazy tower${useFastG2 ? ' + fast-G2' : ''}${useGlv ? ' + GLV' : ''}`}) ===`);
 console.log(`locking ${template.length}B  unlocking ${unlocking.length}B`);
 console.log(`loosened: ACCEPT valid = ${looseAccept.accepted}  (op-cost ${opCost.toLocaleString()})  err=${looseAccept.error ?? '(none)'}`);
 console.log(`loosened: ACCEPT worst = ${wcAccept.accepted}  (op-cost ${wcAccept.operationCost.toLocaleString()})  err=${wcAccept.error ?? '(none)'}   [+${(wcAccept.operationCost - opCost).toLocaleString()} vs committed]`);
@@ -126,9 +201,14 @@ console.log(`real BCH 2026: accepted = ${realAccept.accepted}  err = ${realAccep
 console.log(`inputsNeeded = ${Math.ceil(opCost / STANDARD_BUDGET)}`);
 
 if (STAGE === 'full' && CASH === 'groth16_minop') {
+  // FAIL-CLOSED: refuse to write unless everything is exactly right.
+  if (!looseAccept.accepted) throw new Error(`fail-closed: valid proof REJECTED (${looseAccept.error})`);
+  if (!wcAccept.accepted) throw new Error(`fail-closed: worst-case proof REJECTED (${wcAccept.error})`);
+  if (looseRejectInvalid.accepted) throw new Error('fail-closed: tampered-input fixture ACCEPTED');
+  if (tamperResults.some((accepted) => accepted)) throw new Error('fail-closed: a tamper fixture was ACCEPTED');
   const out = {
     contract: 'Groth16VerifyMinOp (singleton/bn254/groth16_minop.cash)',
-    description: 'op-optimized full Groth16 verifier: lazy-tower Miller (3 reused single-pair, skip e(alpha,beta)) + witnessed residue final-exp + fast-endo 63-bit G2 check + GLV vk_x',
+    description: 'op-optimized full Groth16 verifier: lazy-tower quotient-torus Miller (6-limb residue root u, affine witnessed-slope runtime B, unit lines, e(alpha,beta) baked) + endpoint-fused exact G2 subgroup check + projective cross-multiplied residue verdict + nb-bounded affine GLV vk_x (witnessed slopes)',
     lockingOK: binToHex(template),
     unlocking: binToHex(unlocking),
     invalidUnlocking: binToHex(invalidUnlocking),

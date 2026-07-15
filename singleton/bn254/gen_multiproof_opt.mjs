@@ -17,6 +17,7 @@ const C = await import('../../chunked/pairing/_millermath.mjs');
 const R = await import('../../chunked/pairing/_residuemath.mjs');
 const G2 = await import('../../chunked/pairing/gen_g2check.mjs');
 const GLV = await import('../../chunked/pairing/gen_vkx_glv.mjs');
+const GA = await import('./_glv_affine.mjs');
 
 const VARIANT = process.env.VARIANT ?? 'minbytes';
 const useFastG2 = VARIANT === 'minop';
@@ -48,7 +49,8 @@ const evalPair = (locking, unlocking) => {
   return { accepted: state.error === undefined && state.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1, error: state.error };
 };
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
-const unlockingFor = (args) => Uint8Array.from(args.slice().reverse().flatMap((a) => [...pushInt(a)]));
+const unlockingFor = (args) => Uint8Array.from(args.slice().reverse().flatMap((a) =>
+  a instanceof Uint8Array ? [...encodeDataPush(a)] : [...pushInt(BigInt(a))]));
 
 // --- VK scalars from the committed instance (to solve C in the exponent) ---
 const vec = JSON.parse(readFileSync(VDIR + 'src/checkpoints/pairing-vectors.json', 'utf8'));
@@ -60,17 +62,36 @@ const ic_s = s.ic.map(BigInt);
 const single = JSON.parse(readFileSync(VDIR + `src/bch/groth16-singleton-${VARIANT}-vectors.json`, 'utf8'));
 const locking = hexToBin(single.lockingOK);
 
-// witnesses for a proof (A,B,C points + inputs)
+// witnesses for a proof (A,B,C points + inputs). For the minop TORUS layout, `claimedInputs`
+// (defaults to the true inputs) lets tamper fixtures keep honest per-proof witnesses while
+// claiming different public inputs — every gate passes and the pairing verdict itself rejects.
 const g1aff = (p) => { const a = p.toAffine(); return [a.x, a.y]; };
 const g2aff = (p) => { const a = p.toAffine(); return [a.x.c0, a.x.c1, a.y.c0, a.y.c1]; };
-function fullUnlocking(A, B, Cc, inputs) {
+const Fp = bn254.fields.Fp;
+function fullUnlocking(A, B, Cc, inputs, claimedInputs = inputs) {
   const [Ax, Ay] = g1aff(A), [Bxa, Bxb, Bya, Byb] = g2aff(B), [Cx, Cy] = g1aff(Cc);
   const pf = C.proofFromLimbs(Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy);
   const pairs = C.pairsFor(inputs, pf);
   const { boundary: fRaw } = C.millerBatchOps(pairs);
+  const args = [Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy, ...claimedInputs];
+  if (VARIANT === 'minop') {
+    // torus layout: u[6], iAy, iVy, iCy, slopes[...], k10,k20,k11,k21, nb, glvSlopes(bytes)
+    const root = R.residueTorusWitness(fRaw);
+    const trace = R.millerFusedAffineOps(pairs, root.c, root.cInv, { unitLines: true, torusU: root.u });
+    const u = root.u;
+    args.push(...[u.c0.c0, u.c0.c1, u.c1.c0, u.c1.c1, u.c2.c0, u.c2.c1].map(canon));
+    const vkx = C.pairsFor(claimedInputs, pf)[2].P.toAffine();
+    args.push(Fp.inv(Ay), Fp.inv(vkx.y), Fp.inv(Cy));
+    args.push(...trace.ops.flatMap((op) => (op.affineSlopes ?? []).flatMap((m) => [canon(m.c0), canon(m.c1)])));
+    const gw = GA.glvAffineWitness(claimedInputs[0], claimedInputs[1]);
+    if (gw.vkx[0] !== vkx.x || gw.vkx[1] !== vkx.y) {
+      throw new Error('fail-closed: affine GLV replay disagrees with the pairing-side vk_x');
+    }
+    args.push(gw.k10, gw.k20, gw.k11, gw.k21, gw.nb, hexToBin(gw.blobHex));
+    return unlockingFor(args);
+  }
   const { c, cInv, w } = R.residueWitness(fRaw);
-  const args = [Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy, ...inputs,
-    ...R.fp12limbsOf(c).map(canon), ...R.fp12limbsOf(cInv).map(canon), ...R.fp12limbsOf(w).map(canon)];
+  args.push(...R.fp12limbsOf(c).map(canon), ...R.fp12limbsOf(cInv).map(canon), ...R.fp12limbsOf(w).map(canon));
   if (useFastG2) { const [za, zb] = G2.g2checkFastZinv([[Bxa, Bxb], [Bya, Byb]]); args.push(canon(za), canon(zb)); }
   if (useGlv) {
     const [k10, k20] = GLV.glvDecompose(BigInt(inputs[0])), [k11, k21] = GLV.glvDecompose(BigInt(inputs[1]));
@@ -99,20 +120,22 @@ console.log(`=== ${VARIANT}: minting ${EXTRA} extra proofs + worst-case (witness
 for (let k = 0; k < EXTRA; k++) {
   const { inputs, A, B, Cc } = (() => { const m = mint(false); return { inputs: m.inputs, A: m.A, B: m.B, Cc: m.C }; })();
   const unlocking = fullUnlocking(A, B, Cc, inputs);
-  // invalid: same witnesses, tampered in1 -> reject
+  // invalid: same per-proof witnesses, tampered in1 (claimed) -> the pairing verdict rejects
   const tampered = [inputs[0], modr(inputs[1] + 1n)];
-  const invalidUnlocking = (() => {
-    // reuse this proof's witnesses but tamper the public input -> verdict/GLV gate fails
-    const [Ax, Ay] = g1aff(A), [Bxa, Bxb, Bya, Byb] = g2aff(B), [Cx, Cy] = g1aff(Cc);
-    const pf = C.proofFromLimbs(Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy);
-    const { boundary: fRaw } = C.millerBatchOps(C.pairsFor(inputs, pf));
-    const { c, cInv, w } = R.residueWitness(fRaw);
-    const args = [Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy, ...tampered,
-      ...R.fp12limbsOf(c).map(canon), ...R.fp12limbsOf(cInv).map(canon), ...R.fp12limbsOf(w).map(canon)];
-    if (useFastG2) { const [za, zb] = G2.g2checkFastZinv([[Bxa, Bxb], [Bya, Byb]]); args.push(canon(za), canon(zb)); }
-    if (useGlv) { const [k10, k20] = GLV.glvDecompose(inputs[0]), [k11, k21] = GLV.glvDecompose(inputs[1]); args.push(k10, k20, k11, k21, canon(GLV.vkxGlvZinv(k10, k20, k11, k21))); }
-    return unlockingFor(args.map(BigInt));
-  })();
+  const invalidUnlocking = VARIANT === 'minop'
+    ? fullUnlocking(A, B, Cc, inputs, tampered)
+    : (() => {
+      // reuse this proof's witnesses but tamper the public input -> verdict/GLV gate fails
+      const [Ax, Ay] = g1aff(A), [Bxa, Bxb, Bya, Byb] = g2aff(B), [Cx, Cy] = g1aff(Cc);
+      const pf = C.proofFromLimbs(Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy);
+      const { boundary: fRaw } = C.millerBatchOps(C.pairsFor(inputs, pf));
+      const { c, cInv, w } = R.residueWitness(fRaw);
+      const args = [Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy, ...tampered,
+        ...R.fp12limbsOf(c).map(canon), ...R.fp12limbsOf(cInv).map(canon), ...R.fp12limbsOf(w).map(canon)];
+      if (useFastG2) { const [za, zb] = G2.g2checkFastZinv([[Bxa, Bxb], [Bya, Byb]]); args.push(canon(za), canon(zb)); }
+      if (useGlv) { const [k10, k20] = GLV.glvDecompose(inputs[0]), [k11, k21] = GLV.glvDecompose(inputs[1]); args.push(k10, k20, k11, k21, canon(GLV.vkxGlvZinv(k10, k20, k11, k21))); }
+      return unlockingFor(args.map(BigInt));
+    })();
   const good = evalPair(locking, unlocking), bad = evalPair(locking, invalidUnlocking);
   if (!good.accepted) throw new Error(`proof ${k} REJECTED: ${good.error}`);
   if (bad.accepted) throw new Error(`proof ${k} tamper ACCEPTED`);

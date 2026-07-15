@@ -28,13 +28,13 @@ axes; this doc is the map. Individual folders have the authoritative per-verifie
 | entry | form / variant | headline | notes |
 |---|---|---|---|
 | `bch-groth16-singleton` | singleton, baseline | ~14.4 KB source; size-scored recompile **8,874 B** | correctness oracle; over per-input limits |
-| `bch-groth16-singleton-minop` | singleton, op-optimized | ~66.5 KB / ~195M op-cost | residue + GLV, still single-input (oracle) |
-| `bch-groth16-chunked` | chunked, covenant chain | **44 inputs / 334,578 B / 262.82M op** | NFT-commitment chain |
+| `bch-groth16-singleton-minop` | singleton, op-optimized | ~58.8 KB / **~74.2M op-cost** | quotient-torus residue + affine GLV; below the 13-input chunked total, still single-input (oracle) |
+| `bch-groth16-chunked` | chunked, covenant chain | **43 inputs / 331,856 B / 261.42M op** | NFT-commitment chain |
 | `bch-groth16-intratx` | chunked, intra-tx linked | **42 inputs / 330,580 B / 262.68M op** | whole verifier in one (non-standard) tx |
 | `bch-groth16-grouped` | chunked, grouped | **42 inputs / 330,501 B / 262.59M op** | standard-relayable in 5 txs |
 | `bch-groth16-intratx-residue` | chunked, intra-tx + quotient-torus residue | **13 inputs / 100,448 B score / 99,993 B tx wire / 78.42M op** | current-BCH standard; smallest single-tx BN254 verifier |
 | `bch-groth16-grouped-residue` | chunked, grouped + residue | **26 inputs / 224,830 B / 179.59M op** | standard-relayable in 3 txs |
-| `bch-groth16-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **4 inputs / 187,792 B / 177.33M op** | targets the proposed `bch-spec` upgrade, not current BCH; structural (fewest UTXOs), own leaderboard category — see [Target VM](#target-vm-bch-spec) |
+| `bch-groth16-intratx-residue-large` | chunked, intra-tx + quotient-torus residue, **`bch-spec`** | **2 inputs / 82,183 B / 77.0M op** | targets the proposed `bch-spec` upgrade, not current BCH; standard-relayable there; structural (fewest UTXOs), own leaderboard category — see [Target VM](#target-vm-bch-spec) |
 | `bch-pairing-chunked` | chunked pairing-only, covenant | **20 inputs / 175,788 B / 138.94M op**; score **178,368** | Miller-boundary milestone |
 | `bch-pairing-intratx` | chunked pairing-only, intra-tx | **20 inputs / 174,134 B / 138.80M op**; score **175,014** | Miller-boundary milestone |
 | `bch-vkx-chunked-covenant` | chunked `vk_x`-only | **8 inputs / 11,306 B / 7.07M op** | the G1 MSM checkpoint (see `chunked/shamir/`, `chunked/twoloop/`) |
@@ -125,10 +125,11 @@ comparison: [`chunked/twoloop/`](chunked/twoloop/) (simple, 16 chunks) and
 ## The optimisation variants
 
 - **`minop` singletons** (`groth16_minop.cash` per curve) — the singleton recomputed
-  with the op-cost tricks: one batched `c^{-|x|}`-fused Miller with only the single
-  runtime pair on-chain (`e(α,β)` and the `vk_x`/`C` lines baked), a witnessed-residue
-  final exponentiation, and GLV `vk_x`. Bytes go *up* (not their axis) but op-cost drops
-  ~70–80 %. These are still single-input oracles.
+  with the op-cost tricks: one batched fused Miller with only the single runtime pair
+  on-chain (`e(α,β)` and the `vk_x`/`C` lines baked) and GLV `vk_x`. The BN254 build
+  evaluates in the quotient torus (6-limb root, affine witnessed slopes, endpoint-fused
+  exact G2 check) and lands below the 13-input chunked total; the BLS build keeps the
+  witnessed-residue final exponentiation. These are still single-input oracles.
 
 - **`residue` chunked** (`*-intratx-residue`, `*-grouped-residue`) — the same residue
   math packed into a deployable chunk graph. The hard-part final exponentiation
