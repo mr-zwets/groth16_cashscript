@@ -47,4 +47,3 @@ out.forEach((v, i) => console.log(`C${i}: [${v.lo}, ${v.hi}] p^2; bias=${biases[
 console.log(`uniform bias: ${uniform} p^2`);
 console.log(`uniform literal: ${uniform * P * P}`);
 if (out.some((v, i) => v.lo + biases[i] < 0n)) throw new Error('bias proof failed');
-
