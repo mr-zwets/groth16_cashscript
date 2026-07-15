@@ -13,12 +13,10 @@
 // Endpoint fusion validates canonical/on-curve proof coordinates at Miller genesis and enforces
 // exact G2 subgroup membership in runtime B's post-processing. The standalone G2 stage is removed.
 //
-// Outside endpoint-fusion mode, the chunk math is reused verbatim by the grouped-residue build;
-// only the assembly differs:
-// grouped partitions the chain into token-threaded standard txs, this links the whole chain
-// into ONE non-standard (<1 MB) tx via OP_INPUTBYTECODE forward-checks. The residue witness
-// (c, cInv) threads through every fused-Miller chunk; the terminal Miller chunk checks
-// c*cInv==ONE, c canonical, the exact w encoding in {1,w27,w27^2}, and the residue verdict.
+// Legacy mode links the c/cInv+w residue construction into one consensus-valid transaction;
+// grouped mode instead partitions that graph into token-threaded standard transactions.
+// MILLER_TORUS=1 carries one canonical six-limb quotient root, verifies the residue relation
+// in Fp12*/Fp6*, and requires the committed and second-proof transactions to pass standard policy.
 //
 //   FUSE_G2_ENDPOINT=1 node build_vectors_residue.mjs
 //     -> verifier/src/bch/groth16-intratx-residue-vectors.json
@@ -32,7 +30,9 @@ import {
   assertG2StageManifest,
 } from '../pairing/_millermath.mjs';
 import { g2checkAccAt, g2checkFastZinv } from '../pairing/gen_g2check.mjs';
-import { millerFusedOps, millerFusedAffineOps, residueWitness, fp12limbsOf } from '../pairing/_residuemath.mjs';
+import {
+  millerFusedOps, millerFusedAffineOps, residueTorusWitness, residueWitness, fp12limbsOf,
+} from '../pairing/_residuemath.mjs';
 import { GLV_LAMBDA, GLV_R, GLV_TABLE_HEX, glvDecompose, vkxGlvStateAt, vkxGlvZinv } from '../pairing/gen_vkx_glv.mjs';
 import { transformChunk } from './transform.mjs';
 import { GLV_SAFE_BOUNDS, regenGlvSafe } from '../regen_vkx_windows.mjs';
@@ -42,11 +42,15 @@ const GEN = join(here, '..', 'pairing', 'generated');
 const FUSE_G2_ENDPOINT = process.env.FUSE_G2_ENDPOINT === '1';
 const MILLER_AFFINE_G2 = process.env.MILLER_AFFINE_G2 === '1';
 const MILLER_UNIT_LINES = process.env.MILLER_UNIT_LINES === '1';
+const MILLER_TORUS = process.env.MILLER_TORUS === '1';
 if (MILLER_AFFINE_G2 && !FUSE_G2_ENDPOINT) {
   throw new Error('MILLER_AFFINE_G2 requires FUSE_G2_ENDPOINT=1');
 }
 if (MILLER_UNIT_LINES && !MILLER_AFFINE_G2) {
   throw new Error('MILLER_UNIT_LINES requires MILLER_AFFINE_G2=1');
+}
+if (MILLER_TORUS && (!FUSE_G2_ENDPOINT || !MILLER_AFFINE_G2 || !MILLER_UNIT_LINES)) {
+  throw new Error('MILLER_TORUS requires endpoint, affine, and unit-line modes');
 }
 const ENDPOINT_VM_CASES = Number(process.env.ENDPOINT_VM_CASES ?? 1);
 if (!Number.isInteger(ENDPOINT_VM_CASES) || ENDPOINT_VM_CASES < 1) {
@@ -153,21 +157,25 @@ const PTL_LEN = dummy.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine(
 const MILLER_UNIT_NAMES = MILLER_UNIT_LINES
   ? ['Pu0', 'Pv0', 'Pu2', 'Pv2', 'Pu3', 'Pv3']
   : [];
-const MILLER_IN_LIMBS = PTL_LEN + 24 + MILLER_UNIT_NAMES.length;
+const MILLER_ROOT_NAMES = MILLER_TORUS
+  ? Array.from({ length: 6 }, (_, i) => `u${i}`)
+  : [
+      ...Array.from({ length: 12 }, (_, i) => `c${i}`),
+      ...Array.from({ length: 12 }, (_, i) => `ci${i}`),
+    ];
+const MILLER_IN_LIMBS = PTL_LEN + MILLER_ROOT_NAMES.length + MILLER_UNIT_NAMES.length;
 const MILLER_DYNAMIC_LIMBS = 16; // f(12) + affine runtime R0(4)
 const MILLER_GENESIS_INPUT = G2_COUNT + GLV_COUNT;
 const MILLER_GENESIS_NAMES = [
   'Px0', 'Py0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Px3', 'Py3', 'Px2', 'Py2',
-  ...Array.from({ length: 12 }, (_, i) => `c${i}`),
-  ...Array.from({ length: 12 }, (_, i) => `ci${i}`),
+  ...MILLER_ROOT_NAMES,
   ...MILLER_UNIT_NAMES,
 ];
 const MILLER_STATIC_NAMES = [
   ...(MILLER_UNIT_LINES
     ? ['Pu0', 'Pv0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Pu2', 'Pv2', 'Pu3', 'Pv3']
     : ['Px0', 'Py0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Px2', 'Py2', 'Px3', 'Py3']),
-  ...Array.from({ length: 12 }, (_, i) => `c${i}`),
-  ...Array.from({ length: 12 }, (_, i) => `ci${i}`),
+  ...MILLER_ROOT_NAMES,
 ];
 const MILLER_GENESIS_OFFSETS = new Map(MILLER_GENESIS_NAMES.map((name, i) => [name, i * W]));
 
@@ -228,13 +236,16 @@ function specsVkx(inst, crossToMiller) {
     };
   });
 }
-// c^-(6x+2)-FUSED miller (residue method). The final Miller chunk also consumes w and
-// performs the residue verdict, so there is no separate terminal input or state hand-off.
-function specsMillerFused(inst, c, cInv, w) {
+// c^-(6x+2)-FUSED Miller (residue method). Quotient mode carries the finite
+// root coordinate u; legacy mode carries c/cInv and consumes w at the tail.
+function specsMillerFused(inst, root) {
   const pairs = pairsFor(inst.inputs, inst.proof);
   const trace = MILLER_AFFINE_G2
-    ? millerFusedAffineOps(pairs, c, cInv, { unitLines: MILLER_UNIT_LINES })
-    : millerFusedOps(pairs, c, cInv);
+    ? millerFusedAffineOps(pairs, root.c, root.cInv, {
+        unitLines: MILLER_UNIT_LINES,
+        torusU: MILLER_TORUS ? root.u : null,
+      })
+    : millerFusedOps(pairs, root.c, root.cInv);
   const { ops, states } = trace;
   const rawPtL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
   const ptL = pairs.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine(), MILLER_UNIT_LINES));
@@ -244,16 +255,22 @@ function specsMillerFused(inst, c, cInv, w) {
   const runtimeRLimbs = (R) => MILLER_AFFINE_G2
     ? [R.x.c0, R.x.c1, R.y.c0, R.y.c1]
     : r6limbs(R);
-  const full = (s) => [...f12limbs(s.f), ...runtimeRLimbs(s.Rs[0]), ...ptL, ...f12limbs(s.c), ...f12limbs(s.cInv)];
+  const rootLimbs = MILLER_TORUS
+    ? [root.u.c0.c0, root.u.c0.c1, root.u.c1.c0, root.u.c1.c1, root.u.c2.c0, root.u.c2.c1]
+    : [...f12limbs(root.c), ...f12limbs(root.cInv)];
+  const full = (s) => [...f12limbs(s.f), ...runtimeRLimbs(s.Rs[0]), ...ptL, ...rootLimbs];
   const genesisPts = [...rawPtL.slice(0, 6), ...rawPtL.slice(8, 10), ...rawPtL.slice(6, 8)];
   const genesisUnitPoints = MILLER_UNIT_LINES ? [...ptL.slice(0, 2), ...ptL.slice(6, 10)] : [];
-  const genesis = [...genesisPts, ...f12limbs(c), ...f12limbs(cInv), ...genesisUnitPoints];
+  const genesis = [...genesisPts, ...rootLimbs, ...genesisUnitPoints];
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
   if (man.linkedLayout !== true) {
     throw new Error('intratx residue requires MILLER_LINKED_LAYOUT=1 during Miller generation');
   }
   if (man.stageBound !== true) {
     throw new Error('intratx residue requires STAGE_BOUND_LAYOUT=1 during Miller generation');
+  }
+  if (man.covenantResidue !== true) {
+    throw new Error('intratx residue requires COVENANT_RESIDUE_LAYOUT=1 during Miller generation');
   }
   if (man.endpointSubgroup !== FUSE_G2_ENDPOINT) {
     throw new Error(`Miller endpoint subgroup mode mismatch: generated=${man.endpointSubgroup} requested=${FUSE_G2_ENDPOINT}`);
@@ -264,6 +281,9 @@ function specsMillerFused(inst, c, cInv, w) {
   if (man.unitLines !== MILLER_UNIT_LINES) {
     throw new Error(`Miller unit-line mode mismatch: generated=${man.unitLines} requested=${MILLER_UNIT_LINES}`);
   }
+  if (man.quotientTorus !== MILLER_TORUS) {
+    throw new Error(`Miller quotient-torus mode mismatch: generated=${man.quotientTorus} requested=${MILLER_TORUS}`);
+  }
   return man.chunks.map((ch) => {
     const slopes = ops.slice(ch.opLo, ch.opHi).flatMap((op) =>
       (op.affineSlopes ?? []).flatMap((slope) => [slope.c0, slope.c1]));
@@ -271,7 +291,11 @@ function specsMillerFused(inst, c, cInv, w) {
       file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`),
       inLimbs: ch.opLo === 0 ? genesis : full(states[ch.opLo]),
       outLimbs: ch.final ? [] : full(states[ch.opHi]),
-      extras: [...(ch.opLo === 0 ? invY : []), ...slopes, ...(ch.final ? fp12limbsOf(w) : [])],
+      extras: [
+        ...(ch.opLo === 0 ? invY : []),
+        ...slopes,
+        ...(ch.final && !MILLER_TORUS ? fp12limbsOf(root.w) : []),
+      ],
       unitInvYCount: ch.opLo === 0 ? invY.length : 0,
       affineSlopeCount: slopes.length,
       role: ch.final ? 'terminal' : 'within',
@@ -293,8 +317,8 @@ function buildSpecs(inst, staticContextLockingHash) {
         { unitLines: MILLER_UNIT_LINES },
       ).boundary
     : millerBatchOps(pairs).boundary;
-  const { c, cInv, w } = residueWitness(fRaw);
-  const miller = specsMillerFused(inst, c, cInv, w);
+  const root = MILLER_TORUS ? residueTorusWitness(fRaw) : residueWitness(fRaw);
+  const miller = specsMillerFused(inst, root);
   if (MILLER_AFFINE_G2) {
     if (MILLER_GENESIS_INPUT !== 3 || g2.length !== 0 || miller.length === 0) {
       throw new Error('affine Miller static context requires genesis at absolute input 3');
@@ -541,17 +565,18 @@ function invalidRun(asm, idx) {
 const sum = (a, f) => a.reduce((x, m) => x + f(m), 0);
 const report = (tag, asm) => {
   const maxOp = Math.max(...asm.meta.map((m) => m.operationCost));
+  const totalOperationCost = sum(asm.meta, (m) => m.operationCost);
   const maxL = Math.max(...asm.meta.map((m) => m.lockingBytes)), maxU = Math.max(...asm.meta.map((m) => m.unlockingBytes));
   const data = verificationData(asm.inputs);
   const wireBytes = encodeTransactionBch(data.transaction).length;
   const consensusVerified = realVm.verify(data) === true;
   const standardVerified = standardVm.verify(data) === true;
   if (asm.accepted && !consensusVerified) throw new Error(`${tag}: independently accepted inputs failed whole-transaction consensus verification`);
-  console.error(`${tag}: ${asm.meta.length} inputs, accepted=${asm.accepted} fits=${asm.fits} | totalBytes=${sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes).toLocaleString()} wireBytes=${wireBytes.toLocaleString()} totalOp=${sum(asm.meta, (m) => m.operationCost).toLocaleString()} maxOp=${maxOp.toLocaleString()} maxLock=${maxL} maxUnlock=${maxU} consensus=${consensusVerified} standard=${standardVerified}`);
+  console.error(`${tag}: ${asm.meta.length} inputs, accepted=${asm.accepted} fits=${asm.fits} | totalBytes=${sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes).toLocaleString()} wireBytes=${wireBytes.toLocaleString()} totalOp=${totalOperationCost.toLocaleString()} maxOp=${maxOp.toLocaleString()} maxLock=${maxL} maxUnlock=${maxU} consensus=${consensusVerified} standard=${standardVerified}`);
   if (process.env.DUMP_OPCOSTS) asm.meta.forEach((m, i) => console.error(`  op[${String(i).padStart(2)}] ${String(m.operationCost).padStart(9)} lock=${m.lockingBytes} unlock=${m.unlockingBytes} ${m.accepted ? '' : 'REJECTED '}${m.label}`));
   const bad = asm.meta.find((m) => !m.accepted);
   if (bad) console.error(`  !! first non-accepting: ${bad.label} :: ${bad.error}`);
-  return { wireBytes, consensusVerified, standardVerified };
+  return { wireBytes, consensusVerified, standardVerified, totalOperationCost, maxStepOperationCost: maxOp };
 };
 
 // ===================== FULL GROTH16 (residue, single tx) =====================
@@ -592,8 +617,8 @@ console.error(`  max-density GLV max op: ${Math.max(...densityGlv.map((meta) => 
 if (process.env.DUMP_OPCOSTS) console.error(`  max-density GLV ops: ${densityGlv.map((meta) => meta.operationCost.toLocaleString()).join(', ')}`);
 const full1 = assemble(proof1Specs);
 const fullWc = assemble(worstSpecs);
-report('groth16-intratx-residue proof#1', full1);
-report('groth16-intratx-residue worst-case', fullWc);
+const full1Transaction = report('groth16-intratx-residue proof#1', full1);
+const fullWcTransaction = report('groth16-intratx-residue worst-case', fullWc);
 let proofConsistency;
 let proofMutations;
 if (FUSE_G2_ENDPOINT) {
@@ -677,8 +702,7 @@ if (MILLER_AFFINE_G2) {
     ['-A/B', MILLER_UNIT_LINES ? 'Pu0' : 'Px0'],
     ['C', MILLER_UNIT_LINES ? 'Pu3' : 'Px3'],
     ['vk_x', MILLER_UNIT_LINES ? 'Pu2' : 'Px2'],
-    ['c', 'c0'],
-    ['cInv', 'ci0'],
+    ...(MILLER_TORUS ? [['residue root', 'u0']] : [['c', 'c0'], ['cInv', 'ci0']]),
   ].map(([label, name]) => {
     const byteOffset = MILLER_GENESIS_OFFSETS.get(name);
     if (byteOffset === undefined) throw new Error(`missing Miller genesis offset for ${name}`);
@@ -730,13 +754,60 @@ if (MILLER_AFFINE_G2) {
     throw new Error('Miller reader accepted trailing bytes in dynamic state');
   }
 
+  const torusMutations = [];
+  if (MILLER_TORUS) {
+    const rootIndex = MILLER_GENESIS_NAMES.indexOf('u0');
+    const rootByteOffset = MILLER_GENESIS_OFFSETS.get('u0');
+    if (rootIndex < 0 || rootByteOffset === undefined) throw new Error('missing torus root offset');
+    const rootAliasInputs = full0.inputs.slice();
+    const rootAliasUnlocking = Uint8Array.from(rootAliasInputs[MILLER_GENESIS_INPUT].unlocking);
+    const rootAliasBlob = pushBounds(rootAliasUnlocking);
+    const rootAlias = BigInt(committedSpecs[MILLER_GENESIS_INPUT].inLimbs[rootIndex]) + P;
+    rootAliasUnlocking.set(le40(rootAlias).slice(0, W), rootAliasBlob.dataStart + rootByteOffset);
+    rootAliasInputs[MILLER_GENESIS_INPUT] = {
+      ...rootAliasInputs[MILLER_GENESIS_INPUT],
+      unlocking: rootAliasUnlocking,
+    };
+    if (evalInput(rootAliasInputs, MILLER_GENESIS_INPUT).accepted ||
+        evalInput(rootAliasInputs, MILLER_GENESIS_INPUT, standardVm).accepted) {
+      throw new Error('Miller genesis accepted a noncanonical u+p residue root');
+    }
+
+    const terminalIndex = committedSpecs.findIndex((spec) => spec.role === 'terminal');
+    if (terminalIndex < 0) throw new Error('missing torus terminal input');
+    const zeroRepresentativeInputs = full0.inputs.slice();
+    const zeroRepresentativeUnlocking = Uint8Array.from(zeroRepresentativeInputs[terminalIndex].unlocking);
+    const terminalBlob = pushBounds(zeroRepresentativeUnlocking);
+    if (terminalBlob.dataLen < 12 * W) throw new Error('torus terminal state is missing f');
+    zeroRepresentativeUnlocking.fill(0, terminalBlob.dataStart, terminalBlob.dataStart + 12 * W);
+    zeroRepresentativeInputs[terminalIndex] = {
+      ...zeroRepresentativeInputs[terminalIndex],
+      unlocking: zeroRepresentativeUnlocking,
+    };
+    if (evalInput(zeroRepresentativeInputs, terminalIndex).accepted ||
+        evalInput(zeroRepresentativeInputs, terminalIndex, standardVm).accepted) {
+      throw new Error('torus tail accepted the projective zero representative');
+    }
+    const wrongClassInputs = mutateInputBlob(full0.inputs, terminalIndex, 0);
+    if (evalInput(wrongClassInputs, terminalIndex).accepted ||
+        evalInput(wrongClassInputs, terminalIndex, standardVm).accepted) {
+      throw new Error('torus tail accepted a wrong nonzero quotient class');
+    }
+    torusMutations.push(
+      { steps: toStepArr({ inputs: rootAliasInputs, meta: full0.meta }), rejected: true },
+      { steps: toStepArr({ inputs: zeroRepresentativeInputs, meta: full0.meta }), rejected: true },
+      { steps: toStepArr({ inputs: wrongClassInputs, meta: full0.meta }), rejected: true },
+    );
+  }
+
   fullInvalid.push(
     ...contextMutations,
     { steps: toStepArr({ inputs: lockingInputs, meta: full0.meta }), rejected: true },
     { steps: toStepArr({ inputs: seamInputs, meta: full0.meta }), rejected: true },
     { steps: toStepArr({ inputs: trailingInputs, meta: full0.meta }), rejected: true },
+    ...torusMutations,
   );
-  console.error('  static context mutations: -A/B, C, vk_x, c, cInv, carrier locking, dynamic seam, and trailing state rejected');
+  console.error(`  static context mutations: -A/B, C, vk_x, ${MILLER_TORUS ? 'residue root, u+p alias, projective zero, wrong quotient class' : 'c, cInv'}, carrier locking, dynamic seam, and trailing state rejected`);
 }
 let endpointSpecIndex = -1;
 if (FUSE_G2_ENDPOINT) {
@@ -922,11 +993,20 @@ const invalidInputs = [
 ];
 console.error(`  invalid runs rejected: ${fullInvalid.map((r) => r.rejected).join(',')}`);
 console.error(`  invalid point runs rejected: ${invalidPointRuns.length}; serialized=${invalidInputs.length}`);
-if (!full0.fits || !full1.fits || !fullWc.fits || !fullInvalid.every((run) => run.rejected) || invalidInputs.length === 0) {
+if (!full0.accepted || !full1.accepted || !fullWc.accepted ||
+    !full0.fits || !full1.fits || !fullWc.fits ||
+    !full0Transaction.consensusVerified || !full1Transaction.consensusVerified || !fullWcTransaction.consensusVerified ||
+    !fullInvalid.every((run) => run.rejected) || invalidInputs.length === 0) {
   throw new Error('valid, worst-case, or invalid fixture failed; refusing to write vectors');
 }
+if (MILLER_TORUS && (!full0Transaction.standardVerified || !full1Transaction.standardVerified)) {
+  throw new Error('quotient-torus committed or second-proof transaction is not standard-policy valid; refusing to write vectors');
+}
 
-const description = FUSE_G2_ENDPOINT
+const torusDescription = `The committed benchmark transaction is a standard-policy-valid, ${full0.inputs.length}-input BN254 Groth16 verifier. Three GLV vk_x inputs feed ten c^-(6x+2)-fused Miller inputs with e(alpha,beta) precomputed. The Miller accumulator is evaluated in the quotient Fp12*/Fp6*: genesis carries the six canonical limbs of a finite [c]=[1+u*W] residue root, derives [c^-1]=[1-u*W], and pins that immutable root through every later input, where W is the quadratic-tower basis. The old residue-coset correction w lies in Fp6 and therefore disappears in this quotient. The terminal input checks the exact quotient relation [f*c^(p^2)]=[c^p*c^(p^3)] and explicitly rejects the projective zero representative. Runtime B is affine with canonical slope witnesses, normalized unit lines, and an exact endomorphism subgroup endpoint check. prove_miller_torus.mjs proves the quotient-kernel equivalence, finite-chart completeness, every projective transition, specialized Frobenius maps, and the terminal relation; the builder additionally exercises u+p alias, projective-zero, wrong-nonzero-quotient-class, static-context, seam, slope, inverse, point, and proof-binding mutations.`;
+const description = MILLER_TORUS
+  ? torusDescription
+  : FUSE_G2_ENDPOINT
   ? MILLER_AFFINE_G2
     ? MILLER_UNIT_LINES
       ? `INTRA-TRANSACTION LINKED + RESIDUE full BN254 Groth16 verifier in ONE transaction (${full0.inputs.length} inputs). Three GLV vk_x inputs feed a c^-(6x+2)-fused batched Miller chain with e(alpha,beta) precomputed and a terminal witnessed-residue verdict. The Miller genesis requires canonical A/B/C coordinates, checks all three proof points on their curves, and binds canonical inverse-Y witnesses for the three runtime G1 points. Each G1 point is carried as (-x/y,-1/y), and every fixed line is normalized offline to c2=1, making the sparse multiplier's o0 coefficient one. Runtime B uses a four-limb affine accumulator; every tangent/chord carries a two-limb canonical slope witness, rejects a zero denominator, and checks the slope equation. These normalizations change the Miller value only by an Fp2 scale, which vanishes in final exponentiation. Exact G2 subgroup membership is fused into B's post-processing by requiring R+psi(B)-psi^2(B)=-psi^3(B). prove_miller_unit_lines.mjs proves the line-scale equivalence and all fixed-line denominators; unit_line_bound_analysis.mjs proves the specialized integer bounds; the affine and endpoint proof scripts retain their original completeness guarantees. Miller genesis at absolute input 3 carries the immutable normalized proof points, vk_x, c, and cInv once; every later Miller input pins that locking, reads the static values by explicit genesis offsets, and forward-binds only its exact 512-byte f/R state.`
@@ -944,6 +1024,20 @@ writeFileSync(verifierPath('src/bch/groth16-intratx-residue-vectors.json'), JSON
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
   maxStepOperationCost: Math.max(...full0.meta.map((m) => m.operationCost)),
   allFit: full0.fits, allAccept: full0.accepted,
+  extraValidProofTransactions: [{
+    serializedTransactionBytes: full1Transaction.wireBytes,
+    consensusTransactionVerified: full1Transaction.consensusVerified,
+    standardTransactionVerified: full1Transaction.standardVerified,
+    totalOperationCost: full1Transaction.totalOperationCost,
+    maxStepOperationCost: full1Transaction.maxStepOperationCost,
+  }],
+  worstCaseTransaction: {
+    serializedTransactionBytes: fullWcTransaction.wireBytes,
+    consensusTransactionVerified: fullWcTransaction.consensusVerified,
+    standardTransactionVerified: fullWcTransaction.standardVerified,
+    totalOperationCost: fullWcTransaction.totalOperationCost,
+    maxStepOperationCost: fullWcTransaction.maxStepOperationCost,
+  },
   steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullWc),
   invalid: fullInvalid.map((r) => r.steps),
   invalidInputs,

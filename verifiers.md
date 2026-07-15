@@ -32,8 +32,8 @@ axes; this doc is the map. Individual folders have the authoritative per-verifie
 | `bch-groth16-chunked` | chunked, covenant chain | **44 inputs / 334,578 B / 262.82M op** | NFT-commitment chain |
 | `bch-groth16-intratx` | chunked, intra-tx linked | **42 inputs / 330,580 B / 262.68M op** | whole verifier in one (non-standard) tx |
 | `bch-groth16-grouped` | chunked, grouped | **42 inputs / 330,501 B / 262.59M op** | standard-relayable in 5 txs |
-| `bch-groth16-intratx-residue` | chunked, intra-tx + residue | **26 inputs / 224,875 B / 179.64M op** | smallest single-tx BN254 verifier |
-| **`bch-groth16-grouped-residue`** | **chunked, grouped + residue** | **26 inputs / 224,830 B / 179.59M op — flagship** | standard-relayable in 3 txs |
+| `bch-groth16-intratx-residue` | chunked, intra-tx + quotient-torus residue | **13 inputs / 100,448 B score / 99,993 B tx wire / 78.42M op** | current-BCH standard; smallest single-tx BN254 verifier |
+| `bch-groth16-grouped-residue` | chunked, grouped + residue | **26 inputs / 224,830 B / 179.59M op** | standard-relayable in 3 txs |
 | `bch-groth16-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **4 inputs / 187,792 B / 177.33M op** | targets the proposed `bch-spec` upgrade, not current BCH; structural (fewest UTXOs), own leaderboard category — see [Target VM](#target-vm-bch-spec) |
 | `bch-pairing-chunked` | chunked pairing-only, covenant | **20 inputs / 175,788 B / 138.94M op**; score **178,368** | Miller-boundary milestone |
 | `bch-pairing-intratx` | chunked pairing-only, intra-tx | **20 inputs / 174,134 B / 138.80M op**; score **175,014** | Miller-boundary milestone |
@@ -84,8 +84,9 @@ Extra considerations for spec-targeting verifiers (full detail in
 - **Intra-tx introspection is ~free.** Reading a sibling's unlocking costs the reader 1 op/byte while
   those bytes grant the sibling 800 op of budget (800 : 1); pad is serialized once, so it is not
   double-counted in the score.
-- **Non-standard.** A 100 kB input makes the tx exceed the 100 kB standard size, so it is mined
-  directly (the intra-tx bundle was already non-standard).
+- **Non-standard.** A 100 kB input makes the spec-targeting transaction exceed the 100 kB standard
+  size, so it is mined directly. This differs from the current-BCH BN254 quotient-torus fixture,
+  which is 99,993 bytes and standard-policy valid.
 
 ## The forms in one paragraph each
 
@@ -108,12 +109,12 @@ Extra considerations for spec-targeting verifiers (full detail in
 | method | how state crosses | deployability | folder |
 |---|---|---|---|
 | **covenant chain** | NFT `hash256` commitment, one chunk per tx | ~54–87 tx chain (at the 50-deep mempool edge) | `chunked/pairing`, `chunked/bls12-381` |
-| **intra-tx linked** | next input's unlocking bytecode (`OP_INPUTBYTECODE` forward-check), one tx | a single ~0.25–0.7 MB non-standard tx | `chunked/intratx` |
+| **intra-tx linked** | next input's unlocking bytecode (`OP_INPUTBYTECODE` forward-check), one tx | one tx; 99,993 B and standard for the BN254 quotient-torus frontier, larger builds non-standard | `chunked/intratx` |
 | **grouped** | intra-tx *within* a tx + NFT hand-off *across* txs | **standard-relayable, a handful of <100 KB txs, under the 50-tx limit** | `chunked/grouped` |
 
-Grouped is the only full-verifier form that is **both** standard-relayable **and** within
-the mempool chain limit, which is why the flagship deployment is
-`bch-groth16-grouped-residue`.
+The BN254 quotient-torus intra-tx verifier is standard-relayable as one transaction. Grouped remains
+the standard-relayable form for larger graphs, including the current BLS12-381 construction, by
+splitting them into a handful of transactions within the mempool chain limit.
 
 The **`vk_x`-only** checkpoint (the variable-scalar G1 MSM,
 `IC0 + in0·IC1 + in1·IC2`) is factored out and has its own two implementations kept for
@@ -131,9 +132,10 @@ comparison: [`chunked/twoloop/`](chunked/twoloop/) (simple, 16 chunks) and
 
 - **`residue` chunked** (`*-intratx-residue`, `*-grouped-residue`) — the same residue
   math packed into a deployable chunk graph. The hard-part final exponentiation
-  (dozens of chunks in the plain build) collapses to a short witnessed-residue tail,
-  cutting inputs/bytes/op by roughly a third — which is what turns the multi-transaction
-  grouped verifier into the compact flagship.
+  (dozens of chunks in the plain build) collapses to a short witnessed-residue tail.
+  BN254 additionally evaluates the Miller accumulator in `Fp12*/Fp6*`, reducing the
+  graph to a standard 13-input transaction; grouped packing remains available for
+  constructions whose complete graph exceeds standard transaction policy.
 
 The op-cost win that these share at the *codegen* level — the `rescheduleStacks` compile
 mode — is documented separately in

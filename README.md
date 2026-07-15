@@ -14,7 +14,7 @@ BCH 2026 VM:
 
 This has grown into a whole family of verifiers across two curves, two forms, and
 baseline/op-optimized variants — **[verifiers.md](verifiers.md) is the map** of which is
-which and which one is the deployable flagship.
+which and where each deployable frontier sits.
 
 It comes in two forms:
 
@@ -97,4 +97,4 @@ Loops and shift operators are now available (CashScript v0.13.0 / CHIP-2021-05 L
 - **Contract size / unlocking bytecode (the real practical limit):** 10,000 bytes for P2SH (consensus), or just 201 bytes for P2S. A full pairing verifier (F_p¹² tower arithmetic, Miller loops, final exponentiation) is very unlikely to fit under 10 KB even with loops collapsing repeated bytecode.
 - **Operation cost budget (op-cost):** a compute budget enforced per input, scaled by unlocking-script length (`(41 + unlockingBytecodeLength) * 800`). Extra budget can be "bought" by zero-padding the input script, but only up to the 10,000-byte unlocking bytecode limit above, so the two limits are really one wall. The fork's [`unused` modifier](cashscript-compiler-fork.md#3-the-unused-declaration-modifier-issues-125-412) lets a contract declare this pad directly as a `bytes unused zeroPadding` argument instead of a hand-built `OP_DROP` prefix.
 
-Because these limits are per input per transaction, a full verifier almost certainly cannot run in a single transaction and the work must be split into steps. See [Breaking Up Computation Across Multiple Steps](multi-step-computation.md) for why this is done across sequential transactions (carrying state forward in an NFT commitment, using a hash when the state exceeds 128 bytes) rather than across the inputs of one transaction.
+Because these limits are per input, a full verifier cannot run in one input and must be split into steps. Those steps can be sibling inputs of one transaction—the current BN254 quotient-torus construction uses 13 inputs in a standard 99,993-byte transaction—or span sequential transactions with covenant commitments. See [Breaking Up Computation Across Multiple Steps](multi-step-computation.md) for both forms.

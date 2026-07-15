@@ -15,11 +15,11 @@ input i+1:  <inBlob = f0(x)>        redeem: out = f1(f0(x)); ... (verdict)
 
 Input `i` recomputes its chunk and `require`s that input `i+1`'s incoming argument equals that output — a raw byte-equality check across sibling inputs (the "verify `arg01 == arg10`" pattern). This shards one running computation across the inputs of a single transaction and binds it end-to-end, with the verdict asserted by the last input.
 
-Compared with the across-transactions covenant below, this needs **no NFT-commitment hand-off and no hashing**, the intermediate state is **not limited to 128 bytes** (it is just a pushed argument, any size), and the whole computation is **one transaction** instead of a chain of them — so no per-step block/mempool hop. Each input still gets its own op-cost budget and 10,000-byte script cap, so the chunking is the same; the whole verifier (~60–84 inputs) is packed into one **non-standard transaction under 1 MB**. This is implemented in [`chunked/intratx`](chunked/intratx) and benchmarked as the `bch-{pairing,groth16}-intratx` (and `-bls12381-`) entries.
+Compared with the across-transactions covenant below, this needs **no NFT-commitment hand-off and no hashing**, the intermediate state is **not limited to 128 bytes** (it is just a pushed argument, any size), and the whole computation is **one transaction** instead of a chain of them — so no per-step block/mempool hop. Each input still gets its own op-cost budget and 10,000-byte script cap. The plain and BLS constructions remain larger non-standard transactions; the optimized BN254 quotient-torus construction fits 13 inputs into one standard 99,993-byte transaction. These are implemented in [`chunked/intratx`](chunked/intratx) and benchmarked as the `bch-{pairing,groth16}-intratx` (and `-bls12381-`) entries.
 
 > Earlier revisions of this document claimed intra-transaction sharing was "not viable" because inputs cannot pass state. That was wrong: they cannot share a stack, but they can read each other's arguments by introspection, which is enough.
 
-## Across transactions (the viable pattern)
+## Across transactions (the covenant pattern)
 
 Computation can be carried forward across a chain of transactions using a stateful covenant UTXO (a CashToken NFT) that is spent and recreated at each step:
 

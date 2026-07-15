@@ -1,4 +1,5 @@
-// Inclusive BigInt interval proof for Bn254Lazy.cash::mul034Unit.
+// Inclusive BigInt interval proof for Bn254Lazy.cash::mul034Unit and
+// Bn254Lazy.cash::mul034UnitDirect.
 //
 // Every Fp12 limb and both sparse-line products entering mul034Unit are canonical,
 // so they are in [0,p-1]. The only enlarged sparse value is qa=1+o3a, in [1,p].
@@ -58,7 +59,7 @@ G.push(...fp2Sub(fp2Sub(gm1, gt0), gt1));
 const gm2 = fp2Raw(fp2Add(S.slice(0, 2), S.slice(4, 6)), q);
 G.push(...fp2Add(fp2Sub(gm2, gt0), gt1));
 
-const outputs = [
+const karatsubaOutputs = [
   add(sub(scale(9n, B[4]), B[5]), F[0]),
   add(add(B[4], scale(9n, B[5])), F[1]),
   add(B[0], F[2]),
@@ -73,12 +74,60 @@ const outputs = [
   sub(sub(G[5], F[5]), B[5]),
 ];
 
+// mul034UnitDirect computes X+v*Y*l and Y+X*l without the Karatsuba
+// reconstruction above. Mirror its two six-limb Fp6 products exactly.
+const yt0 = fp2Raw(F.slice(6, 8), o3);
+const yt1 = fp2Raw(F.slice(8, 10), o4);
+const ytm12 = fp2Raw(fp2Add(F.slice(8, 10), F.slice(10, 12)), o4);
+const ytu0 = fp2Sub(ytm12, yt1);
+const yt = [
+  add(sub(scale(9n, ytu0[0]), ytu0[1]), yt0[0]),
+  add(add(ytu0[0], scale(9n, ytu0[1])), yt0[1]),
+];
+const ytm1 = fp2Raw(fp2Add(o3, o4), fp2Add(F.slice(6, 8), F.slice(8, 10)));
+yt.push(...fp2Sub(fp2Sub(ytm1, yt0), yt1));
+const ytm2 = fp2Raw(fp2Add(F.slice(6, 8), F.slice(10, 12)), o3);
+yt.push(...fp2Add(fp2Sub(ytm2, yt0), yt1));
+
+const xt0 = fp2Raw(F.slice(0, 2), o3);
+const xt1 = fp2Raw(F.slice(2, 4), o4);
+const xtm12 = fp2Raw(fp2Add(F.slice(2, 4), F.slice(4, 6)), o4);
+const xtu0 = fp2Sub(xtm12, xt1);
+const xt = [
+  add(sub(scale(9n, xtu0[0]), xtu0[1]), xt0[0]),
+  add(add(xtu0[0], scale(9n, xtu0[1])), xt0[1]),
+];
+const xtm1 = fp2Raw(fp2Add(o3, o4), fp2Add(F.slice(0, 2), F.slice(2, 4)));
+xt.push(...fp2Sub(fp2Sub(xtm1, xt0), xt1));
+const xtm2 = fp2Raw(fp2Add(F.slice(0, 2), F.slice(4, 6)), o3);
+xt.push(...fp2Add(fp2Sub(xtm2, xt0), xt1));
+
+const directOutputs = [
+  sub(add(F[0], scale(9n, yt[4])), yt[5]),
+  add(add(F[1], yt[4]), scale(9n, yt[5])),
+  add(F[2], yt[0]),
+  add(F[3], yt[1]),
+  add(F[4], yt[2]),
+  add(F[5], yt[3]),
+  add(F[6], xt[0]),
+  add(F[7], xt[1]),
+  add(F[8], xt[2]),
+  add(F[9], xt[3]),
+  add(F[10], xt[4]),
+  add(F[11], xt[5]),
+];
+
 if (RAW_BIAS !== 132793n * P * P || RAW_BIAS % P !== 0n) {
   throw new Error('mul034Unit bias is not exactly 132,793*p^2');
 }
-outputs.forEach((output, i) => {
-  if (output.lo + RAW_BIAS <= 0n) throw new Error(`output ${i} can remain nonpositive after bias`);
-  if (output.hi + RAW_BIAS >= 1n << 536n) throw new Error(`output ${i} exceeds 67 unsigned bytes`);
+[
+  ['mul034Unit', karatsubaOutputs],
+  ['mul034UnitDirect', directOutputs],
+].forEach(([label, outputs]) => {
+  outputs.forEach((output, i) => {
+    if (output.lo + RAW_BIAS <= 0n) throw new Error(`${label} output ${i} can remain nonpositive after bias`);
+    if (output.hi + RAW_BIAS >= 1n << 536n) throw new Error(`${label} output ${i} exceeds 67 unsigned bytes`);
+  });
 });
 
 // lineUnit source ranges. Runtime c0=Y-mX+p is in [1,2p-1], runtime c1 is a
@@ -86,10 +135,6 @@ outputs.forEach((output, i) => {
 // canonical after canonicalFp. mulFp therefore makes o3/o4 canonical in all cases.
 const runtimeC0 = interval(1n, 2n * P - 1n);
 const canonical = interval(0n, P - 1n);
-const mulFpRange = (a, b) => {
-  if (a.lo < 0n || b.lo < 0n) throw new Error('mulFp source can be negative');
-  return canonical;
-};
 if (runtimeC0.lo < 0n || runtimeC0.hi >= 2n * P) throw new Error('runtime c0 source bound changed');
 for (const [label, source] of [
   ['runtime c0', runtimeC0],
@@ -97,14 +142,19 @@ for (const [label, source] of [
   ['fixed c0', canonical],
   ['fixed c1', canonical],
 ]) {
-  const reduced = mulFpRange(source, canonical);
-  if (reduced.lo !== 0n || reduced.hi !== P - 1n) throw new Error(`${label} lineUnit product is not canonical`);
+  if (source.lo < 0n || canonical.lo < 0n) throw new Error(`${label} mulFp source can be negative`);
+  if (canonical.lo !== 0n || canonical.hi !== P - 1n) throw new Error(`${label} lineUnit product is not canonical`);
 }
 
-const min = outputs.reduce((x, y) => x < y.lo ? x : y.lo, outputs[0].lo);
-const max = outputs.reduce((x, y) => x > y.hi ? x : y.hi, outputs[0].hi);
+const min = karatsubaOutputs.reduce((x, y) => x < y.lo ? x : y.lo, karatsubaOutputs[0].lo);
+const max = karatsubaOutputs.reduce((x, y) => x > y.hi ? x : y.hi, karatsubaOutputs[0].hi);
+const directMin = directOutputs.reduce((x, y) => x < y.lo ? x : y.lo, directOutputs[0].lo);
+const directMax = directOutputs.reduce((x, y) => x > y.hi ? x : y.hi, directOutputs[0].hi);
 const ceiling = (x, y) => (x + y - 1n) / y;
 console.log('mul034Unit interval proof passed');
 console.log(`raw outputs: [-${ceiling(-min, P * P)}, ${ceiling(max, P * P)}] * p^2 (inclusive outer bound)`);
 console.log(`biased maximum: ${(max + RAW_BIAS).toString(2).length} bits; all 12 biased minima are positive`);
-console.log('runtime and fixed lineUnit products are canonical before mul034Unit');
+console.log('mul034UnitDirect interval proof passed');
+console.log(`direct raw outputs: [-${ceiling(-directMin, P * P)}, ${ceiling(directMax, P * P)}] * p^2 (inclusive outer bound)`);
+console.log(`direct biased maximum: ${(directMax + RAW_BIAS).toString(2).length} bits; all 12 biased minima are positive`);
+console.log('runtime and fixed lineUnit products are canonical before both sparse multipliers');

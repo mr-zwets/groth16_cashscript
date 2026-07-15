@@ -27,6 +27,7 @@ const mul = (a, b) => Fp12.mul(a, b), inv = (a) => Fp12.inv(a), sqr = (a) => Fp1
 export const fp12limbsOf = tup;
 const powExact = (a, e) => { let res = Fp12.ONE, base = a; while (e > 0n) { if (e & 1n) res = mul(res, base); base = sqr(base); e >>= 1n; } return res; };
 export const frob = (a, n) => Fp12.frobeniusMap(a, n);
+const isZero6 = (a) => Fp6.eql(a, Fp6.ZERO);
 
 // ---- 27th root of unity (noble tower), cubic non-residue in Fp6 (only c0.c2 nonzero) ----
 export const ROOT27 = mk12([0n, 0n, 0n, 0n,
@@ -60,6 +61,23 @@ export function residueWitness(fRaw) {
   rw = powExact(rw, mInv);
   const c = cubeRoot(rw);
   return { c, cInv: inv(c), w };
+}
+
+// A nontrivial r-th root has k^lambda=1 because r divides lambda. If the
+// residue root returned above is the quotient torus's unique infinity point,
+// multiplying by k preserves the witness relation and moves it to the finite
+// chart because k.c1 is nonzero. Thus every accepting quotient class has a
+// complete six-limb representative [1 + u*W], without a fixture assumption.
+const TORUS_KERNEL_SHIFT = bn254.pairing(bn254.G1.Point.BASE, bn254.G2.Point.BASE);
+if (isZero6(TORUS_KERNEL_SHIFT.c1) || !eq12(powExact(TORUS_KERNEL_SHIFT, LAMBDA), Fp12.ONE)) {
+  throw new Error('invalid BN254 quotient-torus kernel shift');
+}
+export function residueTorusWitness(fRaw) {
+  const witness = residueWitness(fRaw);
+  const c = isZero6(witness.c.c0) ? mul(witness.c, TORUS_KERNEL_SHIFT) : witness.c;
+  if (isZero6(c.c0)) throw new Error('failed to move residue root into the finite torus chart');
+  const u = Fp6.mul(c.c1, Fp6.inv(c.c0));
+  return { c, cInv: inv(c), u };
 }
 
 // ---- c^-(6x+2)-FUSED batched Miller ----------------------------------------------------
@@ -133,7 +151,7 @@ const affineAdd = (point, addend) => {
   };
 };
 
-export function millerFusedAffineOps(pairs, c, cInv, { unitLines = false } = {}) {
+export function millerFusedAffineOps(pairs, c, cInv, { unitLines = false, torusU = null } = {}) {
   const raw = millerFusedOps(pairs, c, cInv);
   const pairData = pairs.map((pair) => {
     const P = pair.P.toAffine();
@@ -161,15 +179,36 @@ export function millerFusedAffineOps(pairs, c, cInv, { unitLines = false } = {})
   };
   const ops = [];
   const states = [];
-  let f = cInv;
+  const fAbTorus = isZero6(raw.fAB.c0) ? null : Fp6.mul(raw.fAB.c1, Fp6.inv(raw.fAB.c0));
+  if (torusU !== null && fAbTorus === null) {
+    throw new Error('the fixed alpha/beta Miller value has no finite quotient-torus coordinate');
+  }
+  let f = torusU === null ? cInv : Fp12.create({ c0: Fp6.ONE, c1: Fp6.neg(torusU) });
   let runtimeR = { ...pairData[0].Q };
   for (const rawOp of raw.ops) {
     states.push({ f, Rs: [runtimeR], c, cInv });
     const op = { ...rawOp, affineSlopes: [] };
     if (op.t === 'sqr') f = Fp12.sqr(f);
-    else if (op.t === 'cf') f = Fp12.mul(f, op.neg ? c : cInv);
-    else if (op.t === 'cmul1') f = Fp12.mul(f, raw.fAB);
-    else if (op.j !== 0) {
+    else if (op.t === 'cf') {
+      if (torusU === null) {
+        f = Fp12.mul(f, op.neg ? c : cInv);
+      } else {
+        const foldU = op.neg ? torusU : Fp6.neg(torusU);
+        f = Fp12.create({
+          c0: Fp6.add(f.c0, Fp6.mulByNonresidue(Fp6.mul(f.c1, foldU))),
+          c1: Fp6.add(f.c1, Fp6.mul(f.c0, foldU)),
+        });
+      }
+    } else if (op.t === 'cmul1') {
+      if (torusU === null) {
+        f = Fp12.mul(f, raw.fAB);
+      } else {
+        f = Fp12.create({
+          c0: Fp6.add(f.c0, Fp6.mulByNonresidue(Fp6.mul(f.c1, fAbTorus))),
+          c1: Fp6.add(f.c1, Fp6.mul(f.c0, fAbTorus)),
+        });
+      }
+    } else if (op.j !== 0) {
       const triples = op.t === 'pp' ? op.coeffs : [op.coeffs];
       const normalized = [];
       for (const coeffs of triples) {

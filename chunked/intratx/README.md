@@ -24,11 +24,12 @@ chunk of a stage is genesis (nothing binds its input); the last asserts the verd
 (`finalExp == 1`). Cross-stage links are bound where byte layouts line up: **vk_x** into
 the Miller genesis input, the **Miller boundary** into the final-exp genesis input.
 
-Each input still fits one BCH budget (op-cost ≤ 8,032,800, script ≤ 10,000 B), so the
-chunking — and the chunk math, reused verbatim — is identical to the covenant version.
-What changes is packaging: ~60–84 inputs in one **non-standard (< 1 MB) transaction**
-instead of that many sequential transactions, with no per-step hashing and no 128-byte
-state cap.
+Each input still fits one BCH budget (op-cost ≤ 8,032,800, script ≤ 10,000 B). The plain and BLS
+graphs reuse the covenant chunks verbatim; the BN254 quotient-torus graph instead specializes its
+arithmetic for the linked layout. In either case, every chunk is an input of one transaction instead
+of one of many sequential transactions, with no per-step hashing and no 128-byte state cap. The
+plain and BLS graphs remain larger non-standard transactions; the optimized BN254 quotient-torus
+graph is 13 inputs in one standard 99,993-byte transaction.
 
 ### P2SH deployment
 
@@ -122,8 +123,9 @@ sibling's forward-check.
 ### Standardness
 
 A 100 kB input exceeds standard relay policy (the *tx* exceeds `maximumStandardTransactionSize` =
-100,000), so the transaction is non-standard and must be mined directly — but the single-tx intratx
-bundle was already non-standard (< 1 MB), so nothing new is given up.
+100,000), so the transaction is non-standard and must be mined directly. The plain and BLS
+current-BCH intra-tx bundles are also non-standard; the 99,993-byte BN254 quotient-torus fixture is
+the standard-policy-valid exception.
 
 ## Files
 
@@ -166,6 +168,21 @@ STAGE_BOUND_LAYOUT=1 MILLER_LINKED_LAYOUT=1 node chunked/pairing/gen_miller_resi
 node chunked/intratx/build_vectors_residue.mjs
 node chunked/grouped/build_vectors_residue.mjs
 ```
+
+The quotient-torus frontier has a separate deterministic entry point. It enables the endpoint,
+affine-G2, unit-line, stage-bound, covenant-residue, and linked layouts together; uses the frozen
+measured cuts; proves the affine steps, normalized lines, raw-integer bounds, endpoint subgroup
+equivalence, and quotient algebra; and refuses to write a vector unless the committed and second
+proof transactions pass both whole current-BCH consensus and standard-policy VMs.
+
+```
+VERIFIER_DIR=/absolute/path/to/zk-verifier-bench pnpm vectors:intratx:torus
+```
+
+For the committed fixture this produces 13 inputs and a 99,993-byte serialized transaction. The
+second valid proof is 99,675 bytes and also standard. The deliberately dense worst-case fixture is
+117,563 bytes: it remains current-BCH consensus-valid but exceeds the standard transaction-size
+policy, so the benchmark reports that distinction explicitly.
 
 ## Harness support
 

@@ -1,11 +1,8 @@
 // Generator for the c^-(6x+2)-FUSED batched BN254 Miller loop (residue method).
 // Identical to gen_miller.mjs (prepared-VK, 4 pairs batched, shared f) EXCEPT the loop also
-// folds c^-(6x+2) into f so the boundary fF = fRaw * c^-(6x+2). The residue witness (c, cInv)
-// is carried as CONSTANT state (12+12 limbs) so each chunk can multiply by it; op 'cf' (c-fold)
-// does f = fp12Mul(f, cInv) [NAF digit +1] or fp12Mul(f, c) [digit -1]. The LEADING 'cf' injects
-// the loop's implicit MSB (R=Q preload -> 2^65 term). The minimal-weight NAF of 6x+2 (22 c-folds)
-// beats a cInv-only binary fold (37 folds) — measured 27 chunks / 194.9M op vs 28 / 201.1M.
-// One fixed locking per chunk verifies ANY proof (c,cInv are runtime state, like the rest).
+// folds c^-(6x+2) into f so the boundary fF = fRaw * c^-(6x+2). The legacy mode carries
+// c/cInv; MILLER_TORUS=1 works in Fp12*/Fp6* and carries only the six-limb finite coordinate
+// [c]=[1+u*W], whose inverse is [1-u*W], where W is the quadratic-tower basis.
 // FUSE_G2_ENDPOINT=1 also validates the proof points at genesis and proves B is in G2 during
 // runtime-B post-processing; prove_miller_endpoint_subgroup.mjs proves the enforced group relation
 // is equivalent to subgroup membership on the complete twist group.
@@ -14,11 +11,13 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  Fp, Fp2, Fp12, BN_X, f12limbs, r6limbs, pairsFor, vec, commit, millerBatchOps, singlePairMiller,
+  Fp, Fp2, Fp6, Fp12, BN_X, f12limbs, r6limbs, pairsFor, vec, commit, millerBatchOps, singlePairMiller,
   measureCovenantFile, planChunk, covIn, covOut, PT_CFG, ptLimbs, decl,
   commitBin, compileFileBytecodeRaw, STATE_BYTES,
 } from './_millermath.mjs';
-import { millerFusedOps, millerFusedAffineOps, residueWitness, fp12limbsOf, COSET27 } from './_residuemath.mjs';
+import {
+  millerFusedOps, millerFusedAffineOps, residueTorusWitness, residueWitness, fp12limbsOf, COSET27,
+} from './_residuemath.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -26,6 +25,7 @@ mkdirSync(GEN, { recursive: true });
 const FUSE_G2_ENDPOINT = process.env.FUSE_G2_ENDPOINT === '1';
 const MILLER_AFFINE_G2 = process.env.MILLER_AFFINE_G2 === '1';
 const MILLER_UNIT_LINES = process.env.MILLER_UNIT_LINES === '1';
+const MILLER_TORUS = process.env.MILLER_TORUS === '1';
 const LIB_IMPORT = FUSE_G2_ENDPOINT
   ? '../../../singleton/bn254/lib/lazy/Bn254LazyG.cash'
   : '../../../singleton/bn254/lib/lazy/Bn254Lazy.cash';
@@ -34,10 +34,13 @@ const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const LINKED_LAYOUT = process.env.MILLER_LINKED_LAYOUT === '1';
 const linkedCutsOverride = process.env.MILLER_LINKED_CUTS;
+const defaultLinkedCuts = MILLER_TORUS
+  ? [38, 76, 114, 153, 190, 229, 267, 304, 342]
+  : [18, 32, 50, 68, 86, 104, 122, 140, 158, 176, 194, 212, 230, 249, 266, 285, 303, 320, 338];
 const LINKED_CUTS = !LINKED_LAYOUT || linkedCutsOverride === 'auto'
   ? []
   : linkedCutsOverride === undefined
-    ? [18, 32, 50, 68, 86, 104, 122, 140, 158, 176, 194, 212, 230, 249, 266, 285, 303, 320, 338]
+    ? defaultLinkedCuts
     : linkedCutsOverride.split(',').map(Number);
 const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 const COVENANT_RESIDUE = STAGE_BOUND && process.env.COVENANT_RESIDUE_LAYOUT === '1';
@@ -49,6 +52,10 @@ if (MILLER_AFFINE_G2 && !FUSE_G2_ENDPOINT) {
 }
 if (MILLER_UNIT_LINES && !MILLER_AFFINE_G2) {
   throw new Error('MILLER_UNIT_LINES requires MILLER_AFFINE_G2=1');
+}
+if (MILLER_TORUS && (!FUSE_G2_ENDPOINT || !MILLER_AFFINE_G2 || !MILLER_UNIT_LINES ||
+    !STAGE_BOUND || !COVENANT_RESIDUE || !LINKED_LAYOUT)) {
+  throw new Error('MILLER_TORUS requires endpoint, affine, unit-line, stage-bound, covenant-residue, and linked layouts');
 }
 
 const PAIRS = pairsFor(vec.publicInputs);
@@ -100,9 +107,15 @@ const unitPtL = MILLER_UNIT_LINES
 const fRawPlan = MILLER_AFFINE_G2
   ? millerFusedAffineOps(PAIRS, Fp12.ONE, Fp12.ONE, { unitLines: MILLER_UNIT_LINES }).boundary
   : millerBatchOps(PAIRS).boundary;
-const { c: C_PLAN, cInv: CINV_PLAN, w: W_PLAN } = residueWitness(fRawPlan);
+const rootPlan = MILLER_TORUS ? residueTorusWitness(fRawPlan) : residueWitness(fRawPlan);
+const { c: C_PLAN, cInv: CINV_PLAN } = rootPlan;
+const U_PLAN = MILLER_TORUS ? rootPlan.u : null;
+const W_PLAN = MILLER_TORUS ? null : rootPlan.w;
 const trace = MILLER_AFFINE_G2
-  ? millerFusedAffineOps(PAIRS, C_PLAN, CINV_PLAN, { unitLines: MILLER_UNIT_LINES })
+  ? millerFusedAffineOps(PAIRS, C_PLAN, CINV_PLAN, {
+      unitLines: MILLER_UNIT_LINES,
+      torusU: U_PLAN,
+    })
   : millerFusedOps(PAIRS, C_PLAN, CINV_PLAN);
 const { ops, states, boundary } = trace;
 if (LINKED_CUTS.some((cut, i) => !Number.isInteger(cut) || cut <= (LINKED_CUTS[i - 1] ?? 0) || cut >= ops.length)) {
@@ -126,17 +139,33 @@ if (!Fp2.eql(endpointAffine.x, expectedEndpoint.x) || !Fp2.eql(endpointAffine.y,
 
 // baked constant f_{alpha,beta} (pair 1's single-pair Miller value; VK-only, proof-independent),
 // multiplied in once by the 'cmul1' op instead of folding pair 1's ~89 lines through the loop.
-const FAB_LIMBS = f12limbs(singlePairMiller(PAIRS[1]).f).map((x) => x.toString());
+const FAB = singlePairMiller(PAIRS[1]).f;
+const FAB_LIMBS = f12limbs(FAB).map((x) => x.toString());
+const FAB_TORUS = Fp6.eql(FAB.c0, Fp6.ZERO) ? null : Fp6.mul(FAB.c1, Fp6.inv(FAB.c0));
+if (FAB_TORUS === null) {
+  throw new Error('the fixed alpha/beta Miller value has no finite quotient-torus coordinate');
+}
+const FAB_TORUS_LIMBS = [
+  FAB_TORUS.c0.c0, FAB_TORUS.c0.c1, FAB_TORUS.c1.c0,
+  FAB_TORUS.c1.c1, FAB_TORUS.c2.c0, FAB_TORUS.c2.c1,
+].map(String);
 const cNames = Array.from({ length: 12 }, (_, i) => `c${i}`);
 const ciNames = Array.from({ length: 12 }, (_, i) => `ci${i}`);
+const torusNames = Array.from({ length: 6 }, (_, i) => `u${i}`);
+const rootNames = MILLER_TORUS ? torusNames : [...cNames, ...ciNames];
 const wNames = Array.from({ length: 12 }, (_, i) => `w${i}`);
 const ONE_L = ['1', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0', '0'];
 const W_HASHES = [ONE_L, fp12limbsOf(COSET27[1]).map(String), fp12limbsOf(COSET27[2]).map(String)]
   .map((limbs) => Buffer.from(commitBin(limbs.map(BigInt))).toString('hex'));
-// state = f(12) + R0(4 affine or 6 projective) + runtime points + c(12) + cInv(12)
-const affineRLimbs = (R) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1];
-const runtimeRLimbs = (R) => MILLER_AFFINE_G2 ? affineRLimbs(R) : r6limbs(R);
-const stateLimbs = (s) => [...f12limbs(s.f), ...runtimeRLimbs(s.Rs[0]), ...f12limbs(s.c), ...f12limbs(s.cInv)];
+// state = f(12) + R0(4 affine or 6 projective) + runtime points + residue root.
+// The quotient-torus mode carries only u(6) for [c]=[1+u*W]; inverse is -u.
+const runtimeRLimbs = (R) => MILLER_AFFINE_G2
+  ? [R.x.c0, R.x.c1, R.y.c0, R.y.c1]
+  : r6limbs(R);
+const rootPlanLimbs = MILLER_TORUS
+  ? [U_PLAN.c0.c0, U_PLAN.c0.c1, U_PLAN.c1.c0, U_PLAN.c1.c1, U_PLAN.c2.c0, U_PLAN.c2.c1]
+  : [...f12limbs(C_PLAN), ...f12limbs(CINV_PLAN)];
+const stateLimbs = (s) => [...f12limbs(s.f), ...runtimeRLimbs(s.Rs[0]), ...rootPlanLimbs];
 const statePrefixLength = 12 + (MILLER_AFFINE_G2 ? 4 : 6);
 const withPts = (limbs) => {
   const fr = limbs.slice(0, statePrefixLength);
@@ -147,12 +176,11 @@ const slopeLimbs = (opLo, opHi) => MILLER_AFFINE_G2
   ? ops.slice(opLo, opHi).flatMap((op) => op.affineSlopes.flatMap((m) => [m.c0, m.c1]))
   : [];
 const inState = (i) => STAGE_BOUND && i === 0
-  ? [...stagePtL, ...f12limbs(states[i].c), ...f12limbs(states[i].cInv), ...unitPtL]
+  ? [...stagePtL, ...rootPlanLimbs, ...unitPtL]
   : withPts(stateLimbs(states[i]));
-// the FINAL chunk hands off only [fF, c, cInv] (36 limbs, contiguous) to the residue tail —
-// R0/pts are done with once the loop ends. Non-final hand-offs carry the full 52-limb state.
+// The final hand-off is used only by non-linked layouts; linked mode verifies inline.
 const outState = (i) => i === states.length - 1
-  ? [...f12limbs(states[i].f), ...f12limbs(states[i].c), ...f12limbs(states[i].cInv)]
+  ? [...f12limbs(states[i].f), ...rootPlanLimbs]
   : withPts(stateLimbs(states[i]));
 
 const bakedCoeffs = (triple) => triple.flatMap((c) => [`${c.c0}`, `${c.c1}`]);
@@ -166,24 +194,27 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   const inR0 = MILLER_AFFINE_G2
     ? ['R0xa', 'R0xb', 'R0ya', 'R0yb']
     : ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
-  const fullStateParams = [...inF, ...inR0, ...ptParams, ...cNames, ...ciNames];
+  const fullStateParams = [...inF, ...inR0, ...ptParams, ...rootNames];
   const stateParams = STAGE_BOUND && opLo === 0
-    ? [...stagePtParams, ...cNames, ...ciNames, ...unitPtParams]
+    ? [...stagePtParams, ...rootNames, ...unitPtParams]
     : fullStateParams;
-  const committedParams = COVENANT_RESIDUE && opLo === 0 ? stagePtParams : stateParams;
+  const committedParams = COVENANT_RESIDUE && opLo === 0
+    ? MILLER_TORUS ? stateParams : stagePtParams
+    : stateParams;
   const slopeNamesByOp = new Map();
   for (let i = opLo; i < opHi; i++) {
     slopeNamesByOp.set(i, (ops[i].affineSlopes ?? []).map((_, j) => [`m${i}_${j}a`, `m${i}_${j}b`]));
   }
   const slopeParams = [...slopeNamesByOp.values()].flat(2);
   const genesisInvYParams = MILLER_UNIT_LINES && STAGE_BOUND && opLo === 0 ? invYNames : [];
-  const allParams = [...stateParams, ...genesisInvYParams, ...slopeParams, ...(withTail ? wNames : [])];
+  const tailParams = withTail && !MILLER_TORUS ? wNames : [];
+  const allParams = [...stateParams, ...genesisInvYParams, ...slopeParams, ...tailParams];
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
   L.push(`import "${LIB_IMPORT}";`);
   L.push(`// c^-(6x+2)-fused prepared-VK batched BN254 Miller chunk: ops [${opLo},${opHi}).${withTail ? ' [+ residue-tail verdict fused]' : ''}`);
-  L.push(`// state = f(12) + R0(${MILLER_AFFINE_G2 ? '4 affine' : '6 projective'}) [+ runtime points] + c(12) + cInv(12); c,cInv are constant`);
-  L.push('// carried witness. cf op folds c^-1/c into f (residue method, ePrint 2024/640).');
+  L.push(`// state = f(12) + R0(${MILLER_AFFINE_G2 ? '4 affine' : '6 projective'}) [+ runtime points] + ${MILLER_TORUS ? 'torus u(6)' : 'c(12) + cInv(12)'}; root data is constant`);
+  L.push(`// carried witness. cf folds c^-1/c into f${MILLER_TORUS ? ' modulo Fp6 scaling' : ''} (residue method, ePrint 2024/640).`);
   L.push(`contract MillerFused${withTail ? 'Tail' : ''}Chunk() {`);
   L.push(`    function spend(${decl(allParams)}, bytes unused zeroPadding) {`);
   L.push(covIn(committedParams));
@@ -213,7 +244,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   }
   if (COVENANT_RESIDUE && opLo === 0) {
     L.push('        int residueP = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
-    L.push('        ' + [...cNames, ...ciNames].map((n) => `require(within(${n}, 0, residueP));`).join(' '));
+    L.push('        ' + rootNames.map((n) => `require(within(${n}, 0, residueP));`).join(' '));
   }
   const negY = PINFO.map((pi) => {
     if (!pi.cfg.Q) return [`${pi.negQ.c0}`, `${pi.negQ.c1}`];
@@ -221,9 +252,17 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     if (needs) { L.push(`        (int nq${pi.j}a,int nq${pi.j}b) = fp2Neg(${pi.Qyae}, ${pi.Qybe}, 64);`); return [`nq${pi.j}a`, `nq${pi.j}b`]; }
     return [pi.Qyae, pi.Qybe];
   });
-  // The fused MSB optimization starts f at cInv and R0 at the runtime B point. Derive both
-  // genesis values here instead of accepting independent witness state.
-  let f = STAGE_BOUND && opLo === 0 ? ciNames.slice() : inF.slice();
+  // The fused MSB optimization starts f at cInv and R0 at the runtime B point. In torus
+  // mode [cInv]=[1-u*W], so the six negated limbs derive from the single canonical u.
+  const negTorusNames = Array.from({ length: 6 }, (_, i) => `nu${i}`);
+  const needsNegTorus = MILLER_TORUS && (STAGE_BOUND && opLo === 0 ||
+    ops.slice(opLo, opHi).some((op) => op.t === 'cf' && !op.neg));
+  if (needsNegTorus) {
+    L.push(`        (${decl(negTorusNames)}) = fp6Neg(${torusNames.join(',')}, 64);`);
+  }
+  let f = STAGE_BOUND && opLo === 0
+    ? MILLER_TORUS ? ['1', '0', '0', '0', '0', '0', ...negTorusNames] : ciNames.slice()
+    : inF.slice();
   let r0 = STAGE_BOUND && opLo === 0
     ? [PINFO[0].Qxae, PINFO[0].Qxbe, PINFO[0].Qyae, PINFO[0].Qybe,
         ...(MILLER_AFFINE_G2 ? [] : ['1', '0'])]
@@ -233,7 +272,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   const emitLine = (coeffs, pi) => {
     const g = fresh(12);
     L.push(MILLER_UNIT_LINES
-      ? `        (${decl(g)}) = lineUnit(${f.join(',')}, ${coeffs.slice(0, 4).join(',')}, ${pi.Pxe}, ${pi.Pye});`
+      ? `        (${decl(g)}) = ${MILLER_TORUS ? 'lineUnitDirect' : 'lineUnit'}(${f.join(',')}, ${coeffs.slice(0, 4).join(',')}, ${pi.Pxe}, ${pi.Pye});`
       : `        (${decl(g)}) = line(${f.join(',')}, ${coeffs.join(',')}, ${pi.Pxe}, ${pi.Pye});`);
     f = g;
   };
@@ -244,11 +283,23 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
       later.j !== undefined && PINFO[later.j].cfg.Q && ['dl', 'al', 'pp'].includes(later.t));
     if (op.t === 'sqr') { const sf = fresh(12); L.push(`        (${decl(sf)}) = fp12Sqr(${f.join(',')});`); f = sf; }
     else if (op.t === 'cf') { // c-fold: f *= (neg ? c : cInv)
-      const g = fresh(12); const m = op.neg ? cNames : ciNames;
-      L.push(`        (${decl(g)}) = fp12Mul(${f.join(',')}, ${m.join(',')});`); f = g;
+      const g = fresh(12);
+      if (MILLER_TORUS) {
+        const m = op.neg ? torusNames : negTorusNames;
+        L.push(`        (${decl(g)}) = fp12MulTorus(${f.join(',')}, ${m.join(',')});`);
+      } else {
+        const m = op.neg ? cNames : ciNames;
+        L.push(`        (${decl(g)}) = fp12Mul(${f.join(',')}, ${m.join(',')});`);
+      }
+      f = g;
     } else if (op.t === 'cmul1') { // f *= baked f_{alpha,beta} (VK constant)
       const g = fresh(12);
-      L.push(`        (${decl(g)}) = fp12Mul(${f.join(',')}, ${FAB_LIMBS.join(',')});`); f = g;
+      if (MILLER_TORUS) {
+        L.push(`        (${decl(g)}) = fp12MulTorus(${f.join(',')}, ${FAB_TORUS_LIMBS.join(',')});`);
+      } else {
+        L.push(`        (${decl(g)}) = fp12Mul(${f.join(',')}, ${FAB_LIMBS.join(',')});`);
+      }
+      f = g;
     } else if (op.t === 'dl') {
       if (fixed) { emitLine(bakedCoeffs(op.coeffs), pi); continue; }
       const dco = fresh(MILLER_AFFINE_G2 ? 4 : 6), dr = fresh(MILLER_AFFINE_G2 ? 4 : 6);
@@ -354,35 +405,58 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     }
   }
   if (withTail) {
-    const pNames = Array.from({ length: 12 }, (_, i) => `tailP${i}`);
-    const cqqNames = Array.from({ length: 12 }, (_, i) => `tailCqq${i}`);
-    const uNames = Array.from({ length: 12 }, (_, i) => `tailU${i}`);
-    const rhsNames = Array.from({ length: 12 }, (_, i) => `tailRhs${i}`);
-    const tNames = Array.from({ length: 12 }, (_, i) => `tailT${i}`);
-    const lhsNames = Array.from({ length: 12 }, (_, i) => `tailLhs${i}`);
-    L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
-    L.push(`        (${decl(pNames)}) = fp12Mul(${cNames.join(',')}, ${ciNames.join(',')});`);
-    L.push('        // fp12Mul returns canonical limbs, so direct equality is field equality.');
-    L.push('        ' + pNames.map((n, i) => `require(${n} == ${ONE_L[i]});`).join(' '));
-    L.push(`        bytes wHash = hash256(${wNames.map((n) => `toPaddedBytes(${n}, ${STATE_BYTES})`).join(' + ')});`);
-    L.push(`        require(wHash == 0x${W_HASHES[0]} || wHash == 0x${W_HASHES[1]} || wHash == 0x${W_HASHES[2]});`);
-    L.push(`        (${decl(cqqNames)}) = fp12Frob2(${cNames.join(',')});`);
-    L.push(`        (${decl(uNames)}) = fp12Mul(${cNames.join(',')}, ${cqqNames.join(',')});`);
-    L.push(`        (${decl(rhsNames)}) = fp12Frob1(${uNames.join(',')});`);
-    L.push(`        (${decl(tNames)}) = fp12Mul(${wNames.join(',')}, ${cqqNames.join(',')});`);
-    L.push(`        (${decl(lhsNames)}) = fp12Mul(${f.join(',')}, ${tNames.join(',')});`);
-    L.push('        // fp12Frob1 leaves only its conjugated c0.c0 imaginary limb noncanonical.');
-    L.push('        ' + lhsNames.map((n, i) => i === 1
-      ? `require((${n} - ${rhsNames[i]}) % P == 0);`
-      : `require(${n} == ${rhsNames[i]});`).join(' '));
+    if (MILLER_TORUS) {
+      const u1 = Array.from({ length: 6 }, (_, i) => `tailU1_${i}`);
+      const u2 = Array.from({ length: 6 }, (_, i) => `tailU2_${i}`);
+      const u3 = Array.from({ length: 6 }, (_, i) => `tailU3_${i}`);
+      const lhs = Array.from({ length: 12 }, (_, i) => `tailLhs${i}`);
+      const q = Array.from({ length: 6 }, (_, i) => `tailQ${i}`);
+      const crossL = Array.from({ length: 6 }, (_, i) => `tailCrossL${i}`);
+      const crossR = Array.from({ length: 6 }, (_, i) => `tailCrossR${i}`);
+      L.push(`        (${decl(u1)}) = torusFrob1(${torusNames.join(',')});`);
+      L.push(`        (${decl(u2)}) = torusFrob2(${torusNames.join(',')});`);
+      L.push(`        (${decl(u3)}) = torusFrob2(${u1.join(',')});`);
+      L.push(`        (${decl(lhs)}) = fp12MulTorus(${f.join(',')}, ${u2.join(',')});`);
+      L.push('        // These limbs are canonical and nonnegative, so their integer sum is zero');
+      L.push('        // exactly for the vacuous projective representative [0:0].');
+      L.push(`        require(${lhs.join(' + ')} != 0);`);
+      L.push(`        (${decl(q)}) = fp6MulRaw(${u1.join(',')}, ${u3.join(',')});`);
+      const rhsX = [`1+9*${q[4]}-${q[5]}`, `${q[4]}+9*${q[5]}`, ...q.slice(0, 4)];
+      const rhsY = u1.map((name, i) => `${name}+${u3[i]}`);
+      L.push(`        (${decl(crossL)}) = fp6MulRaw(${lhs.slice(0, 6).join(',')}, ${rhsY.join(',')});`);
+      L.push(`        (${decl(crossR)}) = fp6MulRaw(${lhs.slice(6).join(',')}, ${rhsX.join(',')});`);
+      L.push('        ' + crossL.map((n, i) => `require(mulFp(${n} - ${crossR[i]}, 1) == 0);`).join(' '));
+    } else {
+      const pNames = Array.from({ length: 12 }, (_, i) => `tailP${i}`);
+      const cqqNames = Array.from({ length: 12 }, (_, i) => `tailCqq${i}`);
+      const tailU = Array.from({ length: 12 }, (_, i) => `tailU${i}`);
+      const rhsNames = Array.from({ length: 12 }, (_, i) => `tailRhs${i}`);
+      const tNames = Array.from({ length: 12 }, (_, i) => `tailT${i}`);
+      const lhsNames = Array.from({ length: 12 }, (_, i) => `tailLhs${i}`);
+      L.push('        int P = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
+      L.push(`        (${decl(pNames)}) = fp12Mul(${cNames.join(',')}, ${ciNames.join(',')});`);
+      L.push('        // fp12Mul returns canonical limbs, so direct equality is field equality.');
+      L.push('        ' + pNames.map((n, i) => `require(${n} == ${ONE_L[i]});`).join(' '));
+      L.push(`        bytes wHash = hash256(${wNames.map((n) => `toPaddedBytes(${n}, ${STATE_BYTES})`).join(' + ')});`);
+      L.push(`        require(wHash == 0x${W_HASHES[0]} || wHash == 0x${W_HASHES[1]} || wHash == 0x${W_HASHES[2]});`);
+      L.push(`        (${decl(cqqNames)}) = fp12Frob2(${cNames.join(',')});`);
+      L.push(`        (${decl(tailU)}) = fp12Mul(${cNames.join(',')}, ${cqqNames.join(',')});`);
+      L.push(`        (${decl(rhsNames)}) = fp12Frob1(${tailU.join(',')});`);
+      L.push(`        (${decl(tNames)}) = fp12Mul(${wNames.join(',')}, ${cqqNames.join(',')});`);
+      L.push(`        (${decl(lhsNames)}) = fp12Mul(${f.join(',')}, ${tNames.join(',')});`);
+      L.push('        // fp12Frob1 leaves only its conjugated c0.c0 imaginary limb noncanonical.');
+      L.push('        ' + lhsNames.map((n, i) => i === 1
+        ? `require((${n} - ${rhsNames[i]}) % P == 0);`
+        : `require(${n} == ${rhsNames[i]});`).join(' '));
+    }
   } else {
-    // final chunk hands off only [fF, c, cInv] to the residue tail; others carry full state.
+    // Final chunk hands off only fF/root to the residue tail; others carry full state.
     const exactState = COVENANT_RESIDUE
-      ? (isFinal ? [...cNames, ...ciNames] : [...ptParams, ...cNames, ...ciNames])
+      ? (isFinal ? rootNames : [...ptParams, ...rootNames])
       : [];
     L.push(isFinal
-      ? covOut([...f, ...cNames, ...ciNames], exactState)
-      : covOut([...f, ...r0, ...ptParams, ...cNames, ...ciNames], exactState));
+      ? covOut([...f, ...rootNames], exactState)
+      : covOut([...f, ...r0, ...ptParams, ...rootNames], exactState));
   }
   L.push('    }');
   L.push('}');
@@ -398,9 +472,11 @@ if (process.argv[2] === 'probe') {
       ...inL,
       ...(MILLER_UNIT_LINES && a === 0 ? invYPlan : []),
       ...slopeLimbs(a, b),
-      ...(withTail ? fp12limbsOf(W_PLAN) : []),
+      ...(withTail && !MILLER_TORUS ? fp12limbsOf(W_PLAN) : []),
     ];
-    const committedIn = COVENANT_RESIDUE && a === 0 ? stagePtL : inL;
+    const committedIn = COVENANT_RESIDUE && a === 0
+      ? MILLER_TORUS ? inL : stagePtL
+      : inL;
     const m = measureCovenantFile(genChunk(a, b, final, withTail), args, withTail ? [] : outState(b), PROBE, true, committedIn);
     console.error(`ops [${a},${b}): lock=${m.lockingBytes}B op=${m.operationCost.toLocaleString()} accepted=${m.accepted} ${m.error ?? ''}`);
   }
@@ -411,7 +487,9 @@ console.error(`planning FUSED BN254 Miller chunks (${ops.length} flat ops, ${ops
 const chunks = []; let lo = 0; const planState = { perUnit: null };
 while (lo < ops.length) {
   const inL = inState(lo);
-  const committedIn = COVENANT_RESIDUE && lo === 0 ? stagePtL : inL;
+  const committedIn = COVENANT_RESIDUE && lo === 0
+    ? MILLER_TORUS ? inL : stagePtL
+    : inL;
   const tryHi = (hi) => {
     const final = hi === ops.length;
     const withTail = final && LINKED_LAYOUT;
@@ -420,16 +498,17 @@ while (lo < ops.length) {
       ...inL,
       ...(MILLER_UNIT_LINES && lo === 0 ? invYPlan : []),
       ...slopeLimbs(lo, hi),
-      ...(withTail ? fp12limbsOf(W_PLAN) : []),
+      ...(withTail && !MILLER_TORUS ? fp12limbsOf(W_PLAN) : []),
     ];
     const src = genChunk(lo, hi, final, withTail);
     const m = measureCovenantFile(src, args, outL, PROBE, true, committedIn);
     return { fits: m.accepted && m.lockingBytes <= BYTE_BUDGET && m.operationCost <= OP_TARGET, operationCost: m.operationCost, hi, final, withTail, outgoing: withTail ? null : commit(outL), src, m };
   };
   // The generic covenant layout needs the greedy windows. Linked grouped/intratx packaging
-  // has a cheaper handoff prologue, so use the measured 20-window layout selected by sweeping
-  // every boundary against the assembled verifier and all official proof runs. Some generic
-  // covenant probes exceed OP_TARGET, so keep the complete measured layout opt-in.
+  // has a cheaper handoff prologue, so use the measured layout selected by sweeping every
+  // boundary against the assembled verifier and all official proof runs (10 quotient-torus
+  // windows, 20 legacy windows). Some generic covenant probes exceed OP_TARGET, so keep the
+  // complete measured layout opt-in.
   const linkedHi = LINKED_CUTS[chunks.length];
   const best = linkedHi === undefined
     ? planChunk(lo, ops.length, OP_TARGET, tryHi, planState)
@@ -447,9 +526,10 @@ console.error(`fused miller: ${chunks.length} chunks, total op=${chunks.reduce((
 // FUSE_TAIL=1: fold the residue final-exp verdict into the FINAL Miller chunk (making it TERMINAL),
 // so the separate ResidueTail input disappears (-1 input). Only the last chunk's SOURCE is
 // regenerated with the verdict inlined; its window/state are unchanged (the verdict replaces the
-// [fF,c,cInv] hand-off, and the final op is an f-only c-fold so no R accumulator dangles). The
-// consuming build must treat it as terminal and supply the w witness. Default (unset) keeps the
-// hand-off form so the flagship builds + the standalone ResidueTail are untouched.
+// legacy [fF,c,cInv] or quotient-torus [fF,u] hand-off, and the final op is an f-only c-fold so no
+// R accumulator dangles). The consuming build must treat it as terminal and, outside torus mode,
+// supply the w witness. Default (unset) keeps the hand-off form so the flagship builds + the
+// standalone ResidueTail are untouched.
 if (process.env.FUSE_TAIL === '1' && chunks[chunks.length - 1].tailFused !== true) {
   const last = chunks[chunks.length - 1];
   const src = genChunk(last.opLo, last.opHi, true, true);
@@ -464,6 +544,8 @@ writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
   covenantResidue: COVENANT_RESIDUE, endpointSubgroup: FUSE_G2_ENDPOINT,
   affineG2: MILLER_AFFINE_G2,
   unitLines: MILLER_UNIT_LINES,
+  quotientTorus: MILLER_TORUS,
+  genesisRootParams: rootNames,
   genesisUnitParams: unitPtParams,
   numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
   chunks: chunks.map((c) => ({ idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final, tailFused: c.tailFused === true, incoming: c.incoming, outgoing: c.outgoing })),
