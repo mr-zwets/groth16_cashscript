@@ -40,43 +40,58 @@ const sha256Hex = (value) => createHash('sha256').update(value).digest('hex');
 const bodyHash = (instructions) => sha256Hex(encodeAuthenticationInstructions(instructions));
 const { asmToBytecode } = utils;
 const P = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787n;
+const GLV_INPUT_COUNT = 1;
 
 const EXPECTED_BOUND_ANALYSIS_SHA256 = 'caa73accba876075490abe6e89d7a7c1575932d5331a0635a976dda0bdfd6bb4';
-const EXPECTED_MANIFEST_SHA256 = '79d7a7ca0b9795ac90e95cf1fb37782c0a2ac7a79d5d7b3779babf124623fcf7';
+const EXPECTED_MANIFEST_SHA256 = '23e5086a2cc2b319edd048855d24c75a63659defbdb9bfac050e1d60712be5f8';
 const EXPECTED_PROGRAM_FINGERPRINTS = [
-  '455bcdcddf884339ab5ce0ebf73ee4d8a7a6ec0ff248a87b9d2384ad8edaf04c',
-  '06adfe5f123a4e9556bbf2edff5c156ef64326fd4ea3265b9f6f9715b1510e6b',
-  '2cf59746b7019284ca2b43f060e136cabc189757b1968e7623d13680962c71bd',
-  'dc92fbffa06c723fdd7daec27c49667ce488a3cf8f0928ab2a178c946d866593',
-  '2aabc57a0f6a9f301edbf8d443ee2eee8b42104c791c0df28037dfd00fc6dd4f',
-  'cb4d8001c48d4e7be1b82d902ef9b3d9b28be872a3cbc05dd7357ef9fdbdd442',
-  '52a21ab04eb470d660dd44309aaf93068057a0386454f7e0b5ed2fe9e7f1cc66',
-  'fa2aacc3882935020e2ab59cd2601fb1c36e7f7e34ed2105c50ad7af4f5e4bdc',
-  '7e9df45e9ebbd3301fd1cc82025aed77ba8c6c3f660024d288fb2492960bfdea',
-  '2a684403ee1958d58fb053e73af29af53e49d069df731df0bbb3b3eca6fedea0',
-  'd7578681b38f2e8f91628c8002d62c41d647afa5481061464de745bb4419438e',
-  'fa2bda13bc007ae8d204ac0d7c54fb7dfd27ad37d126ea0dbbd6f76a59895305',
+  'f91cafec5b97c496ab2e86484cfe8cad4d9f4ac59d1b2c38717604f9b932b8a9',
+  'bee1048ec686d38dad7748f9d8d2c6ae76f0f5e2f2b526b6a8c3328869503267',
+  '970d9e75ce727706471e7cb5a4b604cf8de292192d10e391fdea197468ec2154',
+  'f708674121df6a2addea7bda5e10609e94ca2ad14f2d62022987a68c3350169c',
+  '1852470a39acd08df0634109f05414076e44fd748e317e49e88f404a99400b21',
+  'd746669f2702f62e9583d0ffc8039eaad6a4cfcbfff61e00e26f60d96ccc9b04',
+  '0d801737c6451a2ba07e41dfd44f509b60dcfa0647d60f7c9b647c0e9cdb3209',
+  'd4b6eb5cbc9dec6ccc2e21e9cd984682ac96db76ef39b37965d7f9af99abb082',
+  'ce324c04b4669a74dc8fde7431839a2fa42aa957c4bc5ebb51ec0afbb0129ac3',
+  '8b11437361cb72ec7ece5038b4ba5010c0cbdcd8f837cddf8e1c8187597cc583',
+  'e93ce50e0117485520c0284b5ec6a2714e0ca97eb63785dfbc5c2518d2e89240',
 ];
 const EXPECTED_NUMERIC_FINGERPRINTS = [
-  '3d58545e2ae72890664418b991367beaaa72a918e784775f2ce43fd59add23ba',
-  'bc2b87341610ce696fdd77d953c7bd1a7a234212794d9930f563ea9ed2407ea5',
-  'b15631bfaa4df147e7b517d63ff18a023138196179d2a5e8cd67d9ef1d0b8fca',
-  '7bc08f9555a395a5448ae4796c85daa088062ef2296fe566c12566bd9fb19ea0',
-  '28bb377c97f4a9a0ace0bd59f16244e04fcffba4ba4ef34c17e19f4b17a45ea6',
-  '21b160e0f699cdb6a649718063a5de6d1980f2cb3804ec974d101192be0032c6',
-  'c6b2c4a1b23c67229c3132a52f32b95590e7007dfce0eeecce6120e0fd51fb6d',
-  '194e89328337a3d4cc6778a131fc5b3ffb0d00fefb1142e57fe2ff39af21b1b2',
-  '877f368c995cd9105c5b921ef33829ee4ae447c4fe3f07e506c1dd7aa52a456c',
-  '055e328fd4b5900f5d3992ed669c0307e69ffa0bf3f93f789b3eda818d67f3b5',
-  '63affa5799165f1bad12d06a83799b7143b279047a63017e4d6cd814a09a6922',
-  '969438c764f12aa08e56fc9d8a161baf31e0f1b8aa422845eaf69de1cdf90623',
+  'b5b771cd50bf72dc818d443e317cff8f0d414e1d6aa7f08e9322eebe9e37a7d1',
+  '7a606c823af43a1ab3e3ab0c9cbf132382357045af70e44318a28bc7ee18360a',
+  '11521fca95fd2fd8e959bdf2fbe76485afc88e09e9f8a0ea3129c74885475c47',
+  'a04e222313c3a1d753931fb01f7c7f9a07ff5f18326e8dae2b3da93a6df52058',
+  '685a1c828c3f4d94de9c82231f8102386d2a64dc82d3d73512d0b63b49e80b35',
+  'c3597d5600daf85ff5d698b62288d86dad65a4b165894b58be0327ad010aee72',
+  '6290eb2e537733ab14f4cd32fdb89e73d55264c02666eedef6445645917cb190',
+  '91b879254ad5736b4daeee959a1431714098e0159ac0e32148ac4493df1e81d1',
+  'c7bbd14d6f2fbb013c0ac32b0e348a46a112212c4ee742a522e5415b463a423f',
+  '998a6e4d4c0194a0bf991a10082c90cad922265ac7071e29aa694445ad600b1d',
+  '7e85c1fbf3a464b33ed9dbd3b394601fdf481a2a93f0f791e3a1ad7ac6645eaa',
 ];
 
 assert.equal(manifest.version, 1);
 assert.equal(manifest.curve, 'BLS12-381');
 assert.equal(manifest.bchVm, 'BCH_2026');
 assert.equal(manifest.fixedCombWidth, 6);
-assert.equal(manifest.inputs.length, 12);
+assert.equal(manifest.inputs.length, 11);
+const expectedSlopeWitness = {
+  bytesPerSlope: 48,
+  totalSlopeCount: 85,
+  local: { windowStart: 1, windowEndExclusive: 15, slopeCount: 28, length: 1344 },
+  carriers: [
+    {
+      windowStart: 15, windowEndExclusive: 29, slopeCount: 28, millerOffset: 3,
+      includesFinalAddition: false, inputIndex: 4, unlockingBytecodeOffset: 774, length: 1344,
+    },
+    {
+      windowStart: 29, windowEndExclusive: 43, slopeCount: 29, millerOffset: 5,
+      includesFinalAddition: true, inputIndex: 6, unlockingBytecodeOffset: 774, length: 1392,
+    },
+  ],
+};
+assert.deepEqual(manifest.slopeWitness, expectedSlopeWitness, 'fixed-comb slope witness layout');
 assert.equal(
   sha256Hex(readFileSync(join(here, '..', '..', 'singleton', 'bls12-381', 'bound_analysis.mjs'))),
   EXPECTED_BOUND_ANALYSIS_SHA256,
@@ -189,10 +204,17 @@ assert.equal(computedManifestSha256, EXPECTED_MANIFEST_SHA256, 'resource manifes
 assert.deepEqual(artifacts.map(({ controlFingerprint }) => controlFingerprint), EXPECTED_PROGRAM_FINGERPRINTS, 'control PC drift');
 assert.deepEqual(artifacts.map(({ numericFingerprint }) => numericFingerprint), EXPECTED_NUMERIC_FINGERPRINTS, 'numeric PC drift');
 
+const variableLinkedParts = manifest.inputs.flatMap((input) => input.argumentPushes
+  .filter(({ name, fixedValueHex }) => name === 'linkedData' && fixedValueHex === undefined)
+  .map((argument) => ({ inputIndex: input.index, bytes: argument.bytes })));
+assert.deepEqual(variableLinkedParts, expectedSlopeWitness.carriers.map(({ inputIndex, length }) => ({
+  inputIndex,
+  bytes: length,
+})), 'fixed-comb slope carrier arguments');
 const fixedTableParts = manifest.inputs.flatMap((input) => input.argumentPushes
-  .filter(({ name }) => name === 'linkedData')
+  .filter(({ name, fixedValueHex }) => name === 'linkedData' && fixedValueHex !== undefined)
   .map((argument) => ({ inputIndex: input.index, ...argument })));
-assert.deepEqual(fixedTableParts.map(({ inputIndex }) => inputIndex), [6, 8, 10], 'fixed-table carrier layout');
+assert.deepEqual(fixedTableParts.map(({ inputIndex }) => inputIndex), [5, 7, 9], 'fixed-table carrier layout');
 const fixedTable = Uint8Array.from(fixedTableParts.flatMap((argument) => {
   assert.equal(typeof argument.fixedValueHex, 'string', `input ${argument.inputIndex} fixed table bytes`);
   const value = hexToBin(argument.fixedValueHex);
@@ -400,12 +422,12 @@ const intervalResult = (opcode, operands) => {
 };
 
 const modesFor = (inputIndex) => {
-  if (inputIndex < 2) {
+  if (inputIndex < GLV_INPUT_COUNT) {
     const modes = [];
     for (const selectNonzero of [false, true]) {
       for (const doubleIdentity of [false, true]) {
         for (const add of ['qIdentity', 'pIdentity', 'double', 'inverse', 'general']) {
-          for (const dIdentity of inputIndex === 1 ? [false, true] : [false]) {
+          for (const dIdentity of inputIndex === GLV_INPUT_COUNT - 1 ? [false, true] : [false]) {
             modes.push({ selectNonzero, doubleIdentity, add, dIdentity });
           }
         }
@@ -495,7 +517,7 @@ const runAbstract = (inputIndex, unlockBytes, mode) => {
       const arity = [OpcodesBchSpec.OP_NEGATE, OpcodesBchSpec.OP_ABS, OpcodesBchSpec.OP_1ADD, OpcodesBchSpec.OP_1SUB].includes(opcode) ? 1 : 2;
       const items = state.stack.slice(-arity);
       const tagged = items.some((item) => intervalByEncoding.has(binToHex(item)));
-      const mathFunction = inputIndex < 2
+      const mathFunction = inputIndex < GLV_INPUT_COUNT
         ? ['addFp', 'subFp', 'mulFp', 'sqrFp'].includes(context?.body)
         : context !== undefined && context.body !== 'main';
       if (!tagged && !mathFunction) return operation(state);

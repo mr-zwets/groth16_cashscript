@@ -70,7 +70,7 @@ export const GLV_SHARED_AUDITED_BOUNDS = FIXED_VK_COLLAPSE
     : FIXED_COMB_WIDTH === 7
       ? [0, 19, 37]
       : FIXED_COMB_WIDTH === 6
-        ? [0, 22, 43]
+        ? [0, 43]
         : FIXED_COMB_WIDTH === 5
           ? [0, 26, 51]
           : [0, 16, 32, 48, 64]
@@ -344,6 +344,9 @@ const tableEntrySelection = !FIXED_VK_COLLAPSE
       return `bytes ent = table0.split(0)[0];
         ${branches.join(' ')}`;
     })();
+// Every coordinate entering the emitted affine formulas is canonical. Positive p/2p biases keep
+// unreduced differences nonnegative; field multiplication and final remainders preserve the same
+// equations while canonicalizing each output once.
 const prologue = (sharedTable) => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
 function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
@@ -389,9 +392,9 @@ function affineDouble(int x, int y, int slope) returns (int, int) {
         require(slope == 0);
     } else {
         require(within(slope, 0, ${Pstr}));
-        require(mulFp(addFp(y, y), slope) == mulFp(3, sqrFp(x)));
-        rx = subFp(sqrFp(slope), addFp(x, x));
-        ry = subFp(mulFp(slope, subFp(x, rx)), y);
+        require(mulFp(y + y, slope) == mulFp(3, sqrFp(x)));
+        rx = (sqrFp(slope) + ${2n * P} - x - x) % ${Pstr};
+        ry = (mulFp(slope, x + ${Pstr} - rx) + ${Pstr} - y) % ${Pstr};
     }
     return rx, ry;
 }
@@ -407,13 +410,13 @@ function affineAdd(int x, int y, int qx, int qy, int slope) returns (int, int) {
         if (y == qy) {
             (int dx, int dy) = affineDouble(x, y, slope); rx = dx; ry = dy;
         } else {
-            require(addFp(y, qy) == 0); require(slope == 0); rx = 0; ry = 0;
+            require(y + qy == ${Pstr}); require(slope == 0); rx = 0; ry = 0;
         }
     } else {
         require(within(slope, 0, ${Pstr}));
-        require(mulFp(slope, subFp(x, qx)) == subFp(y, qy));
-        rx = subFp(subFp(sqrFp(slope), x), qx);
-        ry = subFp(mulFp(slope, subFp(x, rx)), y);
+        require(mulFp(slope, x + ${Pstr} - qx) == (y + ${Pstr} - qy) % ${Pstr});
+        rx = (sqrFp(slope) + ${2n * P} - x - qx) % ${Pstr};
+        ry = (mulFp(slope, x + ${Pstr} - rx) + ${Pstr} - y) % ${Pstr};
     }
     return rx, ry;
 }
@@ -437,6 +440,7 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
         dataOffset: sharedTable.dataOffset,
         length: tableBytes.length,
       }];
+  const sharedSlopeParts = sharedTable?.slopeParts ?? [];
   if (sharedTable !== null && (sharedParts.length === 0 ||
     sharedParts.some(({ inputIndex, dataOffset, length }) =>
       !Number.isSafeInteger(inputIndex) || inputIndex < 0 ||
@@ -444,6 +448,18 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
       !Number.isSafeInteger(length) || length <= 0) ||
     sharedParts.reduce((sum, part) => sum + part.length, 0) !== tableBytes.length)) {
     throw new Error(`invalid shared GLV table source: ${JSON.stringify(sharedTable)}`);
+  }
+  if (sharedSlopeParts.some(({ windowStart, inputIndex, unlockingBytecodeOffset, length }) =>
+    !Number.isSafeInteger(windowStart) || windowStart <= 0 || windowStart >= ITERS ||
+    !Number.isSafeInteger(inputIndex) || inputIndex < 0 ||
+    !Number.isSafeInteger(unlockingBytecodeOffset) || unlockingBytecodeOffset < 0 ||
+    !Number.isSafeInteger(length) || length <= 0) ||
+    sharedSlopeParts.some((part, index) => index > 0 && part.windowStart <= sharedSlopeParts[index - 1].windowStart)) {
+    throw new Error(`invalid shared GLV slope source: ${JSON.stringify(sharedSlopeParts)}`);
+  }
+  if (sharedSlopeParts.length !== 0 &&
+    (!FIXED_VK_COLLAPSE || !FIXED_COMB || !first || !final || lo !== 0 || hi !== ITERS)) {
+    throw new Error('shared GLV slopes require one complete fixed-comb chunk');
   }
   const sharedSegmentParts = [];
   if (sharedTable !== null) {
@@ -538,7 +554,18 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
   if (FIXED_VK_COLLAPSE) {
     const slopesPerWindow = FIXED_COMB ? 2 : 3;
     const slopeCount = slopesPerWindow * (count - (directFirstWindow ? 1 : 0)) + (final ? 1 : 0);
-    L.push(`        require(glvSlopes.length == ${slopeCount * 48});`);
+    sharedSlopeParts.forEach((part, index) => {
+      const end = sharedSlopeParts[index + 1]?.windowStart ?? count;
+      const expectedLength = (slopesPerWindow * (end - part.windowStart) +
+        (final && index === sharedSlopeParts.length - 1 ? 1 : 0)) * 48;
+      if (part.length !== expectedLength) {
+        throw new Error(`shared GLV slope part ${index} has length ${part.length}, expected ${expectedLength}`);
+      }
+    });
+    const localSlopeCount = sharedSlopeParts.length === 0
+      ? slopeCount
+      : slopesPerWindow * (sharedSlopeParts[0].windowStart - (directFirstWindow ? 1 : 0));
+    L.push(`        require(glvSlopes.length == ${localSlopeCount * 48});`);
     L.push('        bytes slopeTail = glvSlopes;');
   }
   if (directFirstWindow) {
@@ -555,32 +582,40 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
     L.push(`        (int firstX, int firstY) = select16(firstIdx${sharedTableArguments});`);
     L.push('        rX = firstX; rY = firstY;');
   }
-  L.push(`        for (int k = ${directFirstWindow ? 1 : 0}; k < ${count}; k = k + 1) {`);
-  if (FIXED_VK_COLLAPSE) {
-    L.push('            int d0m = int(slopeTail.split(48)[0]); slopeTail = slopeTail.split(48)[1];');
-    if (!FIXED_COMB) L.push('            int d1m = int(slopeTail.split(48)[0]); slopeTail = slopeTail.split(48)[1];');
-    L.push('            int am = int(slopeTail.split(48)[0]); slopeTail = slopeTail.split(48)[1];');
-    L.push('            (int d0x, int d0y) = affineDouble(rX, rY, d0m); rX = d0x; rY = d0y;');
-    if (FIXED_COMB) {
-      const terms = Array.from({ length: FIXED_COMB_WIDTH }, (_, j) => j === 0
-        ? `(combScalar >> (${ITERS - 1 - lo} - k)) % 2`
-        : `${1 << j} * ((combScalar >> (${ITERS - 1 - lo} - k + ${j * ITERS})) % 2)`);
-      L.push(`            int idx = ${terms.join(' + ')};`);
-    } else {
-      L.push('            (int d1x, int d1y) = affineDouble(rX, rY, d1m); rX = d1x; rY = d1y;');
-      L.push(`            int i = 2 * (${ITERS - 1 - lo} - k);`);
-      L.push('            int idx = (k10 >> i) % 4 + 4 * ((k20 >> i) % 4);');
+  const loopStarts = [directFirstWindow ? 1 : 0, ...sharedSlopeParts.map(({ windowStart }) => windowStart)];
+  const loopEnds = [...sharedSlopeParts.map(({ windowStart }) => windowStart), count];
+  loopStarts.forEach((loopStart, loopIndex) => {
+    if (loopIndex > 0) {
+      const { inputIndex, unlockingBytecodeOffset, length } = sharedSlopeParts[loopIndex - 1];
+      L.push(`        slopeTail = tx.inputs[${inputIndex}].unlockingBytecode.split(${unlockingBytecodeOffset})[1].split(${length})[0];`);
     }
-  } else {
-    L.push(`            int i = ${hiBit} - k;`);
-    L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
-    L.push('            int idx = (k10 >> i) % 2 + 2 * ((k20 >> i) % 2) + 4 * ((k11 >> i) % 2) + 8 * ((k21 >> i) % 2);');
-  }
-  L.push(`            (int aX, int aY) = select16(idx${sharedTableArguments});`);
-  L.push(FIXED_VK_COLLAPSE
-    ? '            (int ax, int ay) = affineAdd(rX, rY, aX, aY, am); rX = ax; rY = ay;'
-    : '            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
-  L.push('        }');
+    L.push(`        for (int k = ${loopStart}; k < ${loopEnds[loopIndex]}; k = k + 1) {`);
+    if (FIXED_VK_COLLAPSE) {
+      L.push('            int d0m = int(slopeTail.split(48)[0]); slopeTail = slopeTail.split(48)[1];');
+      if (!FIXED_COMB) L.push('            int d1m = int(slopeTail.split(48)[0]); slopeTail = slopeTail.split(48)[1];');
+      L.push('            int am = int(slopeTail.split(48)[0]); slopeTail = slopeTail.split(48)[1];');
+      L.push('            (int d0x, int d0y) = affineDouble(rX, rY, d0m); rX = d0x; rY = d0y;');
+      if (FIXED_COMB) {
+        const terms = Array.from({ length: FIXED_COMB_WIDTH }, (_, j) => j === 0
+          ? `(combScalar >> (${ITERS - 1 - lo} - k)) % 2`
+          : `${1 << j} * ((combScalar >> (${ITERS - 1 - lo} - k + ${j * ITERS})) % 2)`);
+        L.push(`            int idx = ${terms.join(' + ')};`);
+      } else {
+        L.push('            (int d1x, int d1y) = affineDouble(rX, rY, d1m); rX = d1x; rY = d1y;');
+        L.push(`            int i = 2 * (${ITERS - 1 - lo} - k);`);
+        L.push('            int idx = (k10 >> i) % 4 + 4 * ((k20 >> i) % 4);');
+      }
+    } else {
+      L.push(`            int i = ${hiBit} - k;`);
+      L.push('            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }');
+      L.push('            int idx = (k10 >> i) % 2 + 2 * ((k20 >> i) % 2) + 4 * ((k11 >> i) % 2) + 8 * ((k21 >> i) % 2);');
+    }
+    L.push(`            (int aX, int aY) = select16(idx${sharedTableArguments});`);
+    L.push(FIXED_VK_COLLAPSE
+      ? '            (int ax, int ay) = affineAdd(rX, rY, aX, aY, am); rX = ax; rY = ay;'
+      : '            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
+    L.push('        }');
+  });
   if (final) {
     if (FIXED_VK_COLLAPSE) {
       L.push('        int cm = int(slopeTail.split(48)[0]);');
@@ -656,6 +691,7 @@ export function regenGlvSharedAudited(GEN_DIR, sharedTable, stageBound = false, 
   writeFileSync(join(GEN_DIR, `manifest_${prefix}.json`), JSON.stringify({
     curve: 'BLS12-381', numChunks: chunks.length, iters: ITERS, glv: true, chunks,
     sharedTable: sharedTable !== null, stageBound, fullStageBound,
+    slopeCarriers: sharedTable?.slopeParts ?? [],
   }, null, 2));
   return chunks.length;
 }

@@ -1,5 +1,5 @@
 // One-transaction quotient-torus verifier vectors for the fixed BLS12-381 Groth16 verification
-// key. Two fixed-comb public-input inputs feed ten fused Miller inputs, all linked inside one
+// key. One fixed-comb public-input input feeds ten fused Miller inputs, all linked inside one
 // current-BCH transaction with OP_INPUTBYTECODE.
 //
 // For this verification key, beta=5*G2.BASE, gamma=7*G2.BASE, and delta=11*G2.BASE, so bilinearity
@@ -7,13 +7,13 @@
 //
 //   e(-A, B) * e(D, G2.BASE) = 1,  D = 5*alpha + 7*vk_x + 11*C.
 //
-// Two width-six fixed-comb inputs assemble D. Ten Miller inputs then evaluate the two pairs with
+// One width-six fixed-comb input assembles D. Ten Miller inputs then evaluate the two pairs with
 // runtime B in affine coordinates; the first and last inputs include point and subgroup gates. The
 // final Miller input performs the quotient-torus residue verdict, so the complete verifier uses
-// twelve P2SH32 inputs and no state token. The 6,048-byte fixed-comb table is split across three
+// eleven P2SH32 inputs and no state token. The 6,048-byte fixed-comb table is split across three
 // Miller witnesses and hash-pinned by the final comb input. Input zero is the graph entry: every
 // nonterminal program pins its immediate successor's P2SH32 locking bytecode, and every program
-// requires its exact index in the twelve-input transaction. The valid portfolio includes every
+// requires its exact index in the eleven-input transaction. The valid portfolio includes every
 // A/B/C identity combination and the vk_x identity.
 //
 //   node build_vectors_residue_bls.mjs -> verifier/src/bch/groth16-bls12381-intratx-residue-vectors.json
@@ -35,7 +35,7 @@ import {
   glvDecompose, vkxGlvStateAt, vkxGlvZinv, vkxGlvYinv, vkxGlvUnit, GLV_TABLE_HEX,
   glvUnitCoordinates, glvCollapsedScalar, glvCollapsedProofPoint, vkxGlvSlopeLimbs,
   GLV_COLLAPSED_HIGH_COST_INPUTS, GLV_FIXED_COMB_WIDTH, GLV_FIXED_VK_COLLAPSE, GLV_SHARED_AUDITED_BOUNDS,
-  regenGlvSharedAudited,
+  VKXGLV_ITERS, regenGlvSharedAudited,
 } from '../bls12-381/gen_vkx_glv.mjs';
 import { LINKED_HIGH_COST_INPUTS, LINKED_RESIDUE_NAMESPACE } from '../bls12-381/_residue_linked_plan.mjs';
 import { transformChunk, headerSize } from './transform.mjs';
@@ -67,8 +67,10 @@ const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
 
 // The fixed-comb table is reconstructed from fixed-offset Miller witness parts. The final GLV
 // chunk pins the complete table with hash256, and every GLV chunk reads those same transaction-local
-// inputs. On high-cost proofs, the parts replace bytes already required by operation-cost density.
+// inputs. Two additional Miller inputs carry proof-dependent slope slices bound by the GLV
+// equations. On high-cost proofs, the parts replace bytes already required by operation-cost density.
 const GLV_COUNT = GLV_SHARED_AUDITED_BOUNDS.length - 1;
+if (GLV_COUNT !== 1) throw new Error(`fixed-key verifier requires one GLV input, received ${GLV_COUNT}`);
 const GLV_TABLE_PART_LENGTHS = [1897, 1898, 2253];
 const GLV_TABLE_PARTS = (() => {
   let offset = 0;
@@ -129,9 +131,32 @@ const mkInstance = (inputs, bScalar = 1n, cScalar = 13n) => {
   const A = mod(fixedVkDScalar(inputs, cScalar) * invR(bScalar));
   return { inputs, proof: { a: G1.BASE.multiply(A), b: g2(bScalar), c: g1(cScalar) } };
 };
+const fixedVk = FIXED_VK_SPECIALIZATION;
 const STRESS_INPUTS = FIXED_COMB
   ? [GLV_FIXED_COMB_WIDTH === 6 ? Rord - 1n : (Rord - 1n) / 2n, 0n]
   : FIXED_VK_COLLAPSE ? GLV_COLLAPSED_HIGH_COST_INPUTS : LINKED_HIGH_COST_INPUTS;
+const FINAL_EQUAL_INPUTS = [1n, 0n];
+const finalEqualCombScalar = glvCollapsedScalar(...FINAL_EQUAL_INPUTS);
+const finalEqualAccumulatorScalar = mod(fixedVk.collapsedPublicBaseG1Scalar * finalEqualCombScalar);
+const finalEqualOffsetScalar = mod(
+  fixedVk.alphaG1Scalar * fixedVk.betaG2Scalar +
+  fixedVk.icG1Scalars[0] * fixedVk.gammaG2Scalar,
+);
+const finalEqualCScalar = mod(
+  (finalEqualAccumulatorScalar - finalEqualOffsetScalar) * invR(fixedVk.deltaG2Scalar),
+);
+const FINAL_EQUAL_INSTANCE = mkInstance(FINAL_EQUAL_INPUTS, 1n, finalEqualCScalar);
+const finalEqualAccumulator = vkxGlvStateAt(
+  finalEqualCombScalar, 0n, 0n, 0n, VKXGLV_ITERS, FINAL_EQUAL_INSTANCE.proof.c,
+);
+const finalEqualAddend = glvCollapsedProofPoint(FINAL_EQUAL_INSTANCE.proof.c);
+if (finalEqualAddend.is0()) throw new Error('fixed-comb final-equal fixture produced the identity');
+const finalEqualAddendAffine = finalEqualAddend.toAffine();
+if (finalEqualAccumulator.length !== 2 ||
+  finalEqualAccumulator[0] !== finalEqualAddendAffine.x ||
+  finalEqualAccumulator[1] !== finalEqualAddendAffine.y) {
+  throw new Error('fixed-comb final-equal fixture does not reach the affine doubling branch');
+}
 const INSTANCES = {
   committed: { inputs: PUBLIC_INPUTS, proof },
   proof1: mkInstance([135208n, 67633n]),
@@ -140,6 +165,7 @@ const INSTANCES = {
   combinedStress: mkInstance(STRESS_INPUTS, 19n),
   variedBC: mkInstance([9137n, 2903n], 37n, 29n),
   combinedVariedC: mkInstance(STRESS_INPUTS, 19n, 29n),
+  finalEqual: FINAL_EQUAL_INSTANCE,
 };
 if (FIXED_VK_COLLAPSE) {
   const stressScalar = glvCollapsedScalar(...STRESS_INPUTS);
@@ -158,7 +184,6 @@ if (FIXED_VK_COLLAPSE) {
   }).filter(Boolean).length;
   if (nonzeroWindows !== windowCount) throw new Error(`fixed-base stress activates ${nonzeroWindows}/${windowCount} windows`);
 }
-const fixedVk = FIXED_VK_SPECIALIZATION;
 const fixedVkConstant = fixedVk.alphaG1Scalar * fixedVk.betaG2Scalar +
   fixedVk.icG1Scalars[0] * fixedVk.gammaG2Scalar;
 const fixedVkInputCoefficients = fixedVk.icG1Scalars.slice(1)
@@ -229,6 +254,25 @@ const MILLER_GENESIS_INPUT = GLV_COUNT;
 const GLV_TABLE_CARRIER_OFFSETS = [4, 6, 8];
 const GLV_TABLE_CARRIER_INPUTS = GLV_TABLE_CARRIER_OFFSETS.map((offset) => GLV_COUNT + offset);
 const MILLER_CARRIER_IN_BYTES = MILLER_DYNAMIC_LIMBS * W;
+const GLV_SLOPE_LOCAL = {
+  windowStart: 1,
+  windowEndExclusive: 15,
+  slopeCount: 28,
+  length: 28 * W,
+};
+const GLV_SLOPE_CARRIERS = [
+  { windowStart: 15, windowEndExclusive: 29, slopeCount: 28, millerOffset: 3, includesFinalAddition: false },
+  { windowStart: 29, windowEndExclusive: 43, slopeCount: 29, millerOffset: 5, includesFinalAddition: true },
+].map((carrier) => {
+  const length = carrier.slopeCount * W;
+  return {
+    ...carrier,
+    inputIndex: GLV_COUNT + carrier.millerOffset,
+    unlockingBytecodeOffset: headerSize(MILLER_CARRIER_IN_BYTES) +
+      MILLER_CARRIER_IN_BYTES + headerSize(length),
+    length,
+  };
+});
 regenGlvSharedAudited(GEN, {
   parts: GLV_TABLE_PARTS.map((part, index) => {
     const inputBytes = GLV_TABLE_CARRIER_OFFSETS[index] === 0
@@ -240,6 +284,7 @@ regenGlvSharedAudited(GEN, {
       length: part.length,
     };
   }),
+  slopeParts: GLV_SLOPE_CARRIERS,
 }, true);
 const MILLER_GENESIS_NAMES = QUOTIENT_TORUS
   ? [
@@ -295,10 +340,25 @@ function specsVkxGlv(inst) {
   const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkxglv.json'), 'utf8'));
   if (man.stageBound !== true) throw new Error('one-transaction BLS residue requires stage-bound GLV generation');
   if (man.sharedTable !== true) throw new Error('one-transaction BLS residue requires shared-table GLV generation');
-  return man.chunks.map((ch) => {
+  if (JSON.stringify(man.slopeCarriers) !== JSON.stringify(GLV_SLOPE_CARRIERS)) {
+    throw new Error('one-transaction BLS residue slope-carrier manifest mismatch');
+  }
+  let slopeCarrierParts = [];
+  const specs = man.chunks.map((ch) => {
     const fullIn = [...vkxGlvStateAt(k10, k20, k11, k21, ch.lo, inst.proof.c), ...scal];
     const inLimbs = ch.first ? fullIn.slice(FIXED_VK_COLLAPSE ? 2 : 3) : fullIn;
-    const slopeBytes = blob(vkxGlvSlopeLimbs(k10, k20, k11, k21, ch.lo, ch.hi, inst.proof.c));
+    const allSlopeBytes = blob(vkxGlvSlopeLimbs(k10, k20, k11, k21, ch.lo, ch.hi, inst.proof.c));
+    const slopeBytes = allSlopeBytes.slice(0, GLV_SLOPE_LOCAL.length);
+    let offset = GLV_SLOPE_LOCAL.length;
+    slopeCarrierParts = GLV_SLOPE_CARRIERS.map(({ length }) => {
+      const part = allSlopeBytes.slice(offset, offset + length);
+      offset += length;
+      return part;
+    });
+    if (offset !== allSlopeBytes.length || slopeCarrierParts.some((part, index) =>
+      part.length !== GLV_SLOPE_CARRIERS[index].length)) {
+      throw new Error('fixed-comb slope carrier parts do not cover the complete witness');
+    }
     if (ch.final) return {
       file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs,
       outLimbs: UNIT_G1 ? vkxGlvUnit(k10, k20, k11, k21, inst.proof.c) : [vkxAff.x, vkxAff.y],
@@ -318,6 +378,7 @@ function specsVkxGlv(inst) {
       enforceExactInputLength: true,
     };
   });
+  return { specs, slopeCarrierParts };
 }
 function specsMillerResidue(inst, c, cInv, u = null, bad = {}) {
   const originalPairs = verifierPairsFor(inst.inputs, inst.proof);
@@ -395,7 +456,7 @@ function buildSpecs(inst) {
   // g2check is no longer a standalone stage: its on-curve checks + G2 subgroup test are fused into
   // the first/last fused-Miller chunks (the Miller loop already walks R_B = [|x|]B). See
   // gen_miller_residue.mjs. This drops ~3 chunks / ~28 KB of op-cost-bought padding.
-  const vkx = specsVkxGlv(inst);
+  const { specs: vkx, slopeCarrierParts } = specsVkxGlv(inst);
   const pairs = effectivePairsFor(inst);
   const { boundary: fRaw } = AFFINE_G2
     ? millerCollapsedAffineOps(pairs)
@@ -415,14 +476,20 @@ function buildSpecs(inst) {
           width: W,
         }));
       }
-      if (!spec.file.includes('millerres_') || spec.role !== 'within') return;
-      spec.outLimbs = spec.outLimbs.slice(0, MILLER_DYNAMIC_LIMBS);
-      spec.outputCount = MILLER_DYNAMIC_LIMBS;
+      const slopePartIndex = GLV_SLOPE_CARRIERS.findIndex(({ inputIndex }) => inputIndex === GLV_COUNT + index);
+      if (slopePartIndex !== -1) {
+        spec.extras = [...spec.extras, slopeCarrierParts[slopePartIndex]];
+        spec.linkedDataLength = GLV_SLOPE_CARRIERS[slopePartIndex].length;
+      }
       const tablePartIndex = GLV_TABLE_CARRIER_INPUTS.indexOf(GLV_COUNT + index);
       if (tablePartIndex !== -1) {
         spec.extras = [...spec.extras, GLV_TABLE_PARTS[tablePartIndex]];
         spec.linkedDataLength = GLV_TABLE_PARTS[tablePartIndex].length;
+        spec.linkedDataFixedValue = true;
       }
+      if (!spec.file.includes('millerres_') || spec.role !== 'within') return;
+      spec.outLimbs = spec.outLimbs.slice(0, MILLER_DYNAMIC_LIMBS);
+      spec.outputCount = MILLER_DYNAMIC_LIMBS;
     });
   }
   if (QUOTIENT_TORUS) return [...vkx, ...miller];
@@ -671,7 +738,9 @@ function assembleRun(specs, expectRejected = false) {
           type: value instanceof Uint8Array ? 'bytes' : 'int',
           name,
           bytes: value instanceof Uint8Array ? value.length : W,
-          ...(name === 'linkedData' ? { fixedValueHex: binToHex(value) } : {}),
+          ...(name === 'linkedData' && spec.linkedDataFixedValue === true
+            ? { fixedValueHex: binToHex(value) }
+            : {}),
         })),
       ],
       redeem,
@@ -724,6 +793,7 @@ const nonBaseBSpecs = buildSpecs(INSTANCES.nonBaseB);
 const combinedStressSpecs = buildSpecs(INSTANCES.combinedStress);
 const variedBCSpecs = buildSpecs(INSTANCES.variedBC);
 const combinedVariedCSpecs = buildSpecs(INSTANCES.combinedVariedC);
+const finalEqualSpecs = buildSpecs(INSTANCES.finalEqual);
 function requireStageGenesis(specs, inst, label) {
   const [in0, in1] = inst.inputs.map(BigInt);
   const [k10, k20] = FIXED_COMB
@@ -754,8 +824,9 @@ function requireStageGenesis(specs, inst, label) {
   ['combined stress', combinedStressSpecs, INSTANCES.combinedStress],
   ['varied B/C', variedBCSpecs, INSTANCES.variedBC],
   ['combined varied C', combinedVariedCSpecs, INSTANCES.combinedVariedC],
+  ['fixed-comb final-equal', finalEqualSpecs, INSTANCES.finalEqual],
 ].forEach(([label, specs, inst]) => requireStageGenesis(specs, inst, label));
-if (cSpecs.length !== 12) throw new Error(`fixed-key verifier requires 12 inputs, received ${cSpecs.length}`);
+if (cSpecs.length !== 11) throw new Error(`fixed-key verifier requires 11 inputs, received ${cSpecs.length}`);
 
 const asmCommitted = assembleRun(cSpecs);
 report('groth16-bls-intratx-residue committed', asmCommitted);
@@ -787,6 +858,13 @@ report('groth16-bls-intratx-residue varied B=37G2/C=29G1', asmVariedBC);
 if (!pairingEquationAccepts(INSTANCES.combinedVariedC)) throw new Error('combined varied-C fixture does not satisfy the pairing equation');
 const asmCombinedVariedC = assembleRun(combinedVariedCSpecs);
 report('groth16-bls-intratx-residue 64/64 + B=19G2/C=29G1', asmCombinedVariedC);
+if (!pairingEquationAccepts(INSTANCES.finalEqual)) throw new Error('fixed-comb final-equal fixture does not satisfy the pairing equation');
+const asmFinalEqual = assembleRun(finalEqualSpecs);
+report('groth16-bls-intratx-residue fixed-comb final-equal', asmFinalEqual);
+if (!asmFinalEqual.transactions.every(({ consensusVerified, standardVerified }) =>
+  consensusVerified && standardVerified)) {
+  throw new Error('fixed-comb final-equal fixture did not pass both BCH 2026 VMs');
+}
 if (process.env.PROFILE === '1') {
   console.error('  combined-index\ttarget\targs\tredeem\tfixed\tdensity\tunlock\tabove-density\topcost\tstandard-opcost\tlabel');
   asmCombinedStress.meta.forEach((meta, index) => {
@@ -801,6 +879,7 @@ if (process.env.PROFILE === '1') {
     ['64/64+B=19G2', asmCombinedStress],
     ['B=37G2/C=29G1', asmVariedBC],
     ['64/64+B=19G2/C=29G1', asmCombinedVariedC],
+    ['fixed-comb final-equal', asmFinalEqual],
   ].forEach(([label, asm]) => {
     const glvMeta = asm.meta.slice(0, GLV_COUNT);
     const millerMeta = asm.meta.slice(GLV_COUNT);
@@ -824,6 +903,11 @@ const completenessRuns = completenessInstances.map((inst) => {
 for (const [label, otherSpecs] of [['proof#1', p1Specs], ['stress', stressSpecs]]) {
   const hybridSpecs = [...cSpecs.slice(0, GLV_COUNT), ...otherSpecs.slice(GLV_COUNT)];
   const unboundSpecs = hybridSpecs.map((spec, i) => i === GLV_COUNT - 1 ? { ...spec, role: 'stage-final', cmp: null } : spec);
+  GLV_SLOPE_CARRIERS.forEach(({ inputIndex }) => {
+    const extras = [...unboundSpecs[inputIndex].extras];
+    extras[extras.length - 1] = cSpecs[inputIndex].extras.at(-1);
+    unboundSpecs[inputIndex] = { ...unboundSpecs[inputIndex], extras };
+  });
   const unbound = assembleRun(unboundSpecs);
   if (!unbound.accepted) throw new Error(`${label} unbound valid-fixture hybrid was not accepted`);
   const boundInputs = [...asmCommitted.inputs.slice(0, GLV_COUNT), ...unbound.inputs.slice(GLV_COUNT)];
@@ -833,6 +917,14 @@ for (const [label, otherSpecs] of [['proof#1', p1Specs], ['stress', stressSpecs]
   if (unrelated) throw new Error(`${label} hybrid also rejected outside the vk_x boundary`);
 }
 console.error('  stage genesis layouts and proof#1/stress vk_x boundaries verified');
+
+function requireRejectedByBoth(inputs, inputIndex, label) {
+  const consensusOutcome = evaluateInput(inputs, inputIndex);
+  const standardOutcome = evaluateInput(inputs, inputIndex, standardVm);
+  if (consensusOutcome.accepted || standardOutcome.accepted) {
+    throw new Error(`${label} was accepted`);
+  }
+}
 
 // shared-table fixture: flip a middle byte of the carried GLV table -> the carrier's hash256
 // pin must reject (the four sibling readers consume that exact slice).
@@ -854,24 +946,28 @@ GLV_TABLE_CARRIER_INPUTS.forEach((tableCarrierIndex, partIndex) => {
   }
   tableUnlocking[tablePush.dataStart + Math.floor(tablePush.dataLen / 2)] ^= 0x01;
   mutatedInputs[tableCarrierIndex] = { ...mutatedInputs[tableCarrierIndex], unlocking: tableUnlocking };
-  if (evaluateInput(mutatedInputs, GLV_COUNT - 1).accepted) {
-    throw new Error("final GLV table hash accepted a mutated carrier " + tableCarrierIndex);
-  }
+  requireRejectedByBoth(mutatedInputs, GLV_COUNT - 1, `final GLV table mutation at carrier ${tableCarrierIndex}`);
   if (partIndex === 0) tableInputs = mutatedInputs;
 });
 if (tableInputs === null) throw new Error("missing shared GLV table mutation fixture");
 const tableMutation = { run: toRun({ ...asmCommitted, inputs: tableInputs }), rejected: true };
 console.error('  shared GLV table mutation rejected at each carrier');
 
-function requireRejectedByBoth(inputs, inputIndex, label) {
-  const consensusOutcome = evaluateInput(inputs, inputIndex);
-  const standardOutcome = evaluateInput(inputs, inputIndex, standardVm);
-  if (consensusOutcome.accepted || standardOutcome.accepted) {
-    throw new Error(`${label} passed an exact graph gate`);
+const slopeMutationRuns = GLV_SLOPE_CARRIERS.map(({ inputIndex: slopeCarrierIndex, length }) => {
+  const mutatedInputs = asmCommitted.inputs.slice();
+  const slopeUnlocking = Uint8Array.from(mutatedInputs[slopeCarrierIndex].unlocking);
+  const carrierBlob = pushBounds(slopeUnlocking);
+  const slopePush = pushBounds(slopeUnlocking, carrierBlob.dataStart + carrierBlob.dataLen);
+  if (slopePush.dataLen !== length) {
+    throw new Error(`shared GLV slope part has unexpected length at carrier ${slopeCarrierIndex}`);
   }
-}
+  slopeUnlocking[slopePush.dataStart + Math.floor(slopePush.dataLen / 2)] ^= 0x01;
+  mutatedInputs[slopeCarrierIndex] = { ...mutatedInputs[slopeCarrierIndex], unlocking: slopeUnlocking };
+  requireRejectedByBoth(mutatedInputs, GLV_COUNT - 1, `final GLV slope mutation at carrier ${slopeCarrierIndex}`);
+  return { run: toRun({ ...asmCommitted, inputs: mutatedInputs }), rejected: true };
+});
+console.error('  shared GLV slope mutation rejected at each carrier');
 
-if (GLV_COUNT !== 2) throw new Error(`expected two fixed-comb inputs, received ${GLV_COUNT}`);
 const exactGlvStateRuns = Array.from({ length: GLV_COUNT }, (_, inputIndex) => {
   const inputs = asmCommitted.inputs.slice();
   const unlocking = inputs[inputIndex].unlocking;
@@ -921,6 +1017,7 @@ const invalids = [
   invalidRun(cSpecs, Math.floor(cSpecs.length / 2)),
   invalidRun(cSpecs, 1),
   tableMutation,
+  ...slopeMutationRuns,
   ...exactGlvStateRuns,
   ...successorProgramRuns,
   inputOrderRun,
@@ -1059,7 +1156,7 @@ const allInvalids = [
 ];
 console.error(`  invalid runs rejected: ${allInvalids.map((r) => r.rejected).join(',')}`);
 if (!asmCommitted.fits || !asmProof1.fits || !asmStress.fits || !asmNonBaseB.fits ||
-  !asmCombinedStress.fits || !asmVariedBC.fits || !asmCombinedVariedC.fits ||
+  !asmCombinedStress.fits || !asmVariedBC.fits || !asmCombinedVariedC.fits || !asmFinalEqual.fits ||
   !allInvalids.every((r) => r.rejected)) {
   console.error('!! a run failed -- NOT writing vectors'); process.exit(1);
 }
@@ -1073,6 +1170,7 @@ const portfolio = [
   ['64/64+B=19G2', asmCombinedStress],
   ['B=37G2/C=29G1', asmVariedBC],
   ['64/64+B=19G2/C=29G1', asmCombinedVariedC],
+  ['fixed-comb final-equal', asmFinalEqual],
   ...completenessRuns.map(({ tag, asm }) => [`${tag} identity`, asm]),
 ];
 portfolio.forEach(([fixture, asm]) => {
@@ -1133,22 +1231,32 @@ const resourceInputs = primaryAsm.resourceChunks.map((chunk, index) => {
     argumentPushes: chunk.argumentPushes,
   };
 });
+const slopeWitnessMetadata = {
+  bytesPerSlope: W,
+  totalSlopeCount: GLV_SLOPE_LOCAL.slopeCount +
+    GLV_SLOPE_CARRIERS.reduce((total, carrier) => total + carrier.slopeCount, 0),
+  local: GLV_SLOPE_LOCAL,
+  carriers: GLV_SLOPE_CARRIERS,
+};
 writeFileSync(join(GEN, 'resource_bounds_inputs.json'), JSON.stringify({
   version: 1,
   curve: 'BLS12-381',
   bchVm: 'BCH_2026',
   fixedCombWidth: GLV_FIXED_COMB_WIDTH,
+  slopeWitness: slopeWitnessMetadata,
   inputs: resourceInputs,
 }, null, 2));
 
 writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-vectors.json'), JSON.stringify({
   description: 'One-transaction fixed-key BLS12-381 Groth16 quotient-torus verifier. ' +
     'The pairing equation is e(-A,B) * e(D,G2.BASE) = 1 with D = 5*alpha + 7*vk_x + 11*C. ' +
-    'Two width-six fixed-comb inputs assemble D, then ten affine-runtime-B Miller inputs complete ' +
+    'One width-six fixed-comb input assembles D, then ten affine-runtime-B Miller inputs complete ' +
     'the quotient verdict. Input zero transitively pins every successor P2SH32 program, exact ' +
-    'input-position gates fix the twelve-input graph, OP_INPUTBYTECODE binds every handoff, and ' +
-    'hash256 pins the complete fixed-base table carried across three transaction inputs. The same ' +
-    'locking graph verifies every canonical proof for this verification key.',
+    'input-position gates fix the eleven-input graph, OP_INPUTBYTECODE binds every handoff and the ' +
+    'two carried slope slices, and hash256 pins the complete fixed-base table carried across three ' +
+    'transaction inputs. The same locking graph verifies every canonical proof for this verification key. ' +
+    'The deterministic benchmark fixtures use verification-key and proof points with known base-point ' +
+    'scalars; this specializes and measures the verifier but does not claim external circuit-toolchain interoperability.',
   method: 'intra-tx-linked-residue', deployment: 'P2SH32', curve: 'BLS12-381',
   primaryFixture: '64/64+B=19G2',
   worstCaseFixture: worstCaseEntry[0],
@@ -1189,6 +1297,13 @@ writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-vecto
       millerOffset: GLV_TABLE_CARRIER_OFFSETS[index],
       length: part.length,
     })),
+    slopeWitness: slopeWitnessMetadata,
+    finalAdditionCoverage: {
+      equalPointFixture: 'fixed-comb final-equal',
+      accumulatorEqualsAddend: true,
+      consensusVerified: asmFinalEqual.transactions.every(({ consensusVerified }) => consensusVerified),
+      standardVerified: asmFinalEqual.transactions.every(({ standardVerified }) => standardVerified),
+    },
   },
   graphBinding: {
     entryInputIndex: 0,

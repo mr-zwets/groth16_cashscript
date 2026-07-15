@@ -29,8 +29,8 @@ also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` 
 - `bch-groth16-bls12381-intratx`: 56 inputs / 475,310 B / 377,658,775 op-cost.
 - `bch-groth16-bls12381-grouped`: 56 inputs / 6 standard transactions / 475,292 B /
   377,556,467 op-cost.
-- `bch-groth16-bls12381-intratx-residue`: fixed-VK quotient-torus frontier, 12 inputs /
-  97,455 B / 77,865,802 op-cost in one 97,571-byte standard-policy transaction.
+- `bch-groth16-bls12381-intratx-residue`: fixed-VK quotient-torus frontier, 11 inputs /
+  96,236 B / 76,886,155 op-cost in one 96,344-byte standard-policy transaction.
 - `bch-groth16-bls12381-grouped-residue`: 35 inputs / 4 standard transactions / 209,937 B /
   158,744,466 op-cost.
 - `bch-groth16-bls12381-intratx-residue-large`: 3 inputs / 164,426 B / 149,814,405 op-cost
@@ -81,9 +81,11 @@ The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B o
   Fp12 half to zero, replacing the 63-step `w^(27A)` walk. The inverse and terminal equations
   exclude zero.
 - **Fixed-key collapse and comb** — bilinearity rewrites the four-pair equation to
-  `e(-A,B)·e(D,G2.BASE)=1`, where `D=5α+7vk_x+11C`. Two width-six fixed-comb inputs
-  assemble `D`; the 6,048-byte fixed table is hash-pinned across three Miller witnesses.
-  Affine G2 walks and half-normalized G1 lines then evaluate the two-pair trace in ten inputs.
+  `e(-A,B)·e(D,G2.BASE)=1`, where `D=5α+7vk_x+11C`. One width-six fixed-comb input
+  assembles `D`; two proof-dependent slope slices are carried by Miller inputs and read with
+  input introspection, while the 6,048-byte fixed table is hash-pinned across three Miller
+  witnesses. Positive field biases let each affine row canonicalize its outputs once. Affine G2
+  walks and half-normalized G1 lines then evaluate the two-pair trace in ten inputs.
 - **Quotient-torus residue frontier** — the fixed-key intra-transaction build works in
   `Fp12*/Fp6*`, a cyclic group of order `p^6+1`. For `lambda=p+|x|`,
   `gcd(lambda,p^6+1)=r`, so the lambda-power image is exactly the final-exponent kernel in the
@@ -96,8 +98,9 @@ Since per-step bytes are dominated (~64%) by op-cost-proportional unlocking padd
 op-cost cuts translate ~1:1 into size.
 
 Every chunk is validated on the real BCH 2026 VM against `@noble/curves` bls12-381. The fixed-key
-one-transaction path covers 15 valid instances, 23 rejection runs, all A/B/C identity combinations,
-the `vk_x` identity, and three isolated point-validation cases under the same locking graph.
+one-transaction path covers 16 valid instances, 24 rejection runs, all A/B/C identity combinations,
+the `vk_x` identity, a satisfying fixed-comb final-equal/doubling case, and three isolated
+point-validation cases under the same locking graph.
 
 ## How it works
 
@@ -195,9 +198,18 @@ source before generating bytecode.
 The final certificate recompiles the exact transformed contracts, pins every source and redeem
 hash plus the control and numeric program counters, covers every finite conditional mode, and
 propagates integer intervals through the BCH 2026 VM. Its proof-independent envelope is a
-98,570-byte transaction (1,430 bytes below the standard limit), with every unlocking at most
-9,172 bytes and every standard-policy input op-cost at most 7,369,952. The largest concrete
-portfolio fixture remains the 97,571-byte transaction reported above.
+97,447-byte transaction (2,553 bytes below the standard limit), with every unlocking at most
+9,753 bytes and every standard-policy input op-cost at most 7,835,111. The primary concrete
+benchmark fixture is the 96,344-byte transaction reported above.
+
+Benchmark fixture scope: this fixed-VK track uses deterministic, known-log synthetic fixtures. The
+verification-key and proof points are constructed as known scalar multiples of the standard G1/G2
+bases so accepting branch, identity, graph-binding, and resource cases can be reproduced exactly.
+The proof-point construction logs are test-generation data rather than witness values; the fixed-key
+scalar relations are intentionally part of this benchmark specialization. These vectors demonstrate
+verifier execution and resource behavior for this specialized key; an interoperability claim
+additionally requires proofs and a verification key produced independently by an external Groth16
+circuit/toolchain.
 
 Do not point the covenant or proposed-large builders at `generated/linked-residue/`. Several linked
 windows exceed the covenant density limit before the boundary hashes are removed; the proposed-large
