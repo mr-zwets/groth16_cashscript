@@ -34,7 +34,7 @@ also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` 
   209,216 B / 157,700,169 op-cost.
 - `bch-groth16-bls12381-grouped-residue`: 35 inputs / 4 standard transactions / 209,937 B /
   158,744,466 op-cost.
-- `bch-groth16-bls12381-intratx-residue-large`: 4 inputs / 171,166 B / 153,410,183 op-cost
+- `bch-groth16-bls12381-intratx-residue-large`: 3 inputs / 164,426 B / 149,814,405 op-cost
   on the proposed 100 kB-script VM.
 
 ## Optimizations (prepared batched Miller + lazy reduction)

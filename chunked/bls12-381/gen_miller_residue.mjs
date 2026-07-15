@@ -29,7 +29,7 @@ import { LINKED_MILLER_BOUNDS, LINKED_RESIDUE_NAMESPACE } from './_residue_linke
 const here = dirname(fileURLToPath(import.meta.url));
 const LINKED = process.argv[2] === 'linked';
 const QUOTIENT_TORUS = process.env.BLS_QUOTIENT_TORUS === '1';
-if (QUOTIENT_TORUS && !LINKED) {
+if (QUOTIENT_TORUS && !LINKED && process.env.BLS_QUOTIENT_LARGE !== '1') {
   throw new Error('BLS_QUOTIENT_TORUS is linked-only; pass the linked layout explicitly');
 }
 const STAGE_BOUND = LINKED || process.env.STAGE_BOUND_LAYOUT === '1';
