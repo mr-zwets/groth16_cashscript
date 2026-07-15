@@ -21,12 +21,14 @@ const { asmToBytecode } = utils;
 // chosen jointly with its schedule, selected by the BCH2026 op-cost meter. Default ON —
 // the committed vectors are built this way; set RESCHEDULE=off to A/B the plain compile.
 const RESCHED_OPTS = process.env.RESCHEDULE === 'off' ? {} : { rescheduleStacks: true };
+const RESCHED_SIZE_OPTS = process.env.RESCHEDULE === 'off' ? {} : { rescheduleStacks: true, optimizeFor: 'size' };
 /** compile a .cash source string -> redeem bytecode (Uint8Array); throws on compile error */
 export const compileBytecode = (src) => asmToBytecode(compileString(src, RESCHED_OPTS).bytecode);
 /** compile a .cash FILE -> redeem bytecode. Unlike compileString, compileFile resolves
  * relative `import` statements (it has a base path), so chunks can import the shared
  * singleton library instead of inlining the tower functions. */
 export const compileFileBytecode = (path) => asmToBytecode(compileFile(path, RESCHED_OPTS).bytecode);
+export const compileFileBytecodeSize = (path) => asmToBytecode(compileFile(path, RESCHED_SIZE_OPTS).bytecode);
 /** plain-cashc variants (no rescheduling): the vector builders A/B the two redeems per
  * chunk and keep whichever measures better, and the chunk PLANNERS measure candidate
  * windows with these so the generated chunk manifests stay independent of the pass. */
@@ -236,7 +238,8 @@ const g1 = (o) => bn254.G1.Point.fromAffine({ x: BigInt(o.x), y: BigInt(o.y) });
 const g2 = (o) => bn254.G2.Point.fromAffine({ x: Fp2.fromBigTuple([BigInt(o.x.c0), BigInt(o.x.c1)]), y: Fp2.fromBigTuple([BigInt(o.y.c0), BigInt(o.y.c1)]) });
 export const vk = { alpha: g1(vec.vk.alpha), beta: g2(vec.vk.beta), gamma: g2(vec.vk.gamma), delta: g2(vec.vk.delta), ic: vec.vk.ic.map(g1) };
 export const proof = { a: g1(vec.proof.a), b: g2(vec.proof.b), c: g1(vec.proof.c) };
-export const vkxPoint = (inputs) => { let x = vk.ic[0]; inputs.map(BigInt).forEach((s, i) => { x = x.add(vk.ic[i + 1].multiply(s)); }); return x; };
+export const vkxPoint = (inputs) => { let x = vk.ic[0]; inputs.map(BigInt).forEach((s, i) => { if (s !== 0n) x = x.add(vk.ic[i + 1].multiply(s)); }); return x; };
+export const vkxMsmPoint = (inputs) => { let x = bn254.G1.Point.ZERO; inputs.map(BigInt).forEach((s, i) => { if (s !== 0n) x = x.add(vk.ic[i + 1].multiply(s)); }); return x; };
 /** Point-limb overrides for isolated input-validation rejection fixtures. */
 export function invalidG2Overrides(proofValue = proof, offSubgroupCount = 1) {
   if (!Number.isInteger(offSubgroupCount) || offSubgroupCount < 1) {
@@ -280,10 +283,10 @@ export function assertG2StageManifest(manifest, { carriesVkx = false, linkedLayo
     throw new Error(`G2 manifest does not match the expected ${expectedLayout.length}-limb stage layout`);
   }
 }
-export const pairsFor = (inputs, pf = proof) => [
+export const pairsFor = (inputs, pf = proof, { msmOnly = false } = {}) => [
   { name: 'negA_B', P: pf.a.negate(), Q: pf.b },
   { name: 'alpha_beta', P: vk.alpha, Q: vk.beta },
-  { name: 'vkx_gamma', P: vkxPoint(inputs), Q: vk.gamma },
+  { name: msmOnly ? 'vkx_msm_gamma' : 'vkx_gamma', P: msmOnly ? vkxMsmPoint(inputs) : vkxPoint(inputs), Q: vk.gamma },
   { name: 'C_delta', P: pf.c, Q: vk.delta },
 ];
 // build a proof object {a,b,c} (curve points) from raw limb bigints — used to
@@ -304,8 +307,11 @@ export const PT_CFG = [{ P: true, Q: true }, { P: false, Q: false }, { P: true, 
 export const ptLimbs = (pairIdx, P, Q, unitLines = false) => {
   const o = [], c = PT_CFG[pairIdx];
   if (c.P && unitLines) {
-    const invY = Fp.inv(P.y);
-    o.push(Fp.neg(Fp.mul(P.x, invY)), Fp.neg(invY));
+    if (P.x === 0n && P.y === 0n) o.push(0n, 0n);
+    else {
+      const invY = Fp.inv(P.y);
+      o.push(Fp.neg(Fp.mul(P.x, invY)), Fp.neg(invY));
+    }
   } else if (c.P) o.push(P.x, P.y);
   if (c.Q) o.push(Q.x.c0, Q.x.c1, Q.y.c0, Q.y.c1);
   return o;

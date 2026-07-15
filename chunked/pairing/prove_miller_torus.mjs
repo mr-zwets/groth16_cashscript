@@ -108,6 +108,25 @@ const torusFrob2 = (value) => {
     mod(limbs[4] * c2), mod(limbs[5] * c2),
   ]);
 };
+const frob2Neg = 2203960485148121921418603742825762020974279258880205651966n;
+const frob2Pos = 2203960485148121921418603742825762020974279258880205651967n;
+const signedMod = (value) => value % p;
+const shortSignedFrob2 = (limbs) => [
+  -signedMod(limbs[0] * frob2Neg),
+  -signedMod(limbs[1] * frob2Neg),
+  -limbs[2],
+  -limbs[3],
+  signedMod(limbs[4] * frob2Pos),
+  signedMod(limbs[5] * frob2Pos),
+];
+const genericFrob2 = (limbs) => [
+  signedMod(limbs[0] * (p - frob2Neg)),
+  signedMod(limbs[1] * (p - frob2Neg)),
+  signedMod(64n * p - limbs[2]),
+  signedMod(64n * p - limbs[3]),
+  signedMod(limbs[4] * frob2Pos),
+  signedMod(limbs[5] * frob2Pos),
+];
 
 for (let i = 0; i < 6; i++) {
   const basis = Fp6.fromBigSix(Array.from({ length: 6 }, (_, j) => i === j ? 1n : 0n));
@@ -137,6 +156,21 @@ for (let i = 0; i < 128; i++) {
   assert(Fp6.eql(cash1, direct1), `specialized q Frobenius mismatch ${i}`);
   assert(Fp6.eql(torusFrob2(u), direct2), `specialized q^2 Frobenius mismatch ${i}`);
   assert(Fp6.eql(torusFrob2(cash1), direct3), `composed q^3 Frobenius mismatch ${i}`);
+}
+
+for (let i = 0; i < 256; i++) {
+  const limbs = Array.from({ length: 6 }, () => randomFp() - randomFp());
+  const short = shortSignedFrob2(limbs);
+  const generic = genericFrob2(limbs);
+  for (let limb = 0; limb < 6; limb++) {
+    assert(mod(short[limb]) === mod(generic[limb]), `short signed q^2 mismatch ${i}:${limb}`);
+    assert(short[limb] > -p && short[limb] < p, `short signed q^2 output bound failed ${i}:${limb}`);
+    if (limb < 2 || limb > 3) {
+      const coefficient = limb < 2 ? frob2Neg : frob2Pos;
+      const product = limbs[limb] * coefficient;
+      assert(product > -(p ** 2n) && product < p ** 2n, `short signed q^2 product bound failed ${i}:${limb}`);
+    }
+  }
 }
 
 assert(classEqual(projectiveSquare(infinity), Fp12.ONE), 'infinity square is not the identity class');
@@ -185,4 +219,5 @@ console.log(`  gcd(lambda, p^6+1) = r (${r})`);
 console.log(`  exact fused trace checked: ${exact.ops.length} ops (${exact.ops.filter((op) => op.t === 'cf').length} c-folds)`);
 console.log(`  projective/random/exceptional transitions checked: 128 + infinity + zero-denominator`);
 console.log('  specialized Frobenius checked: 6 basis vectors + 128 deterministic random vectors');
+console.log('  short signed q^2 coefficients checked: 256 deterministic signed vectors');
 console.log(`  finite residue coordinate limbs: ${fp12limbsOf(cRep).slice(6).length}`);

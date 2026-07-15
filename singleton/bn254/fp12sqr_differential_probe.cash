@@ -1,0 +1,24 @@
+pragma cashscript ^0.14.0;
+
+import "./lib/lazy/Bn254Lazy.cash";
+
+contract Fp12SqrDifferentialProbe() {
+    function spend(
+        int A0,int A1,int A2,int A3,int A4,int A5,
+        int A6,int A7,int A8,int A9,int A10,int A11,
+        bytes unused zeroPadding
+    ) {
+        (int C0,int C1,int C2,int C3,int C4,int C5,int C6,int C7,int C8,int C9,int C10,int C11) =
+            fp12Sqr(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+        (int S0,int S1,int S2,int S3,int S4,int S5,int S6,int S7,int S8,int S9,int S10,int S11) =
+            fp12SqrSigned(A0,A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11);
+
+        int p = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require(within(C0,0,p)); require(within(C1,0,p)); require(within(C2,0,p)); require(within(C3,0,p));
+        require(within(C4,0,p)); require(within(C5,0,p)); require(within(C6,0,p)); require(within(C7,0,p));
+        require(within(C8,0,p)); require(within(C9,0,p)); require(within(C10,0,p)); require(within(C11,0,p));
+        require((C0-S0)%p==0); require((C1-S1)%p==0); require((C2-S2)%p==0); require((C3-S3)%p==0);
+        require((C4-S4)%p==0); require((C5-S5)%p==0); require((C6-S6)%p==0); require((C7-S7)%p==0);
+        require((C8-S8)%p==0); require((C9-S9)%p==0); require((C10-S10)%p==0); require((C11-S11)%p==0);
+    }
+}

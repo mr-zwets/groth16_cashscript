@@ -141,10 +141,13 @@ export function transformChunk(src, cfg) {
     if (sourceOffset + length > inWidths.reduce((sum, width) => sum + width, 0) || targetOffset + length > targetFullInLen) {
       throw new Error(`external binding outside input blob: ${JSON.stringify(binding)}`);
     }
-    const source = sourceOffset === 0 ? 'inBlob' : `inBlob.split(${sourceOffset})[1]`;
+    const source = sourceOffset === 0
+      ? 'inBlob'
+      : `inBlob.split(${sourceOffset + length})[0].split(${sourceOffset})[1]`;
     const targetStart = headerSize(targetFullInLen) + targetOffset;
-    const target = `tx.inputs[${targetInputIndex}].unlockingBytecode.split(${targetStart})[1]`;
-    return `        require(${source}.split(${length})[0] == ${target}.split(${length})[0]);`;
+    const target = `tx.inputs[${targetInputIndex}].unlockingBytecode.split(${targetStart + length})[0].split(${targetStart})[1]`;
+    const sourceSlice = sourceOffset === 0 ? `${source}.split(${length})[0]` : source;
+    return `        require(${sourceSlice} == ${target});`;
   });
   // extras = real spend params that are neither incoming-state limbs nor the dropped budget
   // pad (e.g. vk_x's zInv). The `unused` budget pad is stripped — we supply our own pad.
@@ -239,7 +242,7 @@ export function transformChunk(src, cfg) {
       const cmp = f.cmpExpr ?? 'outBlob';
       const off = headerSize(f.nextFullInLen) + f.skip;
       epilogue.push(
-        `        require(${cmp} == tx.inputs[this.activeInputIndex + 1].unlockingBytecode.split(${off})[1].split(${f.cmpLen})[0]);`,
+        `        require(${cmp} == tx.inputs[this.activeInputIndex + 1].unlockingBytecode.split(${off + f.cmpLen})[0].split(${off})[1]);`,
       );
     } else {
       // stage-final: no successor with a matching layout. Consume outBlob (the boundary
@@ -297,8 +300,9 @@ export function transformChunk(src, cfg) {
     if (targetLockingHash !== undefined) {
       prologue.push(`        require(sha256(tx.inputs[${targetInputIndex}].lockingBytecode) == 0x${targetLockingHash});`);
     }
+    const linkedHeader = headerSize(targetFullInLen);
     prologue.push(
-      `        bytes linkedCarrier = tx.inputs[${targetInputIndex}].unlockingBytecode.split(${headerSize(targetFullInLen)})[1].split(${targetFullInLen})[0];`,
+      `        bytes linkedCarrier = tx.inputs[${targetInputIndex}].unlockingBytecode.split(${linkedHeader + targetFullInLen})[0].split(${linkedHeader})[1];`,
     );
     let carrierTail = 'linkedCarrier';
     let carrierOffset = 0;

@@ -85,7 +85,7 @@ export function residueTorusWitness(fRaw) {
 // of c^-1 (digit +1) or c (digit -1) into the shared f, so that across the loop f accumulates
 // c^-(6x+2) alongside f_{6x+2}. New op type {t:'cf', neg} (c-fold). c,cInv are CONSTANT state
 // carried (12+12 limbs) so each chunk can multiply by them. states[i] = {f, Rs, c, cInv}.
-export function millerFusedOps(pairs, c, cInv) {
+export function millerFusedOps(pairs, c, cInv, { fixedMiller = null } = {}) {
   // f_{6x+2} is built by 65 squarings with the leading 1 (2^65) preloaded by R=Q (naf() drops
   // the MSB, stopping at a>1). So we inject the MSB c-fold as a LEADING 'cf' (xcInv): squared 65
   // times -> c^-2^65; the per-NAF-digit folds add c^-V; total c-power = c^-(2^65+V) = c^-(6x+2).
@@ -94,7 +94,7 @@ export function millerFusedOps(pairs, c, cInv) {
   // the loop (skipPairs) and its single-pair Miller value f_{alpha,beta} is multiplied in once via
   // a 'cmul1' op (a constant fp12Mul the chunk bakes). Saves ~24M op (~12% of the miller).
   const base = millerBatchOps(pairs, { skipPairs: new Set([1]) });
-  const fAB = singlePairMiller(pairs[1]).f; // baked constant e(alpha,beta) Miller value
+  const fAB = fixedMiller ?? singlePairMiller(pairs[1]).f; // baked fixed-pair Miller value
   const ops = []; const states = [];
   // MSB optimization: the 2^65 term's c-fold is folded into the GENESIS f instead of a leading
   // fp12Mul op — we just initialize cpow = cInv (so the genesis fused f = ONE*cInv = cInv, committed
@@ -151,15 +151,20 @@ const affineAdd = (point, addend) => {
   };
 };
 
-export function millerFusedAffineOps(pairs, c, cInv, { unitLines = false, torusU = null } = {}) {
-  const raw = millerFusedOps(pairs, c, cInv);
+export function millerFusedAffineOps(pairs, c, cInv, { unitLines = false, torusU = null, fixedMiller = null } = {}) {
+  const raw = millerFusedOps(pairs, c, cInv, { fixedMiller });
   const pairData = pairs.map((pair) => {
     const P = pair.P.toAffine();
-    const invY = unitLines ? Fp.inv(P.y) : null;
+    const infinity = pair.P.equals(bn254.G1.Point.ZERO);
+    const invY = unitLines && !infinity ? Fp.inv(P.y) : null;
+    let u = null, v = null;
+    if (unitLines) {
+      u = infinity ? 0n : Fp.neg(Fp.mul(P.x, invY));
+      v = infinity ? 0n : Fp.neg(invY);
+    }
     return {
       P, Q: pair.Q.toAffine(),
-      u: unitLines ? Fp.neg(Fp.mul(P.x, invY)) : null,
-      v: unitLines ? Fp.neg(invY) : null,
+      u, v,
     };
   });
   const lineCoeffs = (coeffs) => {
