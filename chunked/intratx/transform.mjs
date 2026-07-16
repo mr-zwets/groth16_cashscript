@@ -88,6 +88,7 @@ function parseParams(sig) {
  *                    hand-off to the actual first locking of the successor group.
  *   cfg.forward.nextLockingHash optional SHA-256 of the immediate successor's locking bytecode.
  *                    Pins an intra-transaction hand-off to the expected successor program.
+ *   cfg.forward.nextLockingBytecode optional exact immediate-successor locking-bytecode hex.
  *   cfg.expectedInputCount optional transaction-graph-size gate.
  *   cfg.expectedInputIndex optional additional position gate; requires expectedInputCount.
  *   cfg.externalBindings additional byte-slice bindings from this chunk's inBlob to another
@@ -252,6 +253,12 @@ export function transformChunk(src, cfg) {
         if (!/^[0-9a-f]{64}$/i.test(f.nextLockingHash)) throw new Error('invalid forward nextLockingHash');
         epilogue.push(
           `        require(sha256(tx.inputs[this.activeInputIndex + 1].lockingBytecode) == 0x${f.nextLockingHash});`,
+        );
+      }
+      if (f.nextLockingBytecode !== undefined) {
+        if (!/^(?:[0-9a-f]{2})+$/i.test(f.nextLockingBytecode)) throw new Error('invalid forward nextLockingBytecode');
+        epilogue.push(
+          `        require(tx.inputs[this.activeInputIndex + 1].lockingBytecode == 0x${f.nextLockingBytecode});`,
         );
       }
     } else {

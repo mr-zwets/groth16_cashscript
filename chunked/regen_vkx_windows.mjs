@@ -16,10 +16,10 @@
 //     after specializing fixed-table additions for affine second operands in
 //     gen_vkx_glv.mjs. Builder max-density peak: 7,659,296 of 8,032,800.
 //   GLV grouped 3x43 (up to three fixed-table additions per position): 2 windows
-//     [0,21)[21,43)F. The concrete full-valid resource fixture peaks at 6,338,695
+//     [0,21)[21,43)F. The concrete full-valid resource fixture peaks at 6,338,518
 //     op-cost. prove_vkx_glv_resource_bound.mjs proves at most 4/6 equal-point
 //     events per input and 9 total; prove_resource_ceiling.mjs combines both
-//     maximal allocations with the Miller ceilings and constructs a 97,023-byte
+//     maximal allocations with the Miller ceilings and constructs a 97,021-byte
 //     proof-independent relayable transaction encoding.
 //   Shamir (254-iter, 2-scalar): 6 windows [0,43)[43,86)[86,129)[129,172)[172,215)[215,254)F
 //     — 95.4% of budget; the worst-case proof (in0,in1 popcount 253/254) already saturates

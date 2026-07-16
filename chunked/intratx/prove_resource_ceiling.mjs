@@ -53,11 +53,11 @@ const DEFAULT_MIN_RELAY_FEE_SATOSHIS_PER_BYTE = 1n;
 const TRANSACTION_OUTPUT_SATOSHIS = 1000n;
 const DENSITY_BASE = 41;
 const DENSITY_MULTIPLIER = 800;
-const LOCKING_GRAPH_HASH = '4e9ebd37b5e58037e5b9b239c5740e9b2e383edaaa5710925bae5c679f8820f7';
+const LOCKING_GRAPH_HASH = 'b3650c298e64218852d3688936d84df57023154afc05a516fc4a5531f54464b1';
 const GLV_TABLE_HASH = '4dedc6a77ffe1f14a1faa12a533a2975e8d7304c8e740a82d8a5c9c41e490028';
 const GLV_EVENT_ALLOCATIONS = [[4, 5], [3, 6]];
 const EXPECTED_EXTRA_COUNTS = [0, 1, 22, 18, 18, 22, 20, 18, 20, 22, 16];
-const EXPECTED_FIXED_FLOORS = [2_424, 5_124, 9_103, 8_110, 8_026, 8_598, 8_607, 7_779, 8_282, 8_099, 9_056];
+const EXPECTED_FIXED_FLOORS = [2_424, 5_124, 9_105, 8_112, 7_864, 8_765, 8_609, 7_779, 8_282, 8_099, 9_056];
 
 const extraValidProofs = vectors.extraValidProofs ?? [];
 const resourceFixtureProof = vectors.resourceFixtureProof;
@@ -388,7 +388,7 @@ results.forEach((result) => {
 const universalWireBytes = Math.max(...results.map((result) => result.wireBytes));
 const universalTotalOperationCost = Math.max(...results.map((result) =>
   result.costs.reduce((sum, cost) => sum + cost, 0)));
-if (universalWireBytes !== 97_023 || universalTotalOperationCost !== 77_257_804) {
+if (universalWireBytes !== 97_016 || universalTotalOperationCost !== 77_253_358) {
   throw new Error('certified proof-independent relay encoding changed');
 }
 console.log(`proved proof-independent relay encoding: ${universalWireBytes} wire bytes, ` +
