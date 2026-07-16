@@ -1,4 +1,4 @@
-// Adversarial soundness audit for the min-op BLS12-381 singleton's omitted G1 subgroup
+// Independent soundness audit for the min-op BLS12-381 singleton's omitted G1 subgroup
 // checks (and the fused psi G2 check), using the repo's own verified math modules.
 // Run: node _soundness_audit.mjs   (delete after review — not part of the repo)
 import {
@@ -112,8 +112,9 @@ check('B + cofactor-torsion: psi(B\') != -[|x|]B\' (fused check REJECTS)', !psi(
 
 // ---------- 5. mid-walk degeneracy closure ----------
 // R_B = [k]B can only hit O mid-loop if ord(B) | gcd(k, h2*r) for some NAF prefix k of |x|.
-// r is 255-bit and every prefix k < 2^64, so it reduces to gcd(k, h2). If every prefix is
-// coprime to h2, no representable on-curve B can degenerate the walk before the psi compare.
+// r is 255-bit and every prefix k < 2^64, so it reduces to gcd(k, h2). The four shared
+// prefixes have gcd 13 with h2; the terminal Rz guard covers this exact case, exhaustively
+// exercised by _psi_degeneracy_test.mjs.
 import('./chunked/bls12-381/_pairingmath.mjs').then(({ ATE_NAF }) => {
   let k = 1n; const prefixes = [k];
   for (let i = 0; i < ATE_NAF.length; i++) {
@@ -121,6 +122,14 @@ import('./chunked/bls12-381/_pairingmath.mjs').then(({ ATE_NAF }) => {
     if (ATE_NAF[i] !== 0) { k += BigInt(ATE_NAF[i]); prefixes.push(k); }
   }
   check('NAF walk reconstructs |x|', k === X);
-  check('every NAF prefix of |x| coprime to h2 (mid-walk O unreachable)', prefixes.every((v) => gcd(v, h2) === 1n));
+  const sharedPrefixes = prefixes.filter((v) => gcd(v, h2) !== 1n);
+  check(
+    'NAF prefixes sharing a factor with h2 are exactly 13,26,52,104',
+    sharedPrefixes.join(',') === '13,26,52,104',
+  );
+  check(
+    'every shared NAF prefix has gcd 13 with h2 (only order-13 needs the Rz guard)',
+    sharedPrefixes.every((v) => gcd(v, h2) === 13n),
+  );
   console.log(process.exitCode ? '\n*** AUDIT FOUND FAILURES ***' : '\nall audit checks passed');
 });

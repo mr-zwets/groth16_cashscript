@@ -17,7 +17,8 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  P, Fp2, f12limbs, r6limbs, pairsFor, singlePairMiller, millerBatchOps, PT_CFG, ptLimbs,
+  B_IDENTITY_SUBSTITUTE, P, Fp2, f12limbs, r6limbs, pairsFor, singlePairMiller,
+  millerBatchOps, PT_CFG, ptLimbs, unitG1,
 } from './_pairingmath.mjs';
 import { commit, measureCovenantFile, planChunk, covIn, covOut, PUBLIC_INPUTS } from './_vkxmath.mjs';
 import {
@@ -29,6 +30,7 @@ import { LINKED_MILLER_BOUNDS, LINKED_RESIDUE_NAMESPACE } from './_residue_linke
 const here = dirname(fileURLToPath(import.meta.url));
 const LINKED = process.argv[2] === 'linked';
 const QUOTIENT_TORUS = process.env.BLS_QUOTIENT_TORUS === '1';
+const UNIT_G1 = process.env.BLS_UNIT_G1 === '1';
 if (QUOTIENT_TORUS && !LINKED && process.env.BLS_QUOTIENT_LARGE !== '1') {
   throw new Error('BLS_QUOTIENT_TORUS is linked-only; pass the linked layout explicitly');
 }
@@ -45,18 +47,28 @@ const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const decl = (names) => names.map((n) => `int ${n}`).join(', ');
 
 const PAIRS = pairsFor(PUBLIC_INPUTS);
+const B_IDENTITY_SUBSTITUTE_AFFINE = B_IDENTITY_SUBSTITUTE.toAffine();
 const PINFO = PAIRS.map((pair, j) => {
   const Q = pair.Q.toAffine(), Pt = pair.P.toAffine(), cfg = PT_CFG[j], negQ = Fp2.neg(Q.y);
   return {
     j, cfg, negQ,
-    Pxe: cfg.P ? `Px${j}` : `${Pt.x}`, Pye: cfg.P ? `Py${j}` : `${Pt.y}`,
+    Pxe: cfg.P ? `${UNIT_G1 ? 'Pu' : 'Px'}${j}` : `${Pt.x}`, Pye: cfg.P ? `${UNIT_G1 ? 'Pv' : 'Py'}${j}` : `${Pt.y}`,
     Qxae: cfg.Q ? `Q${j}xa` : `${Q.x.c0}`, Qxbe: cfg.Q ? `Q${j}xb` : `${Q.x.c1}`,
     Qyae: cfg.Q ? `Q${j}ya` : `${Q.y.c0}`, Qybe: cfg.Q ? `Q${j}yb` : `${Q.y.c1}`,
   };
 });
 const ptParams = [];
-PINFO.forEach((pi, j) => { if (pi.cfg.P) ptParams.push(`Px${j}`, `Py${j}`); if (pi.cfg.Q) ptParams.push(`Q${j}xa`, `Q${j}xb`, `Q${j}ya`, `Q${j}yb`); });
-const ptL = PAIRS.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
+PINFO.forEach((pi, j) => { if (pi.cfg.P) ptParams.push(`${UNIT_G1 ? 'Pu' : 'Px'}${j}`, `${UNIT_G1 ? 'Pv' : 'Py'}${j}`); if (pi.cfg.Q) ptParams.push(`Q${j}xa`, `Q${j}xb`, `Q${j}ya`, `Q${j}yb`); });
+const ptL = PAIRS.flatMap((pair, j) => {
+  const Q = pair.Q.toAffine();
+  const out = [];
+  if (PT_CFG[j].P) {
+    const point = UNIT_G1 ? unitG1(pair.P) : pair.P.toAffine();
+    out.push(...(UNIT_G1 ? [point.u, point.v] : [point.x, point.y]));
+  }
+  if (PT_CFG[j].Q) out.push(Q.x.c0, Q.x.c1, Q.y.c0, Q.y.c1);
+  return out;
+});
 // Put the hot derived-state sources first at genesis: cInv, c, then B/A/vk_x/C.
 const genesisPtParams = [...ptParams.slice(2, 6), ...ptParams.slice(0, 2), ...ptParams.slice(6)];
 const genesisPtL = [...ptL.slice(2, 6), ...ptL.slice(0, 2), ...ptL.slice(6)];
@@ -67,13 +79,13 @@ const stagePtL = [...ptL.slice(0, 6), ...ptL.slice(8, 10), ...ptL.slice(6, 8)];
 
 // witness for the committed planning instance (chunk math is generic; only window boundaries
 // come from this instance).
-const { boundary: fRawPlan } = millerBatchOps(PAIRS);
+const { boundary: fRawPlan } = millerBatchOps(PAIRS, { unitLines: UNIT_G1 });
 const rootPlan = QUOTIENT_TORUS ? residueTorusWitness(fRawPlan) : residueWitness(fRawPlan);
 const { c: C_PLAN, cInv: CINV_PLAN } = rootPlan;
 const U_PLAN = QUOTIENT_TORUS ? rootPlan.u : null;
 const trace = QUOTIENT_TORUS
-  ? millerFusedTorusOps(PAIRS, C_PLAN, CINV_PLAN, U_PLAN)
-  : millerFusedOps(PAIRS, C_PLAN, CINV_PLAN);
+  ? millerFusedTorusOps(PAIRS, C_PLAN, CINV_PLAN, U_PLAN, { unitLines: UNIT_G1 })
+  : millerFusedOps(PAIRS, C_PLAN, CINV_PLAN, { unitLines: UNIT_G1 });
 const { ops, states, boundary, fAB } = trace;
 
 // baked constant f_{alpha,beta} (pair 1's UNCONJUGATED single-pair Miller value; VK-only),
@@ -142,6 +154,13 @@ function genChunk(opLo, opHi, isFinal) {
   }
   L.push(`    function spend(${decl(stateParams)}, bytes unused zeroPadding) {`);
   L.push(covIn(COVENANT_RESIDUE && opLo === 0 ? stagePtParams : stateParams));
+  const identityCompleteGenesis = UNIT_G1 && opLo === 0;
+  const pairPxe = (pi) => identityCompleteGenesis && pi.j === 0 ? 'pairPu0' : pi.Pxe;
+  const pairPye = (pi) => identityCompleteGenesis && pi.j === 0 ? 'pairPv0' : pi.Pye;
+  const pairQxae = (pi) => identityCompleteGenesis && pi.j === 0 ? 'pairQ0xa' : pi.Qxae;
+  const pairQxbe = (pi) => identityCompleteGenesis && pi.j === 0 ? 'pairQ0xb' : pi.Qxbe;
+  const pairQyae = (pi) => identityCompleteGenesis && pi.j === 0 ? 'pairQ0ya' : pi.Qyae;
+  const pairQybe = (pi) => identityCompleteGenesis && pi.j === 0 ? 'pairQ0yb' : pi.Qybe;
   // FUSED input validation (was the standalone g2check pass): the first Miller chunk checks the
   // prover's points are on-curve (A=-P0 & C=P3 on G1 y^2=x^3+4; B=Q0 on G2 y^2=x^3+(4+4u)); the
   // final chunk's psi(B)==[|x|]B subgroup test reuses R_B (=[|x|]B) that this loop already walks.
@@ -151,20 +170,43 @@ function genChunk(opLo, opHi, isFinal) {
       const canonicalRoots = QUOTIENT_TORUS ? rootNames : [...ciNames, ...cNames];
       for (const name of canonicalRoots) L.push(`        require(within(${name}, 0, ${P}));`);
     }
-    L.push('        require(mSqr(Py0) == mAdd(mulFp(mSqr(Px0), Px0), 4));'); // A on G1 (-A shares the curve)
-    L.push('        require(mSqr(Py3) == mAdd(mulFp(mSqr(Px3), Px3), 4));'); // C on G1
-    L.push('        (int bx2a, int bx2b) = r2Sqr(Q0xa, Q0xb);');
-    L.push('        (int bx3a, int bx3b) = r2Mul(bx2a, bx2b, Q0xa, Q0xb);');
-    L.push('        (int rhsa, int rhsb) = r2Add(bx3a, bx3b, 4, 4);'); // b' = 4 + 4u
-    L.push('        (int by2a, int by2b) = r2Sqr(Q0ya, Q0yb);');
-    L.push('        require(by2a == rhsa); require(by2b == rhsb);');
+    if (UNIT_G1) {
+      L.push('        require(Pv0 == mAdd(mulFp(4, mulFp(mSqr(Pu0), Pu0)), mulFp(16, mulFp(mSqr(Pv0), Pv0))));');
+      L.push('        require(Pv3 == mAdd(mulFp(4, mulFp(mSqr(Pu3), Pu3)), mulFp(16, mulFp(mSqr(Pv3), Pv3))));');
+    } else {
+      L.push('        require(mSqr(Py0) == mAdd(mulFp(mSqr(Px0), Px0), 4));'); // A on G1 (-A shares the curve)
+      L.push('        require(mSqr(Py3) == mAdd(mulFp(mSqr(Px3), Px3), 4));'); // C on G1
+    }
+    if (UNIT_G1) {
+      L.push('        bool bIdentity = Q0xa + Q0xb + Q0ya + Q0yb == 0;');
+      L.push('        if (!bIdentity) {');
+      L.push('            (int bx2a, int bx2b) = r2Sqr(Q0xa, Q0xb);');
+      L.push('            (int bx3a, int bx3b) = r2Mul(bx2a, bx2b, Q0xa, Q0xb);');
+      L.push('            (int rhsa, int rhsb) = r2Add(bx3a, bx3b, 4, 4);');
+      L.push('            (int by2a, int by2b) = r2Sqr(Q0ya, Q0yb);');
+      L.push('            require(by2a == rhsa); require(by2b == rhsb);');
+      L.push('        }');
+      L.push('        int pairPu0 = Pu0; int pairPv0 = Pv0;');
+      L.push('        int pairQ0xa = Q0xa; int pairQ0xb = Q0xb; int pairQ0ya = Q0ya; int pairQ0yb = Q0yb;');
+      L.push('        if (bIdentity) {');
+      L.push('            pairPu0 = 0; pairPv0 = 0;');
+      L.push(`            pairQ0xa = ${B_IDENTITY_SUBSTITUTE_AFFINE.x.c0}; pairQ0xb = ${B_IDENTITY_SUBSTITUTE_AFFINE.x.c1};`);
+      L.push(`            pairQ0ya = ${B_IDENTITY_SUBSTITUTE_AFFINE.y.c0}; pairQ0yb = ${B_IDENTITY_SUBSTITUTE_AFFINE.y.c1};`);
+      L.push('        }');
+    } else {
+      L.push('        (int bx2a, int bx2b) = r2Sqr(Q0xa, Q0xb);');
+      L.push('        (int bx3a, int bx3b) = r2Mul(bx2a, bx2b, Q0xa, Q0xb);');
+      L.push('        (int rhsa, int rhsb) = r2Add(bx3a, bx3b, 4, 4);'); // b' = 4 + 4u
+      L.push('        (int by2a, int by2b) = r2Sqr(Q0ya, Q0yb);');
+      L.push('        require(by2a == rhsa); require(by2b == rhsb);');
+    }
   }
   // precompute -Q.y for any runtime pair whose add-line in this window is negated
   const negY = PINFO.map((pi) => {
     if (!pi.cfg.Q) return [`${pi.negQ.c0}`, `${pi.negQ.c1}`];
     const needs = ops.slice(opLo, opHi).some((o) => o.t === 'al' && o.neg && o.j === pi.j);
-    if (needs) { L.push(`        (int nq${pi.j}a, int nq${pi.j}b) = fp2Neg(${pi.Qyae}, ${pi.Qybe}, 1);`); return [`nq${pi.j}a`, `nq${pi.j}b`]; }
-    return [pi.Qyae, pi.Qybe];
+    if (needs) { L.push(`        (int nq${pi.j}a, int nq${pi.j}b) = fp2Neg(${pairQyae(pi)}, ${pairQybe(pi)}, 1);`); return [`nq${pi.j}a`, `nq${pi.j}b`]; }
+    return [pairQyae(pi), pairQybe(pi)];
   });
   // Stage-bound genesis derives the fused MSB state from inputs already needed by the loop.
   // In quotient mode [cInv]=[1-u*W], so its high coordinate is the canonical negation of u.
@@ -182,11 +224,11 @@ function genChunk(opLo, opHi, isFinal) {
       : ciNames.slice()
     : inF.slice();
   let r0 = STAGE_BOUND && opLo === 0
-    ? [PINFO[0].Qxae, PINFO[0].Qxbe, PINFO[0].Qyae, PINFO[0].Qybe, '1', '0']
+    ? [pairQxae(PINFO[0]), pairQxbe(PINFO[0]), pairQyae(PINFO[0]), pairQybe(PINFO[0]), '1', '0']
     : inR0.slice();
   let uid = 0;
   const fresh = (n) => Array.from({ length: n }, () => `v${uid++}`);
-  const emitLine = (coeffs, pi) => { const g = fresh(12); L.push(`        (${decl(g)}) = line(${f.join(',')}, ${coeffs.join(',')}, ${pi.Pxe}, ${pi.Pye});`); f = g; };
+  const emitLine = (coeffs, pi) => { const g = fresh(12); L.push(`        (${decl(g)}) = ${UNIT_G1 && pi.cfg.P ? 'lineUnitScaled' : 'line'}(${f.join(',')}, ${coeffs.join(',')}, ${pairPxe(pi)}, ${pairPye(pi)});`); f = g; };
   for (let i = opLo; i < opHi; i++) {
     const op = ops[i], pi = op.j !== undefined ? PINFO[op.j] : null;
     const fixed = pi !== null && !pi.cfg.Q;
@@ -214,9 +256,9 @@ function genChunk(opLo, opHi, isFinal) {
       emitLine(dco, pi);
     } else if (op.t === 'al') {
       if (fixed) { emitLine(bakedCoeffs(op.coeffs), pi); continue; }
-      const Y = op.neg ? negY[op.j] : [pi.Qyae, pi.Qybe];
+      const Y = op.neg ? negY[op.j] : [pairQyae(pi), pairQybe(pi)];
       const aco = fresh(6), ar = fresh(6);
-      L.push(`        (${decl([...aco, ...ar])}) = pointAdd(${r0.join(',')}, ${pi.Qxae}, ${pi.Qxbe}, ${Y[0]}, ${Y[1]});`); r0 = ar;
+      L.push(`        (${decl([...aco, ...ar])}) = pointAdd(${r0.join(',')}, ${pairQxae(pi)}, ${pairQxbe(pi)}, ${Y[0]}, ${Y[1]});`); r0 = ar;
       emitLine(aco, pi);
     }
   }
@@ -232,7 +274,7 @@ function genChunk(opLo, opHi, isFinal) {
     // so requiring Rz != 0 closes it; non-collapsing walks give the true [|x|]B and gcd(lambda,h2)=1
     // then makes the compare a faithful G2 test. See psi-subgroup-degeneracy.md.
     L.push(`        require(redFp(${r0[4]}) != 0 || redFp(${r0[5]}) != 0);`);
-    L.push(`        (int psxa, int psxb, int psya, int psyb) = psi(Q0xa, Q0xb, Q0ya, Q0yb);`);
+    L.push(`        (int psxa, int psxb, int psya, int psyb) = psi(${pairQxae(PINFO[0])}, ${pairQxbe(PINFO[0])}, ${pairQyae(PINFO[0])}, ${pairQybe(PINFO[0])});`);
     L.push('        (int npya, int npyb) = fp2Neg(psya, psyb, 1);');
     L.push(`        (int exa, int exb) = r2Mul(psxa, psxb, ${r0[4]}, ${r0[5]});`);
     L.push(`        require(redFp(${r0[0]}) == exa); require(redFp(${r0[1]}) == exb);`);
@@ -253,14 +295,17 @@ function genChunk(opLo, opHi, isFinal) {
   } else {
     // The legacy final chunk hands off [fF,c,cInv] to the separate residue tail; non-final
     // chunks carry the full state. Quotient mode instead verifies inline above.
+    const carriedPtParams = identityCompleteGenesis
+      ? [pairPxe(PINFO[0]), pairPye(PINFO[0]), pairQxae(PINFO[0]), pairQxbe(PINFO[0]), pairQyae(PINFO[0]), pairQybe(PINFO[0]), ...ptParams.slice(6)]
+      : ptParams;
     const outNames = isFinal
       ? [...f, ...cNames, ...ciNames]
-      : [...f, ...r0, ...ptParams, ...rootNames];
+      : [...f, ...r0, ...carriedPtParams, ...rootNames];
     // Lazy point arithmetic can leave R_B above p, so every computed f/R limb is reduced exactly
     // once at this ownership boundary. Proof coordinates and roots are range-gated at genesis and
     // never reassigned; carrying those byte-for-byte preserves their canonical encoding.
     const exactNames = COVENANT_RESIDUE
-      ? isFinal ? [...cNames, ...ciNames] : [...new Set([...ptParams, ...rootNames])]
+      ? isFinal ? [...cNames, ...ciNames] : [...new Set([...carriedPtParams, ...rootNames])]
       : [];
     L.push(covOut(outNames, exactNames));
   }
@@ -317,7 +362,7 @@ console.error(`fused miller: ${chunks.length} chunks, total op=${chunks.reduce((
 const manifest = QUOTIENT_TORUS
   ? {
       fused: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', stageBound: STAGE_BOUND,
-      covenantResidue: COVENANT_RESIDUE, inputValidationFused: true,
+      covenantResidue: COVENANT_RESIDUE, inputValidationFused: true, unitG1Lines: UNIT_G1,
       quotientTorus: true, terminalFused: true, genesisRootParams: rootNames,
       numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
       chunks: chunks.map((c) => ({
@@ -327,7 +372,7 @@ const manifest = QUOTIENT_TORUS
     }
   : {
       fused: true, deployment: LINKED ? 'linked-hash-free' : 'covenant', stageBound: STAGE_BOUND,
-      covenantResidue: COVENANT_RESIDUE, inputValidationFused: true,
+      covenantResidue: COVENANT_RESIDUE, inputValidationFused: true, unitG1Lines: UNIT_G1,
       numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),
       chunks: chunks.map((c) => ({
         idx: c.idx, opLo: c.opLo, opHi: c.opHi, final: c.final,
