@@ -284,6 +284,52 @@ function line(
     return r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11;
 }
 
+// Identity-complete G1 line fold for the BLS M-twist. Runtime G1 points use
+// u=-x/(2y), v=-1/(2y) and (0,0) for infinity. Multiplying the raw mul014 line by
+// -2v/(W*V) yields sparse positions (0,4,5):
+//   c2 - (2*c0*v/xi)*W*V - (2*c1*u/xi)*W*V^2, xi=1+i.
+// The removed factor is in the final-exponent kernel. At infinity, every accepted
+// effective G2 walk leaves a nonzero Fp2 c2, which is also killed by that exponent.
+function lineUnitScaled(
+    int F0,int F1,int F2,int F3,int F4,int F5,int F6,int F7,int F8,int F9,int F10,int F11,
+    int c0a,int c0b,int c1a,int c1b,int c2a,int c2b, int u, int v
+) returns (int,int,int,int,int,int,int,int,int,int,int,int) {
+    int o4a = mulFp(subFp(0, addFp(c0a, c0b), 128), v);
+    int o4b = mulFp(subFp(c0a, c0b, 64), v);
+    int o5a = mulFp(subFp(0, addFp(c1a, c1b), 128), u);
+    int o5b = mulFp(subFp(c1a, c1b, 64), u);
+    // Sparse Fp12 multiply by (c2,0,0) + (0,o4,o5)W. This is one
+    // Fp2 product more than mul014, avoiding a generic dense multiply.
+    (int t0a,int t0b,int t1a,int t1b,int t2a,int t2b) =
+        fp6MulByFp2(F0,F1,F2,F3,F4,F5, c2a,c2b);
+
+    (int p1a,int p1b) = fp2Mul(F8,F9, o4a,o4b);
+    (int p2a,int p2b) = fp2Mul(F10,F11, o5a,o5b);
+    (int s12a,int s12b) = fp2Add(F8,F9,F10,F11);
+    (int so12a,int so12b) = fp2Add(o4a,o4b,o5a,o5b);
+    (int pcrossa,int pcrossb) = fp2Mul(s12a,s12b,so12a,so12b);
+    (int dcrossa,int dcrossb) = fp2Sub(pcrossa,pcrossb,p1a,p1b,3);
+    (int crossa,int crossb) = fp2Sub(dcrossa,dcrossb,p2a,p2b,3);
+    (int q0a,int q0b) = fp2MulXi(crossa,crossb,9);
+    (int s01a,int s01b) = fp2Add(F6,F7,F8,F9);
+    (int ps01a,int ps01b) = fp2Mul(s01a,s01b,o4a,o4b);
+    (int b0s1a,int b0s1b) = fp2Sub(ps01a,ps01b,p1a,p1b,3);
+    (int xp2a,int xp2b) = fp2MulXi(p2a,p2b,3);
+    (int q1a,int q1b) = fp2Add(b0s1a,b0s1b,xp2a,xp2b);
+    (int s02a,int s02b) = fp2Add(F6,F7,F10,F11);
+    (int ps02a,int ps02b) = fp2Mul(s02a,s02b,o5a,o5b);
+    (int b0s2a,int b0s2b) = fp2Sub(ps02a,ps02b,p2a,p2b,3);
+    (int q2a,int q2b) = fp2Add(b0s2a,b0s2b,p1a,p1b);
+
+    (int vq0,int vq1,int vq2,int vq3,int vq4,int vq5) = fp6MulByV(q0a,q0b,q1a,q1b,q2a,q2b,9);
+    (int C0,int C1,int C2,int C3,int C4,int C5) = fp6Add(t0a,t0b,t1a,t1b,t2a,t2b, vq0,vq1,vq2,vq3,vq4,vq5);
+    (int sf0,int sf1,int sf2,int sf3,int sf4,int sf5) = fp6Add(F0,F1,F2,F3,F4,F5, F6,F7,F8,F9,F10,F11);
+    (int pr0,int pr1,int pr2,int pr3,int pr4,int pr5) = fp6Mul(sf0,sf1,sf2,sf3,sf4,sf5, c2a,c2b,o4a,o4b,o5a,o5b);
+    (int d0,int d1,int d2,int d3,int d4,int d5) = fp6Sub(pr0,pr1,pr2,pr3,pr4,pr5, t0a,t0b,t1a,t1b,t2a,t2b,3);
+    (int C6,int C7,int C8,int C9,int C10,int C11) = fp6Sub(d0,d1,d2,d3,d4,d5, q0a,q0b,q1a,q1b,q2a,q2b,17);
+    return C0,C1,C2,C3,C4,C5,C6,C7,C8,C9,C10,C11;
+}
+
 function pointDouble(int Xa,int Xb,int Ya,int Yb,int Za,int Zb)
     returns (int,int,int,int,int,int, int,int,int,int,int,int) {
     (int t0a,int t0b) = fp2Sqr(Ya, Yb);

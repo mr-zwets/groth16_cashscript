@@ -151,8 +151,8 @@ export function residueTorusWitness(g) {
 // GENESIS f = cInv (the loop's squarings carry it to c^-2^63). Pair 1 = e(alpha,beta) is a VK
 // constant: its line-folds are dropped (skipPairs) and its UNCONJUGATED single-pair Miller
 // value fAB is multiplied in once via a final 'cmul1' op. states[i] = {f, Rs, c, cInv}.
-export function millerFusedOps(pairs, c, cInv) {
-  const base = millerBatchOps(pairs, { skipPairs: new Set([1]) });
+export function millerFusedOps(pairs, c, cInv, opts = {}) {
+  const base = millerBatchOps(pairs, { skipPairs: new Set([1]), unitLines: opts.unitLines === true });
   const fAB = conj(singlePairMiller(pairs[1]).f); // baked UNCONJUGATED e(alpha,beta) Miller value
   const ops = []; const states = [];
   let cpow = cInv; let k = 0;
@@ -190,8 +190,8 @@ const torusMul = (value, u) => Fp12.create({
 // coordinate u for [c]=[1+u*W], so [c^-1]=[1-u*W]. c-folds and the fixed alpha/beta fold use
 // two Fp6 products rather than a full three-product Fp12 multiplication. Ordinary line folds
 // stay unchanged; their Fp6 scaling is immaterial in Q.
-export function millerFusedTorusOps(pairs, c, cInv, u) {
-  const exact = millerFusedOps(pairs, c, cInv);
+export function millerFusedTorusOps(pairs, c, cInv, u, opts = {}) {
+  const exact = millerFusedOps(pairs, c, cInv, opts);
   if (Fp6.eql(exact.fAB.c0, Fp6.ZERO)) {
     throw new Error('fixed BLS12-381 alpha/beta Miller value has no finite torus coordinate');
   }

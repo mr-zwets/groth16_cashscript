@@ -55,7 +55,33 @@ function mul014(f, o0, o1, o4) {
     c1: Fp6.sub(Fp6.sub(Fp6.mul01(Fp6.add(f.c1, f.c0), o0, Fp2.add(o1, o4)), t0), t1),
   });
 }
-const lineFn = (f, c0, c1, c2, Px, Py) => mul014(f, c0, scalarFp2(c1, Px), scalarFp2(c2, Py));
+export const lineFn = (f, c0, c1, c2, Px, Py) => mul014(f, c0, scalarFp2(c1, Px), scalarFp2(c2, Py));
+
+// Identity-complete G1 line coordinates for the BLS M-twist. For a finite
+// P=(x,y), u=-x/(2y) and v=-1/(2y). The curve equation becomes
+// v=4u^3+16v^3, with the unique v=0 solution (u,v)=(0,0) encoding infinity.
+//
+// A raw mul014 line is c0 + c1*x*V + c2*y*W*V. Multiplying it by
+// -2v/(W*V) gives the sparse (0,4,5) value
+//   c2 - (2*c0*v/xi)*W*V - (2*c1*u/xi)*W*V^2,
+// where V^3=xi. The removed factor is killed by final exponentiation;
+// at (u,v)=(0,0), accepted G2 walks leave a nonzero Fp2 value c2, also killed there.
+const XI_INV = Fp2.inv(Fp2.fromBigTuple([1n, 1n]));
+export function unitG1(point) {
+  if (point.is0()) return { u: 0n, v: 0n };
+  const { x, y } = point.toAffine();
+  const yInv = Fp.inv(Fp.mul(2n, y));
+  return { u: Fp.neg(Fp.mul(x, yInv)), v: Fp.neg(yInv) };
+}
+export const lineUnitScaledFn = (f, c0, c1, c2, u, v) => {
+  const o4 = Fp2.neg(Fp2.mul(scalarFp2(c0, Fp.mul(2n, v)), XI_INV));
+  const o5 = Fp2.neg(Fp2.mul(scalarFp2(c1, Fp.mul(2n, u)), XI_INV));
+  const sparse = Fp12.create({
+    c0: Fp6.create({ c0: c2, c1: Fp2.ZERO, c2: Fp2.ZERO }),
+    c1: Fp6.create({ c0: Fp2.ZERO, c1: o4, c2: o5 }),
+  });
+  return Fp12.mul(f, sparse);
+};
 
 // ---- ate loop NAF of |x| (BLS_X), 64 digits, MSB-first ----
 const BLS_X = 0xd201000000010000n;
@@ -117,7 +143,13 @@ export function millerBatchOps(pairs, opts = {}) {
   // Miller value is baked and multiplied in once instead). Default = skip none, so every other
   // consumer is unaffected. f then = product over the NON-skipped pairs (pre-conjugate).
   const skip = opts.skipPairs ?? new Set();
-  const pds = pairData(pairs);
+  const unitLines = opts.unitLines === true;
+  const pds = pairData(pairs).map((pd, j) => unitLines && PT_CFG[j].P
+    ? { ...pd, ...unitG1(pairs[j].P) }
+    : pd);
+  const foldLine = (value, coeffs, pd) => unitLines && pd.u !== undefined
+    ? lineUnitScaledFn(value, coeffs[0], coeffs[1], coeffs[2], pd.u, pd.v)
+    : lineFn(value, coeffs[0], coeffs[1], coeffs[2], pd.Px, pd.Py);
   const ops = [];
   for (let k = 0; k < ATE_NAF.length; k++) {
     ops.push({ t: 'sqr' });
@@ -131,8 +163,8 @@ export function millerBatchOps(pairs, opts = {}) {
   for (const op of ops) {
     states.push({ f, Rs: Rs.slice() });
     if (op.t === 'sqr') f = Fp12.sqr(f);
-    else if (op.t === 'dl') { const d = pointDouble(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z); Rs[op.j] = d.R; op.coeffs = d.coeffs; f = lineFn(f, d.coeffs[0], d.coeffs[1], d.coeffs[2], pds[op.j].Px, pds[op.j].Py); }
-    else { const pd = pds[op.j]; const a = pointAdd(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z, pd.Qx, op.neg ? pd.negQy : pd.Qy); Rs[op.j] = a.R; op.coeffs = a.coeffs; f = lineFn(f, a.coeffs[0], a.coeffs[1], a.coeffs[2], pd.Px, pd.Py); }
+    else if (op.t === 'dl') { const d = pointDouble(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z); Rs[op.j] = d.R; op.coeffs = d.coeffs; f = foldLine(f, d.coeffs, pds[op.j]); }
+    else { const pd = pds[op.j]; const a = pointAdd(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z, pd.Qx, op.neg ? pd.negQy : pd.Qy); Rs[op.j] = a.R; op.coeffs = a.coeffs; f = foldLine(f, a.coeffs, pd); }
   }
   states.push({ f, Rs: Rs.slice() });
   return { ops, states, boundary: f, finalF: Fp12.conjugate(f) };
@@ -234,6 +266,9 @@ export const pairsFor = (inputs, pf = proof) => [
   { name: 'vkx_gamma', P: vkxPoint(inputs), Q: vk.gamma },
   { name: 'C_delta', P: pf.c, Q: vk.delta },
 ];
+// A canonical B identity is evaluated as e(O,Q*) so the Miller walk remains defined. Q* only
+// needs to be fixed, nonzero, and order-r; the certificate pins those properties for this base.
+export const B_IDENTITY_SUBSTITUTE = bls12_381.G2.Point.BASE;
 // build a proof object {a,b,c} (curve points) from raw limb bigints (replay proof#1)
 export const proofFromLimbs = (Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy) => ({
   a: bls12_381.G1.Point.fromAffine({ x: Ax, y: Ay }),

@@ -86,10 +86,16 @@ function parseParams(sig) {
  *   cfg.nextLockingHash optional 32-byte hex hash. With epilogueMode='covout', require
  *                    output[0]'s locking bytecode to hash to this value, binding a group
  *                    hand-off to the actual first locking of the successor group.
+ *   cfg.nextLockingBytecode optional exact locking-bytecode hex for a grouped output.
  *   cfg.forward.nextLockingHash optional SHA-256 of the immediate successor's locking bytecode.
  *                    Pins an intra-transaction hand-off to the expected successor program.
+ *   cfg.forward.nextLockingBytecode optional exact immediate-successor locking-bytecode hex.
  *   cfg.expectedInputCount optional transaction-graph-size gate.
- *   cfg.expectedInputIndex optional additional position gate; requires expectedInputCount.
+ *   cfg.expectedInputIndex optional position gate.
+ *   cfg.tokenThreadMode optional 'continue' | 'burn'. Require input[0] to carry a mutable NFT
+ *                    and every non-root input to either carry no token or use a different
+ *                    32-byte category. 'burn' also requires the only output to carry no token.
+ *                    Requires the exact root layout (expectedInputIndex=0 and input count > 1).
  *   cfg.externalBindings additional byte-slice bindings from this chunk's inBlob to another
  *                    input's inBlob: [{sourceOffset,targetInputIndex,targetFullInLen,
  *                    targetOffset,length}]. targetInputIndex is transaction-local.
@@ -241,6 +247,10 @@ export function transformChunk(src, cfg) {
         if (!/^[0-9a-f]{64}$/i.test(cfg.nextLockingHash)) throw new Error('invalid nextLockingHash');
         epilogue.push(`        require(hash256(tx.outputs[0].lockingBytecode) == 0x${cfg.nextLockingHash});`);
       }
+      if (cfg.nextLockingBytecode !== undefined) {
+        if (!/^(?:[0-9a-f]{2})+$/i.test(cfg.nextLockingBytecode)) throw new Error('invalid nextLockingBytecode');
+        epilogue.push(`        require(tx.outputs[0].lockingBytecode == 0x${cfg.nextLockingBytecode});`);
+      }
     } else if (cfg.forward) {
       const f = cfg.forward;
       const cmp = f.cmpExpr ?? 'outBlob';
@@ -252,6 +262,12 @@ export function transformChunk(src, cfg) {
         if (!/^[0-9a-f]{64}$/i.test(f.nextLockingHash)) throw new Error('invalid forward nextLockingHash');
         epilogue.push(
           `        require(sha256(tx.inputs[this.activeInputIndex + 1].lockingBytecode) == 0x${f.nextLockingHash});`,
+        );
+      }
+      if (f.nextLockingBytecode !== undefined) {
+        if (!/^(?:[0-9a-f]{2})+$/i.test(f.nextLockingBytecode)) throw new Error('invalid forward nextLockingBytecode');
+        epilogue.push(
+          `        require(tx.inputs[this.activeInputIndex + 1].lockingBytecode == 0x${f.nextLockingBytecode});`,
         );
       }
     } else {
@@ -277,13 +293,19 @@ export function transformChunk(src, cfg) {
   const inLen = inWidths.reduce((sum, width) => sum + width, 0);
   const expectedInputIndex = cfg.expectedInputIndex;
   const expectedInputCount = cfg.expectedInputCount;
-  if ((expectedInputIndex !== undefined && expectedInputCount === undefined) ||
-    (expectedInputCount !== undefined &&
+  if ((expectedInputCount !== undefined &&
       (!Number.isSafeInteger(expectedInputCount) || expectedInputCount <= 0)) ||
     (expectedInputIndex !== undefined &&
       (!Number.isSafeInteger(expectedInputIndex) || expectedInputIndex < 0 ||
-       expectedInputCount <= expectedInputIndex))) {
+       (expectedInputCount !== undefined && expectedInputCount <= expectedInputIndex)))) {
     throw new Error(`invalid expected input layout: ${expectedInputIndex}/${expectedInputCount}`);
+  }
+  if (cfg.tokenThreadMode !== undefined && cfg.tokenThreadMode !== 'continue' && cfg.tokenThreadMode !== 'burn') {
+    throw new Error(`invalid token thread mode: ${cfg.tokenThreadMode}`);
+  }
+  if (cfg.tokenThreadMode !== undefined &&
+    (expectedInputIndex !== 0 || expectedInputCount === undefined || expectedInputCount <= 1)) {
+    throw new Error('token-thread enforcement requires an exact multi-input root layout');
   }
   const prologue = [];
   if (expectedInputCount !== undefined) {
@@ -291,6 +313,26 @@ export function transformChunk(src, cfg) {
   }
   if (expectedInputIndex !== undefined) {
     prologue.push(`        require(this.activeInputIndex == ${expectedInputIndex});`);
+  }
+  if (cfg.tokenThreadMode !== undefined) {
+    prologue.push(
+      '        bytes groupedThreadCategory, bytes groupedThreadCapability = tx.inputs[0].tokenCategory.split(32);',
+      '        require(groupedThreadCapability == 0x01);',
+      '        int groupedSiblingIndex = 1;',
+      '        while (groupedSiblingIndex < tx.inputs.length) {',
+      '            bytes groupedSiblingCategory = tx.inputs[groupedSiblingIndex].tokenCategory;',
+      '            if (groupedSiblingCategory.length > 0) {',
+      '                require(groupedSiblingCategory.split(32)[0] != groupedThreadCategory);',
+      '            }',
+      '            groupedSiblingIndex = groupedSiblingIndex + 1;',
+      '        }',
+    );
+    if (cfg.tokenThreadMode === 'burn') {
+      prologue.push(
+        '        require(tx.outputs.length == 1);',
+        '        require(tx.outputs[0].tokenCategory.length == 0);',
+      );
+    }
   }
   if (cfg.enforceExactInputLength) prologue.push(`        require(inBlob.length == ${inLen});`);
   // GROUPED: a non-genesis group's first chunk binds its incoming blob to the spent token's

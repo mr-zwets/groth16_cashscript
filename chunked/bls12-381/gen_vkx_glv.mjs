@@ -26,6 +26,7 @@ const X = 0xd201000000010000n; // |x|
 const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
+const UNIT_G1 = process.env.BLS_UNIT_G1 === '1';
 const ITERS = 128; // GLV sub-scalars are < 2^128; 128 MSB-first positions
 
 // ---- GLV constants (same as the singleton minop; proof-independent) ----
@@ -101,12 +102,28 @@ export function vkxGlvZinv(k10, k20, k11, k21) {
   const [, , fz] = jacAdd(acc[0], acc[1], acc[2], modP(IC0[0]), modP(IC0[1]), 1n);
   return fz === 0n ? 0n : modinvP(fz);
 }
+/** final yInv for the identity-complete unit G1 handoff. Jacobian Y remains
+ * nonzero for both finite points and the canonical Z=0 infinity state. */
+export function vkxGlvYinv(k10, k20, k11, k21) {
+  const acc = vkxGlvStateAt(k10, k20, k11, k21, ITERS);
+  const [, fy] = jacAdd(acc[0], acc[1], acc[2], modP(IC0[0]), modP(IC0[1]), 1n);
+  return modinvP(mF(2n, fy));
+}
+export function vkxGlvUnit(k10, k20, k11, k21) {
+  const acc = vkxGlvStateAt(k10, k20, k11, k21, ITERS);
+  const [fx, fy, fz] = jacAdd(acc[0], acc[1], acc[2], modP(IC0[0]), modP(IC0[1]), 1n);
+  const yInv = modinvP(mF(2n, fy));
+  const z2 = qF(fz), z3 = mF(z2, fz);
+  return [modP(0n - mF(mF(fx, fz), yInv)), modP(0n - mF(z3, yInv))];
+}
 export const GLV_IC0 = IC0;
 
 // ---- contract template ----
 const STATE = ['rX', 'rY', 'rZ', 'in0', 'in1', 'k10', 'k20', 'k11', 'k21'];
 const GENESIS_STATE = STATE.slice(3);
-const PROOF_NAMES = ['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy'];
+const PROOF_NAMES = UNIT_G1
+  ? ['Au', 'Av', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cu', 'Cv']
+  : ['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy'];
 const prologue = (sharedTable) => `function addFp(int x, int y) returns (int) { return (x + y) % ${Pstr}; }
 function subFp(int x, int y) returns (int) { return (x - y + ${Pstr}) % ${Pstr}; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
@@ -170,7 +187,7 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
   L.push('contract VkxGlvBlsChunk() {');
   if (fullStageBound && !stageBound) throw new Error('full-stage GLV generation requires a stage-bound genesis');
   const extraParams = [
-    final ? 'int zInv' : null,
+    final ? `int ${UNIT_G1 ? 'yInv' : 'zInv'}` : null,
     ...(final && fullStageBound ? PROOF_NAMES.map((name) => `int ${name}`) : []),
     sharedTable !== null && final ? 'bytes glvTable' : null,
   ]
@@ -206,12 +223,20 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
   if (final) {
     L.push(`        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, ${modP(IC0[0])}, ${modP(IC0[1])});`);
     L.push('        rX = icx; rY = icy; rZ = icz;');
-    L.push('        require(mulFp(rZ, zInv) == 1);');
-    L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
-    L.push('        int vkxX = mulFp(rX, zInv2);');
-    L.push('        int vkxY = mulFp(rY, zInv3);');
+    if (UNIT_G1) {
+      L.push('        require(mulFp(addFp(rY, rY), yInv) == 1);');
+      L.push('        int vkxU = subFp(0, mulFp(mulFp(rX, rZ), yInv));');
+      L.push('        int z3 = mulFp(sqrFp(rZ), rZ);');
+      L.push('        int vkxV = subFp(0, mulFp(z3, yInv));');
+    } else {
+      L.push('        require(mulFp(rZ, zInv) == 1);');
+      L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
+      L.push('        int vkxX = mulFp(rX, zInv2);');
+      L.push('        int vkxY = mulFp(rY, zInv3);');
+    }
     // Preserve the proof tuple exactly for the downstream range gate. mulFp makes vk_x canonical.
-    const outputs = fullStageBound ? [...PROOF_NAMES, 'vkxX', 'vkxY'] : ['vkxX', 'vkxY'];
+    const pointOutputs = UNIT_G1 ? ['vkxU', 'vkxV'] : ['vkxX', 'vkxY'];
+    const outputs = fullStageBound ? [...PROOF_NAMES, ...pointOutputs] : pointOutputs;
     L.push(covOut(outputs, outputs));
   } else {
     // A stage-bound genesis derives the accumulator and bounds every scalar. Otherwise only the
@@ -273,11 +298,17 @@ if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
       const committedIn = STAGE_BOUND && first ? inSt.slice(3) : inSt;
       let outLimbs, args;
       if (final) {
-        const zinv = vkxGlvZinv(wk10, wk20, wk11, wk21);
-        const acc = vkxGlvStateAt(wk10, wk20, wk11, wk21, ITERS);
-        const [fx, fy] = jacAdd(acc[0], acc[1], acc[2], modP(IC0[0]), modP(IC0[1]), 1n);
-        const z2 = qF(zinv), z3 = mF(z2, zinv);
-        outLimbs = [mF(fx, z2), mF(fy, z3)]; args = [...committedIn, zinv];
+        if (UNIT_G1) {
+          const yInv = vkxGlvYinv(wk10, wk20, wk11, wk21);
+          outLimbs = vkxGlvUnit(wk10, wk20, wk11, wk21);
+          args = [...committedIn, yInv];
+        } else {
+          const zinv = vkxGlvZinv(wk10, wk20, wk11, wk21);
+          const acc = vkxGlvStateAt(wk10, wk20, wk11, wk21, ITERS);
+          const [fx, fy] = jacAdd(acc[0], acc[1], acc[2], modP(IC0[0]), modP(IC0[1]), 1n);
+          const z2 = qF(zinv), z3 = mF(z2, zinv);
+          outLimbs = [mF(fx, z2), mF(fy, z3)]; args = [...committedIn, zinv];
+        }
       } else { outLimbs = SER_state(...vkxGlvStateAt(wk10, wk20, wk11, wk21, hi)); args = committedIn; }
       const src = genCash(lo, hi, first, final, STAGE_BOUND);
       const m = measureCovenant(src, args.map(BigInt), committedIn.map(BigInt), outLimbs.map(BigInt));

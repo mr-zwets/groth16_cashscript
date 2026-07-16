@@ -9,20 +9,21 @@ BCH 2026 VM:
   verifier (plain and residue-optimized packings).
 - **BLS12-381** — the singleton verifier (baseline and op-optimized), on the **same
   curve as the nChain reference** so the benchmark gets a true apples-to-apples
-  comparison (~21× smaller bytecode), **plus** a deployable grouped-residue chunked
-  verifier (39 inputs in 5 standard transactions).
+  comparison (~21× smaller bytecode), **plus** current-BCH linked and grouped-residue
+  chunked constructions (the grouped quotient-residue verifier is 34 inputs in 3 standard
+  transactions).
 
 This has grown into a whole family of verifiers across two curves, two forms, and
 baseline/op-optimized variants — **[verifiers.md](verifiers.md) is the map** of which is
 which and where each deployable frontier sits.
 
-The deterministic BN254 verifier.cash fixture is an equation-execution benchmark, not a
-circuit-generated proof: its setup scalars are published so the harness can mint many
-valid proofs under one fixed verification key. The BN254 frontier still evaluates the
-complete four-pair equation and does not use those scalar relations to collapse the
-on-chain statement, but the fixture itself does not establish circuit knowledge, secure
-binding of the public-input vector, or interoperability with an independently generated
-setup.
+The deterministic BN254 and BLS12-381 verifier.cash fixtures are equation-execution
+benchmarks, not circuit-generated proofs: their setup scalars are published so the harness
+can mint many valid proofs under one fixed verification key per curve. The frontier
+bytecode still evaluates the complete four-pair equation and does not use those scalar
+relations to collapse the on-chain statement, but the fixtures do not establish circuit
+knowledge, secure binding of the public-input vector, arbitrary-key verification, or
+interoperability with an independently generated setup.
 
 It comes in two forms:
 
@@ -105,4 +106,4 @@ Loops and shift operators are now available (CashScript v0.13.0 / CHIP-2021-05 L
 - **Contract size / unlocking bytecode (the real practical limit):** 10,000 bytes for P2SH (consensus), or just 201 bytes for P2S. A full pairing verifier (F_p¹² tower arithmetic, Miller loops, final exponentiation) is very unlikely to fit under 10 KB even with loops collapsing repeated bytecode.
 - **Operation cost budget (op-cost):** a compute budget enforced per input, scaled by unlocking-script length (`(41 + unlockingBytecodeLength) * 800`). Extra budget can be "bought" by zero-padding the input script, but only up to the 10,000-byte unlocking bytecode limit above, so the two limits are really one wall. The fork's [`unused` modifier](cashscript-compiler-fork.md#3-the-unused-declaration-modifier-issues-125-412) lets a contract declare this pad directly as a `bytes unused zeroPadding` argument instead of a hand-built `OP_DROP` prefix.
 
-Because these limits are per input, a full verifier cannot run in one input and must be split into steps. Those steps can be sibling inputs of one transaction—the current BN254 quotient-torus construction uses 11 inputs—or span sequential transactions with covenant commitments. The committed proof is 88,510 serialized bytes / 68,579,470 op-cost and has an 88,895-byte verifier.cash score after including the 11 spent P2SH32 locking programs. The primary transaction, twelve alternate/identity transactions, and the proof-independent resource fixture are standard and fund the default 1 sat/byte relay fee; a separate dense worst-case transaction also passes both consensus and standard-policy evaluation. A proof-independent resource certificate constructs a 97,023-byte relayable encoding for every valid proof, with a 2,977-byte standard-relay margin and a 77,257,804-op-cost ceiling. See [Breaking Up Computation Across Multiple Steps](multi-step-computation.md) for both forms.
+Because these limits are per input, a full verifier cannot run in one input and must be split into steps. Those steps can be sibling inputs of one transaction—the current BN254 quotient-torus construction uses 11 inputs—or span sequential transactions with covenant commitments. The committed proof is 88,505 serialized bytes / 68,575,152 op-cost and has an 88,890-byte verifier.cash score after including the 11 spent P2SH32 locking programs. The primary transaction, twelve alternate/identity transactions, and the proof-independent resource fixture are standard and fund the default 1 sat/byte relay fee; a separate dense worst-case transaction also passes both consensus and standard-policy evaluation. A proof-independent resource certificate constructs a 97,016-byte relayable encoding for every valid proof, with a 2,984-byte standard-relay margin and a 77,253,358-op-cost ceiling. See [Breaking Up Computation Across Multiple Steps](multi-step-computation.md) for both forms.

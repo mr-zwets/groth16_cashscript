@@ -12,6 +12,8 @@ import { PUBLIC_INPUTS, proof } from '../../singleton/bls12-381/bls_instance.mjs
 
 const r = bls12_381.fields.Fr.ORDER;
 const p = Fp.ORDER;
+const UNIT_G1 = process.env.BLS_UNIT_G1 === '1';
+const millerOptions = { unitLines: UNIT_G1 };
 const quotientOrder = p ** 6n + 1n;
 const finalExponent = (p ** 12n - 1n) / r;
 const gcd = (a, b) => {
@@ -154,7 +156,7 @@ const instances = [
 
 for (const instance of instances) {
   const pairs = pairsFor(instance.inputs, instance.proof);
-  const rawBoundary = millerBatchOps(pairs).boundary;
+  const rawBoundary = millerBatchOps(pairs, millerOptions).boundary;
   const root = residueTorusWitness(rawBoundary);
   assert(!isZero6(root.c.c0), `${instance.label}: residue root is outside the finite chart`);
   assert(
@@ -162,8 +164,8 @@ for (const instance of instances) {
     `${instance.label}: residue correction survives quotienting`,
   );
 
-  const exact = millerFusedOps(pairs, root.c, root.cInv);
-  const quotient = millerFusedTorusOps(pairs, root.c, root.cInv, root.u);
+  const exact = millerFusedOps(pairs, root.c, root.cInv, millerOptions);
+  const quotient = millerFusedTorusOps(pairs, root.c, root.cInv, root.u, millerOptions);
   assert(exact.ops.length === quotient.ops.length, `${instance.label}: trace length changed`);
   for (let i = 0; i < quotient.states.length; i++) {
     assert(
