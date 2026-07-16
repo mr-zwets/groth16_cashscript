@@ -19,7 +19,7 @@
 //     [0,29)[29,64)F. The complete current-BCH verifier's concrete resource fixture
 //     peaks at 7,025,263 op-cost. prove_vkx_glv_resource_bound.mjs charges every
 //     physical fallback opportunity, 58/70 by input; prove_resource_ceiling.mjs
-//     combines those maxima with the Miller ceilings and constructs a 99,353-byte
+//     combines those maxima with the Miller ceilings and constructs a 99,079-byte
 //     proof-independent relayable transaction encoding.
 //   Shamir (254-iter, 2-scalar): 6 windows [0,43)[43,86)[86,129)[129,172)[172,215)[215,254)F
 //     — 95.4% of budget; the worst-case proof (in0,in1 popcount 253/254) already saturates

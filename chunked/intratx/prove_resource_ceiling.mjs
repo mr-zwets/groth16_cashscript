@@ -54,11 +54,11 @@ const DEFAULT_MIN_RELAY_FEE_SATOSHIS_PER_BYTE = 1n;
 const TRANSACTION_OUTPUT_SATOSHIS = 1000n;
 const DENSITY_BASE = 41;
 const DENSITY_MULTIPLIER = 800;
-const LOCKING_GRAPH_HASH = '00fdb00e1a5fd1806ff0621f0b83b244ddbe20ee9fbbeb76e3aa194047d62b3d';
+const LOCKING_GRAPH_HASH = 'aa4b7607776c5dc68234195ad060c1fd154904a5c713a0dbd6c0324e49951682';
 const GLV_TABLE_HASH = '8449064aeddfff724948516b67a6e9e9f04f267dd15f090150ec5c8970ea9046';
 const GLV_EVENT_CEILING_CASES = [GLV_FALLBACK_EVENT_CEILINGS];
-const EXPECTED_EXTRA_COUNTS = [0, 1, 22, 18, 18, 22, 20, 18, 20, 22, 16];
-const EXPECTED_FIXED_FLOORS = [2_172, 3_908, 9_105, 8_510, 7_777, 8_413, 8_631, 7_762, 8_282, 8_099, 9_056];
+const EXPECTED_EXTRA_COUNTS = [0, 1, 22, 18, 18, 22, 20, 18, 20, 18, 20];
+const EXPECTED_FIXED_FLOORS = [2_172, 3_908, 9_105, 8_510, 7_663, 8_413, 8_631, 7_863, 8_282, 7_787, 9_368];
 
 const extraValidProofs = vectors.extraValidProofs ?? [];
 const resourceFixtureProof = vectors.resourceFixtureProof;
@@ -188,7 +188,7 @@ const expectedDependencies = Array.from({ length: INPUT_COUNT }, (_, inputIndex)
   } else if (inputIndex < INPUT_COUNT - 1) {
     // These generated schedules move the retained genesis-unlocking suffix
     // once more, adding one byte of cost per byte of input 2.
-    row[2] = [3, 5, 6, 8, 9].includes(inputIndex) ? 3 : 2;
+    row[2] = [3, 5, 6, 8].includes(inputIndex) ? 3 : 2;
     row[inputIndex] += 1; row[inputIndex + 1] += 2;
   } else {
     row[2] = 2; row[inputIndex] = 1;
@@ -389,7 +389,7 @@ results.forEach((result) => {
 const universalWireBytes = Math.max(...results.map((result) => result.wireBytes));
 const universalTotalOperationCost = Math.max(...results.map((result) =>
   result.costs.reduce((sum, cost) => sum + cost, 0)));
-if (universalWireBytes !== 99_353 || universalTotalOperationCost !== 79_122_059) {
+if (universalWireBytes !== 99_079 || universalTotalOperationCost !== 79_226_279) {
   throw new Error('certified proof-independent relay encoding changed');
 }
 console.log(`proved proof-independent relay encoding: ${universalWireBytes} wire bytes, ` +

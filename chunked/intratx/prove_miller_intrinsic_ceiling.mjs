@@ -562,15 +562,15 @@ const traceCeiling = (inputIndex) => {
 };
 
 export const MILLER_INTRINSIC_CEILINGS = [
-  7_404_546, 7_473_706, 6_410_113, 7_440_919, 7_697_331,
-  6_679_529, 7_029_267, 7_137_710, 6_927_126,
+  7_404_546, 7_473_706, 6_296_374, 7_440_919, 7_697_331,
+  6_800_962, 7_029_267, 6_601_149, 7_570_285,
 ];
 const dependencyCost = (inputIndex) => {
   if (inputIndex === 2) return inputs[2].unlocking.length + 2 * inputs[3].unlocking.length;
   if (inputIndex < inputs.length - 1) {
     // These generated schedules move the retained genesis suffix once more,
     // matching the coefficient measured by the outer dependency audit.
-    const genesisCoefficient = [3, 5, 6, 8, 9].includes(inputIndex) ? 3 : 2;
+    const genesisCoefficient = [3, 5, 6, 8].includes(inputIndex) ? 3 : 2;
     return genesisCoefficient * inputs[2].unlocking.length + inputs[inputIndex].unlocking.length +
       2 * inputs[inputIndex + 1].unlocking.length;
   }

@@ -39,9 +39,9 @@ arithmetic for the linked layout. In either case, every chunk is an input of one
 of one of many sequential transactions, with no per-step hashing and no 128-byte state cap. The
 plain graphs remain larger non-standard transactions. The optimized BN254 quotient-torus graph is
 11 inputs: the committed, alternate, density, resource, and all 11 identity/special fixtures are
-standard and fund the default 1 sat/byte relay fee. The committed proof is 86,903 serialized bytes,
-and the proof-independent resource certificate constructs a 99,353-byte relayable encoding for
-every valid proof, leaving 647 bytes below the standard transaction limit. The
+standard and fund the default 1 sat/byte relay fee. The committed proof is 86,565 serialized bytes,
+and the proof-independent resource certificate constructs a 99,079-byte relayable encoding for
+every valid proof, leaving 921 bytes below the standard transaction limit. The
 BLS12-381 quotient-torus graph is 26 inputs in one current-BCH consensus-valid 192,871-byte
 transaction, non-standard only by total size.
 
@@ -126,7 +126,7 @@ the central trade-off for spec-targeting verifiers:
 
 That relationship holds when the arithmetic and layout stay fixed. The current four-input BN254
 spec build also changes the scalar schedule and flattens the verifier layout, so its 58,683-byte
-transaction is smaller than the 86,903-byte current-BCH construction despite using fewer inputs.
+transaction is smaller than the 86,565-byte current-BCH construction despite using fewer inputs.
 It remains a result in the separate proposed-VM category, not evidence that larger scripts make
 operations cheaper. Within one fixed layout, `FUSE_FINAL` and `FUSE_TAIL` still trade each removed
 input's 8M budget allowance for roughly 10 kB of additional pad, so compare alternatives using their
@@ -149,7 +149,7 @@ sibling's forward-check.
 Standardness is measured for each complete transaction. The BN254 spec fixture is 58,683 bytes and
 passes the proposed VM's standard-policy checks. The BLS spec fixture is 164,474 bytes and exceeds
 the 100,000-byte standard transaction limit. Among current-BCH intra-tx bundles, the optimized
-BN254 quotient-torus verifier has a certified 99,353-byte proof-independent relay encoding, while
+BN254 quotient-torus verifier has a certified 99,079-byte proof-independent relay encoding, while
 the 192,871-byte BLS quotient-torus transaction is non-standard by total size.
 
 ## Files
@@ -227,20 +227,29 @@ VERIFIER_DIR=/absolute/path/to/zk-verifier-bench pnpm vectors:intratx:torus
 ```
 
 The generated verifier uses 11 inputs. Exact full-valid serialized transaction measurements are
-86,903 bytes / 68,384,800 op-cost for the committed proof, 86,923 / 68,245,516 for the alternate
-proof, 96,767 / 76,855,997 for the all-lanes density proof, and 96,840 / 76,911,983 for the
-asymmetric resource fixture. The 11 identity/special fixtures range from 82,316 to 93,860 bytes.
+86,565 bytes / 68,489,869 op-cost for the committed proof, 86,581 / 68,348,601 for the alternate
+proof, 96,429 / 76,959,929 for the all-lanes density proof, and 96,497 / 77,016,148 for the
+asymmetric resource fixture. The 11 identity/special fixtures range from 82,281 to 93,519 bytes.
 All are consensus-valid, standard, and fund the default 1 sat/byte relay fee.
 
 Three byte metrics are intentionally kept distinct. The benchmark CLI's script total is the
-sum of locking and unlocking programs (86,795 for the committed proof). The serialized transaction
-is 86,903 bytes because it contains the unlockings and transaction framing, but not the spent
-outputs. The verifier.cash on-chain score is 87,288 bytes: serialized transaction bytes plus the
+sum of locking and unlocking programs (86,457 for the committed proof). The serialized transaction
+is 86,565 bytes because it contains the unlockings and transaction framing, but not the spent
+outputs. The verifier.cash on-chain score is 86,950 bytes: serialized transaction bytes plus the
 11 × 35-byte spent P2SH32 locking programs.
 
+Against current upstream main (source `551f1b2`, benchmark `a86b230`), the complete branch
+reduces each committed byte metric and the verifier.cash score by 1,828 bytes, while increasing the
+committed transaction by 18,237 op-cost. Its universal encoding is 349 bytes larger and its summed
+op-cost ceiling is 602,150 higher, while remaining standard-relayable with 921 bytes of margin.
+Relative to the preceding branch schedule at source `b6926e0` and benchmark `3044417`, moving
+the final Miller cut from 316 to 313 reduces each committed byte metric and the score by another
+338 bytes, at 105,069 additional committed op-cost. This schedule is selected for the byte-ranked
+verifier.cash track; the op-cost and universal-envelope tradeoffs are reported separately.
+
 The concrete fixtures are regression evidence, not the proof-independent claim:
-`prove_resource_ceiling.mjs` separately constructs a 99,353-serialized-byte relayable encoding for
-every valid proof, with a 79,122,059-op-cost ceiling and 647 bytes below the 100,000-byte standard
+`prove_resource_ceiling.mjs` separately constructs a 99,079-serialized-byte relayable encoding for
+every valid proof, with a 79,226,279-op-cost ceiling and 921 bytes below the 100,000-byte standard
 transaction limit. It charges the fallback surcharge at all 58 and 70 physical GLV lookup slots,
 then checks that universal ceiling on the standard BCH2026 VM. The certificate refuses a changed
 locking graph, compiler schedule, or lookup table and does not use setup or IC discrete logarithms.
