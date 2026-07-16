@@ -310,8 +310,8 @@ function emitMillerTailLazy() {
 // endomorphism relation R+psi(B)-psi^2(B) == -psi^3(B) doubles as the EXACT G2 subgroup check
 // (prove_miller_endpoint_subgroup.mjs) — the standalone fast-endo 63-bit walk disappears.
 // Terminal verdict: [F*c^(p^2)] == [c^p*c^(p^3)] by projective cross-multiplication with an
-// explicit [0:0] rejection on canonical limbs. Every accepting quotient class has a finite
-// six-limb representative thanks to the fixed r-torsion kernel shift (_residuemath.mjs).
+// explicit [0:0] rejection on canonical limbs. Every accepting boundary has a finite six-limb
+// lambda-root witness thanks to the fixed r-torsion kernel shift (_residuemath.mjs).
 // Mirrors chunked/pairing/gen_miller_residue.mjs (MILLER_TORUS=1) unrolled with baked literals.
 const KX = '21888242871839275220042445260109153167277707414472061641714758635765020556616'; // psi^2 x-coeff
 function buildTorusTrace() {

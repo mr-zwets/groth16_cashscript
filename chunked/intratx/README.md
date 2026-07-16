@@ -24,16 +24,32 @@ chunk of a stage is genesis (nothing binds its input); the last asserts the verd
 (`finalExp == 1`). Cross-stage links are bound where byte layouts line up: **vk_x** into
 the Miller genesis input, the **Miller boundary** into the final-exp genesis input.
 
+The quotient-torus verifier additionally treats input 0 as the graph root. The root requires exactly
+11 inputs, and every nonterminal program pins the SHA-256 of its immediate successor's complete
+P2SH32 locking bytecode at `activeInputIndex + 1`. If the root were at index `j`, those ten pinned
+hops require `j + 10 < 11`, so `j = 0` and every successor position follows. The final three
+programs retain logically redundant position gates because public cashc compiles them smaller.
+`OP_INPUTBYTECODE` binds each state handoff. Spending the designated input-0 UTXO enforces the
+complete graph; an isolated suffix UTXO does not establish the omitted prefix.
+
 Each input still fits one BCH budget (op-cost ≤ 8,032,800, script ≤ 10,000 B). The plain and BLS
 graphs reuse the covenant chunks verbatim; the BN254 quotient-torus graph instead specializes its
 arithmetic for the linked layout. In either case, every chunk is an input of one transaction instead
 of one of many sequential transactions, with no per-step hashing and no 128-byte state cap. The
 plain graphs remain larger non-standard transactions. The optimized BN254 quotient-torus graph is
-11 inputs: the committed, alternate, density, resource, and all nine identity/special fixtures are
-standard and fund the default 1 sat/byte relay fee. The committed proof is 90,564 serialized bytes,
-and the proof-independent resource certificate bounds every accepted witness at 99,285 bytes. The
+11 inputs: the committed, alternate, density, resource, and all 11 identity/special fixtures are
+standard and fund the default 1 sat/byte relay fee. The committed proof is 88,510 serialized bytes,
+and the proof-independent resource certificate constructs a 97,023-byte relayable encoding for
+every valid proof. The
 BLS12-381 quotient-torus graph is 34 inputs in one current-BCH consensus-valid 195,705-byte
 transaction, non-standard only by total size.
+
+The BN254 programs evaluate the complete four-pair equation and consume the proof and two public
+inputs at runtime. The prescribed checkpoint key is nevertheless synthetic: its setup and IC
+scalars are published. The BN254 measurements therefore establish equation execution, runtime
+witness handling, and BCH resource validity for that key, not circuit knowledge, secure binding of
+the public-input vector, or interoperability with an independently generated setup. Regenerating
+the construction for a circuit-derived key requires new bytecode and a fresh resource certificate.
 
 ### P2SH deployment
 
@@ -50,7 +66,7 @@ Two variants target the **proposed `bch-spec` upgrade** instead of current BCH:
 `build_vectors_residue_large.mjs` (BN254 → `bch-groth16-intratx-residue-large`) and
 `build_vectors_residue_bls_large.mjs` (BLS12-381 → `bch-groth16-bls12381-intratx-residue-large`).
 Same forward-checking mechanism as the 10 kB builds; the BN254 build consumes the same
-quotient-torus graph as the 13-input frontier, re-planned to 2 inputs at the 100 kB budget,
+quotient-torus graph as the 11-input frontier, re-planned to 2 inputs at the 100 kB budget,
 while the BLS build keeps its residue graph — only the per-input budget changes. They are
 graded against libauth's `createVirtualMachineBchSpec`, are **not valid on current BCH**
 (`createVirtualMachineBch2026`), and the harness marks them `vm: 'bch-spec'` and files
@@ -130,8 +146,8 @@ sibling's forward-check.
 
 A 100 kB input exceeds standard relay policy (the *tx* exceeds `maximumStandardTransactionSize` =
 100,000), so the transaction is non-standard and must be mined directly. The plain and BLS
-current-BCH intra-tx bundles are also non-standard; the BN254 quotient-torus verifier is the
-standard-policy-valid exception, with a certified 99,285-byte universal envelope.
+current-BCH intra-tx bundles are also non-standard; the BN254 quotient-torus verifier
+has a certified 97,023-byte proof-independent relay encoding.
 
 ## Files
 
@@ -153,6 +169,11 @@ standard-policy-valid exception, with a certified 99,285-byte universal envelope
   grouped 3x43 MSM/table construction and its proof-independent equal-point event bound.
 - `../pairing/prove_projective_vkx.mjs` / `../pairing/prove_miller_unit_lines.mjs` — prove the
   universal nonzero-Y projective handoff and the identity-complete normalized G1 representation.
+- `../pairing/prove_miller_affine_raw.mjs` — differentially replays every runtime-G2 affine step
+  against the field formulas and proves the unreduced integer intermediates remain below `8p^2`.
+  The pipeline also compiles direct CashScript probes and executes both raw kernels on consensus
+  and standard BCH VMs. The quotient-torus generator calls separately named raw kernels; the
+  canonical affine kernels remain unchanged for the singleton-minop compiler schedule.
 - `infinity_fixtures.mjs` — constructs every combination of identity A, B, and C, plus finite-B
   and runtime-MSM-identity disambiguation fixtures, under the same verification key.
 - `prove_miller_intrinsic_ceiling.mjs` / `prove_resource_ceiling.mjs` — shadow the generated Miller
@@ -193,7 +214,7 @@ The quotient-torus frontier has a separate deterministic entry point. It selects
 covenant-residue, and linked layouts together, and uses the frozen measured cuts. The command runs
 the grouped-GLV/table/event proofs, affine and normalized-line proofs, integer-bound analysis,
 signed-square differential, endpoint and quotient/Frobenius proofs, projective handoff proof,
-whole-transaction mutation suite, Miller shadow, and universal resource certificate. It refuses
+whole-transaction mutation suite, Miller shadow, and proof-independent relay certificate. It refuses
 to write vectors unless the committed, alternate, density, and asymmetric-resource full-valid
 transactions pass both whole current-BCH consensus and standard-policy VMs.
 
@@ -202,22 +223,24 @@ VERIFIER_DIR=/absolute/path/to/zk-verifier-bench pnpm vectors:intratx:torus
 ```
 
 The generated verifier uses 11 inputs. Exact full-valid serialized transaction measurements are
-90,564 bytes / 70,663,907 op-cost for the committed proof, 90,572 / 70,511,678 for the alternate
-proof, 98,381 / 78,524,566 for the all-lanes density proof, and 98,462 / 78,589,573 for the
-asymmetric resource fixture. The nine identity/special fixtures range from 83,623 to 90,581 bytes.
+88,510 bytes / 68,579,470 op-cost for the committed proof, 88,535 / 68,440,254 for the alternate
+proof, 96,243 / 76,430,954 for the all-lanes density proof, and 96,318 / 76,490,951 for the
+asymmetric resource fixture. The 11 identity/special fixtures range from 83,845 to 93,242 bytes.
 All are consensus-valid, standard, and fund the default 1 sat/byte relay fee.
 
 Three byte metrics are intentionally kept distinct. The benchmark leaderboard's `total B` is the
-sum of locking and unlocking programs (90,456 for the committed proof). The serialized transaction
-is 90,564 bytes because it contains the unlockings and transaction framing, but not the spent
-outputs. The verifier.cash on-chain score is 90,949 bytes: serialized transaction bytes plus the
+sum of locking and unlocking programs (88,402 for the committed proof). The serialized transaction
+is 88,510 bytes because it contains the unlockings and transaction framing, but not the spent
+outputs. The verifier.cash on-chain score is 88,895 bytes: serialized transaction bytes plus the
 11 × 35-byte spent P2SH32 locking programs.
 
-The concrete fixtures are regression evidence, not the universal claim:
-`prove_resource_ceiling.mjs` separately proves a 99,285-serialized-byte,
-79,389,147-op-cost envelope for every accepted witness, leaving 715 bytes below the 100,000-byte
-standard transaction limit. The two componentwise-maximal GLV event allocations are checked on the
-standard BCH2026 VM, and the certificate refuses a changed locking graph or lookup table.
+The concrete fixtures are regression evidence, not the proof-independent claim:
+`prove_resource_ceiling.mjs` separately constructs a 97,023-serialized-byte relayable encoding for
+every valid proof, with a 77,257,804-op-cost ceiling and 2,977 bytes below the 100,000-byte standard
+transaction limit. The two componentwise-maximal GLV event allocations are checked on the standard
+BCH2026 VM, and the certificate refuses a changed locking graph, compiler schedule, or lookup table.
+The existing unused padding arguments can be enlarged within per-input limits, so this is an
+existence result for a uniform relayable encoding rather than a maximum over all accepted byte strings.
 
 The BLS12-381 quotient frontier has the same proof-before-write workflow and a separate opt-in
 entry point; the unflagged BLS commands continue to generate the legacy Fp6-tail construction.

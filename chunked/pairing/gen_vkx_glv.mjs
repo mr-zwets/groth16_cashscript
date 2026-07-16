@@ -8,8 +8,9 @@
 // The decomposition witnesses k10,k20,k11,k21 are checked on-chain at genesis
 // (k1 + k2*lambda == in mod r); phi(IC1),phi(IC2) and the table are baked (proof-independent).
 // State (committed, 9 limbs): rX,rY,rZ, in0,in1, k10,k20,k11,k21. The
-// covenant-residue layout carries the validated (-A,B,C) tuple beside this state
-// and emits (-A,B,C,vk_x) for the Miller stage.
+// covenant-residue layout carries the (-A,B,C) tuple beside this state and emits the
+// exact Miller-stage tuple. The token-chain layout additionally derives a B-infinity
+// flag and replaces the all-zero B encoding with G2.BASE for the neutral affine walk.
 //   node gen_vkx_glv.mjs    plan + emit vkxglv_NN.cash + manifest_vkxglv.json
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
@@ -31,6 +32,7 @@ const OP_TARGET = Number(process.env.OP_COST_TARGET ?? 7_700_000);
 const BYTE_BUDGET = Number(process.env.BYTE_BUDGET ?? 9_700);
 const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 const COVENANT_RESIDUE = STAGE_BOUND && process.env.COVENANT_RESIDUE_LAYOUT === '1';
+const COVENANT_TOKEN_CHAIN = COVENANT_RESIDUE && process.env.COVENANT_TOKEN_CHAIN === '1';
 const PROJECTIVE_OUTPUT = process.env.MILLER_PROJECTIVE_VKX === '1';
 const ITERS = 128; // GLV sub-scalars are <= 127 bits; 128 MSB-first positions
 
@@ -333,13 +335,34 @@ export function genCash(
   if (final) {
     if (!projectiveOutput) {
       L.push(`        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, ${IC0[0]}, ${IC0[1]});`);
-      L.push('        require(mulFp(icz, zInv) == 1);');
-      L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
-      L.push('        int vkxX = mulFp(icx, zInv2);');
-      L.push('        int vkxY = mulFp(icy, zInv3);');
+      if (covenantResidue && COVENANT_TOKEN_CHAIN) {
+        L.push('        int vkxX = 0; int vkxY = 0;');
+        L.push('        if (icz == 0) { require(zInv == 0); } else {');
+        L.push('            require(mulFp(icz, zInv) == 1);');
+        L.push('            int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
+        L.push('            vkxX = mulFp(icx, zInv2); vkxY = mulFp(icy, zInv3);');
+        L.push('        }');
+      } else {
+        L.push('        require(mulFp(icz, zInv) == 1);');
+        L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
+        L.push('        int vkxX = mulFp(icx, zInv2);');
+        L.push('        int vkxY = mulFp(icy, zInv3);');
+      }
     }
     const vkxState = projectiveOutput ? ['rX', 'rY', 'rZ'] : ['vkxX', 'vkxY'];
-    const finalState = covenantResidue ? [...PROOF_STATE, ...vkxState] : vkxState;
+    let finalProofState = PROOF_STATE;
+    if (covenantResidue && COVENANT_TOKEN_CHAIN) {
+      const base = bn254.G2.Point.BASE.toAffine();
+      L.push('        int bInfinityFlag = 0;');
+      L.push('        int millerBxa = Bxa; int millerBxb = Bxb; int millerBya = Bya; int millerByb = Byb;');
+      L.push('        if (Bxa == 0 && Bxb == 0 && Bya == 0 && Byb == 0) {');
+      L.push(`            bInfinityFlag = 1; millerBxa = ${base.x.c0}; millerBxb = ${base.x.c1}; millerBya = ${base.y.c0}; millerByb = ${base.y.c1};`);
+      L.push('        }');
+      finalProofState = ['Ax', 'Ay', 'millerBxa', 'millerBxb', 'millerBya', 'millerByb', 'Cx', 'Cy'];
+    }
+    const finalState = covenantResidue
+      ? [...finalProofState, ...vkxState, ...(COVENANT_TOKEN_CHAIN ? ['bInfinityFlag'] : [])]
+      : vkxState;
     L.push(covOut(finalState, finalState));
   } else {
     // Upstream G2 bounds the proof tuple and its exact commitment seam carries it here; this
@@ -443,7 +466,9 @@ if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
         const acc = vkxGlvStateAt(wk10, wk20, wk11, wk21, ITERS);
         if (PROJECTIVE_OUTPUT) {
           const vkx = acc.map(String);
-          outLimbs = COVENANT_RESIDUE ? [...proofState, ...vkx] : vkx;
+          outLimbs = COVENANT_RESIDUE
+            ? [...proofState, ...vkx, ...(COVENANT_TOKEN_CHAIN ? ['0'] : [])]
+            : vkx;
           args = firstArgs;
         } else {
           const zinv = vkxGlvZinv(wk10, wk20, wk11, wk21);
@@ -451,7 +476,9 @@ if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
           const [fx, fy] = jacAdd(acc[0], acc[1], acc[2], ic0[0], ic0[1], 1n);
           const z2 = qF(zinv), z3 = mF(z2, zinv);
           const vkx = [mF(fx, z2), mF(fy, z3)].map(String);
-          outLimbs = COVENANT_RESIDUE ? [...proofState, ...vkx] : vkx;
+          outLimbs = COVENANT_RESIDUE
+            ? [...proofState, ...vkx, ...(COVENANT_TOKEN_CHAIN ? ['0'] : [])]
+            : vkx;
           args = [...firstArgs, String(zinv)];
         }
       }
@@ -480,6 +507,9 @@ if (process.argv[1] && process.argv[1].endsWith('gen_vkx_glv.mjs')) {
     lo = best.hi;
   }
   const vkxState = PROJECTIVE_OUTPUT ? ['rX', 'rY', 'rZ'] : ['vkxX', 'vkxY'];
-  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ numChunks: chunks.length, iters: ITERS, glv: true, stageBound: STAGE_BOUND, covenantResidue: COVENANT_RESIDUE, ...(PROJECTIVE_OUTPUT ? { projectiveOutput: true } : {}), genesisDerived: STAGE_BOUND, exactProofHandoff: COVENANT_RESIDUE, stageLayout: COVENANT_RESIDUE ? [...PROOF_STATE, ...vkxState] : undefined, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, final: c.final })) }, null, 2));
+  const stageLayout = COVENANT_RESIDUE
+    ? [...PROOF_STATE, ...vkxState, ...(COVENANT_TOKEN_CHAIN ? ['bInfinityFlag'] : [])]
+    : undefined;
+  writeFileSync(join(GEN, 'manifest_vkxglv.json'), JSON.stringify({ numChunks: chunks.length, iters: ITERS, glv: true, stageBound: STAGE_BOUND, covenantResidue: COVENANT_RESIDUE, covenantTokenChain: COVENANT_TOKEN_CHAIN, ...(PROJECTIVE_OUTPUT ? { projectiveOutput: true } : {}), genesisDerived: STAGE_BOUND, exactProofHandoff: COVENANT_RESIDUE, stageLayout, chunks: chunks.map((c) => ({ idx: c.idx, lo: c.lo, hi: c.hi, first: c.first, final: c.final })) }, null, 2));
   console.error(`GLV vk_x: ${chunks.length} chunks, total op=${chunks.reduce((s, c) => s + c.operationCost, 0).toLocaleString()}`);
 }

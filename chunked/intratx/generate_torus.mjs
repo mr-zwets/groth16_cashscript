@@ -9,7 +9,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 if (!process.env.VERIFIER_DIR) {
   throw new Error('VERIFIER_DIR must point to the zk-verifier-bench checkout');
 }
-const stageCount = 12;
+const stageCount = 13;
 
 const torusEnv = {
   FUSE_G2_ENDPOINT: '1',
@@ -18,10 +18,11 @@ const torusEnv = {
   MILLER_TORUS: '1',
   MILLER_PROJECTIVE_VKX: '1',
   MILLER_NORMALIZED_PROOF_POINTS: '1',
+  MILLER_RAW_B_INFINITY: '1',
   STAGE_BOUND_LAYOUT: '1',
   COVENANT_RESIDUE_LAYOUT: '1',
   MILLER_LINKED_LAYOUT: '1',
-  MILLER_LINKED_CUTS: '39,79,119,159,199,238,277,316',
+  MILLER_LINKED_CUTS: '40,78,115,158,200,238,277,316',
   OP_COST_TARGET: '7950000',
   BYTE_BUDGET: '9700',
   RESCHEDULE: 'on',
@@ -47,19 +48,22 @@ console.log(`[3/${stageCount}] prove grouped GLV resource bound...`);
 await run('chunked/pairing/prove_vkx_glv_resource_bound.mjs');
 console.log(`[4/${stageCount}] prove affine Miller-step equivalence...`);
 await run('chunked/pairing/prove_miller_affine.mjs');
-console.log(`[5/${stageCount}] prove normalized Miller-line equivalence...`);
+console.log(`[5/${stageCount}] prove and execute raw affine formulas and integer bounds...`);
+await run('chunked/pairing/prove_miller_affine_raw.mjs');
+await run('singleton/bn254/test_affine_kernels.mjs');
+console.log(`[6/${stageCount}] prove normalized Miller-line equivalence...`);
 await run('chunked/pairing/prove_miller_unit_lines.mjs');
-console.log(`[6/${stageCount}] prove specialized integer bounds...`);
+console.log(`[7/${stageCount}] prove specialized integer bounds...`);
 await run('chunked/pairing/unit_line_bound_analysis.mjs');
-console.log(`[7/${stageCount}] check signed fp12 square against the canonical BCH implementation...`);
+console.log(`[8/${stageCount}] check signed fp12 square against the canonical BCH implementation...`);
 await run('singleton/bn254/test_fp12sqr_differential.mjs');
-console.log(`[8/${stageCount}] prove endpoint subgroup equivalence...`);
+console.log(`[9/${stageCount}] prove endpoint subgroup equivalence...`);
 await run('chunked/pairing/prove_miller_endpoint_subgroup.mjs');
-console.log(`[9/${stageCount}] prove quotient-torus algebra and short signed Frobenius formulas...`);
+console.log(`[10/${stageCount}] prove quotient-torus algebra and short signed Frobenius formulas...`);
 await run('chunked/pairing/prove_miller_torus.mjs');
-console.log(`[10/${stageCount}] prove universal grouped-GLV Y invariant and projective vk_x handoff...`);
+console.log(`[11/${stageCount}] prove universal grouped-GLV Y invariant and projective vk_x handoff...`);
 await run('chunked/pairing/prove_projective_vkx.mjs');
-console.log(`[11/${stageCount}] assemble and verify the whole transaction...`);
+console.log(`[12/${stageCount}] assemble and verify the whole transaction...`);
 await run('chunked/intratx/build_vectors_residue.mjs');
-console.log(`[12/${stageCount}] certify the universal BCH resource envelope...`);
+console.log(`[13/${stageCount}] certify the proof-independent BCH relay encoding...`);
 await run('chunked/intratx/prove_resource_ceiling.mjs');

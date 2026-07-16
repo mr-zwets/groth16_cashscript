@@ -15,7 +15,9 @@ import { bn254 } from '@noble/curves/bn254.js';
 const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const root = process.env.PROBE_ROOT ?? fileURLToPath(new URL('.', import.meta.url));
 const compileOptions = process.env.RAW === '1' ? {} : { rescheduleStacks: true };
-const probes = Object.fromEntries(['fp2sqr', 'affine_double', 'affine_add'].map((name) => {
+const probes = Object.fromEntries([
+  'fp2sqr', 'affine_double', 'affine_add', 'affine_double_raw', 'affine_add_raw',
+].map((name) => {
   const redeem = utils.asmToBytecode(compileFile(join(root, `${name}_kernel_probe.cash`), compileOptions).bytecode);
   return [name, { redeem, locking: encodeLockingBytecodeP2sh32(hash256(redeem)), redeemPush: encodeDataPush(redeem) }];
 }));
@@ -78,7 +80,10 @@ const doubleVector = (name, x, y, slope) => {
   const nY = Fp2.sub(Fp2.mul(m, Fp2.sub(X, nX)), Y);
   const mx = limbs(Fp2.mul(m, X));
   const exactC0 = [mod(y[0]) - mx[0] + P, mod(y[1]) - mx[1] + P];
-  return { name, args: [...x.map(mod), ...y.map(mod), ...limbs(m), ...exactC0, ...limbs(m), ...limbs(nX), ...limbs(nY)] };
+  const rawC0 = [mod(y[0] - mx[0]), mod(y[1] - mx[1])];
+  const prefix = [...x.map(mod), ...y.map(mod), ...limbs(m)];
+  const suffix = [...limbs(m), ...limbs(nX), ...limbs(nY)];
+  return { name, args: [...prefix, ...exactC0, ...suffix], rawArgs: [...prefix, ...rawC0, ...suffix] };
 };
 const addVector = (name, x, y, qx, qy, slope) => {
   const X = asFp2(x), Y = asFp2(y), Qx = asFp2(qx), Qy = asFp2(qy);
@@ -87,7 +92,10 @@ const addVector = (name, x, y, qx, qy, slope) => {
   const nY = Fp2.sub(Fp2.mul(m, Fp2.sub(X, nX)), Y);
   const mx = limbs(Fp2.mul(m, X));
   const exactC0 = [mod(y[0]) - mx[0] + P, mod(y[1]) - mx[1] + P];
-  return { name, args: [...x.map(mod), ...y.map(mod), ...qx.map(mod), ...qy.map(mod), ...limbs(m), ...exactC0, ...limbs(m), ...limbs(nX), ...limbs(nY)] };
+  const rawC0 = [mod(y[0] - mx[0]), mod(y[1] - mx[1])];
+  const prefix = [...x.map(mod), ...y.map(mod), ...qx.map(mod), ...qy.map(mod), ...limbs(m)];
+  const suffix = [...limbs(m), ...limbs(nX), ...limbs(nY)];
+  return { name, args: [...prefix, ...exactC0, ...suffix], rawArgs: [...prefix, ...rawC0, ...suffix] };
 };
 
 const sqrVectors = [
@@ -128,12 +136,18 @@ const run = (label, probe, vectors, argsFor) => {
 run('fp2Sqr', probes.fp2sqr, sqrVectors, (vector) => [...vector.a, ...sqrExpected(vector.a)]);
 run('pointDoubleAffine', probes.affine_double, doubleVectors, (vector) => vector.args);
 run('pointAddAffine', probes.affine_add, addVectors, (vector) => vector.args);
+run('pointDoubleAffineRaw', probes.affine_double_raw, doubleVectors, (vector) => vector.rawArgs);
+run('pointAddAffineRaw', probes.affine_add_raw, addVectors, (vector) => vector.rawArgs);
 
 const badSqr = [...sqrVectors[0].a, ...sqrExpected(sqrVectors[0].a)]; badSqr[2] += P;
 const badDoubleSlope = doubleVectors[0].args.slice(); badDoubleSlope[4] = (badDoubleSlope[4] + 1n) % P;
 const zeroDoubleDenominator = doubleVectors[0].args.slice(); zeroDoubleDenominator[2] = 0n; zeroDoubleDenominator[3] = 0n;
 const badAddSlope = addVectors[0].args.slice(); badAddSlope[8] = (badAddSlope[8] + 1n) % P;
 const zeroAddDenominator = addVectors[0].args.slice(); zeroAddDenominator[4] = zeroAddDenominator[0]; zeroAddDenominator[5] = zeroAddDenominator[1];
+const badRawDoubleSlope = doubleVectors[0].rawArgs.slice(); badRawDoubleSlope[4] = (badRawDoubleSlope[4] + 1n) % P;
+const zeroRawDoubleDenominator = doubleVectors[0].rawArgs.slice(); zeroRawDoubleDenominator[2] = 0n; zeroRawDoubleDenominator[3] = 0n;
+const badRawAddSlope = addVectors[0].rawArgs.slice(); badRawAddSlope[8] = (badRawAddSlope[8] + 1n) % P;
+const zeroRawAddDenominator = addVectors[0].rawArgs.slice(); zeroRawAddDenominator[4] = zeroRawAddDenominator[0]; zeroRawAddDenominator[5] = zeroRawAddDenominator[1];
 for (const [vmName, vm] of vms) {
   for (const [label, probe, args] of [
     ['noncanonical square result', probes.fp2sqr, badSqr],
@@ -141,6 +155,10 @@ for (const [vmName, vm] of vms) {
     ['zero double denominator', probes.affine_double, zeroDoubleDenominator],
     ['add slope mutation', probes.affine_add, badAddSlope],
     ['zero add denominator', probes.affine_add, zeroAddDenominator],
+    ['raw double slope mutation', probes.affine_double_raw, badRawDoubleSlope],
+    ['raw zero double denominator', probes.affine_double_raw, zeroRawDoubleDenominator],
+    ['raw add slope mutation', probes.affine_add_raw, badRawAddSlope],
+    ['raw zero add denominator', probes.affine_add_raw, zeroRawAddDenominator],
   ]) {
     if (evaluate(probe, args, vm).accepted) throw new Error(`${label} accepted on ${vmName}`);
   }

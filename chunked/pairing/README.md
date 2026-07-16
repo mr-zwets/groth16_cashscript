@@ -24,19 +24,39 @@ VERIFIER_DIR=/path/to/zk-verifier-bench pnpm vectors:covenant:torus
 
 It writes exactly
 `$VERIFIER_DIR/src/bch/groth16-chunked-covenant-residue-vectors.json`.
-The 14-transaction graph uses a four-chunk GLV `vk_x` stage followed by ten
-quotient-torus Miller chunks. Its GLV minting-baton genesis commits `(-A,B,C)`; the
-first Miller step checks those canonical points, derives its normalized line state,
-and the runtime-B endpoint proves exact G2 subgroup membership. The six-limb finite
-residue root is introduced at that GLV-to-Miller seam, then every later state is
-committed by a canonical NFT commitment. Every nonterminal covenant pins its
-successor P2SH32 locking, and the mutable thread terminates as an immutable NFT.
+The 12-transaction graph uses three standalone GLV `vk_x` chunks, one transaction that
+fuses the GLV terminal with the Miller prefix, and eight remaining quotient-torus Miller
+chunks. Its GLV minting-baton genesis commits the raw proof tuple. The fused transaction
+finishes `vk_x`, derives a B-identity flag exactly from the all-zero raw B encoding, and maps only that case to
+`G2.BASE` for the affine walk, and immediately checks the canonical points and curve
+equations before emitting the first Miller state. There is no intermediate
+`(-A,effective-B,C,vk_x,B-identity)` covenant seam: the fused input commitment binds the
+partial GLV state and raw proof tuple, and its output commitment binds the resulting Miller
+state. A finite raw `B=G2.BASE` remains finite. The fused step derives its normalized line
+state and uses the identity flag to make only the
+original all-zero B pairing neutral; the runtime-B endpoint proves exact G2 subgroup
+membership. The six-limb finite residue root is introduced inside that fused transition,
+then every later state is committed by a canonical NFT commitment. Every nonterminal
+covenant pins its successor P2SH32 locking, and the mutable thread terminates as an
+immutable NFT.
 
 The reproduction command also runs the affine, unit-line, integer-bound, endpoint,
 and quotient-torus proof scripts. The writer refuses to emit vectors unless the
-committed, second, and dense proofs all pass the same locking graph on both BCH 2026
-consensus and standard-policy VMs, and its point, residue-range, state,
-successor-locking, token-lifecycle, quotient, and stage-seam negative cases reject.
+committed, second, dense, and 11 identity/boundary proofs all pass the same locking graph
+on both BCH 2026 consensus and standard-policy VMs with exact per-transaction fee funding,
+and it rejects its point, residue-range, state, successor-locking, token-lifecycle,
+quotient, and stage-seam fixtures.
+The exact satoshi values and fees belong to those funded vectors; the covenant programs enforce
+the token and successor transitions but intentionally do not pin satoshi values. This accepting
+suite is relay evidence for the measured fixtures, not a proof-independent relay ceiling for every
+valid proof.
+
+The verifier evaluates the complete four-pair equation, but verifier.cash's prescribed BN254
+checkpoint key is synthetic and publishes its setup and IC scalars. The vectors therefore establish
+equation execution, runtime witness handling, and covenant validity for that key, not circuit
+knowledge, secure binding of the public-input vector, or interoperability with an independently
+generated setup.
+
 The legacy 20-transaction non-quotient residue graph remains reproducible by running
 `generate_covenant_residue.mjs` without `MILLER_TORUS=1`.
 

@@ -65,9 +65,9 @@ export function residueWitness(fRaw) {
 
 // A nontrivial r-th root has k^lambda=1 because r divides lambda. If the
 // residue root returned above is the quotient torus's unique infinity point,
-// multiplying by k preserves the witness relation and moves it to the finite
-// chart because k.c1 is nonzero. Thus every accepting quotient class has a
-// complete six-limb representative [1 + u*W], without a fixture assumption.
+// multiplying by k preserves the witness relation and selects an alternative
+// root in the finite chart because k.c1 is nonzero. Thus every accepting
+// boundary has at least one finite six-limb lambda-root witness [1 + u*W].
 const TORUS_KERNEL_SHIFT = bn254.pairing(bn254.G1.Point.BASE, bn254.G2.Point.BASE);
 if (isZero6(TORUS_KERNEL_SHIFT.c1) || !eq12(powExact(TORUS_KERNEL_SHIFT, LAMBDA), Fp12.ONE)) {
   throw new Error('invalid BN254 quotient-torus kernel shift');
