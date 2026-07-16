@@ -54,8 +54,8 @@ comparison. Per-layer status and build commands are in
 | `bch-groth16-bls12381-singleton` | singleton, baseline | ~24.2 KB / ~1.04–1.48B op-cost | **~21× smaller bytecode than the nChain reference** |
 | `bch-groth16-bls12381-singleton-minop` | singleton, op-optimized | 58,345 B / **149.2M op-cost** | quotient torus (`λ=p+|x|`, 6-limb root u) + GLV; fused G2 ψ-check; A/C on-curve (G1 subgroup checks omitted) |
 | `bch-pairing-bls12381-singleton` | singleton, pairing-only | ~19.8 KB / ~1.38B op-cost | the pairing verdict milestone (`verify.cash`) |
-| `bch-groth16-bls12381-intratx-residue` | chunked, intra-tx + quotient-torus residue | **26 inputs / 193,781 B score / 192,871 B wire / 151.67M op** | one current-consensus-valid transaction; non-standard only by total size |
-| `bch-groth16-bls12381-grouped-residue` | chunked, grouped + quotient-torus residue | **34 inputs / 3 standard tx / 207,709 B score / 206,589 B wire / 162.25M op** | current-policy grouped BLS verifier; exact successor pins and mutable-NFT state thread |
+| `bch-groth16-bls12381-intratx-residue` | chunked, intra-tx + quotient-torus residue | **24 inputs / 193,369 B score / 192,529 B wire / 151.43M op** | one current-consensus-valid transaction; non-standard only by total size |
+| `bch-groth16-bls12381-grouped-residue` | chunked, grouped + quotient-torus residue | **26 inputs / 3 standard tx / 205,734 B score / 204,894 B wire / 160.95M op** | current-policy grouped BLS verifier; exact successor pins and mutable-NFT state thread |
 | `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **3 inputs / 164,579 B score / 164,474 B wire / 149.81M op** | proposed-VM-only; non-standard by total transaction size — see [Target VM](#target-vm-bch-spec) |
 
 The BLS chunked pairing/Miller/final-exp families also exist in
@@ -128,10 +128,9 @@ comparison: [`chunked/twoloop/`](chunked/twoloop/) (simple, 16 chunks) and
 
 - **`minop` singletons** (`groth16_minop.cash` per curve) — the singleton recomputed
   with the op-cost tricks: one batched fused Miller with only the single runtime pair
-  on-chain (`e(α,β)` and the `vk_x`/`C` lines baked) and GLV `vk_x`. The BN254 build
-  evaluates in the quotient torus (6-limb root, affine witnessed slopes, endpoint-fused
-  exact G2 check); the BLS build keeps the
-  witnessed-residue final exponentiation. These are still single-input oracles.
+  on-chain (`e(α,β)` and the `vk_x`/`C` lines baked) and GLV `vk_x`. Both curve builds
+  evaluate in their quotient torus, replacing the full residue witness with a six-limb
+  root. These are still single-input oracles.
 
 - **`residue` chunked** (`*-intratx-residue`, `*-grouped-residue`) — the same residue
   math packed into a deployable chunk graph. The hard-part final exponentiation

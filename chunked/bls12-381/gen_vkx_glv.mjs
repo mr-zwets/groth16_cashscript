@@ -261,16 +261,22 @@ export function genCash(lo, hi, first, final, stageBound = false, sharedTable = 
   }
 }
 
-/** Emit the empirically audited five-window plan. Linked callers provide one shared-table
- * carrier; a covenant caller passes null and embeds the same fixed table in each locking. */
-export function regenGlvSharedAudited(GEN_DIR, sharedTable, stageBound = false, fullStageBound = false) {
+/** Emit a five-window plan, defaulting to the empirically audited shared bounds. Linked callers
+ * provide one table carrier and may pass path-specific bounds; covenant callers pass null. */
+export function regenGlvSharedAudited(
+  GEN_DIR,
+  sharedTable,
+  stageBound = false,
+  fullStageBound = false,
+  bounds = GLV_SHARED_AUDITED_BOUNDS,
+) {
   const prefix = fullStageBound ? 'vkxglvfull' : 'vkxglv';
-  const chunks = GLV_SHARED_AUDITED_BOUNDS.slice(0, -1).map((lo, idx) => ({
+  const chunks = bounds.slice(0, -1).map((lo, idx) => ({
     idx,
     lo,
-    hi: GLV_SHARED_AUDITED_BOUNDS[idx + 1],
+    hi: bounds[idx + 1],
     first: idx === 0,
-    final: idx === GLV_SHARED_AUDITED_BOUNDS.length - 2,
+    final: idx === bounds.length - 2,
   }));
   for (const ch of chunks) {
     writeFileSync(join(GEN_DIR, `${prefix}_${String(ch.idx).padStart(2, '0')}.cash`), genCash(ch.lo, ch.hi, ch.first, ch.final, stageBound, sharedTable, fullStageBound));

@@ -17,9 +17,10 @@
 //
 // With BLS_QUOTIENT_TORUS=1, the generated Miller windows instead carry the six-limb finite class
 // [c]=[1+u*W] in Fp12*/Fp6*. The final Miller input performs the projective terminal check, so
-// the correction w and separate tail disappear. The one-command frontier path replans only this
-// linked affine-G1 schedule; the default and grouped schedules remain fixed. The opt-in generator
-// proves the quotient construction before this builder writes its vector. One fixed set of
+// the correction w and separate tail disappear. The one-command frontier path pins this linked
+// affine-G1 schedule; the grouped quotient path is separately pinned and the default Fp6-tail path
+// remains unchanged. The opt-in generator proves the quotient construction before this builder
+// writes its vector. One fixed set of
 // lockings verifies any proof for the VK in either mode.
 //
 //   node build_vectors_residue_bls.mjs -> verifier/src/bch/groth16-bls12381-intratx-residue-vectors.json
@@ -40,7 +41,9 @@ import {
   glvDecompose, vkxGlvStateAt, vkxGlvZinv, GLV_TABLE_HEX,
   GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
 } from '../bls12-381/gen_vkx_glv.mjs';
-import { LINKED_HIGH_COST_INPUTS, LINKED_RESIDUE_NAMESPACE } from '../bls12-381/_residue_linked_plan.mjs';
+import {
+  LINKED_HIGH_COST_INPUTS, LINKED_RESIDUE_NAMESPACE, LINKED_TORUS_GLV_BOUNDS,
+} from '../bls12-381/_residue_linked_plan.mjs';
 import { transformChunk, headerSize } from './transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -59,7 +62,8 @@ const DEFAULT_MIN_RELAY_FEE_SATOSHIS_PER_BYTE = 1n;
 const TRANSACTION_OUTPUT_SATOSHIS = 1000n;
 const OP_RETURN = Uint8Array.from([0x6a]);
 const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
-const GLV_COUNT = GLV_SHARED_AUDITED_BOUNDS.length - 1;
+const GLV_BOUNDS = QUOTIENT_TORUS ? LINKED_TORUS_GLV_BOUNDS : GLV_SHARED_AUDITED_BOUNDS;
+const GLV_COUNT = GLV_BOUNDS.length - 1;
 
 // SHARED GLV TABLE: the 1,440-byte Straus table rides ONCE in the final GLV input (right after its
 // 9-limb inBlob push); the four sibling GLV inputs read that exact slice via input-bytecode
@@ -69,7 +73,7 @@ const GLV_COUNT = GLV_SHARED_AUDITED_BOUNDS.length - 1;
   regenGlvSharedAudited(GEN, {
     inputIndex: GLV_COUNT - 1,
     dataOffset: headerSize(GLV_STATE_BYTES) + GLV_STATE_BYTES + headerSize(GLV_TABLE_BYTES.length),
-  }, true);
+  }, true, false, GLV_BOUNDS);
 }
 
 // Deploy as P2SH so the ~4-5 KB redeem (in the scriptSig) counts toward the op-cost budget and

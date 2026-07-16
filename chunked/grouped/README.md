@@ -50,7 +50,7 @@ The plain BLS12-381 entry (`bch-groth16-bls12381-grouped`) is 56 inputs / **6 tr
 Its five GLV inputs remain together in group 0 so four siblings can read the one hash-bound VK
 table carried by the fifth.
 
-The quotient-residue BLS entry (`bch-groth16-bls12381-grouped-residue`) is 34 inputs in **3 standard
-transactions**, 206,055 script B / 207,709 score B / 206,589 wire B, and 162,247,773 op-cost. Its
+The quotient-residue BLS entry (`bch-groth16-bls12381-grouped-residue`) is 26 inputs in **3 standard
+transactions**, 204,424 script B / 205,734 score B / 204,894 wire B, and 160,953,436 op-cost. Its
 cross-transaction state thread requires a mutable NFT, excludes same-category sibling inputs, and
 requires the terminal transaction to burn the thread token.

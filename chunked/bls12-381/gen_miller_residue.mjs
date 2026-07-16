@@ -25,18 +25,29 @@ import {
   millerFusedOps, millerFusedTorusOps, residueTorusWitness, residueWitness,
   conj, fp12limbsOf,
 } from './_residuemath.mjs';
-import { LINKED_MILLER_BOUNDS, LINKED_RESIDUE_NAMESPACE } from './_residue_linked_plan.mjs';
+import {
+  GROUPED_TORUS_MILLER_BOUNDS, LINKED_MILLER_BOUNDS, LINKED_RESIDUE_NAMESPACE,
+  LINKED_TORUS_MILLER_BOUNDS,
+} from './_residue_linked_plan.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const LINKED = process.argv[2] === 'linked';
 const QUOTIENT_TORUS = process.env.BLS_QUOTIENT_TORUS === '1';
 const UNIT_G1 = process.env.BLS_UNIT_G1 === '1';
 const REPLAN_LINKED = process.env.BLS_REPLAN_LINKED === '1';
+const PIN_LINKED_TORUS = process.env.BLS_PIN_LINKED_TORUS === '1';
+const GROUPED_TORUS = process.env.BLS_GROUPED_TORUS === '1';
 if (REPLAN_LINKED && (!LINKED || UNIT_G1)) {
   throw new Error('BLS_REPLAN_LINKED requires the linked affine-G1 layout');
 }
+if (PIN_LINKED_TORUS && (!LINKED || !QUOTIENT_TORUS || UNIT_G1 || REPLAN_LINKED)) {
+  throw new Error('BLS_PIN_LINKED_TORUS requires the pinned linked affine-G1 quotient layout');
+}
+if (GROUPED_TORUS && (!LINKED || !QUOTIENT_TORUS || !UNIT_G1 || REPLAN_LINKED || PIN_LINKED_TORUS)) {
+  throw new Error('BLS_GROUPED_TORUS requires the pinned linked unit-G1 quotient layout');
+}
 // The grouped builder owns a fixed standard-transaction schedule. Only the one-transaction
-// affine-G1 path opts into planning against its actual linked-input byte/op-cost context.
+// affine-G1 path opts into its separately audited linked-input schedule.
 if (QUOTIENT_TORUS && !LINKED && process.env.BLS_QUOTIENT_LARGE !== '1') {
   throw new Error('BLS_QUOTIENT_TORUS is linked-only; pass the linked layout explicitly');
 }
@@ -328,8 +339,12 @@ if (process.argv[2] === 'probe') {
   process.exit(0);
 }
 
-if (LINKED && !REPLAN_LINKED && (LINKED_MILLER_BOUNDS[0] !== 0 || LINKED_MILLER_BOUNDS[LINKED_MILLER_BOUNDS.length - 1] !== ops.length ||
-  LINKED_MILLER_BOUNDS.some((bound, i) => i > 0 && bound <= LINKED_MILLER_BOUNDS[i - 1]))) {
+const linkedMillerBounds = GROUPED_TORUS
+  ? GROUPED_TORUS_MILLER_BOUNDS
+  : PIN_LINKED_TORUS ? LINKED_TORUS_MILLER_BOUNDS : LINKED_MILLER_BOUNDS;
+const pinnedLinkedPlan = LINKED && !REPLAN_LINKED;
+if (pinnedLinkedPlan && (linkedMillerBounds[0] !== 0 || linkedMillerBounds[linkedMillerBounds.length - 1] !== ops.length ||
+  linkedMillerBounds.some((bound, i) => i > 0 && bound <= linkedMillerBounds[i - 1]))) {
   throw new Error('invalid linked Miller boundaries');
 }
 console.error(`planning FUSED BLS12-381 Miller chunks (${ops.length} flat ops, ${ops.filter((o) => o.t === 'cf').length} c-folds)  deployment=${LINKED ? 'linked' : 'covenant'} OP_TARGET=${OP_TARGET.toLocaleString()}`);
@@ -351,10 +366,12 @@ while (lo < ops.length) {
       m,
     };
   };
-  const best = LINKED && !REPLAN_LINKED
-    ? tryHi(LINKED_MILLER_BOUNDS[chunks.length + 1])
+  const best = pinnedLinkedPlan
+    ? tryHi(linkedMillerBounds[chunks.length + 1])
     : planChunk(lo, ops.length, OP_TARGET, tryHi, planState);
-  if (!best || (QUOTIENT_TORUS && !best.fits)) {
+  // Quotient-torus linked windows are pinned against the transformed scripts. The raw covenant
+  // probe retains boundary hashes, so each fixed deployment builder is its authoritative fit gate.
+  if (!best || (QUOTIENT_TORUS && !PIN_LINKED_TORUS && !GROUPED_TORUS && !best.fits)) {
     throw new Error(`no fitting quotient-torus window at op ${lo}`);
   }
   const idx = chunks.length;

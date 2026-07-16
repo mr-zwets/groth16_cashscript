@@ -14,7 +14,8 @@ if (!process.env.VERIFIER_DIR) {
 
 const torusEnv = {
   BLS_QUOTIENT_TORUS: '1',
-  BLS_REPLAN_LINKED: '1',
+  BLS_PIN_LINKED_TORUS: '1',
+  BLS_REPLAN_LINKED: '0',
   BCH_VM: '2026',
   RESCHEDULE: 'on',
   INTRATX_BARE: '0',

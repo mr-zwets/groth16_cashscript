@@ -7,10 +7,11 @@
 // Chunk graph (vs the plain BLS grouped's g2check -> vk_x -> 4-pair Miller -> final exp):
 //   GLV vk_x (4-scalar 128-bit Straus, baked table)                -> 5 chunks
 //   c^-|x|-FUSED prepared-VK batched Miller (e(a,b) baked, cmul1),
-//     with G2 validation fused into its first/last chunks           -> 29 chunks
-//   witnessed-residue tail: w in Fp6* + fF*w==frob(c,1)            -> 1 chunk
+//     with G2 validation fused into its first/last chunks           -> 29 default / 21 quotient
+//   witnessed-residue tail: w in Fp6* + fF*w==frob(c,1)            -> 1 default / 0 quotient
 //                                                                     ---------
-//                                                                     35 inputs
+//                                                                     35 default / 26 quotient
+// The quotient-torus terminal is fused into the last Miller chunk.
 // The hard-part final exponentiation (Hayashida-Scott, 23 chunks in the plain build) collapses to
 // the residue tail. c,cInv thread through every fused-Miller chunk as constant witness; w enters
 // the terminal tail as an uncommitted witness and is checked there (see gen_finalexp_residue).
@@ -32,7 +33,9 @@ import {
   glvDecompose, vkxGlvStateAt, vkxGlvZinv, vkxGlvYinv, vkxGlvUnit, GLV_TABLE_HEX,
   GLV_SHARED_AUDITED_BOUNDS, regenGlvSharedAudited,
 } from '../bls12-381/gen_vkx_glv.mjs';
-import { LINKED_HIGH_COST_INPUTS, LINKED_RESIDUE_NAMESPACE } from '../bls12-381/_residue_linked_plan.mjs';
+import {
+  GROUPED_TORUS_GLV_BOUNDS, LINKED_HIGH_COST_INPUTS, LINKED_RESIDUE_NAMESPACE,
+} from '../bls12-381/_residue_linked_plan.mjs';
 import { transformChunk, headerSize } from '../intratx/transform.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -58,12 +61,13 @@ const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
 // 9-limb inBlob push); the four sibling GLV inputs read that exact slice via input-bytecode
 // introspection and the carrier pins it with hash256. The GLV chunks lead the graph and the packer
 // blocks cuts inside the span, so the carrier's transaction-local index equals its graph index.
-const GLV_COUNT = GLV_SHARED_AUDITED_BOUNDS.length - 1;
+const GLV_BOUNDS = QUOTIENT_TORUS ? GROUPED_TORUS_GLV_BOUNDS : GLV_SHARED_AUDITED_BOUNDS;
+const GLV_COUNT = GLV_BOUNDS.length - 1;
 const GLV_STATE_BYTES = 9 * W; // rX,rY,rZ,in0,in1,k10,k20,k11,k21
 regenGlvSharedAudited(GEN, {
   inputIndex: GLV_COUNT - 1,
   dataOffset: headerSize(GLV_STATE_BYTES) + GLV_STATE_BYTES + headerSize(GLV_TABLE_BYTES.length),
-}, true);
+}, true, false, GLV_BOUNDS);
 
 const p2shSpk = (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem));
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
@@ -994,8 +998,8 @@ const observedValidFixtureEnvelope = {
   maxUnlockingBytes: Math.max(...observedValidMetadata.map((meta) => meta.maxUnlockingBytes)),
 };
 const description = QUOTIENT_TORUS
-  ? 'GROUPED + QUOTIENT-TORUS BLS12-381 Groth16 verifier: 34 inputs packed into current-policy standard transactions. ' +
-    'The graph is five shared-table GLV vk_x chunks followed by 29 input-validation-fused Miller chunks; the final Miller input executes the quotient terminal. ' +
+  ? 'GROUPED + QUOTIENT-TORUS BLS12-381 Groth16 verifier: 26 inputs packed into current-policy standard transactions. ' +
+    'The graph is five shared-table GLV vk_x chunks followed by 21 input-validation-fused Miller chunks; the final Miller input executes the quotient terminal. ' +
     'The immutable six-limb root represents the finite class [c]=[1+u*W] in Fp12*/Fp6*, and the terminal checks the exact projective Frobenius relation while excluding [0:0]. ' +
     'Every in-group program pins its immediate successor locking and state; every group root fixes input index zero and the exact transaction input count. ' +
     'Across groups, a CashToken NFT commitment and pinned successor P2SH32 locking bind the state and program. One fixed locking graph verifies every proof for the VK.'
