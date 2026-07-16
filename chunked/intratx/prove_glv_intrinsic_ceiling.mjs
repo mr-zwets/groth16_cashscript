@@ -30,6 +30,7 @@ import {
 import {
   GLV_LAMBDA,
   GLV_R,
+  VKXGLV_SPLIT_GROUPS,
   VKXGLV_SPLIT_ITERS,
   vkxGlvSplitStateAt,
 } from '../pairing/gen_vkx_glv.mjs';
@@ -46,9 +47,10 @@ const resourceSteps = vectors.resourceFixtureProof;
 if (!Array.isArray(resourceSteps) || resourceSteps.length !== 11) {
   throw new Error('missing named 11-input full-valid resource fixture');
 }
-if (GLV_GROUPED_BOUNDS.length !== 3 || GLV_GROUPED_BOUNDS[0] !== 0 ||
-  GLV_GROUPED_BOUNDS[1] !== 21 || GLV_GROUPED_BOUNDS[2] !== VKXGLV_SPLIT_ITERS) {
-  throw new Error('GLV resource proof requires grouped bounds [0,21,43]');
+if (VKXGLV_SPLIT_GROUPS !== 2 || VKXGLV_SPLIT_ITERS !== 64 ||
+  GLV_GROUPED_BOUNDS.length !== 3 || GLV_GROUPED_BOUNDS[0] !== 0 ||
+  GLV_GROUPED_BOUNDS[1] !== 29 || GLV_GROUPED_BOUNDS[2] !== VKXGLV_SPLIT_ITERS) {
+  throw new Error('GLV resource proof requires the 2x64 schedule with bounds [0,29,64]');
 }
 
 const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
@@ -280,7 +282,8 @@ const unlockingByteTags = inputs.map((input, inputIndex) => {
       const dataOffset = offset + encoded.length - data.length;
       if (instructionIndex === 0) {
         output.set(inBlobTags(inputIndex, data.length), dataOffset);
-      } else if (inputIndex === 1 && instructionIndex === 1 && data.length === 2880) {
+      } else if (inputIndex === 1 && instructionIndex === 1 &&
+        data.length === VKXGLV_SPLIT_GROUPS * 15 * 64) {
         output.fill(BYTE_FIELD, dataOffset, dataOffset + data.length);
       }
     }
@@ -301,7 +304,7 @@ const redeemStack = (inputIndex, stack) => {
     if (stackIndex === 0) {
       return { length: item.length, byteTags: inBlobTags(inputIndex, item.length) };
     }
-    if (inputIndex === 1 && stackIndex === 1 && item.length === 2880) {
+    if (inputIndex === 1 && stackIndex === 1 && item.length === VKXGLV_SPLIT_GROUPS * 15 * 64) {
       return {
         length: item.length,
         byteTags: bytesTagged(item.length, BYTE_FIELD),
@@ -325,15 +328,13 @@ const traceCeiling = (inputIndex) => {
   }
   const actualInventory = [...inventory].sort(([left], [right]) => left.localeCompare(right));
   const expectedInventory = (inputIndex === 0 ? [
-    ['137:9', [61, 1]], ['822:129', [21, 1]], ['822:137', [20, 2]],
-    ['822:217', [21, 1]], ['822:254', [21, 1]], ['822:268', [0, 22]],
-    ['822:394', [21, 1]], ['822:431', [21, 1]], ['822:445', [0, 22]],
-    ['822:577', [20, 2]], ['822:614', [20, 2]], ['822:628', [0, 22]],
+    ['137:9', [57, 1]], ['614:127', [29, 1]], ['614:135', [28, 2]],
+    ['614:213', [29, 1]], ['614:250', [29, 1]], ['614:264', [0, 30]],
+    ['614:388', [29, 1]], ['614:425', [29, 1]], ['614:439', [0, 30]],
   ] : [
-    ['137:9', [66, 0]], ['705:149', [22, 1]], ['705:186', [22, 1]],
-    ['705:200', [0, 23]], ['705:319', [22, 1]], ['705:356', [22, 1]],
-    ['705:370', [0, 23]], ['705:495', [22, 1]], ['705:532', [22, 1]],
-    ['705:546', [0, 23]], ['705:68', [22, 1]], ['705:76', [22, 1]],
+    ['137:9', [70, 0]], ['504:145', [35, 1]], ['504:182', [35, 1]],
+    ['504:196', [0, 36]], ['504:313', [35, 1]], ['504:350', [35, 1]],
+    ['504:364', [0, 36]], ['504:66', [35, 1]], ['504:74', [35, 1]],
   ]).sort(([left], [right]) => left.localeCompare(right));
   if (JSON.stringify(actualInventory) !== JSON.stringify(expectedInventory)) {
     throw new Error(`input ${inputIndex} GLV conditional inventory changed: ${JSON.stringify(actualInventory)}`);
@@ -684,8 +685,8 @@ if (glvStates.at(-1).error !== undefined) throw new Error(glvStates.at(-1).error
 const addEntries = glvStates
   .map((state, index) => ({ state, index }))
   .filter(({ state }) => state.instructions.length === ADD_FUNCTION_LENGTH && state.ip === 0);
-if (addEntries.length !== 62) {
-  throw new Error(`all-index-1 input 0 must execute 62 generic-add slots, got ${addEntries.length}`);
+if (addEntries.length !== 58) {
+  throw new Error(`all-index-1 input 0 must execute 58 generic-add slots, got ${addEntries.length}`);
 }
 // The first two calls include initialization special cases. The third is the
 // first ordinary non-infinity add and supplies an exact concrete replay check.
@@ -698,7 +699,7 @@ if (doubleInstructions.length !== DOUBLE_FUNCTION_LENGTH) {
 const addReturn = glvStates.slice(selectedAdd.index + 1).find((state) =>
   state.instructions !== addEntry.instructions &&
   state.instructions.length !== DOUBLE_FUNCTION_LENGTH);
-if (addReturn === undefined || addReturn.instructions.length !== 822 || addReturn.ip !== 265) {
+if (addReturn === undefined || addReturn.instructions.length !== 614 || addReturn.ip !== 261) {
   throw new Error('failed to locate the pinned ordinary-add return site');
 }
 const concreteAddCost = addReturn.metrics.operationCost - addEntry.metrics.operationCost;
@@ -934,11 +935,11 @@ if (JSON.stringify(abstractEqualityAdd.outputLengths) !== JSON.stringify([0, 0, 
   throw new Error('equal-point sentinel or jacDouble output widths changed');
 }
 
-const callerBodyNames = addReturn.instructions.slice(265, 299)
+const callerBodyNames = addReturn.instructions.slice(261, 295)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
 const expectedCallerBodyNames = [
   'OP_OVER', 'OP_0', 'OP_NUMEQUAL', 'OP_IF',
-  'OP_11', 'OP_PICK', 'OP_13', 'OP_PICK', 'OP_15', 'OP_PICK', 'OP_0', 'OP_INVOKE',
+  'OP_10', 'OP_PICK', 'OP_12', 'OP_PICK', 'OP_14', 'OP_PICK', 'OP_0', 'OP_INVOKE',
   'OP_3', 'OP_ROLL', 'OP_DROP', 'OP_SWAP', 'OP_TOALTSTACK', 'OP_SWAP', 'OP_FROMALTSTACK',
   'OP_3', 'OP_ROLL', 'OP_DROP', 'OP_SWAP', 'OP_TOALTSTACK', 'OP_SWAP', 'OP_FROMALTSTACK',
   'OP_3', 'OP_ROLL', 'OP_DROP', 'OP_SWAP', 'OP_TOALTSTACK', 'OP_SWAP', 'OP_FROMALTSTACK',
@@ -961,7 +962,7 @@ const equalPointCallerVariableCost = callerPickCost + callerInvokeReturnCost + c
 const equalPointSurcharge = abstractEqualityAdd.operationCost + abstractDouble.operationCost +
   equalPointCallerVariableCost - abstractGenericAdd.operationCost;
 
-export const GLV_GENERIC_INTRINSIC = [6_002_682, 6_347_609];
+export const GLV_GENERIC_INTRINSIC = [5_845_761, 7_033_265];
 export const GLV_EQUAL_POINT_SURCHARGE = 12_099;
 if (JSON.stringify(intrinsicCeilings) !== JSON.stringify(GLV_GENERIC_INTRINSIC)) {
   throw new Error(`GLV generic intrinsic ceilings changed: ${JSON.stringify(intrinsicCeilings)}`);

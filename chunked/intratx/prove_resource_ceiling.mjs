@@ -54,11 +54,11 @@ const DEFAULT_MIN_RELAY_FEE_SATOSHIS_PER_BYTE = 1n;
 const TRANSACTION_OUTPUT_SATOSHIS = 1000n;
 const DENSITY_BASE = 41;
 const DENSITY_MULTIPLIER = 800;
-const LOCKING_GRAPH_HASH = 'cf6f11ca2d10eaf8fa5a7bbb401908908513a01e3270189aa8728965e28202ad';
-const GLV_TABLE_HASH = '4dedc6a77ffe1f14a1faa12a533a2975e8d7304c8e740a82d8a5c9c41e490028';
+const LOCKING_GRAPH_HASH = '00fdb00e1a5fd1806ff0621f0b83b244ddbe20ee9fbbeb76e3aa194047d62b3d';
+const GLV_TABLE_HASH = '8449064aeddfff724948516b67a6e9e9f04f267dd15f090150ec5c8970ea9046';
 const GLV_EVENT_CEILING_CASES = [GLV_FALLBACK_EVENT_CEILINGS];
 const EXPECTED_EXTRA_COUNTS = [0, 1, 22, 18, 18, 22, 20, 18, 20, 22, 16];
-const EXPECTED_FIXED_FLOORS = [2_424, 5_124, 9_105, 8_510, 7_398, 8_602, 8_796, 7_762, 8_282, 8_099, 9_056];
+const EXPECTED_FIXED_FLOORS = [2_172, 3_908, 9_105, 8_510, 7_777, 8_413, 8_631, 7_762, 8_282, 8_099, 9_056];
 
 const extraValidProofs = vectors.extraValidProofs ?? [];
 const resourceFixtureProof = vectors.resourceFixtureProof;
@@ -188,7 +188,7 @@ const expectedDependencies = Array.from({ length: INPUT_COUNT }, (_, inputIndex)
   } else if (inputIndex < INPUT_COUNT - 1) {
     // These generated schedules move the retained genesis-unlocking suffix
     // once more, adding one byte of cost per byte of input 2.
-    row[2] = [3, 4, 5, 6, 8, 9].includes(inputIndex) ? 3 : 2;
+    row[2] = [3, 5, 6, 8, 9].includes(inputIndex) ? 3 : 2;
     row[inputIndex] += 1; row[inputIndex + 1] += 2;
   } else {
     row[2] = 2; row[inputIndex] = 1;
@@ -248,8 +248,8 @@ for (let inputIndex = 0; inputIndex < INPUT_COUNT; inputIndex += 1) {
     }
   });
   if (inputIndex === 1) {
-    if (hard.extras.length !== 1 || hard.extras[0].length !== 2880) {
-      throw new Error('input 1 does not contain one fixed 2880-byte GLV table');
+    if (hard.extras.length !== 1 || hard.extras[0].length !== 1920) {
+      throw new Error('input 1 does not contain one fixed 1920-byte GLV table');
     }
     const tableHash = createHash('sha256').update(hard.extras[0]).digest('hex');
     if (tableHash !== GLV_TABLE_HASH) throw new Error(`unexpected GLV table hash ${tableHash}`);
@@ -389,7 +389,7 @@ results.forEach((result) => {
 const universalWireBytes = Math.max(...results.map((result) => result.wireBytes));
 const universalTotalOperationCost = Math.max(...results.map((result) =>
   result.costs.reduce((sum, cost) => sum + cost, 0)));
-if (universalWireBytes !== 98_730 || universalTotalOperationCost !== 78_624_129) {
+if (universalWireBytes !== 99_353 || universalTotalOperationCost !== 79_122_059) {
   throw new Error('certified proof-independent relay encoding changed');
 }
 console.log(`proved proof-independent relay encoding: ${universalWireBytes} wire bytes, ` +
