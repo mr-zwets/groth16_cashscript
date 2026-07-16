@@ -3,7 +3,7 @@
 //
 // The intrinsic operation-cost ceilings below are tied to the exact generated
 // locking graph by LOCKING_GRAPH_HASH. Inputs 0 and 1 combine the generic GLV
-// trace ceilings with the equal-point-event bound proved by
+// trace ceilings with the key-agnostic fallback-event bound proved by
 // ../pairing/prove_vkx_glv_resource_bound.mjs. Inputs 2 through 10 use the
 // interval-shadow ceilings for the Miller trace: every proof-controlled limb is
 // canonical in [0,p), each arithmetic interval is propagated through the exact
@@ -11,9 +11,9 @@
 // normalized/projective Miller hand-off uses branch-free cross products.
 //
 // This script independently measures the exact transaction-length/op-cost
-// dependency matrix, checks the generated witness layout, solves both maximal
-// GLV event allocations, constructs those exact padded transactions, asks the
-// standard BCH2026 VM to verify them, and explicitly funds/asserts the default
+// dependency matrix, checks the generated witness layout, solves the universal
+// GLV fallback-event ceiling, constructs the exact padded transaction, asks the
+// standard BCH2026 VM to verify it, and explicitly funds/asserts the default
 // 1 sat/byte relay fee (which is outside VM policy evaluation). This proves
 // every valid proof has an encoding at the reported lengths; it does not cap
 // accepted serializations with additional OP_DROP padding.
@@ -37,6 +37,7 @@ import {
   GLV_GENERIC_INTRINSIC,
 } from './prove_glv_intrinsic_ceiling.mjs';
 import { MILLER_INTRINSIC_CEILINGS } from './prove_miller_intrinsic_ceiling.mjs';
+import { GLV_FALLBACK_EVENT_CEILINGS } from '../pairing/prove_vkx_glv_resource_bound.mjs';
 
 const verifierDir = process.env.VERIFIER_DIR;
 if (verifierDir === undefined) {
@@ -55,7 +56,7 @@ const DENSITY_BASE = 41;
 const DENSITY_MULTIPLIER = 800;
 const LOCKING_GRAPH_HASH = 'cf6f11ca2d10eaf8fa5a7bbb401908908513a01e3270189aa8728965e28202ad';
 const GLV_TABLE_HASH = '4dedc6a77ffe1f14a1faa12a533a2975e8d7304c8e740a82d8a5c9c41e490028';
-const GLV_EVENT_ALLOCATIONS = [[4, 5], [3, 6]];
+const GLV_EVENT_CEILING_CASES = [GLV_FALLBACK_EVENT_CEILINGS];
 const EXPECTED_EXTRA_COUNTS = [0, 1, 22, 18, 18, 22, 20, 18, 20, 22, 16];
 const EXPECTED_FIXED_FLOORS = [2_424, 5_124, 9_105, 8_510, 7_398, 8_602, 8_796, 7_762, 8_282, 8_099, 9_056];
 
@@ -331,7 +332,7 @@ const wireLength = (unlockingLengths) => {
   return 4 + compactSizeLength(unlockingLengths.length) + inputs + 1 + 8 + 1 + 1 + 4;
 };
 
-const results = GLV_EVENT_ALLOCATIONS.map((allocation) => {
+const results = GLV_EVENT_CEILING_CASES.map((allocation) => {
   const ceilings = [
     GLV_GENERIC_INTRINSIC[0] + allocation[0] * GLV_EQUAL_POINT_SURCHARGE,
     GLV_GENERIC_INTRINSIC[1] + allocation[1] * GLV_EQUAL_POINT_SURCHARGE,
@@ -375,7 +376,7 @@ const results = GLV_EVENT_ALLOCATIONS.map((allocation) => {
 });
 
 results.forEach((result) => {
-  console.log(`GLV equal-point allocation ${JSON.stringify(result.allocation)}:`);
+  console.log(`GLV fallback-event ceiling ${JSON.stringify(result.allocation)}:`);
   console.log(`  intrinsic ceilings: ${result.ceilings.join(',')}`);
   console.log(`  unlocking lengths: ${result.lengths.join(',')}`);
   console.log(`  wire bytes: ${result.wireBytes}; standard margin: ${STANDARD_TRANSACTION_LIMIT - result.wireBytes}`);
@@ -388,7 +389,7 @@ results.forEach((result) => {
 const universalWireBytes = Math.max(...results.map((result) => result.wireBytes));
 const universalTotalOperationCost = Math.max(...results.map((result) =>
   result.costs.reduce((sum, cost) => sum + cost, 0)));
-if (universalWireBytes !== 96_909 || universalTotalOperationCost !== 77_166_796) {
+if (universalWireBytes !== 98_730 || universalTotalOperationCost !== 78_624_129) {
   throw new Error('certified proof-independent relay encoding changed');
 }
 console.log(`proved proof-independent relay encoding: ${universalWireBytes} wire bytes, ` +

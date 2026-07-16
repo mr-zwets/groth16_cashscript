@@ -44,7 +44,7 @@ console.log(`[1/${stageCount}] generate quotient-torus Miller chunks...`);
 await run('chunked/pairing/gen_miller_residue.mjs');
 console.log(`[2/${stageCount}] prove grouped 3x43 GLV equivalence...`);
 await run('chunked/pairing/prove_vkx_glv_split.mjs');
-console.log(`[3/${stageCount}] prove grouped GLV resource bound...`);
+console.log(`[3/${stageCount}] prove key-agnostic grouped GLV resource bound...`);
 await run('chunked/pairing/prove_vkx_glv_resource_bound.mjs');
 console.log(`[4/${stageCount}] prove affine Miller-step equivalence...`);
 await run('chunked/pairing/prove_miller_affine.mjs');

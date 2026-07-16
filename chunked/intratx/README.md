@@ -40,8 +40,8 @@ of one of many sequential transactions, with no per-step hashing and no 128-byte
 plain graphs remain larger non-standard transactions. The optimized BN254 quotient-torus graph is
 11 inputs: the committed, alternate, density, resource, and all 11 identity/special fixtures are
 standard and fund the default 1 sat/byte relay fee. The committed proof is 88,393 serialized bytes,
-and the proof-independent resource certificate constructs a 96,909-byte relayable encoding for
-every valid proof, leaving 3,091 bytes below the standard transaction limit. The
+and the proof-independent resource certificate constructs a 98,730-byte relayable encoding for
+every valid proof, leaving 1,270 bytes below the standard transaction limit. The
 BLS12-381 quotient-torus graph is 34 inputs in one current-BCH consensus-valid 195,705-byte
 transaction, non-standard only by total size.
 
@@ -50,7 +50,8 @@ inputs at runtime. The prescribed checkpoint key is nevertheless synthetic: its 
 scalars are published. The BN254 measurements therefore establish equation execution, runtime
 witness handling, and BCH resource validity for that key, not circuit knowledge, secure binding of
 the public-input vector, or interoperability with an independently generated setup. Regenerating
-the construction for a circuit-derived key requires new bytecode and a fresh resource certificate.
+the construction for a circuit-derived key requires new bytecode. The resource certificate itself
+does not use the published setup or IC scalar relations.
 
 ### P2SH deployment
 
@@ -148,7 +149,7 @@ sibling's forward-check.
 Standardness is measured for each complete transaction. The BN254 spec fixture is 72,201 bytes and
 passes the proposed VM's standard-policy checks. The BLS spec fixture is 164,474 bytes and exceeds
 the 100,000-byte standard transaction limit. Among current-BCH intra-tx bundles, the optimized
-BN254 quotient-torus verifier has a certified 96,909-byte proof-independent relay encoding, while
+BN254 quotient-torus verifier has a certified 98,730-byte proof-independent relay encoding, while
 the 195,705-byte BLS quotient-torus transaction is non-standard by total size.
 
 ## Files
@@ -168,7 +169,8 @@ the 195,705-byte BLS quotient-torus transaction is non-standard by total size.
   budget (`bch-groth16-intratx-residue`, `bch-groth16-bls12381-intratx-residue`). Their opt-in
   quotient modes carry six-limb classes in `Fp12*/Fp6*` and fuse the verdict into Miller.
 - `../pairing/prove_vkx_glv_split.mjs` / `../pairing/prove_vkx_glv_resource_bound.mjs` — prove the
-  grouped 3x43 MSM/table construction and its proof-independent equal-point event bound.
+  grouped 3x43 MSM/table construction and its key-agnostic fallback-event ceiling. The resource
+  bound charges all 63 and 66 physical lookup slots and uses no setup or IC discrete logarithms.
 - `../pairing/prove_projective_vkx.mjs` / `../pairing/prove_miller_unit_lines.mjs` — prove the
   universal nonzero-Y projective handoff and the identity-complete normalized G1 representation.
 - `../pairing/prove_miller_affine_raw.mjs` — differentially replays every runtime-G2 affine step
@@ -237,10 +239,11 @@ outputs. The verifier.cash on-chain score is 88,778 bytes: serialized transactio
 11 × 35-byte spent P2SH32 locking programs.
 
 The concrete fixtures are regression evidence, not the proof-independent claim:
-`prove_resource_ceiling.mjs` separately constructs a 96,909-serialized-byte relayable encoding for
-every valid proof, with a 77,166,796-op-cost ceiling and 3,091 bytes below the 100,000-byte standard
-transaction limit. The two componentwise-maximal GLV event allocations are checked on the standard
-BCH2026 VM, and the certificate refuses a changed locking graph, compiler schedule, or lookup table.
+`prove_resource_ceiling.mjs` separately constructs a 98,730-serialized-byte relayable encoding for
+every valid proof, with a 78,624,129-op-cost ceiling and 1,270 bytes below the 100,000-byte standard
+transaction limit. It charges the fallback surcharge at all 63 and 66 physical GLV lookup slots,
+then checks that universal ceiling on the standard BCH2026 VM. The certificate refuses a changed
+locking graph, compiler schedule, or lookup table and does not use setup or IC discrete logarithms.
 The existing unused padding arguments can be enlarged within per-input limits, so this is an
 existence result for a uniform relayable encoding rather than a maximum over all accepted byte strings.
 
