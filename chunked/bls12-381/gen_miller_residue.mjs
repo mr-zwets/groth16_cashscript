@@ -31,6 +31,12 @@ const here = dirname(fileURLToPath(import.meta.url));
 const LINKED = process.argv[2] === 'linked';
 const QUOTIENT_TORUS = process.env.BLS_QUOTIENT_TORUS === '1';
 const UNIT_G1 = process.env.BLS_UNIT_G1 === '1';
+const REPLAN_LINKED = process.env.BLS_REPLAN_LINKED === '1';
+if (REPLAN_LINKED && (!LINKED || UNIT_G1)) {
+  throw new Error('BLS_REPLAN_LINKED requires the linked affine-G1 layout');
+}
+// The grouped builder owns a fixed standard-transaction schedule. Only the one-transaction
+// affine-G1 path opts into planning against its actual linked-input byte/op-cost context.
 if (QUOTIENT_TORUS && !LINKED && process.env.BLS_QUOTIENT_LARGE !== '1') {
   throw new Error('BLS_QUOTIENT_TORUS is linked-only; pass the linked layout explicitly');
 }
@@ -322,7 +328,7 @@ if (process.argv[2] === 'probe') {
   process.exit(0);
 }
 
-if (LINKED && (LINKED_MILLER_BOUNDS[0] !== 0 || LINKED_MILLER_BOUNDS[LINKED_MILLER_BOUNDS.length - 1] !== ops.length ||
+if (LINKED && !REPLAN_LINKED && (LINKED_MILLER_BOUNDS[0] !== 0 || LINKED_MILLER_BOUNDS[LINKED_MILLER_BOUNDS.length - 1] !== ops.length ||
   LINKED_MILLER_BOUNDS.some((bound, i) => i > 0 && bound <= LINKED_MILLER_BOUNDS[i - 1]))) {
   throw new Error('invalid linked Miller boundaries');
 }
@@ -345,7 +351,7 @@ while (lo < ops.length) {
       m,
     };
   };
-  const best = LINKED
+  const best = LINKED && !REPLAN_LINKED
     ? tryHi(LINKED_MILLER_BOUNDS[chunks.length + 1])
     : planChunk(lo, ops.length, OP_TARGET, tryHi, planState);
   if (!best || (QUOTIENT_TORUS && !best.fits)) {

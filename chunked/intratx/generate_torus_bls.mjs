@@ -1,4 +1,6 @@
-// One-command reproduction of the current-BCH BLS12-381 quotient-torus prototype.
+// One-command reproduction of the ordinary-preparation current-BCH BLS12-381 quotient-torus
+// verifier. The fixed verification-key Miller factors remain separate; no setup-scalar relation
+// is used to collapse the four-pair equation.
 //
 //   VERIFIER_DIR=/path/to/zk-verifier-bench pnpm vectors:intratx:torus:bls
 import { spawn } from 'node:child_process';
@@ -12,6 +14,7 @@ if (!process.env.VERIFIER_DIR) {
 
 const torusEnv = {
   BLS_QUOTIENT_TORUS: '1',
+  BLS_REPLAN_LINKED: '1',
   BCH_VM: '2026',
   RESCHEDULE: 'on',
   INTRATX_BARE: '0',
@@ -36,7 +39,7 @@ const run = (script, args = []) => new Promise((resolve, reject) => {
 
 console.log('[1/4] generate the shared-table GLV stage...');
 await run('chunked/bls12-381/gen_vkx_glv.mjs');
-console.log('[2/4] generate the fixed-boundary quotient-torus Miller stage...');
+console.log('[2/4] plan the linked quotient-torus Miller stage...');
 await run('chunked/bls12-381/gen_miller_residue.mjs', ['linked']);
 console.log('[3/4] prove the quotient-torus algebra and three complete traces...');
 await run('chunked/bls12-381/prove_miller_torus.mjs');
