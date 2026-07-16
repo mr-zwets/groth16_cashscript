@@ -53,11 +53,11 @@ const DEFAULT_MIN_RELAY_FEE_SATOSHIS_PER_BYTE = 1n;
 const TRANSACTION_OUTPUT_SATOSHIS = 1000n;
 const DENSITY_BASE = 41;
 const DENSITY_MULTIPLIER = 800;
-const LOCKING_GRAPH_HASH = 'b3650c298e64218852d3688936d84df57023154afc05a516fc4a5531f54464b1';
+const LOCKING_GRAPH_HASH = 'cf6f11ca2d10eaf8fa5a7bbb401908908513a01e3270189aa8728965e28202ad';
 const GLV_TABLE_HASH = '4dedc6a77ffe1f14a1faa12a533a2975e8d7304c8e740a82d8a5c9c41e490028';
 const GLV_EVENT_ALLOCATIONS = [[4, 5], [3, 6]];
 const EXPECTED_EXTRA_COUNTS = [0, 1, 22, 18, 18, 22, 20, 18, 20, 22, 16];
-const EXPECTED_FIXED_FLOORS = [2_424, 5_124, 9_105, 8_112, 7_864, 8_765, 8_609, 7_779, 8_282, 8_099, 9_056];
+const EXPECTED_FIXED_FLOORS = [2_424, 5_124, 9_105, 8_510, 7_398, 8_602, 8_796, 7_762, 8_282, 8_099, 9_056];
 
 const extraValidProofs = vectors.extraValidProofs ?? [];
 const resourceFixtureProof = vectors.resourceFixtureProof;
@@ -187,7 +187,7 @@ const expectedDependencies = Array.from({ length: INPUT_COUNT }, (_, inputIndex)
   } else if (inputIndex < INPUT_COUNT - 1) {
     // These generated schedules move the retained genesis-unlocking suffix
     // once more, adding one byte of cost per byte of input 2.
-    row[2] = [5, 6, 8, 9].includes(inputIndex) ? 3 : 2;
+    row[2] = [3, 4, 5, 6, 8, 9].includes(inputIndex) ? 3 : 2;
     row[inputIndex] += 1; row[inputIndex + 1] += 2;
   } else {
     row[2] = 2; row[inputIndex] = 1;
@@ -388,7 +388,7 @@ results.forEach((result) => {
 const universalWireBytes = Math.max(...results.map((result) => result.wireBytes));
 const universalTotalOperationCost = Math.max(...results.map((result) =>
   result.costs.reduce((sum, cost) => sum + cost, 0)));
-if (universalWireBytes !== 97_016 || universalTotalOperationCost !== 77_253_358) {
+if (universalWireBytes !== 96_909 || universalTotalOperationCost !== 77_166_796) {
   throw new Error('certified proof-independent relay encoding changed');
 }
 console.log(`proved proof-independent relay encoding: ${universalWireBytes} wire bytes, ` +
