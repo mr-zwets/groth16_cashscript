@@ -1,6 +1,6 @@
 // Multiproof vectors for the OP-OPTIMIZED BLS12-381 singleton: mint distinct valid
 // Groth16 proofs under the committed VK and, for each, compute the verifier's gated
-// WITNESSES (residue c,cInv,w over the unconjugated boundary; GLV k-decomp + vkxZinv),
+// WITNESSES (quotient-torus root u over the unconjugated boundary; GLV k-decomp + vkxZinv),
 // validating every unlocking against the committed minop locking on the loosened VM.
 // Writes verifier/src/bch/groth16-bls12381-singleton-minop-multiproof-vectors.json.
 //   node gen_multiproof_minop.mjs      (EXTRA_PROOFS=3 default)
@@ -58,11 +58,11 @@ function witnessArgs(A, B, Cc, realInputs, claimedInputs) {
   const [Ax, Ay] = g1aff(A), [Bxa, Bxb, Bya, Byb] = g2aff(B), [Cx, Cy] = g1aff(Cc);
   const pf = C.proofFromLimbs(Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy);
   const { boundary: g } = C.millerBatchOps(C.pairsFor(realInputs, pf));
-  const { c, cInv, w } = R.residueWitness(g);
+  const { u } = R.residueTorusWitness(g);
   const [k10, k20] = G.glvDecompose(modr(claimedInputs[0])), [k11, k21] = G.glvDecompose(modr(claimedInputs[1]));
   return unlockingFor([
     Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy, ...claimedInputs,
-    ...R.fp12limbsOf(c).map(canon), ...R.fp12limbsOf(cInv).map(canon), ...R.fp12limbsOf(w).map(canon),
+    ...[u.c0.c0, u.c0.c1, u.c1.c0, u.c1.c1, u.c2.c0, u.c2.c1].map(canon),
     k10, k20, k11, k21, canon(G.vkxGlvZinv(k10, k20, k11, k21)),
   ]);
 }
@@ -109,7 +109,7 @@ console.log(`  worst-case (dense inputs): accept OK`);
 
 const out = {
   contract: single.contract,
-  description: `${proofs.length} DISTINCT valid BLS12-381 Groth16 proofs verifying under ONE fixed min-op locking (VK baked); witnesses (residue c/cInv/w, GLV decomposition + vkxZinv) recomputed per proof. Demonstrates runtime-generality. Plus a worstCaseProof with dense (near-r) public inputs for apples-to-apples op-cost.`,
+  description: `${proofs.length} DISTINCT valid BLS12-381 Groth16 proofs verifying under ONE fixed min-op locking (VK baked); witnesses (quotient-torus root u, GLV decomposition + vkxZinv) recomputed per proof. Demonstrates runtime-generality. Plus a worstCaseProof with dense (near-r) public inputs for apples-to-apples op-cost.`,
   lockingOK: single.lockingOK,
   lockingBytes: single.lockingBytes,
   numProofs: proofs.length,

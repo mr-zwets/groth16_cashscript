@@ -1,11 +1,14 @@
 // Generator for the OP-OPTIMIZED BLS12-381 Groth16 singleton: groth16_minop.cash.
 // BLS analog of ../bn254/gen_singletons.mjs — stacks every op-lowering optimization:
 //   - LAZY field tower for the Miller loop (lib/lazy/, deferred reductions);
-//   - witnessed-residue final exponentiation (ePrint 2024/640 adapted to BLS12-381,
-//     see ../../chunked/bls12-381/_residuemath.mjs): lambda = p + |x|, tail
-//     fF*w == frob(c,1), with w checked in the embedded Fp6*;
+//   - QUOTIENT-TORUS residue final exponentiation (ePrint 2024/640 in Fp12*/Fp6*, see
+//     ../../chunked/bls12-381/_residuemath.mjs): the root is ONE gated 6-limb witness u
+//     ([c]=[1+u*W], so [c^-1]=[1-u*W]); c-folds are 2-Fp6-product fp12MulTorus; the
+//     terminal is the cross-multiplied quotient relation [fF]=[frob(c,1)] with the
+//     vacuous [0:0] projective value rejected. lambda = p + |x|; the legacy Fp6
+//     correction w vanishes in the quotient (no w witness, no c*cInv==1 gate);
 //   - ONE batched c^-|x|-fused Miller (UNROLLED): only (-A,B) runs on-chain G2
-//     arithmetic; e(alpha,beta) baked; (vk_x,gamma)/(C,delta) lines baked;
+//     arithmetic; e(alpha,beta) baked as a torus constant; (vk_x,gamma)/(C,delta) lines baked;
 //   - G2 subgroup check psi(B) == [-x]B, FUSED into the Miller tail: the loop already
 //     walks R_B to [|x|]B, so the membership test reuses it (no separate 64-step walk);
 //   - NO G1 subgroup checks on A,C: redundant for soundness. A,C are only paired against
@@ -44,7 +47,15 @@ const g1aff = (pt) => { const a = pt.toAffine(); return [a.x, a.y]; };
 const IC0 = g1aff(vk.ic[0]);
 
 const pairs = C.pairsFor(PUBLIC_INPUTS);
-const FAB = R.fp12limbsOf(R.conj(C.singlePairMiller(pairs[1]).f)).map(String); // baked UNCONJUGATED e(alpha,beta)
+// baked UNCONJUGATED e(alpha,beta), as its finite quotient-torus coordinate (6 limbs):
+// [fAB] = [1 + fAbU*W] with fAbU = fAB.c1 / fAB.c0 (VK-only; fails loudly if no finite chart).
+const Fp6 = bls12_381.fields.Fp6;
+const FAB12 = R.conj(C.singlePairMiller(pairs[1]).f);
+if (Fp6.eql(FAB12.c0, Fp6.ZERO)) throw new Error('e(alpha,beta) has no finite torus coordinate');
+const FABU = (() => {
+  const t = Fp6.mul(FAB12.c1, Fp6.inv(FAB12.c0));
+  return [t.c0.c0, t.c0.c1, t.c1.c0, t.c1.c1, t.c2.c0, t.c2.c1].map(String);
+})();
 
 const N = (n) => Array.from({ length: n }, (_, i) => i);
 const list = (a) => a.join(',');
@@ -110,6 +121,9 @@ function emitInputValidationLazy() {
     `        int fieldP = ${P};`,
     ...['Ax', 'Ay', 'Bxa', 'Bxb', 'Bya', 'Byb', 'Cx', 'Cy']
       .map((name) => `        require(within(${name}, 0, fieldP));`),
+    '        // torus root u must be canonical: the terminal Frobenius/cross-product compare',
+    '        // and the [c^-1]=[1-u*W] derivation assume reduced coordinates.',
+    ...N(6).map((i) => `        require(within(u${i}, 0, fieldP));`),
     '        require(mulFp(Ay, Ay) == mAdd(mulFp(mulFp(Ax, Ax), Ax), 4)); // A on E(Fp)',
     '        require(mulFp(Cy, Cy) == mAdd(mulFp(mulFp(Cx, Cx), Cx), 4)); // C on E(Fp)',
     '        (int bx2a,int bx2b) = r2Sqr(Bxa, Bxb);                       // B on E\'(Fp2)',
@@ -154,54 +168,66 @@ function emitGlvVkxLazy() {
 // (shared) and c^-|x| is folded in-loop (genesis f = cInv folds the 2^63 MSB term). The
 // witnessed-residue verdict replaces the final exponentiation. All on the UNCONJUGATED
 // boundary (x<0's final conjugation is absorbed into the witness — see _residuemath.mjs).
-function bakedLineLits(triple, Px, Py) {
-  const lim = triple.flatMap((f) => [f.c0.toString(), f.c1.toString()]);
-  return `        (${use12('F')}) = line(${use12('F')}, ${lim.join(', ')}, ${Px}, ${Py});`;
-}
 function emitMillerTailLazy() {
   const base = C.millerBatchOps(pairs, { skipPairs: new Set([1]) });
   const NAF = C.ATE_NAF;
   const Pof = { 0: ['Ax', 'nAy'], 2: ['vkxX', 'vkxY'], 3: ['Cx', 'Cy'] };
   const L = [];
-  L.push('        // ---- batched c^-|x|-fused Miller (unrolled): (-A,B) runtime G2; (vk_x,gamma)/(C,delta) baked ----');
+  // SSA emission (fresh names per op, matching the chunked emitter): reassigning one F/R_B tuple
+  // hundreds of times keeps every limb live at a fixed stack slot and the scheduler pays a deep
+  // roll per store; fresh names die at their last use instead and drop from the top for free.
+  let uid = 0;
+  const fresh = (n) => Array.from({ length: n }, () => `v${uid++}`);
+  const decl = (a) => a.map((n) => 'int ' + n).join(',');
+  L.push('        // ---- batched c^-|x|-fused Miller (unrolled, SSA): (-A,B) runtime G2; (vk_x,gamma)/(C,delta) baked ----');
   L.push('        int nAy = mSub(0, Ay);');
-  L.push(`        ${N(12).map((i) => `int F${i}=ci${i};`).join(' ')}`); // genesis f = cInv (folds the 2^63 c-term)
-  L.push('        int Rbxa=Bxa; int Rbxb=Bxb; int Rbya=Bya; int Rbyb=Byb; int Rbza=1; int Rbzb=0;');
-  let uid = 0, k = -1;
+  // [c^-1] = [1 - u*W]: canonical negation of the (gated, canonical) torus root.
+  const nur = fresh(6);
+  L.push(`        (${decl(nur)}) = fp6Neg(${use6('u')}, 1);`);
+  L.push(`        ${N(6).map((i) => `int nu${i} = mulFp(${nur[i]}, 1);`).join(' ')}`);
+  // one canonical -B.y shared by every negated add-line (was one fp2Neg per negated add)
+  if (base.ops.some((o) => o.t === 'al' && o.neg && o.j === 0)) {
+    L.push('        (int nBya, int nByb) = fp2Neg(Bya, Byb, 1);');
+  }
+  const bakedLits = (triple) => triple.flatMap((cf) => [cf.c0.toString(), cf.c1.toString()]).join(', ');
+  // genesis f = [c^-1] representative 1 + nu*W (folds the 2^63 c-term); genesis R_B = B
+  let f = ['1', '0', '0', '0', '0', '0', ...N(6).map((i) => `nu${i}`)];
+  let rb = ['Bxa', 'Bxb', 'Bya', 'Byb', '1', '0'];
+  const emitF = (call) => { const g = fresh(12); L.push(`        (${decl(g)}) = ${call};`); f = g; };
+  let k = -1;
   for (const op of base.ops) {
     if (op.t === 'sqr') {
       k++;
-      L.push(`        (${use12('F')}) = fp12Sqr(${use12('F')});`);
+      emitF(`fp12Sqr(${f.join(',')})`);
       if (NAF[k] !== undefined && NAF[k] !== 0) {
-        // fold c^-|x|: digit +1 -> x cInv, digit -1 -> x c
-        L.push(`        (${use12('F')}) = fp12Mul(${use12('F')}, ${NAF[k] === -1 ? use12('c') : use12('ci')});`);
+        // fold c^-|x| in the quotient: digit +1 -> x [c^-1]=[1-u*W], digit -1 -> x [c]=[1+u*W]
+        emitF(`fp12MulTorus(${f.join(',')}, ${NAF[k] === -1 ? use6('u') : use6('nu')})`);
       }
     } else if (op.t === 'dl') {
       const [px, py] = Pof[op.j];
       if (op.j === 0) {
-        const d = N(6).map((i) => `d${uid}_${i}`), rr = N(6).map((i) => `dr${uid}_${i}`); uid++;
-        L.push(`        (${d.map((n) => 'int ' + n).join(',')}, ${rr.map((n) => 'int ' + n).join(',')}) = pointDouble(Rbxa,Rbxb,Rbya,Rbyb,Rbza,Rbzb);`);
-        L.push(`        Rbxa=${rr[0]}; Rbxb=${rr[1]}; Rbya=${rr[2]}; Rbyb=${rr[3]}; Rbza=${rr[4]}; Rbzb=${rr[5]};`);
-        L.push(`        (${use12('F')}) = line(${use12('F')}, ${d.join(',')}, ${px}, ${py});`);
+        const d = fresh(6), rr = fresh(6);
+        L.push(`        (${decl([...d, ...rr])}) = pointDouble(${rb.join(',')});`);
+        rb = rr;
+        emitF(`line(${f.join(',')}, ${d.join(',')}, ${px}, ${py})`);
       } else {
-        L.push(bakedLineLits(op.coeffs, px, py));
+        emitF(`line(${f.join(',')}, ${bakedLits(op.coeffs)}, ${px}, ${py})`);
       }
     } else if (op.t === 'al') {
       const [px, py] = Pof[op.j];
       if (op.j === 0) {
-        const a = N(6).map((i) => `a${uid}_${i}`), rr = N(6).map((i) => `ar${uid}_${i}`); const u = `uy${uid}`; uid++;
-        L.push(`        int ${u}a = Bya; int ${u}b = Byb;`);
-        if (op.neg) L.push(`        (${u}a,${u}b) = fp2Neg(Bya, Byb, 1);`);
-        L.push(`        (${a.map((n) => 'int ' + n).join(',')}, ${rr.map((n) => 'int ' + n).join(',')}) = pointAdd(Rbxa,Rbxb,Rbya,Rbyb,Rbza,Rbzb, Bxa,Bxb,${u}a,${u}b);`);
-        L.push(`        Rbxa=${rr[0]}; Rbxb=${rr[1]}; Rbya=${rr[2]}; Rbyb=${rr[3]}; Rbza=${rr[4]}; Rbzb=${rr[5]};`);
-        L.push(`        (${use12('F')}) = line(${use12('F')}, ${a.join(',')}, ${px}, ${py});`);
+        const Y = op.neg ? ['nBya', 'nByb'] : ['Bya', 'Byb'];
+        const a = fresh(6), rr = fresh(6);
+        L.push(`        (${decl([...a, ...rr])}) = pointAdd(${rb.join(',')}, Bxa,Bxb,${Y.join(',')});`);
+        rb = rr;
+        emitF(`line(${f.join(',')}, ${a.join(',')}, ${px}, ${py})`);
       } else {
-        L.push(bakedLineLits(op.coeffs, px, py));
+        emitF(`line(${f.join(',')}, ${bakedLits(op.coeffs)}, ${px}, ${py})`);
       }
     }
   }
-  // multiply in the baked e(alpha,beta); F is now gF = g * c^-|x| (unconjugated)
-  L.push(`        (${use12('F')}) = fp12Mul(${use12('F')}, ${lits(FAB)});`);
+  // multiply in the baked e(alpha,beta) torus coordinate; f is now gF = g * c^-|x| (unconjugated)
+  emitF(`fp12MulTorus(${f.join(',')}, ${lits(FABU)})`);
   // ---- G2 subgroup membership, FUSED into the Miller loop ----
   // The Miller loop above already walks R_B to [|x|]B (homogeneous projective; NAF excludes the
   // MSB, R_B starts at B), so psi(B) == -[|x|]B needs NO separate 64-step [|x|]B walk. Compare
@@ -212,32 +238,43 @@ function emitMillerTailLazy() {
   // compare below (0 == psi.x*0). Requiring Rbz != 0 rejects that: gcd(prefix, r)=1 forces any
   // collapsing B to order exactly 13 -> Rbz=0, while every non-collapsing walk yields the true
   // [|x|]B where gcd(lambda, h2)=1 makes psi(B)==[x]B equivalent to B in G2. See psi-subgroup-degeneracy.md.
-  L.push('        require(redFp(Rbza) != 0 || redFp(Rbzb) != 0);');
+  L.push(`        require(redFp(${rb[4]}) != 0 || redFp(${rb[5]}) != 0);`);
   L.push('        (int psxa,int psxb,int psya,int psyb) = psi(Bxa, Bxb, Bya, Byb);');
   L.push('        (int npya,int npyb) = r2Neg(psya, psyb);');
-  L.push('        (int gcxa,int gcxb) = r2Mul(psxa, psxb, Rbza, Rbzb);');
-  L.push('        require(redFp(Rbxa) == gcxa); require(redFp(Rbxb) == gcxb);');
-  L.push('        (int gcya,int gcyb) = r2Mul(npya, npyb, Rbza, Rbzb);');
-  L.push('        require(redFp(Rbya) == gcya); require(redFp(Rbyb) == gcyb);');
-  L.push(`        require(residueVerdict(${use12('F')}, ${use12('c')}, ${use12('ci')}, ${use6('w')}));`);
+  L.push(`        (int gcxa,int gcxb) = r2Mul(psxa, psxb, ${rb[4]}, ${rb[5]});`);
+  L.push(`        require(redFp(${rb[0]}) == gcxa); require(redFp(${rb[1]}) == gcxb);`);
+  L.push(`        (int gcya,int gcyb) = r2Mul(npya, npyb, ${rb[4]}, ${rb[5]});`);
+  L.push(`        require(redFp(${rb[2]}) == gcya); require(redFp(${rb[3]}) == gcyb);`);
+  // ---- quotient-torus terminal: [fF] == [frob(c,1)] in Q = Fp12*/Fp6* ----
+  // fF = g*c^-|x|*fAB accumulated above; lambda = p+|x| makes acceptance equivalent to the full
+  // pairing verdict (r-torsion result, gcd(r, p^6-1)=1). Canonicalize the lazy accumulator, reject
+  // the vacuous projective value [0:0], then cross-multiply: [F_lo:F_hi] == [1:frob1(u)] iff
+  // F_lo*frob1(u) == F_hi in Fp6.
+  L.push(`        ${N(12).map((i) => `int tF${i} = mulFp(${f[i]}, 1);`).join(' ')}`);
+  L.push(`        require(${N(12).map((i) => `tF${i}`).join(' + ')} != 0);`);
+  L.push(`        (${N(6).map((i) => `int tu${i}`).join(',')}) = torusFrob1(${use6('u')});`);
+  L.push(`        (${N(6).map((i) => `int tp${i}`).join(',')}) = fp6Mul(${N(6).map((i) => `tF${i}`).join(',')}, ${N(6).map((i) => `tu${i}`).join(',')});`);
+  L.push('        ' + N(6).map((i) => `require(mulFp(tp${i} - tF${i + 6}, 1) == 0);`).join(' '));
   return L;
 }
 function emitMinOp() {
   const L = [];
   L.push('pragma cashscript ^0.14.0;');
   L.push('');
-  L.push('// GENERATED by gen_singleton_minop.mjs — op-optimized BLS12-381 Groth16 singleton (lazy tower).');
-  L.push('// ONE batched c^-|x|-fused Miller (UNROLLED, unconjugated boundary): only (-A,B) runs on-chain');
-  L.push('// G2 arithmetic; e(alpha,beta)=baked fAB, (vk_x,gamma)/(C,delta) lines baked; witnessed-residue');
-  L.push('// final-exp (lambda=p+|x|, w in Fp6*); G2 subgroup check psi(B)==[-x]B FUSED into the Miller');
-  L.push('// tail (reuses R_B=[|x|]B); no G1 subgroup checks (redundant given B in G2 — see header);');
-  L.push('// GLV vk_x. Large by design — bytes are not this variant\'s axis; needs the cashc fork');
-  L.push('// large-contract compile fix. Regenerate: node gen_singleton_minop.mjs.');
-  L.push('import "./lib/lazy/Bls12381LazyG.cash";');
+  L.push('// GENERATED by gen_singleton_minop.mjs — op-optimized BLS12-381 Groth16 singleton (lazy tower,');
+  L.push('// quotient torus). ONE batched c^-|x|-fused Miller (UNROLLED, unconjugated boundary): only (-A,B)');
+  L.push('// runs on-chain G2 arithmetic; e(alpha,beta) baked as its torus coordinate, (vk_x,gamma)/(C,delta)');
+  L.push('// lines baked; QUOTIENT-TORUS residue final-exp (lambda=p+|x|): 6-limb root u ([c]=[1+u*W]),');
+  L.push('// 2-Fp6-product c-folds, terminal [fF]=[frob(c,1)] cross-product with [0:0] rejected; G2 subgroup');
+  L.push('// check psi(B)==[-x]B FUSED into the Miller tail (reuses R_B=[|x|]B); no G1 subgroup checks');
+  L.push('// (redundant given B in G2 — see header); GLV vk_x. Large by design — bytes are not this');
+  L.push('// variant\'s axis; needs the cashc fork large-contract compile fix.');
+  L.push('// Regenerate: node gen_singleton_minop.mjs.');
+  L.push('import "./lib/lazy/Bls12381LazyTorus.cash";');
   L.push('');
   L.push('contract Groth16VerifyMinOp() {');
   const sig = ['int Ax', 'int Ay', 'int Bxa', 'int Bxb', 'int Bya', 'int Byb', 'int Cx', 'int Cy', 'int in0', 'int in1',
-    decl12('c'), decl12('ci'), decl6('w'), 'int k10', 'int k20', 'int k11', 'int k21', 'int vkxZinv'].join(', ');
+    decl6('u'), 'int k10', 'int k20', 'int k11', 'int k21', 'int vkxZinv'].join(', ');
   L.push(`    function spend(${sig}) {`);
   for (const ln of emitInputValidationLazy()) L.push(ln);
   // G1 subgroup checks on A,C are OMITTED (not just fused): they are redundant for Groth16

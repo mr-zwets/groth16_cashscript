@@ -49,10 +49,10 @@ const Aaff = C.proof.a.toAffine(), Baff = C.proof.b.toAffine(), Caff = C.proof.c
 function residueWit(publicInputs) {
   const pairs = C.pairsFor(publicInputs);
   const { boundary: g } = C.millerBatchOps(pairs); // UNCONJUGATED batched boundary
-  const { c, cInv, w } = R.residueWitness(g);
-  return [...R.fp12limbsOf(c), ...R.fp12limbsOf(cInv), ...R.fp12limbsOf(w).slice(0, 6)].map(canon);
+  const { u } = R.residueTorusWitness(g);
+  return [u.c0.c0, u.c0.c1, u.c1.c0, u.c1.c1, u.c2.c0, u.c2.c1].map(canon);
 }
-// spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1, c[12],ci[12],w[6], k10,k20,k11,k21,vkxZinv)
+// spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1, u[6], k10,k20,k11,k21,vkxZinv)
 function argsFor(publicInputs, resWit) {
   const [k10, k20] = G.glvDecompose(publicInputs[0] % G.GLV_R);
   const [k11, k21] = G.glvDecompose(publicInputs[1] % G.GLV_R);
@@ -77,9 +77,9 @@ const unlocking = unlockingFor(validArgs);
 const invalidUnlocking = unlockingFor(argsFor([PUBLIC_INPUTS[0] + 1n, PUBLIC_INPUTS[1]], rwValid));
 const rangeInvalidUnlockings = [
   { label: 'non-canonical B.x limb', index: 2, value: validArgs[2] - Pm },
-  { label: 'non-canonical residue c limb', index: 10, value: validArgs[10] - Pm },
-  { label: 'non-canonical residue w limb', index: 34, value: validArgs[34] - Pm },
-  { label: 'negative GLV decomposition limb', index: 40, value: -1n },
+  { label: 'non-canonical torus u low limb', index: 10, value: validArgs[10] - Pm },
+  { label: 'non-canonical torus u high limb', index: 15, value: validArgs[15] - Pm },
+  { label: 'negative GLV decomposition limb', index: 16, value: -1n },
 ].map(({ label, index, value }) => {
   const args = validArgs.slice();
   args[index] = value;
@@ -98,7 +98,7 @@ if (rangeRejections.some(({ rejected }) => !rejected)) {
 const realAccept = evalPair(realVm, template, unlocking);
 const opCost = looseAccept.operationCost;
 
-console.log('=== Groth16VerifyMinOp BLS12-381 (lazy tower + residue tail + Miller-fused psi G2 check + GLV) ===');
+console.log('=== Groth16VerifyMinOp BLS12-381 (lazy tower + quotient-torus verdict + Miller-fused psi G2 check + GLV) ===');
 console.log(`locking ${template.length}B  unlocking ${unlocking.length}B`);
 console.log(`loosened: ACCEPT valid = ${looseAccept.accepted}  (op-cost ${opCost.toLocaleString()})  err=${looseAccept.error ?? '(none)'}`);
 console.log(`loosened: REJECT invalid = ${!looseRejectInvalid.accepted}`);
@@ -108,7 +108,7 @@ console.log(`inputsNeeded = ${Math.ceil(opCost / STANDARD_BUDGET)}`);
 
 const out = {
   contract: 'Groth16VerifyMinOp (singleton/bls12-381/groth16_minop.cash)',
-  description: 'op-optimized full BLS12-381 Groth16 verifier: lazy-tower fused Miller (1 runtime G2 pair, lines/e(alpha,beta) baked) + witnessed-residue final-exp (lambda=p+|x|, w checked in embedded Fp6*) + G2 subgroup check psi(B)==[-x]B fused into the Miller tail (reuses R_B=[|x|]B; no separate walk) + GLV vk_x. G1 subgroup checks on A,C omitted as redundant (they are only paired against order-r G2 elements, so cofactor components vanish); on-curve checks kept.',
+  description: 'op-optimized full BLS12-381 Groth16 verifier: lazy-tower fused Miller (1 runtime G2 pair, lines/e(alpha,beta) baked) + QUOTIENT-TORUS residue final-exp (lambda=p+|x|, one gated 6-limb root u with [c]=[1+u*W], 2-Fp6-product c-folds, terminal [fF]=[frob(c,1)] cross-product with [0:0] rejected) + G2 subgroup check psi(B)==[-x]B fused into the Miller tail (reuses R_B=[|x|]B; no separate walk) + GLV vk_x. G1 subgroup checks on A,C omitted as redundant (they are only paired against order-r G2 elements, so cofactor components vanish); on-curve checks kept.',
   lockingOK: binToHex(template),
   unlocking: binToHex(unlocking),
   invalidUnlocking: binToHex(invalidUnlocking),
