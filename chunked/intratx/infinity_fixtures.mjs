@@ -24,8 +24,10 @@ const ordinaryInputs = [17n, 29n];
 const zeroFixedInputs = [37n, modR(
   (modR(-alpha * beta * invR(gamma)) - ic[0] - 37n * ic[1]) * invR(ic[2]),
 )];
+const zeroVkxInputs = [41n, modR((modR(-ic[0] - 41n * ic[1])) * invR(ic[2]))];
 
-if (fixedExponent(ordinaryInputs) === 0n || fixedExponent(zeroFixedInputs) !== 0n) {
+if (fixedExponent(ordinaryInputs) === 0n || fixedExponent(zeroFixedInputs) !== 0n ||
+    vkExponent(zeroVkxInputs) !== 0n) {
   throw new Error('failed to construct deterministic infinity-proof input fixtures');
 }
 
@@ -38,7 +40,9 @@ const definitions = [
   { name: 'b-c-infinity', inputs: zeroFixedInputs, a: 13n, b: 0n, c: 0n },
   { name: 'all-infinity', inputs: zeroFixedInputs, a: 0n, b: 0n, c: 0n },
   { name: 'finite-b-base', inputs: ordinaryInputs, a: 7n, b: 1n, c: solveC(ordinaryInputs, 7n, 1n) },
+  { name: 'a-infinity-b-base', inputs: ordinaryInputs, a: 0n, b: 1n, c: solveC(ordinaryInputs) },
   { name: 'vkx-msm-infinity', inputs: [0n, 0n], a: 19n, b: 23n, c: solveC([0n, 0n], 19n, 23n) },
+  { name: 'vkx-full-infinity', inputs: zeroVkxInputs, a: 17n, b: 19n, c: solveC(zeroVkxInputs, 17n, 19n) },
 ];
 
 const verifies = (proof, inputs) => Fp12.eql(bn254.pairingBatch([

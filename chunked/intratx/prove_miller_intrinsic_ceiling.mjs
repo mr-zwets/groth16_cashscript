@@ -76,10 +76,12 @@ const concreteItem = (item, byteTags = bytesTagged(item.length, BYTE_FIXED)) => 
     ? { minimum: actualNumber(item), maximum: actualNumber(item) }
     : {}),
 });
+let nextLineage = 0;
 const numericItem = (minimum, maximum = minimum) => ({
   length: vmLength(abs(minimum) > abs(maximum) ? abs(minimum) : abs(maximum)),
   minimum,
   maximum,
+  lineage: nextLineage++,
   byteTags: new Uint8Array(vmLength(abs(minimum) > abs(maximum) ? abs(minimum) : abs(maximum))),
 });
 const requireInterval = (item) => {
@@ -161,6 +163,7 @@ const traceCeiling = (inputIndex) => {
   const adjustmentByOpcode = new Map();
   const arithmeticShapes = new Map();
   const conditionalCounts = { canonical: 0, seam: 0 };
+  const conditionalShapes = new Map();
   const addAdjustment = (opcode, amount) => {
     adjustment += amount;
     adjustmentByOpcode.set(opcode, (adjustmentByOpcode.get(opcode) ?? 0) + amount);
@@ -383,45 +386,108 @@ const traceCeiling = (inputIndex) => {
       addAdjustment(opcode, delta);
     } else if (opcode === 154 || opcode === 155 || opcode === 156 || opcode === 158 ||
       opcode === 159 || opcode === 160 || opcode === 161 || opcode === 162) {
-      popMany(2); push(numericItem(0n, 1n));
+      const [left, right] = popMany(2);
+      const result = numericItem(0n, 1n);
+      if (opcode === 159 && right.minimum === 0n && right.maximum === 0n) {
+        result.lessThanZeroLineage = left.lineage;
+      }
+      push(result);
       addAdjustment(opcode, 1 - resultLength(next));
     } else if (opcode === 165) { // OP_WITHIN
       popMany(3); push(numericItem(0n, 1n));
       addAdjustment(opcode, 1 - resultLength(next));
     } else if (opcode === 99) { // OP_IF
+      const condition = active ? abstractStack.at(-1) : undefined;
       if (active) pop();
-      const nextOpcode = state.instructions[state.ip + 1]?.opcode;
-      const canonical = state.instructions.length === 13 && state.ip === 7;
-      const previousName = OpcodesBCH[state.instructions[state.ip - 1]?.opcode];
-      const seam = inputIndex >= 2 && state.instructions.length > 1000 &&
-        state.ip >= state.instructions.length - 300 && previousName === 'OP_LESSTHAN';
-      const preambleName = OpcodesBCH[state.instructions[state.ip - 3]?.opcode];
-      const firstSeam = seam && (preambleName === 'OP_SWAP' || preambleName === 'OP_OVER');
+      const endOffset = state.instructions
+        .slice(state.ip + 1)
+        .findIndex((candidate) => candidate.opcode === 104);
+      if (endOffset < 0) throw new Error('conditional has no OP_ENDIF');
+      const branchOpcodes = state.instructions
+        .slice(state.ip + 1, state.ip + endOffset + 2)
+        .map((candidate) => candidate.opcode);
+      if (branchOpcodes.slice(0, -1).some((candidate) =>
+        candidate === 99 || candidate === 100 || candidate === 103)) {
+        throw new Error('nested or alternate conditional is not a normalization branch');
+      }
+      const branchKey = branchOpcodes.join(',');
+      let normalization;
+      if (branchKey === '110,147,119,104') {
+        // OP_2DUP OP_ADD OP_NIP: duplicate p,x, replace x with p+x.
+        normalization = { branchCost: 64 + 64, name: 'pair-duplicate', pDepths: [2], targetDepth: 1 };
+      } else if (branchOpcodes.length === 4 &&
+        branchOpcodes[0] >= 82 && branchOpcodes[0] <= 96 &&
+        branchOpcodes[1] === 121 && branchOpcodes[2] === 147 && branchOpcodes[3] === 104) {
+        // OP_n OP_PICK OP_ADD: copy p from the pinned depth and add it to x.
+        const pDepth = branchOpcodes[0] - 80;
+        normalization = { branchCost: 1 + 32 + 64, name: `pick-${pDepth}`, pDepths: [pDepth + 1], targetDepth: 1 };
+      } else if (branchOpcodes.length === 6 && branchOpcodes[0] === 118 &&
+        branchOpcodes[1] >= 82 && branchOpcodes[1] <= 96 &&
+        branchOpcodes[2] === 121 && branchOpcodes[3] === 147 &&
+        branchOpcodes[4] === 119 && branchOpcodes[5] === 104) {
+        // OP_DUP OP_n OP_PICK OP_ADD OP_NIP: keep x in place while replacing
+        // its duplicate with x+p.
+        const pDepth = branchOpcodes[1] - 80;
+        normalization = { branchCost: 32 + 1 + 32 + 64, name: `duplicate-pick-${pDepth}`, pDepths: [pDepth], targetDepth: 1 };
+      } else if (branchKey === '110,147,123,117,124,104') {
+        // OP_2DUP OP_ADD OP_ROT OP_DROP OP_SWAP: replace the item below p.
+        normalization = { branchCost: 64 + 64, name: 'inline-pair', pDepths: [1], targetDepth: 2 };
+      } else if (branchKey === '82,121,120,147,83,122,117,124,107,124,108,104') {
+        // Rescheduled first seam: copy x and p, add, then restore two live p
+        // values while replacing the item below them.
+        normalization = {
+          branchCost: 1 + 32 + 32 + 64 + 1 + 35 + 32,
+          name: 'delayed-first',
+          pDepths: [1, 2],
+          targetDepth: 3,
+        };
+      }
+      const target = normalization === undefined
+        ? undefined
+        : abstractStack.at(-normalization.targetDepth);
+      const normalizationProvenance = normalization !== undefined &&
+        target?.minimum !== undefined && target.maximum !== undefined &&
+        target.lineage !== undefined && condition?.lessThanZeroLineage !== undefined &&
+        target.minimum >= -(P - 1n) && target.maximum <= P - 1n &&
+        condition?.minimum === 0n && condition.maximum === 1n &&
+        condition.lessThanZeroLineage === target.lineage &&
+        normalization.pDepths.every((depth) => {
+          const item = abstractStack.at(-depth);
+          return item?.minimum === P && item.maximum === P;
+        });
+      const smallCanonical = state.instructions.length === 13 && state.ip === 7;
+      const inSeamTail = inputIndex >= 2 && state.instructions.length > 1000 &&
+        state.ip >= state.instructions.length - 300;
+      const canonical = smallCanonical && normalizationProvenance;
+      const seam = inSeamTail && normalizationProvenance;
       const classes = Number(canonical) + Number(seam);
       if (classes !== 1) {
+        const nearbyOpcodes = state.instructions
+          .slice(Math.max(0, state.ip - 12), state.ip + 40)
+          .map((candidate) => OpcodesBCH[candidate.opcode]);
         throw new Error(`unclassified OP_IF at input ${inputIndex}, trace ${index}, ` +
-          `instructions ${state.instructions.length}, ip ${state.ip}`);
+          `instructions ${state.instructions.length}, ip ${state.ip}, ` +
+          `nearby=${JSON.stringify(nearbyOpcodes)}, ` +
+          `condition=${JSON.stringify(condition, (_, value) => typeof value === 'bigint' ? value.toString() : value)}, ` +
+          `stackTail=${JSON.stringify(abstractStack.slice(-4), (_, value) => typeof value === 'bigint' ? value.toString() : value)}`);
       }
       const className = canonical ? 'canonical' : 'seam';
       conditionalCounts[className] += 1;
-      const context = { canonical, seam, firstSeam };
+      const shape = `${className}:${normalization.name}:${normalization.branchCost}`;
+      conditionalShapes.set(shape, (conditionalShapes.get(shape) ?? 0) + 1);
+      const context = { normalizedDepth: normalization.targetDepth };
       if (process.env.DUMP_IF === '1') {
-        console.log(`if input=${inputIndex} trace=${index} class=${className} taken=${next.controlStack.at(-1) === true}`);
+        console.log(`if input=${inputIndex} trace=${index} class=${className} ` +
+          `shape=${normalization.name} taken=${next.controlStack.at(-1) === true}`);
       }
       abstractConditionals.push(context);
       const taken = next.controlStack.at(-1) === true;
-      if (!taken && (canonical || seam)) {
+      if (!taken) {
         // The base instruction cost of inactive branch instructions is already
         // charged by BCH. Add only the stack/arithmetic work of the more costly
-        // normalization branch. Both forms implement x<0 ? x+p : x.
-        if (firstSeam) {
-          // The first seam correction also rewrites the deepest pending output.
-          // Input 2's first form is already taken by the hard trace. Later
-          // inputs add exactly 197 variable operation-cost units when absent.
-          addAdjustment(opcode, preambleName === 'OP_OVER' ? 256 : 197);
-        } else {
-          addAdjustment(opcode, nextOpcode === 110 ? 128 : 97);
-        }
+        // normalization branch. Each recognized form implements x<0 ? x+p : x;
+        // branchCost is its exact full-field stack-push plus arithmetic cost.
+        addAdjustment(opcode, normalization.branchCost);
       }
     } else if (opcode === 101) { // OP_BEGIN
       // control stack only
@@ -431,16 +497,16 @@ const traceCeiling = (inputIndex) => {
       if (opcode === 104) {
         const context = abstractConditionals.pop();
         if (context === undefined) throw new Error('abstract conditional stack underflow');
-        if (context.canonical || context.seam) {
-          const normalized = pop();
-          push({
-            ...normalized,
-            length: 32,
-            minimum: 0n,
-            maximum: P - 1n,
-            byteTags: bytesTagged(32, BYTE_FIELD),
-          });
-        }
+        const normalizedIndex = abstractStack.length - context.normalizedDepth;
+        const normalized = abstractStack[normalizedIndex];
+        if (normalized === undefined) throw new Error('canonical result is missing');
+        abstractStack[normalizedIndex] = {
+          ...normalized,
+          length: 32,
+          minimum: 0n,
+          maximum: P - 1n,
+          byteTags: bytesTagged(32, BYTE_FIELD),
+        };
       }
     } else if (opcode === 105) { // OP_VERIFY
       pop();
@@ -448,6 +514,8 @@ const traceCeiling = (inputIndex) => {
       pop(); push({ length: 32, byteTags: bytesTagged(32, BYTE_UNKNOWN) });
     } else if (opcode === 192) { // OP_INPUTINDEX
       push(numericItem(BigInt(inputIndex)));
+    } else if (opcode === 195) { // OP_TXINPUTCOUNT
+      push(numericItem(BigInt(inputs.length)));
     } else if (opcode === 199) { // OP_UTXOBYTECODE
       const target = Number(actualNumber(state.stack.at(-1)));
       pop();
@@ -469,7 +537,7 @@ const traceCeiling = (inputIndex) => {
   }
 
   if (abstractConditionals.length !== 0) throw new Error('unterminated abstract conditional');
-  const expectedSeams = inputIndex >= 2 && inputIndex <= 9 ? 12 : 0;
+  const expectedSeams = inputIndex >= 2 && inputIndex < inputs.length - 1 ? 12 : 0;
   if (conditionalCounts.seam !== expectedSeams ||
     conditionalCounts.canonical === 0) {
     throw new Error(`unexpected conditional inventory at input ${inputIndex}: ${JSON.stringify(conditionalCounts)}`);
@@ -489,17 +557,21 @@ const traceCeiling = (inputIndex) => {
       .slice(0, 20)
       .map(([shape, count]) => `${count} ${shape}`),
     conditionalCounts,
+    conditionalShapes: [...conditionalShapes].sort(([left], [right]) => left.localeCompare(right)),
   };
 };
 
 export const MILLER_INTRINSIC_CEILINGS = [
-  7_444_595, 7_451_929, 7_498_476, 7_497_296, 7_497_289,
-  7_279_182, 7_314_412, 7_447_419, 7_055_553,
+  7_404_867, 6_908_399, 6_764_261, 7_773_937, 7_516_348,
+  6_861_217, 7_029_267, 7_137_710, 6_927_126,
 ];
 const dependencyCost = (inputIndex) => {
   if (inputIndex === 2) return inputs[2].unlocking.length + 2 * inputs[3].unlocking.length;
   if (inputIndex < inputs.length - 1) {
-    return 2 * inputs[2].unlocking.length + inputs[inputIndex].unlocking.length +
+    // These generated schedules move the retained genesis suffix once more,
+    // matching the coefficient measured by the outer dependency audit.
+    const genesisCoefficient = [5, 6, 8, 9].includes(inputIndex) ? 3 : 2;
+    return genesisCoefficient * inputs[2].unlocking.length + inputs[inputIndex].unlocking.length +
       2 * inputs[inputIndex + 1].unlocking.length;
   }
   return 2 * inputs[2].unlocking.length + inputs[inputIndex].unlocking.length;
@@ -512,7 +584,8 @@ for (let inputIndex = 2; inputIndex < inputs.length; inputIndex += 1) {
   intrinsicCeilings.push(intrinsic);
   console.log(`input${inputIndex}: actual=${result.finalCost} adjustment=${result.adjustment} ` +
     `total-ceiling=${result.ceiling} intrinsic-ceiling=${intrinsic}`);
-  console.log(`  branches=${JSON.stringify(result.conditionalCounts)} ${result.adjustmentByOpcode.join(' ')}`);
+  console.log(`  branches=${JSON.stringify(result.conditionalCounts)} ` +
+    `shapes=${JSON.stringify(result.conditionalShapes)} ${result.adjustmentByOpcode.join(' ')}`);
   if (process.env.SHAPES === '1') console.log(`  ${result.arithmeticShapes.join('\n  ')}`);
 }
 if (JSON.stringify(intrinsicCeilings) !== JSON.stringify(MILLER_INTRINSIC_CEILINGS)) {

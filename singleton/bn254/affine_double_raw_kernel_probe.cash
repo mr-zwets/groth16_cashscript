@@ -1,0 +1,16 @@
+pragma cashscript ^0.14.0;
+
+import "./lib/lazy/Bn254Lazy.cash";
+
+contract AffineDoubleRawKernelProbe() {
+    function spend(
+        int xa,int xb,int ya,int yb,int ma,int mb,
+        int z0,int z1,int z2,int z3,int z4,int z5,int z6,int z7,
+        bytes unused zeroPadding
+    ) {
+        (int r0,int r1,int r2,int r3,int r4,int r5,int r6,int r7) =
+            pointDoubleAffineRaw(xa,xb,ya,yb,ma,mb);
+        require(r0==z0); require(r1==z1); require(r2==z2); require(r3==z3); require(r4==z4);
+        require(r5==z5); require(r6==z6); require(r7==z7);
+    }
+}

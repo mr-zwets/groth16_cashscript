@@ -26,6 +26,7 @@ const FUSE_G2_ENDPOINT = process.env.FUSE_G2_ENDPOINT === '1';
 const MILLER_AFFINE_G2 = process.env.MILLER_AFFINE_G2 === '1';
 const MILLER_UNIT_LINES = process.env.MILLER_UNIT_LINES === '1';
 const MILLER_TORUS = process.env.MILLER_TORUS === '1';
+const affineAddFunction = MILLER_TORUS ? 'pointAddAffineRaw' : 'pointAddAffine';
 const PROJECTIVE_VKX = process.env.MILLER_PROJECTIVE_VKX === '1';
 const NORMALIZED_PROOF_POINTS = process.env.MILLER_NORMALIZED_PROOF_POINTS === '1';
 const LIB_IMPORT = FUSE_G2_ENDPOINT
@@ -47,6 +48,8 @@ const LINKED_CUTS = !LINKED_LAYOUT || linkedCutsOverride === 'auto'
 const STAGE_BOUND = process.env.STAGE_BOUND_LAYOUT === '1';
 const COVENANT_RESIDUE = STAGE_BOUND && process.env.COVENANT_RESIDUE_LAYOUT === '1';
 const COVENANT_TOKEN_CHAIN = process.env.COVENANT_TOKEN_CHAIN === '1';
+const B_INFINITY_FLAG = COVENANT_TOKEN_CHAIN;
+const RAW_B_INFINITY = process.env.MILLER_RAW_B_INFINITY === '1';
 if (FUSE_G2_ENDPOINT && !STAGE_BOUND) {
   throw new Error('FUSE_G2_ENDPOINT requires STAGE_BOUND_LAYOUT=1');
 }
@@ -69,6 +72,12 @@ if (NORMALIZED_PROOF_POINTS && (!MILLER_UNIT_LINES || !PROJECTIVE_VKX)) {
 if (COVENANT_TOKEN_CHAIN && !COVENANT_RESIDUE) {
   throw new Error('COVENANT_TOKEN_CHAIN requires the stage-bound covenant-residue layout');
 }
+if (B_INFINITY_FLAG && (!MILLER_UNIT_LINES || !STAGE_BOUND)) {
+  throw new Error('covenant B-infinity binding requires unit lines and a stage-bound layout');
+}
+if (RAW_B_INFINITY && (!NORMALIZED_PROOF_POINTS || !FUSE_G2_ENDPOINT)) {
+  throw new Error('MILLER_RAW_B_INFINITY requires normalized proof points and fused input validation');
+}
 
 const PAIRS = pairsFor(vec.publicInputs, undefined, { msmOnly: PROJECTIVE_VKX });
 const PINFO = PAIRS.map((pair, j) => {
@@ -78,8 +87,12 @@ const PINFO = PAIRS.map((pair, j) => {
   return {
     j, cfg, negQ,
     rawPxe, rawPye,
-    Pxe: MILLER_UNIT_LINES && cfg.P ? `Pu${j}` : rawPxe,
-    Pye: MILLER_UNIT_LINES && cfg.P ? `Pv${j}` : rawPye,
+    Pxe: MILLER_UNIT_LINES && cfg.P
+      ? (B_INFINITY_FLAG || RAW_B_INFINITY) && NORMALIZED_PROOF_POINTS && j === 0 ? 'effectivePu0' : `Pu${j}`
+      : rawPxe,
+    Pye: MILLER_UNIT_LINES && cfg.P
+      ? (B_INFINITY_FLAG || RAW_B_INFINITY) && NORMALIZED_PROOF_POINTS && j === 0 ? 'effectivePv0' : `Pv${j}`
+      : rawPye,
     Qxae: cfg.Q ? `Q${j}xa` : `${Q.x.c0}`, Qxbe: cfg.Q ? `Q${j}xb` : `${Q.x.c1}`,
     Qyae: cfg.Q ? `Q${j}ya` : `${Q.y.c0}`, Qybe: cfg.Q ? `Q${j}yb` : `${Q.y.c1}`,
   };
@@ -99,6 +112,10 @@ PINFO.forEach((pi, j) => {
 });
 const rawPtL = PAIRS.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine()));
 const ptL = PAIRS.flatMap((p, j) => ptLimbs(j, p.P.toAffine(), p.Q.toAffine(), MILLER_UNIT_LINES));
+const carriedPtParams = RAW_B_INFINITY
+  ? ['effectivePu0', 'effectivePv0', ...ptParams.slice(2)]
+  : ptParams;
+const carriedPtL = [...ptL];
 // Keep the proof tuple contiguous at stage genesis so G2-final can bind -A/B/C with one slice.
 // Later Miller states retain the generic -A/B, vk_x, C point order.
 const stagePtParams = PROJECTIVE_VKX
@@ -106,12 +123,22 @@ const stagePtParams = PROJECTIVE_VKX
     ? [...ptParams.slice(0, 6), ...ptParams.slice(8, 10), 'VkxX', 'VkxY', 'VkxZ']
     : [...rawPtParams.slice(0, 6), ...rawPtParams.slice(8, 10), 'VkxX', 'VkxY', 'VkxZ']
   : [...rawPtParams.slice(0, 6), ...rawPtParams.slice(8, 10), ...rawPtParams.slice(6, 8)];
+if (B_INFINITY_FLAG) stagePtParams.push('bInfinityFlag');
+if (RAW_B_INFINITY) {
+  stagePtParams.push('effectivePu0', 'effectivePv0', 'rawBxa', 'rawBxb', 'rawBya', 'rawByb');
+}
 const msmPlan = PAIRS[2].P.toAffine();
 const stagePtL = PROJECTIVE_VKX
   ? NORMALIZED_PROOF_POINTS
     ? [...ptL.slice(0, 6), ...ptL.slice(8, 10), msmPlan.x, msmPlan.y, 1n]
     : [...rawPtL.slice(0, 6), ...rawPtL.slice(8, 10), msmPlan.x, msmPlan.y, 1n]
   : [...rawPtL.slice(0, 6), ...rawPtL.slice(8, 10), ...rawPtL.slice(6, 8)];
+if (B_INFINITY_FLAG) {
+  stagePtL.push(0n);
+}
+if (RAW_B_INFINITY) {
+  stagePtL.push(...ptL.slice(0, 6));
+}
 const invYNames = NORMALIZED_PROOF_POINTS
   ? []
   : PINFO.filter((pi) => pi.cfg.P).map((pi) => `pyInv${pi.j}`);
@@ -207,7 +234,7 @@ const statePrefixLength = 12 + (MILLER_AFFINE_G2 ? 4 : 6);
 const withPts = (limbs) => {
   const fr = limbs.slice(0, statePrefixLength);
   const rest = limbs.slice(statePrefixLength);
-  return [...fr, ...ptL, ...rest];
+  return [...fr, ...carriedPtL, ...rest];
 };
 const slopeLimbs = (opLo, opHi) => MILLER_AFFINE_G2
   ? ops.slice(opLo, opHi).flatMap((op) => op.affineSlopes.flatMap((m) => [m.c0, m.c1]))
@@ -231,7 +258,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   const inR0 = MILLER_AFFINE_G2
     ? ['R0xa', 'R0xb', 'R0ya', 'R0yb']
     : ['R0xa', 'R0xb', 'R0ya', 'R0yb', 'R0za', 'R0zb'];
-  const fullStateParams = [...inF, ...inR0, ...ptParams, ...rootNames];
+  const fullStateParams = [...inF, ...inR0, ...carriedPtParams, ...rootNames];
   const stateParams = STAGE_BOUND && opLo === 0
     ? [...stagePtParams, ...rootNames, ...unitPtParams]
     : fullStateParams;
@@ -255,13 +282,26 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
   L.push(`contract MillerFused${withTail ? 'Tail' : ''}Chunk() {`);
   L.push(`    function spend(${decl(allParams)}, bytes unused zeroPadding) {`);
   L.push(covIn(committedParams));
+  if (RAW_B_INFINITY && STAGE_BOUND && opLo === 0) {
+    L.push('        bool proofBInfinity = rawBxa == 0 && rawBxb == 0 && rawBya == 0 && rawByb == 0;');
+    L.push(`        require(!proofBInfinity || (Q0xa == ${infinityB.x.c0} && Q0xb == ${infinityB.x.c1} && Q0ya == ${infinityB.y.c0} && Q0yb == ${infinityB.y.c1} && effectivePu0 == 0 && effectivePv0 == 0));`);
+    L.push('        require(proofBInfinity || (Q0xa == rawBxa && Q0xb == rawBxb && Q0ya == rawBya && Q0yb == rawByb && effectivePu0 == Pu0 && effectivePv0 == Pv0));');
+  } else if (B_INFINITY_FLAG && NORMALIZED_PROOF_POINTS) {
+    L.push('        int effectivePu0 = Pu0; int effectivePv0 = Pv0;');
+    L.push('        if (bInfinityFlag == 1) { effectivePu0 = 0; effectivePv0 = 0; }');
+  }
   if (MILLER_AFFINE_G2 && !MILLER_UNIT_LINES) {
     L.push('        int affineC2 = 21888242871839275222246405745257275088696311157297823662689037894645226208582;');
   }
   if (FUSE_G2_ENDPOINT && STAGE_BOUND && opLo === 0) {
     L.push('        int fieldP = 21888242871839275222246405745257275088696311157297823662689037894645226208583;');
     const proofNames = NORMALIZED_PROOF_POINTS
-      ? ['Pu0', 'Pv0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Pu3', 'Pv3', 'Pu2', 'Pv2']
+      ? [
+          'Pu0', 'Pv0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Pu3', 'Pv3', 'Pu2', 'Pv2',
+          ...(RAW_B_INFINITY
+            ? ['effectivePu0', 'effectivePv0', 'rawBxa', 'rawBxb', 'rawBya', 'rawByb']
+            : []),
+        ]
       : ['Px0', 'Py0', 'Q0xa', 'Q0xb', 'Q0ya', 'Q0yb', 'Px3', 'Py3'];
     L.push('        ' + proofNames.map((name) => `require(within(${name}, 0, fieldP));`).join(' '));
     if (NORMALIZED_PROOF_POINTS) {
@@ -282,9 +322,10 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
       L.push('        require(proofCInfinity || (mulFp(Py3, Py3) - addFp(mulFp(mulFp(Px3, Px3), Px3), 3)) % fieldP == 0);');
     }
     if (MILLER_AFFINE_G2) {
-      L.push('        (int bx2a,int bx2b) = fp2Sqr(Q0xa, Q0xb);');
-      L.push('        (int bx3a,int bx3b) = fp2Mul(bx2a, bx2b, Q0xa, Q0xb);');
-      L.push('        (int by2a,int by2b) = fp2Sqr(Q0ya, Q0yb);');
+      const q0 = PINFO[0];
+      L.push(`        (int bx2a,int bx2b) = fp2Sqr(${q0.Qxae}, ${q0.Qxbe});`);
+      L.push(`        (int bx3a,int bx3b) = fp2Mul(bx2a, bx2b, ${q0.Qxae}, ${q0.Qxbe});`);
+      L.push(`        (int by2a,int by2b) = fp2Sqr(${q0.Qyae}, ${q0.Qybe});`);
       L.push('        require((by2a - bx3a - 19485874751759354771024239261021720505790618469301721065564631296452457478373) % fieldP == 0);');
       L.push('        require((by2b - bx3b - 266929791119991161246907387137283842545076965332900288569378510910307636690) % fieldP == 0);');
     }
@@ -296,7 +337,14 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
           L.push(`        bool pair0Identity = ${invY} == 0;`);
           L.push(`        require(pair0Identity || mulFp(${pi.rawPye}, ${invY}) == 1);`);
           L.push('        require(!proofAInfinity || pair0Identity);');
-          L.push(`        require(!pair0Identity || proofAInfinity || (Q0xa == ${infinityB.x.c0} && Q0xb == ${infinityB.x.c1} && Q0ya == ${infinityB.y.c0} && Q0yb == ${infinityB.y.c1}));`);
+          if (B_INFINITY_FLAG) {
+            L.push('        require(bInfinityFlag == 0 || bInfinityFlag == 1);');
+            L.push('        require(bInfinityFlag == 0 || pair0Identity);');
+            L.push('        require(!pair0Identity || proofAInfinity || bInfinityFlag == 1);');
+            L.push(`        require(bInfinityFlag == 0 || (Q0xa == ${infinityB.x.c0} && Q0xb == ${infinityB.x.c1} && Q0ya == ${infinityB.y.c0} && Q0yb == ${infinityB.y.c1}));`);
+          } else {
+            L.push('        require(proofAInfinity == pair0Identity);');
+          }
           L.push(`        require(Pu0 == canonicalFp(0 - mulFp(${pi.rawPxe}, ${invY}))); require(Pv0 == canonicalFp(0 - ${invY}));`);
         } else if (PROJECTIVE_VKX && pi.j === 2) {
           L.push('        if (VkxZ == 0) {');
@@ -308,7 +356,15 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
           L.push(`            require(Pv2 == canonicalFp(0 - mulFp(vkxZ3, ${invY})));`);
           L.push('        }');
         } else if (pi.j === 2) {
-          L.push(`        require(mulFp(${pi.rawPye}, ${invY}) == 1);`);
+          if (B_INFINITY_FLAG) {
+            L.push(`        bool vkxInfinity = ${pi.rawPxe} == 0 && ${pi.rawPye} == 0;`);
+            L.push(`        bool pair2Identity = ${invY} == 0;`);
+            L.push('        require(!vkxInfinity || pair2Identity);');
+            L.push('        require(!pair2Identity || vkxInfinity);');
+            L.push(`        require(pair2Identity || mulFp(${pi.rawPye}, ${invY}) == 1);`);
+          } else {
+            L.push(`        require(mulFp(${pi.rawPye}, ${invY}) == 1);`);
+          }
           L.push(`        require(Pu2 == canonicalFp(0 - mulFp(${pi.rawPxe}, ${invY}))); require(Pv2 == canonicalFp(0 - ${invY}));`);
         } else if (pi.j === 3) {
           L.push(`        bool pair3Identity = ${invY} == 0;`);
@@ -319,6 +375,10 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
           throw new Error(`unexpected runtime G1 pair ${pi.j}`);
         }
       });
+    }
+    if (B_INFINITY_FLAG && NORMALIZED_PROOF_POINTS) {
+      L.push('        require(bInfinityFlag == 0 || bInfinityFlag == 1);');
+      L.push(`        require(bInfinityFlag == 0 || (Q0xa == ${infinityB.x.c0} && Q0xb == ${infinityB.x.c1} && Q0ya == ${infinityB.y.c0} && Q0yb == ${infinityB.y.c1}));`);
     }
   }
   if (COVENANT_RESIDUE && opLo === 0) {
@@ -384,7 +444,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
       const dco = fresh(MILLER_AFFINE_G2 ? 4 : 6), dr = fresh(MILLER_AFFINE_G2 ? 4 : 6);
       if (MILLER_AFFINE_G2) {
         const slope = slopeNamesByOp.get(i)[0];
-        L.push(`        (${decl([...dco, ...dr])}) = pointDoubleAffine(${r0.join(',')}, ${slope.join(',')});`);
+        L.push(`        (${decl([...dco, ...dr])}) = ${MILLER_TORUS ? 'pointDoubleAffineRaw' : 'pointDoubleAffine'}(${r0.join(',')}, ${slope.join(',')});`);
       } else {
         L.push(`        (${decl([...dco, ...dr])}) = pointDouble(${r0.join(',')});`);
       }
@@ -404,7 +464,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
       const aco = fresh(MILLER_AFFINE_G2 ? 4 : 6), ar = fresh(MILLER_AFFINE_G2 ? 4 : 6);
       if (MILLER_AFFINE_G2) {
         const slope = slopeNamesByOp.get(i)[0];
-        L.push(`        (${decl([...aco, ...ar])}) = pointAddAffine(${r0.join(',')}, ${pi.Qxae}, ${pi.Qxbe}, ${Y[0]}, ${Y[1]}, ${slope.join(',')});`);
+        L.push(`        (${decl([...aco, ...ar])}) = ${affineAddFunction}(${r0.join(',')}, ${pi.Qxae}, ${pi.Qxbe}, ${Y[0]}, ${Y[1]}, ${slope.join(',')});`);
       } else {
         L.push(`        (${decl([...aco, ...ar])}) = pointAdd(${r0.join(',')}, ${pi.Qxae}, ${pi.Qxbe}, ${Y[0]}, ${Y[1]});`);
       }
@@ -417,7 +477,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
       if (MILLER_AFFINE_G2) {
         const [firstSlope, secondSlope] = slopeNamesByOp.get(i);
         const bco = fresh(4), br = fresh(4);
-        L.push(`        (${decl([...bco, ...br])}) = pointAddAffine(${r0.join(',')}, ${q1.join(',')}, ${firstSlope.join(',')});`);
+        L.push(`        (${decl([...bco, ...br])}) = ${affineAddFunction}(${r0.join(',')}, ${q1.join(',')}, ${firstSlope.join(',')});`);
         r0 = br;
         emitLine(affineCoeffs(bco), pi);
         const q2 = fresh(4);
@@ -425,7 +485,7 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
         const q2ny = fresh(2);
         L.push(`        (${decl(q2ny)}) = fp2Neg(${q2[2]}, ${q2[3]}, 64);`);
         const cco = fresh(4), cr = fresh(4);
-        L.push(`        (${decl([...cco, ...cr])}) = pointAddAffine(${r0.join(',')}, ${q2[0]}, ${q2[1]}, ${q2ny[0]}, ${q2ny[1]}, ${secondSlope.join(',')});`);
+        L.push(`        (${decl([...cco, ...cr])}) = ${affineAddFunction}(${r0.join(',')}, ${q2[0]}, ${q2[1]}, ${q2ny[0]}, ${q2ny[1]}, ${secondSlope.join(',')});`);
         r0 = cr;
         if (FUSE_G2_ENDPOINT && i === endpointOp) {
           const q3x = fresh(2);
@@ -546,11 +606,11 @@ function genChunk(opLo, opHi, isFinal, withTail = false) {
     const exactState = COVENANT_RESIDUE
       ? (isFinal
           ? [...(MILLER_TORUS ? f : []), ...rootNames]
-          : [...(MILLER_TORUS ? f : []), ...ptParams, ...rootNames])
+          : [...(MILLER_TORUS ? f : []), ...carriedPtParams, ...rootNames])
       : [];
     L.push(isFinal
       ? covOut([...f, ...rootNames], exactState)
-      : covOut([...f, ...r0, ...ptParams, ...rootNames], exactState));
+      : covOut([...f, ...r0, ...carriedPtParams, ...rootNames], exactState));
   }
   L.push('    }');
   L.push('}');
@@ -637,12 +697,14 @@ writeFileSync(join(GEN, 'manifest_millerres.json'), JSON.stringify({
   fused: true, linkedLayout: LINKED_LAYOUT, stageBound: STAGE_BOUND,
   covenantResidue: COVENANT_RESIDUE, endpointSubgroup: FUSE_G2_ENDPOINT,
   covenantTokenChain: COVENANT_TOKEN_CHAIN,
+  bInfinityFlag: B_INFINITY_FLAG,
+  rawBInfinity: RAW_B_INFINITY,
+  projectiveVkx: PROJECTIVE_VKX,
+  normalizedProofPoints: NORMALIZED_PROOF_POINTS,
   affineG2: MILLER_AFFINE_G2,
   unitLines: MILLER_UNIT_LINES,
   implicitInfinityB: MILLER_UNIT_LINES,
   quotientTorus: MILLER_TORUS,
-  ...(PROJECTIVE_VKX ? { projectiveVkx: true } : {}),
-  ...(NORMALIZED_PROOF_POINTS ? { normalizedProofPoints: true } : {}),
   genesisRootParams: rootNames,
   genesisUnitParams: unitPtParams,
   numPairs: 4, numOps: ops.length, numChunks: chunks.length, boundary: f12limbs(boundary).map(String),

@@ -325,15 +325,15 @@ const traceCeiling = (inputIndex) => {
   }
   const actualInventory = [...inventory].sort(([left], [right]) => left.localeCompare(right));
   const expectedInventory = (inputIndex === 0 ? [
-    ['137:9', [61, 1]], ['813:126', [21, 1]], ['813:134', [20, 2]],
-    ['813:214', [21, 1]], ['813:251', [21, 1]], ['813:265', [0, 22]],
-    ['813:391', [21, 1]], ['813:428', [21, 1]], ['813:442', [0, 22]],
-    ['813:574', [20, 2]], ['813:611', [20, 2]], ['813:625', [0, 22]],
+    ['137:9', [61, 1]], ['822:129', [21, 1]], ['822:137', [20, 2]],
+    ['822:217', [21, 1]], ['822:254', [21, 1]], ['822:268', [0, 22]],
+    ['822:394', [21, 1]], ['822:431', [21, 1]], ['822:445', [0, 22]],
+    ['822:577', [20, 2]], ['822:614', [20, 2]], ['822:628', [0, 22]],
   ] : [
-    ['137:9', [66, 0]], ['699:149', [22, 1]], ['699:186', [22, 1]],
-    ['699:200', [0, 23]], ['699:319', [22, 1]], ['699:356', [22, 1]],
-    ['699:370', [0, 23]], ['699:495', [22, 1]], ['699:532', [22, 1]],
-    ['699:546', [0, 23]], ['699:68', [22, 1]], ['699:76', [22, 1]],
+    ['137:9', [66, 0]], ['705:149', [22, 1]], ['705:186', [22, 1]],
+    ['705:200', [0, 23]], ['705:319', [22, 1]], ['705:356', [22, 1]],
+    ['705:370', [0, 23]], ['705:495', [22, 1]], ['705:532', [22, 1]],
+    ['705:546', [0, 23]], ['705:68', [22, 1]], ['705:76', [22, 1]],
   ]).sort(([left], [right]) => left.localeCompare(right));
   if (JSON.stringify(actualInventory) !== JSON.stringify(expectedInventory)) {
     throw new Error(`input ${inputIndex} GLV conditional inventory changed: ${JSON.stringify(actualInventory)}`);
@@ -594,6 +594,8 @@ const traceCeiling = (inputIndex) => {
       pop(); push({ length: 32, byteTags: bytesTagged(32, BYTE_UNKNOWN) });
     } else if (opcode === 192) { // OP_INPUTINDEX
       push(numericItem(BigInt(inputIndex)));
+    } else if (opcode === 195) { // OP_TXINPUTCOUNT
+      push(numericItem(BigInt(inputs.length)));
     } else if (opcode === 199) { // OP_UTXOBYTECODE
       const target = Number(actualNumber(state.stack.at(-1)));
       pop();
@@ -696,7 +698,7 @@ if (doubleInstructions.length !== DOUBLE_FUNCTION_LENGTH) {
 const addReturn = glvStates.slice(selectedAdd.index + 1).find((state) =>
   state.instructions !== addEntry.instructions &&
   state.instructions.length !== DOUBLE_FUNCTION_LENGTH);
-if (addReturn === undefined || addReturn.instructions.length !== 813 || addReturn.ip !== 262) {
+if (addReturn === undefined || addReturn.instructions.length !== 822 || addReturn.ip !== 265) {
   throw new Error('failed to locate the pinned ordinary-add return site');
 }
 const concreteAddCost = addReturn.metrics.operationCost - addEntry.metrics.operationCost;
@@ -932,7 +934,7 @@ if (JSON.stringify(abstractEqualityAdd.outputLengths) !== JSON.stringify([0, 0, 
   throw new Error('equal-point sentinel or jacDouble output widths changed');
 }
 
-const callerBodyNames = addReturn.instructions.slice(262, 296)
+const callerBodyNames = addReturn.instructions.slice(265, 299)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
 const expectedCallerBodyNames = [
   'OP_OVER', 'OP_0', 'OP_NUMEQUAL', 'OP_IF',
@@ -959,7 +961,7 @@ const equalPointCallerVariableCost = callerPickCost + callerInvokeReturnCost + c
 const equalPointSurcharge = abstractEqualityAdd.operationCost + abstractDouble.operationCost +
   equalPointCallerVariableCost - abstractGenericAdd.operationCost;
 
-export const GLV_GENERIC_INTRINSIC = [6_001_485, 6_346_522];
+export const GLV_GENERIC_INTRINSIC = [6_002_682, 6_347_609];
 export const GLV_EQUAL_POINT_SURCHARGE = 12_099;
 if (JSON.stringify(intrinsicCeilings) !== JSON.stringify(GLV_GENERIC_INTRINSIC)) {
   throw new Error(`GLV generic intrinsic ceilings changed: ${JSON.stringify(intrinsicCeilings)}`);

@@ -1,4 +1,4 @@
-// Verify the proof-independent BCH resource envelope for the generated BN254
+// Verify a proof-independent BCH relay encoding for the generated BN254
 // one-transaction verifier.
 //
 // The intrinsic operation-cost ceilings below are tied to the exact generated
@@ -14,7 +14,9 @@
 // dependency matrix, checks the generated witness layout, solves both maximal
 // GLV event allocations, constructs those exact padded transactions, asks the
 // standard BCH2026 VM to verify them, and explicitly funds/asserts the default
-// 1 sat/byte relay fee (which is outside VM policy evaluation).
+// 1 sat/byte relay fee (which is outside VM policy evaluation). This proves
+// every valid proof has an encoding at the reported lengths; it does not cap
+// accepted serializations with additional OP_DROP padding.
 //
 // Run from the repository root with VERIFIER_DIR pointing to the matching
 // zk-verifier-bench checkout.
@@ -51,11 +53,11 @@ const DEFAULT_MIN_RELAY_FEE_SATOSHIS_PER_BYTE = 1n;
 const TRANSACTION_OUTPUT_SATOSHIS = 1000n;
 const DENSITY_BASE = 41;
 const DENSITY_MULTIPLIER = 800;
-const LOCKING_GRAPH_HASH = '356c903265c0b741e9ab84ee656541fa3bfccaa8898ca1a6d2675526385e7d22';
+const LOCKING_GRAPH_HASH = '4e9ebd37b5e58037e5b9b239c5740e9b2e383edaaa5710925bae5c679f8820f7';
 const GLV_TABLE_HASH = '4dedc6a77ffe1f14a1faa12a533a2975e8d7304c8e740a82d8a5c9c41e490028';
 const GLV_EVENT_ALLOCATIONS = [[4, 5], [3, 6]];
-const EXPECTED_EXTRA_COUNTS = [0, 1, 20, 20, 20, 20, 20, 18, 20, 22, 16];
-const EXPECTED_FIXED_FLOORS = [2_383, 5_086, 8_119, 8_243, 8_123, 8_109, 8_105, 7_880, 8_109, 7_961, 8_729];
+const EXPECTED_EXTRA_COUNTS = [0, 1, 22, 18, 18, 22, 20, 18, 20, 22, 16];
+const EXPECTED_FIXED_FLOORS = [2_424, 5_124, 9_103, 8_110, 8_026, 8_598, 8_607, 7_779, 8_282, 8_099, 9_056];
 
 const extraValidProofs = vectors.extraValidProofs ?? [];
 const resourceFixtureProof = vectors.resourceFixtureProof;
@@ -183,7 +185,10 @@ const expectedDependencies = Array.from({ length: INPUT_COUNT }, (_, inputIndex)
   } else if (inputIndex === 2) {
     row[2] = 1; row[3] = 2;
   } else if (inputIndex < INPUT_COUNT - 1) {
-    row[2] = 2; row[inputIndex] += 1; row[inputIndex + 1] += 2;
+    // These generated schedules move the retained genesis-unlocking suffix
+    // once more, adding one byte of cost per byte of input 2.
+    row[2] = [5, 6, 8, 9].includes(inputIndex) ? 3 : 2;
+    row[inputIndex] += 1; row[inputIndex + 1] += 2;
   } else {
     row[2] = 2; row[inputIndex] = 1;
   }
@@ -210,7 +215,13 @@ const records = runs.map(([name, steps]) => {
 const layouts = records.map((record, recordIndex) =>
   toInputs(runs[recordIndex][1]).map((input, inputIndex) => {
     const instructions = decodeAuthenticationInstructions(input.unlocking);
-    if (instructions.some((instruction) => instruction.data === undefined)) {
+    const pushed = instructions.map((instruction) => instruction.data ??
+      (instruction.opcode === 0
+        ? new Uint8Array(0)
+        : instruction.opcode >= 81 && instruction.opcode <= 96
+        ? Uint8Array.of(instruction.opcode - 80)
+        : undefined));
+    if (pushed.some((data) => data === undefined)) {
       throw new Error(`${record.name} input ${inputIndex} is not push-only`);
     }
     const expectedPushes = EXPECTED_EXTRA_COUNTS[inputIndex] + 3;
@@ -218,10 +229,10 @@ const layouts = records.map((record, recordIndex) =>
       throw new Error(`${record.name} input ${inputIndex}: expected ${expectedPushes} pushes, got ${instructions.length}`);
     }
     return {
-      inBlob: instructions[0].data,
-      extras: instructions.slice(1, -2).map((instruction) => instruction.data),
-      padding: instructions.at(-2).data,
-      redeem: instructions.at(-1).data,
+      inBlob: pushed[0],
+      extras: pushed.slice(1, -2),
+      padding: pushed.at(-2),
+      redeem: pushed.at(-1),
     };
   }));
 const hardLayout = layouts[runs.findIndex(([name]) => name === 'worstCaseProof')];
@@ -346,7 +357,7 @@ const results = GLV_EVENT_ALLOCATIONS.map((allocation) => {
   }));
   const control = measure(inputs);
   if (control.wireBytes !== wireBytes) throw new Error('exact wire-length model mismatch');
-  if (wireBytes > STANDARD_TRANSACTION_LIMIT) throw new Error('universal envelope exceeds 100 kB');
+  if (wireBytes > STANDARD_TRANSACTION_LIMIT) throw new Error('proof-independent relay encoding exceeds 100 kB');
   if (lengths.some((length) => length > SCRIPT_LIMIT)) throw new Error('unlocking script exceeds 10 kB');
   if (inputs.some((input) => input.locking.length > SCRIPT_LIMIT)) throw new Error('locking script exceeds 10 kB');
   if (costs.some((cost, inputIndex) => cost > limits[inputIndex])) {
@@ -377,9 +388,9 @@ results.forEach((result) => {
 const universalWireBytes = Math.max(...results.map((result) => result.wireBytes));
 const universalTotalOperationCost = Math.max(...results.map((result) =>
   result.costs.reduce((sum, cost) => sum + cost, 0)));
-if (universalWireBytes !== 99_285 || universalTotalOperationCost !== 79_389_147) {
-  throw new Error('certified universal envelope changed');
+if (universalWireBytes !== 97_023 || universalTotalOperationCost !== 77_257_804) {
+  throw new Error('certified proof-independent relay encoding changed');
 }
-console.log(`proved universal envelope: ${universalWireBytes} wire bytes, ` +
+console.log(`proved proof-independent relay encoding: ${universalWireBytes} wire bytes, ` +
   `${STANDARD_TRANSACTION_LIMIT - universalWireBytes} bytes standard-relay margin, ` +
   `${universalTotalOperationCost} summed ceiling op-cost`);
