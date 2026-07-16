@@ -13,9 +13,8 @@ oracle. Four benchmark entries (in the verifier repo) are produced from here:
   the BLS/Hayashida-Scott final exponentiation → verdict (== Fp12 ONE). 51 chunks / 470,061 B / 372,314,128 op-cost.
 - **`bch-groth16-bls12381-chunked`** — the **complete verifier**: five stage-bound GLV vk_x
   chunks prepended to an input-validated Miller namespace. 56 chunks / 484,519 B /
-  377,785,509 op-cost; ranked in the main
-  Groth16 leaderboard against nchain (its BLS12-381 reference) — the only BCH-compatible
-  full Groth16 verifier on that curve.
+  377,785,509 op-cost; ranked in the main Groth16 leaderboard against nchain (its
+  BLS12-381 reference).
 - **`bch-groth16-bls12381-chunked-covenant-residue`** — the source-owned standard-VM
   covenant graph: five full-stage GLV chunks -> input-validation-fused residue Miller -> the
   one-input Fp6 residue verdict. It enforces a minting-baton genesis, one mutable state
@@ -29,13 +28,13 @@ also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` 
 - `bch-groth16-bls12381-intratx`: 56 inputs / 475,310 B / 377,658,775 op-cost.
 - `bch-groth16-bls12381-grouped`: 56 inputs / 6 standard transactions / 475,292 B /
   377,556,467 op-cost.
-- `bch-groth16-bls12381-intratx-residue`: quotient-torus frontier, 34 inputs / 195,413 B /
-  153,091,714 op-cost. The unchanged default Fp6-tail path remains reproducible at 35 inputs /
+- `bch-groth16-bls12381-intratx-residue`: quotient-torus frontier, 34 inputs / 195,413 script B /
+  196,895 score B / 195,705 wire B / 153,091,714 op-cost. The unchanged default Fp6-tail path remains reproducible at 35 inputs /
   209,216 B / 157,700,169 op-cost.
-- `bch-groth16-bls12381-grouped-residue`: 35 inputs / 4 standard transactions / 209,937 B /
-  158,744,466 op-cost.
-- `bch-groth16-bls12381-intratx-residue-large`: 3 inputs / 164,426 B / 149,814,405 op-cost
-  on the proposed 100 kB-script VM.
+- `bch-groth16-bls12381-grouped-residue`: 34 inputs / 3 standard transactions / 206,055 script B /
+  207,709 score B / 206,589 wire B / 162,247,773 op-cost.
+- `bch-groth16-bls12381-intratx-residue-large`: 3 inputs / 164,426 script B / 164,579 score B /
+  164,474 wire B / 149,814,405 op-cost on the proposed 100 kB-script VM; non-standard by total size.
 
 ## Optimizations (prepared batched Miller + lazy reduction)
 
@@ -93,6 +92,11 @@ op-cost cuts translate ~1:1 into size.
 
 Every chunk is validated on the real BCH 2026 VM, against `@noble/curves` bls12-381,
 for **two** distinct instances under the same VK (runtime-general).
+
+The prescribed verifier.cash BLS12-381 key is synthetic and publishes its setup and IC scalars.
+The bytecode evaluates the complete four-pair equation without collapsing it through those scalar
+relations, but these fixtures do not establish circuit knowledge, secure application public-input
+binding, arbitrary-key verification, or interoperability with an independently generated setup.
 
 ## How it works
 

@@ -9,20 +9,21 @@ BCH 2026 VM:
   verifier (plain and residue-optimized packings).
 - **BLS12-381** — the singleton verifier (baseline and op-optimized), on the **same
   curve as the nChain reference** so the benchmark gets a true apples-to-apples
-  comparison (~21× smaller bytecode), **plus** a deployable grouped-residue chunked
-  verifier (39 inputs in 5 standard transactions).
+  comparison (~21× smaller bytecode), **plus** current-BCH linked and grouped-residue
+  chunked constructions (the grouped quotient-residue verifier is 34 inputs in 3 standard
+  transactions).
 
 This has grown into a whole family of verifiers across two curves, two forms, and
 baseline/op-optimized variants — **[verifiers.md](verifiers.md) is the map** of which is
 which and where each deployable frontier sits.
 
-The deterministic BN254 verifier.cash fixture is an equation-execution benchmark, not a
-circuit-generated proof: its setup scalars are published so the harness can mint many
-valid proofs under one fixed verification key. The BN254 frontier still evaluates the
-complete four-pair equation and does not use those scalar relations to collapse the
-on-chain statement, but the fixture itself does not establish circuit knowledge, secure
-binding of the public-input vector, or interoperability with an independently generated
-setup.
+The deterministic BN254 and BLS12-381 verifier.cash fixtures are equation-execution
+benchmarks, not circuit-generated proofs: their setup scalars are published so the harness
+can mint many valid proofs under one fixed verification key per curve. The frontier
+bytecode still evaluates the complete four-pair equation and does not use those scalar
+relations to collapse the on-chain statement, but the fixtures do not establish circuit
+knowledge, secure binding of the public-input vector, arbitrary-key verification, or
+interoperability with an independently generated setup.
 
 It comes in two forms:
 

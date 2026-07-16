@@ -2,14 +2,13 @@
 
 A THIRD chunking method for the BN254 Groth16 verifier, a hybrid of the other two:
 
-- **Covenant** (`chunked/pairing`, `bch-groth16-chunked`): 54 sequential transactions, one
-  chunk each → a 54-deep unconfirmed chain that exceeds BCH's default mempool ancestor/
-  descendant limit (50).
-- **Intra-tx** (`chunked/intratx`, `bch-groth16-intratx`): the whole verifier in ONE
-  transaction → ~0.5 MB, over the 100,000-byte standard size, so it is non-standard
-  (mine-direct).
-- **Grouped** (this dir, `bch-groth16-grouped`): the SAME 54 chunks packed into **~6 standard
-  (<100,000 B) transactions** → under the chain limit AND relayable under standard policy.
+- **Covenant** (`chunked/pairing`, `bch-groth16-chunked`): one sequential transaction per
+  chunk; larger layouts can approach or exceed BCH's default 50-transaction mempool-chain edge.
+- **Intra-tx** (`chunked/intratx`, `bch-groth16-intratx`): the whole verifier in one
+  transaction; large layouts exceed the 100,000-byte standard size, while the optimized BN254
+  quotient construction fits.
+- **Grouped** (this dir, `bch-groth16-grouped`): packs one chunk graph into a handful of standard
+  transactions, remaining under both the transaction-size and chain-depth limits.
 
 ## Mechanism
 
@@ -42,15 +41,16 @@ A THIRD chunking method for the BN254 Groth16 verifier, a hybrid of the other tw
 
 ## Result (benchmark `bch-groth16-grouped`)
 
-54 inputs / **6 transactions**, ~446 KB total, op-cost 348 M (worst-case 391 M, accepted),
-every step ≤ 8,032,800 op / ≤ 10 KB, every group < 100,000 B. PASS, **standard-relayable**,
-runtime-general (2/2 proofs), invalid runs rejected. The only full Groth16 verifier that is both
-standard-relayable and within the mempool chain limit.
+42 inputs / **5 transactions**, 328,458 script B / 330,628 score B, and 261,496,203 op-cost.
+Every step fits the current BCH per-input limits and every group passes standard policy. One fixed
+locking graph accepts multiple runtime proofs.
 
-The BLS12-381 entry (`bch-groth16-bls12381-grouped`) is 56 inputs / **6 transactions**,
-475,292 B total, op-cost 377,556,467, every group < 100,000 B — likewise standard-relayable
-and six deep. Its five GLV inputs remain together in group 0 so four siblings can read the one
-hash-bound VK table carried by the fifth.
+The plain BLS12-381 entry (`bch-groth16-bls12381-grouped`) is 56 inputs / **6 transactions**,
+475,292 script B / 478,150 score B, and 377,556,467 op-cost. Every group passes standard policy.
+Its five GLV inputs remain together in group 0 so four siblings can read the one hash-bound VK
+table carried by the fifth.
 
-The residue entry (`bch-groth16-bls12381-grouped-residue`) is 39 inputs / **5 transactions**,
-324,179 B total, op-cost 256,875,048, with the same standard-relayable group handoffs.
+The quotient-residue BLS entry (`bch-groth16-bls12381-grouped-residue`) is 34 inputs in **3 standard
+transactions**, 206,055 script B / 207,709 score B / 206,589 wire B, and 162,247,773 op-cost. Its
+cross-transaction state thread requires a mutable NFT, excludes same-category sibling inputs, and
+requires the terminal transaction to burn the thread token.
