@@ -30,7 +30,7 @@ axes; this doc is the map. Individual folders have the authoritative per-verifie
 | `bch-groth16-singleton` | singleton, baseline | ~14.4 KB source; size-scored recompile **8,874 B** | correctness oracle; over per-input limits |
 | `bch-groth16-singleton-minop` | singleton, op-optimized | ~58.8 KB / **~74.2M op-cost** | quotient-torus residue + affine GLV; still single-input (oracle) |
 | `bch-groth16-chunked` | chunked, covenant chain | **43 inputs / 331,856 B / 261.42M op** | NFT-commitment chain |
-| `bch-groth16-chunked-covenant-residue` | chunked, quotient-torus covenant chain | **12 tx / 93,984 B score / 93,982 B wire / 69.90M op** | standard-relayable measured fixture suite; token-bound state thread |
+| `bch-groth16-chunked-covenant-residue` | chunked, quotient-torus covenant chain | **12 tx / 93,938 B score / 93,936 B wire / 69.89M op** | standard-relayable measured fixture suite; token-bound state thread |
 | `bch-groth16-intratx` | chunked, intra-tx linked | **42 inputs / 330,580 B / 262.68M op** | whole verifier in one (non-standard) tx |
 | `bch-groth16-grouped` | chunked, grouped | **42 inputs / 330,628 B score / 261.50M op** | standard-relayable in 5 txs |
 | `bch-groth16-intratx-residue` | chunked, intra-tx + quotient-torus residue | **11 inputs / 87,288 B score / 86,903 B wire / 68.38M op** | current-BCH standard; smallest current-BCH full verifier in this benchmark |
