@@ -90,7 +90,7 @@ function parseParams(sig) {
  *                    Pins an intra-transaction hand-off to the expected successor program.
  *   cfg.forward.nextLockingBytecode optional exact immediate-successor locking-bytecode hex.
  *   cfg.expectedInputCount optional transaction-graph-size gate.
- *   cfg.expectedInputIndex optional additional position gate; requires expectedInputCount.
+ *   cfg.expectedInputIndex optional position gate.
  *   cfg.externalBindings additional byte-slice bindings from this chunk's inBlob to another
  *                    input's inBlob: [{sourceOffset,targetInputIndex,targetFullInLen,
  *                    targetOffset,length}]. targetInputIndex is transaction-local.
@@ -284,12 +284,11 @@ export function transformChunk(src, cfg) {
   const inLen = inWidths.reduce((sum, width) => sum + width, 0);
   const expectedInputIndex = cfg.expectedInputIndex;
   const expectedInputCount = cfg.expectedInputCount;
-  if ((expectedInputIndex !== undefined && expectedInputCount === undefined) ||
-    (expectedInputCount !== undefined &&
+  if ((expectedInputCount !== undefined &&
       (!Number.isSafeInteger(expectedInputCount) || expectedInputCount <= 0)) ||
     (expectedInputIndex !== undefined &&
       (!Number.isSafeInteger(expectedInputIndex) || expectedInputIndex < 0 ||
-       expectedInputCount <= expectedInputIndex))) {
+       (expectedInputCount !== undefined && expectedInputCount <= expectedInputIndex)))) {
     throw new Error(`invalid expected input layout: ${expectedInputIndex}/${expectedInputCount}`);
   }
   const prologue = [];
