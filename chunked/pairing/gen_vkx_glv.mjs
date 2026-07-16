@@ -3,8 +3,8 @@
 // ~127 bits, turning the 2-scalar 254-bit MSM into a 4-scalar ~128-bit Straus over the FIXED
 // points {IC1, phi(IC1), IC2, phi(IC2)} (phi(x,y)=(beta*x,y)). A baked 16-entry subset-sum table
 // folds all 4 scalars into ONE add per iteration -> ~half the doublings (vkx ~9 -> ~4 chunks).
-// The current-BCH intratx residue builder opts into a grouped schedule: three 43-bit groups
-// share 43 doublings and use tables for P, [2^43]P, and [2^86]P.
+// The current-BCH intratx residue builder opts into a grouped schedule: two 64-bit groups
+// share 64 doublings and use tables for P and [2^64]P.
 // The decomposition witnesses k10,k20,k11,k21 are checked on-chain at genesis
 // (k1 + k2*lambda == in mod r); phi(IC1),phi(IC2) and the table are baked (proof-independent).
 // State (committed, 9 limbs): rX,rY,rZ, in0,in1, k10,k20,k11,k21. The
@@ -140,8 +140,8 @@ for (let idx = 1; idx < 16; idx++) {
   const a = acc.toAffine(); TABLE[idx] = [a.x, a.y];
 }
 if (TABLE.slice(1).some(([x]) => x === 0n)) throw new Error('x=0 is reserved for the GLV no-add sentinel');
-const SPLIT_WIDTH = 43;
-const SPLIT_GROUPS = 3;
+const SPLIT_WIDTH = 64;
+const SPLIT_GROUPS = 2;
 const shiftedTables = Array.from({ length: SPLIT_GROUPS }, (_, group) => group * SPLIT_WIDTH).map((shift) => {
   const bases = BP.map((point) => point.multiplyUnsafe(1n << BigInt(shift)));
   const table = [];
@@ -153,8 +153,8 @@ const shiftedTables = Array.from({ length: SPLIT_GROUPS }, (_, group) => group *
   if (table.slice(1).some(([x]) => x === 0n)) throw new Error('x=0 is reserved for the split GLV no-add sentinel');
   return table;
 });
-// Encode the original 15-entry table as a 960-byte blob and the three grouped tables as
-// one 2,880-byte blob. Each entry is x(LE32) || y(LE32).
+// Encode the original 15-entry table as a 960-byte blob and the two grouped tables as
+// one 1,920-byte blob. Each entry is x(LE32) || y(LE32).
 // A runtime `split` reads entry idx in O(1) (one indexed slice) — ~74% cheaper op-cost than the
 // 15-deep if/else dispatch, which costs ~3.5M op in branch comparisons over the 128-iter Straus.
 // 32-byte LE is safe (field elements < P < 2^255 -> sign bit clear -> int() recovers them positive).
@@ -306,8 +306,7 @@ export function genCash(
   }
   if (grouped && sharedTable === null) L.push(`        bytes glvTable = ${SPLIT_TABLE_HEX};`);
   if (grouped) {
-    L.push(`        bytes glvTable0, bytes glvTableTail = glvTable.split(${tableBytes.length});`);
-    L.push(`        bytes glvTable${SPLIT_WIDTH}, bytes glvTable${2 * SPLIT_WIDTH} = glvTableTail.split(${tableBytes.length});`);
+    L.push(`        bytes glvTable0, bytes glvTable${SPLIT_WIDTH} = glvTable.split(${tableBytes.length});`);
   }
   L.push(`        for (int k = 0; k < ${count}; k = k + 1) {`);
   L.push(`            int i = ${hiBit} - k;`);
@@ -408,7 +407,7 @@ export function vkxGlvStateAt(k10, k20, k11, k21, upto) {
   }
   return [X, Y, Z];
 }
-/** Grouped accumulator: three fixed-table base groups over 43 positions. */
+/** Grouped accumulator: two fixed-table base groups over 64 positions. */
 export function vkxGlvSplitStateAt(k10, k20, k11, k21, upto) {
   let X = 0n, Y = 1n, Z = 0n;
   for (let w = 0; w < upto; w++) {

@@ -8,18 +8,18 @@
 // grouped builders call the helpers below at startup so re-running a builder reproduces the
 // replanned count instead of inheriting the covenant-planned manifest.
 //
-// SAFE FLOORS — grouped GLV revalidated 2026-07-15 with named full-valid density
+// SAFE FLOORS — grouped GLV revalidated 2026-07-16 with named full-valid density
 // and asymmetric-resource fixtures plus an exhaustive equal-point event certificate;
 // Shamir validated 2026-07-09. These floors are not based merely on a convenient
 // proof vector: GLV's raw inputs decompose into four independently bounded witnesses.
 //   GLV (128-iter, 4-scalar Straus): 3 windows [0,43)[43,86)[86,128)F — revalidated
 //     after specializing fixed-table additions for affine second operands in
 //     gen_vkx_glv.mjs. Builder max-density peak: 7,659,296 of 8,032,800.
-//   GLV grouped 3x43 (up to three fixed-table additions per position): 2 windows
-//     [0,21)[21,43)F. The concrete full-valid resource fixture peaks at 6,338,518
-//     op-cost. prove_vkx_glv_resource_bound.mjs proves at most 4/6 equal-point
-//     events per input and 9 total; prove_resource_ceiling.mjs combines both
-//     maximal allocations with the Miller ceilings and constructs a 97,021-byte
+//   GLV grouped 2x64 (up to two fixed-table additions per position): 2 windows
+//     [0,29)[29,64)F. The complete current-BCH verifier's concrete resource fixture
+//     peaks at 7,025,263 op-cost. prove_vkx_glv_resource_bound.mjs charges every
+//     physical fallback opportunity, 58/70 by input; prove_resource_ceiling.mjs
+//     combines those maxima with the Miller ceilings and constructs a 99,079-byte
 //     proof-independent relayable transaction encoding.
 //   Shamir (254-iter, 2-scalar): 6 windows [0,43)[43,86)[86,129)[129,172)[172,215)[215,254)F
 //     — 95.4% of budget; the worst-case proof (in0,in1 popcount 253/254) already saturates
@@ -36,7 +36,7 @@ import { genCash as glvGenCash } from './pairing/gen_vkx_glv.mjs';
 import { genCash as shamirGenCash } from './pairing/gen_vkx.mjs';
 
 export const GLV_SAFE_BOUNDS = [0, 43, 86, 128];
-export const GLV_GROUPED_BOUNDS = [0, 21, 43];
+export const GLV_GROUPED_BOUNDS = [0, 29, 64];
 export const SHAMIR_SAFE_BOUNDS = [0, 43, 86, 129, 172, 215, 254];
 
 const clearPrefix = (GEN, prefix) => {

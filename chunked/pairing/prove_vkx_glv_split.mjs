@@ -1,7 +1,7 @@
 // Executable equivalence and range checks for the grouped BN254 GLV schedule.
 //
-// The current schedule evaluates three 43-bit groups together, using fixed tables
-// for P, [2^43]P, and [2^86]P. These checks cover every scalar basis position,
+// The current schedule evaluates two 64-bit groups together, using fixed tables
+// for P and [2^64]P. These checks cover every scalar basis position,
 // every serialized table entry, the exact integer inequalities used by the
 // constructive <2^128 decomposition bound, and the non-grouped generator output.
 import { createHash } from 'node:crypto';

@@ -30,10 +30,10 @@ axes; this doc is the map. Individual folders have the authoritative per-verifie
 | `bch-groth16-singleton` | singleton, baseline | ~14.4 KB source; size-scored recompile **8,874 B** | correctness oracle; over per-input limits |
 | `bch-groth16-singleton-minop` | singleton, op-optimized | ~58.8 KB / **~74.2M op-cost** | quotient-torus residue + affine GLV; still single-input (oracle) |
 | `bch-groth16-chunked` | chunked, covenant chain | **43 inputs / 331,856 B / 261.42M op** | NFT-commitment chain |
-| `bch-groth16-chunked-covenant-residue` | chunked, quotient-torus covenant chain | **12 tx / 93,984 B score / 93,982 B wire / 69.90M op** | standard-relayable measured fixture suite; token-bound state thread |
+| `bch-groth16-chunked-covenant-residue` | chunked, quotient-torus covenant chain | **12 tx / 93,938 B score / 93,936 B wire / 69.89M op** | standard-relayable measured fixture suite; token-bound state thread |
 | `bch-groth16-intratx` | chunked, intra-tx linked | **42 inputs / 330,580 B / 262.68M op** | whole verifier in one (non-standard) tx |
 | `bch-groth16-grouped` | chunked, grouped | **42 inputs / 330,628 B score / 261.50M op** | standard-relayable in 5 txs |
-| `bch-groth16-intratx-residue` | chunked, intra-tx + quotient-torus residue | **11 inputs / 88,778 B score / 88,393 B wire / 68.47M op** | current-BCH standard; smallest current-BCH full verifier in this benchmark |
+| `bch-groth16-intratx-residue` | chunked, intra-tx + quotient-torus residue | **11 inputs / 86,950 B score / 86,565 B wire / 68.49M op** | current-BCH standard; smallest current-BCH full verifier in this benchmark |
 | `bch-groth16-grouped-residue` | chunked, grouped + residue | **26 inputs / 224,830 B / 179.59M op** | standard-relayable in 3 txs |
 | `bch-groth16-intratx-residue-large` | chunked, intra-tx + quotient-torus residue, **`bch-spec`** | **4 inputs / 58,823 B score / 58,683 B wire / 68.32M op** | proposed-VM-only; passes its standard-policy model; own leaderboard category — see [Target VM](#target-vm-bch-spec) |
 | `bch-pairing-chunked` | chunked pairing-only, covenant | **20 inputs / 175,788 B / 138.94M op**; score **178,368** | Miller-boundary milestone |
@@ -111,7 +111,7 @@ Extra considerations for spec-targeting verifiers (full detail in
 | method | how state crosses | deployability | folder |
 |---|---|---|---|
 | **covenant chain** | NFT `hash256` commitment, one chunk per tx | 12 tx for the BN254 quotient frontier; larger historical layouts can approach or exceed the 50-deep mempool edge | `chunked/pairing`, `chunked/bls12-381` |
-| **intra-tx linked** | next input's unlocking bytecode (`OP_INPUTBYTECODE` forward-check), one tx | one tx; 88,393 B and standard for the BN254 quotient-torus frontier, larger builds can be non-standard | `chunked/intratx` |
+| **intra-tx linked** | next input's unlocking bytecode (`OP_INPUTBYTECODE` forward-check), one tx | one tx; 86,565 B and standard for the BN254 quotient-torus frontier, larger builds can be non-standard | `chunked/intratx` |
 | **grouped** | intra-tx *within* a tx + NFT hand-off *across* txs | **standard-relayable, a handful of <100 KB txs, under the 50-tx limit** | `chunked/grouped` |
 
 The BN254 quotient-torus intra-tx verifier is standard-relayable as one transaction. Grouped remains
