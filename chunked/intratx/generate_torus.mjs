@@ -22,7 +22,7 @@ const torusEnv = {
   STAGE_BOUND_LAYOUT: '1',
   COVENANT_RESIDUE_LAYOUT: '1',
   MILLER_LINKED_LAYOUT: '1',
-  MILLER_LINKED_CUTS: '40,78,114,158,200,238,277,316',
+  MILLER_LINKED_CUTS: '40,82,114,157,201,238,277,316',
   OP_COST_TARGET: '7950000',
   BYTE_BUDGET: '9700',
   RESCHEDULE: 'on',
@@ -44,7 +44,7 @@ console.log(`[1/${stageCount}] generate quotient-torus Miller chunks...`);
 await run('chunked/pairing/gen_miller_residue.mjs');
 console.log(`[2/${stageCount}] prove grouped 3x43 GLV equivalence...`);
 await run('chunked/pairing/prove_vkx_glv_split.mjs');
-console.log(`[3/${stageCount}] prove grouped GLV resource bound...`);
+console.log(`[3/${stageCount}] prove key-agnostic grouped GLV resource bound...`);
 await run('chunked/pairing/prove_vkx_glv_resource_bound.mjs');
 console.log(`[4/${stageCount}] prove affine Miller-step equivalence...`);
 await run('chunked/pairing/prove_miller_affine.mjs');
