@@ -13,17 +13,17 @@
 //
 //   the bch-spec op-cost budget an input gets is (10000 + unlockingLen) * 800 and scripts may be
 //   100,000 B. The current-BCH torus build sizes each chunk to a 10 kB unlocking (=> 8,032,800
-//   op/input, 11 inputs). Here one 128-position GLV window and ONE unrolled Miller chunk
-//   covering all 348 fused ops (verdict folded in) each fit their own fat input:
+//   op/input, 11 inputs). Here one 128-position GLV window and the unrolled Miller loop
+//   covering all 348 fused ops (verdict folded in) fit in three linked inputs:
 //     GLV vk_x MSM                       1 input   (one [0,128) window, baked table)
-//     c^-(6x+2)-fused Miller + verdict   1 input   (terminal; ~63M op, op-bound)
+//     c^-(6x+2)-fused Miller + verdict   3 inputs  (two state handoffs, verdict terminal)
 //                                        --------
-//                                        2 inputs  (ONE <100 kB transaction)
+//                                        4 inputs  (ONE <100 kB transaction)
 //
-// Removing nine chunk boundaries also removes their forward-checks, state re-parses and per-chunk
-// static-context reads, so total op-cost drops below the 11-input current-BCH build. The two-input
-// layout keeps the GLV and Miller generators independent, and the vk_x hand-off remains byte-bound
-// through OP_INPUTBYTECODE exactly like the current-BCH graph.
+// The three-way Miller partition uses the proposed VM's 10,000-byte density-control base without
+// changing the arithmetic: each boundary forwards the complete canonical Miller state and pins the
+// successor locking program. The GLV and Miller generators remain independent, and every handoff is
+// byte-bound through OP_INPUTBYTECODE exactly like the current-BCH graph.
 //
 // NOTE: this leaves chunked/pairing/generated/ holding LARGE-budget chunks. Regenerate the
 // current-BCH chunks before rebuilding a flagship build (generate_torus.mjs does it all):
@@ -66,9 +66,9 @@ const NORMALIZED_PROOF_POINTS = true;
 const RAW_B_INFINITY = true;
 
 // ---- regenerate the two variable-length stages at the 100 kB budget ----
-// The fused-Miller op count is proof-independent (fixed ATE loop), so the whole loop is ONE
-// explicit terminal cut. gen_miller_residue.mjs re-measures the chunk on the real bch-spec VM
-// (BCH_VM=spec) and the assembly below re-verifies every fixture on it.
+// The fused-Miller op count is proof-independent (fixed ATE loop). The three explicit cuts were
+// selected from the public operation schedule; gen_miller_residue.mjs re-measures every chunk on
+// the real bch-spec VM (BCH_VM=spec), and the assembly below re-verifies every fixture on it.
 const TORUS_OPS = millerFusedAffineOps(
   pairsFor(vec.publicInputs.map(BigInt)), Fp12.ONE, Fp12.ONE, { unitLines: true },
 ).ops.length;
@@ -77,11 +77,11 @@ const GEN_ENV = {
   FUSE_G2_ENDPOINT: '1', MILLER_AFFINE_G2: '1', MILLER_UNIT_LINES: '1', MILLER_TORUS: '1',
   MILLER_PROJECTIVE_VKX: '1', MILLER_NORMALIZED_PROOF_POINTS: '1', MILLER_RAW_B_INFINITY: '1',
   STAGE_BOUND_LAYOUT: '1', COVENANT_RESIDUE_LAYOUT: '1', MILLER_LINKED_LAYOUT: '1',
-  MILLER_LINKED_CUTS: String(TORUS_OPS), // ONE chunk [0,TORUS_OPS) with the verdict fused in
+  MILLER_LINKED_CUTS: `92,219,${TORUS_OPS}`,
   BCH_VM: 'spec', TARGET_UNLOCK: String(LARGE_UNLOCK),
   OP_COST_TARGET: '86000000', BYTE_BUDGET: '95000',
 };
-console.error(`\n== regenerating gen_miller_residue.mjs (quotient torus) as ONE chunk [0,${TORUS_OPS}) at the 100 kB budget ==`);
+console.error(`\n== regenerating gen_miller_residue.mjs (quotient torus) as three chunks [0,92), [92,219), [219,${TORUS_OPS}) at the 100 kB budget ==`);
 execFileSync(process.execPath, [join(PAIR, 'gen_miller_residue.mjs')], { env: GEN_ENV, stdio: 'inherit' });
 console.error('\n== regenerating GLV vk_x as ONE stage-bound window [0,128) ==');
 const GLV_COUNT = 1;
@@ -255,7 +255,7 @@ function specsVkx(inst, crossToMiller) {
     };
   });
 }
-// c^-(6x+2)-FUSED Miller, quotient-torus mode: ONE terminal chunk covering the whole loop. The
+// c^-(6x+2)-FUSED Miller, quotient-torus mode: three linked chunks covering the whole loop. The
 // genesis prologue validates canonical A/B/C coordinates, on-curve membership, canonical
 // inverse-Y witnesses (unit lines) and range-gates the six-limb torus root u; the endpoint psi
 // relation proves exact G2 subgroup membership; the fused tail checks the cross-multiplied
@@ -345,11 +345,13 @@ function buildSpecs(inst) {
   return [...vkx, ...miller];
 }
 
-// The single-chunk layout cannot inject a forged f into the terminal verdict (f is computed
-// in-contract from the genesis witness), so assert the emitted source still carries the
+// The linked layout cannot inject a forged f into the terminal verdict (each boundary byte-binds
+// the complete canonical state computed from the genesis witness), so assert the emitted source carries the
 // projective-zero guard and the cross-multiplied quotient relation as compensating evidence.
 {
-  const finalSrc = readFileSync(join(GEN, 'millerres_00.cash'), 'utf8');
+  const finalManifest = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
+  const finalIndex = finalManifest.chunks.length - 1;
+  const finalSrc = readFileSync(join(GEN, `millerres_${String(finalIndex).padStart(2, '0')}.cash`), 'utf8');
   // The terminal uses short signed inline Frobenius^2 coefficients, so pin the emitted operations
   // and all six quotient guards rather than depending on the generic helper's source spelling.
   const zeroGuard = `require(${Array.from({ length: 12 }, (_, i) => `tailLhs${i} != 0`).join(' || ')});`;
@@ -788,7 +790,7 @@ for (const name of ['Pu2', 'Pv2']) {
   fullInvalid.push({ steps: toStepArr({ inputs, meta: full0.meta }), rejected: true });
 }
 
-// ---- torus-root mutations at the genesis-terminal input ----
+// ---- torus-root mutations at the Miller genesis input ----
 {
   const rootByteOffset = MILLER_GENESIS_OFFSETS.get('u0');
   // u+p alias of the canonical residue root: rejected by the genesis range gate.
@@ -883,7 +885,20 @@ for (const name of ['Pu2', 'Pv2']) {
 
 // ---- isolated invalid points (off-curve A/C/B + off-subgroup B): full-tx runs that must be
 // rejected at their validation step (genesis canonical/on-curve checks, or the fused psi
-// endpoint subgroup relation inside the same Miller input). ----
+// endpoint subgroup relation in the chunk containing the runtime-B pp operation). ----
+const endpointTrace = millerFusedAffineOps(
+  pairsFor(INSTANCES.committed.inputs, proof),
+  Fp12.ONE,
+  Fp12.ONE,
+  { unitLines: true },
+);
+const endpointOp = endpointTrace.ops.findIndex((op) => op.t === 'pp' && op.j === 0);
+const endpointManifest = JSON.parse(readFileSync(join(GEN, 'manifest_millerres.json'), 'utf8'));
+const endpointChunk = endpointManifest.chunks.findIndex(
+  (chunk) => chunk.opLo <= endpointOp && endpointOp < chunk.opHi,
+);
+if (endpointChunk < 0) throw new Error('missing fused Miller endpoint chunk');
+const endpointSpecIndex = GLV_COUNT + endpointChunk;
 const invalidPointRuns = invalidG2Overrides(INSTANCES.committed.proof, 1).map((bad) => {
   const baseNegA = proof.a.negate().toAffine();
   const baseB = proof.b.toAffine();
@@ -894,10 +909,11 @@ const invalidPointRuns = invalidG2Overrides(INSTANCES.committed.proof, 1).map((b
     c: bn254.G1.Point.fromAffine({ x: bad.Cx ?? baseC.x, y: bad.Cy ?? baseC.y }),
   };
   const run = assemble(buildSpecs({ proof: badProof, inputs: INSTANCES.committed.inputs }), true);
-  if (run.meta[millerGenesisIndex]?.accepted !== false) {
+  const expectedFailure = bad.Bx === undefined ? millerGenesisIndex : endpointSpecIndex;
+  if (run.meta[expectedFailure]?.accepted !== false) {
     throw new Error('fused Miller input validation accepted an invalid point');
   }
-  const earlierFailure = run.meta.find((meta, i) => i < millerGenesisIndex && !meta.accepted);
+  const earlierFailure = run.meta.find((meta, i) => i < expectedFailure && !meta.accepted);
   if (earlierFailure) throw new Error(`invalid point rejected before its validation step at ${earlierFailure.label}`);
   return run;
 });
@@ -950,11 +966,11 @@ for (const [name, run] of [
 
 const description = [
   `INTRA-TRANSACTION LINKED + QUOTIENT-TORUS full BN254 Groth16 verifier in one ${full0.inputs.length}-input transaction targeting the proposed bch-spec VM.`,
-  `One 128-position four-scalar GLV input computes the runtime IC1/IC2 MSM projectively; one unrolled ${TORUS_OPS}-operation Miller input completes the verifier and quotient-torus verdict.`,
-  'The Miller input folds the fixed e(alpha,beta) and e(IC0,gamma) factors, binds the projective MSM by cross multiplication, validates canonical normalized A/C and raw B encodings, supports every A/B/C identity combination, and enforces the exact runtime-B subgroup endpoint.',
+  `One 128-position four-scalar GLV input computes the runtime IC1/IC2 MSM projectively; three linked inputs execute the unrolled ${TORUS_OPS}-operation Miller loop and quotient-torus verdict.`,
+  'The Miller inputs fold the fixed e(alpha,beta) and e(IC0,gamma) factors, bind the projective MSM by cross multiplication, validate canonical normalized A/C and raw B encodings, support every A/B/C identity combination, and enforce the exact runtime-B subgroup endpoint.',
   'The terminal checks [f*c^(p^2)]=[c^p*c^(p^3)] and rejects the projective zero representative.',
-  'The root fixes the exact input count, the terminal fixes its position, and the root SHA-256-pins the terminal locking program; OP_INPUTBYTECODE binds the projective handoff, and both input blobs have exact widths.',
-  'Both inputs satisfy the proposed VM script and length-derived operation budgets, and every accepting fixture passes its standard-policy VM with a default-minimum-fee-funded deterministic template.',
+  'The root fixes the exact input count, the terminal fixes its position, and the root SHA-256-pins the terminal locking program; OP_INPUTBYTECODE binds every state handoff, and all input blobs have exact widths.',
+  'All four inputs satisfy the proposed VM script and length-derived operation budgets, and every accepting fixture passes its standard-policy VM with a default-minimum-fee-funded deterministic template.',
   'This artifact requires the proposed bch-spec upgrade because current BCH limits scripts to 10,000 bytes.',
   'The bytecode evaluates the complete four-pair equation for runtime proof points and two runtime public inputs without using the prescribed key\'s published scalar relations to collapse the statement.',
   'The checkpoint key is synthetic and publishes setup and IC scalars, so the result establishes complete-equation execution and proposed-VM resource validity for that key, not circuit knowledge, secure public-input-vector binding, arbitrary-key verification, or independent-setup interoperability.',

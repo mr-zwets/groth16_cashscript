@@ -124,8 +124,8 @@ the central trade-off for spec-targeting verifiers:
 - **Each input you add is worth one freebie ≈ 10,000 fewer pad bytes.** So on spec, *more* inputs =
   *fewer* bytes; *fewer/fatter* inputs = *more* bytes.
 
-That relationship holds when the arithmetic and layout stay fixed. The current two-input BN254
-spec build also changes the scalar schedule and flattens the verifier layout, so its 72,201-byte
+That relationship holds when the arithmetic and layout stay fixed. The current four-input BN254
+spec build also changes the scalar schedule and flattens the verifier layout, so its 58,683-byte
 transaction is smaller than the 88,393-byte current-BCH construction despite using fewer inputs.
 It remains a result in the separate proposed-VM category, not evidence that larger scripts make
 operations cheaper. Within one fixed layout, `FUSE_FINAL` and `FUSE_TAIL` still trade each removed
@@ -146,7 +146,7 @@ sibling's forward-check.
 
 ### Standardness
 
-Standardness is measured for each complete transaction. The BN254 spec fixture is 72,201 bytes and
+Standardness is measured for each complete transaction. The BN254 spec fixture is 58,683 bytes and
 passes the proposed VM's standard-policy checks. The BLS spec fixture is 164,474 bytes and exceeds
 the 100,000-byte standard transaction limit. Among current-BCH intra-tx bundles, the optimized
 BN254 quotient-torus verifier has a certified 98,730-byte proof-independent relay encoding, while
