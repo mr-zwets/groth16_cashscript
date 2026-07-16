@@ -54,7 +54,7 @@ comparison. Per-layer status and build commands are in
 | `bch-groth16-bls12381-singleton` | singleton, baseline | ~24.2 KB / ~1.04–1.48B op-cost | **~21× smaller bytecode than the nChain reference** |
 | `bch-groth16-bls12381-singleton-minop` | singleton, op-optimized | 67,163 B / **256.6M op-cost** | residue (`λ=p+|x|`, μ₂₇A witness) + GLV; fused G2 ψ-check; A/C on-curve (G1 subgroup checks omitted) |
 | `bch-pairing-bls12381-singleton` | singleton, pairing-only | ~19.8 KB / ~1.38B op-cost | the pairing verdict milestone (`verify.cash`) |
-| `bch-groth16-bls12381-intratx-residue` | chunked, intra-tx + quotient-torus residue | **34 inputs / 196,895 B score / 195,705 B wire / 153.09M op** | one current-consensus-valid transaction; non-standard only by total size |
+| `bch-groth16-bls12381-intratx-residue` | chunked, intra-tx + quotient-torus residue | **26 inputs / 193,781 B score / 192,871 B wire / 151.67M op** | one current-consensus-valid transaction; non-standard only by total size |
 | `bch-groth16-bls12381-grouped-residue` | chunked, grouped + quotient-torus residue | **34 inputs / 3 standard tx / 207,709 B score / 206,589 B wire / 162.25M op** | current-policy grouped BLS verifier; exact successor pins and mutable-NFT state thread |
 | `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **3 inputs / 164,579 B score / 164,474 B wire / 149.81M op** | proposed-VM-only; non-standard by total transaction size — see [Target VM](#target-vm-bch-spec) |
 

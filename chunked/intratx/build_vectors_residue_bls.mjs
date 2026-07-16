@@ -15,11 +15,12 @@
 //                                                                     ---------
 //                                                                     35 inputs
 //
-// With BLS_QUOTIENT_TORUS=1, the same 29 Miller windows instead carry the six-limb finite class
+// With BLS_QUOTIENT_TORUS=1, the generated Miller windows instead carry the six-limb finite class
 // [c]=[1+u*W] in Fp12*/Fp6*. The final Miller input performs the projective terminal check, so
-// the correction w and separate tail disappear: five GLV + 29 Miller = 34 inputs. The opt-in
-// generator proves the quotient construction before this builder writes its vector. One fixed
-// set of lockings verifies any proof for the VK in either mode.
+// the correction w and separate tail disappear. The one-command frontier path replans only this
+// linked affine-G1 schedule; the default and grouped schedules remain fixed. The opt-in generator
+// proves the quotient construction before this builder writes its vector. One fixed set of
+// lockings verifies any proof for the VK in either mode.
 //
 //   node build_vectors_residue_bls.mjs -> verifier/src/bch/groth16-bls12381-intratx-residue-vectors.json
 //   VERIFIER_DIR=/path/to/verifier pnpm vectors:intratx:torus:bls  # quotient frontier
@@ -48,9 +49,15 @@ const GEN = join(here, '..', 'bls12-381', 'generated', LINKED_RESIDUE_NAMESPACE)
 const PROBE = join(GEN, '_intratx_residue_bls_probe.cash'); // transformed import-chunks compiled from here
 const W = 48; // BLS12-381 limb width (bytes)
 const PRIME = P.toString();
-import { hexToBin, binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32, encodeDataPush, createVirtualMachineBch2026 } from '@bitauth/libauth';
+import {
+  hexToBin, binToHex, bigIntToVmNumber, hash256, encodeLockingBytecodeP2sh32,
+  encodeDataPush, encodeTransactionBch, createVirtualMachineBch2026,
+} from '@bitauth/libauth';
 const realVm = createVirtualMachineBch2026(false);
 const standardVm = createVirtualMachineBch2026(true);
+const DEFAULT_MIN_RELAY_FEE_SATOSHIS_PER_BYTE = 1n;
+const TRANSACTION_OUTPUT_SATOSHIS = 1000n;
+const OP_RETURN = Uint8Array.from([0x6a]);
 const GLV_TABLE_BYTES = hexToBin(GLV_TABLE_HEX.slice(2));
 const GLV_COUNT = GLV_SHARED_AUDITED_BOUNDS.length - 1;
 
@@ -80,13 +87,33 @@ const padPush = (argLen, target) => {
 };
 const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41));
 
-// ---- multi-input evaluation: build ONE tx from all inputs, evaluate at `index` ----
+// ---- multi-input evaluation: build ONE exactly funded tx, evaluate at `index` ----
+function verificationData(inputs) {
+  if (inputs.length === 0) throw new Error('cannot build an empty verifier transaction');
+  const transaction = {
+    version: 2,
+    inputs: inputs.map((i, n) => ({
+      outpointTransactionHash: new Uint8Array(32), outpointIndex: n,
+      sequenceNumber: 0, unlockingBytecode: i.unlocking,
+    })),
+    outputs: [{ lockingBytecode: OP_RETURN, valueSatoshis: TRANSACTION_OUTPUT_SATOSHIS }],
+    locktime: 0,
+  };
+  const feeSatoshis = BigInt(encodeTransactionBch(transaction).length) *
+    DEFAULT_MIN_RELAY_FEE_SATOSHIS_PER_BYTE;
+  const totalInputSatoshis = TRANSACTION_OUTPUT_SATOSHIS + feeSatoshis;
+  const perInputSatoshis = totalInputSatoshis / BigInt(inputs.length);
+  const remainder = totalInputSatoshis % BigInt(inputs.length);
+  return {
+    sourceOutputs: inputs.map((i, n) => ({
+      lockingBytecode: i.locking,
+      valueSatoshis: perInputSatoshis + (BigInt(n) < remainder ? 1n : 0n),
+    })),
+    transaction,
+  };
+}
 function evalInput(inputs, index, vm = realVm) {
-  const st = vm.evaluate({
-    inputIndex: index,
-    sourceOutputs: inputs.map((i) => ({ lockingBytecode: i.locking, valueSatoshis: 1000n })),
-    transaction: { version: 2, inputs: inputs.map((i, n) => ({ outpointTransactionHash: new Uint8Array(32), outpointIndex: n, sequenceNumber: 0, unlockingBytecode: i.unlocking })), outputs: [{ lockingBytecode: Uint8Array.from([0x6a]), valueSatoshis: 1000n }], locktime: 0 },
-  });
+  const st = vm.evaluate({ inputIndex: index, ...verificationData(inputs) });
   const top = st.stack[st.stack.length - 1];
   return { accepted: st.error === undefined && st.stack.length === 1 && top !== undefined && top.length === 1 && top[0] === 1, operationCost: st.metrics.operationCost, error: st.error ?? null };
 }
@@ -340,11 +367,31 @@ function invalidRun(asm, idx) {
 }
 
 const sum = (a, f) => a.reduce((x, m) => x + f(m), 0);
+const transactionMetadata = (asm) => {
+  const data = verificationData(asm.inputs);
+  const wireBytes = encodeTransactionBch(data.transaction).length;
+  const feeSatoshis = data.sourceOutputs.reduce((total, output) => total + output.valueSatoshis, 0n) -
+    data.transaction.outputs.reduce((total, output) => total + output.valueSatoshis, 0n);
+  const consensusVerified = asm.inputs.every((_, i) => evalInput(asm.inputs, i).accepted);
+  const standardScriptsVerified = asm.inputs.every((_, i) => evalInput(asm.inputs, i, standardVm).accepted);
+  const standardTransactionSizeVerified = wireBytes <= 100000;
+  return {
+    wireBytes,
+    consensusVerified,
+    standardScriptsVerified,
+    standardTransactionSizeVerified,
+    standardTransactionVerified: standardScriptsVerified && standardTransactionSizeVerified,
+    defaultMinRelayFeeVerified: feeSatoshis ===
+      BigInt(wireBytes) * DEFAULT_MIN_RELAY_FEE_SATOSHIS_PER_BYTE,
+  };
+};
 const report = (tag, asm) => {
+  const tx = transactionMetadata(asm);
   const bad = asm.meta.find((m) => !m.accepted);
-  console.error(`${tag}: ${asm.meta.length} inputs accepted=${asm.accepted} fits=${asm.fits} | totalBytes=${sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes).toLocaleString()} totalOp=${sum(asm.meta, (m) => m.operationCost).toLocaleString()} maxOp=${Math.max(...asm.meta.map((m) => m.operationCost)).toLocaleString()}`);
+  console.error(`${tag}: ${asm.meta.length} inputs accepted=${asm.accepted} fits=${asm.fits} | totalBytes=${sum(asm.meta, (m) => m.lockingBytes + m.unlockingBytes).toLocaleString()} wireBytes=${tx.wireBytes.toLocaleString()} totalOp=${sum(asm.meta, (m) => m.operationCost).toLocaleString()} maxOp=${Math.max(...asm.meta.map((m) => m.operationCost)).toLocaleString()} consensus=${tx.consensusVerified} standardScripts=${tx.standardScriptsVerified} standardSize=${tx.standardTransactionSizeVerified} relayFee=${tx.defaultMinRelayFeeVerified}`);
   if (process.env.DUMP_OPCOSTS) asm.meta.forEach((m, i) => console.error(`  op[${String(i).padStart(2)}] ${String(m.operationCost).padStart(9)} lock=${m.lockingBytes} unlock=${m.unlockingBytes} ${m.accepted ? '' : 'REJECTED '}${m.label}`));
   if (bad) console.error(`  !! first non-accepting: ${bad.label} :: ${bad.error}`);
+  return tx;
 };
 
 // ===================== FULL GROTH16 (residue, single tx) =====================
@@ -373,11 +420,11 @@ function requireStageGenesis(specs, inst, label) {
 ].forEach(([label, specs, inst]) => requireStageGenesis(specs, inst, label));
 
 const full0 = assemble(committedSpecs);
-report('groth16-bls12381-intratx-residue committed', full0);
+const full0Transaction = report('groth16-bls12381-intratx-residue committed', full0);
 const full1 = assemble(proof1Specs);
-report('groth16-bls12381-intratx-residue proof#1', full1);
+const full1Transaction = report('groth16-bls12381-intratx-residue proof#1', full1);
 const fullStress = assemble(stressSpecs);
-report('groth16-bls12381-intratx-residue all-position stress', fullStress);
+const fullStressTransaction = report('groth16-bls12381-intratx-residue all-position stress', fullStress);
 for (const [label, otherSpecs, otherRun] of [['proof#1', proof1Specs, full1], ['stress', stressSpecs, fullStress]]) {
   const hybridSpecs = [...committedSpecs.slice(0, GLV_COUNT), ...otherSpecs.slice(GLV_COUNT)];
   const unboundSpecs = hybridSpecs.map((spec, i) => i === GLV_COUNT - 1 ? { ...spec, role: 'stage-final', cmp: null } : spec);
@@ -532,18 +579,25 @@ if (QUOTIENT_TORUS) {
 
 const allInvalid = [...fInv, ...semanticRuns, ...rangeRuns, ...torusRuns];
 console.error(`  invalid runs rejected: ${allInvalid.map((r) => r.rejected).join(',')}`);
-if (!full0.fits || !full1.fits || !fullStress.fits || !allInvalid.every((r) => r.rejected)) {
+const validTransactions = [full0Transaction, full1Transaction, fullStressTransaction];
+if (!full0.fits || !full1.fits || !fullStress.fits || !allInvalid.every((r) => r.rejected) ||
+  validTransactions.some((tx) => !tx.consensusVerified || !tx.standardScriptsVerified ||
+    tx.standardTransactionSizeVerified || tx.standardTransactionVerified ||
+    !tx.defaultMinRelayFeeVerified)) {
   console.error('!! a run failed the consensus/standard dual-VM gates -- NOT writing vectors');
   process.exit(1);
 }
 
+const millerInputCount = committedSpecs.length - GLV_COUNT;
 const description = QUOTIENT_TORUS
-  ? 'INTRA-TRANSACTION LINKED + QUOTIENT-TORUS RESIDUE full BLS12-381 Groth16 verifier in one transaction. ' +
-    'Its 34-input graph is five shared-table GLV vk_x chunks followed by 29 input-validation-fused prepared Miller chunks; the final Miller input also executes the terminal verdict. ' +
+  ? `INTRA-TRANSACTION LINKED + QUOTIENT-TORUS RESIDUE full BLS12-381 Groth16 verifier in one current-BCH consensus-valid transaction. Its ${full0.inputs.length}-input graph is ${GLV_COUNT} shared-table GLV vk_x chunks followed by ${millerInputCount} input-validation-fused prepared Miller chunks; the final Miller input also executes the terminal verdict. ` +
+    'The bytecode evaluates e(-A,B) * e(alpha,beta) * e(vk_x,gamma) * e(C,delta) = 1 for runtime A/B/C and two runtime public inputs. The fixed e(alpha,beta) Miller value and fixed-G2 gamma/delta lines are ordinary verification-key preparation; the construction retains all four terms and does not use the fixture\'s published setup-scalar relations to collapse the equation. ' +
     'The Miller accumulator lives in Fp12*/Fp6*, and the immutable six-limb canonical u represents the finite residue-root class [c]=[1+u*W], with inverse [1-u*W]. ' +
     'Because gcd(p+|x|,p^6+1)=r, the lambda-power image is exactly the final-exponent kernel in the quotient; the legacy correction w is in Fp6 and disappears. ' +
     'The terminal checks [fF]=[frob(c,1)] by a projective cross-product and explicitly rejects [0:0]. ' +
-    'OP_INPUTBYTECODE binds every state, the root, and both stage seams without hashing. Deployed P2SH32.'
+    'Canonical A/C encodings are checked on-curve; non-identity B is canonical, on-curve, and checked in the exact G2 subgroup. A/C cofactor components pair trivially with their order-r G2 partners, so unique G1 subgroup encodings are not claimed. ' +
+    `OP_INPUTBYTECODE binds every state, the residue root, and both stage seams without hashing. The exactly funded committed spend is ${full0Transaction.wireBytes} bytes and every input passes current BCH consensus and standard script policy; the complete transaction is non-standard only because it exceeds 100,000 bytes. Deployed P2SH32. ` +
+    'The prescribed key is a synthetic fixture with published setup and IC scalars, so this artifact establishes complete-equation execution and BCH resource validity for that key, not circuit knowledge, application-level public-input binding, arbitrary-key support, or independent-setup interoperability.'
   : 'INTRA-TRANSACTION LINKED + RESIDUE full BLS12-381 Groth16 verifier in one transaction. ' +
     'Its 35-input graph is five shared-table GLV vk_x chunks, 29 input-validation-fused prepared Miller chunks, and one terminal residue chunk. ' +
     'The terminal checks c*cInv==1 and fF*w==frob(c,1), with w supplied directly as six Fp6 limbs and its Fp12 upper half fixed to zero. ' +
@@ -554,10 +608,35 @@ writeFileSync(verifierPath('src', 'bch', 'groth16-bls12381-intratx-residue-vecto
   description,
   method: 'intra-tx-linked-residue', deployment: 'P2SH32', curve: 'BLS12-381', numInputs: full0.inputs.length, budgetPerInput: OP_BUDGET,
   totalBytes: sum(full0.meta, (m) => m.lockingBytes + m.unlockingBytes),
+  serializedTransactionBytes: full0Transaction.wireBytes,
+  consensusTransactionVerified: full0Transaction.consensusVerified,
+  standardScriptsVerified: full0Transaction.standardScriptsVerified,
+  standardTransactionSizeVerified: full0Transaction.standardTransactionSizeVerified,
+  standardTransactionVerified: full0Transaction.standardTransactionVerified,
+  minimumRelayFeeSatoshisAtOneSatPerByte: full0Transaction.wireBytes,
+  defaultMinRelayFeeVerified: full0Transaction.defaultMinRelayFeeVerified,
   totalOperationCost: sum(full0.meta, (m) => m.operationCost),
   maxStepOperationCost: Math.max(...full0.meta.map((m) => m.operationCost)),
   allFit: full0.fits, allAccept: full0.accepted,
-  steps: toStepArr(full0), extraValidProofs: [toStepArr(full1)], worstCaseProof: toStepArr(fullStress),
+  steps: toStepArr(full0),
+  extraValidProofs: [toStepArr(full1)],
+  extraValidProofTransactions: [{
+    serializedTransactionBytes: full1Transaction.wireBytes,
+    consensusTransactionVerified: full1Transaction.consensusVerified,
+    standardScriptsVerified: full1Transaction.standardScriptsVerified,
+    standardTransactionSizeVerified: full1Transaction.standardTransactionSizeVerified,
+    standardTransactionVerified: full1Transaction.standardTransactionVerified,
+    defaultMinRelayFeeVerified: full1Transaction.defaultMinRelayFeeVerified,
+  }],
+  worstCaseProof: toStepArr(fullStress),
+  worstCaseTransaction: {
+    serializedTransactionBytes: fullStressTransaction.wireBytes,
+    consensusTransactionVerified: fullStressTransaction.consensusVerified,
+    standardScriptsVerified: fullStressTransaction.standardScriptsVerified,
+    standardTransactionSizeVerified: fullStressTransaction.standardTransactionSizeVerified,
+    standardTransactionVerified: fullStressTransaction.standardTransactionVerified,
+    defaultMinRelayFeeVerified: fullStressTransaction.defaultMinRelayFeeVerified,
+  },
   invalid: allInvalid.map((r) => r.steps),
   invalidInputs: [toStepArr(offCurveA), toStepArr(offSubgroupB), toStepArr(plusPRange)],
 }, null, 2));

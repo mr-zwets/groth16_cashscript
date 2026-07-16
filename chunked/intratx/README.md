@@ -42,7 +42,7 @@ plain graphs remain larger non-standard transactions. The optimized BN254 quotie
 standard and fund the default 1 sat/byte relay fee. The committed proof is 88,393 serialized bytes,
 and the proof-independent resource certificate constructs a 98,730-byte relayable encoding for
 every valid proof, leaving 1,270 bytes below the standard transaction limit. The
-BLS12-381 quotient-torus graph is 34 inputs in one current-BCH consensus-valid 195,705-byte
+BLS12-381 quotient-torus graph is 26 inputs in one current-BCH consensus-valid 192,871-byte
 transaction, non-standard only by total size.
 
 The BN254 programs evaluate the complete four-pair equation and consume the proof and two public
@@ -150,7 +150,7 @@ Standardness is measured for each complete transaction. The BN254 spec fixture i
 passes the proposed VM's standard-policy checks. The BLS spec fixture is 164,474 bytes and exceeds
 the 100,000-byte standard transaction limit. Among current-BCH intra-tx bundles, the optimized
 BN254 quotient-torus verifier has a certified 98,730-byte proof-independent relay encoding, while
-the 195,705-byte BLS quotient-torus transaction is non-standard by total size.
+the 192,871-byte BLS quotient-torus transaction is non-standard by total size.
 
 ## Files
 
@@ -254,9 +254,12 @@ entry point; the unflagged BLS commands continue to generate the legacy Fp6-tail
 VERIFIER_DIR=/absolute/path/to/zk-verifier-bench pnpm vectors:intratx:torus:bls
 ```
 
-It produces 34 inputs, 195,413 script bytes, 153,091,714 total op-cost, and a 195,705-byte
-serialized transaction. The committed, alternate, and dense fixtures all pass current-BCH
-consensus; each is non-standard only because the full transaction exceeds 100,000 bytes.
+It produces 26 inputs, 192,643 script bytes, 151,669,685 total op-cost, and a 192,871-byte
+serialized transaction. The committed, alternate, and dense fixtures use exactly funded
+1 sat/byte templates, pass current-BCH consensus and standard script policy, and are
+non-standard only because each complete transaction exceeds 100,000 bytes. The planner retains
+the complete 277-operation four-pair Miller trace and changes only its linked-input boundaries;
+the grouped and default Fp6-tail schedules remain unchanged.
 
 ## Harness support
 
