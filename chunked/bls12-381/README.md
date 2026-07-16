@@ -28,11 +28,11 @@ also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` 
 - `bch-groth16-bls12381-intratx`: 56 inputs / 475,310 B / 377,658,775 op-cost.
 - `bch-groth16-bls12381-grouped`: 56 inputs / 6 standard transactions / 475,292 B /
   377,556,467 op-cost.
-- `bch-groth16-bls12381-intratx-residue`: quotient-torus frontier, 26 inputs / 192,643 script B /
-  193,781 score B / 192,871 wire B / 151,669,685 op-cost. The unchanged default Fp6-tail path remains reproducible at 35 inputs /
+- `bch-groth16-bls12381-intratx-residue`: quotient-torus frontier, 24 inputs / 192,317 script B /
+  193,369 score B / 192,529 wire B / 151,427,800 op-cost. The unchanged default Fp6-tail path remains reproducible at 35 inputs /
   209,216 B / 157,700,169 op-cost.
-- `bch-groth16-bls12381-grouped-residue`: 34 inputs / 3 standard transactions / 206,055 script B /
-  207,709 score B / 206,589 wire B / 162,247,773 op-cost.
+- `bch-groth16-bls12381-grouped-residue`: 26 inputs / 3 standard transactions / 204,424 script B /
+  205,734 score B / 204,894 wire B / 160,953,436 op-cost.
 - `bch-groth16-bls12381-intratx-residue-large`: 3 inputs / 164,426 script B / 164,579 score B /
   164,474 wire B / 149,814,405 op-cost on the proposed 100 kB-script VM; non-standard by total size.
 

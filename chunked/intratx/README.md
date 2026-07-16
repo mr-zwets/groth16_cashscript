@@ -42,7 +42,7 @@ plain graphs remain larger non-standard transactions. The optimized BN254 quotie
 standard and fund the default 1 sat/byte relay fee. The committed proof is 86,565 serialized bytes,
 and the proof-independent resource certificate constructs a 99,079-byte relayable encoding for
 every valid proof, leaving 921 bytes below the standard transaction limit. The
-BLS12-381 quotient-torus graph is 26 inputs in one current-BCH consensus-valid 192,871-byte
+BLS12-381 quotient-torus graph is 24 inputs in one current-BCH consensus-valid 192,529-byte
 transaction, non-standard only by total size.
 
 The BN254 programs evaluate the complete four-pair equation and consume the proof and two public
@@ -150,7 +150,7 @@ Standardness is measured for each complete transaction. The BN254 spec fixture i
 passes the proposed VM's standard-policy checks. The BLS spec fixture is 164,474 bytes and exceeds
 the 100,000-byte standard transaction limit. Among current-BCH intra-tx bundles, the optimized
 BN254 quotient-torus verifier has a certified 99,079-byte proof-independent relay encoding, while
-the 192,871-byte BLS quotient-torus transaction is non-standard by total size.
+the 192,529-byte BLS quotient-torus transaction is non-standard by total size.
 
 ## Files
 
@@ -263,12 +263,13 @@ entry point; the unflagged BLS commands continue to generate the legacy Fp6-tail
 VERIFIER_DIR=/absolute/path/to/zk-verifier-bench pnpm vectors:intratx:torus:bls
 ```
 
-It produces 26 inputs, 192,643 script bytes, 151,669,685 total op-cost, and a 192,871-byte
+It produces 24 inputs, 192,317 script bytes, 151,427,800 total op-cost, and a 192,529-byte
 serialized transaction. The committed, alternate, and dense fixtures use exactly funded
 1 sat/byte templates, pass current-BCH consensus and standard script policy, and are
-non-standard only because each complete transaction exceeds 100,000 bytes. The planner retains
-the complete 277-operation four-pair Miller trace and changes only its linked-input boundaries;
-the grouped and default Fp6-tail schedules remain unchanged.
+non-standard only because each complete transaction exceeds 100,000 bytes. The pinned schedule
+retains the complete 277-operation four-pair Miller trace and uses linked-only GLV and Miller
+boundaries. Its schedule is isolated from the independently pinned grouped quotient-torus path and
+the unchanged default Fp6-tail path.
 
 ## Harness support
 
