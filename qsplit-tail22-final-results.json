@@ -1,0 +1,2573 @@
+{
+  "construction": "q132 tail22 physical quotient split and optimized density full10 corpus",
+  "strictCurrentBch": true,
+  "fixtureCount": 10,
+  "fixtures": [
+    {
+      "fixture": "committed",
+      "cacheFixture": "committed",
+      "publicInputs": [
+        "123",
+        "456"
+      ],
+      "proofScalars": {
+        "a": "22768",
+        "b": "1",
+        "c": "13",
+        "vx": "3230"
+      },
+      "identities": {
+        "A": false,
+        "B": false,
+        "C": false,
+        "msmContribution": false
+      },
+      "inputCount": 22,
+      "wireBytes": 89553,
+      "scriptBytes": 89357,
+      "feeSatoshis": 89553,
+      "exactOneSatPerByteFee": true,
+      "standardRelaySize": true,
+      "allConsensusInputsAccepted": true,
+      "allStandardInputsAccepted": true,
+      "wholeConsensusVerified": true,
+      "wholeStandardVerified": true,
+      "consensusOperationCost": 67899727,
+      "standardOperationCost": 68272719,
+      "maxConsensusInputOperationCost": 6724785,
+      "maxStandardInputOperationCost": 6729521,
+      "maxRedeemBytes": 5071,
+      "maxUnlockingBytes": 8406,
+      "smallestDensityMargin": 4826,
+      "witnesses": {
+        "proofStatementSha256": "8bea217d3504d821fb9e73060c409b9cebc225ba70aeaaf10ae585067ea16f12",
+        "residueRootSha256": "d44cb0469cea8cfefc8e4ec1bb985791072e7ecc20e2e5866aa959334c85eb12",
+        "transcriptHeaderSha256": "0ccfe692e0921c971d686fe51cbc1b2e95081d82045688ee08bde798ddb076e9",
+        "blockPayloadsSha256": "1fffdfd06b095613d87a1eef93f6232750a32bf90249ca214e3ff243ad3f4323",
+        "quotientPayloadsSha256": "d6aad855643a6fd75de7615ffb02a0ec8d3a0281c78a15ddf7efe90c11ed7d70",
+        "quotientPhysicalChunksSha256": "d6aad855643a6fd75de7615ffb02a0ec8d3a0281c78a15ddf7efe90c11ed7d70",
+        "transactionSha256": "59ccf00a23e41ec0834b11b711554c34831363225ee24c85fbf38a3a80fab44d"
+      },
+      "rejectionFixtures": [
+        {
+          "name": "changed-template-common-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking-length",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-authenticated-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-public-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-A-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-B-coordinate",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-B-identity-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-C-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-evaluation-recurrence",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-block15-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-block15-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-block15-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-coefficient-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-root-old-alpha",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-push-order",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-payload",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-tail-chunk-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-tail-chunk",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "swapped-q132-physical-chunks",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "cross-carrier-q132-boundary-shift",
+          "consensusRejected": true,
+          "standardRejected": true
+        }
+      ]
+    },
+    {
+      "fixture": "proof1",
+      "cacheFixture": "proof1",
+      "publicInputs": [
+        "135208",
+        "67633"
+      ],
+      "proofScalars": {
+        "a": "15422316227978291317484629561231166422850162500155187594883429029393700738189",
+        "b": "17",
+        "c": "19",
+        "vx": "946632"
+      },
+      "identities": {
+        "A": false,
+        "B": false,
+        "C": false,
+        "msmContribution": false
+      },
+      "inputCount": 22,
+      "wireBytes": 89553,
+      "scriptBytes": 89357,
+      "feeSatoshis": 89553,
+      "exactOneSatPerByteFee": true,
+      "standardRelaySize": true,
+      "allConsensusInputsAccepted": true,
+      "allStandardInputsAccepted": true,
+      "wholeConsensusVerified": true,
+      "wholeStandardVerified": true,
+      "consensusOperationCost": 68009695,
+      "standardOperationCost": 68382687,
+      "maxConsensusInputOperationCost": 6732496,
+      "maxStandardInputOperationCost": 6737232,
+      "maxRedeemBytes": 5071,
+      "maxUnlockingBytes": 8406,
+      "smallestDensityMargin": 4927,
+      "witnesses": {
+        "proofStatementSha256": "0fbef5e898a7f08d5735f4d664829d6ab0be973b86f59d5593a0a441ac70f742",
+        "residueRootSha256": "763bca25198b32459886b4ba44a894e7d9b9ee2606ad12cbb9843cabc41e151a",
+        "transcriptHeaderSha256": "7c7c2eb4e447c4bff8d3ed00fba0662e70584ab26d63dbd80e94418cee75499c",
+        "blockPayloadsSha256": "ddfa69d2eae8c625ec9b1509992a50379378b5948ebc5767309c10bf0903bd20",
+        "quotientPayloadsSha256": "f00f1c11c22c9e12de8efafbb15af414d2f6ce38c40b790fd9ae620796501ca9",
+        "quotientPhysicalChunksSha256": "f00f1c11c22c9e12de8efafbb15af414d2f6ce38c40b790fd9ae620796501ca9",
+        "transactionSha256": "1df984c2f339e16737a33b9179d9aecbe8b43a81d87db63da921e203b390fe85"
+      },
+      "rejectionFixtures": [
+        {
+          "name": "changed-template-common-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking-length",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-authenticated-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-public-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-A-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-B-coordinate",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-B-identity-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-C-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-evaluation-recurrence",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-block15-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-block15-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-block15-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-coefficient-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-root-old-alpha",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-push-order",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-payload",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-tail-chunk-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-tail-chunk",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "swapped-q132-physical-chunks",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "cross-carrier-q132-boundary-shift",
+          "consensusRejected": true,
+          "standardRejected": true
+        }
+      ]
+    },
+    {
+      "fixture": "dense",
+      "cacheFixture": "dense-worst",
+      "publicInputs": [
+        "40792793307691160132937706698213704133054528069427933762012433436987942497952",
+        "20976222017425405296340351928930328963278634447870202382235661951061637561134"
+      ],
+      "proofScalars": {
+        "a": "40088963420416065482615131212745749982249036097541315265894308933980041853733",
+        "b": "23",
+        "c": "29",
+        "vx": "26849129459686119912554235825506961123437156462294760228445411954628689436049"
+      },
+      "identities": {
+        "A": false,
+        "B": false,
+        "C": false,
+        "msmContribution": false
+      },
+      "inputCount": 22,
+      "wireBytes": 89553,
+      "scriptBytes": 89357,
+      "feeSatoshis": 89553,
+      "exactOneSatPerByteFee": true,
+      "standardRelaySize": true,
+      "allConsensusInputsAccepted": true,
+      "allStandardInputsAccepted": true,
+      "wholeConsensusVerified": true,
+      "wholeStandardVerified": true,
+      "consensusOperationCost": 69750806,
+      "standardOperationCost": 70123798,
+      "maxConsensusInputOperationCost": 6723633,
+      "maxStandardInputOperationCost": 6728369,
+      "maxRedeemBytes": 5071,
+      "maxUnlockingBytes": 8406,
+      "smallestDensityMargin": 4744,
+      "witnesses": {
+        "proofStatementSha256": "6f151810888a1e2f43239acf5543b787a1e2cd63e909d06d1afa923f5644598d",
+        "residueRootSha256": "795d7a10c342d30b510ffeec968101d145c25fed6899cd0f945572e4f6d14609",
+        "transcriptHeaderSha256": "e6b7e65ca4644d467dfd80a3c4ccb5016c62b282fe5eddcc1be7ef54a1c49764",
+        "blockPayloadsSha256": "879e7f88b463485469569227d4f7dd91559f1f6164903b47296084bde0d8c17f",
+        "quotientPayloadsSha256": "343bf308b41c6f9b3141b1b1f3a1c66c5fc4f1874b7b42c5789403e40f2f889d",
+        "quotientPhysicalChunksSha256": "343bf308b41c6f9b3141b1b1f3a1c66c5fc4f1874b7b42c5789403e40f2f889d",
+        "transactionSha256": "04192adda25175e2badba94d90c1ea13314996f53ee555fb316989e91fec7281"
+      },
+      "rejectionFixtures": [
+        {
+          "name": "changed-template-common-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking-length",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-authenticated-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-public-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-A-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-B-coordinate",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-B-identity-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-C-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-evaluation-recurrence",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-block15-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-block15-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-block15-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-coefficient-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-root-old-alpha",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-push-order",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-payload",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-tail-chunk-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-tail-chunk",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "swapped-q132-physical-chunks",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "cross-carrier-q132-boundary-shift",
+          "consensusRejected": true,
+          "standardRejected": true
+        }
+      ]
+    },
+    {
+      "fixture": "zero",
+      "cacheFixture": "zero",
+      "publicInputs": [
+        "0",
+        "0"
+      ],
+      "proofScalars": {
+        "a": "30446637198460368665485784811204754357368707903532176800221479245125627784570",
+        "b": "31",
+        "c": "37",
+        "vx": "2"
+      },
+      "identities": {
+        "A": false,
+        "B": false,
+        "C": false,
+        "msmContribution": true
+      },
+      "inputCount": 22,
+      "wireBytes": 89553,
+      "scriptBytes": 89357,
+      "feeSatoshis": 89553,
+      "exactOneSatPerByteFee": true,
+      "standardRelaySize": true,
+      "allConsensusInputsAccepted": true,
+      "allStandardInputsAccepted": true,
+      "wholeConsensusVerified": true,
+      "wholeStandardVerified": true,
+      "consensusOperationCost": 67828196,
+      "standardOperationCost": 68201188,
+      "maxConsensusInputOperationCost": 6733134,
+      "maxStandardInputOperationCost": 6737870,
+      "maxRedeemBytes": 5071,
+      "maxUnlockingBytes": 8406,
+      "smallestDensityMargin": 5111,
+      "witnesses": {
+        "proofStatementSha256": "6e447e2e59df0b861f9853ebff543a063c3905b3bbd5f3bdc53fbb9543d6d35d",
+        "residueRootSha256": "d09d3eaaa4baf2e6a6c9720bb4943568b23ca61101cb90969b785d8d3b9add94",
+        "transcriptHeaderSha256": "b8ed3d82d8ae5215e6ce0449f944d20d92b4edfb94f3b1d2e5409e14740966d8",
+        "blockPayloadsSha256": "567b525ac693a3161f1b4da11ffbd4e7c21abfa8df902b82a1b23811654d12e1",
+        "quotientPayloadsSha256": "64c108f7a69e687d9129d4b919b9d3696b7f000a9f536d304bebb7909edbda11",
+        "quotientPhysicalChunksSha256": "64c108f7a69e687d9129d4b919b9d3696b7f000a9f536d304bebb7909edbda11",
+        "transactionSha256": "132357519759e0a40d67bd14e4055e4b17e9fca6739e552d050b36b505b60234"
+      },
+      "rejectionFixtures": [
+        {
+          "name": "changed-template-common-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking-length",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-authenticated-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-public-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-A-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-B-coordinate",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-B-identity-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-C-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-evaluation-recurrence",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-block15-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-block15-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-block15-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-coefficient-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-root-old-alpha",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-push-order",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-payload",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-tail-chunk-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-tail-chunk",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "swapped-q132-physical-chunks",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "cross-carrier-q132-boundary-shift",
+          "consensusRejected": true,
+          "standardRejected": true
+        }
+      ]
+    },
+    {
+      "fixture": "max",
+      "cacheFixture": "max-canonical",
+      "publicInputs": [
+        "52435875175126190479447740508185965837690552500527637822603658699938581184512",
+        "52435875175126190479447740508185965837690552500527637822603658699938581184512"
+      ],
+      "proofScalars": {
+        "a": "31973094618979384438687646651332905998591800305199779160124182134108890966177",
+        "b": "41",
+        "c": "43",
+        "vx": "52435875175126190479447740508185965837690552500527637822603658699938581184505"
+      },
+      "identities": {
+        "A": false,
+        "B": false,
+        "C": false,
+        "msmContribution": false
+      },
+      "inputCount": 22,
+      "wireBytes": 89553,
+      "scriptBytes": 89357,
+      "feeSatoshis": 89553,
+      "exactOneSatPerByteFee": true,
+      "standardRelaySize": true,
+      "allConsensusInputsAccepted": true,
+      "allStandardInputsAccepted": true,
+      "wholeConsensusVerified": true,
+      "wholeStandardVerified": true,
+      "consensusOperationCost": 69493679,
+      "standardOperationCost": 69866671,
+      "maxConsensusInputOperationCost": 6721675,
+      "maxStandardInputOperationCost": 6726411,
+      "maxRedeemBytes": 5071,
+      "maxUnlockingBytes": 8406,
+      "smallestDensityMargin": 4893,
+      "witnesses": {
+        "proofStatementSha256": "f709b3de376d828e1c57fbacd719b2313eeba11f3d545555b369274f67245be6",
+        "residueRootSha256": "28f411c89c4dacbd67c1e7a69b6004c88eaea201c69e9c6890ee8eb6966fcae8",
+        "transcriptHeaderSha256": "2cdf52247eb706e4ef94224233d1d3c13d4e1db2977d2b14465b887635f051fc",
+        "blockPayloadsSha256": "44ad95beffe9128b97e7177e3b5f8811dd5e31d269ecc35db5b05082d43bbfe4",
+        "quotientPayloadsSha256": "0b3733dbca32102714ee852dcaff09affd73936139cc340d53484f5ae321cfab",
+        "quotientPhysicalChunksSha256": "0b3733dbca32102714ee852dcaff09affd73936139cc340d53484f5ae321cfab",
+        "transactionSha256": "ff061ecf72c74e22fd491728c6865f0b6122af8cbd3c5efb761355c7929214f1"
+      },
+      "rejectionFixtures": [
+        {
+          "name": "changed-template-common-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking-length",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-authenticated-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-public-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-A-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-B-coordinate",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-B-identity-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-C-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-evaluation-recurrence",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-block15-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-block15-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-block15-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-coefficient-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-root-old-alpha",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-push-order",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-payload",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-tail-chunk-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-tail-chunk",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "swapped-q132-physical-chunks",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "cross-carrier-q132-boundary-shift",
+          "consensusRejected": true,
+          "standardRejected": true
+        }
+      ]
+    },
+    {
+      "fixture": "msm-identity",
+      "cacheFixture": "msm-identity",
+      "publicInputs": [
+        "3",
+        "52435875175126190479447740508185965837690552500527637822603658699938581184511"
+      ],
+      "proofScalars": {
+        "a": "3346970755859118541241345138820380798150460797906019435485339917017356245833",
+        "b": "47",
+        "c": "53",
+        "vx": "2"
+      },
+      "identities": {
+        "A": false,
+        "B": false,
+        "C": false,
+        "msmContribution": true
+      },
+      "inputCount": 22,
+      "wireBytes": 89553,
+      "scriptBytes": 89357,
+      "feeSatoshis": 89553,
+      "exactOneSatPerByteFee": true,
+      "standardRelaySize": true,
+      "allConsensusInputsAccepted": true,
+      "allStandardInputsAccepted": true,
+      "wholeConsensusVerified": true,
+      "wholeStandardVerified": true,
+      "consensusOperationCost": 69798359,
+      "standardOperationCost": 70171351,
+      "maxConsensusInputOperationCost": 6733184,
+      "maxStandardInputOperationCost": 6737920,
+      "maxRedeemBytes": 5071,
+      "maxUnlockingBytes": 8406,
+      "smallestDensityMargin": 5075,
+      "witnesses": {
+        "proofStatementSha256": "366cf38beb02ef83fb2d5a899da8e9fae59660aa814e3f14fdca4622e69a5b1e",
+        "residueRootSha256": "6c3c55afb3c20a6159f2b4b1d39c3e98fd0cc6f5bd0e97079e4b972bf5d4085e",
+        "transcriptHeaderSha256": "075396c841a3fb1bab620a41a3cf7c8274eecde7bb0e5be593ce58da2a1e5fbd",
+        "blockPayloadsSha256": "34a38f6bbe27f5a4a0cb57c731c9874ad3dfc1648549992f604d63e47ff71325",
+        "quotientPayloadsSha256": "8ad5d3c0f664ebab319de4fa1f0861adde87801cd4ee15d3ae021d201d6c8908",
+        "quotientPhysicalChunksSha256": "8ad5d3c0f664ebab319de4fa1f0861adde87801cd4ee15d3ae021d201d6c8908",
+        "transactionSha256": "1c1f973d29026cb8fe7fe6851ade2a9be8a1ce5e17d46013d12d5bf06900e3b4"
+      },
+      "rejectionFixtures": [
+        {
+          "name": "changed-template-common-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking-length",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-authenticated-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-public-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-A-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-B-coordinate",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-B-identity-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-C-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-evaluation-recurrence",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-block15-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-block15-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-block15-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-coefficient-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-root-old-alpha",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-push-order",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-payload",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-tail-chunk-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-tail-chunk",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "swapped-q132-physical-chunks",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "cross-carrier-q132-boundary-shift",
+          "consensusRejected": true,
+          "standardRejected": true
+        }
+      ]
+    },
+    {
+      "fixture": "b-identity",
+      "cacheFixture": "proof1",
+      "publicInputs": [
+        "135208",
+        "67633"
+      ],
+      "proofScalars": {
+        "a": "59",
+        "b": "0",
+        "c": "28601386459159740261516949368101435911467574091196893357783813836330134589149",
+        "vx": "946632"
+      },
+      "identities": {
+        "A": false,
+        "B": true,
+        "C": false,
+        "msmContribution": false
+      },
+      "inputCount": 22,
+      "wireBytes": 89553,
+      "scriptBytes": 89357,
+      "feeSatoshis": 89553,
+      "exactOneSatPerByteFee": true,
+      "standardRelaySize": true,
+      "allConsensusInputsAccepted": true,
+      "allStandardInputsAccepted": true,
+      "wholeConsensusVerified": true,
+      "wholeStandardVerified": true,
+      "consensusOperationCost": 61867817,
+      "standardOperationCost": 62240809,
+      "maxConsensusInputOperationCost": 6124384,
+      "maxStandardInputOperationCost": 6129120,
+      "maxRedeemBytes": 5071,
+      "maxUnlockingBytes": 8406,
+      "smallestDensityMargin": 132021,
+      "witnesses": {
+        "proofStatementSha256": "5bf67a92cc88dd688988af82b4bbcee9b8b07c9e651e04f36f1bb6cba105818a",
+        "residueRootSha256": "c21b4d3a04992a67e56efa8c009672b8859ff18f3888b3984da7cc84e10f5ac7",
+        "transcriptHeaderSha256": "e1bf191d08e5269857b286bb109a14a16b7d3be3716cd81a7474fef53e0afc13",
+        "blockPayloadsSha256": "76feb9a2a0cc892bc28248d79d6d3509889da4f810e4786b91971e5f715b8412",
+        "quotientPayloadsSha256": "3f5be2255c6ebe92ef86f20744adca9fa1a3bb466261dae76d99ebe59494a3d6",
+        "quotientPhysicalChunksSha256": "3f5be2255c6ebe92ef86f20744adca9fa1a3bb466261dae76d99ebe59494a3d6",
+        "transactionSha256": "125e6ef11ea31d8d55ee235d6842c3e303aa160a4aca633f22a7102d87f3a15b"
+      },
+      "rejectionFixtures": [
+        {
+          "name": "changed-template-common-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking-length",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-authenticated-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-public-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-A-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-B-coordinate",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-B-identity-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-C-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-evaluation-recurrence",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-block15-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-block15-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-block15-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-coefficient-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-root-old-alpha",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-push-order",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-payload",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-tail-chunk-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-tail-chunk",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "swapped-q132-physical-chunks",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "cross-carrier-q132-boundary-shift",
+          "consensusRejected": true,
+          "standardRejected": true
+        }
+      ]
+    },
+    {
+      "fixture": "a-identity",
+      "cacheFixture": "proof1",
+      "publicInputs": [
+        "135208",
+        "67633"
+      ],
+      "proofScalars": {
+        "a": "0",
+        "b": "17",
+        "c": "28601386459159740261516949368101435911467574091196893357783813836330134589149",
+        "vx": "946632"
+      },
+      "identities": {
+        "A": true,
+        "B": false,
+        "C": false,
+        "msmContribution": false
+      },
+      "inputCount": 22,
+      "wireBytes": 89553,
+      "scriptBytes": 89357,
+      "feeSatoshis": 89553,
+      "exactOneSatPerByteFee": true,
+      "standardRelaySize": true,
+      "allConsensusInputsAccepted": true,
+      "allStandardInputsAccepted": true,
+      "wholeConsensusVerified": true,
+      "wholeStandardVerified": true,
+      "consensusOperationCost": 61960465,
+      "standardOperationCost": 62333457,
+      "maxConsensusInputOperationCost": 6123588,
+      "maxStandardInputOperationCost": 6128324,
+      "maxRedeemBytes": 5071,
+      "maxUnlockingBytes": 8406,
+      "smallestDensityMargin": 37033,
+      "witnesses": {
+        "proofStatementSha256": "7b44d6b61f8250eebd8f903e6da8841937b5e11ac242dbf34670fb2808b66959",
+        "residueRootSha256": "c21b4d3a04992a67e56efa8c009672b8859ff18f3888b3984da7cc84e10f5ac7",
+        "transcriptHeaderSha256": "713a079600d9f717a3d160082aefcc306bf9b5880a841db17539ae9058a1717d",
+        "blockPayloadsSha256": "03b2fc449fcc50ab88d2641b4d7b57e976d1c10ec746541ab9c14c9e65cc685b",
+        "quotientPayloadsSha256": "bf77b47ae3183a87245b09e7995bb3d19e14bfe26129def00a8ba26dfcd29db9",
+        "quotientPhysicalChunksSha256": "bf77b47ae3183a87245b09e7995bb3d19e14bfe26129def00a8ba26dfcd29db9",
+        "transactionSha256": "73dd0669437cd16886b4419ac3b1e8ea57e196514fd003afe73d7cf22e7b4a82"
+      },
+      "rejectionFixtures": [
+        {
+          "name": "changed-template-common-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking-length",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-authenticated-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-public-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-A-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-B-coordinate",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-B-identity-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-C-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-evaluation-recurrence",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-block15-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-block15-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-block15-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-coefficient-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-root-old-alpha",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-push-order",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-payload",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-tail-chunk-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-tail-chunk",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "swapped-q132-physical-chunks",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "cross-carrier-q132-boundary-shift",
+          "consensusRejected": true,
+          "standardRejected": true
+        }
+      ]
+    },
+    {
+      "fixture": "c-identity",
+      "cacheFixture": "proof1",
+      "publicInputs": [
+        "135208",
+        "67633"
+      ],
+      "proofScalars": {
+        "a": "6168926491191316526993851824492466569140065000062075037953371611757480529145",
+        "b": "17",
+        "c": "0",
+        "vx": "946632"
+      },
+      "identities": {
+        "A": false,
+        "B": false,
+        "C": true,
+        "msmContribution": false
+      },
+      "inputCount": 22,
+      "wireBytes": 89553,
+      "scriptBytes": 89357,
+      "feeSatoshis": 89553,
+      "exactOneSatPerByteFee": true,
+      "standardRelaySize": true,
+      "allConsensusInputsAccepted": true,
+      "allStandardInputsAccepted": true,
+      "wholeConsensusVerified": true,
+      "wholeStandardVerified": true,
+      "consensusOperationCost": 61930325,
+      "standardOperationCost": 62303317,
+      "maxConsensusInputOperationCost": 6116427,
+      "maxStandardInputOperationCost": 6121163,
+      "maxRedeemBytes": 5071,
+      "maxUnlockingBytes": 8406,
+      "smallestDensityMargin": 37136,
+      "witnesses": {
+        "proofStatementSha256": "c37661488d1922cf2f83a70ccded63a1f0e9a4f3b8bc8273f21d991e12bbcae5",
+        "residueRootSha256": "d3b076e9471fe95f727b0e84242640260dc06b5c8b1806e3aa869458306d7654",
+        "transcriptHeaderSha256": "8311d6ffda4cffe69f931a70fe94340cba4d7da98751b4adab33035c5547cbb7",
+        "blockPayloadsSha256": "29c6b883146825c33dc3a72292eddcba87a15ffd10c28a3ebe683ae266eef32a",
+        "quotientPayloadsSha256": "005315e3e39916db19440249a7c086695a3131cf3f6920aa961fcfa408794f31",
+        "quotientPhysicalChunksSha256": "005315e3e39916db19440249a7c086695a3131cf3f6920aa961fcfa408794f31",
+        "transactionSha256": "7d78513b56c66121b7bca5b37d9909cebf436900283f847f0d210c84b1137a90"
+      },
+      "rejectionFixtures": [
+        {
+          "name": "changed-template-common-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking-length",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-authenticated-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-public-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-A-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-B-coordinate",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-B-identity-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-C-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-evaluation-recurrence",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-block15-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-block15-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-block15-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-coefficient-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-root-old-alpha",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-push-order",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-payload",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-tail-chunk-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-tail-chunk",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "swapped-q132-physical-chunks",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "cross-carrier-q132-boundary-shift",
+          "consensusRejected": true,
+          "standardRejected": true
+        }
+      ]
+    },
+    {
+      "fixture": "all-identity",
+      "cacheFixture": "identity-balanced",
+      "publicInputs": [
+        "0",
+        "6242366092276927438029492917641186409248875297681861645548054607135545379108"
+      ],
+      "proofScalars": {
+        "a": "0",
+        "b": "0",
+        "c": "0",
+        "vx": "37454196553661564628176957505847118455493251786091169873288327642813272274650"
+      },
+      "identities": {
+        "A": true,
+        "B": true,
+        "C": true,
+        "msmContribution": false
+      },
+      "inputCount": 22,
+      "wireBytes": 89553,
+      "scriptBytes": 89357,
+      "feeSatoshis": 89553,
+      "exactOneSatPerByteFee": true,
+      "standardRelaySize": true,
+      "allConsensusInputsAccepted": true,
+      "allStandardInputsAccepted": true,
+      "wholeConsensusVerified": true,
+      "wholeStandardVerified": true,
+      "consensusOperationCost": 57653943,
+      "standardOperationCost": 58026935,
+      "maxConsensusInputOperationCost": 5582101,
+      "maxStandardInputOperationCost": 5586837,
+      "maxRedeemBytes": 5071,
+      "maxUnlockingBytes": 8406,
+      "smallestDensityMargin": 164178,
+      "witnesses": {
+        "proofStatementSha256": "8b6bfd3c797dcd9e6e8de7957e75edd22e69d94be35277b3e30a0ad4d939222d",
+        "residueRootSha256": "46a596a5dde9b8e3999c71c504b8a9a5e45ddf96712de0234c48d8a0e0aa146b",
+        "transcriptHeaderSha256": "67f2abc0aa3681b27f2ad1f2dd8a419aa8bc58de4bf5e7040e05ba4e50245f8e",
+        "blockPayloadsSha256": "eca39a64c2d77c1941bee989174f152cc6436acec01418c26363038215b377d6",
+        "quotientPayloadsSha256": "ffa9d631ea9cb1271dd3bb20f2e517edd3950f298f29307d0c305c79b04e6369",
+        "quotientPhysicalChunksSha256": "ffa9d631ea9cb1271dd3bb20f2e517edd3950f298f29307d0c305c79b04e6369",
+        "transactionSha256": "ba42d2762edb6bd190274ad40846e04e8aaff30aca31b691f66e5f2d5e22c2cb"
+      },
+      "rejectionFixtures": [
+        {
+          "name": "changed-template-common-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-common-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-extra-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-fixed-width-sibling-locking-length",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-authenticated-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-public-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-A-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-B-coordinate",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-B-identity-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-proof-C-unit",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-evaluation-recurrence",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-block15-split-payload-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "nonzero-chart-1-block15-split-U",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "out-of-domain-block15-split-flag",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-coefficient-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-root-old-alpha",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-push-order",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-payload",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-q132-tail-chunk-old-root",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "truncated-q132-tail-chunk",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "swapped-q132-physical-chunks",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "cross-carrier-q132-boundary-shift",
+          "consensusRejected": true,
+          "standardRejected": true
+        }
+      ]
+    }
+  ],
+  "identicalLockingBytecodes": true,
+  "lockingBytecodeCount": 22,
+  "lockingSetSha256": "4cd6f93829da3708513aa61d408c0b2bd4bba851ba31abefaad573b82c1d0284",
+  "cacheSha256": "8544c835d36af1148a49f05f003e8a7c05b4f7ae645032774a0aa5f9ffb0f423",
+  "cacheGlobalRoot": "b64e1bdd14a1d88d7448b23f654b37e369bda13e1612d97f4c78b0b447ba1911",
+  "regularDensityPadding": {
+    "3": 60,
+    "5": 36,
+    "6": 41,
+    "7": 49,
+    "8": 31,
+    "9": 39,
+    "10": 41,
+    "11": 49,
+    "12": 41,
+    "13": 49,
+    "14": 50,
+    "16": 26,
+    "17": 46,
+    "18": 47,
+    "19": 55
+  },
+  "coordinatorDensityPadding": 129,
+  "picBlock2DensityPadding": 116,
+  "picBlock4DensityPadding": 40,
+  "templateFactorDensityPadding": 0,
+  "templateTailDensityPadding": 41,
+  "quotientTailCoefficients": 22,
+  "maximumWireBytes": 89553,
+  "maximumScriptBytes": 89357,
+  "minimumRelayMarginBytes": 10447,
+  "minimumDensityMargin": 4744,
+  "maximumConsensusOperationCost": 69798359,
+  "maximumStandardOperationCost": 70171351,
+  "maximumConsensusInputOperationCost": 6733184,
+  "maximumStandardInputOperationCost": 6737920,
+  "maximumRedeemBytes": 5071,
+  "maximumUnlockingBytes": 8406,
+  "perInputWorst": [
+    {
+      "index": 0,
+      "role": "coordinator-template-classes",
+      "unlockingBytes": 5944,
+      "redeemBytes": 5071,
+      "worstConsensus": {
+        "fixture": "dense",
+        "operationCost": 4583064
+      },
+      "worstStandard": {
+        "fixture": "dense",
+        "operationCost": 4783256
+      },
+      "smallestDensityMargin": {
+        "fixture": "dense",
+        "margin": 4744
+      }
+    },
+    {
+      "index": 1,
+      "role": "block-0-template-First",
+      "unlockingBytes": 4960,
+      "redeemBytes": 2695,
+      "worstConsensus": {
+        "fixture": "proof1",
+        "operationCost": 3323589
+      },
+      "worstStandard": {
+        "fixture": "proof1",
+        "operationCost": 3331269
+      },
+      "smallestDensityMargin": {
+        "fixture": "proof1",
+        "margin": 669531
+      }
+    },
+    {
+      "index": 2,
+      "role": "block-1-template-AdditionTail",
+      "unlockingBytes": 5111,
+      "redeemBytes": 3423,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 4073297
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 4101329
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 20271
+      }
+    },
+    {
+      "index": 3,
+      "role": "block-2-template-Regular",
+      "unlockingBytes": 6452,
+      "redeemBytes": 3452,
+      "worstConsensus": {
+        "fixture": "proof1",
+        "operationCost": 5125964
+      },
+      "worstStandard": {
+        "fixture": "proof1",
+        "operationCost": 5172940
+      },
+      "smallestDensityMargin": {
+        "fixture": "proof1",
+        "margin": 21460
+      }
+    },
+    {
+      "index": 4,
+      "role": "block-3-template-Regular",
+      "unlockingBytes": 3119,
+      "redeemBytes": 120,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2506768
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2508560
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 19440
+      }
+    },
+    {
+      "index": 5,
+      "role": "block-4-template-AdditionTail",
+      "unlockingBytes": 8406,
+      "redeemBytes": 1435,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 6733184
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 6737920
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 19680
+      }
+    },
+    {
+      "index": 6,
+      "role": "block-5-template-Regular",
+      "unlockingBytes": 3095,
+      "redeemBytes": 96,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2488598
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2490262
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 18538
+      }
+    },
+    {
+      "index": 7,
+      "role": "block-6-template-Regular",
+      "unlockingBytes": 3100,
+      "redeemBytes": 101,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2491673
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2493337
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 19463
+      }
+    },
+    {
+      "index": 8,
+      "role": "block-7-template-Regular",
+      "unlockingBytes": 3108,
+      "redeemBytes": 109,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2498734
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2500398
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 18802
+      }
+    },
+    {
+      "index": 9,
+      "role": "block-8-template-Regular",
+      "unlockingBytes": 3090,
+      "redeemBytes": 91,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2483661
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2485325
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 19475
+      }
+    },
+    {
+      "index": 10,
+      "role": "block-9-template-Regular",
+      "unlockingBytes": 3098,
+      "redeemBytes": 99,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2490502
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2492166
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 19034
+      }
+    },
+    {
+      "index": 11,
+      "role": "block-10-template-Regular",
+      "unlockingBytes": 3100,
+      "redeemBytes": 101,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2491925
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2493589
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 19211
+      }
+    },
+    {
+      "index": 12,
+      "role": "block-11-template-Regular",
+      "unlockingBytes": 3108,
+      "redeemBytes": 109,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2497950
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2499614
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 19586
+      }
+    },
+    {
+      "index": 13,
+      "role": "block-12-template-Regular",
+      "unlockingBytes": 3100,
+      "redeemBytes": 101,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2491763
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2493427
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 19373
+      }
+    },
+    {
+      "index": 14,
+      "role": "block-13-template-Regular",
+      "unlockingBytes": 3108,
+      "redeemBytes": 109,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2498393
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2500057
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 19143
+      }
+    },
+    {
+      "index": 15,
+      "role": "block-14-template-Regular",
+      "unlockingBytes": 3109,
+      "redeemBytes": 110,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2498700
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2500364
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 19636
+      }
+    },
+    {
+      "index": 16,
+      "role": "block-15-template-AdditionMiddle",
+      "unlockingBytes": 5605,
+      "redeemBytes": 2569,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 4259755
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 4286123
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 230677
+      }
+    },
+    {
+      "index": 17,
+      "role": "block-16-template-Regular",
+      "unlockingBytes": 3085,
+      "redeemBytes": 86,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2480201
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2481865
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 18935
+      }
+    },
+    {
+      "index": 18,
+      "role": "block-17-template-Regular",
+      "unlockingBytes": 3106,
+      "redeemBytes": 107,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2496391
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2498055
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 19545
+      }
+    },
+    {
+      "index": 19,
+      "role": "block-18-template-Regular",
+      "unlockingBytes": 3107,
+      "redeemBytes": 108,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2497943
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2499607
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 18793
+      }
+    },
+    {
+      "index": 20,
+      "role": "block-19-template-Regular",
+      "unlockingBytes": 3115,
+      "redeemBytes": 116,
+      "worstConsensus": {
+        "fixture": "msm-identity",
+        "operationCost": 2504372
+      },
+      "worstStandard": {
+        "fixture": "msm-identity",
+        "operationCost": 2506036
+      },
+      "smallestDensityMargin": {
+        "fixture": "msm-identity",
+        "margin": 18764
+      }
+    },
+    {
+      "index": 21,
+      "role": "block-20-template-Terminal",
+      "unlockingBytes": 5561,
+      "redeemBytes": 4161,
+      "worstConsensus": {
+        "fixture": "zero",
+        "operationCost": 4284184
+      },
+      "worstStandard": {
+        "fixture": "zero",
+        "operationCost": 4318104
+      },
+      "smallestDensityMargin": {
+        "fixture": "zero",
+        "margin": 163496
+      }
+    }
+  ]
+}

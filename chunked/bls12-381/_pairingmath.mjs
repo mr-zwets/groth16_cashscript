@@ -83,6 +83,36 @@ export const lineUnitScaledFn = (f, c0, c1, c2, u, v) => {
   return Fp12.mul(f, sparse);
 };
 
+// qsplit-only direct eight-Fp2-product fold for a normalized affine G2 line
+// d0 - m*x + y = 0. The established shared Miller generators continue to use
+// the NAF/mul014 path below; qsplit callers opt into this path explicitly.
+export const qsplitLineUnitDirect8Fn = (f, d0, m, u, v) => {
+  const oneMinusI = Fp2.fromBigTuple([1n, Fp.neg(1n)]);
+  const q = Fp2.mul(
+    Fp2.fromBigTuple([Fp.neg(Fp.mul(d0.c0, v)), Fp.neg(Fp.mul(d0.c1, v))]),
+    oneMinusI,
+  );
+  const r = Fp2.mul(
+    Fp2.fromBigTuple([Fp.mul(m.c0, u), Fp.mul(m.c1, u)]),
+    oneMinusI,
+  );
+  return Fp12.mul(f, Fp12.create({
+    c0: Fp6.ONE,
+    c1: Fp6.create({ c0: Fp2.ZERO, c1: q, c2: r }),
+  }));
+};
+
+export function qsplitNormalizeLine(coeffs) {
+  if (Fp2.eql(coeffs[2], Fp2.ZERO)) {
+    throw new Error('cannot normalize a Miller line with zero c2');
+  }
+  const c2Inv = Fp2.inv(coeffs[2]);
+  return {
+    d0: Fp2.mul(coeffs[0], c2Inv),
+    m: Fp2.neg(Fp2.mul(coeffs[1], c2Inv)),
+  };
+}
+
 // ---- ate loop NAF of |x| (BLS_X), 64 digits, MSB-first ----
 const BLS_X = 0xd201000000010000n;
 const naf = (a) => { const r = []; for (; a > 1n; a >>= 1n) { if ((a & 1n) === 0n) r.unshift(0); else if ((a & 3n) === 3n) { r.unshift(-1); a += 1n; } else r.unshift(1); } return r; };
@@ -165,6 +195,80 @@ export function millerBatchOps(pairs, opts = {}) {
     if (op.t === 'sqr') f = Fp12.sqr(f);
     else if (op.t === 'dl') { const d = pointDouble(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z); Rs[op.j] = d.R; op.coeffs = d.coeffs; f = foldLine(f, d.coeffs, pds[op.j]); }
     else { const pd = pds[op.j]; const a = pointAdd(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z, pd.Qx, op.neg ? pd.negQy : pd.Qy); Rs[op.j] = a.R; op.coeffs = a.coeffs; f = foldLine(f, a.coeffs, pd); }
+  }
+  states.push({ f, Rs: Rs.slice() });
+  return { ops, states, boundary: f, finalF: Fp12.conjugate(f) };
+}
+
+// qsplit uses the ordinary binary expansion of |x| because its affine/direct8
+// trace is smaller with five additions. These exports are deliberately separate
+// from ATE_NAF and millerBatchOps, preserving every existing generator default.
+export const QSPLIT_ATE_LOOP_DIGITS = Array.from(BLS_X.toString(2).slice(1), Number);
+
+const qsplitPairData = (pairs) => pairs.map((pair) => {
+  const Q = pair.Q.toAffine();
+  const Ppoint = pair.P.toAffine();
+  return { Qx: Q.x, Qy: Q.y, Px: Ppoint.x, Py: Ppoint.y };
+});
+
+export function qsplitSinglePairMiller(pair) {
+  const Q = pair.Q.toAffine();
+  const Ppoint = pair.P.toAffine();
+  let f = Fp12.ONE;
+  let R = { x: Q.x, y: Q.y, z: Fp2.ONE };
+  for (let k = 0; k < QSPLIT_ATE_LOOP_DIGITS.length; k++) {
+    f = Fp12.sqr(f);
+    const doubled = pointDouble(R.x, R.y, R.z);
+    R = doubled.R;
+    f = lineFn(f, ...doubled.coeffs, Ppoint.x, Ppoint.y);
+    if (QSPLIT_ATE_LOOP_DIGITS[k] !== 0) {
+      const added = pointAdd(R.x, R.y, R.z, Q.x, Q.y);
+      R = added.R;
+      f = lineFn(f, ...added.coeffs, Ppoint.x, Ppoint.y);
+    }
+  }
+  return { f: Fp12.conjugate(f), R };
+}
+
+export function qsplitMillerBatchOps(pairs, opts = {}) {
+  const skip = opts.skipPairs ?? new Set();
+  const unitLines = opts.unitLines === true;
+  const pds = qsplitPairData(pairs).map((pd, index) => unitLines && PT_CFG[index].P
+    ? { ...pd, ...unitG1(pairs[index].P) }
+    : pd);
+  const foldLine = (value, coeffs, pd) => unitLines && pd.u !== undefined
+    ? lineUnitScaledFn(value, coeffs[0], coeffs[1], coeffs[2], pd.u, pd.v)
+    : lineFn(value, coeffs[0], coeffs[1], coeffs[2], pd.Px, pd.Py);
+  const ops = [];
+  for (let k = 0; k < QSPLIT_ATE_LOOP_DIGITS.length; k++) {
+    ops.push({ t: 'sqr' });
+    for (let index = 0; index < 4; index++) {
+      if (skip.has(index)) continue;
+      ops.push({ t: 'dl', j: index });
+      if (QSPLIT_ATE_LOOP_DIGITS[k] !== 0) {
+        ops.push({ t: 'al', j: index, neg: false });
+      }
+    }
+  }
+  const states = [];
+  let f = Fp12.ONE;
+  const Rs = pds.map((pd) => ({ x: pd.Qx, y: pd.Qy, z: Fp2.ONE }));
+  for (const op of ops) {
+    states.push({ f, Rs: Rs.slice() });
+    if (op.t === 'sqr') {
+      f = Fp12.sqr(f);
+    } else if (op.t === 'dl') {
+      const doubled = pointDouble(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z);
+      Rs[op.j] = doubled.R;
+      op.coeffs = doubled.coeffs;
+      f = foldLine(f, doubled.coeffs, pds[op.j]);
+    } else {
+      const pd = pds[op.j];
+      const added = pointAdd(Rs[op.j].x, Rs[op.j].y, Rs[op.j].z, pd.Qx, pd.Qy);
+      Rs[op.j] = added.R;
+      op.coeffs = added.coeffs;
+      f = foldLine(f, added.coeffs, pd);
+    }
   }
   states.push({ f, Rs: Rs.slice() });
   return { ops, states, boundary: f, finalF: Fp12.conjugate(f) };
@@ -257,6 +361,7 @@ export function assertPreparedMillerManifest(manifest, trace, { checkReferenceBo
 // ---- state serialization (matches the .cash hash256(toPaddedBytes(.,48))) ----
 export const f12limbs = (f) => [f.c0.c0.c0, f.c0.c0.c1, f.c0.c1.c0, f.c0.c1.c1, f.c0.c2.c0, f.c0.c2.c1, f.c1.c0.c0, f.c1.c0.c1, f.c1.c1.c0, f.c1.c1.c1, f.c1.c2.c0, f.c1.c2.c1];
 export const r6limbs = (R) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1, R.z.c0, R.z.c1];
+export const qsplitR4limbs = (R) => [R.x.c0, R.x.c1, R.y.c0, R.y.c1];
 
 // ---- the committed instance's 4 Groth16 pairs ----
 export const vkxPoint = (inputs) => computeVkx(inputs.map(BigInt));
@@ -264,6 +369,19 @@ export const pairsFor = (inputs, pf = proof) => [
   { name: 'negA_B', P: pf.a.negate(), Q: pf.b },
   { name: 'alpha_beta', P: vk.alpha, Q: vk.beta },
   { name: 'vkx_gamma', P: vkxPoint(inputs), Q: vk.gamma },
+  { name: 'C_delta', P: pf.c, Q: vk.delta },
+];
+export const qsplitVkxMsmPoint = (inputs) => inputs.map(BigInt).reduce(
+  (point, scalar, index) => scalar === 0n
+    ? point
+    : point.add(vk.ic[index + 1].multiply(scalar)),
+  bls12_381.G1.Point.ZERO,
+);
+export const qsplitVkxPoint = (inputs) => vk.ic[0].add(qsplitVkxMsmPoint(inputs));
+export const qsplitPairsFor = (inputs, pf = proof, { msmOnly = false } = {}) => [
+  { name: 'negA_B', P: pf.a.negate(), Q: pf.b },
+  { name: 'alpha_beta', P: vk.alpha, Q: vk.beta },
+  { name: 'vkx_gamma', P: msmOnly ? qsplitVkxMsmPoint(inputs) : qsplitVkxPoint(inputs), Q: vk.gamma },
   { name: 'C_delta', P: pf.c, Q: vk.delta },
 ];
 // A canonical B identity is evaluated as e(O,Q*) so the Miller walk remains defined. Q* only
