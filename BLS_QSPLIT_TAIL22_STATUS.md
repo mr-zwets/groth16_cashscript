@@ -1,5 +1,11 @@
 # BLS12-381 qsplit tail-22 — latest-main integration
 
+Benchmark entry name: `bch-groth16-bls12381-intratx-fs` (intra-tx packing +
+Fiat-Shamir polynomial-identity checking). Listed in
+[verifiers.md](verifiers.md) under its own security-model category; "qsplit
+tail-22" remains the internal build codename used by the sources and artifact
+files below.
+
 This source integration is based on
 `6a309f506f87ef584165b9d3ae4c0ec6d66ad56f`; the frozen hashes below pin the
 reviewed candidate artifacts.
