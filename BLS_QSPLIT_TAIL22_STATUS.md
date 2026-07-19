@@ -155,6 +155,11 @@ truncation, payload swap) are all rejected:
 RPA_PROOF_FIXTURE=committed node chunked/bls12-381/measure_fs_singleton.mjs
 ```
 
+`chunked/bls12-381/export_fs_singleton_vectors.mjs` runs the full corpus and
+writes the zk-verifier-bench vector file
+(`../verifier/src/bch/groth16-bls12381-singleton-fs-vectors.json`, sha256
+`3421cd9e805e27d0bd2ae6513039f775b229489587fffc90033a86fceeca7f3e`).
+
 ## Reproduction
 
 From this repository root:

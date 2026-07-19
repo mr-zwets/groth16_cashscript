@@ -2176,6 +2176,7 @@ const {
 const { writeFileSync: fsWriteFileSync } = await import('node:fs');
 
 const FS_RESCHEDULE = process.env.FS_RESCHEDULE !== 'off';
+const FS_EXPORT_VECTORS = process.env.FS_EXPORT_VECTORS === '1';
 const hexByte = (value) => value.toString(16).padStart(2, '0');
 
 const fsArgNames = [
@@ -2601,7 +2602,9 @@ const fsRejections = [
 ].map(([name, unlocking]) => {
   const result = fsEvaluate(unlocking);
   assert(!result.accepted, `fs singleton accepted changed-field fixture ${name}`);
-  return { name, rejected: !result.accepted };
+  return FS_EXPORT_VECTORS
+    ? { name, rejected: !result.accepted, unlocking: hex(unlocking) }
+    : { name, rejected: !result.accepted };
 });
 
 console.log(JSON.stringify({
@@ -2621,4 +2624,8 @@ console.log(JSON.stringify({
   accepted: fsValid.accepted,
   rejectionFixtures: fsRejections,
   cacheGlobalRoot: picCache.globalRoot,
+  ...(FS_EXPORT_VECTORS ? {
+    lockingHex: hex(fsRedeem),
+    unlockingHex: hex(fsValidUnlocking),
+  } : {}),
 }, null, 2));
