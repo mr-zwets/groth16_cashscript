@@ -127,6 +127,34 @@ resource export and benchmark-vector payloads changed only in their source and
 resource provenance hashes; all locking, unlocking, valid-proof, worst-case, and
 changed-field vector bytes remained identical.
 
+## Singleton variant (`bch-groth16-bls12381-singleton-fs`)
+
+`chunked/bls12-381/measure_fs_singleton.mjs` emits the same construction as ONE
+contract (single-script oracle, loosened BCH 2026 VM, same category as
+`bch-groth16-bls12381-singleton-minop`): the Fiat-Shamir commitment roots and the
+beta/alpha challenges are recomputed in-script over the witness blobs, the 32 PIC
+GT-table Merkle authentications run inline against the baked window roots, and
+the 21 Miller blocks chain through locals instead of cross-input reads. The
+witness blobs are byte-identical to this transaction's statement, block payloads,
+and logical q132 quotient.
+
+| Measurement | Result |
+| --- | ---: |
+| Locking bytes | 61,147 |
+| Unlocking bytes (witness pushes) | 63,005 |
+| Maximum op-cost across the ten fixtures | 60,575,949 |
+| Committed-fixture op-cost | 58,690,636 |
+| Previous unconditional op-cost oracle (`-minop`) | 149.2M |
+
+All ten fixtures produce one identical contract (proof-independent script), and
+twelve changed-field mutations per fixture (statement, proof points, residue
+root, slopes, chart outputs, PIC factor and path, quotient coefficient and
+truncation, payload swap) are all rejected:
+
+```sh
+RPA_PROOF_FIXTURE=committed node chunked/bls12-381/measure_fs_singleton.mjs
+```
+
 ## Reproduction
 
 From this repository root:
