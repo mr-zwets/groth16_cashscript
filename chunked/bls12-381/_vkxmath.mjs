@@ -34,14 +34,18 @@ import { compileString, compileFile, utils } from 'cashc';
 const { asmToBytecode } = utils;
 const RESCHED_OPTS = process.env.RESCHEDULE === 'off' ? {} : { rescheduleStacks: true };
 /** compile a .cash source string -> redeem bytecode (Uint8Array); throws on compile error */
-export const compileBytecode = (src) => asmToBytecode(compileString(src, RESCHED_OPTS).bytecode);
+export const compileBytecode = (src, compilerOptions = {}) =>
+  asmToBytecode(compileString(src, { ...RESCHED_OPTS, ...compilerOptions }).bytecode);
 /** compile a .cash FILE -> redeem bytecode. compileFile resolves relative `import`s (it has a
  * base path), so chunks can import the shared singleton library instead of inlining it. */
-export const compileFileBytecode = (path) => asmToBytecode(compileFile(path, RESCHED_OPTS).bytecode);
+export const compileFileBytecode = (path, compilerOptions = {}) =>
+  asmToBytecode(compileFile(path, { ...RESCHED_OPTS, ...compilerOptions }).bytecode);
 /** plain-cashc variants (no rescheduling) for the chunk planners, so the generated chunk
  * manifests stay independent of the pass. */
-export const compileBytecodeRaw = (src) => asmToBytecode(compileString(src).bytecode);
-export const compileFileBytecodeRaw = (path) => asmToBytecode(compileFile(path).bytecode);
+export const compileBytecodeRaw = (src, compilerOptions = {}) =>
+  asmToBytecode(compileString(src, compilerOptions).bytecode);
+export const compileFileBytecodeRaw = (path, compilerOptions = {}) =>
+  asmToBytecode(compileFile(path, compilerOptions).bytecode);
 
 // TARGET_UNLOCK is the per-input unlocking length the chunk planners/measurers pad to; the BCH
 // op-cost budget an input gets is (densityControlBase + unlockingLen) * 800, so OP_BUDGET follows.

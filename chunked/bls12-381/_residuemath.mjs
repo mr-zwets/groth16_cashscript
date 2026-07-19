@@ -27,6 +27,8 @@
 // returning, so a construction regression fails loudly at build time.
 import {
   Fp, Fp2, Fp6, Fp12, ATE_NAF, pairsFor, millerBatchOps, singlePairMiller,
+  QSPLIT_ATE_LOOP_DIGITS, qsplitLineUnitDirect8Fn, qsplitMillerBatchOps,
+  qsplitNormalizeLine, qsplitSinglePairMiller, unitG1, vk,
 } from './_pairingmath.mjs';
 import { bls12_381 } from '@noble/curves/bls12-381.js';
 
@@ -48,6 +50,16 @@ export const fp12limbsOf = tup;
 const powExact = (a, e) => { let res = Fp12.ONE, base = a; while (e > 0n) { if (e & 1n) res = mul(res, base); base = sqr(base); e >>= 1n; } return res; };
 export const frob = (a, n) => Fp12.frobeniusMap(a, n);
 export const conj = (a) => Fp12.conjugate(a);
+
+// Prepared factor for the qsplit binary/direct8 path. Existing residue builders
+// continue to call the NAF-based exports below unless they opt into this name.
+export function qsplitFixedVkMiller(pairs, foldIc0 = false) {
+  let fixed = conj(qsplitSinglePairMiller(pairs[1]).f);
+  if (foldIc0) {
+    fixed = mul(fixed, conj(qsplitSinglePairMiller({ P: vk.ic[0], Q: vk.gamma }).f));
+  }
+  return fixed;
+}
 
 // ---- parameter facts (asserted once at import) ----
 if (LAMBDA % r !== 0n) throw new Error('lambda not divisible by r');
@@ -178,6 +190,173 @@ export function millerFusedOps(pairs, c, cInv, opts = {}) {
   const boundary = mul(preF1, fAB);
   states.push({ f: boundary, Rs: base.states[base.states.length - 1].Rs.slice(), c, cInv });
   return { ops, states, boundary, baseBoundary: mul(base.boundary, fAB), cpowFinal: cpow, fAB };
+}
+
+// qsplit-only binary fused trace. The shared millerFusedOps export above remains
+// NAF-based, so the established grouped/intra-transaction generators are unchanged.
+export function qsplitMillerFusedOps(pairs, c, cInv, opts = {}) {
+  const skipPairs = opts.skipPairs ?? new Set([1]);
+  const base = qsplitMillerBatchOps(pairs, {
+    skipPairs,
+    unitLines: opts.unitLines === true,
+  });
+  const fixedMiller = opts.fixedMiller ?? qsplitFixedVkMiller(pairs);
+  const ops = [];
+  const states = [];
+  let cpow = cInv;
+  let round = 0;
+  for (let index = 0; index < base.ops.length; index++) {
+    const op = base.ops[index];
+    states.push({
+      f: mul(base.states[index].f, cpow),
+      Rs: base.states[index].Rs.slice(),
+      c,
+      cInv,
+    });
+    ops.push(op.t === 'sqr' ? { t: 'sqr' } : op);
+    if (op.t === 'sqr') {
+      cpow = sqr(cpow);
+      if ((QSPLIT_ATE_LOOP_DIGITS[round] ?? 0) !== 0) {
+        states.push({
+          f: mul(base.states[index + 1].f, cpow),
+          Rs: base.states[index + 1].Rs.slice(),
+          c,
+          cInv,
+        });
+        ops.push({ t: 'cf', neg: false });
+        cpow = mul(cpow, cInv);
+      }
+      round++;
+    }
+  }
+  const preFixed = mul(base.boundary, cpow);
+  states.push({
+    f: preFixed,
+    Rs: base.states[base.states.length - 1].Rs.slice(),
+    c,
+    cInv,
+  });
+  ops.push({ t: 'cmul1' });
+  const boundary = mul(preFixed, fixedMiller);
+  states.push({
+    f: boundary,
+    Rs: base.states[base.states.length - 1].Rs.slice(),
+    c,
+    cInv,
+  });
+  return {
+    ops,
+    states,
+    boundary,
+    baseBoundary: mul(base.boundary, fixedMiller),
+    cpowFinal: cpow,
+    fAB: fixedMiller,
+  };
+}
+
+const qsplitPointDoubleAffine = (point) => {
+  const denominator = Fp2.mul(point.y, 2n);
+  if (Fp2.eql(denominator, Fp2.ZERO)) {
+    throw new Error('affine BLS Miller doubling denominator is zero');
+  }
+  const slope = Fp2.div(Fp2.mul(Fp2.sqr(point.x), 3n), denominator);
+  const x = Fp2.sub(Fp2.sqr(slope), Fp2.mul(point.x, 2n));
+  const y = Fp2.sub(Fp2.mul(slope, Fp2.sub(point.x, x)), point.y);
+  return { R: { x, y }, slope, d0: Fp2.sub(Fp2.mul(slope, point.x), point.y) };
+};
+
+const qsplitPointAddAffine = (point, addend) => {
+  const denominator = Fp2.sub(addend.x, point.x);
+  if (Fp2.eql(denominator, Fp2.ZERO)) {
+    throw new Error('affine BLS Miller addition denominator is zero');
+  }
+  const slope = Fp2.div(Fp2.sub(addend.y, point.y), denominator);
+  const x = Fp2.sub(Fp2.sub(Fp2.sqr(slope), point.x), addend.x);
+  const y = Fp2.sub(Fp2.mul(slope, Fp2.sub(point.x, x)), point.y);
+  return { R: { x, y }, slope, d0: Fp2.sub(Fp2.mul(slope, point.x), point.y) };
+};
+
+export function qsplitMillerFusedAffineDirect8Ops(
+  pairs,
+  c,
+  cInv,
+  { torusU = null, fixedMiller = null, skipPairs = undefined } = {},
+) {
+  const raw = qsplitMillerFusedOps(pairs, c, cInv, { fixedMiller, skipPairs });
+  const pairData = pairs.map((pair) => ({ Q: pair.Q.toAffine(), ...unitG1(pair.P) }));
+  const fixedTorus = Fp6.eql(raw.fAB.c0, Fp6.ZERO)
+    ? null
+    : Fp6.mul(raw.fAB.c1, Fp6.inv(raw.fAB.c0));
+  if (torusU !== null && fixedTorus === null) {
+    throw new Error('the prepared BLS Miller factor has no finite quotient-torus coordinate');
+  }
+
+  let f = torusU === null
+    ? cInv
+    : Fp12.create({ c0: Fp6.ONE, c1: Fp6.neg(torusU) });
+  let runtimeR = { ...pairData[0].Q };
+  const ops = [];
+  const states = [];
+  for (const rawOp of raw.ops) {
+    states.push({ f, Rs: [runtimeR], c, cInv });
+    const op = { ...rawOp, affineSlopes: [] };
+    if (op.t === 'sqr') {
+      f = Fp12.sqr(f);
+    } else if (op.t === 'cf') {
+      if (torusU === null) {
+        f = Fp12.mul(f, op.neg ? c : cInv);
+      } else {
+        const fold = op.neg ? torusU : Fp6.neg(torusU);
+        f = Fp12.create({
+          c0: Fp6.add(f.c0, Fp6.mulByNonresidue(Fp6.mul(f.c1, fold))),
+          c1: Fp6.add(f.c1, Fp6.mul(f.c0, fold)),
+        });
+      }
+    } else if (op.t === 'cmul1') {
+      if (torusU === null) {
+        f = Fp12.mul(f, raw.fAB);
+      } else {
+        f = Fp12.create({
+          c0: Fp6.add(f.c0, Fp6.mulByNonresidue(Fp6.mul(f.c1, fixedTorus))),
+          c1: Fp6.add(f.c1, Fp6.mul(f.c0, fixedTorus)),
+        });
+      }
+    } else if (op.j !== 0) {
+      const { d0, m } = qsplitNormalizeLine(op.coeffs);
+      op.coeffs = [d0, m];
+      f = qsplitLineUnitDirect8Fn(f, d0, m, pairData[op.j].u, pairData[op.j].v);
+    } else if (op.t === 'dl') {
+      const step = qsplitPointDoubleAffine(runtimeR);
+      runtimeR = step.R;
+      op.affineSlopes.push(step.slope);
+      op.coeffs = [step.d0, step.slope];
+      f = qsplitLineUnitDirect8Fn(
+        f,
+        step.d0,
+        step.slope,
+        pairData[0].u,
+        pairData[0].v,
+      );
+    } else {
+      const step = qsplitPointAddAffine(runtimeR, {
+        x: pairData[0].Q.x,
+        y: op.neg ? Fp2.neg(pairData[0].Q.y) : pairData[0].Q.y,
+      });
+      runtimeR = step.R;
+      op.affineSlopes.push(step.slope);
+      op.coeffs = [step.d0, step.slope];
+      f = qsplitLineUnitDirect8Fn(
+        f,
+        step.d0,
+        step.slope,
+        pairData[0].u,
+        pairData[0].v,
+      );
+    }
+    ops.push(op);
+  }
+  states.push({ f, Rs: [runtimeR], c, cInv });
+  return { ops, states, boundary: f, fAB: raw.fAB, fAbU: fixedTorus };
 }
 
 const torusRepresentative = (u) => Fp12.create({ c0: Fp6.ONE, c1: u });

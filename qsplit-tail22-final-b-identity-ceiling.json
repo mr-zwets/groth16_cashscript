@@ -1,0 +1,384 @@
+{
+  "resourceProfile": "qsplit22-tail22",
+  "fixture": "b-identity",
+  "branchClass": "B-identity",
+  "probe": false,
+  "derivedFromResourceBytecodes": true,
+  "minimumUniversalMargin": 95753,
+  "results": [
+    {
+      "inputIndex": 0,
+      "finalCost": 4655979,
+      "adjustment": 36268,
+      "ceiling": 4692247,
+      "densityMargin": 95753,
+      "conditionalCounts": {
+        "fixed": 236,
+        "picOrder": 176,
+        "identity": 0,
+        "stateSwap": 0,
+        "select": 0,
+        "terminalReset": 0,
+        "bIdentity": 1,
+        "splitReset": 0
+      }
+    },
+    {
+      "inputIndex": 1,
+      "finalCost": 2908461,
+      "adjustment": 22272,
+      "ceiling": 2930733,
+      "densityMargin": 1070067,
+      "conditionalCounts": {
+        "fixed": 1,
+        "picOrder": 0,
+        "identity": 2,
+        "stateSwap": 0,
+        "select": 2,
+        "terminalReset": 1,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 2,
+      "finalCost": 3762998,
+      "adjustment": 19515,
+      "ceiling": 3782513,
+      "densityMargin": 339087,
+      "conditionalCounts": {
+        "fixed": 90,
+        "picOrder": 64,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 3,
+      "finalCost": 4920072,
+      "adjustment": 19676,
+      "ceiling": 4939748,
+      "densityMargin": 254652,
+      "conditionalCounts": {
+        "fixed": 183,
+        "picOrder": 128,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 4,
+      "finalCost": 2193620,
+      "adjustment": 80072,
+      "ceiling": 2273692,
+      "densityMargin": 254308,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 5,
+      "finalCost": 6129120,
+      "adjustment": 289637,
+      "ceiling": 6418757,
+      "densityMargin": 338843,
+      "conditionalCounts": {
+        "fixed": 134,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 6,
+      "finalCost": 2113034,
+      "adjustment": 141326,
+      "ceiling": 2254360,
+      "densityMargin": 254440,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 7,
+      "finalCost": 2116856,
+      "adjustment": 141083,
+      "ceiling": 2257939,
+      "densityMargin": 254861,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 8,
+      "finalCost": 2123006,
+      "adjustment": 141362,
+      "ceiling": 2264368,
+      "densityMargin": 254832,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 9,
+      "finalCost": 2109926,
+      "adjustment": 140412,
+      "ceiling": 2250338,
+      "densityMargin": 254462,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 10,
+      "finalCost": 2115577,
+      "adjustment": 141075,
+      "ceiling": 2256652,
+      "densityMargin": 254548,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 11,
+      "finalCost": 2116586,
+      "adjustment": 141370,
+      "ceiling": 2257956,
+      "densityMargin": 254844,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 12,
+      "finalCost": 2123121,
+      "adjustment": 141249,
+      "ceiling": 2264370,
+      "densityMargin": 254830,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 13,
+      "finalCost": 2117426,
+      "adjustment": 140580,
+      "ceiling": 2258006,
+      "densityMargin": 254794,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 14,
+      "finalCost": 2123494,
+      "adjustment": 140876,
+      "ceiling": 2264370,
+      "densityMargin": 254830,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 15,
+      "finalCost": 2124266,
+      "adjustment": 141406,
+      "ceiling": 2265672,
+      "densityMargin": 254328,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 16,
+      "finalCost": 3945408,
+      "adjustment": 27228,
+      "ceiling": 3972636,
+      "densityMargin": 544164,
+      "conditionalCounts": {
+        "fixed": 89,
+        "picOrder": 64,
+        "identity": 2,
+        "stateSwap": 1,
+        "select": 2,
+        "terminalReset": 1,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 17,
+      "finalCost": 2105255,
+      "adjustment": 141158,
+      "ceiling": 2246413,
+      "densityMargin": 254387,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 18,
+      "finalCost": 2121042,
+      "adjustment": 141706,
+      "ceiling": 2262748,
+      "densityMargin": 254852,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 19,
+      "finalCost": 2122838,
+      "adjustment": 141277,
+      "ceiling": 2264115,
+      "densityMargin": 254285,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 20,
+      "finalCost": 2128981,
+      "adjustment": 141543,
+      "ceiling": 2270524,
+      "densityMargin": 254276,
+      "conditionalCounts": {
+        "fixed": 10,
+        "picOrder": 0,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 0,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    },
+    {
+      "inputIndex": 21,
+      "finalCost": 4063743,
+      "adjustment": 24452,
+      "ceiling": 4088195,
+      "densityMargin": 393405,
+      "conditionalCounts": {
+        "fixed": 110,
+        "picOrder": 80,
+        "identity": 1,
+        "stateSwap": 1,
+        "select": 1,
+        "terminalReset": 1,
+        "bIdentity": 0,
+        "splitReset": 1
+      }
+    }
+  ]
+}

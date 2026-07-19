@@ -53,14 +53,46 @@ comparison. Per-layer status and build commands are in
 |---|---|---|---|
 | `bch-groth16-bls12381-singleton` | singleton, baseline | ~24.2 KB / ~1.04–1.48B op-cost | **~21× smaller bytecode than the nChain reference** |
 | `bch-groth16-bls12381-singleton-minop` | singleton, op-optimized | 58,345 B / **149.2M op-cost** | quotient torus (`λ=p+|x|`, 6-limb root u) + GLV; fused G2 ψ-check; A/C on-curve (G1 subgroup checks omitted) |
+| `bch-groth16-bls12381-singleton-fs` | singleton, **Fiat-Shamir PIT** | 61,147 B locking / **60.58M worst-case op-cost** | single-script qsplit tail-22 (`chunked/bls12-381/measure_fs_singleton.mjs`); ten-fixture corpus, one proof-independent script; separate security model — see [Fiat-Shamir model](#security-model-fiat-shamir-pit) |
 | `bch-pairing-bls12381-singleton` | singleton, pairing-only | ~19.8 KB / ~1.38B op-cost | the pairing verdict milestone (`verify.cash`) |
 | `bch-groth16-bls12381-intratx-residue` | chunked, intra-tx + quotient-torus residue | **24 inputs / 193,369 B score / 192,529 B wire / 151.43M op** | one current-consensus-valid transaction; non-standard only by total size |
 | `bch-groth16-bls12381-grouped-residue` | chunked, grouped + quotient-torus residue | **26 inputs / 3 standard tx / 205,734 B score / 204,894 B wire / 160.95M op** | current-policy grouped BLS verifier; exact successor pins and mutable-NFT state thread |
 | `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **3 inputs / 164,579 B score / 164,474 B wire / 149.81M op** | proposed-VM-only; non-standard by total transaction size — see [Target VM](#target-vm-bch-spec) |
+| `bch-groth16-bls12381-intratx-fs` | chunked, intra-tx + residue + **Fiat-Shamir PIT** | **22 inputs / 1 standard tx / 90,323 B score / 89,553 B wire / 69.80M op** | first single-standard-tx full verifier; separate security model — see [Fiat-Shamir model](#security-model-fiat-shamir-pit) |
 
 The BLS chunked pairing/Miller/final-exp families also exist in
 [chunked/bls12-381/](chunked/bls12-381/) (plain and residue generators); the
 grouped-residue packing above is the assembled full-verifier deployment.
+
+## Security model (Fiat-Shamir PIT)
+
+Every other entry is an **unconditional algebraic certificate**: the script computes the
+field arithmetic exactly, so acceptance is equivalent to the Groth16 pairing equation with
+no extra assumptions. The `-fs` entries — `bch-groth16-bls12381-intratx-fs` (the deployable
+22-input transaction) and `bch-groth16-bls12381-singleton-fs` (the same construction in one
+script, the FS-family op-cost oracle on the loosened VM) — instead share this model.
+`bch-groth16-bls12381-intratx-fs` (source and frozen artifacts:
+[BLS_QSPLIT_TAIL22_STATUS.md](BLS_QSPLIT_TAIL22_STATUS.md), internal codename
+"qsplit tail-22") instead verifies the Fp6/torus multiplication relations by
+**polynomial identity testing at a SHA-256-derived Fiat-Shamir point**: Fp6 values are
+committed as degree-5 polynomials, the per-block relations are batched by a challenge
+`beta` and checked at a challenge `alpha` against one prover-supplied 132-coefficient
+quotient, and the coordinator re-derives both challenges on-chain from Merkle roots over
+the transaction's own payloads. The G2 walk, slope checks, ψ terminal relation, and the
+`λ=p+|x|` residue terminal stay exact. Consequences, disclosed in its status doc:
+
+- Soundness is computational, in the SHA-256 random-oracle model, with a stated union
+  bound below `161/2^256` per spend attempt — STARK-class, but a **new assumption** the
+  unconditional entries do not make. It is therefore filed under this separate name
+  rather than as a successor to `-intratx-residue` / `-grouped-residue`.
+- A and C are graded **cofactor-equivalent**: on-curve is enforced and the pairing verdict
+  binds their prime-order projections, but unlike `-singleton-minop`'s ψ/φ subgroup
+  checks, alternate cofactor encodings of the same valid proof also spend. No
+  unique-G1-encoding grade is claimed.
+- The `e(vk_x, γ)` pair is served from a **2,097,152-entry public-VK-derived GT table**
+  (window-8 over the two public-input byte pairs), Merkle-committed in the locking
+  programs; per-VK preprocessing regenerates ~1.2 GB of table data
+  (`chunked/bls12-381/prove_gt_window_preimage.mjs`, deterministic, VK points only).
 
 ## Target VM (`bch-spec`)
 
