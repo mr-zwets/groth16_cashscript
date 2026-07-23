@@ -2,7 +2,7 @@
 
 The verifiers in this repo are compiled with a stack-rescheduling pass in the
 [CashScript compiler fork](cashscript-compiler-fork.md) (branch
-`compiler-optimizations`). This is the single biggest codegen lever in the project: on
+`compiler-optimizations-2`). This is the single biggest codegen lever in the project: on
 the op-cost-bound chunk families it is worth **−4.9 % to −6.7 %** of the whole verifier
 score, and on the plain BN254 singleton **−37.7 %** of bytecode. This doc explains what
 the mode is, how it works, and how to turn it on.

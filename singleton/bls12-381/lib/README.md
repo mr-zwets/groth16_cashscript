@@ -2,7 +2,7 @@
 
 Shared CashScript function files for the BLS12-381 Groth16 verifier, consumed by the contracts in the
 parent directory (`../*.cash`). They rely on the custom cashc fork's top-level (global) functions +
-`import` support (branch `compiler-optimizations`): a library file is just plain top-level `function`s
+`import` support (branch `compiler-optimizations-2`): a library file is just plain top-level `function`s
 (no `library` wrapper, no `internal` keyword). Mirrors the bn254 singleton (`../../bn254/lib/`).
 
 ## Why a `contract` per layer

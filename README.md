@@ -38,13 +38,13 @@ It comes in two forms:
   state forward in a hash commitment. This is the BCH-limit-viable on-chain form. See
   [`chunked/README.md`](chunked/README.md).
 
-The verifier is built with a local fork of `cashc` (branch `compiler-optimizations`):
-a patch series on top of upstream's `next` branch, which now provides user-defined
-functions and file imports itself. On top of those, the fork adds multi-return functions,
-re-added global constants, and an op-cost optimisation suite: an
-`optimizeFor: 'size' | 'opcost'` objective, byte-accounted inlining, and a
-`rescheduleStacks` DAG stack scheduler (the single biggest codegen lever here). The goal
-is to upstream these and eventually compile with stock CashScript. See
+The verifier is built with a local fork of `cashc` (branch `compiler-optimizations-2`,
+which supersedes the earlier `compiler-optimizations`): a patch series on top of
+upstream's `next` branch, which now provides user-defined functions, file imports,
+multi-return functions, and global constants itself. On top of those, the fork adds an
+op-cost optimisation suite: an `optimizeFor: 'size' | 'opcost'` objective, definition
+sinking, and a `rescheduleStacks` DAG stack scheduler (the single biggest codegen lever
+here). The goal is to upstream these and eventually compile with stock CashScript. See
 [The CashScript Compiler Fork](cashscript-compiler-fork.md) and, for the rescheduler
 specifically, [The `rescheduleStacks` Compile Mode](rescheduling-stacks.md).
 

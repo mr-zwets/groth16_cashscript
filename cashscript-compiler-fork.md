@@ -4,13 +4,24 @@ The verifiers in this repo are compiled with a local fork of `cashc`, not the
 released compiler.
 
 - Fork: [`mr-zwets/cashscript`](https://github.com/mr-zwets/cashscript), branch
-  `compiler-optimizations`. The current verifier artifacts pin compiler commit
-  `1c707c1dbf87396b30ba5e0704b1db44475ce893`, a patch series on top of upstream's
-  `next` branch (v0.14.0-next.0). It began as the five
-  custom-feature commits of `feat/multi-returns` and has since grown an op-cost
-  optimisation suite: the `optimizeFor` objective, definition-sinking, and the
-  `rescheduleStacks` DAG scheduler. The features below are grouped as language
-  features and op-cost passes.
+  `compiler-optimizations-2`. The current verifier artifacts pin compiler commit
+  `9fb14833713449403104c8a77cb10973130993e1`: ten fork commits on top of upstream's
+  `next` branch at v0.14.0-next.2, where multi-return functions (#423) and global
+  constants + inlining (#426) have since landed upstream. What remains fork-only is
+  the smaller feature set below (the `unused` modifier, tuple-destructure into
+  existing variables, the faster peephole optimiser) plus the op-cost optimisation
+  suite: the `optimizeFor` objective, definition-sinking, and the `rescheduleStacks`
+  DAG scheduler. The features below are grouped as language features and op-cost
+  passes; the ones upstream now provides are marked as such.
+- Branch history: the earlier branch `compiler-optimizations` (pinned `1c707c1`, base
+  v0.14.0-next.0) carried its own ports of multi-returns and global constants.
+  `compiler-optimizations-2` is a reworked, cleaned-up series rebased onto next.2 —
+  not a mechanical rebase: several passes were reimplemented against the upstream
+  versions of those features, so its output differs. Recompiling every verifier under
+  it (2026-07-23) improved all byte-scored singletons by 1–4 % while trading some
+  op-cost back under the size objective (+2–7 % on those oracles); a few op-bound
+  chunk builds regressed (shamir vk_x +12 % op; the BN254 grouped-residue plan now
+  overflows its per-input caps and awaits replanning).
 - CLI used by the graders and `_harness.mjs`: `packages/cashc/dist/cashc-cli.js`,
   rebuilt with `yarn build` in `packages/utils` and `packages/cashc` after any compiler
   edit (`node_modules/cashc` in this repo symlinks to the fork).
@@ -35,8 +46,9 @@ the upstream model (2026-07-02):
 - `library X { ... }` wrappers → plain top-level functions (the `library` and
   `internal` keywords are gone);
 - global `constant`s → initially dropped (values written as literals at their use
-  sites), but since re-added to the fork as top-level `constant`s (still folded to
-  literals, no stack slot); this remains fork-only;
+  sites), then re-added to the fork as top-level `constant`s (still folded to
+  literals, no stack slot); upstream has since landed its own global constants and
+  inlining optimisations (#426), which `compiler-optimizations-2` builds on;
 - the old repeated-call-argument codegen fix (`fpNSqr(a) = fpNMul(a, a)` used to
   mis-compile) is obsolete: upstream's function model handles it;
 - `pragma cashscript ^0.14.0;`.
@@ -65,9 +77,10 @@ bytecode.
 
 ## Language / codegen features
 
-### 1. Multi-return functions
+### 1. Multi-return functions (now upstream, #423)
 
-A global function can declare and return multiple values —
+Originally a fork feature; upstream `next` merged its own implementation in #423 and
+`compiler-optimizations-2` uses that one. A global function can declare and return multiple values —
 `function fp2Mul(...) returns (int, int)` / `return c0, c1;` — destructured at the
 call site with N-ary tuple assignment (`int m0, int m1 = fp2Mul(...);`).
 
@@ -112,13 +125,15 @@ original depth (+1 `OP_NIP` only); a *leading* pad deepens every access by one. 
 tight-budget chunked families use trailing pads; the singleton vk_x contracts use a
 leading pad (it sits under the constructor args and keeps the tamper test valid).
 
-### 4. Byte-accounted inlining of global functions
+### 4. Byte-accounted inlining of global functions (base now upstream, #426)
 
 Sharing a function via `OP_DEFINE` / `OP_INVOKE` costs its body once (as a push) plus
 `<id> OP_DEFINE`, and `<id> OP_INVOKE` per call site; inlining costs the body at every
-call site. The fork splices a function's compiled body at its call sites **whenever
+call site. The compiler splices a function's compiled body at its call sites **whenever
 that is cheaper by exact byte accounting** (a single-use function always inlines;
-recursive functions never; ties favour inlining). An inlined body is compiled with its
+recursive functions never; ties favour inlining) — landed upstream in #426; the fork
+keeps its `opcost`-objective refinements on top (§6: the small-multi-use-body inline
+gate and the loop-resident `OP_DEFINE` exclusion). An inlined body is compiled with its
 arguments staged on top of the stack and its cleanup baked in, so splicing it where
 the args sit runs identically to invoking. Debug info (logs, require messages, source
 locations) is preserved across inlining. On by default; `disableInlining` exists as a
@@ -137,7 +152,7 @@ array, and adds a peephole rule exploiting `OP_MUL` commutativity.
 
 ## The op-cost optimisation suite
 
-The later commits on `compiler-optimizations` add passes aimed at **op-cost**, the
+The later commits on `compiler-optimizations-2` add passes aimed at **op-cost**, the
 per-input compute budget that binds the deployable chunk families (a BCH input buys
 budget with unlocking-script length, so every op-cost saving directly buys back
 zero-padding bytes). They are organised around one new setting.

@@ -11,7 +11,7 @@ Basis is locked to noble's tower so checkpoint #2 (`millerHex`) grades byte-for-
 
 Every tower op is a reusable multi-return function (shared via `OP_DEFINE`/`OP_INVOKE`
 unless the compiler decides inlining is byte-cheaper). This needs the local cashc
-`compiler-optimizations` build (top-level functions + `import` + multi-return).
+`compiler-optimizations-2` build (top-level functions + `import` + multi-return).
 
 ## Files / status
 
