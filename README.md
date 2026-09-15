@@ -38,15 +38,8 @@ It comes in two forms:
   state forward in a hash commitment. This is the BCH-limit-viable on-chain form. See
   [`chunked/README.md`](chunked/README.md).
 
-The verifier is built with a local fork of `cashc` (branch `compiler-optimizations-2`,
-which supersedes the earlier `compiler-optimizations`): a patch series on top of
-upstream's `next` branch, which now provides user-defined functions, file imports,
-multi-return functions, and global constants itself. On top of those, the fork adds an
-op-cost optimisation suite: an `optimizeFor: 'size' | 'opcost'` objective, definition
-sinking, and a `rescheduleStacks` DAG stack scheduler (the single biggest codegen lever
-here). The goal is to upstream these and eventually compile with stock CashScript. See
-[The CashScript Compiler Fork](cashscript-compiler-fork.md) and, for the rescheduler
-specifically, [The `rescheduleStacks` Compile Mode](rescheduling-stacks.md).
+The verifier is compiled with a small fork of `cashc` that adds an op-cost objective and
+a stack-rescheduling pass for very large contracts; see [Why a CashScript fork](#why-a-cashscript-fork).
 
 This repo also documents the surrounding design: the map of all the verifiers
 ([verifiers.md](verifiers.md)), why the work is split across transactions
@@ -56,54 +49,46 @@ the field-tower representation ([arrays.md](arrays.md)), the codegen op-cost lev
 ([rescheduling-stacks.md](rescheduling-stacks.md)), and the build plan
 ([roadmap.md](roadmap.md)).
 
-## CashScript Shortcomings
+## Why a CashScript fork
 
-Implementing a pairing verifier pushed CashScript past several of its limits. The two biggest, reusable functions and multi-file imports, have since landed upstream on the `next` branch; the remaining custom features live in a small fork rebased on top of it (see [The CashScript Compiler Fork](cashscript-compiler-fork.md)); the rest still shape the code.
+Everything the verifier needs from the language is in CashScript v0.14 (currently the
+`next` pre-release): user-defined functions compiled to `OP_DEFINE` / `OP_INVOKE`,
+multi-file `import`s with dead-code elimination, multi-return functions, global
+constants, tuple reassignment, and the `unused` modifier for op-cost padding arguments.
+The one remaining language gap is arrays: each field-tower element is carried as
+separate ints (2 for `Fp2`, 12 for `Fp12`) through multi-return functions, which costs
+readability rather than bytes (see [Arrays and the Field Tower](arrays.md)).
 
-### Reusable Functions (landed upstream on `next`)
+We still compile with a fork ([`mr-zwets/cashscript`](https://github.com/mr-zwets/cashscript),
+branch `compiler-optimizations-5`, rebased on v0.14.0-next.5) because a pairing
+verifier is an unusual contract: thousands of field operations per input, with every
+byte and every executed op counted against consensus limits. Two things matter at that
+scale that stock `cashc` does not do:
 
-Released CashScript (≤0.13) only allows calling built-in functions: you cannot define your
-own function and call it from a contract function or from another function. The verifier
-relies on user-defined functions everywhere (the `Fp2 → Fp6 → Fp12` tower, G1/G2 point ops,
-the Miller and final-exponentiation steps), compiled to `OP_DEFINE` / `OP_INVOKE`. This was
-originally a custom fork feature; upstream has since implemented it on `next` (tied to
-the 2026 network upgrade), and our fork is now rebased on that implementation. The
-remaining custom pieces (multi-return functions, tuple reassignment, `unused`, global
-constants, and the op-cost optimisation suite: `optimizeFor`, byte-accounted inlining,
-and `rescheduleStacks`) are in
-[The CashScript Compiler Fork](cashscript-compiler-fork.md).
+- **An op-cost objective** (`optimizeFor: 'opcost'`). Stock `cashc` optimises for bytes.
+  A chunk that only fits its op-cost budget by zero-padding its unlocking script pays for
+  every executed op, so the fork trades bytes for ops where that wins: loop-resident
+  helpers stay `OP_DEFINE`'d instead of re-stepping an inlined body every iteration, and
+  tiny bodies inline to drop the invoke overhead. Under the `size` objective it adds
+  constant hoisting and definition sinking for the byte-scored singletons.
+- **DAG stack rescheduling** (`rescheduleStacks`). An opt-in pass that re-plans each
+  straight-line block so operands are computed onto the top of the stack instead of
+  fetched with `<depth> OP_PICK` / `OP_ROLL`. It is the single biggest codegen lever
+  here (−5 to −7 % on the chunk families, −38 % on the plain BN254 singleton) and also
+  the riskiest: it re-derives the evaluation order from a dataflow model, guarded by
+  per-block "never worse" selection and differential VM tests.
 
-### Multi-file Imports (landed upstream on `next`)
-
-Separately from reusable functions within a file, released CashScript has no multi-file construct: no way to pull definitions from another file with a dependency graph. Upstream `next` now supports top-level (global) functions and `import "./Rel.cash";`, which brings a file's functions into scope unqualified, with the import graph resolved (and de-duplicated) before compilation — covering what this repo previously did with a custom `library` keyword. Each `.cash` in `singleton/<curve>/` is a thin consumer that imports the shared `Fp → Fp2 → Fp6 → Fp12 → Miller → FinalExp` tower:
-
-```solidity
-import "./lib/Fp2.cash";
-
-contract Fp2Ops() {
-  function spend(...) { ... fp2Mul(...) ... }
-}
-```
-
-Dead-code elimination means importing the big shared tower costs nothing for the functions a consumer doesn't call (and the fork's byte-accounted inlining removes the `OP_DEFINE`/`OP_INVOKE` overhead wherever splicing is cheaper). Note this tidies the singleton source layout; it does not shrink the chunked deployment, where each transaction is independent and the per-chunk function prologues are repeated regardless of source organisation.
-
-Upstream's file imports of top-level functions cover this repo's needs.
-
-### Global Constants (re-added in the fork; still open upstream)
-
-Stock CashScript has no file-level constant. An early rebase dropped the fork's constants to stay close to upstream (writing shared values like the BN254 base field prime as literals at each use site), but they were re-added: the fork supports top-level `constant`s again (folded to literals at their use sites, no stack slot), and, under `optimizeFor: 'size'`, additionally hoists repeated in-body literals into a local so a value like the prime that a function reduces mod p several times is pushed once. Both remain fork-only.
-
-### No Array Type
-
-Groth16 in Solidity usually allows for an array of input parameters, CashScript doesn't allow for `array` types. Now that bounded loops exist, it would be useful to 'loop' over the number of elements in an array, however this would require very heavy abstraction on the CashScript side as arrays don't natively exist. In practice each tower element is instead carried as separate ints (2 for `Fp2`, 12 for `Fp12`), passed through multi-return functions.
-
-Arrays are not strictly needed, and since they would compile to a long concatenated byte string for these 256-bit field elements the performance effect would be small. The main win would be cleaner, more auditable code. See [Arrays and the Field Tower](arrays.md) for details.
+Both are experimental and only pay off on contracts of this size. They may land
+upstream once they are better understood; until then the fork is the smallest set of
+patches that keeps the verifiers deployable. Details, measurements and branch history:
+[The CashScript Compiler Fork](cashscript-compiler-fork.md) and
+[The `rescheduleStacks` Compile Mode](rescheduling-stacks.md).
 
 ## BCH Shortcomings
 
 Loops and shift operators are now available (CashScript v0.13.0 / CHIP-2021-05 Loops), so the binding constraints are no longer missing language features but the BCH [script & transaction limits](https://cashscript.org/docs/compiler/limits). In practice the **maximum unlocking bytecode length (10,000 bytes for P2SH)** is the real wall: for P2SH the contract is supplied in the unlocking bytecode, so this single consensus limit caps how large the verifier can be, and (since the op-cost budget scales with script length) also caps the maximum compute budget that can be bought by padding.
 
 - **Contract size / unlocking bytecode (the real practical limit):** 10,000 bytes for P2SH (consensus), or just 201 bytes for P2S. A full pairing verifier (F_p¹² tower arithmetic, Miller loops, final exponentiation) is very unlikely to fit under 10 KB even with loops collapsing repeated bytecode.
-- **Operation cost budget (op-cost):** a compute budget enforced per input, scaled by unlocking-script length (`(41 + unlockingBytecodeLength) * 800`). Extra budget can be "bought" by zero-padding the input script, but only up to the 10,000-byte unlocking bytecode limit above, so the two limits are really one wall. The fork's [`unused` modifier](cashscript-compiler-fork.md#3-the-unused-declaration-modifier-issues-125-412) lets a contract declare this pad directly as a `bytes unused zeroPadding` argument instead of a hand-built `OP_DROP` prefix.
+- **Operation cost budget (op-cost):** a compute budget enforced per input, scaled by unlocking-script length (`(41 + unlockingBytecodeLength) * 800`). Extra budget can be "bought" by zero-padding the input script, but only up to the 10,000-byte unlocking bytecode limit above, so the two limits are really one wall. The `unused` modifier lets a contract declare this pad directly as a `bytes unused zeroPadding` argument instead of a hand-built `OP_DROP` prefix.
 
-Because these limits are per input, a full verifier cannot run in one input and must be split into steps. Those steps can be sibling inputs of one transaction—the current BN254 quotient-torus construction uses 11 inputs—or span sequential transactions with covenant commitments. The committed proof is 86,565 serialized bytes / 68,489,869 op-cost and has an 86,950-byte verifier.cash score after including the 11 spent P2SH32 locking programs. The primary transaction, twelve alternate/identity transactions, and the concrete asymmetric-resource fixture are standard and fund the default 1 sat/byte relay fee; a separate dense worst-case transaction also passes both consensus and standard-policy evaluation. A proof-independent resource certificate constructs a 99,079-byte relayable encoding for every valid proof, with a 921-byte standard-relay margin and a 79,226,279-op-cost ceiling. Its grouped-GLV bound charges the expensive fallback at every physical lookup slot and does not use the checkpoint key's published setup or IC scalar relations. See [Breaking Up Computation Across Multiple Steps](multi-step-computation.md) for both forms.
+Because these limits are per input, a full verifier cannot run in one input and must be split into steps: sibling inputs of one transaction (the one-transaction verifiers) or sequential transactions linked by covenant commitments. See [Breaking Up Computation Across Multiple Steps](multi-step-computation.md) for both forms and [verifiers.md](verifiers.md) for the current entries.
