@@ -23,30 +23,30 @@
         "msmContribution": false
       },
       "inputCount": 22,
-      "wireBytes": 89553,
-      "scriptBytes": 89357,
-      "feeSatoshis": 89553,
+      "wireBytes": 79178,
+      "scriptBytes": 78982,
+      "feeSatoshis": 79178,
       "exactOneSatPerByteFee": true,
       "standardRelaySize": true,
       "allConsensusInputsAccepted": true,
       "allStandardInputsAccepted": true,
       "wholeConsensusVerified": true,
       "wholeStandardVerified": true,
-      "consensusOperationCost": 67899727,
-      "standardOperationCost": 68272719,
-      "maxConsensusInputOperationCost": 6724785,
-      "maxStandardInputOperationCost": 6729521,
-      "maxRedeemBytes": 5071,
-      "maxUnlockingBytes": 8406,
-      "smallestDensityMargin": 4826,
+      "consensusOperationCost": 53133274,
+      "standardOperationCost": 53482586,
+      "maxConsensusInputOperationCost": 5820192,
+      "maxStandardInputOperationCost": 5824928,
+      "maxRedeemBytes": 2857,
+      "maxUnlockingBytes": 8399,
+      "smallestDensityMargin": 41118,
       "witnesses": {
         "proofStatementSha256": "8bea217d3504d821fb9e73060c409b9cebc225ba70aeaaf10ae585067ea16f12",
         "residueRootSha256": "d44cb0469cea8cfefc8e4ec1bb985791072e7ecc20e2e5866aa959334c85eb12",
-        "transcriptHeaderSha256": "0ccfe692e0921c971d686fe51cbc1b2e95081d82045688ee08bde798ddb076e9",
-        "blockPayloadsSha256": "1fffdfd06b095613d87a1eef93f6232750a32bf90249ca214e3ff243ad3f4323",
-        "quotientPayloadsSha256": "d6aad855643a6fd75de7615ffb02a0ec8d3a0281c78a15ddf7efe90c11ed7d70",
-        "quotientPhysicalChunksSha256": "d6aad855643a6fd75de7615ffb02a0ec8d3a0281c78a15ddf7efe90c11ed7d70",
-        "transactionSha256": "59ccf00a23e41ec0834b11b711554c34831363225ee24c85fbf38a3a80fab44d"
+        "transcriptHeaderSha256": "827e8f610e5cb2255583ff2e3894e03d813b4193e10af2f35d1157ac19b481c2",
+        "blockPayloadsSha256": "41f32678931545119e90bcec70f4f40521d5511b94f0b85c0e17be846ae0b7fb",
+        "quotientPayloadsSha256": "cf6f77ce10960c32cd92a9df4a39c10a4c94894769e0e293bf6fda097f329a56",
+        "quotientPhysicalChunksSha256": "cf6f77ce10960c32cd92a9df4a39c10a4c94894769e0e293bf6fda097f329a56",
+        "transactionSha256": "c06642e62e38d654bba4f4b11e6b449ff7f559bae5b7e321dbcefe05fd4c9883"
       },
       "rejectionFixtures": [
         {
@@ -56,6 +56,91 @@
         },
         {
           "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-factor",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-loader-source-input",
           "consensusRejected": true,
           "standardRejected": true
         },
@@ -236,30 +321,30 @@
         "msmContribution": false
       },
       "inputCount": 22,
-      "wireBytes": 89553,
-      "scriptBytes": 89357,
-      "feeSatoshis": 89553,
+      "wireBytes": 79178,
+      "scriptBytes": 78982,
+      "feeSatoshis": 79178,
       "exactOneSatPerByteFee": true,
       "standardRelaySize": true,
       "allConsensusInputsAccepted": true,
       "allStandardInputsAccepted": true,
       "wholeConsensusVerified": true,
       "wholeStandardVerified": true,
-      "consensusOperationCost": 68009695,
-      "standardOperationCost": 68382687,
-      "maxConsensusInputOperationCost": 6732496,
-      "maxStandardInputOperationCost": 6737232,
-      "maxRedeemBytes": 5071,
-      "maxUnlockingBytes": 8406,
-      "smallestDensityMargin": 4927,
+      "consensusOperationCost": 53168847,
+      "standardOperationCost": 53518159,
+      "maxConsensusInputOperationCost": 5811171,
+      "maxStandardInputOperationCost": 5815907,
+      "maxRedeemBytes": 2857,
+      "maxUnlockingBytes": 8399,
+      "smallestDensityMargin": 42072,
       "witnesses": {
         "proofStatementSha256": "0fbef5e898a7f08d5735f4d664829d6ab0be973b86f59d5593a0a441ac70f742",
         "residueRootSha256": "763bca25198b32459886b4ba44a894e7d9b9ee2606ad12cbb9843cabc41e151a",
-        "transcriptHeaderSha256": "7c7c2eb4e447c4bff8d3ed00fba0662e70584ab26d63dbd80e94418cee75499c",
-        "blockPayloadsSha256": "ddfa69d2eae8c625ec9b1509992a50379378b5948ebc5767309c10bf0903bd20",
-        "quotientPayloadsSha256": "f00f1c11c22c9e12de8efafbb15af414d2f6ce38c40b790fd9ae620796501ca9",
-        "quotientPhysicalChunksSha256": "f00f1c11c22c9e12de8efafbb15af414d2f6ce38c40b790fd9ae620796501ca9",
-        "transactionSha256": "1df984c2f339e16737a33b9179d9aecbe8b43a81d87db63da921e203b390fe85"
+        "transcriptHeaderSha256": "1226745bfad4049787c60d36791a341755e9a319ac0c0907c4b5f8a2b3f908e5",
+        "blockPayloadsSha256": "038e6bb9084da860e1d446d856799e1ffbe8a991a4191cbe12a9d57abb63c1ae",
+        "quotientPayloadsSha256": "329c1f03949618f9bf163e7c54ab289448ef0bae56ddd65a3acc2912a8900dc8",
+        "quotientPhysicalChunksSha256": "329c1f03949618f9bf163e7c54ab289448ef0bae56ddd65a3acc2912a8900dc8",
+        "transactionSha256": "1c58adbe2bd84b23887bf3a3decab392366a3c854685a32eca61395a0a711c34"
       },
       "rejectionFixtures": [
         {
@@ -269,6 +354,91 @@
         },
         {
           "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-factor",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-loader-source-input",
           "consensusRejected": true,
           "standardRejected": true
         },
@@ -449,30 +619,30 @@
         "msmContribution": false
       },
       "inputCount": 22,
-      "wireBytes": 89553,
-      "scriptBytes": 89357,
-      "feeSatoshis": 89553,
+      "wireBytes": 79178,
+      "scriptBytes": 78982,
+      "feeSatoshis": 79178,
       "exactOneSatPerByteFee": true,
       "standardRelaySize": true,
       "allConsensusInputsAccepted": true,
       "allStandardInputsAccepted": true,
       "wholeConsensusVerified": true,
       "wholeStandardVerified": true,
-      "consensusOperationCost": 69750806,
-      "standardOperationCost": 70123798,
-      "maxConsensusInputOperationCost": 6723633,
-      "maxStandardInputOperationCost": 6728369,
-      "maxRedeemBytes": 5071,
-      "maxUnlockingBytes": 8406,
-      "smallestDensityMargin": 4744,
+      "consensusOperationCost": 55076351,
+      "standardOperationCost": 55425663,
+      "maxConsensusInputOperationCost": 5819890,
+      "maxStandardInputOperationCost": 5824626,
+      "maxRedeemBytes": 2857,
+      "maxUnlockingBytes": 8399,
+      "smallestDensityMargin": 40714,
       "witnesses": {
         "proofStatementSha256": "6f151810888a1e2f43239acf5543b787a1e2cd63e909d06d1afa923f5644598d",
         "residueRootSha256": "795d7a10c342d30b510ffeec968101d145c25fed6899cd0f945572e4f6d14609",
-        "transcriptHeaderSha256": "e6b7e65ca4644d467dfd80a3c4ccb5016c62b282fe5eddcc1be7ef54a1c49764",
-        "blockPayloadsSha256": "879e7f88b463485469569227d4f7dd91559f1f6164903b47296084bde0d8c17f",
-        "quotientPayloadsSha256": "343bf308b41c6f9b3141b1b1f3a1c66c5fc4f1874b7b42c5789403e40f2f889d",
-        "quotientPhysicalChunksSha256": "343bf308b41c6f9b3141b1b1f3a1c66c5fc4f1874b7b42c5789403e40f2f889d",
-        "transactionSha256": "04192adda25175e2badba94d90c1ea13314996f53ee555fb316989e91fec7281"
+        "transcriptHeaderSha256": "c648a76d83946db13c1de2b7e2b201d47e0f0ccbaa7e58010713bfed601a30be",
+        "blockPayloadsSha256": "8e518cf160b21c72c61fc770d87d5d97f7741958c4ad9a5a69a02a510bf264d5",
+        "quotientPayloadsSha256": "e45007d255909ed4e870887950b1f9070212cbbea539176ef94a927869fa7416",
+        "quotientPhysicalChunksSha256": "e45007d255909ed4e870887950b1f9070212cbbea539176ef94a927869fa7416",
+        "transactionSha256": "ce2d075f80bb72890008cc1961774330906e0efbd362483a7c8cced5364c1084"
       },
       "rejectionFixtures": [
         {
@@ -482,6 +652,91 @@
         },
         {
           "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-factor",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-loader-source-input",
           "consensusRejected": true,
           "standardRejected": true
         },
@@ -662,30 +917,30 @@
         "msmContribution": true
       },
       "inputCount": 22,
-      "wireBytes": 89553,
-      "scriptBytes": 89357,
-      "feeSatoshis": 89553,
+      "wireBytes": 79178,
+      "scriptBytes": 78982,
+      "feeSatoshis": 79178,
       "exactOneSatPerByteFee": true,
       "standardRelaySize": true,
       "allConsensusInputsAccepted": true,
       "allStandardInputsAccepted": true,
       "wholeConsensusVerified": true,
       "wholeStandardVerified": true,
-      "consensusOperationCost": 67828196,
-      "standardOperationCost": 68201188,
-      "maxConsensusInputOperationCost": 6733134,
-      "maxStandardInputOperationCost": 6737870,
-      "maxRedeemBytes": 5071,
-      "maxUnlockingBytes": 8406,
-      "smallestDensityMargin": 5111,
+      "consensusOperationCost": 52998246,
+      "standardOperationCost": 53347558,
+      "maxConsensusInputOperationCost": 5819784,
+      "maxStandardInputOperationCost": 5824520,
+      "maxRedeemBytes": 2857,
+      "maxUnlockingBytes": 8399,
+      "smallestDensityMargin": 40839,
       "witnesses": {
         "proofStatementSha256": "6e447e2e59df0b861f9853ebff543a063c3905b3bbd5f3bdc53fbb9543d6d35d",
         "residueRootSha256": "d09d3eaaa4baf2e6a6c9720bb4943568b23ca61101cb90969b785d8d3b9add94",
-        "transcriptHeaderSha256": "b8ed3d82d8ae5215e6ce0449f944d20d92b4edfb94f3b1d2e5409e14740966d8",
-        "blockPayloadsSha256": "567b525ac693a3161f1b4da11ffbd4e7c21abfa8df902b82a1b23811654d12e1",
-        "quotientPayloadsSha256": "64c108f7a69e687d9129d4b919b9d3696b7f000a9f536d304bebb7909edbda11",
-        "quotientPhysicalChunksSha256": "64c108f7a69e687d9129d4b919b9d3696b7f000a9f536d304bebb7909edbda11",
-        "transactionSha256": "132357519759e0a40d67bd14e4055e4b17e9fca6739e552d050b36b505b60234"
+        "transcriptHeaderSha256": "59cfca69b50162440063110f09f3c161b53c5e241e01195fc7f3c6879bcc4b69",
+        "blockPayloadsSha256": "69d79c969c5cfcae2712a8c062f4f6696e5b7b8adba80016a6dbe9dd4537ea1f",
+        "quotientPayloadsSha256": "7542d930aaf413981fab37435d7c273ee657e9c4cc9bcff34f5646e37bb36eef",
+        "quotientPhysicalChunksSha256": "7542d930aaf413981fab37435d7c273ee657e9c4cc9bcff34f5646e37bb36eef",
+        "transactionSha256": "d66f4a85a84ce4245b859cacfdd13e8f3cdd21eb7f9a4a7fcf67d302d8b23968"
       },
       "rejectionFixtures": [
         {
@@ -695,6 +950,91 @@
         },
         {
           "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-factor",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-loader-source-input",
           "consensusRejected": true,
           "standardRejected": true
         },
@@ -875,30 +1215,30 @@
         "msmContribution": false
       },
       "inputCount": 22,
-      "wireBytes": 89553,
-      "scriptBytes": 89357,
-      "feeSatoshis": 89553,
+      "wireBytes": 79178,
+      "scriptBytes": 78982,
+      "feeSatoshis": 79178,
       "exactOneSatPerByteFee": true,
       "standardRelaySize": true,
       "allConsensusInputsAccepted": true,
       "allStandardInputsAccepted": true,
       "wholeConsensusVerified": true,
       "wholeStandardVerified": true,
-      "consensusOperationCost": 69493679,
-      "standardOperationCost": 69866671,
-      "maxConsensusInputOperationCost": 6721675,
-      "maxStandardInputOperationCost": 6726411,
-      "maxRedeemBytes": 5071,
-      "maxUnlockingBytes": 8406,
-      "smallestDensityMargin": 4893,
+      "consensusOperationCost": 54817884,
+      "standardOperationCost": 55167196,
+      "maxConsensusInputOperationCost": 5819678,
+      "maxStandardInputOperationCost": 5824414,
+      "maxRedeemBytes": 2857,
+      "maxUnlockingBytes": 8399,
+      "smallestDensityMargin": 41211,
       "witnesses": {
         "proofStatementSha256": "f709b3de376d828e1c57fbacd719b2313eeba11f3d545555b369274f67245be6",
         "residueRootSha256": "28f411c89c4dacbd67c1e7a69b6004c88eaea201c69e9c6890ee8eb6966fcae8",
-        "transcriptHeaderSha256": "2cdf52247eb706e4ef94224233d1d3c13d4e1db2977d2b14465b887635f051fc",
-        "blockPayloadsSha256": "44ad95beffe9128b97e7177e3b5f8811dd5e31d269ecc35db5b05082d43bbfe4",
-        "quotientPayloadsSha256": "0b3733dbca32102714ee852dcaff09affd73936139cc340d53484f5ae321cfab",
-        "quotientPhysicalChunksSha256": "0b3733dbca32102714ee852dcaff09affd73936139cc340d53484f5ae321cfab",
-        "transactionSha256": "ff061ecf72c74e22fd491728c6865f0b6122af8cbd3c5efb761355c7929214f1"
+        "transcriptHeaderSha256": "57ec3ea5d78ce48df3ae690ef909cd020931cd9d8bb4fc3b6dcb90e7fdefd001",
+        "blockPayloadsSha256": "45e6e6ed7372c5904f3d3e7224367e3c5987ce6536496098d17c04572703a986",
+        "quotientPayloadsSha256": "aa35cee3e0e9179b5bcfcb0700fed49df93900c0b72f79a936273e2c76b447f2",
+        "quotientPhysicalChunksSha256": "aa35cee3e0e9179b5bcfcb0700fed49df93900c0b72f79a936273e2c76b447f2",
+        "transactionSha256": "4f72eb9d8537a147adf9cfeecf3a341fbbeadfd36e7198df5ff7ae2dde76043a"
       },
       "rejectionFixtures": [
         {
@@ -908,6 +1248,91 @@
         },
         {
           "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-factor",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-loader-source-input",
           "consensusRejected": true,
           "standardRejected": true
         },
@@ -1088,30 +1513,30 @@
         "msmContribution": true
       },
       "inputCount": 22,
-      "wireBytes": 89553,
-      "scriptBytes": 89357,
-      "feeSatoshis": 89553,
+      "wireBytes": 79178,
+      "scriptBytes": 78982,
+      "feeSatoshis": 79178,
       "exactOneSatPerByteFee": true,
       "standardRelaySize": true,
       "allConsensusInputsAccepted": true,
       "allStandardInputsAccepted": true,
       "wholeConsensusVerified": true,
       "wholeStandardVerified": true,
-      "consensusOperationCost": 69798359,
-      "standardOperationCost": 70171351,
-      "maxConsensusInputOperationCost": 6733184,
-      "maxStandardInputOperationCost": 6737920,
-      "maxRedeemBytes": 5071,
-      "maxUnlockingBytes": 8406,
-      "smallestDensityMargin": 5075,
+      "consensusOperationCost": 55081462,
+      "standardOperationCost": 55430774,
+      "maxConsensusInputOperationCost": 5820084,
+      "maxStandardInputOperationCost": 5824820,
+      "maxRedeemBytes": 2857,
+      "maxUnlockingBytes": 8399,
+      "smallestDensityMargin": 40456,
       "witnesses": {
         "proofStatementSha256": "366cf38beb02ef83fb2d5a899da8e9fae59660aa814e3f14fdca4622e69a5b1e",
         "residueRootSha256": "6c3c55afb3c20a6159f2b4b1d39c3e98fd0cc6f5bd0e97079e4b972bf5d4085e",
-        "transcriptHeaderSha256": "075396c841a3fb1bab620a41a3cf7c8274eecde7bb0e5be593ce58da2a1e5fbd",
-        "blockPayloadsSha256": "34a38f6bbe27f5a4a0cb57c731c9874ad3dfc1648549992f604d63e47ff71325",
-        "quotientPayloadsSha256": "8ad5d3c0f664ebab319de4fa1f0861adde87801cd4ee15d3ae021d201d6c8908",
-        "quotientPhysicalChunksSha256": "8ad5d3c0f664ebab319de4fa1f0861adde87801cd4ee15d3ae021d201d6c8908",
-        "transactionSha256": "1c1f973d29026cb8fe7fe6851ade2a9be8a1ce5e17d46013d12d5bf06900e3b4"
+        "transcriptHeaderSha256": "762a2322595e020bbc5fc01ad4b6933878b2859833a86cbf37c3830c20e52739",
+        "blockPayloadsSha256": "2e09779a2c3d5bb556f51ad12702b7b0983350e507f1ccdfc4d0dad347eb8dae",
+        "quotientPayloadsSha256": "e3b5a47732deadc0e7d17ec1b417220068a8315ef03e8ffe75d0a6e048cdb538",
+        "quotientPhysicalChunksSha256": "e3b5a47732deadc0e7d17ec1b417220068a8315ef03e8ffe75d0a6e048cdb538",
+        "transactionSha256": "8b62db5d079b28709712e2a947c23aa05991f379ada544a5b2f069209be71f66"
       },
       "rejectionFixtures": [
         {
@@ -1121,6 +1546,91 @@
         },
         {
           "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-factor",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-loader-source-input",
           "consensusRejected": true,
           "standardRejected": true
         },
@@ -1301,30 +1811,30 @@
         "msmContribution": false
       },
       "inputCount": 22,
-      "wireBytes": 89553,
-      "scriptBytes": 89357,
-      "feeSatoshis": 89553,
+      "wireBytes": 79178,
+      "scriptBytes": 78982,
+      "feeSatoshis": 79178,
       "exactOneSatPerByteFee": true,
       "standardRelaySize": true,
       "allConsensusInputsAccepted": true,
       "allStandardInputsAccepted": true,
       "wholeConsensusVerified": true,
       "wholeStandardVerified": true,
-      "consensusOperationCost": 61867817,
-      "standardOperationCost": 62240809,
-      "maxConsensusInputOperationCost": 6124384,
-      "maxStandardInputOperationCost": 6129120,
-      "maxRedeemBytes": 5071,
-      "maxUnlockingBytes": 8406,
-      "smallestDensityMargin": 132021,
+      "consensusOperationCost": 50591646,
+      "standardOperationCost": 50940958,
+      "maxConsensusInputOperationCost": 5441973,
+      "maxStandardInputOperationCost": 5446709,
+      "maxRedeemBytes": 2857,
+      "maxUnlockingBytes": 8399,
+      "smallestDensityMargin": 139182,
       "witnesses": {
         "proofStatementSha256": "5bf67a92cc88dd688988af82b4bbcee9b8b07c9e651e04f36f1bb6cba105818a",
         "residueRootSha256": "c21b4d3a04992a67e56efa8c009672b8859ff18f3888b3984da7cc84e10f5ac7",
-        "transcriptHeaderSha256": "e1bf191d08e5269857b286bb109a14a16b7d3be3716cd81a7474fef53e0afc13",
-        "blockPayloadsSha256": "76feb9a2a0cc892bc28248d79d6d3509889da4f810e4786b91971e5f715b8412",
-        "quotientPayloadsSha256": "3f5be2255c6ebe92ef86f20744adca9fa1a3bb466261dae76d99ebe59494a3d6",
-        "quotientPhysicalChunksSha256": "3f5be2255c6ebe92ef86f20744adca9fa1a3bb466261dae76d99ebe59494a3d6",
-        "transactionSha256": "125e6ef11ea31d8d55ee235d6842c3e303aa160a4aca633f22a7102d87f3a15b"
+        "transcriptHeaderSha256": "354593a4e9f850da4a9fd875f0862efce7eaa372ecb4543ec2fc3f703fd5b408",
+        "blockPayloadsSha256": "5f7fb3e1851ea8330283c192406430695bd0207fcf59fc417150eeb1ff134105",
+        "quotientPayloadsSha256": "9ab3583912629bbbfb1f9eee546a4892cb1dee1ab5dd3ea114f3a5b6164a8136",
+        "quotientPhysicalChunksSha256": "9ab3583912629bbbfb1f9eee546a4892cb1dee1ab5dd3ea114f3a5b6164a8136",
+        "transactionSha256": "9459f7b7467c12746d1941e0d654b6ab82c821a06ebcd6454132e4768ecfd3ca"
       },
       "rejectionFixtures": [
         {
@@ -1334,6 +1844,91 @@
         },
         {
           "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-factor",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-loader-source-input",
           "consensusRejected": true,
           "standardRejected": true
         },
@@ -1514,30 +2109,30 @@
         "msmContribution": false
       },
       "inputCount": 22,
-      "wireBytes": 89553,
-      "scriptBytes": 89357,
-      "feeSatoshis": 89553,
+      "wireBytes": 79178,
+      "scriptBytes": 78982,
+      "feeSatoshis": 79178,
       "exactOneSatPerByteFee": true,
       "standardRelaySize": true,
       "allConsensusInputsAccepted": true,
       "allStandardInputsAccepted": true,
       "wholeConsensusVerified": true,
       "wholeStandardVerified": true,
-      "consensusOperationCost": 61960465,
-      "standardOperationCost": 62333457,
-      "maxConsensusInputOperationCost": 6123588,
-      "maxStandardInputOperationCost": 6128324,
-      "maxRedeemBytes": 5071,
-      "maxUnlockingBytes": 8406,
-      "smallestDensityMargin": 37033,
+      "consensusOperationCost": 50690860,
+      "standardOperationCost": 51040172,
+      "maxConsensusInputOperationCost": 5441565,
+      "maxStandardInputOperationCost": 5446301,
+      "maxRedeemBytes": 2857,
+      "maxUnlockingBytes": 8399,
+      "smallestDensityMargin": 84406,
       "witnesses": {
         "proofStatementSha256": "7b44d6b61f8250eebd8f903e6da8841937b5e11ac242dbf34670fb2808b66959",
         "residueRootSha256": "c21b4d3a04992a67e56efa8c009672b8859ff18f3888b3984da7cc84e10f5ac7",
-        "transcriptHeaderSha256": "713a079600d9f717a3d160082aefcc306bf9b5880a841db17539ae9058a1717d",
-        "blockPayloadsSha256": "03b2fc449fcc50ab88d2641b4d7b57e976d1c10ec746541ab9c14c9e65cc685b",
-        "quotientPayloadsSha256": "bf77b47ae3183a87245b09e7995bb3d19e14bfe26129def00a8ba26dfcd29db9",
-        "quotientPhysicalChunksSha256": "bf77b47ae3183a87245b09e7995bb3d19e14bfe26129def00a8ba26dfcd29db9",
-        "transactionSha256": "73dd0669437cd16886b4419ac3b1e8ea57e196514fd003afe73d7cf22e7b4a82"
+        "transcriptHeaderSha256": "d491672583933dbe14a1db2df654c624753f38bfe1c3d17f1aec81436626fef5",
+        "blockPayloadsSha256": "717eeda310e5993fbefe8129c8f257dbd5a6cb061774cef31d3e280a544d8b2b",
+        "quotientPayloadsSha256": "042fc797e8da93266bd6c40b7c95dbef29683128c67242a11b6f447295fb64b3",
+        "quotientPhysicalChunksSha256": "042fc797e8da93266bd6c40b7c95dbef29683128c67242a11b6f447295fb64b3",
+        "transactionSha256": "596e86a83a8da3dac04e8b29850fd6aba2d751d432cf79c8350cf82159bc40e8"
       },
       "rejectionFixtures": [
         {
@@ -1547,6 +2142,91 @@
         },
         {
           "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-factor",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-loader-source-input",
           "consensusRejected": true,
           "standardRejected": true
         },
@@ -1727,30 +2407,30 @@
         "msmContribution": false
       },
       "inputCount": 22,
-      "wireBytes": 89553,
-      "scriptBytes": 89357,
-      "feeSatoshis": 89553,
+      "wireBytes": 79178,
+      "scriptBytes": 78982,
+      "feeSatoshis": 79178,
       "exactOneSatPerByteFee": true,
       "standardRelaySize": true,
       "allConsensusInputsAccepted": true,
       "allStandardInputsAccepted": true,
       "wholeConsensusVerified": true,
       "wholeStandardVerified": true,
-      "consensusOperationCost": 61930325,
-      "standardOperationCost": 62303317,
-      "maxConsensusInputOperationCost": 6116427,
-      "maxStandardInputOperationCost": 6121163,
-      "maxRedeemBytes": 5071,
-      "maxUnlockingBytes": 8406,
-      "smallestDensityMargin": 37136,
+      "consensusOperationCost": 50649956,
+      "standardOperationCost": 50999268,
+      "maxConsensusInputOperationCost": 5432202,
+      "maxStandardInputOperationCost": 5436938,
+      "maxRedeemBytes": 2857,
+      "maxUnlockingBytes": 8399,
+      "smallestDensityMargin": 84509,
       "witnesses": {
         "proofStatementSha256": "c37661488d1922cf2f83a70ccded63a1f0e9a4f3b8bc8273f21d991e12bbcae5",
         "residueRootSha256": "d3b076e9471fe95f727b0e84242640260dc06b5c8b1806e3aa869458306d7654",
-        "transcriptHeaderSha256": "8311d6ffda4cffe69f931a70fe94340cba4d7da98751b4adab33035c5547cbb7",
-        "blockPayloadsSha256": "29c6b883146825c33dc3a72292eddcba87a15ffd10c28a3ebe683ae266eef32a",
-        "quotientPayloadsSha256": "005315e3e39916db19440249a7c086695a3131cf3f6920aa961fcfa408794f31",
-        "quotientPhysicalChunksSha256": "005315e3e39916db19440249a7c086695a3131cf3f6920aa961fcfa408794f31",
-        "transactionSha256": "7d78513b56c66121b7bca5b37d9909cebf436900283f847f0d210c84b1137a90"
+        "transcriptHeaderSha256": "ffed30e5b91979167e704207aed59d24d7389592fed6979901578a12bb7a16a0",
+        "blockPayloadsSha256": "d648964be235359f1d9e54361cbfd94d0a353213f854b6e742c0aaeaf95bbb8f",
+        "quotientPayloadsSha256": "4a7c90b1fade358b245333f44c7f29b5a88bbd6069421d29bd11fa551372ff38",
+        "quotientPhysicalChunksSha256": "4a7c90b1fade358b245333f44c7f29b5a88bbd6069421d29bd11fa551372ff38",
+        "transactionSha256": "43c1fe9f7b3811464e346fa390c7ddd5249ff0597eb5cc599ba0bf3a81a6df03"
       },
       "rejectionFixtures": [
         {
@@ -1760,6 +2440,91 @@
         },
         {
           "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-factor",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-loader-source-input",
           "consensusRejected": true,
           "standardRejected": true
         },
@@ -1940,30 +2705,30 @@
         "msmContribution": false
       },
       "inputCount": 22,
-      "wireBytes": 89553,
-      "scriptBytes": 89357,
-      "feeSatoshis": 89553,
+      "wireBytes": 79178,
+      "scriptBytes": 78982,
+      "feeSatoshis": 79178,
       "exactOneSatPerByteFee": true,
       "standardRelaySize": true,
       "allConsensusInputsAccepted": true,
       "allStandardInputsAccepted": true,
       "wholeConsensusVerified": true,
       "wholeStandardVerified": true,
-      "consensusOperationCost": 57653943,
-      "standardOperationCost": 58026935,
-      "maxConsensusInputOperationCost": 5582101,
-      "maxStandardInputOperationCost": 5586837,
-      "maxRedeemBytes": 5071,
-      "maxUnlockingBytes": 8406,
-      "smallestDensityMargin": 164178,
+      "consensusOperationCost": 49960645,
+      "standardOperationCost": 50309957,
+      "maxConsensusInputOperationCost": 5075636,
+      "maxStandardInputOperationCost": 5080372,
+      "maxRedeemBytes": 2857,
+      "maxUnlockingBytes": 8399,
+      "smallestDensityMargin": 212125,
       "witnesses": {
         "proofStatementSha256": "8b6bfd3c797dcd9e6e8de7957e75edd22e69d94be35277b3e30a0ad4d939222d",
         "residueRootSha256": "46a596a5dde9b8e3999c71c504b8a9a5e45ddf96712de0234c48d8a0e0aa146b",
-        "transcriptHeaderSha256": "67f2abc0aa3681b27f2ad1f2dd8a419aa8bc58de4bf5e7040e05ba4e50245f8e",
-        "blockPayloadsSha256": "eca39a64c2d77c1941bee989174f152cc6436acec01418c26363038215b377d6",
-        "quotientPayloadsSha256": "ffa9d631ea9cb1271dd3bb20f2e517edd3950f298f29307d0c305c79b04e6369",
-        "quotientPhysicalChunksSha256": "ffa9d631ea9cb1271dd3bb20f2e517edd3950f298f29307d0c305c79b04e6369",
-        "transactionSha256": "ba42d2762edb6bd190274ad40846e04e8aaff30aca31b691f66e5f2d5e22c2cb"
+        "transcriptHeaderSha256": "c4b4f3482d5ee829107841796f4b090233796537391b51575c657e53703a05b5",
+        "blockPayloadsSha256": "2fa4b961cd14ad2b8b4116d4057d5fef03508baa3b0d0e86647d4d4723f1bfad",
+        "quotientPayloadsSha256": "5f560a776cc0de1546663ea1e7df2bb2f06e1cff17150fd8cea869e04fce8003",
+        "quotientPhysicalChunksSha256": "5f560a776cc0de1546663ea1e7df2bb2f06e1cff17150fd8cea869e04fce8003",
+        "transactionSha256": "0d22bbef3c6ef87358d06a421e0e6d338efa5c830f53a324dac2f4bde7e02c42"
       },
       "rejectionFixtures": [
         {
@@ -1973,6 +2738,91 @@
         },
         {
           "name": "changed-template-extra-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-byte",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-factor",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-path",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-first-PIC-helper-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-start",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-slice-end",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-function-id",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-arithmetic-loader-source-input",
+          "consensusRejected": true,
+          "standardRejected": true
+        },
+        {
+          "name": "changed-template-first-arithmetic-loader-source-input",
           "consensusRejected": true,
           "standardRejected": true
         },
@@ -2136,437 +2986,422 @@
   ],
   "identicalLockingBytecodes": true,
   "lockingBytecodeCount": 22,
-  "lockingSetSha256": "4cd6f93829da3708513aa61d408c0b2bd4bba851ba31abefaad573b82c1d0284",
-  "cacheSha256": "8544c835d36af1148a49f05f003e8a7c05b4f7ae645032774a0aa5f9ffb0f423",
-  "cacheGlobalRoot": "b64e1bdd14a1d88d7448b23f654b37e369bda13e1612d97f4c78b0b447ba1911",
-  "regularDensityPadding": {
-    "3": 60,
-    "5": 36,
-    "6": 41,
-    "7": 49,
-    "8": 31,
-    "9": 39,
-    "10": 41,
-    "11": 49,
-    "12": 41,
-    "13": 49,
-    "14": 50,
-    "16": 26,
-    "17": 46,
-    "18": 47,
-    "19": 55
-  },
-  "coordinatorDensityPadding": 129,
-  "picBlock2DensityPadding": 116,
-  "picBlock4DensityPadding": 40,
+  "lockingSetSha256": "4d7e68150d02a5f170cb3845bd117fed6af903ad8cddce16a132a2d8d70e51b3",
+  "cacheSha256": "79f150d0090db38e04270d4091b9944c29a0d2bddf249fb910f6947ecd4db0a8",
+  "cacheGlobalRoot": "0dad7c2f1bf344d76ba271c584a9d21f2bd5440987e9e71187e2b36c64c667aa",
+  "regularDensityPadding": {},
+  "coordinatorDensityPadding": 0,
+  "picBlock2DensityPadding": 0,
+  "picBlock4DensityPadding": 0,
   "templateFactorDensityPadding": 0,
-  "templateTailDensityPadding": 41,
+  "templateTailDensityPadding": 0,
+  "templateTerminalDensityPadding": 0,
   "quotientTailCoefficients": 22,
-  "maximumWireBytes": 89553,
-  "maximumScriptBytes": 89357,
-  "minimumRelayMarginBytes": 10447,
-  "minimumDensityMargin": 4744,
-  "maximumConsensusOperationCost": 69798359,
-  "maximumStandardOperationCost": 70171351,
-  "maximumConsensusInputOperationCost": 6733184,
-  "maximumStandardInputOperationCost": 6737920,
-  "maximumRedeemBytes": 5071,
-  "maximumUnlockingBytes": 8406,
+  "maximumWireBytes": 79178,
+  "maximumScriptBytes": 78982,
+  "minimumRelayMarginBytes": 20822,
+  "minimumDensityMargin": 40456,
+  "maximumConsensusOperationCost": 55081462,
+  "maximumStandardOperationCost": 55430774,
+  "maximumConsensusInputOperationCost": 5820192,
+  "maximumStandardInputOperationCost": 5824928,
+  "maximumRedeemBytes": 2857,
+  "maximumUnlockingBytes": 8399,
   "perInputWorst": [
     {
       "index": 0,
       "role": "coordinator-template-classes",
-      "unlockingBytes": 5944,
-      "redeemBytes": 5071,
+      "unlockingBytes": 3702,
+      "redeemBytes": 2829,
       "worstConsensus": {
         "fixture": "dense",
-        "operationCost": 4583064
+        "operationCost": 2777334
       },
       "worstStandard": {
         "fixture": "dense",
-        "operationCost": 4783256
+        "operationCost": 2942198
       },
       "smallestDensityMargin": {
         "fixture": "dense",
-        "margin": 4744
+        "margin": 52202
       }
     },
     {
       "index": 1,
       "role": "block-0-template-First",
-      "unlockingBytes": 4960,
-      "redeemBytes": 2695,
+      "unlockingBytes": 4387,
+      "redeemBytes": 2122,
       "worstConsensus": {
-        "fixture": "proof1",
-        "operationCost": 3323589
+        "fixture": "zero",
+        "operationCost": 3450811
       },
       "worstStandard": {
-        "fixture": "proof1",
-        "operationCost": 3331269
+        "fixture": "zero",
+        "operationCost": 3476155
       },
       "smallestDensityMargin": {
-        "fixture": "proof1",
-        "margin": 669531
+        "fixture": "zero",
+        "margin": 66245
       }
     },
     {
       "index": 2,
       "role": "block-1-template-AdditionTail",
-      "unlockingBytes": 5111,
-      "redeemBytes": 3423,
+      "unlockingBytes": 4447,
+      "redeemBytes": 2759,
       "worstConsensus": {
-        "fixture": "msm-identity",
-        "operationCost": 4073297
+        "fixture": "max",
+        "operationCost": 3369142
       },
       "worstStandard": {
-        "fixture": "msm-identity",
-        "operationCost": 4101329
+        "fixture": "max",
+        "operationCost": 3399990
       },
       "smallestDensityMargin": {
-        "fixture": "msm-identity",
-        "margin": 20271
+        "fixture": "max",
+        "margin": 190410
       }
     },
     {
       "index": 3,
       "role": "block-2-template-Regular",
-      "unlockingBytes": 6452,
-      "redeemBytes": 3452,
+      "unlockingBytes": 5026,
+      "redeemBytes": 2218,
       "worstConsensus": {
-        "fixture": "proof1",
-        "operationCost": 5125964
+        "fixture": "committed",
+        "operationCost": 3750870
       },
       "worstStandard": {
-        "fixture": "proof1",
-        "operationCost": 5172940
+        "fixture": "committed",
+        "operationCost": 3784918
       },
       "smallestDensityMargin": {
-        "fixture": "proof1",
-        "margin": 21460
+        "fixture": "committed",
+        "margin": 268682
       }
     },
     {
       "index": 4,
       "role": "block-3-template-Regular",
-      "unlockingBytes": 3119,
-      "redeemBytes": 120,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
         "fixture": "msm-identity",
-        "operationCost": 2506768
+        "operationCost": 1919477
       },
       "worstStandard": {
         "fixture": "msm-identity",
-        "operationCost": 2508560
+        "operationCost": 1921141
       },
       "smallestDensityMargin": {
         "fixture": "msm-identity",
-        "margin": 19440
+        "margin": 404459
       }
     },
     {
       "index": 5,
       "role": "block-4-template-AdditionTail",
-      "unlockingBytes": 8406,
-      "redeemBytes": 1435,
+      "unlockingBytes": 8399,
+      "redeemBytes": 1428,
       "worstConsensus": {
-        "fixture": "msm-identity",
-        "operationCost": 6733184
+        "fixture": "committed",
+        "operationCost": 5820192
       },
       "worstStandard": {
-        "fixture": "msm-identity",
-        "operationCost": 6737920
+        "fixture": "committed",
+        "operationCost": 5824928
       },
       "smallestDensityMargin": {
-        "fixture": "msm-identity",
-        "margin": 19680
+        "fixture": "committed",
+        "margin": 927072
       }
     },
     {
       "index": 6,
       "role": "block-5-template-Regular",
-      "unlockingBytes": 3095,
-      "redeemBytes": 96,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
-        "fixture": "msm-identity",
-        "operationCost": 2488598
+        "fixture": "max",
+        "operationCost": 1911973
       },
       "worstStandard": {
-        "fixture": "msm-identity",
-        "operationCost": 2490262
+        "fixture": "max",
+        "operationCost": 1913637
       },
       "smallestDensityMargin": {
-        "fixture": "msm-identity",
-        "margin": 18538
+        "fixture": "max",
+        "margin": 411963
       }
     },
     {
       "index": 7,
       "role": "block-6-template-Regular",
-      "unlockingBytes": 3100,
-      "redeemBytes": 101,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
         "fixture": "msm-identity",
-        "operationCost": 2491673
+        "operationCost": 1910335
       },
       "worstStandard": {
         "fixture": "msm-identity",
-        "operationCost": 2493337
+        "operationCost": 1911999
       },
       "smallestDensityMargin": {
         "fixture": "msm-identity",
-        "margin": 19463
+        "margin": 413601
       }
     },
     {
       "index": 8,
       "role": "block-7-template-Regular",
-      "unlockingBytes": 3108,
-      "redeemBytes": 109,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
         "fixture": "msm-identity",
-        "operationCost": 2498734
+        "operationCost": 1916984
       },
       "worstStandard": {
         "fixture": "msm-identity",
-        "operationCost": 2500398
+        "operationCost": 1918648
       },
       "smallestDensityMargin": {
         "fixture": "msm-identity",
-        "margin": 18802
+        "margin": 406952
       }
     },
     {
       "index": 9,
       "role": "block-8-template-Regular",
-      "unlockingBytes": 3090,
-      "redeemBytes": 91,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
         "fixture": "msm-identity",
-        "operationCost": 2483661
+        "operationCost": 1902393
       },
       "worstStandard": {
         "fixture": "msm-identity",
-        "operationCost": 2485325
+        "operationCost": 1904057
       },
       "smallestDensityMargin": {
         "fixture": "msm-identity",
-        "margin": 19475
+        "margin": 421543
       }
     },
     {
       "index": 10,
       "role": "block-9-template-Regular",
-      "unlockingBytes": 3098,
-      "redeemBytes": 99,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
-        "fixture": "msm-identity",
-        "operationCost": 2490502
+        "fixture": "max",
+        "operationCost": 1908845
       },
       "worstStandard": {
-        "fixture": "msm-identity",
-        "operationCost": 2492166
+        "fixture": "max",
+        "operationCost": 1910509
       },
       "smallestDensityMargin": {
-        "fixture": "msm-identity",
-        "margin": 19034
+        "fixture": "max",
+        "margin": 415091
       }
     },
     {
       "index": 11,
       "role": "block-10-template-Regular",
-      "unlockingBytes": 3100,
-      "redeemBytes": 101,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
-        "fixture": "msm-identity",
-        "operationCost": 2491925
+        "fixture": "max",
+        "operationCost": 1910067
       },
       "worstStandard": {
-        "fixture": "msm-identity",
-        "operationCost": 2493589
+        "fixture": "max",
+        "operationCost": 1911731
       },
       "smallestDensityMargin": {
-        "fixture": "msm-identity",
-        "margin": 19211
+        "fixture": "max",
+        "margin": 413869
       }
     },
     {
       "index": 12,
       "role": "block-11-template-Regular",
-      "unlockingBytes": 3108,
-      "redeemBytes": 109,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
-        "fixture": "msm-identity",
-        "operationCost": 2497950
+        "fixture": "max",
+        "operationCost": 1916480
       },
       "worstStandard": {
-        "fixture": "msm-identity",
-        "operationCost": 2499614
+        "fixture": "max",
+        "operationCost": 1918144
       },
       "smallestDensityMargin": {
-        "fixture": "msm-identity",
-        "margin": 19586
+        "fixture": "max",
+        "margin": 407456
       }
     },
     {
       "index": 13,
       "role": "block-12-template-Regular",
-      "unlockingBytes": 3100,
-      "redeemBytes": 101,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
         "fixture": "msm-identity",
-        "operationCost": 2491763
+        "operationCost": 1910514
       },
       "worstStandard": {
         "fixture": "msm-identity",
-        "operationCost": 2493427
+        "operationCost": 1912178
       },
       "smallestDensityMargin": {
         "fixture": "msm-identity",
-        "margin": 19373
+        "margin": 413422
       }
     },
     {
       "index": 14,
       "role": "block-13-template-Regular",
-      "unlockingBytes": 3108,
-      "redeemBytes": 109,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
         "fixture": "msm-identity",
-        "operationCost": 2498393
+        "operationCost": 1917044
       },
       "worstStandard": {
         "fixture": "msm-identity",
-        "operationCost": 2500057
+        "operationCost": 1918708
       },
       "smallestDensityMargin": {
         "fixture": "msm-identity",
-        "margin": 19143
+        "margin": 406892
       }
     },
     {
       "index": 15,
       "role": "block-14-template-Regular",
-      "unlockingBytes": 3109,
-      "redeemBytes": 110,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
-        "fixture": "msm-identity",
-        "operationCost": 2498700
+        "fixture": "max",
+        "operationCost": 1917878
       },
       "worstStandard": {
-        "fixture": "msm-identity",
-        "operationCost": 2500364
+        "fixture": "max",
+        "operationCost": 1919542
       },
       "smallestDensityMargin": {
-        "fixture": "msm-identity",
-        "margin": 19636
+        "fixture": "max",
+        "margin": 406058
       }
     },
     {
       "index": 16,
       "role": "block-15-template-AdditionMiddle",
-      "unlockingBytes": 5605,
-      "redeemBytes": 2569,
+      "unlockingBytes": 5001,
+      "redeemBytes": 1965,
       "worstConsensus": {
-        "fixture": "msm-identity",
-        "operationCost": 4259755
+        "fixture": "committed",
+        "operationCost": 3852711
       },
       "worstStandard": {
-        "fixture": "msm-identity",
-        "operationCost": 4286123
+        "fixture": "committed",
+        "operationCost": 3886631
       },
       "smallestDensityMargin": {
-        "fixture": "msm-identity",
-        "margin": 230677
+        "fixture": "committed",
+        "margin": 146969
       }
     },
     {
       "index": 17,
       "role": "block-16-template-Regular",
-      "unlockingBytes": 3085,
-      "redeemBytes": 86,
+      "unlockingBytes": 2866,
+      "redeemBytes": 60,
       "worstConsensus": {
         "fixture": "msm-identity",
-        "operationCost": 2480201
+        "operationCost": 1901163
       },
       "worstStandard": {
         "fixture": "msm-identity",
-        "operationCost": 2481865
+        "operationCost": 1902827
       },
       "smallestDensityMargin": {
         "fixture": "msm-identity",
-        "margin": 18935
+        "margin": 422773
       }
     },
     {
       "index": 18,
       "role": "block-17-template-Regular",
-      "unlockingBytes": 3106,
-      "redeemBytes": 107,
+      "unlockingBytes": 2867,
+      "redeemBytes": 61,
       "worstConsensus": {
-        "fixture": "msm-identity",
-        "operationCost": 2496391
+        "fixture": "dense",
+        "operationCost": 1914711
       },
       "worstStandard": {
-        "fixture": "msm-identity",
-        "operationCost": 2498055
+        "fixture": "dense",
+        "operationCost": 1916375
       },
       "smallestDensityMargin": {
-        "fixture": "msm-identity",
-        "margin": 19545
+        "fixture": "dense",
+        "margin": 410025
       }
     },
     {
       "index": 19,
       "role": "block-18-template-Regular",
-      "unlockingBytes": 3107,
-      "redeemBytes": 108,
+      "unlockingBytes": 2867,
+      "redeemBytes": 61,
       "worstConsensus": {
         "fixture": "msm-identity",
-        "operationCost": 2497943
+        "operationCost": 1916509
       },
       "worstStandard": {
         "fixture": "msm-identity",
-        "operationCost": 2499607
+        "operationCost": 1918173
       },
       "smallestDensityMargin": {
         "fixture": "msm-identity",
-        "margin": 18793
+        "margin": 408227
       }
     },
     {
       "index": 20,
       "role": "block-19-template-Regular",
-      "unlockingBytes": 3115,
-      "redeemBytes": 116,
+      "unlockingBytes": 2867,
+      "redeemBytes": 61,
       "worstConsensus": {
         "fixture": "msm-identity",
-        "operationCost": 2504372
+        "operationCost": 1922762
       },
       "worstStandard": {
         "fixture": "msm-identity",
-        "operationCost": 2506036
+        "operationCost": 1924426
       },
       "smallestDensityMargin": {
         "fixture": "msm-identity",
-        "margin": 18764
+        "margin": 401974
       }
     },
     {
       "index": 21,
       "role": "block-20-template-Terminal",
-      "unlockingBytes": 5561,
-      "redeemBytes": 4161,
+      "unlockingBytes": 4257,
+      "redeemBytes": 2857,
       "worstConsensus": {
-        "fixture": "zero",
-        "operationCost": 4284184
+        "fixture": "msm-identity",
+        "operationCost": 3367352
       },
       "worstStandard": {
-        "fixture": "zero",
-        "operationCost": 4318104
+        "fixture": "msm-identity",
+        "operationCost": 3397944
       },
       "smallestDensityMargin": {
-        "fixture": "zero",
-        "margin": 163496
+        "fixture": "msm-identity",
+        "margin": 40456
       }
     }
   ]

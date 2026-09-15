@@ -16,6 +16,7 @@ import {
   createVirtualMachine,
   createVirtualMachineBch2026,
   decodeAuthenticationInstructions,
+  encodeAuthenticationInstructions,
   encodeDataPush,
   encodeLockingBytecodeP2sh32,
   encodeTransactionBch,
@@ -28,6 +29,7 @@ import {
   QSPLIT_ATE_LOOP_DIGITS as ATE_LOOP_DIGITS,
   B_IDENTITY_SUBSTITUTE,
   Fp,
+  Fp2,
   Fp6,
   Fp12,
   qsplitMillerBatchOps as millerBatchOps,
@@ -373,12 +375,17 @@ const regularPicCarrierBlocks = [2, 3, ...Array.from({ length: 10 }, (_, index) 
   16, 17, 18, 19];
 const regularPicWindowBlocks = regularPicCarrierBlocks.flatMap((blockIndex) => [blockIndex, blockIndex]);
 const regularPicRemainingSquares = regularPicWindowBlocks.map((blockIndex) => 3 * (20 - blockIndex));
+const PIC_PROJECTIVE_RECORDS = PIC32_RECORDS && picCache.version === 5;
 const PIC_FLAT_RECORDS = PIC32_RECORDS && picCache.version === 4;
+const PIC_AUTHENTICATED_LIMBS = PIC_PROJECTIVE_RECORDS ? 4 : 6;
+const PIC_DOMAIN = PIC_PROJECTIVE_RECORDS ? 'BLSGTP1' : PIC_FLAT_RECORDS ? 'BLSGTF1' : 'BLSGTR1';
 assert(!PIC32_RECORDS || (
-  (picCache.version === 3 || picCache.version === 4) &&
+  (picCache.version === 3 || picCache.version === 4 || picCache.version === 5) &&
   picCache.layout === 'uniform-regular' &&
-  picCache.merkleDomain === (PIC_FLAT_RECORDS ? 'BLSGTF1' : 'BLSGTR1') &&
-  picCache.recordEncoding === (PIC_FLAT_RECORDS
+  picCache.merkleDomain === PIC_DOMAIN &&
+  picCache.recordEncoding === (PIC_PROJECTIVE_RECORDS
+    ? 'canonical-projective-fp2-quadric'
+    : PIC_FLAT_RECORDS
     ? 'canonical-conjugated-flat-fp6'
     : 'canonical-standard-fp6') &&
   picCache.carrierBlocks.join(',') === regularPicCarrierBlocks.join(',') &&
@@ -389,27 +396,62 @@ const picRecords = picFixtureRecords.map((record) => ({
   index: record.index,
   carrierBlock: record.carrierBlock,
   remainingSquares: record.remainingSquares,
-  authenticatedLimbs: (PIC_FLAT_RECORDS ? record.factor : record.u).map(BigInt),
-  terminalLimbs: (PIC_FLAT_RECORDS ? record.terminalFactor : record.terminalU).map(BigInt),
+  authenticatedLimbs: (PIC_PROJECTIVE_RECORDS ? record.parameters : PIC_FLAT_RECORDS ? record.factor : record.u).map(BigInt),
+  terminalLimbs: (PIC_PROJECTIVE_RECORDS || PIC_FLAT_RECORDS ? record.terminalFactor : record.terminalU).map(BigInt),
   path: Uint8Array.from(Buffer.from(record.path, 'hex')),
 })) ?? [];
 assert(!PIC32_RECORDS || picRecords.length === 32, 'PIC record count changed');
 assert(!PIC32_RECORDS || picRecords.every((record, window) =>
-  record.authenticatedLimbs.length === 6 && record.path.length === 512 &&
+  record.authenticatedLimbs.length === PIC_AUTHENTICATED_LIMBS && record.path.length === 512 &&
     record.terminalLimbs.length === 6 &&
     record.authenticatedLimbs.every((limb) => limb >= 0n && limb < P) &&
     record.terminalLimbs.every((limb) => limb >= 0n && limb < P) &&
     record.carrierBlock === regularPicWindowBlocks[window] &&
     record.remainingSquares === regularPicRemainingSquares[window]),
 'PIC record encoding changed');
+// Decode the authenticated quadric parameters into the exact scaled polynomial
+// factor used by the worker. Multiplication by 9*xi removes runtime inversions
+// and preserves the quotient class; the field components must be flattened
+// after that scaling, before constructing the polynomial relation.
+const decodeProjectivePic = ([s0, s1, t0, t1]) => {
+  const s = Fp2.fromBigTuple([s0, s1]);
+  const t = Fp2.fromBigTuple([t0, t1]);
+  const xi = Fp2.fromBigTuple([1n, 1n]);
+  const three = Fp2.fromBigTuple([3n, 0n]);
+  const nine = Fp2.fromBigTuple([9n, 0n]);
+  const threeT = Fp2.mul(three, t);
+  const h = Fp2.add(Fp2.sub(Fp2.mul(three, Fp2.sqr(s)), threeT),
+    Fp2.mul(xi, Fp2.sqr(t)));
+  const factor = Fp12.create({
+    c0: Fp6.create({
+      c0: Fp2.mul(Fp2.mul(nine, xi), s),
+      c1: Fp2.mul(Fp2.mul(three, xi), Fp2.add(h, threeT)),
+      c2: Fp2.add(Fp2.mul(xi, Fp2.sub(h, threeT)), nine),
+    }),
+    c1: Fp6.create({
+      c0: Fp2.ZERO,
+      c1: Fp2.mul(Fp2.mul(three, xi), h),
+      c2: Fp2.ZERO,
+    }),
+  });
+  assert(!Fp6.eql(factor.c0, Fp6.ZERO), 'projective PIC denominator is zero');
+  return factor;
+};
 picRecords.forEach((record) => {
-  if (PIC_FLAT_RECORDS) {
+  if (PIC_PROJECTIVE_RECORDS) {
+    record.factorValue = decodeProjectivePic(record.authenticatedLimbs);
+    record.terminalFactor = flatToFp6(record.terminalLimbs);
+  } else if (PIC_FLAT_RECORDS) {
     record.factor = record.authenticatedLimbs;
     record.terminalFactor = flatToFp6(record.terminalLimbs);
   } else {
     record.factor = fp6ToFlat(Fp6.neg(Fp6.fromBigSix(record.authenticatedLimbs)));
     record.terminalFactor = Fp6.neg(Fp6.fromBigSix(record.terminalLimbs));
   }
+  if (!PIC_PROJECTIVE_RECORDS) {
+    record.factorValue = Fp12.create({ c0: Fp6.ONE, c1: flatToFp6(record.factor) });
+  }
+  record.factorPair = pairFor(record.factorValue);
 });
 const picTerminalPreconjugateProduct = picRecords.reduce((product, record) => Fp12.mul(
   product,
@@ -530,6 +572,8 @@ if (PIC32_RECORDS) {
 } else if (SKIP_GAMMA) {
   liftRecordsByBlock[blockRanges.length - 1] = [{
     factor: fp6ToFlat(gammaTorusU),
+    factorValue: gammaTorusFactor,
+    factorPair: pairFor(gammaTorusFactor),
     payload: serializeLimbs(fp6ToFlat(gammaTorusU)),
     path: new Uint8Array(),
   }];
@@ -556,7 +600,7 @@ blockRanges.forEach((range, blockIndex) => {
   liftRecordsByBlock[blockIndex].forEach((record) => {
     liftedState = Fp12.mul(
       liftedState,
-      Fp12.create({ c0: Fp6.ONE, c1: flatToFp6(record.factor) }),
+      record.factorValue,
     );
   });
   boundaryCharts.push(canonicalChart(liftedState));
@@ -595,7 +639,7 @@ const blockRecords = blockRanges.map((range, blockIndex) => {
     `block ${blockIndex} split relation was not created`);
   const liftRecords = liftRecordsByBlock[blockIndex];
   liftRecords.forEach((record) => {
-    components = pairMultiply(components, [[1n], record.factor]);
+    components = pairMultiply(components, record.factorPair);
   });
   const relation = relationFor(components, boundaryCharts[blockIndex + 1]);
   const operations = trace.ops.slice(range.opLo, range.opHi);
@@ -688,12 +732,17 @@ const segmentDegreeCeiling = (operations, trailingFactorCount = 0) => {
   let maximumRelationDegree = Number.NEGATIVE_INFINITY;
   [0, 1].forEach((inputChart) => {
     let degrees = inputChart === 0 ? [0, 5] : [Number.NEGATIVE_INFINITY, 0];
-    [...operations, ...Array.from({ length: trailingFactorCount }, () => ({ t: 'factor' }))]
+    [...operations, ...Array.from({ length: trailingFactorCount }, () => ({ t: PIC_PROJECTIVE_RECORDS ? 'projective' : 'factor' }))]
       .forEach((operation) => {
         if (operation.t === 'sqr') {
           degrees = [
             Math.max(degreeSum(degrees[0], degrees[0]), degreeSum(degrees[1], degrees[1]) + 1),
             degreeSum(degrees[0], degrees[1]),
+          ];
+        } else if (operation.t === 'projective') {
+          degrees = [
+            Math.max(degreeSum(degrees[0], 5), degreeSum(degrees[1], 5)),
+            Math.max(degreeSum(degrees[0], 4), degreeSum(degrees[1], 5)),
           ];
         } else {
           degrees = [
@@ -1106,6 +1155,7 @@ const COMMON_SOURCE = `pragma cashscript ^0.14.0;
 function mAdd(int x, int y) returns (int) { return (x + y) % ${P}; }
 function mSub(int x, int y) returns (int) { return (x - y + ${P}) % ${P}; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${P}; }
+function mulAddFp(int x, int y, int z) returns (int) { return (x * y + z) % ${P}; }
 function mSqr(int x) returns (int) { return (x * x) % ${P}; }
 
 function r2Sub(int a0,int a1,int b0,int b1) returns (int,int) {
@@ -1115,40 +1165,37 @@ function r2Sc(int a0,int a1,int k) returns (int,int) {
     return mulFp(a0,k),mulFp(a1,k);
 }
 function r2Mul(int a0,int a1,int b0,int b1) returns (int,int) {
-    return mSub(mulFp(a0,b0),mulFp(a1,b1)),mAdd(mulFp(a0,b1),mulFp(a1,b0));
+    return mulAddFp(a0,b0,(${P}-a1)*b1),mulAddFp(a0,b1,a1*b0);
 }
 function r2Sqr(int a0,int a1) returns (int,int) {
-    return mulFp(mAdd(a0,a1),mSub(a0,a1)),mulFp(mAdd(a0,a0),a1);
+    return mulFp(a0+a1,a0+${P}-a1),mulFp(2*a0,a1);
 }
 
 function eval6(int c0,int c1,int c2,int c3,int c4,int c5,int a) returns (int) {
     int result = c5;
-    result = mAdd(mulFp(result,a),c4);
-    result = mAdd(mulFp(result,a),c3);
-    result = mAdd(mulFp(result,a),c2);
-    result = mAdd(mulFp(result,a),c1);
-    result = mAdd(mulFp(result,a),c0);
+    result = mulAddFp(result,a,c4);
+    result = mulAddFp(result,a,c3);
+    result = mulAddFp(result,a,c2);
+    result = mulAddFp(result,a,c1);
+    result = mulAddFp(result,a,c0);
     return result;
 }
 function pairSquareEval(int x,int y,int a) returns (int,int) {
-    return mAdd(mSqr(x),mulFp(a,mSqr(y))),mulFp(mAdd(x,x),y);
+    return mulAddFp(a*y,y,x*x),mulFp(2*x,y);
 }
 function pairMulEval(int x,int y,int t,int a) returns (int,int) {
-    return mAdd(x,mulFp(a,mulFp(y,t))),mAdd(y,mulFp(x,t));
+    return mulAddFp(a,mulFp(y,t),x),mulAddFp(x,t,y);
 }
 function lineEval(
     int x,int y,int d0a,int d0b,int ma,int mb,int u,int v,
     int a,int a2,int a4,int a5
 ) returns (int,int) {
-    int qa = mulFp(mSub(0,mAdd(d0a,d0b)),v);
-    int qb = mulFp(mSub(d0a,d0b),v);
-    int ra = mulFp(mAdd(ma,mb),u);
-    int rb = mulFp(mSub(mb,ma),u);
-    int t = mAdd(
-        mAdd(mulFp(mSub(qa,qb),a),mulFp(mSub(ra,rb),a2)),
-        mAdd(mulFp(qb,a4),mulFp(rb,a5))
-    );
-    return mAdd(x,mulFp(a,mulFp(y,t))),mAdd(y,mulFp(x,t));
+    // Expand the line coefficients before reducing. Added multiples of P keep
+    // the numerator nonnegative for canonical operands.
+    int t = mAdd(v*(d0a*(a4+2*${P} - 2*a)+(${P}-d0b)*a4),
+        u*(ma*(2*a2+${P}-a5)+mb*a5));
+    (int nextX,int nextY) = pairMulEval(x,y,t,a);
+    return nextX,nextY;
 }
 function pointDoubleAffine(
     int xa,int xb,int ya,int yb,int ma,int mb
@@ -1222,10 +1269,10 @@ const FUSED_QUOTIENT_INPUT_INDEX = FUSED_QUOTIENT_BLOCK_INDEX + 1;
 const FUSED_QUOTIENT_TAIL_BLOCK_INDEX = 15;
 const FUSED_QUOTIENT_TAIL_INPUT_INDEX = FUSED_QUOTIENT_TAIL_BLOCK_INDEX + 1;
 const TEMPLATE_TOTAL_INPUTS = 1 + blockPayloads.length;
-const rangeLine = (name) => `        require(within(${name},0,${P}));`;
-const declareLimb = (lines, name, blob, offset, requireRange = true) => {
+const rangeLine = (name, upperBound = P) => `        require(within(${name},0,${upperBound}));`;
+const declareLimb = (lines, name, blob, offset, requireRange = true, upperBound = P) => {
   lines.push(`        int ${name} = ${limbExpression(blob, offset)};`);
-  if (requireRange) lines.push(rangeLine(name));
+  if (requireRange) lines.push(rangeLine(name, upperBound));
 };
 const constantRelationPowerLines = (blockIndex) => {
   const exponent = relationStartExponent(blockIndex);
@@ -1284,6 +1331,25 @@ const templateRelationPowerLines = (members) => {
   ];
 };
 
+// Reuse the shared pair multiplication, then add x*(D-1) and y*(D-1).
+// fpComplement keeps both corrections nonnegative without another reduction.
+const PIC_PROJECTIVE_SOURCE = `function fpComplement(int value) returns (int) { return ${P}-value; }
+function applyCompressed(int s0,int s1,int t0,int t1,int x,int y,int a,int a2,int a4,int a5) returns (int,int) {
+    (int ss0,int ss1)=r2Sqr(s0,s1);
+    (int tt0,int tt1)=r2Sqr(t0,t1);
+    int h0=mAdd(3*ss0+3*fpComplement(t0),tt0+fpComplement(tt1));
+    int h1=mAdd(3*ss1+3*fpComplement(t1),tt0+tt1);
+    int a3=mulFp(a2,a);
+    int d=mAdd(18*fpComplement(s1)+(6*fpComplement(h1)+18*fpComplement(t1))*a
+        +(2*fpComplement(h1)+6*t1+9)*a2,
+        9*(s0+s1)*a3+3*(h0+h1+3*t0+3*t1)*a4
+        +(h0+h1+3*fpComplement(t0)+3*fpComplement(t1))*a5);
+    int n=mulFp(mulAddFp(3*(h0+h1),a3,6*fpComplement(h1)),a);
+    (int next0,int next1)=pairMulEval(x,y,n,a);
+    return mulAddFp(x,d,next0+fpComplement(x)),mulAddFp(y,d,next1+fpComplement(y));
+}
+`;
+
 const blockSource = (
   record,
   usePicFixedBlob = false,
@@ -1294,6 +1360,7 @@ const blockSource = (
   const needsRootEval = record.operations.some((op) => op.t === 'cf');
   const needsRoot = record.blockIndex === 0 || needsRootEval || record.terminalRelation !== undefined;
   const lines = [COMMON_SOURCE,
+    ...(PIC_PROJECTIVE_RECORDS && record.liftRecords.length > 0 ? [PIC_PROJECTIVE_SOURCE] : []),
     `contract D3TwoChartBlock${record.blockIndex}() {`,
     '    function spend(bytes evaluationBlob,bytes payload) {',
     `        require(this.activeInputIndex == ${record.blockIndex + 1});`,
@@ -1328,8 +1395,10 @@ const blockSource = (
     '        if (bIdentity==1) { pairP0u=0; pairP0v=0; }',
   );
 
+  // End prime reuse at the shared slope prefix so template-specific parsing keeps its stack layout.
+  lines.push(`        int fieldPrime=${P};`);
   Array.from({ length: 6 }, (_, index) => `outU${index}`).forEach((name, index) => {
-    declareLimb(lines, name, 'payload', record.layout.outputU + index * W);
+    declareLimb(lines, name, 'payload', record.layout.outputU + index * W, true, 'fieldPrime');
   });
   lines.push(`        int outFlag = ${byteExpression('payload', record.layout.outputFlag)};`);
   lines.push('        require(outFlag == 0 || outFlag == 1);');
@@ -1342,12 +1411,15 @@ const blockSource = (
     });
   }
   ['outRxa', 'outRxb', 'outRya', 'outRyb'].forEach((name, index) => {
-    declareLimb(lines, name, 'payload', record.layout.outputR + index * W);
+    declareLimb(lines, name, 'payload', record.layout.outputR + index * W, true, 'fieldPrime');
   });
 
   record.runtimeOps.forEach((_, index) => {
-    declareLimb(lines, `s${index}a`, 'payload', record.layout.runtimeSlopes + index * 2 * W);
-    declareLimb(lines, `s${index}b`, 'payload', record.layout.runtimeSlopes + (index * 2 + 1) * W);
+    const upperBound = index < 4 ? 'fieldPrime' : P;
+    declareLimb(lines, `s${index}a`, 'payload', record.layout.runtimeSlopes + index * 2 * W,
+      true, upperBound);
+    declareLimb(lines, `s${index}b`, 'payload', record.layout.runtimeSlopes + (index * 2 + 1) * W,
+      true, upperBound);
   });
   record.fixedOps.forEach((_, index) => {
     ['d0a', 'd0b', 'ma', 'mb'].forEach((suffix, limbIndex) => {
@@ -1363,7 +1435,7 @@ const blockSource = (
   );
   let liftRecordOffset = record.layout.liftRecords;
   record.liftRecords.forEach((liftRecord, factorIndex) => {
-    Array.from({ length: 6 }, (_, limbIndex) => {
+    Array.from({ length: PIC_PROJECTIVE_RECORDS ? 4 : 6 }, (_, limbIndex) => {
       declareLimb(
         lines,
         `lift${factorIndex}_${limbIndex}`,
@@ -1393,8 +1465,6 @@ const blockSource = (
   if (record.blockIndex === 0) {
     lines.push(
       '        int inFlag = 0;',
-      '        int inU0=mSub(0,root0); int inU1=mSub(0,root1); int inU2=mSub(0,root2);',
-      '        int inU3=mSub(0,root3); int inU4=mSub(0,root4); int inU5=mSub(0,root5);',
       '        int rXa=Bxa; int rXb=Bxb; int rYa=Bya; int rYb=Byb;',
       '        int relationTotal=0;',
     );
@@ -1427,11 +1497,15 @@ const blockSource = (
     '        int alpha2=mulFp(alpha,alpha);',
     '        int alpha4=mulFp(alpha2,alpha2);',
     '        int alpha5=mulFp(alpha4,alpha);',
-    '        int inEval=eval6(inU0,inU1,inU2,inU3,inU4,inU5,alpha);',
+    ...(record.blockIndex === 0 ? [
+      '        int rootEval=eval6(root0,root1,root2,root3,root4,root5,alpha);',
+      // Evaluation commutes with negation; normalize zero without discovering mSub early.
+      `        int inEval=mulFp(${P}-rootEval,1);`,
+    ] : ['        int inEval=eval6(inU0,inU1,inU2,inU3,inU4,inU5,alpha);']),
     '        int state0=1; int state1=inEval;',
     '        if (inFlag == 1) { state0=inEval; state1=1; }',
   );
-  if (needsRootEval) {
+  if (needsRootEval && record.blockIndex !== 0) {
     lines.push('        int rootEval=eval6(root0,root1,root2,root3,root4,root5,alpha);');
   }
 
@@ -1442,7 +1516,17 @@ const blockSource = (
     if (op.t === 'sqr') {
       lines.push('        (state0,state1)=pairSquareEval(state0,state1,alpha);');
     } else if (op.t === 'cf') {
-      lines.push(`        (state0,state1)=pairMulEval(state0,state1,${op.neg ? 'rootEval' : 'mSub(0,rootEval)'},alpha);`);
+      if (record.blockIndex === 0 && operationIndex === 1) {
+        assert(!op.neg, 'First root factor must equal its initial negated root evaluation');
+        // Keep pairMulEval discovery after pointDoubleAffine so First shares the library prefix.
+        lines.push(
+          '        int firstNext0=mulAddFp(alpha,mulFp(state1,inEval),state0);',
+          '        state1=mulAddFp(state0,inEval,state1);',
+          '        state0=firstNext0;',
+        );
+      } else {
+        lines.push(`        (state0,state1)=pairMulEval(state0,state1,${op.neg ? 'rootEval' : 'mSub(0,rootEval)'},alpha);`);
+      }
     } else if (op.j === 0) {
       const suffix = operationIndex;
       if (op.t === 'dl') {
@@ -1493,7 +1577,13 @@ const blockSource = (
   assert(fixedIndex === record.fixedOps.length, `block ${record.blockIndex} fixed source count changed`);
   record.liftRecords.forEach((_, factorIndex) => {
     if (PIC32_RECORDS) {
-      if (PIC_FLAT_RECORDS) {
+      if (PIC_PROJECTIVE_RECORDS) {
+        lines.push(
+          `        (state0,state1)=applyCompressed(` +
+            Array.from({ length: 4 }, (__, limbIndex) =>
+              `lift${factorIndex}_${limbIndex}`).join(',') + ',state0,state1,alpha,alpha2,alpha4,alpha5);',
+        );
+      } else if (PIC_FLAT_RECORDS) {
         lines.push(
           `        int liftEval${factorIndex}=eval6(` +
             Array.from({ length: 6 }, (__, limbIndex) =>
@@ -1980,17 +2070,20 @@ templateClasses.forEach((template) => {
     `${template.name} template exceeds the 10,000-byte script element limit`);
 });
 
-const PIC_RECORD_BYTES = 800;
-const PIC_FACTOR_BYTES = 288;
+const PIC_FACTOR_BYTES = PIC_AUTHENTICATED_LIMBS * W;
 const PIC_PATH_BYTES = 512;
+const PIC_RECORD_BYTES = PIC_FACTOR_BYTES + PIC_PATH_BYTES;
 const PIC_RECORD_REGION_BYTES = 2 * PIC_RECORD_BYTES;
 const PIC_REGULAR_PAYLOAD_BYTES = blockRecords[2].payload.length;
 const PIC_RECORD_REGION_OFFSET = PIC_REGULAR_PAYLOAD_BYTES - PIC_RECORD_REGION_BYTES;
-const PIC_LEAF_TAG = Uint8Array.of(...Buffer.from('BLSGTF1', 'ascii'), 0x4c);
-const PIC_NODE_TAG = Uint8Array.of(...Buffer.from('BLSGTF1', 'ascii'), 0x4e);
-assert(PIC_FLAT_RECORDS && picCache.version === 4, 'batch authentication requires the v4 flat cache');
-assert(picCache.globalRoot === 'b64e1bdd14a1d88d7448b23f654b37e369bda13e1612d97f4c78b0b447ba1911',
-  'v4 PIC global root changed');
+const PIC_LEAF_TAG = Uint8Array.of(...Buffer.from(PIC_DOMAIN, 'ascii'), 0x4c);
+const PIC_NODE_TAG = Uint8Array.of(...Buffer.from(PIC_DOMAIN, 'ascii'), 0x4e);
+assert(PIC_FLAT_RECORDS || PIC_PROJECTIVE_RECORDS,
+  'batch authentication requires the v4 flat or v5 projective cache');
+assert(picCache.globalRoot === (PIC_PROJECTIVE_RECORDS
+  ? '0dad7c2f1bf344d76ba271c584a9d21f2bd5440987e9e71187e2b36c64c667aa'
+  : 'b64e1bdd14a1d88d7448b23f654b37e369bda13e1612d97f4c78b0b447ba1911'),
+  'PIC global root changed');
 assert(picCache.windowRoots.length === 32, 'v4 PIC window-root count changed');
 assert(regularPicCarrierBlocks.every((blockIndex) =>
   blockRecords[blockIndex].payload.length === PIC_REGULAR_PAYLOAD_BYTES &&
@@ -2012,21 +2105,23 @@ const picWindowRootBlob = concat(...picCache.windowRoots.map(
   (root) => Uint8Array.from(Buffer.from(root, 'hex')),
 ));
 assert(picWindowRootBlob.length === 1024, 'v4 PIC window-root blob length changed');
-assert(hex(sha256(picWindowRootBlob)) ===
-  '9fa1294e6f2d904ac0a1f181ea43fdfac13b8cbb007b1814482d6d807a55a9ef',
-'v4 PIC window-root blob changed');
+assert(hex(sha256(picWindowRootBlob)) === (PIC_PROJECTIVE_RECORDS
+  ? 'd94d1a48041f84af03afa59f772404e088cc52c536179e693571e8cf7c07bdf4'
+  : '9fa1294e6f2d904ac0a1f181ea43fdfac13b8cbb007b1814482d6d807a55a9ef'),
+'PIC window-root blob changed');
 const picAuthBatches = [
-  { host: 'coordinator', firstWindow: 0, windowCount: 11 },
-  { host: 'block-2', firstWindow: 11, windowCount: 8 },
-  { host: 'block-1', firstWindow: 19, windowCount: 4 },
-  { host: 'block-20', firstWindow: 23, windowCount: 5 },
-  { host: 'block-15', firstWindow: 28, windowCount: 4 },
+  { host: 'coordinator', firstWindow: 0, windowCount: 6 },
+  { host: 'block-0', firstWindow: 6, windowCount: 4 },
+  { host: 'block-1', firstWindow: 10, windowCount: 5 },
+  { host: 'block-2', firstWindow: 15, windowCount: 6 },
+  { host: 'block-15', firstWindow: 21, windowCount: 6 },
+  { host: 'block-20', firstWindow: 27, windowCount: 5 },
 ];
 assert(picAuthBatches.reduce((count, batch) => count + batch.windowCount, 0) === 32 &&
-  picAuthBatches.every((batch, index) => batch.firstWindow ===
+  picAuthBatches.every((batch, index) => batch.windowCount > 0 && batch.firstWindow ===
     picAuthBatches.slice(0, index).reduce((count, prior) => count + prior.windowCount, 0)),
 'v4 PIC authentication batch partition changed');
-const PIC_BATCH_TAG = Uint8Array.of(...Buffer.from('BLSGTF1', 'ascii'), 0x42);
+const PIC_BATCH_TAG = Uint8Array.of(...Buffer.from(PIC_DOMAIN, 'ascii'), 0x42);
 const picBatchCommitments = picAuthBatches.map(({ firstWindow, windowCount }) => sha256(concat(
   PIC_BATCH_TAG,
   Uint8Array.of(firstWindow, windowCount),
@@ -2035,7 +2130,7 @@ const picBatchCommitments = picAuthBatches.map(({ firstWindow, windowCount }) =>
   ),
 )));
 const picBatchCommitmentBlob = concat(...picBatchCommitments);
-assert(picBatchCommitmentBlob.length === 160,
+assert(picBatchCommitmentBlob.length === 192,
   'v4 PIC batch-commitment blob length changed');
 const picBSubstituteBlob = serializeLimbs([
   identitySubstituteB.x.c0,
@@ -2081,16 +2176,14 @@ contract PicBatchAuth() {
             bytes recordRegion=payload.split(${PIC_RECORD_REGION_OFFSET})[1];
             bytes record=recordRegion.split(${PIC_RECORD_BYTES})[0];
             if (window%2==1) { record=recordRegion.split(${PIC_RECORD_BYTES})[1]; }
-            bytes factor=record.split(${PIC_FACTOR_BYTES})[0];
-            bytes path=record.split(${PIC_FACTOR_BYTES})[1];
+            (bytes factor,bytes path)=record.split(${PIC_FACTOR_BYTES});
             bytes digitBytes=scalar0.split(window+1)[0].split(window)[1]
                 +scalar1.split(window+1)[0].split(window)[1];
             bytes root=sha256(0x${hex(PIC_LEAF_TAG)}+toPaddedBytes(blockIndex,1)
                 +toPaddedBytes(window,1)+digitBytes+factor);
             int globalIndex=int(digitBytes+toPaddedBytes(window,1)+0x00);
             for (int level=0;level<16;level=level+1) {
-                bytes sibling=path.split(32)[0];
-                path=path.split(32)[1];
+                (bytes sibling,path)=path.split(32);
                 int parent=globalIndex>>1;
                 bytes prefix=0x${hex(PIC_NODE_TAG)}+toPaddedBytes(level+1,1)
                     +toPaddedBytes(parent,4);
@@ -2176,17 +2269,18 @@ const sliceTopBytes = (start, end) => concat(
 const TEMPLATE_FUNCTION_ID = 101;
 const TEMPLATE_COMMON_FUNCTION_ID = 102;
 const TEMPLATE_EXTRA_FUNCTION_ID = 103;
+const TEMPLATE_ARITHMETIC_FUNCTION_ID = 104;
 const PIC_AUTH_FUNCTION_ID = 117;
 const templateCommonOffsets = new Map([
-  ['First', 756],
-  ['AdditionTail', 633],
-  ['AdditionMiddle', 648],
+  ['First', 921],
+  ['AdditionTail', 822],
+  ['AdditionMiddle', 837],
 ]);
-const templateCommonLength = 1615;
+const templateCommonLength = 823;
 const templateCommonCarrier = templateClasses.find(({ name }) => name === 'AdditionTail');
 const templateExtraOffsets = new Map([
-  ['AdditionTail', 633 + templateCommonLength],
-  ['AdditionMiddle', 648 + templateCommonLength],
+  ['AdditionTail', 822 + templateCommonLength],
+  ['AdditionMiddle', 837 + templateCommonLength],
 ]);
 const templateExtraLength = 257;
 const templateExtraCarrier = templateClasses.find(({ name }) => name === 'AdditionMiddle');
@@ -2198,6 +2292,9 @@ const templateCommonBody = templateCommonCarrier.core.slice(
 );
 assert(templateCommonBody.length === templateCommonLength,
   'shared template body length changed');
+assert(hex(sha256(templateCommonBody)) ===
+  '33d339834e8264157b76d17f383d12674889607127c9370887e51659be4a24ee',
+'shared template canonical parsing body changed');
 const templateCommonOpcodes = decodeAuthenticationInstructions(templateCommonBody)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
 let templateCommonConditionalDepth = 0;
@@ -2274,6 +2371,35 @@ assert(!templateExtraOpcodes.some((opcode) => [
   );
   template.digest = sha256(template.core);
 });
+const templateArithmeticLength = 799;
+const templateArithmeticImports = new Set(['First', 'Regular', 'AdditionMiddle', 'Terminal']);
+const templateArithmeticBody = templateCommonCarrier.core.slice(0, templateArithmeticLength);
+const templateArithmeticInstructions = decodeAuthenticationInstructions(templateArithmeticBody);
+assert(templateArithmeticInstructions.length === 13 * 3 && equalBytes(
+  encodeAuthenticationInstructions(templateArithmeticInstructions), templateArithmeticBody,
+), 'arithmetic library prefix does not end at the expected instruction boundary');
+templateArithmeticInstructions.forEach((instruction, index) => {
+  if (index % 3 === 0) {
+    assert(instruction.data !== undefined && instruction.data.length > 0,
+      'arithmetic library definition body changed');
+  } else if (index % 3 === 1) {
+    const functionId = (index - 1) / 3;
+    assert(equalBytes(encodeAuthenticationInstructions([instruction]), pushVmNumber(functionId)),
+      'arithmetic library function identifier changed');
+  } else {
+    assert(instruction.opcode === OP.DEFINE,
+      'arithmetic library prefix contains executable work outside definitions');
+  }
+});
+assert(hex(sha256(templateArithmeticBody)) ===
+  '11113485fc60b9d279e6531bf901ae1bba89d340f8ed9422da78b1b878a2548b',
+'arithmetic library compiled definitions changed');
+templateClasses.forEach((template) => {
+  if (!templateArithmeticImports.has(template.name)) return;
+  assert(equalBytes(template.core.slice(0, templateArithmeticLength), templateArithmeticBody),
+    `${template.name} arithmetic library prefix differs from its carrier`);
+  template.arithmeticRemainder = template.core.slice(templateArithmeticLength);
+});
 const templateForBlock = (index) => templateClasses.find(({ members }) => members.includes(index));
 const templateConfig = (record, index) => concat(
   pushVmNumber(index),
@@ -2317,6 +2443,23 @@ for (let payloadLength = 0;
 }
 assert(templateTailDensityPadding.length === templateTailDensityPaddingBytes,
   'AdditionTail shared-template density padding cannot be encoded');
+const templateTerminalDensityPaddingBytes = Number(
+  process.env.RPA_TEMPLATE_TERMINAL_DENSITY_PADDING ?? 0,
+);
+assert(Number.isInteger(templateTerminalDensityPaddingBytes) &&
+  templateTerminalDensityPaddingBytes >= 0 && templateTerminalDensityPaddingBytes <= 1_000,
+'Terminal template density padding is invalid');
+let templateTerminalDensityPadding = new Uint8Array();
+for (let payloadLength = 0;
+  payloadLength <= templateTerminalDensityPaddingBytes && templateTerminalDensityPadding.length === 0;
+  payloadLength += 1) {
+  const candidate = concat(encodeDataPush(new Uint8Array(payloadLength)), Uint8Array.of(OP.DROP));
+  if (candidate.length === templateTerminalDensityPaddingBytes) {
+    templateTerminalDensityPadding = candidate;
+  }
+}
+assert(templateTerminalDensityPadding.length === templateTerminalDensityPaddingBytes,
+  'Terminal template density padding cannot be encoded');
 const loadTemplateBody = (carrier, carrierRedeemLength, start, end, functionId) => concat(
   pushVmNumber(carrier.representative + 1),
   Uint8Array.of(OP.INPUTBYTECODE, OP.SIZE),
@@ -2331,9 +2474,31 @@ let templateCarrierLengths = new Map([
   [templateExtraCarrier.name, 4_000],
 ]);
 let templateCarrierLengthsStable = false;
+// First now imports the arithmetic prefix too; lay out its authenticated carrier first.
+const templateLayoutOrder = [
+  templateCommonCarrier,
+  ...templateClasses.filter((template) => template !== templateCommonCarrier),
+];
 for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration += 1) {
-  templateClasses.forEach((template) => {
+  templateLayoutOrder.forEach((template) => {
     const record = blockRecords[template.representative];
+    if (templateArithmeticImports.has(template.name)) {
+      assert(Number.isInteger(templateCommonCarrier.coreStart),
+        'arithmetic library carrier must be laid out before its consumers');
+      template.core = concat(
+        loadTemplateBody(
+          templateCommonCarrier,
+          templateCarrierLengths.get(templateCommonCarrier.name),
+          templateCommonCarrier.coreStart,
+          templateCommonCarrier.coreStart + templateArithmeticLength,
+          TEMPLATE_ARITHMETIC_FUNCTION_ID,
+        ),
+        pushVmNumber(TEMPLATE_ARITHMETIC_FUNCTION_ID),
+        Uint8Array.of(OP.INVOKE),
+        template.arithmeticRemainder,
+      );
+      template.digest = sha256(template.core);
+    }
     const definitions = [];
     if (template === templateCommonCarrier) {
       definitions.push(concat(
@@ -2372,7 +2537,9 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
       ? templateFactorDensityPadding
       : template.name === 'AdditionTail'
         ? templateTailDensityPadding
-        : new Uint8Array();
+        : template.name === 'Terminal'
+          ? templateTerminalDensityPadding
+          : new Uint8Array();
     const corePush = encodeDataPush(template.core);
     template.coreStart = commonDefinition.length + factorDensityPadding.length +
       corePush.length - template.core.length;
@@ -2533,9 +2700,21 @@ const picAuthWrapper = (firstWindow, windowCount, retainCarrierRedeem = false) =
   pushVmNumber(PIC_AUTH_FUNCTION_ID),
   Uint8Array.of(OP.INVOKE, OP.ONE, OP.EQUALVERIFY),
 );
-const picBlock2AuthWrapper = picAuthWrapper(
+const picBlock0AuthWrapper = picAuthWrapper(
   picAuthBatches[1].firstWindow,
   picAuthBatches[1].windowCount,
+);
+assert(picBlock0AuthWrapper.at(-2) === OP.ONE &&
+  picBlock0AuthWrapper.at(-1) === OP.EQUALVERIFY,
+'block-0 PIC authentication result guard changed');
+templateBlockRedeems[0] = concat(
+  picBlock0AuthWrapper.slice(0, -2),
+  Uint8Array.of(OP.VERIFY),
+  templateBlockRedeems[0],
+);
+const picBlock2AuthWrapper = picAuthWrapper(
+  picAuthBatches[3].firstWindow,
+  picAuthBatches[3].windowCount,
 );
 assert(picBlock2AuthWrapper.at(-2) === OP.ONE &&
   picBlock2AuthWrapper.at(-1) === OP.EQUALVERIFY,
@@ -2572,8 +2751,8 @@ templateBlockRedeems[1] = concat(
   templateBlockRedeems[1],
 );
 const picBlock20AuthWrapper = picAuthWrapper(
-  picAuthBatches[3].firstWindow,
-  picAuthBatches[3].windowCount,
+  picAuthBatches[5].firstWindow,
+  picAuthBatches[5].windowCount,
   true,
 );
 assert(picBlock20AuthWrapper.at(-2) === OP.ONE &&
@@ -2611,6 +2790,7 @@ const templateCoordinatorCore = compileNamed(
     true,
   ),
   'template coordinator',
+  { optimizeFor: 'size' },
 );
 const templateCoordinatorCoreRedeem = concat(
   picAuthWrapper(
@@ -2819,6 +2999,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
 
   const picAuthHostIndices = new Map([
     ['coordinator', 0],
+    ['block-0', 1],
     ['block-1', 2],
     ['block-2', 3],
     ['block-15', 16],
@@ -2875,7 +3056,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       const payload = inputsForFixture[inputIndex].payload;
       fixtureRecords.slice(carrier * 2, carrier * 2 + 2).forEach((record, inCarrier) => {
         const recordBytes = concat(
-          serializeLimbs(record.factor.map(BigInt)),
+          serializeLimbs((PIC_PROJECTIVE_RECORDS ? record.parameters : record.factor).map(BigInt)),
           Uint8Array.from(Buffer.from(record.path, 'hex')),
         );
         assert(recordBytes.length === PIC_RECORD_BYTES,
@@ -3077,7 +3258,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     encodeDataPush(wrongCountRedeem),
   );
   const wrongCountRejection = picGateRejection(
-    'v4 PIC batch with changed count', wrongCountInputs, 12,
+    'v4 PIC batch with changed count', wrongCountInputs, wrongCountBatch.firstWindow,
   );
 
   const truncatedPathInputs = makePicGateInputs('committed');
@@ -3119,8 +3300,10 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     assert(consensusRejected && standardRejected, `${name} passed a strict whole-transaction VM`);
     return { name, consensusRejected, standardRejected };
   };
-  const templateLoaderLayout = (carrier, start, end, functionId) => {
-    const carrierRedeemLength = templateCarrierLengths.get(carrier.name);
+  const templateLoaderLayout = (
+    carrier, start, end, functionId,
+    carrierRedeemLength = templateCarrierLengths.get(carrier.name),
+  ) => {
     const sourceInputPush = pushVmNumber(carrier.representative + 1);
     const carrierLengthPush = pushVmNumber(carrierRedeemLength);
     const endPush = pushVmNumber(end);
@@ -3220,6 +3403,68 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     inputs: changedExtraHelperInputs,
   });
 
+  const arithmeticMutationTemplate = templateClasses.find(({ name }) => name === 'Regular');
+  const arithmeticMutationTarget = arithmeticMutationTemplate.representative + 1;
+  const changedArithmeticInputs = cloneTemplateInputs();
+  const changedArithmeticCarrierRedeem = Uint8Array.from(
+    changedArithmeticInputs[commonCarrierInput].redeem,
+  );
+  const arithmeticBodyOffset = commonCarrierPrefix + templateCommonCarrier.coreStart;
+  assert(equalBytes(changedArithmeticCarrierRedeem.slice(
+    arithmeticBodyOffset, arithmeticBodyOffset + templateArithmeticLength,
+  ), templateArithmeticBody), 'arithmetic library carrier prefix moved');
+  changedArithmeticCarrierRedeem[arithmeticBodyOffset] = 0x6a;
+  replaceTemplateBlockRedeem(changedArithmeticInputs, commonCarrierInput,
+    changedArithmeticCarrierRedeem);
+  assertTemplateMutationRejected(
+    'changed arithmetic library byte', changedArithmeticInputs, arithmeticMutationTarget,
+  );
+  templateFactoringMutationInputs.push({
+    name: 'changed-template-arithmetic-helper-byte',
+    inputs: changedArithmeticInputs,
+  });
+  const firstArithmeticMutationTemplate = templateClasses.find(({ name }) => name === 'First');
+  const firstArithmeticMutationTarget = firstArithmeticMutationTemplate.representative + 1;
+  const firstCommonLoaderOffset = templateInputs[firstArithmeticMutationTarget].redeem.length -
+    firstArithmeticMutationTemplate.representativeRedeem.length;
+  assertTemplateMutationRejected(
+    'changed arithmetic library byte in First',
+    changedArithmeticInputs,
+    firstArithmeticMutationTarget,
+  );
+  templateFactoringMutationInputs.push({
+    name: 'changed-template-first-arithmetic-helper-byte',
+    inputs: changedArithmeticInputs,
+  });
+  const changedFirstPicHelperInputs = cloneTemplateInputs();
+  const changedFirstPicCarrierRedeem = Uint8Array.from(
+    changedFirstPicHelperInputs[PIC_BLOCK4_INPUT].redeem,
+  );
+  assert(equalBytes(changedFirstPicCarrierRedeem.slice(picHelperStart, picHelperEnd), picAuthHelper),
+    'First PIC helper carrier slice moved');
+  assert(changedFirstPicCarrierRedeem[picHelperStart] !== OpcodesBCH.OP_RETURN,
+    'First PIC helper mutation must change the original opcode');
+  changedFirstPicCarrierRedeem[picHelperStart] = OpcodesBCH.OP_RETURN;
+  replaceTemplateBlockRedeem(changedFirstPicHelperInputs, PIC_BLOCK4_INPUT,
+    changedFirstPicCarrierRedeem);
+  assertTemplateMutationRejected('changed First PIC helper byte', changedFirstPicHelperInputs,
+    firstArithmeticMutationTarget);
+  templateFactoringMutationInputs.push({
+    name: 'changed-first-PIC-helper-byte', inputs: changedFirstPicHelperInputs,
+  });
+  [
+    { name: 'changed-first-PIC-factor', offset: 0 },
+    { name: 'changed-first-PIC-path', offset: PIC_FACTOR_BYTES + 7 * 32 },
+  ].forEach(({ name, offset }) => {
+    const changed = cloneTemplateInputs();
+    const record = mutatedRecordPayload(changed, picAuthBatches[1].firstWindow);
+    record.payload[record.recordOffset + offset] ^= 1;
+    changed[record.inputIndex].payload = record.payload;
+    replaceTemplateBlockRedeem(changed, record.inputIndex, changed[record.inputIndex].redeem);
+    assertTemplateMutationRejected(name, changed, firstArithmeticMutationTarget);
+    templateFactoringMutationInputs.push({ name, inputs: changed });
+  });
+
   const commonLoaderLayout = templateLoaderLayout(
     templateCommonCarrier,
     templateCommonStart,
@@ -3232,16 +3477,105 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     templateExtraEnd,
     TEMPLATE_EXTRA_FUNCTION_ID,
   );
+  const arithmeticLoaderLayout = templateLoaderLayout(
+    templateCommonCarrier,
+    templateCommonCarrier.coreStart,
+    templateCommonCarrier.coreStart + templateArithmeticLength,
+    TEMPLATE_ARITHMETIC_FUNCTION_ID,
+  );
+  const firstPicLoaderLayout = templateLoaderLayout(
+    { name: 'PIC authentication', representative: PIC_BLOCK4_INDEX },
+    picHelperStart, picHelperEnd, PIC_AUTH_FUNCTION_ID, picBlock4Redeem.length,
+  );
+  assert(equalBytes(firstPicLoaderLayout.loader, picAuthLoader),
+    'First PIC loader layout differs from authenticated wrapper');
+  const arithmeticLoaderOffset = templateInputs[arithmeticMutationTarget].redeem.length -
+    arithmeticMutationTemplate.representativeRedeem.length + arithmeticMutationTemplate.coreStart;
+  const firstArithmeticLoaderOffset = templateInputs[firstArithmeticMutationTarget].redeem.length -
+    firstArithmeticMutationTemplate.representativeRedeem.length +
+    firstArithmeticMutationTemplate.coreStart;
   const commonDefinitionBytes = templateCommonBodyPush.length +
     pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID).length + 1;
   const extraLoaderOffset = templateInputs[extraMutationTarget].redeem.length -
     templateCommonCarrier.representativeRedeem.length + commonDefinitionBytes;
   [
     {
+      name: 'changed-first-PIC-helper-slice-start',
+      layout: firstPicLoaderLayout,
+      targetInput: firstArithmeticMutationTarget,
+      loaderOffset: 0,
+      mutationOffset: firstPicLoaderLayout.startOffset,
+      before: firstPicLoaderLayout.startPush,
+      after: pushVmNumber(picHelperStart + 1),
+    },
+    {
+      name: 'changed-first-PIC-helper-slice-end',
+      layout: firstPicLoaderLayout,
+      targetInput: firstArithmeticMutationTarget,
+      loaderOffset: 0,
+      mutationOffset: firstPicLoaderLayout.endOffset,
+      before: firstPicLoaderLayout.endPush,
+      after: pushVmNumber(picHelperEnd - 1),
+    },
+    {
+      name: 'changed-first-PIC-helper-function-id',
+      layout: firstPicLoaderLayout,
+      targetInput: firstArithmeticMutationTarget,
+      loaderOffset: 0,
+      mutationOffset: firstPicLoaderLayout.functionIdOffset,
+      before: firstPicLoaderLayout.functionIdPush,
+      after: pushVmNumber(PIC_AUTH_FUNCTION_ID + 1),
+    },
+    {
+      name: 'changed-first-PIC-helper-source-input',
+      layout: firstPicLoaderLayout,
+      targetInput: firstArithmeticMutationTarget,
+      loaderOffset: 0,
+      mutationOffset: 0,
+      before: firstPicLoaderLayout.sourceInputPush,
+      after: pushVmNumber(PIC_BLOCK4_INPUT + 1),
+    },
+    {
+      name: 'changed-template-arithmetic-slice-start',
+      layout: arithmeticLoaderLayout,
+      targetInput: arithmeticMutationTarget,
+      loaderOffset: arithmeticLoaderOffset,
+      mutationOffset: arithmeticLoaderLayout.startOffset,
+      before: arithmeticLoaderLayout.startPush,
+      after: pushVmNumber(templateCommonCarrier.coreStart + 1),
+    },
+    {
+      name: 'changed-template-arithmetic-slice-end',
+      layout: arithmeticLoaderLayout,
+      targetInput: arithmeticMutationTarget,
+      loaderOffset: arithmeticLoaderOffset,
+      mutationOffset: arithmeticLoaderLayout.endOffset,
+      before: arithmeticLoaderLayout.endPush,
+      after: pushVmNumber(templateCommonCarrier.coreStart + templateArithmeticLength - 1),
+    },
+    {
+      name: 'changed-template-arithmetic-function-id',
+      layout: arithmeticLoaderLayout,
+      targetInput: arithmeticMutationTarget,
+      loaderOffset: arithmeticLoaderOffset,
+      mutationOffset: arithmeticLoaderLayout.functionIdOffset,
+      before: arithmeticLoaderLayout.functionIdPush,
+      after: pushVmNumber(TEMPLATE_ARITHMETIC_FUNCTION_ID + 1),
+    },
+    {
+      name: 'changed-template-arithmetic-loader-source-input',
+      layout: arithmeticLoaderLayout,
+      targetInput: arithmeticMutationTarget,
+      loaderOffset: arithmeticLoaderOffset,
+      mutationOffset: 0,
+      before: arithmeticLoaderLayout.sourceInputPush,
+      after: pushVmNumber(commonCarrierInput + 1),
+    },
+    {
       name: 'changed-template-common-slice-start',
       layout: commonLoaderLayout,
       targetInput: commonMutationTarget,
-      loaderOffset: 0,
+      loaderOffset: firstCommonLoaderOffset,
       mutationOffset: commonLoaderLayout.startOffset,
       before: commonLoaderLayout.startPush,
       after: pushVmNumber(templateCommonStart + 1),
@@ -3250,7 +3584,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       name: 'changed-template-common-slice-end',
       layout: commonLoaderLayout,
       targetInput: commonMutationTarget,
-      loaderOffset: 0,
+      loaderOffset: firstCommonLoaderOffset,
       mutationOffset: commonLoaderLayout.endOffset,
       before: commonLoaderLayout.endPush,
       after: pushVmNumber(templateCommonEnd - 1),
@@ -3259,7 +3593,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       name: 'changed-template-common-function-id',
       layout: commonLoaderLayout,
       targetInput: commonMutationTarget,
-      loaderOffset: 0,
+      loaderOffset: firstCommonLoaderOffset,
       mutationOffset: commonLoaderLayout.functionIdOffset,
       before: commonLoaderLayout.functionIdPush,
       after: pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID + 1),
@@ -3268,7 +3602,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       name: 'changed-template-common-loader-source-input',
       layout: commonLoaderLayout,
       targetInput: commonMutationTarget,
-      loaderOffset: 0,
+      loaderOffset: firstCommonLoaderOffset,
       mutationOffset: 0,
       before: commonLoaderLayout.sourceInputPush,
       after: pushVmNumber(commonCarrierInput + 1),
@@ -3309,7 +3643,15 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       before: extraLoaderLayout.sourceInputPush,
       after: pushVmNumber(extraCarrierInput - 1),
     },
-  ].forEach((fixture) => {
+  ].flatMap((fixture) => fixture.layout === arithmeticLoaderLayout ? [
+    fixture,
+    {
+      ...fixture,
+      name: fixture.name.replace('template-arithmetic-', 'template-first-arithmetic-'),
+      targetInput: firstArithmeticMutationTarget,
+      loaderOffset: firstArithmeticLoaderOffset,
+    },
+  ] : [fixture]).forEach((fixture) => {
     const changed = cloneTemplateInputs();
     const changedLoader = mutateTemplateLoader(
       fixture.layout,
@@ -3856,7 +4198,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       totalSplitPayloadBytes: SPLIT_RELATION_BLOCKS.length * (6 * W + 1),
       canonicalChartRule: 'flag 0 encodes 1+u*W; flag 1 requires all six u limbs equal zero',
       selectedScaleNonzeroProof:
-        'each split begins with a nonzero canonical representative and applies only field squares and nonzero 1+W*t factors; if a selected scale were zero, the canonical cross identity would force both projective components to zero',
+        'each split begins with a nonzero canonical representative and applies only field squares and nonzero factors; normalized factors are nonzero by irreducibility, and projective PIC factors have a nonzero denominator by the homogeneous quadric identity; if a selected scale were zero, the canonical cross identity would force both projective components to zero',
       preBetaBinding: {
         commitmentRoot: hex(commitmentRoot),
         beta: hex(betaDigest),
@@ -3989,13 +4331,22 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       transactionSha256: hex(sha256(templateTransactionBytes)),
     },
     picAuthentication: {
-      fixture: 'v4 public-vk position-adjusted flat GT cache',
+      fixture: PIC_PROJECTIVE_RECORDS
+        ? 'v5 public-vk position-adjusted projective GT cache'
+        : 'v4 public-vk position-adjusted flat GT cache',
+      version: picCache.version,
+      recordEncoding: picCache.recordEncoding,
+      recordBytes: PIC_RECORD_BYTES,
+      authenticatedFactorBytes: PIC_FACTOR_BYTES,
       globalRoot: picCache.globalRoot,
       cachePath: picCachePath,
       cacheSha256: hex(sha256(picCacheBytes)),
       helperBytes: picAuthHelper.length,
       helperSha256: hex(sha256(picAuthHelper)),
       helperCompilerOptions: { rescheduleStacks: false, optimizeFor: 'size' },
+      coordinatorCoreBytes: templateCoordinatorCore.length,
+      coordinatorCompilerOptions: { rescheduleStacks: true, optimizeFor: 'size' },
+      firstWrapperBytes: picBlock0AuthWrapper.length - 1,
       oneSha256PerMerkleLevel: true,
       batchCommitmentBytes: picBatchCommitmentBlob.length,
       batchCommitmentSha256: hex(sha256(picBatchCommitmentBlob)),
@@ -4063,6 +4414,18 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       carrierRedeemLengths: Object.fromEntries(templateCarrierLengths),
       additionTailDensityPaddingBytes: templateTailDensityPadding.length,
       additionMiddleDensityPaddingBytes: templateFactorDensityPaddingBytes,
+      terminalDensityPaddingBytes: templateTerminalDensityPaddingBytes,
+      arithmeticLibrary: {
+        functionId: TEMPLATE_ARITHMETIC_FUNCTION_ID,
+        bodyBytes: templateArithmeticLength,
+        bodySha256: hex(sha256(templateArithmeticBody)),
+        definitions: 13,
+        carrierTemplate: templateCommonCarrier.name,
+        carrierBlockIndex: templateCommonCarrier.representative,
+        carrierCoreStart: templateCommonCarrier.coreStart,
+        importedTemplates: [...templateArithmeticImports],
+        definitionOnlyPrefix: true,
+      },
       p2shPinnedByCoordinatorSiblingDigest: true,
       mutationRejections: fullRejectionFixtures.filter(({ name }) =>
         name.startsWith('changed-template-')),
@@ -4450,7 +4813,9 @@ const report = {
       INVERSE_RELATIONS
         ? 'six-limb residue-root Frobenius terminal cross and selected-scale inverse relation'
         : 'six-limb residue-root Frobenius terminal cross relation',
-      'all 32 public-input-indexed GT factors authenticated against the fixed v4 window roots',
+      PIC_PROJECTIVE_RECORDS
+        ? 'all 32 public-input-indexed GT factors authenticated against the fixed v5 window roots'
+        : 'all 32 public-input-indexed GT factors authenticated against the fixed v4 window roots',
       'runtime effective-B on-curve check plus terminal psi subgroup endpoint comparison',
     ],
     omittedChecks: [
@@ -4471,7 +4836,9 @@ const report = {
     unitEquation: 'v = 4*u^3 + 16*v^3 (mod p), with (0,0) the unique identity encoding',
     unitEquationsCheckedAtRoot: ['p0 (-A)', 'p3 (C)'],
     publicInputLinkComplete: PIC32_RECORDS,
-    publicInputLink: 'little-endian public-scalar bytes select authenticated v4 public-vk GT factors',
+    publicInputLink: PIC_PROJECTIVE_RECORDS
+      ? 'little-endian public-scalar bytes select authenticated v5 public-vk GT factors'
+      : 'little-endian public-scalar bytes select authenticated v4 public-vk GT factors',
   },
   deferredG2Completion: {
     integrated: true,

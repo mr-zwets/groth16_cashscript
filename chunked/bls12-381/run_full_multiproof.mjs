@@ -9,7 +9,7 @@ const root = resolve(here, '../..');
 const measure = resolve(here, 'measure_d3_two_chart_binary.mjs');
 const cache = process.env.RPA_GT_CACHE ?? resolve(
   root,
-  'bls-gt-merkle-w8-position-regular-flat-v1.json',
+  'bls-gt-merkle-w8-position-regular-projective-v1.json',
 );
 const resultPath = process.env.RPA_CORPUS_RESULT ?? resolve(
   root,
@@ -24,30 +24,16 @@ const fixtures = (process.env.RPA_CORPUS ??
   .split(',')
   .map((name) => name.trim())
   .filter((name) => name.length > 0);
-const regularDensityPadding = process.env.RPA_REGULAR_DENSITY_PADDING ?? JSON.stringify({
-  3: 60,
-  5: 36,
-  6: 41,
-  7: 49,
-  8: 31,
-  9: 39,
-  10: 41,
-  11: 49,
-  12: 41,
-  13: 49,
-  14: 50,
-  16: 26,
-  17: 46,
-  18: 47,
-  19: 55,
-});
-const coordinatorDensityPadding = process.env.RPA_COORDINATOR_DENSITY_PADDING ?? '129';
-const picBlock2DensityPadding = process.env.RPA_PIC_BLOCK2_DENSITY_PADDING ?? '116';
-const picBlock4DensityPadding = process.env.RPA_PIC_BLOCK4_DENSITY_PADDING ?? '40';
+const regularDensityPadding = process.env.RPA_REGULAR_DENSITY_PADDING ?? '{}';
+const coordinatorDensityPadding = process.env.RPA_COORDINATOR_DENSITY_PADDING ?? '0';
+const picBlock2DensityPadding = process.env.RPA_PIC_BLOCK2_DENSITY_PADDING ?? '0';
+const picBlock4DensityPadding = process.env.RPA_PIC_BLOCK4_DENSITY_PADDING ?? '0';
 const templateFactorDensityPadding =
   process.env.RPA_TEMPLATE_FACTOR_DENSITY_PADDING ?? '0';
 const templateTailDensityPadding =
-  process.env.RPA_TEMPLATE_TAIL_DENSITY_PADDING ?? '41';
+  process.env.RPA_TEMPLATE_TAIL_DENSITY_PADDING ?? '0';
+const templateTerminalDensityPadding =
+  process.env.RPA_TEMPLATE_TERMINAL_DENSITY_PADDING ?? '0';
 const quotientTailCoefficients = process.env.RPA_Q_TAIL_COEFFICIENTS ?? '22';
 const requiredFixtures = [
   'committed',
@@ -66,6 +52,23 @@ if (fixtures.length !== requiredFixtures.length || new Set(fixtures).size !== fi
   throw new Error('the exact ten-fixture full-proof corpus is required');
 }
 const requiredRejectionFixtures = [
+  'changed-first-PIC-helper-byte',
+  'changed-first-PIC-helper-slice-start',
+  'changed-first-PIC-helper-slice-end',
+  'changed-first-PIC-helper-function-id',
+  'changed-first-PIC-helper-source-input',
+  'changed-first-PIC-factor',
+  'changed-first-PIC-path',
+  'changed-template-arithmetic-helper-byte',
+  'changed-template-arithmetic-slice-start',
+  'changed-template-arithmetic-slice-end',
+  'changed-template-arithmetic-function-id',
+  'changed-template-arithmetic-loader-source-input',
+  'changed-template-first-arithmetic-helper-byte',
+  'changed-template-first-arithmetic-slice-start',
+  'changed-template-first-arithmetic-slice-end',
+  'changed-template-first-arithmetic-function-id',
+  'changed-template-first-arithmetic-loader-source-input',
   'changed-template-common-helper-byte',
   'changed-template-extra-helper-byte',
   'changed-template-common-slice-start',
@@ -123,6 +126,7 @@ const runs = fixtures.map((fixture) => {
       RPA_PIC_BLOCK4_DENSITY_PADDING: picBlock4DensityPadding,
       RPA_TEMPLATE_FACTOR_DENSITY_PADDING: templateFactorDensityPadding,
       RPA_TEMPLATE_TAIL_DENSITY_PADDING: templateTailDensityPadding,
+      RPA_TEMPLATE_TERMINAL_DENSITY_PADDING: templateTerminalDensityPadding,
       RPA_Q_TAIL_COEFFICIENTS: quotientTailCoefficients,
       RPA_REGULAR_DENSITY_PADDING: regularDensityPadding,
       RPA_PROOF_FIXTURE: fixture,
@@ -151,6 +155,18 @@ const runs = fixtures.map((fixture) => {
   }
   if (!requiredRejectionFixtures.every((name) => rejectionNames.includes(name))) {
     throw new Error(`${fixture} is missing a required changed-field fixture`);
+  }
+  const picHosts = ['coordinator', 'block-0', 'block-1', 'block-2', 'block-15', 'block-20'];
+  const commitmentRejections = run.picAuthentication.rejectionFixtures.changedBatchCommitmentByHost;
+  if (commitmentRejections.length !== picHosts.length ||
+    !picHosts.every((host) => commitmentRejections.some((row) => row.host === host &&
+      row.owner === host && row.consensusRejected && row.standardRejected))) {
+    throw new Error(`${fixture} is missing a strict PIC commitment rejection for one of six hosts`);
+  }
+  if (run.picAuthentication.fixtureGate.length === 0 ||
+    !run.picAuthentication.fixtureGate.every(({ hosts }) => hosts.length === picHosts.length &&
+      picHosts.every((host) => hosts.some((row) => row.host === host)))) {
+    throw new Error(`${fixture} is missing a PIC acceptance gate for one of six hosts`);
   }
   if (resourceExportPath !== null &&
     (run.resourceBytecodes?.inputs.length !== expectedInputCount ||
@@ -244,6 +260,7 @@ const report = {
   picBlock4DensityPadding: Number(picBlock4DensityPadding),
   templateFactorDensityPadding: Number(templateFactorDensityPadding),
   templateTailDensityPadding: Number(templateTailDensityPadding),
+  templateTerminalDensityPadding: Number(templateTerminalDensityPadding),
   quotientTailCoefficients: Number(quotientTailCoefficients),
   maximumWireBytes: Math.max(...runs.map((run) => run.wireBytes)),
   maximumScriptBytes: Math.max(...runs.map((run) => run.scriptBytes)),

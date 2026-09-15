@@ -17,11 +17,14 @@ const POINTS = WINDOWS * DIGIT_LIMIT * DIGIT_LIMIT;
 const CARRIER_BLOCKS = [2, 3, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 16, 17, 18, 19];
 const WINDOW_BLOCKS = CARRIER_BLOCKS.flatMap((block) => [block, block]);
 const WINDOW_REMAINING_SQUARES = WINDOW_BLOCKS.map((block) => 3 * (20 - block));
-const FLAT_CONJUGATE = process.env.GT_CACHE_ENCODING === 'flat-conjugate';
-const CACHE_PATH = process.env.GT_CACHE_PATH ?? (FLAT_CONJUGATE
+const PROJECTIVE = process.env.GT_CACHE_ENCODING === 'projective';
+const FLAT_CONJUGATE = PROJECTIVE || process.env.GT_CACHE_ENCODING === 'flat-conjugate';
+const CACHE_PATH = process.env.GT_CACHE_PATH ?? (PROJECTIVE
+  ? 'bls-gt-merkle-w8-position-regular-projective-v1.json'
+  : FLAT_CONJUGATE
   ? 'bls-gt-merkle-w8-position-regular-flat-v1.json'
   : 'bls-gt-merkle-w8-position-regular-v1.json');
-const MERKLE_DOMAIN = Uint8Array.from(Buffer.from(FLAT_CONJUGATE ? 'BLSGTF1' : 'BLSGTR1', 'ascii'));
+const MERKLE_DOMAIN = Uint8Array.from(Buffer.from(PROJECTIVE ? 'BLSGTP1' : FLAT_CONJUGATE ? 'BLSGTF1' : 'BLSGTR1', 'ascii'));
 
 const fail = (message) => { throw new Error(message); };
 const assert = (condition, message) => { if (!condition) fail(message); };
@@ -104,6 +107,27 @@ preimageBases.forEach((preimage, index) => {
     `base ${index} preimage is outside GT`);
 });
 
+// Public constants for the four-coordinate quadric chart. The encoder applies
+// Cayley to the square of the exact conjugated GT entry, never to [1,u].
+const Fp2 = bls12_381.fields.Fp2;
+const xi = Fp2.fromBigTuple([1n, 1n]);
+const third = Fp2.inv(Fp2.fromBigTuple([3n, 0n]));
+const inverseXi = Fp2.inv(xi);
+const theta = Fp12.create({
+  c0: Fp6.ZERO,
+  c1: Fp6.create({ c0: Fp2.ZERO, c1: Fp2.ONE, c2: Fp2.ZERO }),
+});
+if (PROJECTIVE) {
+  assert(Fp2.eql(Fp2.pow(Fp2.neg(Fp2.mul(xi, third)), (P * P - 1n) / 2n),
+    Fp2.neg(Fp2.ONE)), 'projective chart tangent is not anisotropic');
+  const omittedPoint = Fp12.create({
+    c0: Fp6.create({ c0: Fp2.ZERO, c1: Fp2.ONE, c2: third }), c1: Fp6.ZERO,
+  });
+  const omittedImage = Fp12.div(Fp12.add(omittedPoint, theta), Fp12.sub(omittedPoint, theta));
+  assert(!Fp12.eql(Fp12.pow(omittedImage, R), Fp12.ONE),
+    'projective chart omits a target-group point');
+}
+
 const identityBalancedInputs = [0n, ((-29n * inverseMod(42n, R)) % R + R) % R];
 assert((29n + 28n * identityBalancedInputs[0] + 42n * identityBalancedInputs[1]) % R === 0n,
   'identity-balanced public inputs changed');
@@ -139,6 +163,7 @@ const certificate = {
   selectedTerminalChartChecks: 0,
   conjugatedFlatDifferentials: 0,
   interleavedReplayChecks: 0,
+  ...(PROJECTIVE ? { projectiveParameterChecks: 0, projectiveDecodeChecks: 0 } : {}),
 };
 
 for (let window = 0; window < WINDOWS; window += 1) {
@@ -195,7 +220,39 @@ for (let window = 0; window < WINDOWS; window += 1) {
         `window ${window} entry ${index} conjugated flat differential failed`);
       certificate.conjugatedFlatDifferentials += 1;
     }
-    const encoded = Buffer.concat(authenticatedLimbs.map((limb) => Buffer.from(le48(limb))));
+    let projectiveParameters;
+    if (PROJECTIVE) {
+      const target = Fp12.conjugate(entry);
+      let s = Fp2.ZERO;
+      let t = Fp2.ZERO;
+      if (!Fp12.eql(target, Fp12.ONE)) {
+        const squared = Fp12.sqr(target);
+        const cayley = Fp12.mul(theta,
+          Fp12.div(Fp12.add(squared, Fp12.ONE), Fp12.sub(squared, Fp12.ONE)));
+        assert(Fp6.eql(cayley.c1, Fp6.ZERO), 'GT Cayley coordinate left Fp6');
+        const a = cayley.c0;
+        const ell = Fp2.mul(xi, Fp2.add(
+          Fp2.mul(Fp2.sub(a.c1, Fp2.ONE), third), Fp2.sub(a.c2, third),
+        ));
+        assert(!Fp2.eql(ell, Fp2.ZERO), 'GT entry reached omitted projective point');
+        const inverseEll = Fp2.inv(ell);
+        s = Fp2.mul(a.c0, inverseEll);
+        t = Fp2.mul(Fp2.sub(a.c1, Fp2.ONE), inverseEll);
+      }
+      projectiveParameters = [s.c0, s.c1, t.c0, t.c1];
+      assert(projectiveParameters.every((limb) => limb >= 0n && limb < P),
+        'projective GT parameter is non-canonical');
+      certificate.projectiveParameterChecks += 1;
+      const h = Fp2.add(Fp2.sub(Fp2.sqr(s), t), Fp2.mul(Fp2.mul(xi, third), Fp2.sqr(t)));
+      const D = Fp6.create({ c0: s, c1: Fp2.add(h, t),
+        c2: Fp2.add(Fp2.mul(Fp2.sub(h, t), third), inverseXi) });
+      const numerator = Fp6.create({ c0: Fp2.ZERO, c1: h, c2: Fp2.ZERO });
+      assert(!Fp6.eql(D, Fp6.ZERO) && Fp6.eql(Fp6.mul(D, Fp6.neg(u)), numerator),
+        'projective GT decoding changed the conjugated quotient class');
+      certificate.projectiveDecodeChecks += 1;
+    }
+    const encoded = Buffer.concat((PROJECTIVE ? projectiveParameters : authenticatedLimbs)
+      .map((limb) => Buffer.from(le48(limb))));
     tableHash.update(encoded);
     leaves[index] = merkleLeaf(carrierBlock, window, index, encoded);
     fixtures.forEach(([name, inputs]) => {
@@ -226,6 +283,7 @@ for (let window = 0; window < WINDOWS; window += 1) {
         terminalU,
         carrierBlock,
         remainingSquares,
+        ...(PROJECTIVE ? { projectiveParameters } : {}),
       });
     });
   });
@@ -263,7 +321,10 @@ for (let window = 0; window < WINDOWS; window += 1) {
       remainingSquares,
       path: Buffer.from(concatenate(...siblings)).toString('hex'),
     };
-    if (FLAT_CONJUGATE) {
+    if (PROJECTIVE) {
+      record.parameters = selectedRecord.projectiveParameters.map(String);
+      record.terminalFactor = flat6(Fp6.neg(selectedRecord.terminalU)).map(String);
+    } else if (FLAT_CONJUGATE) {
       record.factor = flat6(Fp6.neg(selectedRecord.u)).map(String);
       record.terminalFactor = flat6(Fp6.neg(selectedRecord.terminalU)).map(String);
     } else {
@@ -284,6 +345,10 @@ assert(certificate.finiteCharts === POINTS &&
 'GT table certificate coverage mismatch');
 assert(certificate.conjugatedFlatDifferentials === (FLAT_CONJUGATE ? POINTS : 0),
   'conjugated flat differential coverage mismatch');
+if (PROJECTIVE) {
+  assert(certificate.projectiveParameterChecks === POINTS &&
+    certificate.projectiveDecodeChecks === POINTS, 'projective GT coverage mismatch');
+}
 assert(certificate.adjustedBaseSubgroupChecks === 2 * WINDOWS,
   'position-adjusted base subgroup coverage mismatch');
 assert(certificate.selectedEntrySubgroupChecks === fixtures.length * WINDOWS &&
@@ -355,18 +420,21 @@ assert(certificate.interleavedReplayChecks === fixtures.length,
 const k1RootBlob = concatenate(...k1Roots);
 const globalRoot = globalLevel[0];
 const cache = {
-  version: FLAT_CONJUGATE ? 4 : 3,
+  version: PROJECTIVE ? 5 : FLAT_CONJUGATE ? 4 : 3,
   construction: 'public-vk-gt-position-adjusted-preimages-window8',
   layout: 'uniform-regular',
-  recordEncoding: FLAT_CONJUGATE ? 'canonical-conjugated-flat-fp6' : 'canonical-standard-fp6',
+  recordEncoding: PROJECTIVE ? 'canonical-projective-fp2-quadric'
+    : FLAT_CONJUGATE ? 'canonical-conjugated-flat-fp6' : 'canonical-standard-fp6',
   carrierBlocks: CARRIER_BLOCKS,
   windowBlocks: WINDOW_BLOCKS,
   windowRemainingSquares: WINDOW_REMAINING_SQUARES,
   merkleDomain: Buffer.from(MERKLE_DOMAIN).toString('ascii'),
-  merkleLeaf: FLAT_CONJUGATE
+  merkleLeaf: PROJECTIVE
+    ? 'SHA256(BLSGTP1 || L || carrier-block:u8 || window:u8 || index:u16le || projective-parameters:192B)'
+    : FLAT_CONJUGATE
     ? 'SHA256(BLSGTF1 || L || carrier-block:u8 || window:u8 || index:u16le || adjusted-conjugated-flat-factor:288B)'
     : 'SHA256(BLSGTR1 || L || carrier-block:u8 || window:u8 || index:u16le || adjusted-canonical-u:288B)',
-  merkleNode: `SHA256(${FLAT_CONJUGATE ? 'BLSGTF1' : 'BLSGTR1'} || N || level:u8 || global-node-index:u32le || left || right)`,
+  merkleNode: `SHA256(${PROJECTIVE ? 'BLSGTP1' : FLAT_CONJUGATE ? 'BLSGTF1' : 'BLSGTR1'} || N || level:u8 || global-node-index:u32le || left || right)`,
   tableTorusSha256,
   certificate,
   k1Roots: k1Roots.map((root) => Buffer.from(root).toString('hex')),
@@ -381,9 +449,12 @@ console.log(JSON.stringify({
   construction: 'public-vk-gt-position-adjusted-preimages-window8',
   equation: 'after block-position squarings, nobleFinalExponent(product_j hAdjusted(j,d)^2^s(j)) = e(in0*IC1 + in1*IC2, gamma)',
   derivation: 'hAdjusted = e(256^j*(d0*IC1+d1*IC2), gamma)^((N*2^s)^-1 mod r), N=3*(p^12-1)/r',
-  preConjugationFactor: 'each block folds conjugate(hAdjusted), implemented as the negative authenticated torus coordinate',
+  preConjugationFactor: PROJECTIVE
+    ? 'each block folds the projective factor decoded from authenticated parameters for conjugate(hAdjusted)'
+    : 'each block folds conjugate(hAdjusted), implemented as the negative authenticated torus coordinate',
   layout: 'uniform-regular',
-  recordEncoding: FLAT_CONJUGATE ? 'canonical-conjugated-flat-fp6' : 'canonical-standard-fp6',
+  recordEncoding: PROJECTIVE ? 'canonical-projective-fp2-quadric'
+    : FLAT_CONJUGATE ? 'canonical-conjugated-flat-fp6' : 'canonical-standard-fp6',
   carrierBlocks: CARRIER_BLOCKS,
   windowBlocks: WINDOW_BLOCKS,
   windowRemainingSquares: WINDOW_REMAINING_SQUARES,
@@ -394,14 +465,14 @@ console.log(JSON.stringify({
     Fp12.eql(Fp12.finalExponentiate(base), Fp12.pow(base, N))),
   finalExponentGcd: gcd(N, R).toString(),
   inverseFinalExponentModR: inverseN.toString(),
-  torusEntryBytes: 6 * 48,
+  torusEntryBytes: (PROJECTIVE ? 4 : 6) * 48,
   fullFp12EntryBytes: 12 * 48,
   k1PathBytesPerWindow: 15 * 32,
-  k1TorusRecordBytesPerWindow: 6 * 48 + 15 * 32,
-  k1TorusAuthenticationBytes: WINDOWS * (6 * 48 + 15 * 32),
+  k1TorusRecordBytesPerWindow: (PROJECTIVE ? 4 : 6) * 48 + 15 * 32,
+  k1TorusAuthenticationBytes: WINDOWS * ((PROJECTIVE ? 4 : 6) * 48 + 15 * 32),
   k1RootBytes: WINDOWS * 2 * 32,
   sha256Invocations: WINDOWS * 16,
-  tableTorusBytes: POINTS * 6 * 48,
+  tableTorusBytes: POINTS * (PROJECTIVE ? 4 : 6) * 48,
   tableTorusSha256,
   merkleCachePath: CACHE_PATH,
   k1RootBlobSha256: cache.k1RootBlobSha256,
@@ -412,7 +483,7 @@ console.log(JSON.stringify({
     currentG1MsmWireBytes: 26478,
     currentG1AuthenticationBytes: 18432,
     preparedPair2CoefficientBytes: 13056,
-    torusAuthenticationBytes: WINDOWS * (6 * 48 + 15 * 32),
-    grossBytesRemovedBeforeTorusFoldCode: 26478 + 13056 - WINDOWS * (6 * 48 + 15 * 32),
+    torusAuthenticationBytes: WINDOWS * ((PROJECTIVE ? 4 : 6) * 48 + 15 * 32),
+    grossBytesRemovedBeforeTorusFoldCode: 26478 + 13056 - WINDOWS * ((PROJECTIVE ? 4 : 6) * 48 + 15 * 32),
   },
 }, null, 2));

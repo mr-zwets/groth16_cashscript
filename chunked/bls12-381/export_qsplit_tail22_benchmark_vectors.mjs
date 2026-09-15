@@ -48,10 +48,10 @@ if (resource.fixtures.some((fixture) => fixture.lockingSetSha256 !==
   throw new Error('locking-set hash changed');
 }
 if (results.lockingSetSha256 !==
-  '4cd6f93829da3708513aa61d408c0b2bd4bba851ba31abefaad573b82c1d0284' ||
+  '4d7e68150d02a5f170cb3845bd117fed6af903ad8cddce16a132a2d8d70e51b3' ||
   !results.strictCurrentBch || results.fixtureCount !== required.length ||
-  results.maximumWireBytes !== 89_553 ||
-  results.maximumStandardOperationCost !== 70_171_351 ||
+  results.maximumWireBytes !== 79_178 ||
+  results.maximumStandardOperationCost !== 55_430_774 ||
   !results.fixtures.every((fixture) => fixture.wholeConsensusVerified &&
     fixture.wholeStandardVerified && fixture.allConsensusInputsAccepted &&
     fixture.allStandardInputsAccepted && fixture.standardRelaySize &&

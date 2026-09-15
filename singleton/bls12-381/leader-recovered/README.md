@@ -1,0 +1,11 @@
+# Recovered BLS singleton program
+
+`program.mjs` is symbolic assembly recovered from the exact 3,425-byte genpow leader. It declares all 51 functions by name and gives the complete main program. Calls reference names rather than historical numeric identifiers. `field.mjs` records the deterministic negative-seed field and full-exponent derivation. `build.mjs` compiles this source directly and rejects a baseline that differs from SHA256 `44d79298047a012b2a1d132949f55c1bbd1c803d28197b2e63366eb54614e4c1`.
+
+Run `node singleton/bls12-381/leader-recovered/build.mjs /absolute/output.json` with the pinned Libauth dependency. This build reads no benchmark artifact, frozen hex, recovery inventory or historical compiler output. Data literals in the assembly retain their exact wire encodings; function declarations and calls are emitted from symbolic references.
+
+This recovers a reviewable program source, not the unavailable original CashScript generator, compiler revision, committed search witness or stackcert compression pipeline. Descriptive function names are recovered labels; neutral stack/tower names identify bodies whose complete semantic contract has not been established here. Exact-byte reconstruction transfers the existing artifact's behavior and limitations. It does not prove subgroup/canonical-input soundness or make the singleton runnable under current BCH limits.
+
+Only identifier assignment is exposed for the bounded compression experiment. Unknown symbols, raw DEFINE/INVOKE instructions, duplicate identifiers and malformed data literals fail explicitly. The complete source contains no dynamic invocation references.
+
+After committing this source, run `node singleton/bls12-381/leader-recovered/export.mjs /absolute/candidate-benchmark` against a benchmark containing the pinned original genpow vectors. The exporter builds the compact locking from these declarations, retains all witness/public-input fields exactly, and updates only the two genpow vector files. It records the recovered-source revision and hashes, explicitly preserving the missing original compiler/search lineage. It fails on an unexpected or already-updated baseline; it never imports a prebuilt candidate locking.

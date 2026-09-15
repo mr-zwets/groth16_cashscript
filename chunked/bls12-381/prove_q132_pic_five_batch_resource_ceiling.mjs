@@ -32,8 +32,11 @@ const corpusPath = resolve('q132-corpus-resource-fixtures.json');
 const fixtureName = process.env.RESOURCE_FIXTURE ?? 'committed';
 const probe = process.env.RESOURCE_PROBE === '1';
 const resourceProfile = process.env.RESOURCE_PROFILE ?? 'baseline23';
+const balancedSixPicProfile = resourceProfile === 'qsplit22-tail22-six-pic-balanced';
+const sixPicProfile = resourceProfile === 'qsplit22-tail22-six-pic' ||
+  balancedSixPicProfile;
 const qsplitProfile = resourceProfile === 'qsplit22' ||
-  resourceProfile === 'qsplit22-tail22';
+  resourceProfile === 'qsplit22-tail22' || sixPicProfile;
 const expectedInputCount = resourceProfile === 'baseline23'
   ? 23
   : qsplitProfile
@@ -223,11 +226,43 @@ const branchShape = (instructions, ifIp) => {
 };
 const sameNames = (left, right) => left.length === right.length &&
   left.every((name, index) => name === right[index]);
-const classifyVariableConditional = (instructions, ifIp) => {
+// The size-compiled six-PIC coordinator schedules the same B check differently.
+// Pin its entire IF/ELSE/ENDIF encoding (including PICK depths), and every
+// invoked helper: IDs 0/1/2/3 are c2Sqr/cAdd/cSub/cMul. This variant is valid
+// only at coordinator input 0 in the explicit six-PIC profile. Each B class
+// still requires its own concrete trace and complete interval propagation.
+const SIX_PIC_B_IDENTITY_BRANCH = hexToBin(
+  '6301157959799d0113795a799d0112795b799d0111795c799d675c79009e69011179011379008a' +
+  '011579011879008a011779011a79707c53795279538a53795279538a528a72538a72538a518a' +
+  '545279518a5679789d545279518a5679789d6d6d6d6d68',
+);
+const SIX_PIC_B_IDENTITY_FUNCTIONS = [
+  ['', '6e528a7876518a53797c538a72518a7b7c538a7c'],
+  ['01', '9330abaafffffffffeb9ffff53b1feffab1e24f6b0f6a0d23067bf1285f3844b7764' +
+    'd7ac4b43b6a71b4b9ae67f39ea11011a97'],
+  ['02', '30abaafffffffffeb9ffff53b1feffab1e24f6b0f6a0d23067bf1285f3844b7764' +
+    'd7ac4b43b6a71b4b9ae67f39ea11011a7c7b9478937c97'],
+  ['03', '9530abaafffffffffeb9ffff53b1feffab1e24f6b0f6a0d23067bf1285f3844b7764' +
+    'd7ac4b43b6a71b4b9ae67f39ea11011a97'],
+].map(([id, bytecode]) => [id, hexToBin(bytecode)]);
+const classifyVariableConditional = (instructions, ifIp, inputIndex, functionTable) => {
   const actualShape = branchShape(instructions, ifIp);
-  const specification = VARIABLE_CONDITIONAL_CLASSES.find((candidate) =>
+  let specification = VARIABLE_CONDITIONAL_CLASSES.find((candidate) =>
     sameNames(actualShape.trueBranch, candidate.trueBranch) &&
     sameNames(actualShape.falseBranch, candidate.falseBranch));
+  if (specification === undefined && sixPicProfile && inputIndex === 0) {
+    const bytecode = encodeAuthenticationInstructions(instructions.slice(ifIp, ifIp + 90));
+    const exactBranch = bytecode.length === SIX_PIC_B_IDENTITY_BRANCH.length &&
+      bytecode.every((byte, index) => byte === SIX_PIC_B_IDENTITY_BRANCH[index]);
+    const exactFunctions = SIX_PIC_B_IDENTITY_FUNCTIONS.every(([id, expected]) => {
+      const actual = functionTable?.[id];
+      return actual !== undefined && actual.length === expected.length &&
+        actual.every((byte, index) => byte === expected[index]);
+    });
+    if (exactBranch && exactFunctions) {
+      specification = { kind: 'b-identity', untakenTrueCost: 0, expectedTaken: bIdentityTrace };
+    }
+  }
   return { actualShape, specification };
 };
 const BASELINE_CONDITIONAL_COUNTS = [
@@ -271,9 +306,35 @@ const QSPLIT_CONDITIONAL_COUNTS = [
   bIdentity: inputIndex === 0 ? 1 : 0,
   splitReset: inputIndex >= 1 ? 1 : 0,
 }));
-const expectedConditionalCounts = qsplitProfile
-  ? QSPLIT_CONDITIONAL_COUNTS
-  : BASELINE_CONDITIONAL_COUNTS;
+// Six contiguous batches contain 5/4/5/7/6/5 windows at inputs 0/1/2/3/16/21.
+// Each window contributes 21 fixed and 16 PIC-order conditionals. The sixth
+// batch adds one fixed commitment-selection conditional to each helper call;
+// all non-PIC categories and all other inputs retain their existing inventory.
+const SIX_PIC_CONDITIONAL_COUNTS = [
+  { ...QSPLIT_CONDITIONAL_COUNTS[0], fixed: 111, picOrder: 80 },
+  { ...QSPLIT_CONDITIONAL_COUNTS[1], fixed: 91, picOrder: 64 },
+  { ...QSPLIT_CONDITIONAL_COUNTS[2], fixed: 112, picOrder: 80 },
+  { ...QSPLIT_CONDITIONAL_COUNTS[3], fixed: 163, picOrder: 112 },
+  ...QSPLIT_CONDITIONAL_COUNTS.slice(4, 16),
+  { ...QSPLIT_CONDITIONAL_COUNTS[16], fixed: 132, picOrder: 96 },
+  ...QSPLIT_CONDITIONAL_COUNTS.slice(17, 21),
+  { ...QSPLIT_CONDITIONAL_COUNTS[21], fixed: 111, picOrder: 80 },
+];
+// Moving one window from input 3 to input 0 yields batches 6/4/5/6/6/5.
+// Only those inputs change their exact fixed/PIC-order inventories.
+const BALANCED_SIX_PIC_CONDITIONAL_COUNTS = [
+  { ...SIX_PIC_CONDITIONAL_COUNTS[0], fixed: 132, picOrder: 96 },
+  ...SIX_PIC_CONDITIONAL_COUNTS.slice(1, 3),
+  { ...SIX_PIC_CONDITIONAL_COUNTS[3], fixed: 142, picOrder: 96 },
+  ...SIX_PIC_CONDITIONAL_COUNTS.slice(4),
+];
+const expectedConditionalCounts = balancedSixPicProfile
+  ? BALANCED_SIX_PIC_CONDITIONAL_COUNTS
+  : sixPicProfile
+    ? SIX_PIC_CONDITIONAL_COUNTS
+    : qsplitProfile
+      ? QSPLIT_CONDITIONAL_COUNTS
+      : BASELINE_CONDITIONAL_COUNTS;
 const bIdentityTrace = fixtureName === 'b-identity' || fixtureName === 'all-identity';
 if (!probe && expectedConditionalCounts.length !== expectedInputCount) {
   throw new Error(`resource certificate tables must cover all ${expectedInputCount} inputs`);
@@ -643,10 +704,15 @@ const traceCeiling = (inputIndex) => {
           const { actualShape, specification } = classifyVariableConditional(
             state.instructions,
             state.ip,
+            inputIndex,
+            state.functionTable,
           );
           if (specification === undefined) {
             throw new Error(`unclassified variable OP_IF site ${site} at input ${inputIndex}: ` +
               JSON.stringify({ taken, ...actualShape }));
+          }
+          if (specification.expectedTaken !== undefined && taken !== specification.expectedTaken) {
+            throw new Error(`B-identity branch disagrees with resource fixture class at input ${inputIndex}`);
           }
           if (!taken && specification.untakenTrueCost !== 0) {
             addAdjustment(opcode, specification.untakenTrueCost);
