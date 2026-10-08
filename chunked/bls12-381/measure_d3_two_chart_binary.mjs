@@ -930,6 +930,20 @@ const treeFor = (payloads, metadataLengths = payloads.map((payload) => payload.l
   return nodes[0];
 };
 
+// Zero exponents use the identity without a table-membership witness. Keep the
+// original record metadata for proof-independent constructor/configuration lengths;
+// commit the actual compact bytes before deriving beta, quotient and alpha.
+assert(PIC_PROJECTIVE_RECORDS, 'compact PIC requires the declared v5 projective encoding');
+picCarrierBlocks.forEach((blockIndex, carrier) => {
+  const payload = blockPayloads[blockIndex];
+  const slots = [0, 1].map((slot) => {
+    const window = carrier * 2 + slot;
+    const zero = activePublicInputs.every((value) => ((value >> BigInt(8 * window)) & 255n) === 0n);
+    return zero ? Uint8Array.from(Buffer.from(picCache.windowRoots[window], 'hex'))
+      : payload.slice(1345 + 704 * slot, 1345 + 704 * (slot + 1));
+  });
+  blockPayloads[blockIndex] = concat(payload.slice(0, 1345), ...slots);
+});
 const commitmentPayloads = [statementBytes, ...blockPayloads];
 const commitmentRoot = treeFor(commitmentPayloads);
 const splitCommitmentMutationPayloads = commitmentPayloads.map((payload) => Uint8Array.from(payload));
@@ -1753,6 +1767,55 @@ const templateBlockSource = (record, template) => {
     templateRelationPowerLines(template.members).join('\n'),
     `${name} relation power`,
   );
+  const scalarSource = `        bytes scalar0=statementBlob.split(225)[0].split(193)[1];
+        bytes scalar1=statementBlob.split(257)[0].split(225)[1];
+        require(int(scalar0+0x00)<${bls12_381.fields.Fr.ORDER} && int(scalar1+0x00)<${bls12_381.fields.Fr.ORDER});`;
+  if (name === 'Regular') {
+    source = replaceExactlyOnce(source, `        require(payload.length == ${record.payload.length});`, '', 'compact producer length');
+    source = replaceExactlyOnce(source, `        bytes statementBlob = ${statementExpression};`,
+      `        bytes statementBlob = ${statementExpression};\n${scalarSource}
+        int carrier=blockIndex - 2;
+        if(blockIndex>=5){carrier=carrier - 1;} if(blockIndex>=16){carrier=carrier - 1;}
+        int firstWindow=carrier*2;
+        bytes digits0=scalar0.split(firstWindow+1)[0].split(firstWindow)[1]+scalar1.split(firstWindow+1)[0].split(firstWindow)[1];
+        bytes digits1=scalar0.split(firstWindow+2)[0].split(firstWindow+1)[1]+scalar1.split(firstWindow+2)[0].split(firstWindow+1)[1];
+        bool zero0=digits0==0x0000; bool zero1=digits1==0x0000;
+        int length0=704; int length1=704;
+        if(zero0){length0=32;} if(zero1){length1=32;}
+        require(payload.length==1345+length0+length1);`, 'compact scalar mask');
+    const originalLimbs = [];
+    record.liftRecords.forEach((lift, slot) => {
+      for (let limb = 0; limb < 4; limb += 1) declareLimb(originalLimbs, `lift${slot}_${limb}`, 'payload', record.layout.liftRecords + 704 * slot + W * limb, false);
+    });
+    const compactLimbs = ['        (bytes record0,bytes record1)=payload.split(1345)[1].split(length0);'];
+    for (let slot = 0; slot < 2; slot += 1) {
+      compactLimbs.push(`        int lift${slot}_0=0; int lift${slot}_1=0; int lift${slot}_2=0; int lift${slot}_3=0;`);
+      compactLimbs.push(`        if(!zero${slot}){`);
+      for (let limb = 0; limb < 4; limb += 1) compactLimbs.push(`            lift${slot}_${limb}=${limbExpression(`record${slot}`, limb * W)};`);
+      compactLimbs.push('        }');
+      const apply = `        (state0,state1)=applyCompressed(lift${slot}_0,lift${slot}_1,lift${slot}_2,lift${slot}_3,state0,state1,alpha,alpha2,alpha4,alpha5);`;
+      source = replaceExactlyOnce(source, apply, `        if(zero${slot}){int scale=mulFp(9,alpha2);state0=mulFp(state0,scale);state1=mulFp(state1,scale);}else{\n${apply}\n        }`, `compact zero factor ${slot}`);
+    }
+    source = replaceExactlyOnce(source, originalLimbs.join('\n'), compactLimbs.join('\n'), 'compact factor parsing');
+  }
+  if (record.blockIndex !== 0) {
+    const predecessor = `        bytes previousPayload = tx.inputs[blockIndex].unlockingBytecode.split(previousPayloadLength+3)[0].split(3)[1];`;
+    source = replaceExactlyOnce(source, predecessor, `${name === 'Regular' ? '' : `        bytes previousStatement=${statementExpression};\n${scalarSource.replaceAll('statementBlob', 'previousStatement')}`}
+        int previousLength=previousPayloadLength;
+        int previousBlock=blockIndex - 1;
+        if((previousBlock>=2 && previousBlock<=3)||(previousBlock>=5 && previousBlock<=14)||(previousBlock>=16 && previousBlock<=19)){
+            int previousCarrier=previousBlock - 2;
+            if(previousBlock>=5){previousCarrier=previousCarrier - 1;} if(previousBlock>=16){previousCarrier=previousCarrier - 1;}
+            int previousWindow=previousCarrier*2;
+            bytes previousDigits0=scalar0.split(previousWindow+1)[0].split(previousWindow)[1]+scalar1.split(previousWindow+1)[0].split(previousWindow)[1];
+            bytes previousDigits1=scalar0.split(previousWindow+2)[0].split(previousWindow+1)[1]+scalar1.split(previousWindow+2)[0].split(previousWindow+1)[1];
+            previousLength=1345;
+            if(previousDigits0==0x0000){previousLength=previousLength+32;}else{previousLength=previousLength+704;}
+            if(previousDigits1==0x0000){previousLength=previousLength+32;}else{previousLength=previousLength+704;}
+        }
+        bytes previousPayload = tx.inputs[blockIndex].unlockingBytecode.split(previousLength+3)[0].split(3)[1];`, 'compact predecessor length');
+    source = replaceExactlyOnce(source, 'tx.inputs[blockIndex].unlockingBytecode.split(previousPayloadLength+3)[1].split(49)[0].split(1)[1]', 'tx.inputs[blockIndex].unlockingBytecode.split(previousLength+3)[1].split(49)[0].split(1)[1]', 'compact predecessor evaluation');
+  }
   return source;
 };
 const templateClasses = [
@@ -1857,10 +1920,16 @@ const nodeMetadataHex = (level, index) => binToHex(concat(u32(level), u32(index)
 const appendTreeSource = (lines, namespace, leafSpecs) => {
   let nodes = leafSpecs.map((leaf, index) => {
     const variable = `${namespace}Leaf${index}`;
-    lines.push(
-      `        bytes ${variable}=sha256(0x${prefixHex('leaf', 12 + leaf.payloadLength)}+` +
-        `0x${metadataHex(index, leafSpecs.length, leaf.metadataLength)}+${leaf.expression});`,
-    );
+    if (typeof leaf.payloadLength === 'string') {
+      lines.push(`        bytes ${variable}=sha256(0x${prefixHex('leaf', 0).slice(0, -8)}+` +
+        `toPaddedBytes(12+${leaf.payloadLength},4)+0x${metadataHex(index, leafSpecs.length, 0).slice(0, -8)}+` +
+        `toPaddedBytes(${leaf.metadataLength},4)+${leaf.expression});`);
+    } else {
+      lines.push(
+        `        bytes ${variable}=sha256(0x${prefixHex('leaf', 12 + leaf.payloadLength)}+` +
+          `0x${metadataHex(index, leafSpecs.length, leaf.metadataLength)}+${leaf.expression});`,
+      );
+    }
     return variable;
   });
   let level = 0;
@@ -1970,9 +2039,22 @@ const coordinatorSource = (
     metadataLength: statementBytes.length,
   }, ...blockPayloads.map((payload, index) => {
     const variable = `blockPayload${index}`;
-    lines.push(`        bytes ${variable}=${firstPushExpression(index + 1, payload.length)};`);
-    lines.push(`        require(${variable}.length==${payload.length});`);
-    return { expression: variable, payloadLength: payload.length, metadataLength: payload.length };
+    const carrier = picCarrierBlocks.indexOf(index);
+    let length = payload.length;
+    if (carrier >= 0) {
+      length = `blockLength${index}`;
+      lines.push(`        int ${length}=1345;`);
+      for (let slot = 0; slot < 2; slot += 1) {
+        const shift = (carrier * 2 + slot) * 8;
+        lines.push(`        if (((public0>>${shift})%256)+((public1>>${shift})%256)==0) { ${length}=${length}+32; } else { ${length}=${length}+704; }`);
+      }
+    }
+    lines.push(`        bytes rawInput${index}=tx.inputs[${index + 1}].unlockingBytecode;`);
+    lines.push(`        require(rawInput${index}.split(3)[0]==0x4d+toPaddedBytes(${length},2));`);
+    lines.push(`        require(rawInput${index}.split(${length}+4)[0].split(${length}+3)[1]==0x30);`);
+    lines.push(`        bytes ${variable}=rawInput${index}.split(${length}+3)[0].split(3)[1];`);
+    lines.push(`        require(${variable}.length==${length});`);
+    return { expression: variable, payloadLength: length, metadataLength: length };
   })];
   const commitmentTreeRoot = appendTreeSource(lines, 'commitment', commitmentSpecs);
   const quotientSpecs = fusedQuotient
@@ -2164,22 +2246,28 @@ contract PicBatchAuth() {
         bytes statementBlob=${statementExpression};
         bytes scalar0=statementBlob.split(${public0Offset + 32})[0].split(${public0Offset})[1];
         bytes scalar1=statementBlob.split(${public1Offset + 32})[0].split(${public1Offset})[1];
+        require(int(scalar0+0x00)<${bls12_381.fields.Fr.ORDER} && int(scalar1+0x00)<${bls12_381.fields.Fr.ORDER});
         bytes windowRootBlob=0x;
         for (int window=firstWindow;window<finalWindow;window=window+1) {
             int carrier=window>>1;
             int blockIndex=carrier+2;
             if (carrier>=2) { blockIndex=blockIndex+1; }
             if (carrier>=12) { blockIndex=blockIndex+1; }
-            bytes payload=tx.inputs[blockIndex+1].unlockingBytecode
-                .split(${PIC_REGULAR_PAYLOAD_BYTES + pushHeaderLength(PIC_REGULAR_PAYLOAD_BYTES)})[0]
-                .split(${pushHeaderLength(PIC_REGULAR_PAYLOAD_BYTES)})[1];
-            bytes recordRegion=payload.split(${PIC_RECORD_REGION_OFFSET})[1];
-            bytes record=recordRegion.split(${PIC_RECORD_BYTES})[0];
-            if (window%2==1) { record=recordRegion.split(${PIC_RECORD_BYTES})[1]; }
-            (bytes factor,bytes path)=record.split(${PIC_FACTOR_BYTES});
             bytes digitBytes=scalar0.split(window+1)[0].split(window)[1]
                 +scalar1.split(window+1)[0].split(window)[1];
-            bytes root=sha256(0x${hex(PIC_LEAF_TAG)}+toPaddedBytes(blockIndex,1)
+            bool zero=digitBytes==0x0000;
+            int recordLength=704; if(zero){recordLength=32;}
+            int recordOffset=1348;
+            if(window%2==1){
+                bytes priorDigits=scalar0.split(window)[0].split(window - 1)[1]
+                    +scalar1.split(window)[0].split(window - 1)[1];
+                if(priorDigits==0x0000){recordOffset=recordOffset+32;}else{recordOffset=recordOffset+704;}
+            }
+            bytes record=tx.inputs[blockIndex+1].unlockingBytecode.split(recordOffset+recordLength)[0].split(recordOffset)[1];
+            bytes root=record;
+            if(!zero){
+            (bytes factor,bytes path)=record.split(${PIC_FACTOR_BYTES});
+            root=sha256(0x${hex(PIC_LEAF_TAG)}+toPaddedBytes(blockIndex,1)
                 +toPaddedBytes(window,1)+digitBytes+factor);
             int globalIndex=int(digitBytes+toPaddedBytes(window,1)+0x00);
             for (int level=0;level<16;level=level+1) {
@@ -2192,6 +2280,8 @@ contract PicBatchAuth() {
                 globalIndex=parent;
             }
             require(path.length==0); require(globalIndex==window);
+            }
+            require(root.length==32);
             windowRootBlob=windowRootBlob+root;
         }
         bytes expectedBatch=0x${hex(picBatchCommitments[0])};
@@ -2614,6 +2704,26 @@ const templateBlockRedeems = blockRecords.map((record, index) => {
   );
 });
 
+// Experimental compact-record layout padding. This is outside the frozen
+// resource profile; retain the old audited <=76-byte Regular option unchanged.
+const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_DENSITY_PADDING ?? '{"3":444,"5":432,"6":423,"7":431,"8":413,"9":421,"10":423,"11":431,"12":423,"13":431,"14":433,"16":419,"17":428,"18":430,"19":438}');
+Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
+  const index = Number(block);
+  assert(Number.isInteger(index) && String(index) === block && index !== 2 &&
+    templateForBlock(index)?.name === 'Regular', 'compact padding host must be a Regular proxy');
+  assert(Number.isInteger(byteCount) && byteCount >= 0 && byteCount <= 1000,
+    'compact Regular padding exceeds the bounded experiment');
+  let padding = new Uint8Array();
+  while (padding.length < byteCount) {
+    const remaining = byteCount - padding.length;
+    assert(remaining >= 2, 'compact padding cannot encode a one-byte tail');
+    const chunk = Math.min(remaining === 77 ? 75 : 76, remaining);
+    padding = concat(padding, encodeDataPush(new Uint8Array(chunk - 2)), Uint8Array.of(OP.DROP));
+  }
+  assert(padding.length === byteCount, 'compact padding byte count changed');
+  templateBlockRedeems[index] = concat(padding, templateBlockRedeems[index]);
+});
+
 const PIC_BLOCK4_INDEX = 4;
 const PIC_BLOCK4_INPUT = PIC_BLOCK4_INDEX + 1;
 const picBaseBlock4Redeem = templateBlockRedeems[PIC_BLOCK4_INDEX];
@@ -2946,7 +3056,9 @@ const evaluateInput = (inputs, inputIndex, vm) => {
   };
 };
 
-const inputs = makeInputs();
+// The compact construction is the actual 22-input template graph. Apply the
+// preliminary strict input/whole-transaction gates to that same constructor.
+const inputs = makeTemplateInputs();
 const consensusOutcomes = inputs.map((_, index) => evaluateInput(inputs, index, consensusVm));
 const standardOutcomes = inputs.map((_, index) => evaluateInput(inputs, index, standardVm));
 const validData = verificationData(inputs);
@@ -3053,16 +3165,20 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
 
     regularPicCarrierBlocks.forEach((blockIndex, carrier) => {
       const inputIndex = blockIndex + 1;
-      const payload = inputsForFixture[inputIndex].payload;
-      fixtureRecords.slice(carrier * 2, carrier * 2 + 2).forEach((record, inCarrier) => {
-        const recordBytes = concat(
-          serializeLimbs((PIC_PROJECTIVE_RECORDS ? record.parameters : record.factor).map(BigInt)),
-          Uint8Array.from(Buffer.from(record.path, 'hex')),
-        );
-        assert(recordBytes.length === PIC_RECORD_BYTES,
-          `${fixtureName} window ${carrier * 2 + inCarrier} record length changed`);
-        payload.set(recordBytes, PIC_RECORD_REGION_OFFSET + inCarrier * PIC_RECORD_BYTES);
+      const slots = fixtureRecords.slice(carrier * 2, carrier * 2 + 2).map((record, slot) => {
+        const window = carrier * 2 + slot;
+        const recordBytes = record.index === 0
+          ? Uint8Array.from(Buffer.from(picCache.windowRoots[window], 'hex'))
+          : concat(
+            serializeLimbs(record.parameters.map(BigInt)),
+            Uint8Array.from(Buffer.from(record.path, 'hex')),
+          );
+        assert(recordBytes.length === (record.index === 0 ? 32 : PIC_RECORD_BYTES),
+          `${fixtureName} window ${window} compact record length changed`);
+        return recordBytes;
       });
+      const payload = concat(inputsForFixture[inputIndex].payload.slice(0, PIC_RECORD_REGION_OFFSET), ...slots);
+      inputsForFixture[inputIndex].payload = payload;
       inputsForFixture[inputIndex].unlocking = concat(
         encodeDataPush(payload),
         encodeDataPush(inputsForFixture[inputIndex].evaluation),
@@ -3090,7 +3206,8 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     });
     return inputsForFixture;
   };
-  const picAuthFixtureRows = picFixtureNames.map((fixtureName) => {
+  // Keep explicit positive controls for both physical record schemas used below.
+  const picAuthFixtureRows = [...new Set([...picFixtureNames, 'dense-worst', 'zero'])].map((fixtureName) => {
     const gateInputs = makePicGateInputs(fixtureName);
     const hosts = picAuthBatches.map((batch) => {
       const inputIndex = picAuthHostIndices.get(batch.host);
@@ -3140,24 +3257,31 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     return {
       inputIndex,
       payload: Uint8Array.from(inputsForFixture[inputIndex].payload),
-      recordOffset: PIC_RECORD_REGION_OFFSET + (window & 1) * PIC_RECORD_BYTES,
+      recordOffset: PIC_RECORD_REGION_OFFSET + ((window & 1) === 0 ? 0 : (() => {
+        const statement = decodeAuthenticationInstructions(inputsForFixture[0].unlocking)[1].data;
+        assert(statement?.length === statementBytes.length, 'PIC mutation statement framing changed');
+        return statement[public0Offset + window - 1] === 0 && statement[public1Offset + window - 1] === 0
+          ? 32 : PIC_RECORD_BYTES;
+      })()),
     };
   };
 
-  const changedFactorInputs = makePicGateInputs('committed');
+  const changedFactorInputs = makePicGateInputs('dense-worst');
   const changedFactor = mutatedRecordPayload(changedFactorInputs, 12);
   changedFactor.payload[changedFactor.recordOffset] ^= 1;
   replacePicGatePayload(changedFactorInputs, changedFactor.inputIndex, changedFactor.payload);
   const changedFactorRejection = picGateRejection('changed v4 PIC factor', changedFactorInputs, 12);
 
-  const changedPathInputs = makePicGateInputs('committed');
+  const changedPathInputs = makePicGateInputs('dense-worst');
   const changedPath = mutatedRecordPayload(changedPathInputs, 12);
   changedPath.payload[changedPath.recordOffset + PIC_FACTOR_BYTES + 7 * 32] ^= 1;
   replacePicGatePayload(changedPathInputs, changedPath.inputIndex, changedPath.payload);
   const changedPathRejection = picGateRejection('changed v4 PIC path', changedPathInputs, 12);
 
-  const changedScalarInputs = makePicGateInputs('committed');
-  const changedScalarStatement = Uint8Array.from(statementBytes);
+  const changedScalarInputs = makePicGateInputs('dense-worst');
+  const changedScalarStatement = Uint8Array.from(
+    decodeAuthenticationInstructions(changedScalarInputs[0].unlocking)[1].data,
+  );
   changedScalarStatement[public0Offset + 12] ^= 1;
   changedScalarInputs[0].unlocking = concat(
     encodeDataPush(transcriptHeader),
@@ -3169,7 +3293,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
   );
 
   const changedBatchCommitmentRejections = picAuthBatches.map((batch, batchIndex) => {
-    const changedRootInputs = makePicGateInputs('committed');
+    const changedRootInputs = makePicGateInputs('dense-worst');
     const changedRootRedeem = Uint8Array.from(changedRootInputs[PIC_BLOCK4_INPUT].redeem);
     changedRootRedeem[picHelperStart + picBatchCommitmentOffsets[batchIndex]] ^= 1;
     changedRootInputs[PIC_BLOCK4_INPUT].redeem = changedRootRedeem;
@@ -3188,7 +3312,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     };
   });
 
-  const changedBatchDomainInputs = makePicGateInputs('committed');
+  const changedBatchDomainInputs = makePicGateInputs('dense-worst');
   const changedBatchDomainRedeem = Uint8Array.from(
     changedBatchDomainInputs[PIC_BLOCK4_INPUT].redeem,
   );
@@ -3205,7 +3329,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     'changed v4 PIC batch domain', changedBatchDomainInputs, 12,
   );
 
-  const changedBatchOrderInputs = makePicGateInputs('committed');
+  const changedBatchOrderInputs = makePicGateInputs('dense-worst');
   const changedBatchOrder = mutatedRecordPayload(changedBatchOrderInputs, 12);
   const changedBatchOrderSecond = mutatedRecordPayload(changedBatchOrderInputs, 13);
   assert(changedBatchOrder.inputIndex === changedBatchOrderSecond.inputIndex,
@@ -3229,7 +3353,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     'changed v4 PIC record order', changedBatchOrderInputs, 12,
   );
 
-  const wrongCarrierInputs = makePicGateInputs('committed');
+  const wrongCarrierInputs = makePicGateInputs('dense-worst');
   const sourceRecord = mutatedRecordPayload(wrongCarrierInputs, 12);
   const targetRecord = mutatedRecordPayload(wrongCarrierInputs, 14);
   targetRecord.payload.set(
@@ -3241,7 +3365,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     'v4 PIC record under wrong carrier/window tag', wrongCarrierInputs, 14,
   );
 
-  const wrongCountInputs = makePicGateInputs('committed');
+  const wrongCountInputs = makePicGateInputs('dense-worst');
   const wrongCountBatch = picAuthBatches[1];
   const wrongCountInputIndex = picAuthHostIndices.get(wrongCountBatch.host);
   const wrongCountRedeem = padPicGateRedeem(
@@ -3261,7 +3385,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     'v4 PIC batch with changed count', wrongCountInputs, wrongCountBatch.firstWindow,
   );
 
-  const truncatedPathInputs = makePicGateInputs('committed');
+  const truncatedPathInputs = makePicGateInputs('dense-worst');
   const truncatedPath = mutatedRecordPayload(truncatedPathInputs, 12);
   const truncatedAt = truncatedPath.recordOffset + PIC_FACTOR_BYTES + 101;
   const truncatedRegionEnd = PIC_RECORD_REGION_OFFSET + PIC_RECORD_REGION_BYTES;
@@ -3272,7 +3396,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     'truncated v4 PIC path layout', truncatedPathInputs, 12,
   );
 
-  const extendedPathInputs = makePicGateInputs('committed');
+  const extendedPathInputs = makePicGateInputs('dense-worst');
   const extendedPath = mutatedRecordPayload(extendedPathInputs, 12);
   const extendedAt = extendedPath.recordOffset + PIC_FACTOR_BYTES + 101;
   extendedPath.payload.copyWithin(extendedAt + 1, extendedAt, truncatedRegionEnd - 1);
@@ -3298,7 +3422,11 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     const consensusRejected = consensusVm.verify(data) !== true;
     const standardRejected = standardVm.verify(data) !== true;
     assert(consensusRejected && standardRejected, `${name} passed a strict whole-transaction VM`);
-    return { name, consensusRejected, standardRejected };
+    return { name, consensusRejected, standardRejected,
+      scope: ['changed-first-PIC-factor', 'changed-first-PIC-path', 'changed-authenticated-PIC-path'].includes(name)
+        ? 'dense auxiliary PIC control; owning authenticator rejects after a positive control'
+        : 'actual compact transaction mutation' };
+
   };
   const templateLoaderLayout = (
     carrier, start, end, functionId,
@@ -3456,7 +3584,9 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     { name: 'changed-first-PIC-factor', offset: 0 },
     { name: 'changed-first-PIC-path', offset: PIC_FACTOR_BYTES + 7 * 32 },
   ].forEach(({ name, offset }) => {
-    const changed = cloneTemplateInputs();
+    // Zero-rich actual proofs omit these fields. Preserve their authentication
+    // coverage under the same shared helper with a positive dense control.
+    const changed = makePicGateInputs('dense-worst');
     const record = mutatedRecordPayload(changed, picAuthBatches[1].firstWindow);
     record.payload[record.recordOffset + offset] ^= 1;
     changed[record.inputIndex].payload = record.payload;
@@ -3689,26 +3819,33 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     !evaluateInput(fullChangedSiblingLockingLengthInputs, 0, standardVm).accepted,
   'changed fixed-width sibling locking length passed the coordinator under a strict VM');
 
-  const fullChangedPathInputs = cloneTemplateInputs();
-  const fullChangedPathInputIndex = regularPicCarrierBlocks[12 >> 1] + 1;
-  const fullChangedPathPayload = Uint8Array.from(
-    fullChangedPathInputs[fullChangedPathInputIndex].payload,
-  );
-  fullChangedPathPayload[
-    PIC_RECORD_REGION_OFFSET + PIC_FACTOR_BYTES + 7 * 32
-  ] ^= 1;
-  fullChangedPathInputs[fullChangedPathInputIndex].payload = fullChangedPathPayload;
-  fullChangedPathInputs[fullChangedPathInputIndex].unlocking = makeTemplateBlockUnlocking(
-    fullChangedPathPayload,
-    fullChangedPathInputs[fullChangedPathInputIndex].evaluation,
-    fullChangedPathInputs[fullChangedPathInputIndex].quotientChunk,
-    fullChangedPathInputs[fullChangedPathInputIndex].redeem,
-  );
+  const fullChangedPathInputs = makePicGateInputs('dense-worst');
+  const fullChangedPath = mutatedRecordPayload(fullChangedPathInputs, 12);
+  fullChangedPath.payload[fullChangedPath.recordOffset + PIC_FACTOR_BYTES + 7 * 32] ^= 1;
+  replacePicGatePayload(fullChangedPathInputs, fullChangedPath.inputIndex, fullChangedPath.payload);
+  picGateRejection('changed authenticated compact PIC path', fullChangedPathInputs, 12);
 
   const setRecomputedStatement = (changedInputs, changedStatement) => {
     assert(changedStatement.length === statementBytes.length &&
       !equalBytes(changedStatement, statementBytes), 'changed statement is not distinct and canonical');
-    const changedRoot = treeFor([changedStatement, ...blockPayloads]);
+    // Preserve the changed scalar's exact compact schema while retaining old
+    // authenticated factors/paths. A zero->nonzero change must not fail merely
+    // because a new record is absent: its old-index membership must fail.
+    regularPicCarrierBlocks.forEach((blockIndex, carrier) => {
+      const inputIndex = blockIndex + 1;
+      const slots = blockRecords[blockIndex].liftRecords.map((record, slot) => {
+        const window = carrier * 2 + slot;
+        return changedStatement[public0Offset + window] === 0 && changedStatement[public1Offset + window] === 0
+          ? Uint8Array.from(Buffer.from(picCache.windowRoots[window], 'hex'))
+          : record.payload;
+      });
+      const payload = concat(changedInputs[inputIndex].payload.slice(0, PIC_RECORD_REGION_OFFSET), ...slots);
+      changedInputs[inputIndex].payload = payload;
+      changedInputs[inputIndex].unlocking = makeTemplateBlockUnlocking(payload,
+        changedInputs[inputIndex].evaluation, changedInputs[inputIndex].quotientChunk,
+        changedInputs[inputIndex].redeem);
+    });
+    const changedRoot = treeFor([changedStatement, ...changedInputs.slice(1).map((input) => input.payload)]);
     const changedBeta = sha256(frame(
       'beta',
       concat(u32(blockPayloads.length), changedRoot),
@@ -4105,7 +4242,32 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     quotientTailInputIndex,
     standardVm,
   ).accepted, 'shifted quotient boundary passed a strict owning input');
+  const compactFramingInputs = [];
+  const compactTarget = 3;
+  for (const mode of ['truncated', 'extended', 'nonminimal']) {
+    const changed = cloneTemplateInputs();
+    const input = changed[compactTarget];
+    if (mode === 'nonminimal') {
+      assert(OpcodesBCH.OP_PUSHDATA_4 === 78, 'PUSHDATA4 opcode name changed');
+      input.unlocking = concat(Uint8Array.of(OpcodesBCH.OP_PUSHDATA_4),
+        u32(input.payload.length), input.payload, encodeDataPush(input.evaluation),
+        encodeDataPush(input.redeem));
+    } else {
+      input.payload = mode === 'truncated' ? input.payload.slice(0, -1) : concat(input.payload, Uint8Array.of(0));
+      input.unlocking = makeTemplateBlockUnlocking(input.payload, input.evaluation, input.quotientChunk, input.redeem);
+    }
+    assertTemplateMutationRejected(`${mode} compact producer framing`, changed, compactTarget);
+    compactFramingInputs.push({ name: `${mode}-compact-producer-framing`, inputs: changed });
+  }
+  const changedCompactZeroRoot = makePicGateInputs('zero');
+  const zeroRecord = mutatedRecordPayload(changedCompactZeroRoot, 6);
+  zeroRecord.payload[zeroRecord.recordOffset] ^= 1;
+  replacePicGatePayload(changedCompactZeroRoot, zeroRecord.inputIndex, zeroRecord.payload);
+  picGateRejection('changed compact zero-window root', changedCompactZeroRoot, 6);
   const fullRejectionFixtures = [
+    ...compactFramingInputs.map(({ name, inputs: changed }) => strictRejection(name, changed)),
+    { ...strictRejection('changed-compact-zero-window-root', changedCompactZeroRoot),
+      scope: 'zero auxiliary PIC control; owning authenticator rejects after a positive control' },
     ...templateFactoringMutationInputs.map(({ name, inputs: changed }) =>
       strictRejection(name, changed)),
     strictRejection('changed-fixed-width-sibling-locking', fullChangedSiblingLockingInputs),
@@ -4315,6 +4477,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
         name.includes('q132')),
     },
     regularDensityPadding: REGULAR_DENSITY_PADDING,
+    compactRegularDensityPadding,
     coordinatorDensityPadding: COORDINATOR_DENSITY_PADDING,
     picBlock2DensityPadding: PIC_BLOCK2_DENSITY_PADDING,
     picBlock4DensityPadding: PIC_BLOCK4_DENSITY_PADDING,
