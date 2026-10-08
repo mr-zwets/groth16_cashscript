@@ -1,0 +1,12 @@
+// The same executor loader serves all three inputs. Its commitment is derived
+// from the emitted shared program. Function 100 consumes the assembled body.
+export const executor = `
+  OP_DROP OP_DROP OP_SWAP OP_DROP OP_SWAP
+  OP_0 OP_INPUTBYTECODE NUM FRAGMENT_OFFSET OP_SPLIT OP_NIP NUM FRAGMENT_0_BYTES OP_SPLIT OP_DROP
+  OP_1 OP_INPUTBYTECODE NUM FRAGMENT_OFFSET OP_SPLIT OP_NIP NUM FRAGMENT_1_BYTES OP_SPLIT OP_DROP
+  OP_2 OP_INPUTBYTECODE NUM FRAGMENT_OFFSET OP_SPLIT OP_NIP NUM FRAGMENT_2_BYTES OP_SPLIT OP_DROP
+  OP_CAT OP_CAT OP_DUP OP_HASH256 DATA sharedHash256 OP_EQUALVERIFY
+  DEFINE_STACK sharedProgram CALL sharedProgram
+`;
+
+export const p2sh = 'OP_HASH256 DATA redeemHash256 OP_EQUAL';
