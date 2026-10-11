@@ -17,7 +17,7 @@ const numbers = {
 };
 
 // Preserve explicit push opcodes and unsigned payload lengths. Symbols describe
-// static function references; INVOKE_STACK preserves the three dynamic sites.
+// static function references; INVOKE_STACK preserves the two dynamic sites.
 export function assemble(body, identifiers, data = {}) {
   const tokens = body.trim() ? body.trim().split(/\s+/) : [];
   const encoded = [];
