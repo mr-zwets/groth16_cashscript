@@ -1,25 +1,25 @@
-# BN254 densless verifier: terminal-factor candidate 33,003
+# BN254 densless verifier: public-offset candidate 32,774
 
-This is a fixed-deployment BCH-native BN254 Groth16 source candidate derived
-from the reviewed 33,016 frontier. It adds `terminalSubsequenceB` (ID 34),
-whose body is `OP_PICK OP_MOD OP_OVER OP_7 OP_MUL`, at eleven terminal sites.
-The generated terminal redeem is 3,419 bytes, down from 3,432; the first four
-lockings and authenticated worker-root inputs remain unchanged. The terminal
-tail is `0x20 || root32 || 0x88`; the generated tail is the authority for the
-exact 32-byte worker root.
+This fixed-deployment BCH-native BN254 Groth16 candidate reduces the shared
+program and updates its dependent slice offsets and P2SH32 commitments. It
+retains the public-only witness producer and fixed public verification key.
+Relative to the reviewed 33,003 source, executable changes are confined to
+`constants.mjs`, `shared.mjs` and `terminal.mjs`; the third fragment shrinks
+from 810 to 581 bytes. The shared/executor and terminal locking commitments
+change. The genesis locking remains unchanged. Updated locking scripts require
+matching deployment outputs; this package does not assume existing funded coins.
 
-The challenge score is 176 bytes below the published 33,179-byte deployment.
-The latest reduction is 13 bytes relative to the reviewed 33,016 candidate;
-matched supplied positive transactions add 2,457 native operation-cost units.
-
-The supplied public-only corpus and fixed public VK are retained. This is
-experimental source recovery; it does not claim historical compiler recovery,
-arbitrary-VK emission, universal soundness, full-node admission, live network
-acceptance, or an op-cost schedule recommendation.
+The challenge score is **32,774**, comprising 32,539 script bytes and 235 bytes
+of challenge transaction overhead. The canonical serialized spending transaction
+is **32,599 bytes**, with five inputs. The 175 bytes of spent locking scripts
+count toward the challenge score but are not serialized in the spending transaction.
+This saves 229 bytes against 33,003 and 405 against the published 33,179 deployment.
+Canonical modeled operation cost increases by 223,694 to 19,702,166.
 
 ## Reproduce
 
-From this directory, using Node 25.5.0 and pnpm 10.12.2:
+From this directory, using the pinned package environment (Node 25.5.0 and
+pnpm 10.12.2):
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
@@ -27,43 +27,54 @@ node build.mjs generated-programs.json
 node export.mjs source-export.json
 ```
 
-The export regenerates the five supplied public fixtures. Direct registry
-dependencies remain locked: Libauth 3.1.0-next.8 and Noble curves 2.2.0. No
-CashScript compiler checkout is needed.
+The export regenerates five supplied public fixtures. Direct registry dependencies
+remain locked: Libauth 3.1.0-next.8 and Noble curves 2.2.0. No historical CashScript
+compiler checkout is required. Benchmark labels and checkpoints come from the
+owning benchmark corpus; the source export contains transaction bytecode only.
 
-## Validation and scope
+## Validation and limits
 
-The reviewed Libauth controls report 32,768 script bytes, a 33,003 challenge
-score, 32,828 serialized spending bytes, and 19,478,472 modeled operation cost.
-The unchanged owning benchmark
-records 56 primary and 16 binding current/spec whole-transaction contexts,
-360 explicit `evaluatePair` input evaluations, and 72 separate `vm.verify`
-calls. The corpus has five positive, five ordinary-negative and four
-invalid-input run groups per current/spec mode. These fixed-corpus controls do
-not establish universal soundness or full-node admission.
+The completed Z4 package review covers eight actual commands: both source
+builds, both exports, expanded functional controls, official scoring, and owner
+and adapter typechecks. Candidate-only supplied Libauth controls cover 72 whole
+transaction contexts across current/spec consensus/standard modes: 20 accepted
+positives and 52 expected rejects, including 16 manual proof-splice rejects.
+There are 360 scheduled per-input evaluations. Both candidate and baseline
+together comprise 144 contexts and 720 scheduled per-input evaluations. These
+counts do not imply that rejected transactions execute every body successfully.
+Official current/spec controls report correctness, standardness and BCH
+compatibility, four supplied proof checks, five ordinary-negative groups,
+four isolated invalid-input groups and four cross-stage binding seams.
 
-The separate finite B100 native gate observed canonical costs of 19,492,370
-consensus and 19,558,674 standard across 36 current-mode contexts, accepting 10 and
-rejecting 26. It observed 122 input evaluations against 180 scheduled inputs;
-the minimum accepted-input budget margin was 30,978. Source-derived DEFINE
-body storage adds 13,898 native accounting units, matching the observed
-consensus native-minus-model difference under the pinned charging rule.
-These are finite synthetic resource
-results, not a full-node or live-network admission claim.
+The exact package uses synthetic five-input transactions with zero-hash outpoints,
+1,000-satoshi source outputs, sequence zero, and one 1,000-satoshi OP_RETURN output.
+These are library/script controls, not funded full-node, mempool or live-network
+admission.
 
-Selected canonical base-100 cached VerifyScript wall time is now measured on a
-shared M4 Max: standard median 3.589056 ms (3.563547–3.815732), consensus
-3.588507 ms (3.524997–3.826565), across four counterbalanced processes.
-Matched annual and accepted bare-multisig relative metrics, absolute reference
-denominators, setup and process times are reported in
-[benchmark PR36](https://github.com/mr-zwets/zk-verifier-bench/pull/36).
-Paired 33,003/33,016 ratio ranges cross 1 in both modes; no consistent speedup
-or regression was established. The native resource gate's whole-process
-diagnostic is not verification time. Op-cost work remains experimental and
-does not recommend changing a schedule or establish VM memory or full-stock
-performance.
+A separate completed B100 native replay review covers 36 contexts per variant
+(10 accepted positives and 26 expected rejects), with 122 observed input records
+against 180 scheduled inputs per variant. Failed transactions stop early.
+Canonical candidate native cost is 19,715,377 consensus and 19,780,145 standard;
+matched increases over 33,003 are 223,007 and 221,471 respectively. The minimum
+accepted standard input budget margin is 30,978. These are native script-resource
+controls in synthetic transactions, not full-node standardness or live admission.
+All five actual gate jobs exited zero. The frozen aggregate remains FAIL because
+its postprocessor indexed a dictionary as a list; independent offline correction
+validated the same raw outputs without rerunning native jobs. No standalone
+DEFINE-storage or VM-memory conclusion is inferred from the cost difference.
 
-Historical AI-assisted source recovery: GPT-6 Astra, directed by Kallisti;
-subsequent publication assistance by Codex. The fixed public deployment,
-Fiat-Shamir, cofactor-equivalence and supplied-corpus qualifications remain;
-broader resource closure remains open research.
+Cached VerifyScript timing for 32,774 is unmeasured. Measurements from 33,003 or earlier
+sources must not be transferred to these changed bytes.
+
+Op-cost research is experimental. The methodology requires measured absolute
+VerifyScript times and per-spending-byte costs, matched VMLA annual and accepted
+1-of-3 bare-multisig reference ratios and absolute denominators, repeated paired
+schedule comparisons, and separate setup/process times. Actual VM-attributable
+memory needs its own attribution controls; process RSS is not a substitute.
+No schedule change, worst-case ceiling or optimum is recommended here.
+
+Historical AI-assisted source recovery: **GPT-6 Astra**, directed by Kallisti;
+subsequent source, research and publication assistance by Codex. This fixed
+public deployment does not recover the historical compiler or arbitrary-VK
+emission, prove universal soundness, or close the remaining Fiat-Shamir,
+cofactor-equivalence, whole-verifier and adversarial resource obligations.
