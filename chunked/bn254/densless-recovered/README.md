@@ -51,11 +51,17 @@ consensus native-minus-model difference under the pinned charging rule.
 These are finite synthetic resource
 results, not a full-node or live-network admission claim.
 
-Absolute VerifyScript wall time and VMLA-relative verification time remain
-unmeasured for this candidate. The native gate's whole-process diagnostic is
-not verification time. Op-cost work remains experimental: it compares modeled
-Libauth accounting with separate native resource accounting to inform VM
-schedule research and does not recommend changing a schedule.
+Selected canonical base-100 cached VerifyScript wall time is now measured on a
+shared M4 Max: standard median 3.589056 ms (3.563547–3.815732), consensus
+3.588507 ms (3.524997–3.826565), across four counterbalanced processes.
+Matched annual and accepted bare-multisig relative metrics, absolute reference
+denominators, setup and process times are reported in
+[benchmark PR36](https://github.com/mr-zwets/zk-verifier-bench/pull/36).
+Paired 33,003/33,016 ratio ranges cross 1 in both modes; no consistent speedup
+or regression was established. The native resource gate's whole-process
+diagnostic is not verification time. Op-cost work remains experimental and
+does not recommend changing a schedule or establish VM memory or full-stock
+performance.
 
 Historical AI-assisted source recovery: GPT-6 Astra, directed by Kallisti;
 subsequent publication assistance by Codex. The fixed public deployment,
