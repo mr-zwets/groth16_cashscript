@@ -61,4 +61,19 @@ Universal input-5 helper `OP_INVOKE 0x65` composition, arbitrary-witness
 producer/resource bounds and whole-graph proof remain incomplete. Fiat-Shamir
 PIT, cofactor-equivalence and input-validation qualifications remain in force.
 
+## Experimental VM operation-cost measurements
+
+A separate controlled study measured identical compact and fixed transactions at
+instruction bases 100, 50 and 20. It reports both absolute cached `VerifyScript`
+wall times and matched VMLA annual/accepted-bare-multisig normalization, with
+absolute reference times, repeated-process ranges and setup costs separately.
+The supplied canonical transactions accepted all 22 inputs in both native modes
+at each base. These finite results do not establish universal security, live
+network admission or a replacement schedule.
+
+The companion [benchmark PR](https://github.com/mr-zwets/zk-verifier-bench/pull/37)
+includes the methods, raw measurement records and reproduction code under
+`research/bch-vm-opcost/20261012-bls`. Original GPT-6 Astra attribution is retained;
+subsequent controlled timing and assurance work used Codex, directed by Kallisti.
+
 AI-assisted research and implementation: GPT-6 Astra, directed by Kallisti.
