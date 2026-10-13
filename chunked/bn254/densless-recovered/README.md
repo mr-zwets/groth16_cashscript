@@ -1,25 +1,25 @@
-# BN254 densless verifier: public-offset candidate 32,774
+# BN254 densless verifier: public-offset base-field helper candidate 32,547
 
-This fixed-deployment BCH-native BN254 Groth16 candidate reduces the shared
-program and updates its dependent slice offsets and P2SH32 commitments. It
-retains the public-only witness producer and fixed public verification key.
-Relative to the reviewed 33,003 source, executable changes are confined to
-`constants.mjs`, `shared.mjs` and `terminal.mjs`; the third fragment shrinks
-from 810 to 581 bytes. The shared/executor and terminal locking commitments
-change. The genesis locking remains unchanged. Updated locking scripts require
-matching deployment outputs; this package does not assume existing funded coins.
+This fixed-deployment BCH-native BN254 Groth16 candidate preserves the selected
+32,774 public-only verifier and replaces repeated `NUM BASE_FIELD` sequences in
+the shared and terminal programs with one positive-ID helper. The source change
+is confined to `constants.mjs`, `shared.mjs`, and `terminal.mjs`; `genesis.mjs`
+remains byte-for-byte identical to the selected baseline. Regenerated deployment
+outputs must be used together: the helper changes shared, terminal, and their
+P2SH32 commitments while preserving the fixed public verification key and
+public-witness semantics.
 
-The challenge score is **32,774**, comprising 32,539 script bytes and 235 bytes
-of challenge transaction overhead. The canonical serialized spending transaction
-is **32,599 bytes**, with five inputs. The 175 bytes of spent locking scripts
-count toward the challenge score but are not serialized in the spending transaction.
-This saves 229 bytes against 33,003 and 405 against the published 33,179 deployment.
-Canonical modeled operation cost increases by 223,694 to 19,702,166.
+The reviewed package produces a challenge score of **32,547**: 32,312 script
+bytes plus 235 challenge-overhead bytes, and 32,372 canonical serialized
+spending bytes. This is 227 bytes smaller than the selected 32,774 deployment
+and 632 bytes below the published 33,179 deployment. The completed native
+review records candidate costs of 20,111,940 consensus and 20,175,812 standard,
+with minimum accepted input margins of 44,546 consensus and 30,978 standard in
+the supplied corpus.
 
 ## Reproduce
 
-From this directory, using the pinned package environment (Node 25.5.0 and
-pnpm 10.12.2):
+From this directory, using the pinned package environment:
 
 ```sh
 pnpm install --frozen-lockfile --ignore-scripts
@@ -27,54 +27,23 @@ node build.mjs generated-programs.json
 node export.mjs source-export.json
 ```
 
-The export regenerates five supplied public fixtures. Direct registry dependencies
-remain locked: Libauth 3.1.0-next.8 and Noble curves 2.2.0. No historical CashScript
-compiler checkout is required. Benchmark labels and checkpoints come from the
-owning benchmark corpus; the source export contains transaction bytecode only.
+The export regenerates five supplied public fixtures. Registry dependencies are
+locked in `pnpm-lock.yaml`; benchmark labels and checkpoints belong to the
+companion benchmark corpus. Updated locking scripts require matching deployment
+outputs and do not assume existing funded coins.
 
 ## Validation and limits
 
-The completed Z4 package review covers eight actual commands: both source
-builds, both exports, expanded functional controls, official scoring, and owner
-and adapter typechecks. Candidate-only supplied Libauth controls cover 72 whole
-transaction contexts across current/spec consensus/standard modes: 20 accepted
-positives and 52 expected rejects, including 16 manual proof-splice rejects.
-There are 360 scheduled per-input evaluations. Both candidate and baseline
-together comprise 144 contexts and 720 scheduled per-input evaluations. These
-counts do not imply that rejected transactions execute every body successfully.
-Official current/spec controls report correctness, standardness and BCH
-compatibility, four supplied proof checks, five ordinary-negative groups,
-four isolated invalid-input groups and four cross-stage binding seams.
-
-The exact package uses synthetic five-input transactions with zero-hash outpoints,
-1,000-satoshi source outputs, sequence zero, and one 1,000-satoshi OP_RETURN output.
-These are library/script controls, not funded full-node, mempool or live-network
-admission.
-
-A separate completed B100 native replay review covers 36 contexts per variant
-(10 accepted positives and 26 expected rejects), with 122 observed input records
-against 180 scheduled inputs per variant. Failed transactions stop early.
-Canonical candidate native cost is 19,715,377 consensus and 19,780,145 standard;
-matched increases over 33,003 are 223,007 and 221,471 respectively. The minimum
-accepted standard input budget margin is 30,978. These are native script-resource
-controls in synthetic transactions, not full-node standardness or live admission.
-All five actual gate jobs exited zero. The frozen aggregate remains FAIL because
-its postprocessor indexed a dictionary as a list; independent offline correction
-validated the same raw outputs without rerunning native jobs. No standalone
-DEFINE-storage or VM-memory conclusion is inferred from the cost difference.
-
-Cached VerifyScript timing for 32,774 is unmeasured. Measurements from 33,003 or earlier
-sources must not be transferred to these changed bytes.
-
-Op-cost research is experimental. The methodology requires measured absolute
-VerifyScript times and per-spending-byte costs, matched VMLA annual and accepted
-1-of-3 bare-multisig reference ratios and absolute denominators, repeated paired
-schedule comparisons, and separate setup/process times. Actual VM-attributable
-memory needs its own attribution controls; process RSS is not a substitute.
-No schedule change, worst-case ceiling or optimum is recommended here.
+The completed finite package and native reviews cover current/spec
+consensus/standard controls, positive and negative supplied fixtures, isolated
+input validation, binding seams, and 36 native contexts per variant. The native
+corpus contains 10 accepted and 26 rejected contexts per variant; rejected
+transactions may stop before later inputs, so 122 observed inputs are not 180
+executed inputs. These synthetic controls establish the recorded finite result;
+they do not establish full-node, mempool, live-network, universal-witness, or
+whole-block admission. Historical compiler recovery and arbitrary-VK emission,
+universal soundness, Fiat-Shamir and cofactor-equivalence obligations also
+remain outside this source package.
 
 Historical AI-assisted source recovery: **GPT-6 Astra**, directed by Kallisti;
-subsequent source, research and publication assistance by Codex. This fixed
-public deployment does not recover the historical compiler or arbitrary-VK
-emission, prove universal soundness, or close the remaining Fiat-Shamir,
-cofactor-equivalence, whole-verifier and adversarial resource obligations.
+current source and publication assistance: **GPT-6.1 Sol**, directed by Kallisti.
