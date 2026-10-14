@@ -6,10 +6,14 @@ determine each record length. Worker parsing, predecessor extraction and
 Coordinator commitment framing use those same lengths; shortening happens
 before commitment and challenge construction.
 
-The committed challenge score is **70,009**, versus **79,948** for the existing
-fixed layout. Six of ten supplied fixtures shrink and four grow. The largest
-supplied score is **90,169** (89,399 serialized spending bytes). Keep the fixed
-entry as a Pareto alternative. This uses the current base-100 opcode schedule.
+The current candidate challenge score is **69,947**, versus **79,948** for the
+existing fixed layout and 62 fewer score bytes than the prior compact candidate.
+Six of ten supplied fixtures shrink and four grow. The largest supplied score is
+**90,107** (89,337 serialized spending bytes). Keep the fixed entry as a Pareto
+alternative. This uses the current base-100 opcode schedule. The candidate
+remaps exactly three template identifiers: `101 -> 16`, `117 -> 15`, and
+`104 -> -1`; identifiers 102 and 103 are unchanged. This is a finite candidate
+record, not a universal resource or deployment claim.
 
 ## Reproduction
 
@@ -38,27 +42,32 @@ RPA_COMPACT_REGULAR_DENSITY_PADDING='{"3":444,"5":432,"6":423,"7":431,"8":413,"9
 node chunked/bls12-381/run_full_multiproof.mjs
 ```
 
-Generator SHA256:
-`1d218a27133d198c348b8757171ff0575d9082250b1a574c447e5790665721b2`.
-The recorded 220-pair resource export SHA256 is
-`f0ef961d062c6bc065878fdb2e21446320ac8db57b32a8a1c709d4a212fa713a`.
+Candidate generator SHA256 (an export pin, not a Git revision):
+`7d21a55fbab9146ba62bf97321e2160e047524189041ee7c809311b7affad691`.
+The candidate 220-pair resource export SHA256 is
+`e7ad9eaaab5cbc1cc29427098a6e7184a9efbbcbfeb43515175295c97d820d28`.
+The candidate length-prefixed locking-set SHA256 is
+`1db77c2b7c6a0c6a39979cf5aaac5838abe766c4785ecbc4080ca395d264649e`.
 
 ## Validation and scope
 
 All ten source fixtures regenerate the exact 220 locking/unlocking pairs.
-The source runner records 540 rejection cases per VM mode, including auxiliary
-PIC cases; these are not 540 distinct production-proof attacks. The benchmark
-passes all 22 negative fixtures and nine additional proof checks. Its actual
-BCH_SPEC whole-transaction replay accepts ten positives and rejects 22
-negatives in each of consensus and standard mode (64 calls, 1,408 separate
-input diagnostics). Synthetic stateless checks do not establish live mempool,
-fee-policy or chain-state admission.
+The source runner records 540 mutation cases per BCH2026 consensus/standard
+mode; these are source/Libauth checks, not 540 native rejections. The separate
+native gate covers 64 contexts: 20 accepted and 44 rejected across 566 actual
+calls. The candidate benchmark passes all 22 negative fixtures and all 9/9
+proof-generality checks. The separate supplied worst-case fixture also passes.
+Synthetic stateless checks do not establish live
+mempool, fee-policy or chain-state admission.
 
-Native accounting includes an additional 99,480 DEFINE-body storage charge
-omitted by the pinned Libauth accounting. The supplied-corpus native resource
-checks and independent package review passed within their bounded scope.
-Universal input-5 helper `OP_INVOKE 0x65` composition, arbitrary-witness
+For this candidate, native-minus-Libauth DEFINE-body accounting is 99,442
+operation-cost units per mode (`42,779,223 - 42,679,781` and
+`42,969,175 - 42,869,733`). The prior baseline's 99,480-unit figure remains
+historical and is not overwritten by this
+candidate. The supplied-corpus native resource checks and independent package
+review passed within their bounded scope.
+Universal input-5 helper `OP_INVOKE 0x10` (historically `0x65`) composition, arbitrary-witness
 producer/resource bounds and whole-graph proof remain incomplete. Fiat-Shamir
 PIT, cofactor-equivalence and input-validation qualifications remain in force.
 
-AI-assisted research and implementation: GPT-6 Astra, directed by Kallisti.
+AI-assisted research and implementation: GPT-6.1 Sol, directed by Kallisti; prior historical source credits GPT-6 Astra.

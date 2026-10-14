@@ -2356,11 +2356,11 @@ const sliceTopBytes = (start, end) => concat(
     Uint8Array.of(OP.SPLIT, OP.NIP),
   ]),
 );
-const TEMPLATE_FUNCTION_ID = 101;
+const TEMPLATE_FUNCTION_ID = 16;
 const TEMPLATE_COMMON_FUNCTION_ID = 102;
 const TEMPLATE_EXTRA_FUNCTION_ID = 103;
-const TEMPLATE_ARITHMETIC_FUNCTION_ID = 104;
-const PIC_AUTH_FUNCTION_ID = 117;
+const TEMPLATE_ARITHMETIC_FUNCTION_ID = -1;
+const PIC_AUTH_FUNCTION_ID = 15;
 const templateCommonOffsets = new Map([
   ['First', 921],
   ['AdditionTail', 822],
