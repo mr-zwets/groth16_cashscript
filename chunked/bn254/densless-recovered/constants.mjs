@@ -9,7 +9,7 @@ export const deploymentTag = Buffer.from('9c1f30d6d0762b66a52c266e919b1fa2523e19
 
 export const layout = {
   fragmentOffset: 302,
-  fragmentLengths: [867, 982, 581],
+  fragmentLengths: [867, 982, 564],
   quotientLengths: [1248, 1248, 1248],
   quotientSuffixLengths: [0, 0, 0],
   quotientSuffixBytes: [0x5a, 0x79, 0x98],

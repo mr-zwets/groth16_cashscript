@@ -1,25 +1,27 @@
-# BN254 densless verifier: shared-loader candidate 32,529
+# BN254 densless verifier: bounded-slice candidate 32,512
 
-This fixed-deployment BCH-native BN254 Groth16 candidate factors the three
-repeated fragment extractions in the selected 32,547 executor into one local
-helper. Only `build.mjs` and `loader.mjs` change executable source. The helper's
-function identifier is the byte string `81`, emitted using `OP_1NEGATE`; it is
-distinct from the shared program's existing identifiers. The build checks for
-identifier collisions. The helper preserves the alternate stack and returns
-the selected fragment prefix.
+This fixed-deployment BCH-native BN254 Groth16 verifier reconstructs the public
+PairFold-5 densless artifact with public-only witness generation. Its shared
+input reader returns the exact requested slice using two range-checked SPLIT
+operations. The helper consumes length, offset and input index, preserves the
+caller prefix and alternate stack, and returns only the slice.
 
-Each of the first three executor redeems decreases from 85 to 79 bytes.
-Genesis remains byte-for-byte unchanged. The terminal keeps its length but
-binds the new worker-locking root, so the regenerated executor and terminal
-locking scripts must be deployed together. The fixed public verification key,
-public-witness semantics and fragment partition remain unchanged.
+The helper decreases from 24 to 7 opcode bytes relative to the selected 32,529
+candidate. Shared fragments are 867, 982 and 564 bytes; input 2's fixed-table
+and quotient payloads begin at offsets 3432 and 4363. Both consumers use these
+relocated cursors. The inherited fragment-reader loader uses a distinct
+function identifier and the build checks for identifier collisions.
 
-The completed package produces a challenge score of **32,529**: 32,294 script
-bytes plus 235 challenge-overhead bytes, with five inputs and 32,354 canonical
-serialized spending bytes. All five supplied spending transactions are 18
-bytes smaller than the 32,547 deployment. The challenge score includes the
-175 bytes of spent locking scripts; these are distinct from spending-transaction
-serialization.
+The shared program is 2,413 bytes. Executor redeems remain 79 bytes, genesis
+4,008 bytes and terminal 3,366 bytes. Reproduction regenerates the executor and
+terminal locking commitments together. The public verification key, public
+witness semantics and proof/context checks remain fixed.
+
+The completed finite package scores **32,512**: 32,277 script bytes plus 235
+challenge-overhead bytes, with five inputs and 32,337 canonical serialized
+spending bytes. Each supplied spending transaction is 17 bytes smaller than
+the 32,529 deployment. The challenge includes 175 bytes of spent locking
+scripts, which are distinct from spending-transaction serialization.
 
 ## Reproduce
 
@@ -33,21 +35,24 @@ node export.mjs source-export.json
 
 The export regenerates five supplied public fixtures. Registry dependencies are
 locked in `pnpm-lock.yaml`; benchmark labels and checkpoints belong to the
-companion benchmark corpus. Updated locking scripts require matching deployment
-outputs and do not assume existing funded coins.
+companion corpus. Deployment outputs must match the regenerated locking scripts.
 
 ## Validation and limits
 
-The finite package checks cover 144 whole-transaction contexts across
-current/spec consensus/standard, including positive and negative supplied
-fixtures, isolated input validation and binding seams. Native current-rules
-replay covers 36 contexts per variant: 10 accepted and 26 rejected. Rejected
-transactions may stop before later inputs, so 122 observed inputs are not 180
-executed inputs. These synthetic controls establish the recorded finite result;
-they do not establish full-node, mempool, live-network, universal-witness, or
-whole-block admission. Historical compiler recovery and arbitrary-VK emission,
-universal soundness, Fiat-Shamir and cofactor-equivalence obligations also
-remain outside this source package.
+Checks cover 144 whole-transaction contexts across current/spec
+consensus/standard, including positive proofs, ordinary negatives, input
+validation and binding seams. Direct helper checks cover 152 evaluations of
+slice boundaries and malformed numeric arguments. Equivalent helper behavior
+assumes sufficient execution resources; internal failure diagnostics and
+resource-limit acceptance may differ.
+
+Native current-rule replay covers 36 contexts per variant: 10 accepted and 26
+rejected, with 122 actual input calls. Canonical native costs are 20,036,462
+consensus and 20,099,950 standard. The minimum accepted input margins are
+44,564 and 30,996. These are finite synthetic verifier checks, without
+full-node or public-network admission. Historical compiler recovery,
+arbitrary-VK emission, universal soundness, Fiat-Shamir and cofactor-equivalence
+obligations remain outside this package.
 
 Historical AI-assisted source recovery: **GPT-6 Astra**, directed by Kallisti;
 current source and publication assistance: **GPT-6.1 Sol**, directed by Kallisti.
