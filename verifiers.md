@@ -33,7 +33,8 @@ axes; this doc is the map. Individual folders have the authoritative per-verifie
 | `bch-groth16-chunked-covenant-residue` | chunked, quotient-torus covenant chain | **12 tx / 93,938 B score / 93,936 B wire / 69.89M op** | standard-relayable measured fixture suite; token-bound state thread |
 | `bch-groth16-intratx` | chunked, intra-tx linked | **42 inputs / 330,580 B / 262.68M op** | whole verifier in one (non-standard) tx |
 | `bch-groth16-grouped` | chunked, grouped | **42 inputs / 330,628 B score / 261.50M op** | standard-relayable in 5 txs |
-| `bch-groth16-intratx-residue` | chunked, intra-tx + quotient-torus residue | **11 inputs / 86,950 B score / 86,565 B wire / 68.49M op** | current-BCH standard; smallest current-BCH full verifier in this benchmark |
+| `bch-groth16-intratx-residue` | chunked, intra-tx + quotient-torus residue | **11 inputs / 86,950 B score / 86,565 B wire / 68.49M op** | current-BCH standard |
+| `bch-groth16-intratx-pairfold5-densless` | chunked, intra-tx PairFold-5 densless bounded-slice candidate | **5 inputs / 32,507 B score / 32,332 B wire** | authenticated finite current/spec proof and native gates; 20,036,281 consensus / 20,099,769 standard native cost |
 | `bch-groth16-grouped-residue` | chunked, grouped + residue | **26 inputs / 224,830 B / 179.59M op** | standard-relayable in 3 txs |
 | `bch-groth16-intratx-residue-large` | chunked, intra-tx + quotient-torus residue, **`bch-spec`** | **4 inputs / 58,823 B score / 58,683 B wire / 68.32M op** | proposed-VM-only; passes its standard-policy model; own leaderboard category — see [Target VM](#target-vm-bch-spec) |
 | `bch-pairing-chunked` | chunked pairing-only, covenant | **20 inputs / 175,788 B / 138.94M op**; score **178,368** | Miller-boundary milestone |
