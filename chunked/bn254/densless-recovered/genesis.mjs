@@ -60,11 +60,11 @@ export const functions = [
   { name: 'genesisSequence18', originalId: 18, body: `
     CALL genesisSequence2 OP_4 CALL genesisSequence29
   ` },
-  { name: 'genesisSequence19', originalId: 19, body: `
+  { name: 'genesisSequence19', originalId: 8, body: `
     OP_SWAP OP_TOALTSTACK OP_SWAP OP_TOALTSTACK OP_SWAP OP_TOALTSTACK OP_SWAP OP_TOALTSTACK OP_SWAP
     OP_TOALTSTACK OP_SWAP OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK
   ` },
-  { name: 'genesisSequence20', originalId: 20, body: `
+  { name: 'genesisSequence20', originalId: 11, body: `
     CALL genesisSequence3 CALL genesisSequence3 OP_PUSHBYTES_1 0x5b OP_PICK OP_2 CALL genesisSequence28
   ` },
   { name: 'genesisSequence21', originalId: 21, body: `
@@ -81,7 +81,7 @@ export const functions = [
   { name: 'genesisSequence24', originalId: 24, body: `
     NUM BASE_FIELD OP_ADD
   ` },
-  { name: 'genesisSequence25', originalId: 25, body: `
+  { name: 'genesisSequence25', originalId: 10, body: `
     OP_BIN2NUM OP_SWAP OP_PUSHBYTES_1 0x20 OP_SPLIT OP_OVER OP_BIN2NUM OP_SWAP OP_PUSHBYTES_1 0x20 OP_SPLIT
     OP_OVER
   ` },
