@@ -1,21 +1,25 @@
-# BN254 densless verifier: public-offset base-field helper candidate 32,547
+# BN254 densless verifier: shared-loader candidate 32,529
 
-This fixed-deployment BCH-native BN254 Groth16 candidate preserves the selected
-32,774 public-only verifier and replaces repeated `NUM BASE_FIELD` sequences in
-the shared and terminal programs with one positive-ID helper. The source change
-is confined to `constants.mjs`, `shared.mjs`, and `terminal.mjs`; `genesis.mjs`
-remains byte-for-byte identical to the selected baseline. Regenerated deployment
-outputs must be used together: the helper changes shared, terminal, and their
-P2SH32 commitments while preserving the fixed public verification key and
-public-witness semantics.
+This fixed-deployment BCH-native BN254 Groth16 candidate factors the three
+repeated fragment extractions in the selected 32,547 executor into one local
+helper. Only `build.mjs` and `loader.mjs` change executable source. The helper's
+function identifier is the byte string `81`, emitted using `OP_1NEGATE`; it is
+distinct from the shared program's existing identifiers. The build checks for
+identifier collisions. The helper preserves the alternate stack and returns
+the selected fragment prefix.
 
-The reviewed package produces a challenge score of **32,547**: 32,312 script
-bytes plus 235 challenge-overhead bytes, and 32,372 canonical serialized
-spending bytes. This is 227 bytes smaller than the selected 32,774 deployment
-and 632 bytes below the published 33,179 deployment. The completed native
-review records candidate costs of 20,111,940 consensus and 20,175,812 standard,
-with minimum accepted input margins of 44,546 consensus and 30,978 standard in
-the supplied corpus.
+Each of the first three executor redeems decreases from 85 to 79 bytes.
+Genesis remains byte-for-byte unchanged. The terminal keeps its length but
+binds the new worker-locking root, so the regenerated executor and terminal
+locking scripts must be deployed together. The fixed public verification key,
+public-witness semantics and fragment partition remain unchanged.
+
+The completed package produces a challenge score of **32,529**: 32,294 script
+bytes plus 235 challenge-overhead bytes, with five inputs and 32,354 canonical
+serialized spending bytes. All five supplied spending transactions are 18
+bytes smaller than the 32,547 deployment. The challenge score includes the
+175 bytes of spent locking scripts; these are distinct from spending-transaction
+serialization.
 
 ## Reproduce
 
@@ -34,10 +38,10 @@ outputs and do not assume existing funded coins.
 
 ## Validation and limits
 
-The completed finite package and native reviews cover current/spec
-consensus/standard controls, positive and negative supplied fixtures, isolated
-input validation, binding seams, and 36 native contexts per variant. The native
-corpus contains 10 accepted and 26 rejected contexts per variant; rejected
+The finite package checks cover 144 whole-transaction contexts across
+current/spec consensus/standard, including positive and negative supplied
+fixtures, isolated input validation and binding seams. Native current-rules
+replay covers 36 contexts per variant: 10 accepted and 26 rejected. Rejected
 transactions may stop before later inputs, so 122 observed inputs are not 180
 executed inputs. These synthetic controls establish the recorded finite result;
 they do not establish full-node, mempool, live-network, universal-witness, or

@@ -6,7 +6,7 @@ import {OpcodesBCH, encodeAuthenticationInstructions, encodeDataPush, bigIntToVm
 import * as shared from './shared.mjs';
 import * as genesis from './genesis.mjs';
 import * as terminal from './terminal.mjs';
-import {executor, p2sh} from './loader.mjs';
+import {executor, fragmentReader, p2sh} from './loader.mjs';
 import {BASE_FIELD, SCALAR_FIELD, deploymentTag, layout} from './constants.mjs';
 
 const hash256 = bytes => createHash('sha256').update(createHash('sha256').update(bytes).digest()).digest();
@@ -56,7 +56,23 @@ export function build() {
   const programs = {}, declarations = {}, constants = {deploymentTag};
   for (const [name, source] of Object.entries({shared, genesis, terminal})) {
     if (name === 'terminal') {
-      programs.executor = assemble(executor, new Map([['sharedProgram', 100]]), constants);
+      const loaderIdentifiers = new Map([['fragmentReader', -1], ['sharedProgram', 100]]);
+      const globalFunctionKeys = [
+        ...loaderIdentifiers.values(),
+        ...shared.functions.map(f => f.originalId),
+      ].map(id => Buffer.from(bigIntToVmNumber(BigInt(id))).toString('hex'));
+      assert.equal(new Set(globalFunctionKeys).size, globalFunctionKeys.length,
+        'loader/shared function identifier byte collision');
+      const fragmentReaderBytecode = assemble(fragmentReader, loaderIdentifiers, constants);
+      const fragmentReaderDeclaration = Buffer.from([
+        ...encodeDataPush(fragmentReaderBytecode),
+        ...encodeDataPush(bigIntToVmNumber(-1n)),
+        OpcodesBCH.OP_DEFINE,
+      ]);
+      programs.executor = Buffer.concat([
+        fragmentReaderDeclaration,
+        assemble(executor, loaderIdentifiers, constants),
+      ]);
       const workerLockings = [programs.executor, programs.executor, programs.executor, programs.genesis]
         .map(redeem => assemble(p2sh, new Map(), {redeemHash256: hash256(redeem)}));
       constants.workerLockingRoot = hash256(Buffer.concat(workerLockings.map(hash256)));
