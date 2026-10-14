@@ -5,7 +5,7 @@ export const prefix = `
 `;
 
 export const functions = [
-  { name: 'terminalSubsequenceB', originalId: 34, body: `
+  { name: 'terminalSubsequenceB', originalId: -1, body: `
     OP_PICK OP_MOD OP_OVER OP_7 OP_MUL
   ` },
   { name: 'terminalSequence0', originalId: 16, body: `

@@ -100,7 +100,7 @@ export const functions = [
     INVOKE_STACK CALL genesisSequence2 CALL genesisSequence4 CALL genesisSequence2 CALL genesisSequence4 CALL
     genesisSequence2 CALL genesisSequence4
   ` },
-  { name: 'genesisSubsequenceA', originalId: 30, body: `
+  { name: 'genesisSubsequenceA', originalId: 5, body: `
     OP_PICK OP_MOD OP_OVER OP_7 OP_MUL
   ` },
 ];
