@@ -7,7 +7,7 @@
 // final step adds the constant IC0 - [2^64]Q0. An exceptional mixed add (equal x) is rejected.
 //
 // Input A: walks the genesis unlocking (push-only under P2SH) to the claimed n1, n0 (pushes
-//   36, 37), range-checks them, runs positions 63..split and requires input B's state push to
+//   pubIdx, pubIdx + 1), range-checks them, runs positions 63..split and requires input B's state push to
 //   equal (X, Y, Z, n0, n1).
 // Input B: finishes positions split-1..0, adds the constant, converts to affine with the
 //   witnessed Z inverse and requires it to equal its front push (vk_x, which the terminal ties
@@ -122,13 +122,14 @@ const pushNumber = [
 ];
 const le32 = ['NUM2BIN']; // used as [x 32 NUM2BIN]
 
-export const programA = ({ split, genIdx, bIdx, genesisRedeemPushBytes }) => asm(
+// pubIdx: genesis push index of the claimed n1 (n0 follows it, then the genesis redeem).
+export const programA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36 }) => asm(
   prologue,
   'NIP',                                                    // drop the pad: [wa]
   'SIZE', 64 - split, 'NUMEQUALVERIFY',
   genIdx, 'INPUTBYTECODE', 'DUP', 3, 'SPLIT', 'DROP', Buffer.from('4dc001', 'hex'), 'EQUALVERIFY',
-  'SIZE', genesisRedeemPushBytes, 'SUB', 'SPLIT', 'DROP', 451, 'SPLIT', 'NIP', // window: pushes 1..37
-  Array.from({ length: 35 }, () => [pushSkip, 'SPLIT', 'NIP']),               // skip pushes 1..35
+  'SIZE', genesisRedeemPushBytes, 'SUB', 'SPLIT', 'DROP', 451, 'SPLIT', 'NIP', // window: pushes 1..pubIdx+1
+  Array.from({ length: pubIdx - 1 }, () => [pushSkip, 'SPLIT', 'NIP']),        // skip pushes 1..pubIdx-1
   pushNumber, 'ROT', 'SWAP', 'SPLIT', 'NIP',                // [wa n1 rest]
   pushNumber, 'ROT', 'SIZE', 'NIP', 'NUMEQUALVERIFY',       // [wa n1 n0], n0 ends the window
   'DUP', 0, R, 'WITHIN', 'VERIFY', 'OVER', 0, R, 'WITHIN', 'VERIFY',
