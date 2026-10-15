@@ -52,6 +52,10 @@ if (fixtures.length !== requiredFixtures.length || new Set(fixtures).size !== fi
   throw new Error('the exact ten-fixture full-proof corpus is required');
 }
 const requiredRejectionFixtures = [
+  'truncated-compact-producer-framing',
+  'extended-compact-producer-framing',
+  'nonminimal-compact-producer-framing',
+  'changed-compact-zero-window-root',
   'changed-first-PIC-helper-byte',
   'changed-first-PIC-helper-slice-start',
   'changed-first-PIC-helper-slice-end',
@@ -174,6 +178,7 @@ const runs = fixtures.map((fixture) => {
         typeof locking !== 'string' || typeof unlocking !== 'string'))) {
     throw new Error(`${fixture} resource bytecode export is incomplete`);
   }
+  process.stderr.write(`${fixture}: ${run.inputs.length} strict inputs and ${rejectionNames.length} rejection fixtures passed\n`);
   return run;
 });
 
@@ -255,6 +260,7 @@ const report = {
   cacheSha256: runs[0].picAuthentication.cacheSha256,
   cacheGlobalRoot: runs[0].picAuthentication.globalRoot,
   regularDensityPadding: JSON.parse(regularDensityPadding),
+  compactRegularDensityPadding: runs[0].compactRegularDensityPadding,
   coordinatorDensityPadding: Number(coordinatorDensityPadding),
   picBlock2DensityPadding: Number(picBlock2DensityPadding),
   picBlock4DensityPadding: Number(picBlock4DensityPadding),

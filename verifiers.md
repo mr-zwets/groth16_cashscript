@@ -59,6 +59,7 @@ comparison. Per-layer status and build commands are in
 | `bch-groth16-bls12381-grouped-residue` | chunked, grouped + quotient-torus residue | **26 inputs / 3 standard tx / 205,734 B score / 204,894 B wire / 160.95M op** | current-policy grouped BLS verifier; exact successor pins and mutable-NFT state thread |
 | `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **3 inputs / 164,579 B score / 164,474 B wire / 149.81M op** | proposed-VM-only; non-standard by total transaction size — see [Target VM](#target-vm-bch-spec) |
 | `bch-groth16-bls12381-intratx-fs` | chunked, intra-tx + residue + **Fiat-Shamir PIT** | **22 inputs / 1 standard tx / 90,323 B score / 89,553 B wire / 69.80M op** | first single-standard-tx full verifier; separate security model — see [Fiat-Shamir model](#security-model-fiat-shamir-pit) |
+| `bch-groth16-bls12381-intratx-fs-compact` | chunked, compact transcript + **Fiat-Shamir PIT** | **22 inputs / 1 standard tx / 69,947 B score / 69,177 B wire / 42.97M committed standard op** | finite candidate: 10 fixtures / 220 source pairs; committed native standard 42,969,175 op; maximum supplied native standard 57,059,203 (Libauth standard 56,959,761); dense observed 90,107 B score / 89,337 B wire; native gate 20 accepted / 44 rejected over 566 calls; no universal resource theorem |
 
 The BLS chunked pairing/Miller/final-exp families also exist in
 [chunked/bls12-381/](chunked/bls12-381/) (plain and residue generators); the

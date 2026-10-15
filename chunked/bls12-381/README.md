@@ -26,6 +26,7 @@ also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` 
 
 - `bch-pairing-bls12381-intratx`: 51 inputs / 465,462 B / 372,116,160 op-cost.
 - `bch-groth16-bls12381-intratx`: 56 inputs / 475,310 B / 377,658,775 op-cost.
+- `bch-groth16-bls12381-intratx-fs-compact`: compact Fiat-Shamir PIT candidate, 22 inputs / **69,947 B score / 69,177 B wire / 42,969,175 committed native-standard op-cost**; maximum supplied native-standard 57,059,203 (Libauth standard 56,959,761); dense observed 90,107 B score / 89,337 B wire. This is finite source/native corpus evidence, not a universal resource or live-admission claim.
 - `bch-groth16-bls12381-grouped`: 56 inputs / 6 standard transactions / 475,292 B /
   377,556,467 op-cost.
 - `bch-groth16-bls12381-intratx-residue`: quotient-torus frontier, 24 inputs / 192,317 script B /
