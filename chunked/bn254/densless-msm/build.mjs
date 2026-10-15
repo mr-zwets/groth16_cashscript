@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {programA, programB} from '../pairfold5-msm/vkx-msm-asm.mjs';
+import {sourceA, sourceB, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
 import {OpcodesBCH, encodeAuthenticationInstructions, encodeDataPush, bigIntToVmNumber} from '@bitauth/libauth';
 import * as shared from '../densless-recovered/shared.mjs';
 import * as genesis from '../densless-recovered/genesis.mjs';
@@ -56,16 +57,22 @@ export function assemble(body, identifiers, data = {}) {
 // Sound vk_x: two MSM inputs (5, 6) recompute vk_x from the claimed public inputs
 // (genesis pushes 38, 39); see ../pairfold5-msm/vkx-msm-asm.mjs.
 export const MSM_SPLIT = 36;
+// MSM implementation: 'asm' (hand-scheduled, default) or 'cash' (CashScript source, compiled).
+export const MSM_IMPL = process.env.MSM_IMPL ?? 'asm';
 // Zero-pad bytes buying each MSM input's op-cost budget ((41 + unlocking) * 800 >= op-cost):
 // the dense fixture's cost, plus 52k op for every table add it skipped (bound: every 4-bit
 // index nonzero), plus 1%.
-export const MSM_PAD = {a: 270, b: 3324};
+export const MSM_PAD = MSM_IMPL === 'cash' ? {a: 2152, b: 3400} : {a: 270, b: 3324};
 const pushHeader = n => encodeDataPush(new Uint8Array(n)).length - n;
 const msmCache = new Map();
 export const msmPrograms = (genesisLength) => {
   if (!msmCache.has(genesisLength)) msmCache.set(genesisLength, {
-    msmA: programA({split: MSM_SPLIT, genIdx: 3, bIdx: 6, genesisRedeemPushBytes: genesisLength + 3, pubIdx: 38}),
-    msmB: programB({split: MSM_SPLIT, aIdx: 5, waOffset: pushHeader(MSM_PAD.a) + MSM_PAD.a + 1}),
+    msmA: MSM_IMPL === 'cash'
+      ? compileCash(sourceA({split: MSM_SPLIT, genIdx: 3, bIdx: 6, genesisRedeemPushBytes: genesisLength + 3, pubIdx: 38}))
+      : programA({split: MSM_SPLIT, genIdx: 3, bIdx: 6, genesisRedeemPushBytes: genesisLength + 3, pubIdx: 38}),
+    msmB: MSM_IMPL === 'cash'
+      ? compileCash(sourceB({split: MSM_SPLIT, aIdx: 5, waOffset: pushHeader(MSM_PAD.a) + MSM_PAD.a + 1}))
+      : programB({split: MSM_SPLIT, aIdx: 5, waOffset: pushHeader(MSM_PAD.a) + MSM_PAD.a + 1}),
   });
   return msmCache.get(genesisLength);
 };
