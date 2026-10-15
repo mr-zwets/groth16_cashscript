@@ -84,6 +84,12 @@ patches that keeps the verifiers deployable. Details, measurements and branch hi
 [The CashScript Compiler Fork](cashscript-compiler-fork.md) and
 [The `rescheduleStacks` Compile Mode](rescheduling-stacks.md).
 
+The newest branch, `compiler-optimizations-7` (on v0.14.0), also renames reassigned
+variables inside loops and branches instead of re-inserting them at fixed stack slots,
+which cuts loop-heavy code by about 20 % op-cost. The sound vk_x MSM in
+`chunked/bn254/densless-msm` is compiled with it; the other artifacts are still pinned
+to `compiler-optimizations-5` until they are recompiled.
+
 ## BCH Shortcomings
 
 Loops and shift operators are now available (CashScript v0.13.0 / CHIP-2021-05 Loops), so the binding constraints are no longer missing language features but the BCH [script & transaction limits](https://cashscript.org/docs/compiler/limits). In practice the **maximum unlocking bytecode length (10,000 bytes for P2SH)** is the real wall: for P2SH the contract is supplied in the unlocking bytecode, so this single consensus limit caps how large the verifier can be, and (since the op-cost budget scales with script length) also caps the maximum compute budget that can be bought by padding.

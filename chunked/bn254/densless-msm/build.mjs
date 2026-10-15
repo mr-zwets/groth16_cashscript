@@ -55,10 +55,11 @@ export function assemble(body, identifiers, data = {}) {
 }
 
 // Sound vk_x: two MSM inputs (5, 6) recompute vk_x from the claimed public inputs
-// (genesis pushes 38, 39); see ../pairfold5-msm/vkx-msm-asm.mjs.
+// (genesis pushes 38, 39); see ../pairfold5-msm/vkx-msm.mjs and README.md.
 export const MSM_SPLIT = 36;
-// MSM implementation: 'asm' (hand-scheduled, default) or 'cash' (CashScript source, compiled).
-export const MSM_IMPL = process.env.MSM_IMPL ?? 'asm';
+// MSM implementation: 'cash' (CashScript source vkx-msm.mjs, default; needs cashc
+// compiler-optimizations-7) or 'asm' (hand-scheduled vkx-msm-asm.mjs, kept as a cross-check).
+export const MSM_IMPL = process.env.MSM_IMPL ?? 'cash';
 // Zero-pad bytes buying each MSM input's op-cost budget ((41 + unlocking) * 800 >= op-cost):
 // the dense fixture's cost, plus 52k op for every table add it skipped (bound: every 4-bit
 // index nonzero), plus 1%.
