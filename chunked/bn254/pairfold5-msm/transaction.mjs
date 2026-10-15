@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {encodeDataPush,bigIntToVmNumber} from '@bitauth/libauth';
 import {build, MSM_SPLIT, MSM_PAD} from './build.mjs';
-import {witness as msmWitness} from './vkx-msm.mjs';
+import {witness as msmWitness} from './vkx-msm-asm.mjs';
 import {produceWitness} from '../leader-recovered/witness.mjs';
 import {produceGenesisAuxiliary} from '../leader-recovered/genesis-auxiliary.mjs';
 
@@ -23,8 +23,8 @@ export function produceTransaction(vk,proof,publicInputs,msmPad=MSM_PAD){
  assert.ok(genesis.every(x=>Buffer.isBuffer(x)));inputs.push(genesis);
  inputs.push([Buffer.from(w.accumulatorHeaderHex[3],'hex'),quotient.subarray(offset),...w.terminalWitnessHex.map(x=>Buffer.from(x,'hex')),program.terminalPadding,program.redeems[4]]);
  const m=msmWitness(BigInt(publicInputs[0]),BigInt(publicInputs[1]),MSM_SPLIT),num=x=>Buffer.from(bigIntToVmNumber(x));
- inputs.push([Buffer.alloc(msmPad.a),...[...m.ks].reverse().map(num),program.redeems[5]]);
- inputs.push([m.vkx,m.st,Buffer.alloc(msmPad.b),num(m.zInv),program.redeems[6]]);
+ inputs.push([Buffer.alloc(msmPad.a),m.wa,program.redeems[5]]);
+ inputs.push([m.vkx,m.st,m.wb,Buffer.alloc(msmPad.b),num(m.zInv),program.redeems[6]]);
  assert.equal(quotient.length-offset,0);
  return inputs.map((pushes,i)=>({locking:program.lockings[i].toString('hex'),unlocking:Buffer.concat(pushes.map(p=>Buffer.from(encodeDataPush(p)))).toString('hex')}));
 }

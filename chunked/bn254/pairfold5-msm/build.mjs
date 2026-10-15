@@ -8,18 +8,23 @@ import * as genesis from '../leader-recovered/genesis.mjs';
 import * as terminal from './terminal.mjs';
 import {executor, p2sh} from '../leader-recovered/loader.mjs';
 import {BASE_FIELD, SCALAR_FIELD, deploymentTag, layout} from '../leader-recovered/constants.mjs';
-import {sourceA, sourceB, compile as compileMsm} from './vkx-msm.mjs';
+import {programA, programB} from './vkx-msm-asm.mjs';
 
 // Sound vk_x: two MSM inputs (5, 6) recompute vk_x from the claimed public inputs.
 export const MSM_SPLIT = 36;
-// Zero-pad bytes buying each MSM input's op-cost budget: dense fixture cost + 3% headroom
-// for denser GLV bit patterns ((41 + unlocking) * 800 >= op-cost).
-export const MSM_PAD = {a: 4871, b: 4299};
-let msmCache;
-export const msmPrograms = () => (msmCache ??= {
-  msmA: compileMsm(sourceA({split: MSM_SPLIT, genIdx: 3, bIdx: 6})),
-  msmB: compileMsm(sourceB({split: MSM_SPLIT, genIdx: 3})),
-});
+// Zero-pad bytes buying each MSM input's op-cost budget ((41 + unlocking) * 800 >= op-cost):
+// the dense fixture's cost, plus 52k op for every table add it skipped (bound: every 4-bit
+// index nonzero), plus 1%.
+export const MSM_PAD = {a: 352, b: 3339};
+const pushHeader = n => encodeDataPush(new Uint8Array(n)).length - n;
+const msmCache = new Map();
+export const msmPrograms = (genesisLength) => {
+  if (!msmCache.has(genesisLength)) msmCache.set(genesisLength, {
+    msmA: programA({split: MSM_SPLIT, genIdx: 3, bIdx: 6, genesisRedeemPushBytes: genesisLength + 3}),
+    msmB: programB({split: MSM_SPLIT, aIdx: 5, waOffset: pushHeader(MSM_PAD.a) + MSM_PAD.a + 1}),
+  });
+  return msmCache.get(genesisLength);
+};
 
 const hash256 = bytes => createHash('sha256').update(createHash('sha256').update(bytes).digest()).digest();
 const numbers = {
@@ -65,9 +70,11 @@ export function assemble(body, identifiers, data = {}) {
 }
 
 export function build() {
-  const programs = {...msmPrograms()}, declarations = {}, constants = {deploymentTag};
+  const programs = {}, declarations = {}, constants = {deploymentTag};
   for (const [name, source] of Object.entries({shared, genesis, terminal})) {
     if (name === 'terminal') {
+      assert(programs.genesis.length > 255 && programs.genesis.length < 65536, 'genesis redeem push must be PUSHDATA2');
+      Object.assign(programs, msmPrograms(programs.genesis.length));
       programs.executor = assemble(executor, new Map([['sharedProgram', 100]]), constants);
       const workerLockings = [programs.executor, programs.executor, programs.executor, programs.genesis, programs.msmA, programs.msmB]
         .map(redeem => assemble(p2sh, new Map(), {redeemHash256: hash256(redeem)}));
