@@ -75,10 +75,11 @@ const straus = (count, wName) => `        for (int t = 0; t < ${count}; t = t + 
 
 // ownInputs: the claimed n0, n1 are input A's own pushes (unlocking: pad, wa, n1, n0) instead of
 // genesis pushes pubIdx, pubIdx + 1.
-export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false }) => `pragma cashscript ^0.14.0;
+// noPad: no pad parameter (when input A's code is carried by another input that has its own pad).
+export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false, noPad = false }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmA() {
-    function spend(${ownInputs ? 'int n0, int n1, ' : ''}bytes wa, bytes unused pad) {
+    function spend(${ownInputs ? 'int n0, int n1, ' : ''}bytes wa${noPad ? '' : ', bytes unused pad'}) {
         require(wa.length == ${64 - split});
 ${ownInputs ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
         require(g.split(3)[0] == 0x4dc001);

@@ -126,10 +126,10 @@ const le32 = ['NUM2BIN']; // used as [x 32 NUM2BIN]
 
 // pubIdx: genesis push index of the claimed n1 (n0 follows it, then the genesis redeem).
 // ownInputs: the claimed n0, n1 are input A's own pushes (unlocking: pad, wa, n1, n0).
-export const programA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false }) => asm(
+export const programA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false, noPad = false }) => asm(
   prologue,
   ownInputs
-    ? [3, 'ROLL', 'DROP', 2, 'PICK', 'SIZE', 'NIP', 64 - split, 'NUMEQUALVERIFY'] // [wa n1 n0]
+    ? [noPad ? [] : [3, 'ROLL', 'DROP'], 2, 'PICK', 'SIZE', 'NIP', 64 - split, 'NUMEQUALVERIFY'] // [wa n1 n0]
     : [
   'NIP',                                                    // drop the pad: [wa]
   'SIZE', 64 - split, 'NUMEQUALVERIFY',
