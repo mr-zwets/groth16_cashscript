@@ -1,4 +1,6 @@
-// A reverse macro expansion proof, never used to build the candidate.
+// A reverse macro expansion proof, never used to build the candidate. The candidate's main
+// starts with the public-input range check (0 <= n0, n1 < r, r = P - 6x^2); the proof checks
+// that prefix exactly, strips it, and shows the rest expands to the official artifact.
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -15,7 +17,14 @@ const number = instruction => instruction.data !== undefined
 const literal = value => decode(encodeDataPush(bigIntToVmNumber(value)))[0];
 const bytes = instructions => Buffer.from(encode(instructions));
 const hash = value => createHash('sha256').update(value).digest('hex');
-const instructions = decode(bytecode);
+const R_RANGE_CHECK = [O.OP_9, O.OP_PICK, O.OP_9, O.OP_PICK, O.OP_2DUP, O.OP_MIN, O.OP_0, O.OP_GREATERTHANOREQUAL,
+  O.OP_VERIFY, O.OP_MAX].map(opcode => ({opcode}));
+const rangeCheck = bytes([...R_RANGE_CHECK, literal(0n), {opcode: O.OP_INVOKE}, literal(147946756881789318990833708069417712966n),
+  ...[O.OP_SUB, O.OP_LESSTHAN, O.OP_VERIFY].map(opcode => ({opcode}))]);
+const mainStart = bytecode.length - Buffer.from(encode(decode(bytecode).slice(bodies.length * 3))).length;
+assert.deepEqual(bytecode.subarray(mainStart, mainStart + rangeCheck.length), rangeCheck, 'main starts with the range check');
+const candidate = Buffer.concat([bytecode.subarray(0, mainStart), bytecode.subarray(mainStart + rangeCheck.length)]);
+const instructions = decode(candidate);
 const ids = new Set(bodies.map(body => body.id));
 assert.equal(bodies.length, 62);
 assert(ids.has(0) && !ids.has(47));
@@ -67,6 +76,6 @@ assert.equal(restoredPairs, 2);
 const restored = bytes(original);
 assert.equal(restored.length, 4292);
 assert.equal(hash(restored), '61c451d0bf8835e6ab850a02c325775d3769dbff92b87ba2d564c8f1f8494c83');
-assert.equal(bytecode.length, 4228);
-assert.equal(hash(bytecode), 'a7686356eba90eb594d2a05189e645111506e67fc3c52007144081761d357cd0');
-console.log(JSON.stringify({status: 'PASS', candidateBytes: bytecode.length, originalBytes: restored.length, restoredLiterals, restoredPairs, definitions: bodies.length, candidateSha256: hash(bytecode), originalSha256: hash(restored)}));
+assert.equal(candidate.length, 4228);
+assert.equal(hash(candidate), 'a7686356eba90eb594d2a05189e645111506e67fc3c52007144081761d357cd0');
+console.log(JSON.stringify({status: 'PASS', rangeCheckBytes: rangeCheck.length, lockingBytes: bytecode.length, lockingSha256: hash(bytecode), candidateBytes: candidate.length, originalBytes: restored.length, restoredLiterals, restoredPairs, definitions: bodies.length, candidateSha256: hash(candidate), originalSha256: hash(restored)}));

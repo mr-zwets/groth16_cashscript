@@ -48,8 +48,16 @@ changes the former `prime_pair` definition from ID47 to the unused ID0, and adds
 DUP at its two static callers. This yields 4,228 locking bytes, SHA256
 `a7686356eba90eb594d2a05189e645111506e67fc3c52007144081761d357cd0`.
 The committed relaxed-VM cost rises from 5,206,615,819 to 5,505,565,336.
-The benchmark score is 4,587 bytes including its unchanged 272-byte witness and
-87-byte transaction overhead. Full official gates and independent review must
+
+Public-input range check (Oct 16, 2026): main now starts with a 32-byte check that both
+claimed public inputs are canonical scalars, 0 <= n0, n1 < r. Without it n + r gives the same
+vk_x, so one proof verified for two different claimed integers (the bench's public-input gate
+accepted n0 + r and n1 + r). It builds r as P - 6x^2 from the shared `prime` function and the
+G2 subgroup scalar already in the program. Locking: 4,260 bytes, SHA256
+`6d884ee69b1ec0f6b20e749d64422a4f0c779f756a1b01bb1b8edb9b40836e80`.
+`prove-prime-sharing.mjs` checks that prefix exactly, strips it and runs the reverse
+expansion proof on the remaining 4,228-byte program. The witness (272 bytes) and the
+87-byte transaction overhead are unchanged. Full official gates and independent review must
 accompany any promotion; byte equality alone is insufficient.
 
 Run the standalone reverse-expansion certificate:
