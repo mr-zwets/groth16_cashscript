@@ -1838,6 +1838,24 @@ OP_0
 end
 
 main
+# Public inputs must be canonical scalars, 0 <= n < r (n1 is push 0, n0 push 1: depths 9, 8).
+# Without this n + r gives the same vk_x, so one proof verifies two claimed integers.
+# r = P - 6x^2 for BN254, built from the shared prime and the G2 subgroup scalar.
+OP_9
+OP_PICK
+OP_9
+OP_PICK
+OP_2DUP
+OP_MIN
+OP_0
+OP_GREATERTHANOREQUAL
+OP_VERIFY
+OP_MAX
+call prime
+constant G2_SUBGROUP_SCALAR
+OP_SUB
+OP_LESSTHAN
+OP_VERIFY
 # Proof and public-input checks, point arithmetic and Miller accumulation.
 OP_OVER
 OP_2
