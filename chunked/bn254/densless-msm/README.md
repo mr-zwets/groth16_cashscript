@@ -8,17 +8,20 @@ accepted (see `docs/public-input-binding.md` in zk-verifier-bench).
 
 This variant starts from the reconstructed densless verifier (`../densless-recovered`,
 kallisti's public-only source from the withdrawn groth16_cashscript PR #17), removes the dead
-predicate from its genesis and adds two inputs that recompute vk_x itself:
+predicate from its genesis and recomputes vk_x itself in two parts:
 
-- input 5 holds the claimed public inputs n0, n1 as its own pushes, range-checks them, runs
-  Straus positions 63..36 and pins input 6's state push (X, Y, Z, n0, n1 and its witness
-  bytes wa);
-- input 6 finishes positions 35..0, converts to affine with a witnessed Z inverse and
-  checks it against its front push vk_x, then checks the GLV split: it rebuilds
+- MSM part A runs inside the genesis input (`carrier.mjs`): its pushes (wa, n1, n0) are
+  appended to the genesis unlocking just before the redeem, so no byte offset other inputs
+  read moves. The genesis program parks them on the altstack, runs the sliced genesis
+  unchanged, verifies its result, restores them and runs part A (function ids shifted above
+  genesis's). Part A range-checks the claimed public inputs n0, n1 (genesis pushes 22 and 21),
+  runs Straus positions 63..25 and pins input 5's state push (X, Y, Z, n0, n1 and wa).
+- MSM part B (input 5) finishes positions 24..0, converts to affine with a witnessed Z
+  inverse and checks it against its front push vk_x, then checks the GLV split: it rebuilds
   S0 = k10 + lambda*k20 and S1 = k11 + lambda*k21 from wa (taken from the pinned state) and
-  its own witness bytes, and requires S0 = n0 and S1 = n1 (mod r);
-- the terminal requires 7 inputs, pins both MSM lockings and requires input 6's vk_x
-  push to equal the vk_x in genesis push 0, which the Miller loop consumes.
+  its own witness bytes, and requires S0 = n0 and S1 = n1 (mod r).
+- The terminal requires 6 inputs, pins input 5's locking and requires its vk_x push to equal
+  the vk_x in genesis push 0, which the Miller loop consumes.
 
 The genesis slice (`genesis-slice.mjs`, `genesis-slice.json`) drops the predicate's witness
 pushes 19..39 and the code that consumed them, and rewrites 144 PICK/ROLL depths. It was
@@ -38,14 +41,15 @@ The MSM source is CashScript (`../pairfold5-msm/vkx-msm.mjs`) compiled with the
 [`mr-zwets/cashscript`](https://github.com/mr-zwets/cashscript) branch
 `compiler-optimizations-7`; that branch's loop reassignment codegen is what makes it
 competitive. `../pairfold5-msm/vkx-msm-asm.mjs` is a hand-scheduled version with the
-same witness layout (`MSM_IMPL=asm`, 483 bytes smaller), kept as a cross-check.
+same witness layout (`MSM_IMPL=asm`, slightly cheaper), kept as a cross-check.
 `../pairfold5-msm` also holds the same repair on the pevalfuse base.
 
-Result on the official fixtures: 7 inputs, one standard transaction, 42,256 script
-bytes, score 42,577, 24.1M op. Pads cover the worst case where every table index is
-nonzero. Forged and adaptively forged public inputs (including a pad-shift variant found in
-review), non-canonical B and off-curve B are rejected (`redteam.mjs` writes the bench
-red-team file).
+Result on the official fixtures: 6 inputs, one standard transaction, 38,667 script
+bytes, score 38,945, 24.2M op. Pads are sized from a linear op-cost fit over 37 fresh proofs
+at the worst case where every table index is nonzero (checked with real worst-case witnesses:
+about 1.5% margin on both MSM-carrying inputs). Forged and adaptively forged public inputs
+(including a pad-shift variant found in review), non-canonical B and off-curve B are rejected
+(`redteam.mjs` writes the bench red-team file).
 
 The witness generator in `../densless-recovered` (root-witness.mjs, witness.mjs) now uses
 SCALING^2 / xi for residue selector 2, the representative the terminal expects; before, every

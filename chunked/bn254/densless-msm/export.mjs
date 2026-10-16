@@ -8,8 +8,8 @@ import { produceTransaction } from './transaction.mjs';
 
 assert.equal(process.argv.length, 3, 'usage: node export.mjs output.json');
 const fixtures = JSON.parse(readFileSync(new URL('../densless-recovered/public-fixtures.json', import.meta.url)));
-const LABELS = ['exec0', 'exec1', 'exec2', 'genesis', 'terminal', 'vkx-msm-a', 'vkx-msm-b'];
-const CHECKPOINTS = ['executor-start', 'miller-interior', 'miller-interior', 'vkx-subgroup', 'pairing-close', 'vkx-msm', 'vkx-bound'];
+const LABELS = ['exec0', 'exec1', 'exec2', 'genesis+vkx-msm-a', 'terminal', 'vkx-msm-b'];
+const CHECKPOINTS = ['executor-start', 'miller-interior', 'miller-interior', 'vkx-subgroup', 'pairing-close', 'vkx-bound'];
 const run = ({ proof, publicInputs }) => produceTransaction(fixtures.vk, proof, publicInputs)
   .map((s, i) => ({ label: LABELS[i], locking: s.locking, unlocking: s.unlocking, checkpoint: CHECKPOINTS[i] }));
 const tamper = (unlockingHex) => {

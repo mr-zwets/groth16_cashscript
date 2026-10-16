@@ -18,13 +18,13 @@ export function produceTransaction(vk,proof,publicInputs,msmPad=MSM_PAD){
  for(const [index,hex]of Object.entries(w.genesisKnownPushes))if(Number(index)<19)genesis[Number(index)]=Buffer.from(hex,'hex');
  genesis[1]=Buffer.from(bigIntToVmNumber(BigInt(w.selector)));
  assert.ok(Array.from(genesis).every(x=>Buffer.isBuffer(x)));
- inputs.push([...genesis,Buffer.alloc(GENESIS_PAD),program.redeems[3]]);
- inputs.push([Buffer.from(w.accumulatorHeaderHex[3],'hex'),quotient.subarray(offset),...w.terminalWitnessHex.map(x=>Buffer.from(x,'hex')),program.redeems[4]]);
  const m=msmWitness(BigInt(publicInputs[0]),BigInt(publicInputs[1]),MSM_SPLIT),num=x=>Buffer.from(bigIntToVmNumber(x));
+ // genesis carries MSM part A: its pushes (wa, n1, n0) follow the genesis pad (see carrier.mjs)
+ inputs.push([...genesis,Buffer.alloc(GENESIS_PAD),m.wa,num(BigInt(publicInputs[1])),num(BigInt(publicInputs[0])),program.redeems[3]]);
+ inputs.push([Buffer.from(w.accumulatorHeaderHex[3],'hex'),quotient.subarray(offset),...w.terminalWitnessHex.map(x=>Buffer.from(x,'hex')),program.redeems[4]]);
  // the MSM's vk_x must be the one genesis push 0 carries (fields 4, 5) for the terminal binding
  assert.equal(m.vkx.toString('hex'),Buffer.from(w.genesisKnownPushes[0],'hex').subarray(128,192).toString('hex'));
- inputs.push([Buffer.alloc(msmPad.a),m.wa,num(BigInt(publicInputs[1])),num(BigInt(publicInputs[0])),program.redeems[5]]);
- inputs.push([m.vkx,m.st,m.wb,Buffer.alloc(msmPad.b),num(m.zInv),program.redeems[6]]);
+ inputs.push([m.vkx,m.st,m.wb,Buffer.alloc(msmPad.b),num(m.zInv),program.redeems[5]]);
  assert.equal(quotient.length-offset,2336);
  return inputs.map((pushes,i)=>({locking:program.lockings[i].toString('hex'),unlocking:Buffer.concat(pushes.map(p=>Buffer.from(encodeDataPush(p)))).toString('hex')}));
 }

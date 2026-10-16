@@ -5,6 +5,7 @@ import {pathToFileURL} from 'node:url';
 import {programA, programB} from '../pairfold5-msm/vkx-msm-asm.mjs';
 import {sourceA, sourceB, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
 import {sliceGenesis} from './genesis-slice.mjs';
+import {carrier, remapFunctionIds} from './carrier.mjs';
 import {OpcodesBCH, encodeAuthenticationInstructions, encodeDataPush, bigIntToVmNumber} from '@bitauth/libauth';
 import * as shared from '../densless-recovered/shared.mjs';
 import * as genesis from '../densless-recovered/genesis.mjs';
@@ -55,25 +56,28 @@ export function assemble(body, identifiers, data = {}) {
   return Buffer.from(encoded);
 }
 
-// Sound vk_x: two MSM inputs (5, 6) recompute vk_x from the claimed public inputs
-// (input 5's own pushes n0, n1); see ../pairfold5-msm/vkx-msm.mjs and README.md.
-export const MSM_SPLIT = 36;
-// Zero-pad bytes for the sliced genesis input. Without the dead predicate it needs ~0.7M op,
-// far below what its own code and witness already buy, so the pad is an empty push.
-export const GENESIS_PAD = Number(process.env.GENESIS_PAD ?? 0);
+// Sound vk_x: MSM part A (carried inside genesis, see carrier.mjs) and part B (input 5) recompute
+// vk_x from the claimed public inputs (genesis pushes 22 n0, 21 n1); see README.md.
+export const MSM_SPLIT = Number(process.env.MSM_SPLIT ?? 25);
+// Zero-pad bytes buying op-cost budget ((41 + unlocking) * 800 >= op-cost), sized from a linear
+// fit of op-cost against the number of table adds over 37 fresh proofs (standard VM), evaluated
+// at the worst case where every 4-bit index is nonzero, plus the fit's largest residual, plus 1%:
+//   genesis (sliced genesis + MSM part A, positions 63..MSM_SPLIT): 50.7k/add, 78 adds -> 6.22M
+//   MSM part B (input 5, positions MSM_SPLIT-1..0, GLV check):       52.1k/add, 50 adds -> 4.42M
+// Sized for the CashScript build; the asm build is cheaper. Re-fit after changing MSM_SPLIT.
+export const GENESIS_PAD = Number(process.env.GENESIS_PAD ?? 49);
 // MSM implementation: 'cash' (CashScript source vkx-msm.mjs, default; needs cashc
 // compiler-optimizations-7) or 'asm' (hand-scheduled vkx-msm-asm.mjs, kept as a cross-check).
 export const MSM_IMPL = process.env.MSM_IMPL ?? 'cash';
-// Zero-pad bytes buying each MSM input's op-cost budget ((41 + unlocking) * 800 >= op-cost):
-// the dense fixture's cost, plus 52k op for every table add it skipped (bound: every 4-bit
-// index nonzero), plus 1%.
-export const MSM_PAD = MSM_IMPL === 'cash' ? {a: 1635, b: 3404} : {a: 270, b: 3324};
+export const MSM_PAD = {b: 1422};
 const msmCache = new Map();
 export const msmPrograms = (genesisLength) => {
   if (!msmCache.has(genesisLength)) msmCache.set(genesisLength, {
-    msmA: MSM_IMPL === 'cash'
-      ? compileCash(sourceA({split: MSM_SPLIT, bIdx: 6, ownInputs: true}))
-      : programA({split: MSM_SPLIT, bIdx: 6, ownInputs: true}),
+    // MSM part A runs inside genesis (see carrier.mjs), so it has no pad of its own; its function
+    // identifiers are moved above the genesis program's (0..29).
+    msmA: remapFunctionIds(MSM_IMPL === 'cash'
+      ? compileCash(sourceA({split: MSM_SPLIT, bIdx: 5, ownInputs: true, noPad: true}))
+      : programA({split: MSM_SPLIT, bIdx: 5, ownInputs: true, noPad: true}), 100),
     msmB: MSM_IMPL === 'cash'
       ? compileCash(sourceB({split: MSM_SPLIT}))
       : programB({split: MSM_SPLIT}),
@@ -86,8 +90,9 @@ export function build() {
   for (const [name, source] of Object.entries({shared, genesis, terminal})) {
     if (name === 'terminal') {
       // drop the dead vk_x auxiliary predicate from genesis (see genesis-slice.mjs)
-      programs.genesis = sliceGenesis(programs.genesis);
-      Object.assign(programs, msmPrograms(programs.genesis.length));
+      Object.assign(programs, msmPrograms(0));
+      // genesis: the sliced program, then MSM part A on its parked pushes (wa, n1, n0)
+      programs.genesis = carrier(sliceGenesis(programs.genesis), programs.msmA, 3);
       const loaderIdentifiers = new Map([['fragmentReader', -1], ['sharedProgram', 100]]);
       const globalFunctionKeys = [
         ...loaderIdentifiers.values(),
@@ -105,7 +110,7 @@ export function build() {
         fragmentReaderDeclaration,
         assemble(executor, loaderIdentifiers, constants),
       ]);
-      const workerLockings = [programs.executor, programs.executor, programs.executor, programs.genesis, programs.msmA, programs.msmB]
+      const workerLockings = [programs.executor, programs.executor, programs.executor, programs.genesis, programs.msmB]
         .map(redeem => assemble(p2sh, new Map(), {redeemHash256: hash256(redeem)}));
       constants.workerLockingRoot = hash256(Buffer.concat(workerLockings.map(hash256)));
     }
@@ -125,7 +130,7 @@ export function build() {
     ]);
     if (name === 'shared') constants.sharedHash256 = hash256(programs.shared);
   }
-  const redeems = [programs.executor, programs.executor, programs.executor, programs.genesis, programs.terminal, programs.msmA, programs.msmB];
+  const redeems = [programs.executor, programs.executor, programs.executor, programs.genesis, programs.terminal, programs.msmB];
   const lockings = redeems.map(redeem => assemble(p2sh, new Map(), {redeemHash256: hash256(redeem)}));
   let offset = 0;
   const sharedFragments = layout.fragmentLengths.map(length => {
