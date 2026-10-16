@@ -81,13 +81,12 @@ const straus = (count, wName) => `        for (int t = 0; t < ${count}; t = t + 
 export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false, noPad = false, pinEnd = null, pinN = null }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmA() {
-    function spend(${ownInputs ? 'int n0, int n1' : ''}${pinN ? '' : `${ownInputs ? ', ' : ''}bytes wa`}${noPad ? '' : ', bytes unused pad'}) {
+    function spend(${pinN ? '' : `${ownInputs ? 'int n0, int n1, ' : ''}bytes wa${noPad ? '' : ', bytes unused pad'}`}) {
 ${pinN ? `        bytes un = tx.inputs[${pinN.idx}].unlockingBytecode;
-        bytes tn = un.split(un.length - ${pinN.back + 96})[0].split(un.length - ${pinN.back + 224})[1];
-        bytes wa = tn.split(64)[1].split(${64 - split})[0];
+        bytes wa = un.split(un.length - ${pinN.back + 160 - (64 - split)})[0].split(un.length - ${pinN.back + 160})[1];
 ` : `        require(wa.length == ${64 - split});
 `}
-${ownInputs ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
+${ownInputs || pinN ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
         require(g.split(3)[0] == 0x4dc001);
         // window = pushes 1..pubIdx+1 (after the 451-byte push 0, before the genesis redeem push)
         bytes w = g.split(g.length - ${genesisRedeemPushBytes})[0].split(451)[1];
@@ -111,11 +110,10 @@ ${ownInputs ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
         if (op0 >= 81 && op0 <= 96) { n0 = op0 - 80; }
         else { require(op0 < 34); if (op0 != 0) { n0 = int(w0.split(op0 + 1)[0].split(1)[1]); l0 = op0 + 1; } }
         require(w0.length == l0);
-`}        require(within(n0, 0, ${R})); require(within(n1, 0, ${R}));
+`}${pinN ? '' : `        require(within(n0, 0, ${R})); require(within(n1, 0, ${R}));`}
         int rX = ${Q0.x}; int rY = ${Q0.y}; int rZ = 1;
 ${straus(64 - split, 'wa')}
 ${pinN ? `        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32);
-        require(tn.split(64)[0] == toPaddedBytes(n0, 32) + toPaddedBytes(n1, 32));
 ` : `        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) +
             toPaddedBytes(n0, 32) + toPaddedBytes(n1, 32) + wa;
 `}${pinEnd ? `        bytes u = tx.inputs[${pinEnd.idx}].unlockingBytecode;

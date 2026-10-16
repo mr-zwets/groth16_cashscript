@@ -59,16 +59,19 @@ export function assemble(body, identifiers, data = {}, extraNumbers = {}) {
 // Sound vk_x: genesis recomputes MSM part A (positions 63..MSM_SPLIT) from its claimed public
 // inputs (genesis pushes 22 n0, 21 n1) and the executors and the terminal carry the remaining
 // positions as a chain of pinned state pushes (vkx-stages.mjs); see README.md.
-export const MSM_SPLIT = Number(process.env.MSM_SPLIT ?? 26);
+export const MSM_SPLIT = Number(process.env.MSM_SPLIT ?? 27);
 // Witness-byte cuts: genesis runs [0, CUTS[0]), executor k runs [CUTS[k], CUTS[k + 1]), the
 // terminal runs [CUTS[3], 64) and finishes. CUTS[0] = 64 - MSM_SPLIT.
-export const CUTS = (process.env.MSM_CUTS ?? `${64 - MSM_SPLIT},46,54,60`).split(',').map(Number);
+export const CUTS = (process.env.MSM_CUTS ?? `${64 - MSM_SPLIT},45,54,60`).split(',').map(Number);
 // Every input's op-cost must fit its budget ((41 + unlocking) * 800) at the worst case where
 // every 4-bit table index is nonzero. The cuts are sized from a linear fit of op-cost against the
 // number of table adds over 37 fresh proofs (standard VM), evaluated at that worst case, plus the
 // fit's largest residual, plus 1%; worst-case spare in budget bytes: exec0 573, exec1 906,
 // exec2 700, genesis 125, terminal 1035, so no input needs a zero pad. Re-fit after changing
-// MSM_SPLIT or CUTS (GENESIS_PAD / STAGE_PADS buy 800 op per byte if a split needs it).
+// MSM_SPLIT or CUTS. With n0, n1 moved to the terminal genesis's unlocking (so its budget) shrank by
+// 189 B, so one Straus position moved from genesis to exec0 and one from exec0 to exec1
+// (split 27, cuts 37,45,54,60); peaks on the shipped fixtures: 90.4, 87.6, 85.9, 89.8, 84.2%.
+// (GENESIS_PAD / STAGE_PADS buy 800 op per byte if a split needs it).
 export const GENESIS_PAD = Number(process.env.GENESIS_PAD ?? 0);
 export const STAGE_PADS = (process.env.STAGE_PADS ?? '0,0,0,0').split(',').map(Number);
 // Carried function identifiers: the MSM helpers (dbl, madd, tab0, tab64) are defined once in
@@ -130,7 +133,7 @@ function buildWith({backExec, backTerminal}) {
   // then MSM part A on its parked pushes (wa, n1, n0); part A pins input 0's state push
   programs.msmA = cash(sourceA({split: MSM_SPLIT, ownInputs: true, noPad: true,
     pinEnd: {idx: 0, back: backExec, size: EXEC_STATE_BYTES}, pinN: {idx: 4, back: backTerminal}}));
-  programs.genesis = carrier(sliceGenesis(programs.genesisUnsliced), programs.msmA, 2);
+  programs.genesis = carrier(sliceGenesis(programs.genesisUnsliced), programs.msmA, 0);
   delete programs.genesisUnsliced;
   const [definitions] = splitDefinitions(programs.msmA);
   // executors: the shared-program loader, then the executor MSM stage on its parked state push
@@ -159,7 +162,7 @@ function buildWith({backExec, backTerminal}) {
   ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminal, constants));
   programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
   programs.terminal = Buffer.concat([terminalPadded ? Buffer.from([OpcodesBCH.OP_ROT, OpcodesBCH.OP_DROP]) : Buffer.alloc(0),
-    carrier(programs.terminalBase, programs.msmFinal, 2)]);
+    carrier(programs.terminalBase, programs.msmFinal, 4)]);
   delete programs.terminalBase;
   return {programs, declarations};
 }

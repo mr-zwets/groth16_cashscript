@@ -69,6 +69,19 @@ The witness generator in `../densless-recovered` (root-witness.mjs, witness.mjs)
 SCALING^2 / xi for residue selector 2, the representative the terminal expects; before, every
 selector-2 proof (about 4 in 10) was rejected. The on-chain programs are unchanged by that fix.
 
+## Slim MSM state
+
+The claimed public inputs n0, n1 are the terminal's own number pushes (just below zInv and the
+state push), range-checked and GLV-checked there; genesis no longer carries them. The 64 witness
+bytes w live only in the terminal's state push (w, X, Y, Z; 160 bytes, length-checked by the
+terminal, located from the end of its unlocking): genesis reads its 37 witness bytes from that
+window and each executor reads its range from it, so the executors' state pushes shrink to X, Y, Z
+(96 bytes) and nothing is copied through the chain. Every stage still pins the next stage's
+X, Y, Z, and all stages consume one w that the terminal binds to n0, n1, so the binding argument is
+unchanged. The genesis budget shrank with its unlocking, so the Straus split moved to 27 (genesis
+runs positions 63..27) with cuts 37,45,54,60. Result: 35,124 script bytes (from 35,646), 24.6M op;
+peaks on the shipped fixtures 90.4, 87.6, 85.9, 89.8, 84.2% of the five budgets.
+
 ```sh
 VERIFIER_DIR=<zk-verifier-bench checkout> node export.mjs vectors.json
 ```

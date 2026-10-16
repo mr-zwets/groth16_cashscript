@@ -16,10 +16,11 @@
 // the pinned bytes are its state push.
 import { helpers, P, R, LAM, FINAL } from '../pairfold5-msm/vkx-msm.mjs';
 
-export const STATE_BYTES = 224;
-// slim layout: executor state = X, Y, Z (96); terminal state = n0, n1, w, X, Y, Z (224).
-// n0, n1 and the witness bytes w live only in the terminal's state push: genesis pins n0, n1 and
-// reads its wa from there, and every executor reads its witness bytes from there.
+export const STATE_BYTES = 160;
+// slim layout: executor state = X, Y, Z (96); terminal state = w, X, Y, Z (160). The claimed
+// public inputs n0, n1 are the terminal's own number pushes (range-checked and GLV-checked there),
+// and the witness bytes w live only in the terminal's state push: genesis reads its wa from there,
+// and every executor reads its witness bytes from there.
 export const EXEC_STATE_BYTES = 96;
 
 const straus = (from, to) => `        for (int t = ${from}; t < ${to}; t = t + 1) {
@@ -56,15 +57,14 @@ ${straus('from', 'to')}
 }
 `;
 
-// Carried pushes (bottom to top): zInv, st.
+// Carried pushes (bottom to top): n1, n0, zInv, st.
 export const sourceFinal = ({ from, genIdx = 3 }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmFinal() {
-    function spend(bytes st, int zInv) {
+    function spend(bytes st, int zInv, int n0, int n1) {
 ${unpack(STATE_BYTES)}
-        int n0 = int(st.split(32)[0]);
-        int n1 = int(st.split(64)[0].split(32)[1]);
-        bytes w = st.split(128)[0].split(64)[1];
+        require(within(n0, 0, ${R})); require(within(n1, 0, ${R}));
+        bytes w = st.split(64)[0];
 ${straus(from, 64)}
         (rX, rY, rZ) = madd(rX, rY, rZ, ${FINAL.x}, ${FINAL.y});
         require((rZ * zInv) % ${P} == 1);
