@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {sourceA, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
-import {STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
+import {STATE_BYTES, EXEC_STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
 import {sliceGenesis} from './genesis-slice.mjs';
 import {carrier, remapFunctionIds} from './carrier.mjs';
 import {OpcodesBCH, decodeAuthenticationInstructions, encodeAuthenticationInstructions, encodeDataPush, bigIntToVmNumber} from '@bitauth/libauth';
@@ -129,7 +129,7 @@ function buildWith({backExec, backTerminal}) {
   // genesis: the sliced program (dead vk_x auxiliary predicate dropped, see genesis-slice.mjs),
   // then MSM part A on its parked pushes (wa, n1, n0); part A pins input 0's state push
   programs.msmA = cash(sourceA({split: MSM_SPLIT, ownInputs: true, noPad: true,
-    pinEnd: {idx: 0, back: backExec, size: STATE_BYTES}}));
+    pinEnd: {idx: 0, back: backExec, size: EXEC_STATE_BYTES}, pinN: {idx: 4, back: backTerminal}}));
   programs.genesis = carrier(sliceGenesis(programs.genesisUnsliced), programs.msmA, 3);
   delete programs.genesisUnsliced;
   const [definitions] = splitDefinitions(programs.msmA);

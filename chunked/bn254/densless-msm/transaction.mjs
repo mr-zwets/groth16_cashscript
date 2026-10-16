@@ -12,7 +12,8 @@ export function produceTransaction(vk,proof,publicInputs,stagePads=STAGE_PADS){
  const m=msmWitness(n0,n1,MSM_SPLIT,CUTS),num=x=>Buffer.from(bigIntToVmNumber(x));
  const fixed32=v=>Buffer.from(v.toString(16).padStart(64,'0'),'hex').reverse();
  // MSM stage state pushes: the accumulator after witness byte CUTS[k], n0, n1 and all 64 witness bytes
- const state=k=>Buffer.concat([...[...m.states[CUTS[k]],n0,n1].map(fixed32),m.w]);
+ // slim layout: executors X,Y,Z,w; terminal n0,n1,X,Y,Z,w
+ const state=k=>Buffer.concat([...(k===3?[n0,n1].map(fixed32):[]),...m.states[CUTS[k]].map(fixed32),m.w]);
  const execPadded=STAGE_PADS.slice(0,3).some(Boolean),pad=k=>(k<3?execPadded:STAGE_PADS[3]>0)?[Buffer.alloc(stagePads[k])]:[];
  const inputs=[];let offset=0;
  for(let i=0;i<3;i++){
