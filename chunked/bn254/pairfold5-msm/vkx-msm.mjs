@@ -24,16 +24,16 @@ export { witness } from './vkx-msm-asm.mjs';
 
 const { bn254 } = mm;
 const G1 = bn254.G1.Point;
-const P = bn254.fields.Fp.ORDER, R = glv.GLV_R, LAM = glv.GLV_LAMBDA;
+export const P = bn254.fields.Fp.ORDER, R = glv.GLV_R, LAM = glv.GLV_LAMBDA;
 const TABLE = glv.GLV_SPLIT_TABLE_HEX;
-const Q0 = G1.BASE.toAffine();
-const FINAL = mm.vk.ic[0].subtract(G1.BASE.multiply(1n << 64n)).toAffine();
+export const Q0 = G1.BASE.toAffine();
+export const FINAL = mm.vk.ic[0].subtract(G1.BASE.multiply(1n << 64n)).toAffine();
 // Input A pins input B's state push: X, Y, Z, n0, n1 (32 bytes each) and A's witness bytes wa,
 // so B never parses A's unlocking (A's pad length is unconstrained).
-const stateBytes = (split) => 5 * 32 + (64 - split);
+export const stateBytes = (split) => 5 * 32 + (64 - split);
 const stateHeader = (split) => '0x4c' + stateBytes(split).toString(16).padStart(2, '0');
 
-const helpers = `function dbl(int x, int y, int z) returns (int, int, int) {
+export const helpers = `function dbl(int x, int y, int z) returns (int, int, int) {
     int a = (x * x) % ${P}; int b = (y * y) % ${P}; int c = (b * b) % ${P};
     int d = (4 * x * b) % ${P};
     int e = a * 3; int f = (e * e) % ${P};
@@ -76,7 +76,9 @@ const straus = (count, wName) => `        for (int t = 0; t < ${count}; t = t + 
 // ownInputs: the claimed n0, n1 are input A's own pushes (unlocking: pad, wa, n1, n0) instead of
 // genesis pushes pubIdx, pubIdx + 1.
 // noPad: no pad parameter (when input A's code is carried by another input that has its own pad).
-export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false, noPad = false }) => `pragma cashscript ^0.14.0;
+// pinEnd {idx, back, size}: pin the state as the prefix of input idx's size-byte push that ends
+// `back` bytes before the end of its unlocking (instead of input bIdx's front push).
+export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false, noPad = false, pinEnd = null }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmA() {
     function spend(${ownInputs ? 'int n0, int n1, ' : ''}bytes wa${noPad ? '' : ', bytes unused pad'}) {
@@ -110,7 +112,9 @@ ${ownInputs ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
 ${straus(64 - split, 'wa')}
         bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) +
             toPaddedBytes(n0, 32) + toPaddedBytes(n1, 32) + wa;
-        require(tx.inputs[${bIdx}].unlockingBytecode.split(${65 + 2 + stateBytes(split)})[0].split(65)[1] == ${stateHeader(split)} + st);
+${pinEnd ? `        bytes u = tx.inputs[${pinEnd.idx}].unlockingBytecode;
+        require(u.split(u.length - ${pinEnd.back})[0].split(u.length - ${pinEnd.back + pinEnd.size})[1].split(${stateBytes(split)})[0] == st);`
+  : `        require(tx.inputs[${bIdx}].unlockingBytecode.split(${65 + 2 + stateBytes(split)})[0].split(65)[1] == ${stateHeader(split)} + st);`}
     }
 }
 `;

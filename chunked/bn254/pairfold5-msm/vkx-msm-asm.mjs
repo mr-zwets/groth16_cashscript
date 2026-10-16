@@ -215,15 +215,18 @@ const entry = (half, idx) => {
 };
 const fixed32 = (v) => Buffer.from(v.toString(16).padStart(64, '0'), 'hex').reverse();
 
-export const witness = (n0, n1, split) => {
+// cuts: also return the Jacobian accumulator after the first `cut` witness bytes, for each cut.
+export const witness = (n0, n1, split, cuts = []) => {
   const ks = glv.glvDecomposeJoint(n0, n1);
   const nib = (i) => ks.reduce((a, k, j) => a + (Number((k >> BigInt(i)) & 1n) << j), 0);
   const bytes = Buffer.from(Array.from({ length: 64 }, (_, t) => nib(63 - t) + 16 * nib(127 - t)));
   let acc = [Q0.x, Q0.y, 1n], st = null;
+  const states = {};
   for (let t = 0; t < 64; t++) {
     acc = dblJ(acc);
     if (bytes[t] % 16) acc = maddJ(acc, entry(0, bytes[t] % 16));
     if (bytes[t] >> 4) acc = maddJ(acc, entry(1, bytes[t] >> 4));
+    if (cuts.includes(t + 1)) states[t + 1] = [...acc];
     if (t === 63 - split) st = Buffer.concat([...[...acc, n0, n1].map(fixed32), bytes.subarray(0, 64 - split)]);
   }
   acc = maddJ(acc, [FINAL.x, FINAL.y]);
@@ -235,5 +238,5 @@ export const witness = (n0, n1, split) => {
   if (n1 !== 0n) v = v.add(ic[2].multiply(n1));
   const a = v.toAffine();
   if (a.x !== vx || a.y !== vy) throw new Error('MSM reference mismatch');
-  return { wa: bytes.subarray(0, 64 - split), wb: bytes.subarray(64 - split), st, zInv, vkx: Buffer.concat([fixed32(vx), fixed32(vy)]) };
+  return { wa: bytes.subarray(0, 64 - split), wb: bytes.subarray(64 - split), w: bytes, states, st, zInv, vkx: Buffer.concat([fixed32(vx), fixed32(vy)]) };
 };

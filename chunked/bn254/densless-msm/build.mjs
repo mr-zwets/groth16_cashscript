@@ -2,14 +2,14 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
-import {programA, programB} from '../pairfold5-msm/vkx-msm-asm.mjs';
-import {sourceA, sourceB, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
+import {sourceA, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
+import {STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
 import {sliceGenesis} from './genesis-slice.mjs';
 import {carrier, remapFunctionIds} from './carrier.mjs';
-import {OpcodesBCH, encodeAuthenticationInstructions, encodeDataPush, bigIntToVmNumber} from '@bitauth/libauth';
+import {OpcodesBCH, decodeAuthenticationInstructions, encodeAuthenticationInstructions, encodeDataPush, bigIntToVmNumber} from '@bitauth/libauth';
 import * as shared from '../densless-recovered/shared.mjs';
 import * as genesis from '../densless-recovered/genesis.mjs';
-import * as terminal from './terminal.mjs';
+import * as terminal from '../densless-recovered/terminal.mjs';
 import {executor, fragmentReader, p2sh} from '../densless-recovered/loader.mjs';
 import {BASE_FIELD, SCALAR_FIELD, deploymentTag, layout} from '../densless-recovered/constants.mjs';
 
@@ -22,14 +22,14 @@ const numbers = {
 
 // Preserve explicit push opcodes and unsigned payload lengths. Symbols describe
 // static function references; INVOKE_STACK preserves the two dynamic sites.
-export function assemble(body, identifiers, data = {}) {
+export function assemble(body, identifiers, data = {}, extraNumbers = {}) {
   const tokens = body.trim() ? body.trim().split(/\s+/) : [];
   const encoded = [];
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
     if (['CALL', 'DEFINE_STACK', 'NUM', 'DATA'].includes(token)) {
       const name = tokens[++i];
-      const value = token === 'NUM' ? numbers[name] : token === 'DATA' ? data[name] : identifiers.get(name);
+      const value = token === 'NUM' ? (extraNumbers[name] ?? numbers[name]) : token === 'DATA' ? data[name] : identifiers.get(name);
       assert(value !== undefined, `unknown ${token} symbol: ${name}`);
       encoded.push(...encodeDataPush(token === 'DATA' ? value : bigIntToVmNumber(BigInt(value))));
       if (token === 'CALL') encoded.push(OpcodesBCH.OP_INVOKE);
@@ -56,81 +56,130 @@ export function assemble(body, identifiers, data = {}) {
   return Buffer.from(encoded);
 }
 
-// Sound vk_x: MSM part A (carried inside genesis, see carrier.mjs) and part B (input 5) recompute
-// vk_x from the claimed public inputs (genesis pushes 22 n0, 21 n1); see README.md.
-export const MSM_SPLIT = Number(process.env.MSM_SPLIT ?? 25);
-// Zero-pad bytes buying op-cost budget ((41 + unlocking) * 800 >= op-cost), sized from a linear
-// fit of op-cost against the number of table adds over 37 fresh proofs (standard VM), evaluated
-// at the worst case where every 4-bit index is nonzero, plus the fit's largest residual, plus 1%:
-//   genesis (sliced genesis + MSM part A, positions 63..MSM_SPLIT): 50.7k/add, 78 adds -> 6.22M
-//   MSM part B (input 5, positions MSM_SPLIT-1..0, GLV check):       52.1k/add, 50 adds -> 4.42M
-// Sized for the CashScript build; the asm build is cheaper. Re-fit after changing MSM_SPLIT.
-export const GENESIS_PAD = Number(process.env.GENESIS_PAD ?? 49);
-// MSM implementation: 'cash' (CashScript source vkx-msm.mjs, default; needs cashc
-// compiler-optimizations-7) or 'asm' (hand-scheduled vkx-msm-asm.mjs, kept as a cross-check).
-export const MSM_IMPL = process.env.MSM_IMPL ?? 'cash';
-export const MSM_PAD = {b: 1422};
-const msmCache = new Map();
-export const msmPrograms = (genesisLength) => {
-  if (!msmCache.has(genesisLength)) msmCache.set(genesisLength, {
-    // MSM part A runs inside genesis (see carrier.mjs), so it has no pad of its own; its function
-    // identifiers are moved above the genesis program's (0..29).
-    msmA: remapFunctionIds(MSM_IMPL === 'cash'
-      ? compileCash(sourceA({split: MSM_SPLIT, bIdx: 5, ownInputs: true, noPad: true}))
-      : programA({split: MSM_SPLIT, bIdx: 5, ownInputs: true, noPad: true}), 100),
-    msmB: MSM_IMPL === 'cash'
-      ? compileCash(sourceB({split: MSM_SPLIT}))
-      : programB({split: MSM_SPLIT}),
-  });
-  return msmCache.get(genesisLength);
+// Sound vk_x: genesis recomputes MSM part A (positions 63..MSM_SPLIT) from its claimed public
+// inputs (genesis pushes 22 n0, 21 n1) and the executors and the terminal carry the remaining
+// positions as a chain of pinned state pushes (vkx-stages.mjs); see README.md.
+export const MSM_SPLIT = Number(process.env.MSM_SPLIT ?? 26);
+// Witness-byte cuts: genesis runs [0, CUTS[0]), executor k runs [CUTS[k], CUTS[k + 1]), the
+// terminal runs [CUTS[3], 64) and finishes. CUTS[0] = 64 - MSM_SPLIT.
+export const CUTS = (process.env.MSM_CUTS ?? `${64 - MSM_SPLIT},46,54,60`).split(',').map(Number);
+// Every input's op-cost must fit its budget ((41 + unlocking) * 800) at the worst case where
+// every 4-bit table index is nonzero. The cuts are sized from a linear fit of op-cost against the
+// number of table adds over 37 fresh proofs (standard VM), evaluated at that worst case, plus the
+// fit's largest residual, plus 1%; worst-case spare in budget bytes: exec0 573, exec1 906,
+// exec2 700, genesis 125, terminal 1035, so no input needs a zero pad. Re-fit after changing
+// MSM_SPLIT or CUTS (GENESIS_PAD / STAGE_PADS buy 800 op per byte if a split needs it).
+export const GENESIS_PAD = Number(process.env.GENESIS_PAD ?? 0);
+export const STAGE_PADS = (process.env.STAGE_PADS ?? '0,0,0,0').split(',').map(Number);
+// Carried function identifiers: the MSM helpers (dbl, madd, tab0, tab64) are defined once in
+// genesis; the stages read that definition block out of the genesis redeem and run it as
+// function LOADER_ID. Clear of genesis (0..29), shared (0..25), terminal (-1, 0..36) and the
+// executor loader (-1, 100).
+const MSM_ID_OFFSET = 200, LOADER_ID = 199n;
+const redeemPushBytes = (length) => length + (length < 76 ? 1 : length < 256 ? 2 : 3);
+const cashCache = new Map();
+const cash = (source) => {
+  if (!cashCache.has(source)) cashCache.set(source, remapFunctionIds(compileCash(source), MSM_ID_OFFSET));
+  return cashCache.get(source);
+};
+// Split compiled CashScript into its leading function-definition block and its main code.
+const splitDefinitions = (bytecode) => {
+  const list = decodeAuthenticationInstructions(bytecode);
+  let i = 0;
+  while (i + 2 < list.length && list[i + 2].opcode === OpcodesBCH.OP_DEFINE) i += 3;
+  const length = encodeAuthenticationInstructions(list.slice(0, i)).length;
+  return [bytecode.subarray(0, length), bytecode.subarray(length)];
+};
+// Stage code: define the helpers from genesis (the definition block sits `back` bytes before the
+// end of input 3's unlocking, inside the hash-pinned genesis redeem), then run the stage's main.
+const stage = (bytecode, definitions, back) => {
+  const [own, main] = splitDefinitions(bytecode);
+  assert(own.equals(definitions), 'stage helper definitions differ from the genesis copy');
+  return Buffer.concat([assemble(`OP_3 OP_INPUTBYTECODE OP_SIZE NUM BACK OP_SUB OP_SPLIT OP_NIP NUM LENGTH OP_SPLIT OP_DROP`,
+    new Map(), {}, {BACK: BigInt(back), LENGTH: BigInt(definitions.length)}),
+  Buffer.from([...encodeDataPush(bigIntToVmNumber(LOADER_ID)), OpcodesBCH.OP_DEFINE, ...encodeDataPush(bigIntToVmNumber(LOADER_ID)), OpcodesBCH.OP_INVOKE]),
+  main]);
 };
 
-export function build() {
+const compileModule = (source, constants) => {
+  const identifiers = new Map(source.functions.map(f => [f.name, f.originalId]));
+  assert.equal(identifiers.size, source.functions.length, 'duplicate function name');
+  const keys = [...identifiers.values()].map(id => Buffer.from(bigIntToVmNumber(BigInt(id))).toString('hex'));
+  assert.equal(new Set(keys).size, source.functions.length, 'duplicate function identifier');
+  const declarations = source.functions.map(f => ({
+    name: f.name, id: f.originalId, bytecode: assemble(f.body, identifiers, constants),
+  }));
+  const program = Buffer.concat([
+    assemble(source.prefix, identifiers, constants),
+    ...declarations.map(f => Buffer.from([
+      ...encodeDataPush(f.bytecode), ...encodeDataPush(bigIntToVmNumber(BigInt(f.id))), OpcodesBCH.OP_DEFINE,
+    ])),
+    assemble(source.main, identifiers, constants),
+  ]);
+  return {declarations, program};
+};
+
+const execPadded = STAGE_PADS.slice(0, 3).some(Boolean), terminalPadded = STAGE_PADS[3] > 0;
+
+function buildWith({backExec, backTerminal}) {
   const programs = {}, declarations = {}, constants = {deploymentTag};
-  for (const [name, source] of Object.entries({shared, genesis, terminal})) {
-    if (name === 'terminal') {
-      // drop the dead vk_x auxiliary predicate from genesis (see genesis-slice.mjs)
-      Object.assign(programs, msmPrograms(0));
-      // genesis: the sliced program, then MSM part A on its parked pushes (wa, n1, n0)
-      programs.genesis = carrier(sliceGenesis(programs.genesis), programs.msmA, 3);
-      const loaderIdentifiers = new Map([['fragmentReader', -1], ['sharedProgram', 100]]);
-      const globalFunctionKeys = [
-        ...loaderIdentifiers.values(),
-        ...shared.functions.map(f => f.originalId),
-      ].map(id => Buffer.from(bigIntToVmNumber(BigInt(id))).toString('hex'));
-      assert.equal(new Set(globalFunctionKeys).size, globalFunctionKeys.length,
-        'loader/shared function identifier byte collision');
-      const fragmentReaderBytecode = assemble(fragmentReader, loaderIdentifiers, constants);
-      const fragmentReaderDeclaration = Buffer.from([
-        ...encodeDataPush(fragmentReaderBytecode),
-        ...encodeDataPush(bigIntToVmNumber(-1n)),
-        OpcodesBCH.OP_DEFINE,
-      ]);
-      programs.executor = Buffer.concat([
-        fragmentReaderDeclaration,
-        assemble(executor, loaderIdentifiers, constants),
-      ]);
-      const workerLockings = [programs.executor, programs.executor, programs.executor, programs.genesis, programs.msmB]
-        .map(redeem => assemble(p2sh, new Map(), {redeemHash256: hash256(redeem)}));
-      constants.workerLockingRoot = hash256(Buffer.concat(workerLockings.map(hash256)));
-    }
-    const identifiers = new Map(source.functions.map(f => [f.name, f.originalId]));
-    assert.equal(identifiers.size, source.functions.length, 'duplicate function name');
-    const keys = [...identifiers.values()].map(id => Buffer.from(bigIntToVmNumber(BigInt(id))).toString('hex'));
-    assert.equal(new Set(keys).size, source.functions.length, 'duplicate function identifier');
-    declarations[name] = source.functions.map(f => ({
-      name: f.name, id: f.originalId, bytecode: assemble(f.body, identifiers, constants),
-    }));
-    programs[name] = Buffer.concat([
-      assemble(source.prefix, identifiers, constants),
-      ...declarations[name].map(f => Buffer.from([
-        ...encodeDataPush(f.bytecode), ...encodeDataPush(bigIntToVmNumber(BigInt(f.id))), OpcodesBCH.OP_DEFINE,
-      ])),
-      assemble(source.main, identifiers, constants),
-    ]);
-    if (name === 'shared') constants.sharedHash256 = hash256(programs.shared);
+  ({declarations: declarations.shared, program: programs.shared} = compileModule(shared, constants));
+  constants.sharedHash256 = hash256(programs.shared);
+  ({declarations: declarations.genesis, program: programs.genesisUnsliced} = compileModule(genesis, constants));
+  // genesis: the sliced program (dead vk_x auxiliary predicate dropped, see genesis-slice.mjs),
+  // then MSM part A on its parked pushes (wa, n1, n0); part A pins input 0's state push
+  programs.msmA = cash(sourceA({split: MSM_SPLIT, ownInputs: true, noPad: true,
+    pinEnd: {idx: 0, back: backExec, size: STATE_BYTES}}));
+  programs.genesis = carrier(sliceGenesis(programs.genesisUnsliced), programs.msmA, 3);
+  delete programs.genesisUnsliced;
+  const [definitions] = splitDefinitions(programs.msmA);
+  // executors: the shared-program loader, then the executor MSM stage on its parked state push
+  // (and, with stage pads, the pad below it dropped first)
+  const loaderIdentifiers = new Map([['fragmentReader', -1], ['sharedProgram', 100]]);
+  const globalFunctionKeys = [
+    ...loaderIdentifiers.values(),
+    ...shared.functions.map(f => f.originalId),
+  ].map(id => Buffer.from(bigIntToVmNumber(BigInt(id))).toString('hex'));
+  assert.equal(new Set(globalFunctionKeys).size, globalFunctionKeys.length,
+    'loader/shared function identifier byte collision');
+  const fragmentReaderBytecode = assemble(fragmentReader, loaderIdentifiers, constants);
+  const fragmentReaderDeclaration = Buffer.from([
+    ...encodeDataPush(fragmentReaderBytecode),
+    ...encodeDataPush(bigIntToVmNumber(-1n)),
+    OpcodesBCH.OP_DEFINE,
+  ]);
+  programs.loader = Buffer.concat([fragmentReaderDeclaration, assemble(executor, loaderIdentifiers, constants)]);
+  programs.msmExec = stage(cash(sourceExec({cuts: CUTS, backExec, backTerminal})), definitions, programs.msmA.length);
+  programs.executor = Buffer.concat([execPadded ? Buffer.from([OpcodesBCH.OP_NIP]) : Buffer.alloc(0),
+    carrier(programs.loader, programs.msmExec, 1)]);
+  const workerLockings = [programs.executor, programs.executor, programs.executor, programs.genesis]
+    .map(redeem => assemble(p2sh, new Map(), {redeemHash256: hash256(redeem)}));
+  constants.workerLockingRoot = hash256(Buffer.concat(workerLockings.map(hash256)));
+  // terminal: the densless terminal, then the final MSM stage on its parked pushes (zInv, state)
+  ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminal, constants));
+  programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
+  programs.terminal = Buffer.concat([terminalPadded ? Buffer.from([OpcodesBCH.OP_ROT, OpcodesBCH.OP_DROP]) : Buffer.alloc(0),
+    carrier(programs.terminalBase, programs.msmFinal, 2)]);
+  delete programs.terminalBase;
+  return {programs, declarations};
+}
+
+export function build() {
+  // the stages locate each other's state push by redeem length, which the redeems embed:
+  // iterate to the fixed point
+  let backs = {backExec: 600, backTerminal: 6000};
+  for (let round = 0; round < 8; round++) {
+    const result = buildWith(backs);
+    const next = {backExec: redeemPushBytes(result.programs.executor.length),
+      backTerminal: redeemPushBytes(result.programs.terminal.length)};
+    if (next.backExec === backs.backExec && next.backTerminal === backs.backTerminal) return finish(result);
+    backs = next;
   }
-  const redeems = [programs.executor, programs.executor, programs.executor, programs.genesis, programs.terminal, programs.msmB];
+  throw new Error('redeem lengths did not converge');
+}
+
+function finish({programs, declarations}) {
+  const redeems = [programs.executor, programs.executor, programs.executor, programs.genesis, programs.terminal];
   const lockings = redeems.map(redeem => assemble(p2sh, new Map(), {redeemHash256: hash256(redeem)}));
   let offset = 0;
   const sharedFragments = layout.fragmentLengths.map(length => {
