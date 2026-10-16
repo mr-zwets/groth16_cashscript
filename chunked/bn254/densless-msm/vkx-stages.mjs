@@ -17,9 +17,10 @@
 import { helpers, P, R, LAM, FINAL } from '../pairfold5-msm/vkx-msm.mjs';
 
 export const STATE_BYTES = 224;
-// slim layout: executor state = X, Y, Z, w (160); terminal state = n0, n1, X, Y, Z, w (224).
-// n0, n1 are pinned into the terminal state by genesis directly, not copied through executors.
-export const EXEC_STATE_BYTES = 160;
+// slim layout: executor state = X, Y, Z (96); terminal state = n0, n1, w, X, Y, Z (224).
+// n0, n1 and the witness bytes w live only in the terminal's state push: genesis pins n0, n1 and
+// reads its wa from there, and every executor reads its witness bytes from there.
+export const EXEC_STATE_BYTES = 96;
 
 const straus = (from, to) => `        for (int t = ${from}; t < ${to}; t = t + 1) {
             int b = int(w.split(t + 1)[0].split(t)[1] + 0x00);
@@ -32,8 +33,7 @@ const unpack = (size) => `        require(st.length == ${size});
         bytes s = st.split(${size - EXEC_STATE_BYTES})[1];
         int rX = int(s.split(32)[0]);
         int rY = int(s.split(64)[0].split(32)[1]);
-        int rZ = int(s.split(96)[0].split(64)[1]);
-        bytes w = s.split(96)[1];`;
+        int rZ = int(s.split(64)[1]);`;
 
 // cuts: [c0, c1, c2, c3]; executor k (input k) runs witness bytes [cuts[k], cuts[k + 1]).
 // backExec / backTerminal: length of the executor / terminal redeem push (header included).
@@ -42,6 +42,8 @@ ${helpers}
 contract VkxMsmStage() {
     function spend(bytes st) {
 ${unpack(EXEC_STATE_BYTES)}
+        bytes v = tx.inputs[4].unlockingBytecode;
+        bytes w = v.split(v.length - ${backTerminal + 96})[0].split(v.length - ${backTerminal + 160})[1];
         int k = this.activeInputIndex;
         int from = ${cuts[0]}; int to = ${cuts[1]}; int next = 1; int back = ${backExec};
         if (k == 1) { from = ${cuts[1]}; to = ${cuts[2]}; next = 2; }
@@ -49,7 +51,7 @@ ${unpack(EXEC_STATE_BYTES)}
 ${straus('from', 'to')}
         bytes u = tx.inputs[next].unlockingBytecode;
         require(u.split(u.length - back)[0].split(u.length - back - ${EXEC_STATE_BYTES})[1] ==
-            toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) + w);
+            toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32));
     }
 }
 `;
@@ -62,6 +64,7 @@ contract VkxMsmFinal() {
 ${unpack(STATE_BYTES)}
         int n0 = int(st.split(32)[0]);
         int n1 = int(st.split(64)[0].split(32)[1]);
+        bytes w = st.split(128)[0].split(64)[1];
 ${straus(from, 64)}
         (rX, rY, rZ) = madd(rX, rY, rZ, ${FINAL.x}, ${FINAL.y});
         require((rZ * zInv) % ${P} == 1);

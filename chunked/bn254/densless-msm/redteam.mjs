@@ -1,9 +1,9 @@
 // Maintainer red-team runs for bch-groth16-intratx-pairfold5-densless-msm (zk-verifier-bench
 // src/bch/redteam/<id>.json). Every run must be rejected.
-// Layout: genesis (input 3) carries MSM part A; its unlocking ends with pad, wa, n1, n0, redeem
+// Layout: genesis (input 3) carries MSM part A; its unlocking ends with pad, n1, n0, redeem
 // (the claimed public inputs). The executors (inputs 0, 1, 2) and the terminal (input 4) carry
-// the remaining MSM stages; each ends with a state push before its redeem (executors: 160 bytes X, Y, Z, w;
-// terminal: 224 bytes n0, n1, X, Y, Z, w; genesis pins n0, n1 into the terminal's push directly), the terminal with zInv below it (see vkx-stages.mjs).
+// the remaining MSM stages; each ends with a state push before its redeem (executors: 96 bytes X, Y, Z;
+// terminal: 224 bytes n0, n1, w, X, Y, Z; genesis pins n0, n1 and every stage reads w from it), the terminal with zInv below it (see vkx-stages.mjs).
 //   forged-public-inputs: claimed n changed in genesis, everything else honest
 //   forged-public-inputs-adaptive: the whole MSM chain rebuilt for the forged inputs (true vk_x
 //     kept in genesis push 0), optionally also swapping genesis vk_x; a witness swapped mid-chain;
@@ -37,14 +37,14 @@ const chain = (c0, c1, w = null) => {
   const m = msmWitness(c0, c1, MSM_SPLIT, CUTS);
   const bytes = w ?? m.w;
   return {...m, wa: bytes.subarray(0, 64 - MSM_SPLIT),
-    state: (k) => Buffer.concat([...[...(k === 3 ? [c0, c1] : []), ...m.states[CUTS[k]]].map(le32), bytes])};
+    state: (k) => Buffer.concat([...(k === 3 ? [le32(c0), le32(c1), bytes] : []), ...m.states[CUTS[k]].map(le32)])};
 };
 
-// honest genesis pushes: 19 genesis witness pushes, then pad, wa, n1, n0, redeem
+// honest genesis pushes: 19 genesis witness pushes, then pad, n1, n0, redeem (wa is read from the terminal state)
 const genesisPushes = pushesOf(3);
-assert.equal(genesisPushes.length, 24, 'unexpected genesis layout');
+assert.equal(genesisPushes.length, 23, 'unexpected genesis layout');
 const genesisWith = ({push0 = genesisPushes[0], pad = Buffer.alloc(GENESIS_PAD), wa, c1, c0}) =>
-  hex([push0, ...genesisPushes.slice(1, 19), pad, wa, num(c1), num(c0), program.redeems[3]]);
+  hex([push0, ...genesisPushes.slice(1, 19), pad, num(c1), num(c0), program.redeems[3]]);
 // executor k / terminal with its MSM pushes replaced
 const stageWith = (k, st, zInv) => {
   const pushes = pushesOf(k);
@@ -92,7 +92,7 @@ const f = chain(n0 + 1n, n1);
   runs.push({label: 'pad-shift forgery n0 + 2^62, forged w in the chain', kind: 'forged-public-inputs-adaptive', patches: [{input: 3, unlocking: g}, ...[0, 1, 2, 4].map((input, k) => ({input, unlocking: stageWith(input, st(k), c.zInv)}))]});
 }
 [0, 1, 2, 4].forEach((input, k) => {
-  for (const [what, at] of (k < 3 ? [['X', 5], ['Z', 70], ['w', 150]] : [['n0', 5], ['X', 70], ['w', 200]])) {
+  for (const [what, at] of (k < 3 ? [['X', 5], ['Y', 40], ['Z', 70]] : [['n0', 5], ['w', 100], ['X', 200]])) {
     const st = Buffer.from(honest.state(k)); st[at] ^= 0x01;
     runs.push({label: `input ${input} state push: one byte of ${what} flipped`, kind: 'msm-state-tamper', patches: [{input, unlocking: stageWith(input, st, honest.zInv)}]});
   }

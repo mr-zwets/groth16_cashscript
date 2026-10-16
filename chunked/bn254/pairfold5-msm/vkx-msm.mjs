@@ -81,8 +81,12 @@ const straus = (count, wName) => `        for (int t = 0; t < ${count}; t = t + 
 export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false, noPad = false, pinEnd = null, pinN = null }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmA() {
-    function spend(${ownInputs ? 'int n0, int n1, ' : ''}bytes wa${noPad ? '' : ', bytes unused pad'}) {
-        require(wa.length == ${64 - split});
+    function spend(${ownInputs ? 'int n0, int n1' : ''}${pinN ? '' : `${ownInputs ? ', ' : ''}bytes wa`}${noPad ? '' : ', bytes unused pad'}) {
+${pinN ? `        bytes un = tx.inputs[${pinN.idx}].unlockingBytecode;
+        bytes tn = un.split(un.length - ${pinN.back + 96})[0].split(un.length - ${pinN.back + 224})[1];
+        bytes wa = tn.split(64)[1].split(${64 - split})[0];
+` : `        require(wa.length == ${64 - split});
+`}
 ${ownInputs ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
         require(g.split(3)[0] == 0x4dc001);
         // window = pushes 1..pubIdx+1 (after the 451-byte push 0, before the genesis redeem push)
@@ -110,13 +114,12 @@ ${ownInputs ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
 `}        require(within(n0, 0, ${R})); require(within(n1, 0, ${R}));
         int rX = ${Q0.x}; int rY = ${Q0.y}; int rZ = 1;
 ${straus(64 - split, 'wa')}
-${pinN ? `        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) + wa;
-        bytes un = tx.inputs[${pinN.idx}].unlockingBytecode;
-        require(un.split(un.length - ${pinN.back + 160})[0].split(un.length - ${pinN.back + 224})[1] == toPaddedBytes(n0, 32) + toPaddedBytes(n1, 32));
+${pinN ? `        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32);
+        require(tn.split(64)[0] == toPaddedBytes(n0, 32) + toPaddedBytes(n1, 32));
 ` : `        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) +
             toPaddedBytes(n0, 32) + toPaddedBytes(n1, 32) + wa;
 `}${pinEnd ? `        bytes u = tx.inputs[${pinEnd.idx}].unlockingBytecode;
-        require(u.split(u.length - ${pinEnd.back})[0].split(u.length - ${pinEnd.back + pinEnd.size})[1].split(${pinN ? 96 + 64 - split : stateBytes(split)})[0] == st);`
+        require(u.split(u.length - ${pinEnd.back})[0].split(u.length - ${pinEnd.back + pinEnd.size})[1]${pinN ? '' : `.split(${stateBytes(split)})[0]`} == st);`
   : `        require(tx.inputs[${bIdx}].unlockingBytecode.split(${65 + 2 + stateBytes(split)})[0].split(65)[1] == ${stateHeader(split)} + st);`}
     }
 }

@@ -130,7 +130,7 @@ function buildWith({backExec, backTerminal}) {
   // then MSM part A on its parked pushes (wa, n1, n0); part A pins input 0's state push
   programs.msmA = cash(sourceA({split: MSM_SPLIT, ownInputs: true, noPad: true,
     pinEnd: {idx: 0, back: backExec, size: EXEC_STATE_BYTES}, pinN: {idx: 4, back: backTerminal}}));
-  programs.genesis = carrier(sliceGenesis(programs.genesisUnsliced), programs.msmA, 3);
+  programs.genesis = carrier(sliceGenesis(programs.genesisUnsliced), programs.msmA, 2);
   delete programs.genesisUnsliced;
   const [definitions] = splitDefinitions(programs.msmA);
   // executors: the shared-program loader, then the executor MSM stage on its parked state push
