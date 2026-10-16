@@ -6,6 +6,7 @@ import {sourceA, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
 import {STATE_BYTES, EXEC_STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
 import {sliceGenesis} from '../densless-msm/genesis-slice.mjs';
 import {carrier, remapFunctionIds} from '../densless-msm/carrier.mjs';
+import {compileTerminalPins, compileTerminalPinsLenOrder, compileTerminalPinsLenOnly, compileTerminalPinsOrderOnly, compileTerminalPinsLenSign} from './malleability-pins.mjs';
 import {OpcodesBCH, decodeAuthenticationInstructions, encodeAuthenticationInstructions, encodeDataPush, bigIntToVmNumber} from '@bitauth/libauth';
 import * as shared from '../densless-recovered/shared.mjs';
 import * as genesis from '../densless-recovered/genesis.mjs';
@@ -161,6 +162,20 @@ function buildWith({backExec, backTerminal}) {
   // terminal: the densless terminal, then the final MSM stage on its parked pushes (zInv, state)
   ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminal, constants));
   programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
+  // Malleability pins (length / order / sign-bit) run before the densless terminal, paid once.
+  const layoutExec = [
+    { shared: layout.fragmentLengths[0], witness: 2560, table: 928 },
+    { shared: layout.fragmentLengths[1], witness: 2304, table: 832 },
+    { shared: layout.fragmentLengths[2], witness: 2560, table: 928 },
+  ];
+  const pinMode = process.env.SLIM_PINS ?? 'full';
+  const pins = pinMode === '0' ? Buffer.alloc(0)
+    : pinMode === 'lenonly' ? compileTerminalPinsLenOnly()
+    : pinMode === 'lensign' ? compileTerminalPinsLenSign(layoutExec)
+    : pinMode === 'orderonly' ? compileTerminalPinsOrderOnly()
+    : pinMode === 'lenorder' ? compileTerminalPinsLenOrder(layoutExec)
+    : compileTerminalPins(layoutExec);
+  programs.terminalBase = Buffer.concat([pins, programs.terminalBase]);
   programs.terminal = Buffer.concat([terminalPadded ? Buffer.from([OpcodesBCH.OP_ROT, OpcodesBCH.OP_DROP]) : Buffer.alloc(0),
     carrier(programs.terminalBase, programs.msmFinal, 4)]);
   delete programs.terminalBase;

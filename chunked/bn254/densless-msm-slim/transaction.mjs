@@ -3,6 +3,7 @@ import {encodeDataPush,bigIntToVmNumber} from '@bitauth/libauth';
 import {build, MSM_SPLIT, CUTS, STAGE_PADS, GENESIS_PAD} from './build.mjs';
 import {witness as msmWitness} from '../pairfold5-msm/vkx-msm-asm.mjs';
 import {produceWitness} from '../densless-recovered/witness.mjs';
+import {canonicalizeLimbs, sortLimbsBE} from './malleability-pins.mjs';
 
 // stagePads: zero-padding bytes for the MSM stages in the executors and the terminal (op-cost budget)
 export function produceTransaction(vk,proof,publicInputs,stagePads=STAGE_PADS){
@@ -18,7 +19,7 @@ export function produceTransaction(vk,proof,publicInputs,stagePads=STAGE_PADS){
  const inputs=[];let offset=0;
  for(let i=0;i<3;i++){
   const length=program.layout.quotientLengths[i];
-  inputs.push([Buffer.from(w.accumulatorHeaderHex[i],'hex'),program.sharedFragments[i],Buffer.from(w.executorWitnessHex[i],'hex'),Buffer.from(w.fixedTableHex[i],'hex'),Buffer.concat([quotient.subarray(offset,offset+length),program.quotientSuffixes[i]]),...pad(i),state(i),program.redeems[i]]);
+  inputs.push([Buffer.from(w.accumulatorHeaderHex[i],'hex'),program.sharedFragments[i],Buffer.from(w.executorWitnessHex[i],'hex'),(process.env.SLIM_PINS && process.env.SLIM_PINS !== '0' ? canonicalizeLimbs(Buffer.from(w.fixedTableHex[i],'hex')) : Buffer.from(w.fixedTableHex[i],'hex')),Buffer.concat([quotient.subarray(offset,offset+length),program.quotientSuffixes[i]]),...pad(i),state(i),program.redeems[i]]);
   offset+=length;
  }
  const genesis=Array(19); // sliced genesis: the densless pushes 19..39 (dead predicate, n1, n0) are gone
@@ -28,7 +29,12 @@ export function produceTransaction(vk,proof,publicInputs,stagePads=STAGE_PADS){
  // genesis carries MSM part A: its pushes (wa, n1, n0) follow the genesis pad (see carrier.mjs)
  inputs.push([...genesis,Buffer.alloc(GENESIS_PAD),program.redeems[3]]);
  // the terminal carries the final MSM stage: pushes (pad), zInv, state after the redeem's own pushes
- inputs.push([Buffer.from(w.accumulatorHeaderHex[3],'hex'),quotient.subarray(offset),...w.terminalWitnessHex.map(x=>Buffer.from(x,'hex')),...pad(3),num(n1),num(n0),num(m.zInv),state(3),program.redeems[4]]);
+ const termWit = w.terminalWitnessHex.map(x=>Buffer.from(x,'hex'));
+ // First 10 are line-evaluation limbs: pin order on-chain, so sort them here (values form a multiset).
+ const useOrder = process.env.SLIM_PINS && !['0','lenonly','lensign'].includes(process.env.SLIM_PINS);
+ const ordered = useOrder ? sortLimbsBE(termWit.slice(0, 10)) : termWit.slice(0, 10);
+ const termRest = termWit.slice(10);
+ inputs.push([Buffer.from(w.accumulatorHeaderHex[3],'hex'),quotient.subarray(offset),...ordered,...termRest,...pad(3),num(n1),num(n0),num(m.zInv),state(3),program.redeems[4]]);
  // the MSM's vk_x must be the one genesis push 0 carries (fields 4, 5), which the terminal stage checks
  assert.equal(m.vkx.toString('hex'),Buffer.from(w.genesisKnownPushes[0],'hex').subarray(128,192).toString('hex'));
  assert.equal(quotient.length-offset,2336);

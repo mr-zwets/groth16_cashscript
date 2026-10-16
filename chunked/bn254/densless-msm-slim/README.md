@@ -12,13 +12,15 @@ Here:
 - **Soundness argument** (same shape as the parent). All stages consume one w. The terminal binds that w to its claimed n0, n1 mod r. The X, Y, Z chain is pinned stage to stage. The terminal checks the final affine point against the genesis vk_x, which the Miller loop consumes. So a proof verifies only for the claimed inputs.
 - **Rebalance.** The genesis unlocking, and with it the genesis op budget, shrank by 189 bytes. The Straus split moves 26 → 27 (genesis runs positions 63..27), and the cuts become 37,45,54,60.
 
-Result on the official fixtures: 35,124 script bytes, compared with 35,646 for the parent. That is a bench score of 35,359 instead of 35,881, at 24.6M op.
+**Malleability pins** (`malleability-pins.mjs`, default `SLIM_PINS=full`): prepended once to the densless half of the terminal redeem. They pin PUSHDATA2 lengths on the terminal header/quot and each executor quot, enforce non-decreasing order on terminal witness limbs 2..11, and require fixed-table sign bits clear on all three executors. This closes eight witness-malleability findings that also affect the parent entry (none allow a false statement). Modes: `0`, `lenonly`, `orderonly`, `lensign`, `lenorder`, `full`.
+
+Result on the official fixtures with `SLIM_PINS=full`: 35,804 script bytes (bench score 36,039). Unpinned slim was 35,124 script / 35,359 score; parent is 35,646 script / 35,881 score. The +680 vs unpinned slim / +158 vs parent pays for closing the eight malleability holes.
 
 **Worst-case op-cost** (`sweep.mjs`, results in `sweep-results.txt`): 30 fresh proofs under the fixture VK, with public inputs chosen for the densest GLV witnesses (6–7 zero nibbles out of 128, the structural minimum), evaluated in one transaction on the standard BCH 2026 VM. All 30 are accepted. Peak use of each input's budget:
 
 | | exec0 | exec1 | exec2 | genesis | terminal |
 |---|---|---|---|---|---|
-| slim | 92.6% | 89.9% | 90.3% | 95.8% | 86.3% |
+| slim (SLIM_PINS=full) | 92.6% | 90.0% | 90.4% | 95.9% | 86.4% |
 | parent, same sweep | 90.3% | 84.7% | 87.9% | 96.1% | 86.9% |
 
 The parent row matches the README figures for `../densless-msm`.
