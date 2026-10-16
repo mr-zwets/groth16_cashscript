@@ -56,8 +56,8 @@ export function assemble(body, identifiers, data = {}) {
   return Buffer.from(encoded);
 }
 
-// Sound vk_x: two MSM inputs (5, 6) recompute vk_x from the claimed public inputs
-// (input 5's own pushes n0, n1); see ../pairfold5-msm/vkx-msm.mjs and README.md.
+// Sound vk_x: MSM part A (carried inside genesis, see carrier.mjs) and part B (input 5) recompute
+// vk_x from the claimed public inputs (genesis pushes 22 n0, 21 n1); see README.md.
 export const MSM_SPLIT = Number(process.env.MSM_SPLIT ?? 25);
 // Zero-pad bytes buying op-cost budget ((41 + unlocking) * 800 >= op-cost), sized from a linear
 // fit of op-cost against the number of table adds over 37 fresh proofs (standard VM), evaluated
