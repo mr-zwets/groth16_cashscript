@@ -12,6 +12,7 @@ export const redeemPushBytes = (length) => length + (length < 76 ? 1 : length < 
 
 /** Sign-check subroutine id — must not collide with densless fragment/loader ids. */
 const SIGN_FN = 150;
+const NUMBER_FN = 151;
 
 export function canonicalizeLimbs(buf) {
   const out = Buffer.from(buf);
@@ -19,7 +20,7 @@ export function canonicalizeLimbs(buf) {
   return out;
 }
 
-/** Sort by unsigned BE value of the limb (matches on-chain order pin). */
+/** Sort nonnegative, minimally encoded LE numbers by value (the on-chain order). */
 export function sortLimbsBE(list) {
   return [...list].sort((a, b) => {
     const aN = BigInt('0x' + Buffer.from(a).reverse().toString('hex'));
@@ -45,11 +46,24 @@ function requirePushData2Len(len) {
   );
 }
 
-function extract32KeepRest() {
+// [unlocking rest] -> [remaining pushes, number]. Nonnegative VM numbers use
+// OP_0, OP_1..OP_16, or a direct push of up to 32 bytes; never a fixed width.
+function numberBody() {
   return cat(
-    pushN(1), op(OpcodesBCH.OP_SPLIT), op(OpcodesBCH.OP_NIP),
-    pushN(32), op(OpcodesBCH.OP_SPLIT), op(OpcodesBCH.OP_SWAP),
+    pushN(1), op(OpcodesBCH.OP_SPLIT, OpcodesBCH.OP_SWAP),
+    encodeDataPush(Uint8Array.of(0)), op(OpcodesBCH.OP_CAT, OpcodesBCH.OP_BIN2NUM),
+    op(OpcodesBCH.OP_DUP), pushN(81), op(OpcodesBCH.OP_GREATERTHANOREQUAL, OpcodesBCH.OP_IF),
+      op(OpcodesBCH.OP_DUP), pushN(97), op(OpcodesBCH.OP_LESSTHAN, OpcodesBCH.OP_VERIFY),
+      pushN(80), op(OpcodesBCH.OP_SUB),
+    op(OpcodesBCH.OP_ELSE),
+      op(OpcodesBCH.OP_DUP), pushN(33), op(OpcodesBCH.OP_LESSTHAN, OpcodesBCH.OP_VERIFY),
+      op(OpcodesBCH.OP_SPLIT, OpcodesBCH.OP_SWAP, OpcodesBCH.OP_BIN2NUM),
+    op(OpcodesBCH.OP_ENDIF),
   );
+}
+
+function extractNumberKeepRest() {
+  return cat(pushN(NUMBER_FN), op(OpcodesBCH.OP_INVOKE));
 }
 
 /** One-limb sign check body: table-rest on stack → consume 32 B, VERIFY bit7 clear. */
@@ -110,22 +124,17 @@ function pinOneExecTable(inputIdx, shared, witness, table, { signs = true, quot 
 
 function pinOwnHeaderQuotAndOrder(ordered) {
   const parts = [
+    Buffer.from(encodeDataPush(numberBody())), pushN(NUMBER_FN), op(OpcodesBCH.OP_DEFINE),
     op(OpcodesBCH.OP_INPUTINDEX), op(OpcodesBCH.OP_INPUTBYTECODE),
     requirePushData2Len(296),
     requirePushData2Len(2336),
   ];
-  // Order by unsigned LE value = BIN2NUM(limb) with sign bit clear (canonicalizeLimbs).
-  // No REVERSEBYTES/CAT: 33-byte VM numbers break densless on the loosened harness VM.
-  parts.push(extract32KeepRest(), op(OpcodesBCH.OP_TOALTSTACK));
+  parts.push(extractNumberKeepRest(), op(OpcodesBCH.OP_TOALTSTACK));
   for (let i = 1; i < ordered; i++) {
     parts.push(cat(
-      extract32KeepRest(), // [rest][curr]
+      extractNumberKeepRest(), // [rest][curr]
       op(OpcodesBCH.OP_DUP), op(OpcodesBCH.OP_FROMALTSTACK), // [rest][curr][curr][prev]
-      op(OpcodesBCH.OP_BIN2NUM), // [rest][curr][curr][prevNum]
-      op(OpcodesBCH.OP_SWAP), // [rest][curr][prevNum][curr]
-      op(OpcodesBCH.OP_BIN2NUM), // [rest][curr][prevNum][currNum]
-      op(OpcodesBCH.OP_SWAP), // [rest][curr][currNum][prevNum] — need prev<=curr
-      op(OpcodesBCH.OP_SWAP), // [rest][curr][prevNum][currNum]
+      op(OpcodesBCH.OP_SWAP), // [rest][curr][prev][curr]
       op(OpcodesBCH.OP_LESSTHANOREQUAL), op(OpcodesBCH.OP_VERIFY),
       op(OpcodesBCH.OP_TOALTSTACK), // curr limb
     ));

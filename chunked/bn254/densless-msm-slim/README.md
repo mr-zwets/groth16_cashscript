@@ -12,30 +12,30 @@ Here:
 - **Soundness argument** (same shape as the parent). All stages consume one w. The terminal binds that w to its claimed n0, n1 mod r. The X, Y, Z chain is pinned stage to stage. The terminal checks the final affine point against the genesis vk_x, which the Miller loop consumes. So a proof verifies only for the claimed inputs.
 - **Rebalance.** The genesis unlocking, and with it the genesis op budget, shrank by 189 bytes. The Straus split moves 26 → 27 (genesis runs positions 63..27), and the cuts become 37,45,54,60.
 
-**Malleability pins** (`malleability-pins.mjs`, default `SLIM_PINS=full`): prepended once to the densless half of the terminal redeem. They pin PUSHDATA2 lengths on the terminal header/quot and each executor quot, enforce non-decreasing order on terminal witness limbs 2..11, and require fixed-table sign bits clear on all three executors. This closes eight witness-malleability findings that also affect the parent entry (none allow a false statement). Modes: `0`, `lenonly`, `orderonly`, `lensign`, `lenorder`, `full`.
+**Malleability pins** (`malleability-pins.mjs`, default `SLIM_PINS=full`): prepended once to the densless half of the terminal redeem. They pin PUSHDATA2 lengths on the terminal header/quot and each executor quot, enforce non-decreasing order on terminal limbs 2..11, and require fixed-table sign bits clear on all three executors. The order reader follows actual minimally encoded VM-number pushes, including OP_0, small integer opcodes and 31/32-byte payloads. Its helper key 151 is disjoint from sign helper 150 and the existing base/MSM namespaces. The builder and witness producer share `PIN_MODE`, so an unset environment reproduces explicit `full` output. Modes remain `0`, `lenonly`, `orderonly`, `lensign`, `lenorder`, `full`.
 
-Result on the official fixtures with `SLIM_PINS=full`: 35,804 script bytes (bench score 36,039). Unpinned slim was 35,124 script / 35,359 score; parent is 35,646 script / 35,881 score. The +680 vs unpinned slim / +158 vs parent pays for closing the eight malleability holes.
+The five archived fixtures with full pins use **35,773 script bytes / 36,008 score**, including 235 bytes of transaction overhead. This is 31 bytes below the initial pinned submission, 649 above unpinned slim (35,359), and 127 above the original densless-msm entry (35,881). The five archived mathematical proofs and public inputs are unchanged.
 
-**Worst-case op-cost** (`sweep.mjs`, results in `sweep-results.txt`): 30 fresh proofs under the fixture VK, with public inputs chosen for the densest GLV witnesses (6–7 zero nibbles out of 128, the structural minimum), evaluated in one transaction on the standard BCH 2026 VM. All 30 are accepted. Peak use of each input's budget:
+**Dense-witness resource sample.** `sweep.mjs` deterministically generates 30 proofs under the fixture VK using seed `densless-msm-slim-v1`. Each public-input pair is selected by a 20,000-candidate search for few zero Straus nibbles. These samples have 5–7 zero nibbles; no global structural minimum or universal resource bound is claimed. Every input must pass `stateSuccess`, and every complete transaction must pass standard BCH2026 `verify()`; a failure exits nonzero. All 30 pass. Peak standard-VM budget percentages (input order 0..4):
 
-| | exec0 | exec1 | exec2 | genesis | terminal |
-|---|---|---|---|---|---|
-| slim (SLIM_PINS=full) | 92.6% | 90.0% | 90.4% | 95.9% | 86.4% |
-| parent, same sweep | 90.3% | 84.7% | 87.9% | 96.1% | 86.9% |
+| exec0 | exec1 | exec2 | genesis | terminal |
+|---|---|---|---|---|
+| 92.6% | 89.9% | 90.4% | 96.6% | 86.9% |
 
-The parent row matches the README figures for `../densless-msm`.
+`sweep-results.txt` records this run and seed. `SWEEP_JSON` optionally saves the exact proofs, public inputs and outcomes for independent replay. These are finite libauth measurements; corrected-native verification is reported separately in the PR.
 
-**Red-team.** `redteam.mjs` here is a **submitter suggestion**. It is not maintainer-authored. It adapts the parent's 26 runs to this layout. These runs change or weaken relative to the parent:
+**Regression and attack coverage.** `regression.mjs` checks default/full byte identity, all five archived fixtures, the independently pairing-checked `short-number-fixture.json`, and the public order-pin contract over zero, small integer opcodes and 31/32-byte values in both consensus and standard modes. It also refreshes the original 36 attack cases against the new code and adds all eight issue-39 cases (44 total). The first 26 originate in `redteam.mjs` as submitter suggestions; the next ten retain the upstream maintainer cases. The refresh is attributed to GPT-6.1 Sol at Kallisti's request and remains subject to upstream maintainer review. It does not claim fresh independent maintainer authorship.
 
-- the "lengthened state push" run now lengthens the terminal push, without a forged claim;
-- the "pad-shift" run is partly vacuous, because genesis no longer reads witness bytes from its own pushes;
-- the n0 and w tamper runs on executor states became Y and Z tampers.
+The original suggested attacks retain their documented limitations: the lengthened terminal-state attack uses an honest claim, the genesis pad-shift attack is partly vacuous for this layout, and executor n0/w tampers became Y/Z tampers. The additional issue-39 cases directly check quotient/header trailers, terminal limb permutations and the fixed-table sign bit.
 
-The maintainers should author attacks for the new terminal-window read.
+The original, unpinned slim and spec entries accept the eight issue-39 mutations under their respective VMs (BCH2026 / BCH_SPEC), with accepting baselines. Full-pinned slim rejects all eight. These are alternate witnesses for already-valid statements, not a demonstrated false-statement exploit.
+
+Use a fresh output directory for each regression run:
 
 ```sh
 VERIFIER_DIR=<zk-verifier-bench checkout> node export.mjs vectors.json
-VERIFIER_DIR=<zk-verifier-bench checkout> SWEEP_N=30 node sweep.mjs
+VERIFIER_DIR=<zk-verifier-bench checkout> node regression.mjs /tmp/slim-regression
+VERIFIER_DIR=<zk-verifier-bench checkout> SWEEP_N=30 SWEEP_SEED=densless-msm-slim-v1 SWEEP_JSON=/tmp/slim-sweep.json node sweep.mjs
 ```
 
-The changes to `../pairfold5-msm/vkx-msm.mjs` are behind a new `pinN` option of `sourceA`. With the option off (the parent and densless-msm-spec), the output is byte-identical.
+Parent `densless-msm` and `densless-msm-spec` source and vector outputs remain unchanged. Follow-up fixes and validation: **GPT-6.1 Sol**, at Kallisti's request.

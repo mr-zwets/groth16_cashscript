@@ -75,6 +75,7 @@ export const CUTS = (process.env.MSM_CUTS ?? `${64 - MSM_SPLIT},45,54,60`).split
 // (GENESIS_PAD / STAGE_PADS buy 800 op per byte if a split needs it).
 export const GENESIS_PAD = Number(process.env.GENESIS_PAD ?? 0);
 export const STAGE_PADS = (process.env.STAGE_PADS ?? '0,0,0,0').split(',').map(Number);
+export const PIN_MODE = process.env.SLIM_PINS ?? 'full';
 // Carried function identifiers: the MSM helpers (dbl, madd, tab0, tab64) are defined once in
 // genesis; the stages read that definition block out of the genesis redeem and run it as
 // function LOADER_ID. Clear of genesis (0..29), shared (0..25), terminal (-1, 0..36) and the
@@ -168,7 +169,7 @@ function buildWith({backExec, backTerminal}) {
     { shared: layout.fragmentLengths[1], witness: 2304, table: 832 },
     { shared: layout.fragmentLengths[2], witness: 2560, table: 928 },
   ];
-  const pinMode = process.env.SLIM_PINS ?? 'full';
+  const pinMode = PIN_MODE;
   const pins = pinMode === '0' ? Buffer.alloc(0)
     : pinMode === 'lenonly' ? compileTerminalPinsLenOnly()
     : pinMode === 'lensign' ? compileTerminalPinsLenSign(layoutExec)
