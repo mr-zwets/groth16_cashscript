@@ -43,9 +43,14 @@ function cubeRoot(Y) {
 }
 /** given the RAW Miller boundary fRaw, return { c, cInv, w } with c^lambda == fRaw*w. */
 export const SCALING = mk12([0n,0n,0n,0n,1n,0n],[0n,0n,0n,0n,0n,0n]);
+// Selector-2 scaling. The terminal's selector-2 branch expects SCALING^2 / xi (xi = 9 + u), not
+// SCALING^2; both lie in the same cubic-residue coset because xi is a cube in Fp12, so the coset
+// test below is unchanged. With SCALING^2 every selector-2 proof was rejected at the terminal.
+const XI = Fp12.create({c0: Fp6.create({c0: Fp2.fromBigTuple([9n, 1n]), c1: Fp2.ZERO, c2: Fp2.ZERO}), c1: Fp6.ZERO});
+export const SCALING2 = mul(sqr(SCALING), inv(XI));
 export function residueWitness(fRaw) {
   let w = null, rw = null;
-  for (const cand of [Fp12.ONE, SCALING, sqr(SCALING)]) { const t = mul(fRaw, cand); if (isOne(powExact(t, exp1))) { w = cand; rw = t; break; } }
+  for (const cand of [Fp12.ONE, SCALING, SCALING2]) { const t = mul(fRaw, cand); if (isOne(powExact(t, exp1))) { w = cand; rw = t; break; } }
   if (!w) throw new Error('no cubic-residue scaling');
   rw = powExact(rw, rInv);
   rw = powExact(rw, mInv);

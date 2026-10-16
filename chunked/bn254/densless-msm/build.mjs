@@ -4,6 +4,7 @@ import {writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {programA, programB} from '../pairfold5-msm/vkx-msm-asm.mjs';
 import {sourceA, sourceB, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
+import {sliceGenesis} from './genesis-slice.mjs';
 import {OpcodesBCH, encodeAuthenticationInstructions, encodeDataPush, bigIntToVmNumber} from '@bitauth/libauth';
 import * as shared from '../densless-recovered/shared.mjs';
 import * as genesis from '../densless-recovered/genesis.mjs';
@@ -55,25 +56,27 @@ export function assemble(body, identifiers, data = {}) {
 }
 
 // Sound vk_x: two MSM inputs (5, 6) recompute vk_x from the claimed public inputs
-// (genesis pushes 38, 39); see ../pairfold5-msm/vkx-msm.mjs and README.md.
+// (input 5's own pushes n0, n1); see ../pairfold5-msm/vkx-msm.mjs and README.md.
 export const MSM_SPLIT = 36;
+// Zero-pad bytes for the sliced genesis input. Without the dead predicate it needs ~0.7M op,
+// far below what its own code and witness already buy, so the pad is an empty push.
+export const GENESIS_PAD = Number(process.env.GENESIS_PAD ?? 0);
 // MSM implementation: 'cash' (CashScript source vkx-msm.mjs, default; needs cashc
 // compiler-optimizations-7) or 'asm' (hand-scheduled vkx-msm-asm.mjs, kept as a cross-check).
 export const MSM_IMPL = process.env.MSM_IMPL ?? 'cash';
 // Zero-pad bytes buying each MSM input's op-cost budget ((41 + unlocking) * 800 >= op-cost):
 // the dense fixture's cost, plus 52k op for every table add it skipped (bound: every 4-bit
 // index nonzero), plus 1%.
-export const MSM_PAD = MSM_IMPL === 'cash' ? {a: 2152, b: 3400} : {a: 270, b: 3324};
-const pushHeader = n => encodeDataPush(new Uint8Array(n)).length - n;
+export const MSM_PAD = MSM_IMPL === 'cash' ? {a: 1635, b: 3404} : {a: 270, b: 3324};
 const msmCache = new Map();
 export const msmPrograms = (genesisLength) => {
   if (!msmCache.has(genesisLength)) msmCache.set(genesisLength, {
     msmA: MSM_IMPL === 'cash'
-      ? compileCash(sourceA({split: MSM_SPLIT, genIdx: 3, bIdx: 6, genesisRedeemPushBytes: genesisLength + 3, pubIdx: 38}))
-      : programA({split: MSM_SPLIT, genIdx: 3, bIdx: 6, genesisRedeemPushBytes: genesisLength + 3, pubIdx: 38}),
+      ? compileCash(sourceA({split: MSM_SPLIT, bIdx: 6, ownInputs: true}))
+      : programA({split: MSM_SPLIT, bIdx: 6, ownInputs: true}),
     msmB: MSM_IMPL === 'cash'
-      ? compileCash(sourceB({split: MSM_SPLIT, aIdx: 5, waOffset: pushHeader(MSM_PAD.a) + MSM_PAD.a + 1}))
-      : programB({split: MSM_SPLIT, aIdx: 5, waOffset: pushHeader(MSM_PAD.a) + MSM_PAD.a + 1}),
+      ? compileCash(sourceB({split: MSM_SPLIT}))
+      : programB({split: MSM_SPLIT}),
   });
   return msmCache.get(genesisLength);
 };
@@ -82,7 +85,8 @@ export function build() {
   const programs = {}, declarations = {}, constants = {deploymentTag};
   for (const [name, source] of Object.entries({shared, genesis, terminal})) {
     if (name === 'terminal') {
-      assert(programs.genesis.length > 255 && programs.genesis.length < 65536, 'genesis redeem push must be PUSHDATA2');
+      // drop the dead vk_x auxiliary predicate from genesis (see genesis-slice.mjs)
+      programs.genesis = sliceGenesis(programs.genesis);
       Object.assign(programs, msmPrograms(programs.genesis.length));
       const loaderIdentifiers = new Map([['fragmentReader', -1], ['sharedProgram', 100]]);
       const globalFunctionKeys = [

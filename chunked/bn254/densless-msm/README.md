@@ -6,19 +6,26 @@ input. That identity holds for arbitrary multiplicities, so it does not bind vk_
 claimed public inputs: a real proof with the true vk_x and forged public inputs is
 accepted (see `docs/public-input-binding.md` in zk-verifier-bench).
 
-This variant keeps the reconstructed densless verifier unchanged
-(`../densless-recovered`, kallisti's public-only source from the withdrawn
-groth16_cashscript PR #17) and adds two inputs that recompute vk_x itself:
+This variant starts from the reconstructed densless verifier (`../densless-recovered`,
+kallisti's public-only source from the withdrawn groth16_cashscript PR #17), removes the dead
+predicate from its genesis and adds two inputs that recompute vk_x itself:
 
-- input 5 walks the genesis unlocking (push-only under P2SH) to the claimed n1, n0
-  (pushes 38, 39), range-checks them, runs Straus positions 63..36 and pins input 6's
-  state push (X, Y, Z, n0, n1);
+- input 5 holds the claimed public inputs n0, n1 as its own pushes, range-checks them, runs
+  Straus positions 63..36 and pins input 6's state push (X, Y, Z, n0, n1 and its witness
+  bytes wa);
 - input 6 finishes positions 35..0, converts to affine with a witnessed Z inverse and
   checks it against its front push vk_x, then checks the GLV split: it rebuilds
-  S0 = k10 + lambda*k20 and S1 = k11 + lambda*k21 from both inputs' witness bytes and
-  requires S0 = n0 and S1 = n1 (mod r);
+  S0 = k10 + lambda*k20 and S1 = k11 + lambda*k21 from wa (taken from the pinned state) and
+  its own witness bytes, and requires S0 = n0 and S1 = n1 (mod r);
 - the terminal requires 7 inputs, pins both MSM lockings and requires input 6's vk_x
   push to equal the vk_x in genesis push 0, which the Miller loop consumes.
+
+The genesis slice (`genesis-slice.mjs`, `genesis-slice.json`) drops the predicate's witness
+pushes 19..39 and the code that consumed them, and rewrites 144 PICK/ROLL depths. It was
+derived from a shadow-stack taint trace on the official fixtures and checked by an independent
+static audit, differential mutation tests and fresh proofs. The removed span also held checks
+on proof data: B's canonical and on-curve checks are kept; only vk_x's canonical checks are
+dropped, since the MSM pins vk_x exactly. Genesis drops from 5.59M to 0.68M op.
 
 The MSM is a 4-scalar GLV Straus over {IC1, phi(IC1), IC2, phi(IC2)} in two 64-bit
 halves sharing 64 doublings. The witness is one byte per position (both 4-bit table
@@ -34,9 +41,15 @@ competitive. `../pairfold5-msm/vkx-msm-asm.mjs` is a hand-scheduled version with
 same witness layout (`MSM_IMPL=asm`, 483 bytes smaller), kept as a cross-check.
 `../pairfold5-msm` also holds the same repair on the pevalfuse base.
 
-Result on the official fixtures: 7 inputs, one standard transaction, 45,447 script
-bytes, score 45,768, 29.6M op. Pads cover the worst case where every table index is
-nonzero. Forged and adaptively forged public inputs are rejected.
+Result on the official fixtures: 7 inputs, one standard transaction, 42,256 script
+bytes, score 42,577, 24.1M op. Pads cover the worst case where every table index is
+nonzero. Forged and adaptively forged public inputs (including a pad-shift variant found in
+review), non-canonical B and off-curve B are rejected (`redteam.mjs` writes the bench
+red-team file).
+
+The witness generator in `../densless-recovered` (root-witness.mjs, witness.mjs) now uses
+SCALING^2 / xi for residue selector 2, the representative the terminal expects; before, every
+selector-2 proof (about 4 in 10) was rejected. The on-chain programs are unchanged by that fix.
 
 ```sh
 VERIFIER_DIR=<zk-verifier-bench checkout> node export.mjs vectors.json

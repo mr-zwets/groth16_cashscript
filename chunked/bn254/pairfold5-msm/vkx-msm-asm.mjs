@@ -12,8 +12,8 @@
 // Input B: finishes positions split-1..0, adds the constant, converts to affine with the
 //   witnessed Z inverse and requires it to equal its front push (vk_x, which the terminal ties
 //   to the genesis vk_x). It then rebuilds S0 = k10 + lambda*k20 and S1 = k11 + lambda*k21 by
-//   Horner over A's and its own witness bytes and requires S0 = n0, S1 = n1 (mod r). Since
-//   phi(P) = [lambda]P on G1, the MSM equals IC0 + S0*IC1 + S1*IC2, and every k is < 2^128.
+//   Horner over A's witness bytes (carried in the state A pins) and its own, and requires
+//   S0 = n0, S1 = n1 (mod r). Since phi(P) = [lambda]P on G1, the MSM equals IC0 + S0*IC1 + S1*IC2, and every k is < 2^128.
 import { OpcodesBCH, bigIntToVmNumber, encodeDataPush } from '@bitauth/libauth';
 
 const G = '../../pairing/';
@@ -27,7 +27,9 @@ const R = glv.GLV_R, LAM = glv.GLV_LAMBDA;
 const TABLE = Buffer.from(glv.GLV_SPLIT_TABLE_HEX.slice(2), 'hex');
 const Q0 = G1.BASE.toAffine();
 const FINAL = mm.vk.ic[0].subtract(G1.BASE.multiply(1n << 64n)).toAffine();
-export const STATE_BYTES = 5 * 32;
+// Input A pins input B's state push: X, Y, Z, n0, n1 (32 bytes each) and A's witness bytes wa,
+// so B never parses A's unlocking (A's pad length is unconstrained).
+export const stateBytes = (split) => 5 * 32 + (64 - split);
 
 // ---- tiny assembler: opcode names, BigInt numbers, Buffer data, nested arrays ----
 const asm = (...parts) => {
@@ -123,8 +125,12 @@ const pushNumber = [
 const le32 = ['NUM2BIN']; // used as [x 32 NUM2BIN]
 
 // pubIdx: genesis push index of the claimed n1 (n0 follows it, then the genesis redeem).
-export const programA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36 }) => asm(
+// ownInputs: the claimed n0, n1 are input A's own pushes (unlocking: pad, wa, n1, n0).
+export const programA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false }) => asm(
   prologue,
+  ownInputs
+    ? [3, 'ROLL', 'DROP', 2, 'PICK', 'SIZE', 'NIP', 64 - split, 'NUMEQUALVERIFY'] // [wa n1 n0]
+    : [
   'NIP',                                                    // drop the pad: [wa]
   'SIZE', 64 - split, 'NUMEQUALVERIFY',
   genIdx, 'INPUTBYTECODE', 'DUP', 3, 'SPLIT', 'DROP', Buffer.from('4dc001', 'hex'), 'EQUALVERIFY',
@@ -132,24 +138,26 @@ export const programA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx =
   Array.from({ length: pubIdx - 1 }, () => [pushSkip, 'SPLIT', 'NIP']),        // skip pushes 1..pubIdx-1
   pushNumber, 'ROT', 'SWAP', 'SPLIT', 'NIP',                // [wa n1 rest]
   pushNumber, 'ROT', 'SIZE', 'NIP', 'NUMEQUALVERIFY',       // [wa n1 n0], n0 ends the window
+    ],
   'DUP', 0, R, 'WITHIN', 'VERIFY', 'OVER', 0, R, 'WITHIN', 'VERIFY',
   'ROT',                                                    // [n1 n0 wa]
   Q0.x, Q0.y, 1,                                            // [n1 n0 wa X Y Z]
   straus(64 - split, 3),
   32, le32, 'ROT', 32, le32, 'ROT', 32, le32, 'ROT', 'CAT', 'CAT', // [n1 n0 wa X||Y||Z]
-  'NIP', 'SWAP', 32, le32, 'CAT', 'SWAP', 32, le32, 'CAT',  // [X||Y||Z||n0||n1]
-  Buffer.from([0x4c, STATE_BYTES]), 'SWAP', 'CAT',
-  bIdx, 'INPUTBYTECODE', 65 + 2 + STATE_BYTES, 'SPLIT', 'DROP', 65, 'SPLIT', 'NIP', 'EQUAL',
+  'SWAP', 'TOALTSTACK',                                     // [n1 n0 X||Y||Z], alt [wa]
+  'SWAP', 32, le32, 'CAT', 'SWAP', 32, le32, 'CAT', 'FROMALTSTACK', 'CAT', // [X||Y||Z||n0||n1||wa]
+  Buffer.from([0x4c, stateBytes(split)]), 'SWAP', 'CAT',
+  bIdx, 'INPUTBYTECODE', 65 + 2 + stateBytes(split), 'SPLIT', 'DROP', 65, 'SPLIT', 'NIP', 'EQUAL',
 );
 
-export const programB = ({ split, aIdx, waOffset }) => asm(
+export const programB = ({ split }) => asm(
   prologue,
   // unlocking pushes: vkx, st, wb, pad, zInv
   'NIP', 'ROT',                                             // [vkx wb zInv st]
-  'SIZE', STATE_BYTES, 'NUMEQUALVERIFY',
+  'SIZE', stateBytes(split), 'NUMEQUALVERIFY',
   32, 'SPLIT', 'SWAP', 'BIN2NUM', 'SWAP', 32, 'SPLIT', 'SWAP', 'BIN2NUM', 'SWAP',
-  32, 'SPLIT', 'SWAP', 'BIN2NUM', 'SWAP', 32, 'SPLIT', 'SWAP', 'BIN2NUM', 'SWAP', 'BIN2NUM',
-  'TOALTSTACK', 'TOALTSTACK',                               // alt [n1 n0]; [vkx wb zInv X Y Z]
+  32, 'SPLIT', 'SWAP', 'BIN2NUM', 'SWAP', 32, 'SPLIT', 'TOALTSTACK', 'BIN2NUM', // alt [wa]
+  'TOALTSTACK', 'TOALTSTACK',                               // alt [wa n1 n0]; [vkx wb zInv X Y Z]
   4, 'PICK', 'SIZE', 'NIP', split, 'NUMEQUALVERIFY',
   straus(split, 4),
   FINAL.x, FINAL.y, call('MADD'),                           // [vkx wb zInv X Y Z]
@@ -160,7 +168,8 @@ export const programB = ({ split, aIdx, waOffset }) => asm(
   3, 'ROLL', 'SIZE', 64, 'NUMEQUALVERIFY', 32, 'SPLIT', 'BIN2NUM', 3, 'ROLL', 'NUMEQUALVERIFY',
   'BIN2NUM', 'NUMEQUALVERIFY',                              // [wb]
   // GLV binding: Horner over wa || wb (MSB-first), four accumulators
-  aIdx, 'INPUTBYTECODE', waOffset, 'SPLIT', 'NIP', 64 - split, 'SPLIT', 'DROP', 'SWAP', 'CAT',
+  'FROMALTSTACK', 'FROMALTSTACK', 'FROMALTSTACK', 3, 'ROLL', 'CAT', // [n0 n1 wa||wb]
+  'ROT', 'ROT', 'TOALTSTACK', 'TOALTSTACK',                // [wa||wb], alt [n1 n0]
   0, 0, 0, 0, 0,                                            // [w s0lo s1lo s0hi s1hi t]
   'BEGIN',
   5, 'PICK', 'OVER', 'OVER', 'OVER', '1ADD', 'SPLIT', 'DROP', 'SWAP', 'SPLIT', 'NIP',
@@ -215,7 +224,7 @@ export const witness = (n0, n1, split) => {
     acc = dblJ(acc);
     if (bytes[t] % 16) acc = maddJ(acc, entry(0, bytes[t] % 16));
     if (bytes[t] >> 4) acc = maddJ(acc, entry(1, bytes[t] >> 4));
-    if (t === 63 - split) st = Buffer.concat([...acc, n0, n1].map(fixed32));
+    if (t === 63 - split) st = Buffer.concat([...[...acc, n0, n1].map(fixed32), bytes.subarray(0, 64 - split)]);
   }
   acc = maddJ(acc, [FINAL.x, FINAL.y]);
   const zInv = bn254.fields.Fp.inv(acc[2]);
