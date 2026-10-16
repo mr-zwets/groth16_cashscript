@@ -12,6 +12,11 @@ contract Groth16Verify() {
         int Ax, int Ay, int Bxa, int Bxb, int Bya, int Byb, int Cx, int Cy,
         int in0, int in1
     ) {
+        // ---- public inputs must be canonical scalars: in < r. Without this, in + r gives the
+        // same vk_x, so one proof would verify for two different claimed integers (the
+        // input-aliasing bug behind nullifier double-spends). ----
+        require(within(in0, 0, 21888242871839275222246405745257275088548364400416034343698204186575808495617));
+        require(within(in1, 0, 21888242871839275222246405745257275088548364400416034343698204186575808495617));
         // ---- validate spender-supplied proof points (EIP-197 rigor) ----
         require(mulFp(Ay, Ay) == addFp(mulFp(mulFp(Ax, Ax), Ax), 3)); // A on G1
         require(mulFp(Cy, Cy) == addFp(mulFp(mulFp(Cx, Cx), Cx), 3)); // C on G1
