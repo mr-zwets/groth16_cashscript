@@ -1,6 +1,6 @@
 // CashScript sources of the vk_x MSM stages carried by the executors (inputs 0, 1, 2) and the
 // terminal (input 4). Genesis (input 3) carries MSM part A (positions 63..MSM_SPLIT, see
-// ../pairfold5-msm/vkx-msm.mjs) and pins the first 199 bytes of input 0's state push.
+// ../pairfold5-msm/vkx-msm.mjs) and pins the first 198 bytes of input 0's state push.
 //
 // State push (224 bytes, the last push before the redeem): X, Y, Z (Jacobian accumulator),
 // n0, n1 (32 bytes each, little endian) and the 64 witness bytes w (one per Straus position,

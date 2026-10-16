@@ -16,7 +16,7 @@ the verifier already has:
   altstack, runs the input's original program unchanged, verifies its result, restores them and
   runs the stage.
 - Genesis (input 3) runs MSM part A: it range-checks the claimed public inputs n0, n1 (genesis
-  pushes 22 and 21), runs Straus positions 63..26 and pins the first 199 bytes of input 0's
+  pushes 22 and 21), runs Straus positions 63..26 and pins the first 198 bytes of input 0's
   state push (X, Y, Z, n0, n1 and its own witness bytes).
 - The executors (inputs 0, 1, 2) and the terminal (input 4) continue it (`vkx-stages.mjs`).
   Each ends its unlocking with a 224-byte state push (X, Y, Z, n0, n1 and all 64 witness bytes);
