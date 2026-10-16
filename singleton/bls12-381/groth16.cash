@@ -85,6 +85,10 @@ contract Groth16Verify() {
         int Cx, int Cy,
         int in0, int in1
     ) {
+        // public inputs must be canonical scalars, in < r. Without this, in + r gives the same
+        // vk_x, so one proof would verify for two different claimed integers.
+        require(within(in0, 0, 52435875175126190479447740508185965837690552500527637822603658699938581184513));
+        require(within(in1, 0, 52435875175126190479447740508185965837690552500527637822603658699938581184513));
         // vk_x = IC0 + in0*IC1 + in1*IC2 in one shared-doubling Shamir pass.
         (int affX, int affY) = computeVkx(in0, in1);
 
