@@ -123,8 +123,12 @@ const pushNumber = [
 const le32 = ['NUM2BIN']; // used as [x 32 NUM2BIN]
 
 // pubIdx: genesis push index of the claimed n1 (n0 follows it, then the genesis redeem).
-export const programA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36 }) => asm(
+// ownInputs: the claimed n0, n1 are input A's own pushes (unlocking: pad, wa, n1, n0).
+export const programA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false }) => asm(
   prologue,
+  ownInputs
+    ? [3, 'ROLL', 'DROP', 2, 'PICK', 'SIZE', 'NIP', 64 - split, 'NUMEQUALVERIFY'] // [wa n1 n0]
+    : [
   'NIP',                                                    // drop the pad: [wa]
   'SIZE', 64 - split, 'NUMEQUALVERIFY',
   genIdx, 'INPUTBYTECODE', 'DUP', 3, 'SPLIT', 'DROP', Buffer.from('4dc001', 'hex'), 'EQUALVERIFY',
@@ -132,6 +136,7 @@ export const programA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx =
   Array.from({ length: pubIdx - 1 }, () => [pushSkip, 'SPLIT', 'NIP']),        // skip pushes 1..pubIdx-1
   pushNumber, 'ROT', 'SWAP', 'SPLIT', 'NIP',                // [wa n1 rest]
   pushNumber, 'ROT', 'SIZE', 'NIP', 'NUMEQUALVERIFY',       // [wa n1 n0], n0 ends the window
+    ],
   'DUP', 0, R, 'WITHIN', 'VERIFY', 'OVER', 0, R, 'WITHIN', 'VERIFY',
   'ROT',                                                    // [n1 n0 wa]
   Q0.x, Q0.y, 1,                                            // [n1 n0 wa X Y Z]

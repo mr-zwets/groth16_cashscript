@@ -70,12 +70,14 @@ const straus = (count, wName) => `        for (int t = 0; t < ${count}; t = t + 
             if (b / 16 != 0) { (int x1, int y1) = tab64(b / 16); (rX, rY, rZ) = madd(rX, rY, rZ, x1, y1); }
         }`;
 
-export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36 }) => `pragma cashscript ^0.14.0;
+// ownInputs: the claimed n0, n1 are input A's own pushes (unlocking: pad, wa, n1, n0) instead of
+// genesis pushes pubIdx, pubIdx + 1.
+export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmA() {
-    function spend(bytes wa, bytes unused pad) {
+    function spend(${ownInputs ? 'int n0, int n1, ' : ''}bytes wa, bytes unused pad) {
         require(wa.length == ${64 - split});
-        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
+${ownInputs ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
         require(g.split(3)[0] == 0x4dc001);
         // window = pushes 1..pubIdx+1 (after the 451-byte push 0, before the genesis redeem push)
         bytes w = g.split(g.length - ${genesisRedeemPushBytes})[0].split(451)[1];
@@ -99,7 +101,7 @@ contract VkxMsmA() {
         if (op0 >= 81 && op0 <= 96) { n0 = op0 - 80; }
         else { require(op0 < 34); if (op0 != 0) { n0 = int(w0.split(op0 + 1)[0].split(1)[1]); l0 = op0 + 1; } }
         require(w0.length == l0);
-        require(within(n0, 0, ${R})); require(within(n1, 0, ${R}));
+`}        require(within(n0, 0, ${R})); require(within(n1, 0, ${R}));
         int rX = ${Q0.x}; int rY = ${Q0.y}; int rZ = 1;
 ${straus(64 - split, 'wa')}
         bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) +

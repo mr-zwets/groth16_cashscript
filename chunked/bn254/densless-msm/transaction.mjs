@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {encodeDataPush,bigIntToVmNumber} from '@bitauth/libauth';
-import {build, MSM_SPLIT, MSM_PAD} from './build.mjs';
+import {build, MSM_SPLIT, MSM_PAD, GENESIS_PAD} from './build.mjs';
 import {witness as msmWitness} from '../pairfold5-msm/vkx-msm-asm.mjs';
 import {produceWitness} from '../densless-recovered/witness.mjs';
 import {produceGenesisAuxiliary} from '../densless-recovered/genesis-auxiliary.mjs';
@@ -16,14 +16,15 @@ export function produceTransaction(vk,proof,publicInputs,msmPad=MSM_PAD){
   inputs.push([Buffer.from(w.accumulatorHeaderHex[i],'hex'),program.sharedFragments[i],Buffer.from(w.executorWitnessHex[i],'hex'),Buffer.from(w.fixedTableHex[i],'hex'),Buffer.concat([quotient.subarray(offset,offset+length),program.quotientSuffixes[i]]),program.redeems[i]]);
   offset+=length;
  }
- const genesis=Array(41);
+ const genesis=Array(41); // densless layout; pushes 19..39 (dead predicate + n1, n0) are dropped below
  for(const [index,hex]of Object.entries(w.genesisKnownPushes))genesis[Number(index)]=Buffer.from(hex,'hex');
  genesis[1]=Buffer.from(bigIntToVmNumber(BigInt(w.selector)));
  aux.pushes.forEach((push,i)=>genesis[19+i]=push);genesis[40]=program.redeems[3];
- assert.ok(genesis.every(x=>Buffer.isBuffer(x)));inputs.push(genesis);
+ assert.ok(genesis.every(x=>Buffer.isBuffer(x)));
+ inputs.push([...genesis.slice(0,19),Buffer.alloc(GENESIS_PAD),program.redeems[3]]);
  inputs.push([Buffer.from(w.accumulatorHeaderHex[3],'hex'),quotient.subarray(offset),...w.terminalWitnessHex.map(x=>Buffer.from(x,'hex')),program.redeems[4]]);
  const m=msmWitness(BigInt(publicInputs[0]),BigInt(publicInputs[1]),MSM_SPLIT),num=x=>Buffer.from(bigIntToVmNumber(x));
- inputs.push([Buffer.alloc(msmPad.a),m.wa,program.redeems[5]]);
+ inputs.push([Buffer.alloc(msmPad.a),m.wa,num(BigInt(publicInputs[1])),num(BigInt(publicInputs[0])),program.redeems[5]]);
  inputs.push([m.vkx,m.st,m.wb,Buffer.alloc(msmPad.b),num(m.zInv),program.redeems[6]]);
  assert.equal(quotient.length-offset,2336);
  return inputs.map((pushes,i)=>({locking:program.lockings[i].toString('hex'),unlocking:Buffer.concat(pushes.map(p=>Buffer.from(encodeDataPush(p)))).toString('hex')}));
