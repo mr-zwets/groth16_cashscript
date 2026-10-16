@@ -39,12 +39,13 @@ export function assemble(body, identifiers) {
   return Uint8Array.from(encoded);
 }
 
-export function build(identifiers = new Map(functions.map(f => [f.name, f.originalId]))) {
+// mainPrefix: assembly run before the recovered main (compact.mjs adds the public-input range check)
+export function build(identifiers = new Map(functions.map(f => [f.name, f.originalId])), mainPrefix = '') {
   assert.equal(identifiers.size, functions.length);
   const keys = [...identifiers.values()].map(n => Buffer.from(bigIntToVmNumber(BigInt(n))).toString('hex'));
   assert.equal(new Set(keys).size, functions.length, 'duplicate function identifier');
   const declarations = functions.map(f => ({...f, bytecode: assemble(f.body, identifiers)}));
-  const mainBytecode = assemble(main, identifiers);
+  const mainBytecode = assemble(`${mainPrefix} ${main}`, identifiers);
   const bytecode = Uint8Array.from([
     ...declarations.flatMap(f => [
       ...encodeDataPush(f.bytecode),
