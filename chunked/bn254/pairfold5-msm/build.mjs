@@ -16,12 +16,11 @@ export const MSM_SPLIT = 36;
 // the dense fixture's cost, plus 52k op for every table add it skipped (bound: every 4-bit
 // index nonzero), plus 1%.
 export const MSM_PAD = {a: 352, b: 3339};
-const pushHeader = n => encodeDataPush(new Uint8Array(n)).length - n;
 const msmCache = new Map();
 export const msmPrograms = (genesisLength) => {
   if (!msmCache.has(genesisLength)) msmCache.set(genesisLength, {
     msmA: programA({split: MSM_SPLIT, genIdx: 3, bIdx: 6, genesisRedeemPushBytes: genesisLength + 3}),
-    msmB: programB({split: MSM_SPLIT, aIdx: 5, waOffset: pushHeader(MSM_PAD.a) + MSM_PAD.a + 1}),
+    msmB: programB({split: MSM_SPLIT}),
   });
   return msmCache.get(genesisLength);
 };

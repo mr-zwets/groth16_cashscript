@@ -7,15 +7,15 @@
 // idx0 + 16*idx64. The accumulator starts at Q0 = G1 generator (no infinity branches) and the
 // final step adds the constant IC0 - [2^64]Q0; an exceptional mixed add (equal x) is rejected.
 //
-// Input A (unlocking: pad, wa): walks the genesis unlocking (push-only under P2SH) to the
-//   claimed n1, n0 (pushes pubIdx, pubIdx + 1), range-checks them, runs positions 63..split
-//   and requires input B's state push to equal (X, Y, Z, n0, n1).
+// Input A (unlocking: pad, wa, n1, n0 with ownInputs; otherwise pad, wa and the claimed n1, n0
+//   are read by walking the genesis unlocking to pushes pubIdx, pubIdx + 1): range-checks n0, n1,
+//   runs positions 63..split and requires input B's state push to equal (X, Y, Z, n0, n1, wa).
 // Input B (unlocking: vkx, st, wb, pad, zInv): finishes positions split-1..0, adds the
 //   constant, converts to affine with the witnessed Z inverse and requires it to equal its
 //   front push vkx (the terminal ties vkx to the genesis vk_x). It then rebuilds
-//   S0 = k10 + lambda*k20 and S1 = k11 + lambda*k21 by Horner over A's and its own witness
-//   bytes and requires S0 = n0, S1 = n1 (mod r); since phi(P) = [lambda]P on G1, the MSM
-//   equals IC0 + S0*IC1 + S1*IC2, and every k is < 2^128.
+//   S0 = k10 + lambda*k20 and S1 = k11 + lambda*k21 by Horner over wa (from the state A pins,
+//   never from A's unlocking, whose pad length is free) and its own wb, and requires S0 = n0,
+//   S1 = n1 (mod r); since phi(P) = [lambda]P on G1, the MSM equals IC0 + S0*IC1 + S1*IC2.
 const G = '../../pairing/';
 const glv = await import(G + 'gen_vkx_glv.mjs');
 const mm = await import(G + '_millermath.mjs');
@@ -28,7 +28,10 @@ const P = bn254.fields.Fp.ORDER, R = glv.GLV_R, LAM = glv.GLV_LAMBDA;
 const TABLE = glv.GLV_SPLIT_TABLE_HEX;
 const Q0 = G1.BASE.toAffine();
 const FINAL = mm.vk.ic[0].subtract(G1.BASE.multiply(1n << 64n)).toAffine();
-const STATE_BYTES = 5 * 32;
+// Input A pins input B's state push: X, Y, Z, n0, n1 (32 bytes each) and A's witness bytes wa,
+// so B never parses A's unlocking (A's pad length is unconstrained).
+const stateBytes = (split) => 5 * 32 + (64 - split);
+const stateHeader = (split) => '0x4c' + stateBytes(split).toString(16).padStart(2, '0');
 
 const helpers = `function dbl(int x, int y, int z) returns (int, int, int) {
     int a = (x * x) % ${P}; int b = (y * y) % ${P}; int c = (b * b) % ${P};
@@ -105,22 +108,22 @@ ${ownInputs ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
         int rX = ${Q0.x}; int rY = ${Q0.y}; int rZ = 1;
 ${straus(64 - split, 'wa')}
         bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) +
-            toPaddedBytes(n0, 32) + toPaddedBytes(n1, 32);
-        require(tx.inputs[${bIdx}].unlockingBytecode.split(${65 + 2 + STATE_BYTES})[0].split(65)[1] == 0x4ca0 + st);
+            toPaddedBytes(n0, 32) + toPaddedBytes(n1, 32) + wa;
+        require(tx.inputs[${bIdx}].unlockingBytecode.split(${65 + 2 + stateBytes(split)})[0].split(65)[1] == ${stateHeader(split)} + st);
     }
 }
 `;
 
-export const sourceB = ({ split, aIdx, waOffset }) => `pragma cashscript ^0.14.0;
+export const sourceB = ({ split }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmB() {
     function spend(int zInv, bytes unused pad, bytes wb, bytes st, bytes vkx) {
-        require(st.length == ${STATE_BYTES}); require(vkx.length == 64); require(wb.length == ${split});
+        require(st.length == ${stateBytes(split)}); require(vkx.length == 64); require(wb.length == ${split});
         int rX = int(st.split(32)[0]);
         int rY = int(st.split(64)[0].split(32)[1]);
         int rZ = int(st.split(96)[0].split(64)[1]);
         int n0 = int(st.split(128)[0].split(96)[1]);
-        int n1 = int(st.split(128)[1]);
+        int n1 = int(st.split(160)[0].split(128)[1]);
 ${straus(split, 'wb')}
         (rX, rY, rZ) = madd(rX, rY, rZ, ${FINAL.x}, ${FINAL.y});
         require((rZ * zInv) % ${P} == 1);
@@ -128,7 +131,7 @@ ${straus(split, 'wb')}
         require((rX * zi2) % ${P} == int(vkx.split(32)[0]));
         require((rY * (zi2 * zInv % ${P})) % ${P} == int(vkx.split(32)[1]));
         // GLV binding: Horner over A's and B's witness bytes, MSB-first
-        bytes w = tx.inputs[${aIdx}].unlockingBytecode.split(${waOffset})[1].split(${64 - split})[0] + wb;
+        bytes w = st.split(160)[1] + wb;
         int s0lo = 0; int s1lo = 0; int s0hi = 0; int s1hi = 0;
         for (int t = 0; t < 64; t = t + 1) {
             int b = int(w.split(t + 1)[0].split(t)[1] + 0x00);

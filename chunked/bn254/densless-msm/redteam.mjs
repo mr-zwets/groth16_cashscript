@@ -60,6 +60,22 @@ for (const [label, c0, c1] of [['n0 + 1', n0 + 1n, n1], ['n1 + 1', n0, n1 + 1n],
   m.vkx.copy(g, 3 + 32 * 4);
   runs.push({label: 'forged n0 + 1, valid MSM witness, genesis vk_x swapped to match', kind: 'forged-public-inputs-adaptive', patches: [{input: 3, unlocking: g.toString('hex')}, {input: 5, unlocking: m.a}, {input: 6, unlocking: m.b}]});
 }
+{
+  // Pad-shift forgery (found by the slice review): grow input 5's unconstrained pad so its tail
+  // holds w' (wa with one bit flipped at Straus position 1, i.e. k10 + 2^62, so n0' = n0 + 2^62),
+  // run the MSM on the honest wa, and claim n0'. Input 6 now takes wa from the state input 5
+  // pins, so neither choice of wa in that state can satisfy both inputs.
+  const m = msmWitness(n0, n1, MSM_SPLIT);
+  const wForged = Buffer.from(m.wa); wForged[1] ^= 0x01;
+  const n0f = (n0 + (1n << 62n)) % R;
+  const a = Buffer.concat([enc(Buffer.concat([Buffer.alloc(MSM_PAD.a + 1), wForged])), enc(m.wa), enc(num(n1)), enc(num(n0f)), enc(program.redeems[5])]).toString('hex');
+  const le32 = (v) => Buffer.from(v.toString(16).padStart(64, '0'), 'hex').reverse();
+  for (const [variant, wa] of [['honest wa in the pinned state', m.wa], ["w' in the pinned state", wForged]]) {
+    const st = Buffer.from(m.st); le32(n0f).copy(st, 96); Buffer.from(wa).copy(st, 160);
+    const b = Buffer.concat([enc(m.vkx), enc(st), enc(m.wb), enc(Buffer.alloc(MSM_PAD.b)), enc(num(m.zInv)), enc(program.redeems[6])]).toString('hex');
+    runs.push({label: `pad-shift forgery n0 + 2^62, ${variant}`, kind: 'forged-public-inputs-adaptive', patches: [{input: 5, unlocking: a}, {input: 6, unlocking: b}]});
+  }
+}
 runs.push({label: 'B.x0 non-canonical (+p)', kind: 'proof-point-validation', patches: [{input: 3, unlocking: genesisWithField(8, fieldOf(8) + P)}]});
 runs.push({label: 'B.y0 + 1 (off curve)', kind: 'proof-point-validation', patches: [{input: 3, unlocking: genesisWithField(10, (fieldOf(10) + 1n) % P)}]});
 

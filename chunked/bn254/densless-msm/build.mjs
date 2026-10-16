@@ -68,7 +68,6 @@ export const MSM_IMPL = process.env.MSM_IMPL ?? 'cash';
 // the dense fixture's cost, plus 52k op for every table add it skipped (bound: every 4-bit
 // index nonzero), plus 1%.
 export const MSM_PAD = MSM_IMPL === 'cash' ? {a: 1635, b: 3404} : {a: 270, b: 3324};
-const pushHeader = n => encodeDataPush(new Uint8Array(n)).length - n;
 const msmCache = new Map();
 export const msmPrograms = (genesisLength) => {
   if (!msmCache.has(genesisLength)) msmCache.set(genesisLength, {
@@ -76,8 +75,8 @@ export const msmPrograms = (genesisLength) => {
       ? compileCash(sourceA({split: MSM_SPLIT, bIdx: 6, ownInputs: true}))
       : programA({split: MSM_SPLIT, bIdx: 6, ownInputs: true}),
     msmB: MSM_IMPL === 'cash'
-      ? compileCash(sourceB({split: MSM_SPLIT, aIdx: 5, waOffset: pushHeader(MSM_PAD.a) + MSM_PAD.a + 1}))
-      : programB({split: MSM_SPLIT, aIdx: 5, waOffset: pushHeader(MSM_PAD.a) + MSM_PAD.a + 1}),
+      ? compileCash(sourceB({split: MSM_SPLIT}))
+      : programB({split: MSM_SPLIT}),
   });
   return msmCache.get(genesisLength);
 };

@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {bn254} from '@noble/curves/bn254.js';
 import {psiFrobenius} from '@noble/curves/abstract/tower.js';
 import {bigIntToVmNumber} from '@bitauth/libauth';
-import {residueWitness,LAMBDA,SCALING} from './root-witness.mjs';
+import {residueWitness,LAMBDA,SCALING,SCALING2} from './root-witness.mjs';
 import {deploymentTag} from './constants.mjs';
 export function produceWitness(vk,proof,publicInputs){
 const P=bn254.fields.Fp.ORDER,F=bn254.fields.Fp2,T=bn254.fields.Fp12;
@@ -113,7 +113,7 @@ const hash=b=>createHash('sha256').update(createHash('sha256').update(b).digest(
 const be32=x=>Buffer.from(x.toString(16).padStart(64,'0'),'hex');
 const u32=x=>{const b=Buffer.alloc(4);b.writeUInt32BE(x);return b;};
 const fingerprint=c=>mod(c.reduce((sum,x,i)=>sum+BigInt(x)*7n**BigInt(i),0n));
-const selector=[T.ONE,SCALING,T.sqr(SCALING)].findIndex(x=>T.eql(x,witness.w));
+const selector=[T.ONE,SCALING,SCALING2].findIndex(x=>T.eql(x,witness.w));
 assert.ok(selector>=0);
 // Pinned deployment tag embedded at genesis instruction1267. Historical tag derivation is unavailable.
 const tag=deploymentTag;
