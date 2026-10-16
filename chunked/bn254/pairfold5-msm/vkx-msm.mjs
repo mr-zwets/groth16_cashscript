@@ -78,12 +78,15 @@ const straus = (count, wName) => `        for (int t = 0; t < ${count}; t = t + 
 // noPad: no pad parameter (when input A's code is carried by another input that has its own pad).
 // pinEnd {idx, back, size}: pin the state as the prefix of input idx's size-byte push that ends
 // `back` bytes before the end of its unlocking (instead of input bIdx's front push).
-export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false, noPad = false, pinEnd = null }) => `pragma cashscript ^0.14.0;
+export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false, noPad = false, pinEnd = null, pinN = null }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmA() {
-    function spend(${ownInputs ? 'int n0, int n1, ' : ''}bytes wa${noPad ? '' : ', bytes unused pad'}) {
-        require(wa.length == ${64 - split});
-${ownInputs ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
+    function spend(${pinN ? '' : `${ownInputs ? 'int n0, int n1, ' : ''}bytes wa${noPad ? '' : ', bytes unused pad'}`}) {
+${pinN ? `        bytes un = tx.inputs[${pinN.idx}].unlockingBytecode;
+        bytes wa = un.split(un.length - ${pinN.back + 160 - (64 - split)})[0].split(un.length - ${pinN.back + 160})[1];
+` : `        require(wa.length == ${64 - split});
+`}
+${ownInputs || pinN ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
         require(g.split(3)[0] == 0x4dc001);
         // window = pushes 1..pubIdx+1 (after the 451-byte push 0, before the genesis redeem push)
         bytes w = g.split(g.length - ${genesisRedeemPushBytes})[0].split(451)[1];
@@ -107,13 +110,14 @@ ${ownInputs ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
         if (op0 >= 81 && op0 <= 96) { n0 = op0 - 80; }
         else { require(op0 < 34); if (op0 != 0) { n0 = int(w0.split(op0 + 1)[0].split(1)[1]); l0 = op0 + 1; } }
         require(w0.length == l0);
-`}        require(within(n0, 0, ${R})); require(within(n1, 0, ${R}));
+`}${pinN ? '' : `        require(within(n0, 0, ${R})); require(within(n1, 0, ${R}));`}
         int rX = ${Q0.x}; int rY = ${Q0.y}; int rZ = 1;
 ${straus(64 - split, 'wa')}
-        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) +
+${pinN ? `        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32);
+` : `        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) +
             toPaddedBytes(n0, 32) + toPaddedBytes(n1, 32) + wa;
-${pinEnd ? `        bytes u = tx.inputs[${pinEnd.idx}].unlockingBytecode;
-        require(u.split(u.length - ${pinEnd.back})[0].split(u.length - ${pinEnd.back + pinEnd.size})[1].split(${stateBytes(split)})[0] == st);`
+`}${pinEnd ? `        bytes u = tx.inputs[${pinEnd.idx}].unlockingBytecode;
+        require(u.split(u.length - ${pinEnd.back})[0].split(u.length - ${pinEnd.back + pinEnd.size})[1]${pinN ? '' : `.split(${stateBytes(split)})[0]`} == st);`
   : `        require(tx.inputs[${bIdx}].unlockingBytecode.split(${65 + 2 + stateBytes(split)})[0].split(65)[1] == ${stateHeader(split)} + st);`}
     }
 }
