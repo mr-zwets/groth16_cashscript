@@ -148,5 +148,40 @@ ${straus(split, 'wb')}
 }
 `;
 
+// The whole MSM in one program, for a carrier whose budget fits all 64 positions (the proposed
+// bch-spec VM gives every input an 8M op base budget). It runs inside the genesis input and
+// checks the result against the vk_x in genesis push 0 of its own unlocking (the block the Miller
+// loop consumes; vk_x.x at bytes 131..163, vk_x.y at 163..195), so no other input has to bind it.
+// Carried pushes (bottom to top): zInv, w (64 witness bytes), n1, n0.
+export const sourceFull = () => `pragma cashscript ^0.14.0;
+${helpers}
+contract VkxMsmFull() {
+    function spend(int n0, int n1, bytes w, int zInv) {
+        require(w.length == 64);
+        require(within(n0, 0, ${R})); require(within(n1, 0, ${R}));
+        int rX = ${Q0.x}; int rY = ${Q0.y}; int rZ = 1;
+${straus(64, 'w')}
+        (rX, rY, rZ) = madd(rX, rY, rZ, ${FINAL.x}, ${FINAL.y});
+        require((rZ * zInv) % ${P} == 1);
+        int zi2 = (zInv * zInv) % ${P};
+        bytes g = tx.inputs[this.activeInputIndex].unlockingBytecode;
+        require(g.split(3)[0] == 0x4dc001);
+        require((rX * zi2) % ${P} == int(g.split(163)[0].split(131)[1]));
+        require((rY * (zi2 * zInv % ${P})) % ${P} == int(g.split(195)[0].split(163)[1]));
+        int s0lo = 0; int s1lo = 0; int s0hi = 0; int s1hi = 0;
+        for (int t = 0; t < 64; t = t + 1) {
+            int b = int(w.split(t + 1)[0].split(t)[1] + 0x00);
+            int lo = b % 16; int hi = b / 16;
+            s0lo = 2 * s0lo + lo % 2 + lo / 2 % 2 * ${LAM};
+            s1lo = 2 * s1lo + lo / 4 % 2 + lo / 8 * ${LAM};
+            s0hi = 2 * s0hi + hi % 2 + hi / 2 % 2 * ${LAM};
+            s1hi = 2 * s1hi + hi / 4 % 2 + hi / 8 * ${LAM};
+        }
+        require((s0hi * ${1n << 64n} + s0lo) % ${R} == n0);
+        require((s1hi * ${1n << 64n} + s1lo) % ${R} == n1);
+    }
+}
+`;
+
 export const compile = (src, options = { rescheduleStacks: true }) =>
   Buffer.from(utils.asmToBytecode(compileString(src, options).bytecode));
