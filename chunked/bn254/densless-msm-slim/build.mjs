@@ -5,6 +5,7 @@ import {pathToFileURL} from 'node:url';
 import {sourceA, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
 import {cachePrimeLiterals, cacheProfile} from './prime-cache.mjs';
 import {compactInverseCopy} from './terminal-copies.mjs';
+import {compactExecutorCleanup} from './executor-cleanup.mjs';
 import {STATE_BYTES, EXEC_STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
 import {sliceGenesis} from './genesis-slice.mjs';
 import {carrier, remapFunctionIds} from '../densless-msm/carrier.mjs';
@@ -168,6 +169,7 @@ function buildWith({backExec, backTerminal}) {
   ]);
   programs.loader = Buffer.concat([fragmentReaderDeclaration, assemble(executor, loaderIdentifiers, constants)]);
   programs.msmExec = stage(cash(sourceExec({cuts: CUTS, backExec, backTerminal})), definitions, programs.msmA.length);
+  if (cacheProfile === 'raw-both') programs.msmExec = compactExecutorCleanup(programs.msmExec);
   programs.executor = Buffer.concat([execPadded ? Buffer.from([OpcodesBCH.OP_NIP]) : Buffer.alloc(0),
     carrier(programs.loader, programs.msmExec, 1)]);
   const workerLockings = [programs.executor, programs.executor, programs.executor, programs.genesis]
