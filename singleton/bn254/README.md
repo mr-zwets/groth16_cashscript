@@ -10,8 +10,10 @@ Basis is locked to noble's tower so checkpoint #2 (`millerHex`) grades byte-for-
 `c0.c0.c0 … c1.c2.c1`. See `../../../verifier/docs/pairing-checker.md`.
 
 Every tower op is a reusable multi-return function (shared via `OP_DEFINE`/`OP_INVOKE`
-unless the compiler decides inlining is byte-cheaper). This needs the local cashc
-`compiler-optimizations-5` build (top-level functions + `import` + multi-return).
+unless the compiler decides inlining is byte-cheaper). Top-level functions, `import`
+and multi-return are upstream in CashScript v0.14; the committed artifacts are compiled with
+the local cashc fork branch `compiler-optimizations-8` (see
+[cashscript-compiler-fork.md](../../cashscript-compiler-fork.md)).
 
 ## Files / status
 

@@ -1,14 +1,15 @@
 # The `rescheduleStacks` Compile Mode
 
 The verifiers in this repo are compiled with a stack-rescheduling pass in the
-[CashScript compiler fork](cashscript-compiler-fork.md) (branch
-`compiler-optimizations-5`). This is the single biggest codegen lever in the project: on
+[CashScript compiler fork](cashscript-compiler-fork.md) (introduced on
+`compiler-optimizations-2`; current branch `compiler-optimizations-8`, which also re-runs
+the main optimiser over rescheduled output). This is the single biggest codegen lever in the project: on
 the op-cost-bound chunk families it is worth **−4.9 % to −6.7 %** of the whole verifier
 score, and on the plain BN254 singleton **−37.7 %** of bytecode. This doc explains what
 the mode is, how it works, and how to turn it on.
 
 It is the *landed* form of the rescheduling win first prototyped as the external `golf/`
-recompiler and diagnosed in [cashc-stack-optimization.md](cashc-stack-optimization.md);
+recompiler and diagnosed in [cashc-stack-optimization.md](archive/cashc-stack-optimization.md);
 that doc is the *why* (the structural inefficiency in stock cashc codegen), this doc is
 the *what* (the compiler pass that fixes it). The chunk-build wiring and the
 per-family result table live in
@@ -43,7 +44,7 @@ home with `OP_TOALTSTACK … OP_FROMALTSTACK` parking. On a pairing verifier —
 carries a deep working set (the Miller loop alone holds ~25 live values: `F[12] + R[6] +
 Q[4] + P[2] + counter`) and reassigns 12-wide `Fp12` accumulators every iteration — this
 stack-shuffling *dominates* the bytecode: 82–87 % of the bytes in loop/branch bodies are
-shuffle, not math. [cashc-stack-optimization.md](cashc-stack-optimization.md) measures
+shuffle, not math. [cashc-stack-optimization.md](archive/cashc-stack-optimization.md) measures
 and dissects this in full.
 
 ## How the pass works
@@ -117,6 +118,10 @@ independent of the pass).
 
 ## What it buys (committed-proof benchmark)
 
+Measured in July 2026 when the pass landed (`compiler-optimizations-2`); later compiler
+branches and new constructions have moved every absolute number since (current scores are
+in [verifiers.md](verifiers.md)), but the before/after deltas are the pass's own effect.
+
 | entry | before | after | Δ |
 |---|---:|---:|---:|
 | bch-groth16-grouped-residue | 257,810 | 241,628 | −6.3 % |
@@ -131,12 +136,13 @@ into 5 standard transactions instead of 6. Full per-family table, validation sta
 the census of what rescheduling *cannot* recover (intrinsic arithmetic, seam/boundary
 overhead) are in [chunked/rescheduler/README.md](chunked/rescheduler/README.md).
 
-Currently ported to the BN254 families and the plain singleton; **not yet** applied to
-the BLS12-381 chunk families or the shamir `vk_x` build (own compile path).
+Since 2026-07-06 the BLS12-381 chunk families and the shamir `vk_x` build compile through
+the pass as well: BLS chunked −1.8 to −2.4 % (more arithmetic-bound than BN254), the
+`vk_x` family −8 to −23 %.
 
 ## Related docs
 
-- [cashc-stack-optimization.md](cashc-stack-optimization.md) — the diagnosis and the
+- [cashc-stack-optimization.md](archive/cashc-stack-optimization.md) — the diagnosis and the
   `golf/` prototype the pass was ported from, plus the analysis of the *floor* that
   remains after rescheduling (stack-addressing tax, the case for VM-level addressable
   locals).

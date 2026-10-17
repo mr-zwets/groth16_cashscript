@@ -58,5 +58,5 @@ After this pass, ~54% of the remaining bytes are `ROLL`/`PICK` addressing (the d
 push + the opcode) and ~25% is irreducible constant data. The remaining lever is
 register-allocation-style layout (keep the ≤16 hottest values shallow, spill cold ones to
 the altstack), which is bounded because the Miller working set is 25 > 16 live values. See
-`../../../cashc-stack-optimization.md` for the full floor analysis and the upstream cashc
+`../../../archive/cashc-stack-optimization.md` for the full floor analysis and the upstream cashc
 improvement proposal.

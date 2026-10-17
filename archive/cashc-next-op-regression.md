@@ -1,7 +1,9 @@
 # Why some benchmark scores increased after the cashc-next alignment
 
+> **Historical (July 2026).** A measurement of the score regression after the first alignment with upstream cashc-next; its open follow-up was resolved on the later fork branches. Current state: [cashscript-compiler-fork.md](../cashscript-compiler-fork.md).
+
 After porting the contracts to the upstream-rebased compiler (`feat/multi-returns`, see
-[cashscript-compiler-fork.md](cashscript-compiler-fork.md)), most benchmark entries improved,
+[cashscript-compiler-fork.md](../cashscript-compiler-fork.md)), most benchmark entries improved,
 but the **BN254 op-bound multi-input families got worse**. This note pins down where those
 bytes come from, with measurements, and what is (and is not) responsible.
 
