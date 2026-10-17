@@ -171,4 +171,9 @@ compiler it was last regenerated with:
 - **Not cashc-built**: both `genpow` singletons (symbolic assembly, see
   `singleton/bn254/genpow-reconstructed` and `singleton/bls12-381/leader-recovered`).
 - **Contributor entries** (`-densless-msm-slim`, the PairFold, crown8, general and
-  direct-state builds) pin their own compiler/runtime; see each folder's README.
+  direct-state builds) pin their own compiler/runtime; see each folder's README. The merged
+  `-densless-msm-slim` (35,143 B) rebuilds only with `compiler-optimizations-7`: its
+  prime-cache recipes check the hashes of the compiled `dbl`/`madd` bodies, and co-8 compiles
+  those differently. Its build therefore fails with "unreviewed prime-cache helper body"
+  against this repo's co-8 link until the recipes are re-qualified on co-8
+  (groth16_cashscript PR #22).
