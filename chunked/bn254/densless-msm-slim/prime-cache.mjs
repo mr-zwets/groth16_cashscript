@@ -3,7 +3,7 @@ import {createHash} from 'node:crypto';
 import {flattenBinArray, hexToBin} from '@bitauth/libauth';
 
 // Fixed compiler-body hashes bind these independently checked instruction replacements.
-// Each recipe retains P at its first selected literal, lets it move within the owned
+// Cached recipes retain P at their first selected literal and move it within the owned
 // frame, and consumes it at its last selected use. Caller frames and guard order stay fixed.
 const dblSha = '835c258d55b8a2efd642ddbe0c29814502acfc28eac8849b6f3529ed363ddf85';
 const maddSha = 'e50879bb07f15ca1227c9c5f19bb1d7c9381b66f643a0aa00d5b9578c1dab538';
@@ -220,12 +220,13 @@ const recipes = {
   }
 };
 // Choose the cache/byte-cost tradeoff once for both builder and producer.
+const cacheProfile = process.env.SLIM_CACHE ?? 'floating';
 const rawBodies = new Map([
   ['floating', []],
   ['raw-dbl', [dblSha]],
   ['raw-madd', [maddSha]],
   ['raw-both', [dblSha, maddSha]],
-]).get(process.env.SLIM_CACHE ?? 'floating');
+]).get(cacheProfile);
 assert(rawBodies, 'unknown SLIM_CACHE profile');
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 
@@ -233,7 +234,10 @@ export function cachePrimeLiterals(body) {
   const inputSha = sha(body);
   const cached = recipes[inputSha];
   assert(cached, 'unreviewed prime-cache helper body');
-  const recipe = rawBodies.includes(inputSha) ? {bodySha256: inputSha, edits: []} : cached;
+  // Raw-both also removes a duplicate index selection: 2PICK3PICK -> 2PICKDUP.
+  const recipe = cacheProfile === 'raw-both' && inputSha === dblSha
+    ? {bodySha256: '75f3585c32c76cd97deb5b40319ddd8ebf20578e099263de2fca365b5dc80612', edits: [[39, 41, '76']]}
+    : rawBodies.includes(inputSha) ? {bodySha256: inputSha, edits: []} : cached;
   const parts = [];
   let at = 0;
   for (const [start, stop, hex] of recipe.edits) {
