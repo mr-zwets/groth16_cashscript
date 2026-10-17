@@ -220,7 +220,7 @@ const recipes = {
   }
 };
 // Choose the cache/byte-cost tradeoff once for both builder and producer.
-const cacheProfile = process.env.SLIM_CACHE ?? 'floating';
+export const cacheProfile = process.env.SLIM_CACHE ?? 'floating';
 const rawBodies = new Map([
   ['floating', []],
   ['raw-dbl', [dblSha]],
