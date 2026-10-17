@@ -191,5 +191,8 @@ ${straus(64, 'w')}
 }
 `;
 
-export const compile = (src, options = { rescheduleStacks: true }) =>
+// The MSM helpers (dbl, madd, tab0, tab64) are a library shared across inputs: genesis defines
+// them once and the stages load that definition block, so they must stay OP_DEFINE'd even where
+// a compiler would rather inline a function called on every loop iteration.
+export const compile = (src, options = { rescheduleStacks: true, disableInlining: true }) =>
   Buffer.from(utils.asmToBytecode(compileString(src, options).bytecode));
