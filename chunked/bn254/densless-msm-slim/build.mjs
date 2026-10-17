@@ -79,27 +79,24 @@ export const PIN_MODE = process.env.SLIM_PINS ?? 'full';
 // executor loader (-1, 100).
 const MSM_ID_OFFSET = 200, LOADER_ID = 199n;
 const redeemPushBytes = (length) => length + (length < 76 ? 1 : length < 256 ? 2 : 3);
-// This layout is bound to the compiled MADD body, independently proved in NU.
-const MADD_CACHE_COUNT = 13;
-const MADD_LAYOUT = {"originalBodyBytes":607,"originalBodySha256":"9c2975213310d43a593686563feb627098e886e03c2271f69d60cd8dcd15720e","arity":5,"outputs":3,"primeSites":[{"offset":4,"depth":6},{"offset":42,"depth":6},{"offset":85,"depth":6},{"offset":122,"depth":5},{"offset":156,"depth":5},{"offset":232,"depth":6},{"offset":272,"depth":7},{"offset":308,"depth":8},{"offset":350,"depth":7},{"offset":390,"depth":7},{"offset":426,"depth":7},{"offset":537,"depth":4},{"offset":573,"depth":3}],"prologue":["P","OP_5","OP_ROLL","OP_2ROT","OP_2ROT"],"cleanup":["OP_3","OP_ROLL","OP_DROP"],"forecastFullCacheBodyBytes":244,"primeHex":"47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430"};
-function cacheMadd(bytecode) {
+function cachePrimeDefinition(bytecode, id) {
   const instructions = decodeAuthenticationInstructions(bytecode);
-  const key = Buffer.from(encodeDataPush(bigIntToVmNumber(202n)));
+  const key = Buffer.from(encodeDataPush(bigIntToVmNumber(id)));
   let target = -1;
   for (let i = 0; i + 2 < instructions.length && instructions[i + 2].opcode === OpcodesBCH.OP_DEFINE; i += 3) {
     if (!Buffer.from(encodeAuthenticationInstructions([instructions[i + 1]])).equals(key)) continue;
-    assert.equal(target, -1, 'duplicate MADD definition');
-    assert(instructions[i].data !== undefined, 'MADD body must be a literal push');
+    assert.equal(target, -1, 'duplicate cached-prime definition');
+    assert(instructions[i].data !== undefined, 'cached-prime body must be a literal push');
     target = i;
   }
-  assert(target >= 0, 'MADD definition missing');
+  assert(target >= 0, 'cached-prime definition missing');
   return Buffer.concat(instructions.map((instruction, i) => Buffer.from(i === target
-    ? encodeDataPush(cachePrimeLiterals(instruction.data, MADD_LAYOUT, MADD_CACHE_COUNT))
+    ? encodeDataPush(cachePrimeLiterals(instruction.data))
     : encodeAuthenticationInstructions([instruction]))));
 }
 const cashCache = new Map();
 const cash = (source) => {
-  if (!cashCache.has(source)) cashCache.set(source, cacheMadd(remapFunctionIds(compileCash(source), MSM_ID_OFFSET)));
+  if (!cashCache.has(source)) cashCache.set(source, cachePrimeDefinition(cachePrimeDefinition(remapFunctionIds(compileCash(source), MSM_ID_OFFSET), 202n), 200n));
   return cashCache.get(source);
 };
 // Split compiled CashScript into its leading function-definition block and its main code.

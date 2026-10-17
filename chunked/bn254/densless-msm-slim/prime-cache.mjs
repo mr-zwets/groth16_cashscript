@@ -1,30 +1,236 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {OpcodesBCH,decodeAuthenticationInstructions,encodeAuthenticationInstruction,encodeDataPush,bigIntToVmNumber,hexToBin,binToHex,flattenBinArray} from '@bitauth/libauth';
+import {flattenBinArray, hexToBin} from '@bitauth/libauth';
 
-// The reviewed layout belongs to a fixed compiled helper hash. Scratch P stays
-// below its owned arguments; existing relative-depth operands remain unchanged.
-export function cachePrimeLiterals(body,layout,count){
-  assert.equal(createHash('sha256').update(body).digest('hex'),layout.originalBodySha256);
-  assert([3,5].includes(layout.arity)&&layout.outputs===3);
-  assert(Number.isInteger(count)&&count>0&&count<=layout.primeSites.length);
-  const prime=hexToBin(layout.primeHex);assert.equal(prime.length,32);
-  const literal=encodeDataPush(prime),sites=new Map();
-  layout.primeSites.forEach((site,index)=>{
-    assert(Number.isInteger(site.offset)&&site.offset>=0&&Number.isInteger(site.depth)&&site.depth>=0&&site.depth<=16);
-    assert(!sites.has(site.offset));if(index)assert(layout.primeSites[index-1].offset<site.offset);
-    sites.set(site.offset,{...site,selected:index<count});
-  });
-  const op=OpcodesBCH,prologue=layout.arity===3?[op.OP_SWAP,op.OP_2SWAP,op.OP_ROT]:[op.OP_5,op.OP_ROLL,op.OP_2ROT,op.OP_2ROT];
-  const result=[literal,Uint8Array.from(prologue)];let at=0,hits=0;
-  for(const instruction of decodeAuthenticationInstructions(body)){
-    assert(!('malformed'in instruction));
-    const encoded=encodeAuthenticationInstruction(instruction),site=sites.get(at);
-    if(site){assert.equal(binToHex(encoded),binToHex(literal));hits++;}
-    result.push(site?.selected?flattenBinArray([encodeDataPush(bigIntToVmNumber(BigInt(site.depth))),Uint8Array.of(op.OP_PICK)]):encoded);
-    at+=encoded.length;
+// Fixed compiler-body hashes bind these independently checked instruction replacements.
+// Each recipe retains P at its first selected literal, lets it move within the owned
+// frame, and consumes it at its last selected use. Caller frames and guard order stay fixed.
+const recipes = {
+  "835c258d55b8a2efd642ddbe0c29814502acfc28eac8849b6f3529ed363ddf85": {
+    "bodySha256": "4e3b86b609032b3cda1823349f40433ef8912c082951bba7d42fbfecef0ceaca",
+    "edits": [
+      [
+        3,
+        36,
+        "2047fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e64307d"
+      ],
+      [
+        37,
+        39,
+        "5379"
+      ],
+      [
+        39,
+        41,
+        "76"
+      ],
+      [
+        42,
+        75,
+        "5279"
+      ],
+      [
+        79,
+        112,
+        "5379"
+      ],
+      [
+        114,
+        116,
+        "557a"
+      ],
+      [
+        119,
+        152,
+        "5379"
+      ],
+      [
+        153,
+        154,
+        "72"
+      ],
+      [
+        156,
+        157,
+        "7d"
+      ],
+      [
+        159,
+        192,
+        "78"
+      ],
+      [
+        194,
+        196,
+        "5479"
+      ],
+      [
+        232,
+        265,
+        "7c"
+      ]
+    ]
+  },
+  "9c2975213310d43a593686563feb627098e886e03c2271f69d60cd8dcd15720e": {
+    "bodySha256": "d08b357f43e3b9df7c7ae60f997042f69761de6a491d4275a4e9683d654f59db",
+    "edits": [
+      [
+        4,
+        37,
+        "2047fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e64307d"
+      ],
+      [
+        38,
+        40,
+        "557a"
+      ],
+      [
+        42,
+        75,
+        "5279"
+      ],
+      [
+        77,
+        79,
+        "5479"
+      ],
+      [
+        81,
+        82,
+        "7b7b"
+      ],
+      [
+        82,
+        84,
+        "5579"
+      ],
+      [
+        85,
+        118,
+        "78"
+      ],
+      [
+        119,
+        121,
+        "567a"
+      ],
+      [
+        122,
+        155,
+        "78"
+      ],
+      [
+        156,
+        189,
+        "78"
+      ],
+      [
+        190,
+        192,
+        "5479"
+      ],
+      [
+        231,
+        232,
+        "727c"
+      ],
+      [
+        232,
+        265,
+        "78"
+      ],
+      [
+        266,
+        268,
+        "5479"
+      ],
+      [
+        272,
+        305,
+        "5279"
+      ],
+      [
+        308,
+        341,
+        "5379"
+      ],
+      [
+        342,
+        344,
+        "547a"
+      ],
+      [
+        347,
+        349,
+        "567a"
+      ],
+      [
+        350,
+        383,
+        "5479"
+      ],
+      [
+        390,
+        423,
+        "5479"
+      ],
+      [
+        426,
+        459,
+        "5479"
+      ],
+      [
+        460,
+        462,
+        "557a"
+      ],
+      [
+        529,
+        531,
+        "717c"
+      ],
+      [
+        531,
+        533,
+        "547a"
+      ],
+      [
+        534,
+        535,
+        "7b"
+      ],
+      [
+        537,
+        570,
+        "78"
+      ],
+      [
+        571,
+        572,
+        "547a547a"
+      ],
+      [
+        573,
+        606,
+        "7b"
+      ]
+    ]
   }
-  assert.equal(at,body.length);assert.equal(hits,sites.size);
-  result.push(Uint8Array.of(op.OP_3,op.OP_ROLL,op.OP_DROP));
-  return flattenBinArray(result);
+};
+const sha = bytes => createHash('sha256').update(bytes).digest('hex');
+
+export function cachePrimeLiterals(body) {
+  const recipe = recipes[sha(body)];
+  assert(recipe, 'unreviewed prime-cache helper body');
+  const parts = [];
+  let at = 0;
+  for (const [start, stop, hex] of recipe.edits) {
+    assert(at <= start && start < stop && stop <= body.length);
+    parts.push(body.slice(at, start), hexToBin(hex));
+    at = stop;
+  }
+  parts.push(body.slice(at));
+  const result = flattenBinArray(parts);
+  assert.equal(sha(result), recipe.bodySha256);
+  return result;
 }
