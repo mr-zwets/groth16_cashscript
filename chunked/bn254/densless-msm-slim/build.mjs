@@ -3,7 +3,8 @@ import {createHash} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {sourceA, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
-import {cachePrimeLiterals} from './prime-cache.mjs';
+import {cachePrimeLiterals, cacheProfile} from './prime-cache.mjs';
+import {compactInverseCopy} from './terminal-copies.mjs';
 import {STATE_BYTES, EXEC_STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
 import {sliceGenesis} from './genesis-slice.mjs';
 import {carrier, remapFunctionIds} from '../densless-msm/carrier.mjs';
@@ -175,6 +176,7 @@ function buildWith({backExec, backTerminal}) {
   // terminal: the densless terminal, then the final MSM stage on its parked pushes (zInv, state)
   ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminal, constants));
   programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
+  if (cacheProfile === 'raw-both') programs.msmFinal = compactInverseCopy(programs.msmFinal);
   // Malleability pins (length / order / sign-bit) run before the densless terminal, paid once.
   const layoutExec = [
     { shared: layout.fragmentLengths[0], witness: 2560, table: 928 },
