@@ -5,8 +5,10 @@ import {flattenBinArray, hexToBin} from '@bitauth/libauth';
 // Fixed compiler-body hashes bind these independently checked instruction replacements.
 // Each recipe retains P at its first selected literal, lets it move within the owned
 // frame, and consumes it at its last selected use. Caller frames and guard order stay fixed.
+const dblSha = '835c258d55b8a2efd642ddbe0c29814502acfc28eac8849b6f3529ed363ddf85';
+const maddSha = 'e50879bb07f15ca1227c9c5f19bb1d7c9381b66f643a0aa00d5b9578c1dab538';
 const recipes = {
-  "835c258d55b8a2efd642ddbe0c29814502acfc28eac8849b6f3529ed363ddf85": {
+  [dblSha]: {
     "bodySha256": "4e3b86b609032b3cda1823349f40433ef8912c082951bba7d42fbfecef0ceaca",
     "edits": [
       [
@@ -71,7 +73,7 @@ const recipes = {
       ]
     ]
   },
-  "e50879bb07f15ca1227c9c5f19bb1d7c9381b66f643a0aa00d5b9578c1dab538": {
+  [maddSha]: {
     "bodySha256": "d08b357f43e3b9df7c7ae60f997042f69761de6a491d4275a4e9683d654f59db",
     "edits": [
       [
@@ -217,11 +219,21 @@ const recipes = {
     ]
   }
 };
+// Choose the cache/byte-cost tradeoff once for both builder and producer.
+const rawBodies = new Map([
+  ['floating', []],
+  ['raw-dbl', [dblSha]],
+  ['raw-madd', [maddSha]],
+  ['raw-both', [dblSha, maddSha]],
+]).get(process.env.SLIM_CACHE ?? 'floating');
+assert(rawBodies, 'unknown SLIM_CACHE profile');
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 
 export function cachePrimeLiterals(body) {
-  const recipe = recipes[sha(body)];
-  assert(recipe, 'unreviewed prime-cache helper body');
+  const inputSha = sha(body);
+  const cached = recipes[inputSha];
+  assert(cached, 'unreviewed prime-cache helper body');
+  const recipe = rawBodies.includes(inputSha) ? {bodySha256: inputSha, edits: []} : cached;
   const parts = [];
   let at = 0;
   for (const [start, stop, hex] of recipe.edits) {
