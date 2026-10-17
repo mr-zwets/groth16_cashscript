@@ -51,8 +51,8 @@ completeness with negligible probability.
 
 The MSM source is CashScript (`../pairfold5-msm/vkx-msm.mjs`) compiled with the
 [`mr-zwets/cashscript`](https://github.com/mr-zwets/cashscript) branch
-`compiler-optimizations-7`; that branch's loop reassignment codegen is what makes it
-competitive. `../pairfold5-msm/vkx-msm-asm.mjs` is a hand-scheduled version with the
+`compiler-optimizations-8` (with `disableInlining`, as its helpers are shared across inputs);
+the loop reassignment codegen from `compiler-optimizations-7` is what makes it competitive. `../pairfold5-msm/vkx-msm-asm.mjs` is a hand-scheduled version with the
 same witness layout (`MSM_IMPL=asm`, slightly cheaper), kept as a cross-check.
 `../pairfold5-msm` also holds the same repair on the pevalfuse base.
 

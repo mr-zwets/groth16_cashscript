@@ -84,11 +84,14 @@ patches that keeps the verifiers deployable. Details, measurements and branch hi
 [The CashScript Compiler Fork](cashscript-compiler-fork.md) and
 [The `rescheduleStacks` Compile Mode](rescheduling-stacks.md).
 
-The newest branch, `compiler-optimizations-7` (on v0.14.0), also renames reassigned
-variables inside loops and branches instead of re-inserting them at fixed stack slots,
-which cuts loop-heavy code by about 20 % op-cost. The sound vk_x MSM in
-`chunked/bn254/densless-msm` is compiled with it; the other artifacts are still pinned
-to `compiler-optimizations-5` until they are recompiled.
+Branch `compiler-optimizations-7` (on v0.14.0) renames reassigned variables inside loops
+and branches instead of re-inserting them at fixed stack slots, which cuts loop-heavy code by
+about 20 % op-cost. The newest, `compiler-optimizations-8`, adds loop inversion, re-optimises
+after stack rescheduling, and inlines functions that run on every loop iteration (only those
+called inside a repeated branch stay `OP_DEFINE`'d). All of Mathieu's cashc-built artifacts are
+compiled with `compiler-optimizations-8`. Builds that share functions across inputs (the vk_x
+MSM helpers loaded from genesis) compile with `disableInlining`, since the compiler cannot see
+that sharing.
 
 ## BCH Shortcomings
 
