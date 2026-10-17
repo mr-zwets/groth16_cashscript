@@ -1,8 +1,9 @@
 # BLS12-381 singleton libraries
 
 Shared CashScript function files for the BLS12-381 Groth16 verifier, consumed by the contracts in the
-parent directory (`../*.cash`). They rely on the custom cashc fork's top-level (global) functions +
-`import` support (branch `compiler-optimizations-5`): a library file is just plain top-level `function`s
+parent directory (`../*.cash`). They rely on CashScript v0.14's top-level (global) functions +
+`import` support (upstream; the verifiers compile with the fork branch `compiler-optimizations-8`,
+see [cashscript-compiler-fork.md](../../../cashscript-compiler-fork.md)): a library file is just plain top-level `function`s
 (no `library` wrapper, no `internal` keyword). Mirrors the bn254 singleton (`../../bn254/lib/`).
 
 ## Why a `contract` per layer

@@ -1,5 +1,7 @@
 # cashc optimization roadmap (upstream-mergeable)
 
+> **Historical (July 2026).** The compiler roadmap as of `compiler-optimizations-2`. Its conclusion that the compiler track was complete was overtaken by `compiler-optimizations-7`/`-8` (scoped reassignment, loop inversion, branch-aware loop inlining; about 20 % op-cost on loop-heavy code), and the upstream features it plans for have landed in CashScript v0.14.0. Some notes it cites (`branch-review.md`, `next-review.md`, `docs/function-call-convention.md`) were never committed. Current state: [cashscript-compiler-fork.md](../cashscript-compiler-fork.md).
+
 Goal: an optimized compiler for big, advanced contracts (heavy on-stack cryptography: ZK
 verifiers, post-quantum constructions), mergeable into mainline CashScript. Byte savings on
 stack juggling/scheduling are the headline target, op-cost second.
