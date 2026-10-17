@@ -44,14 +44,14 @@ contract VkxMsmStage() {
     function spend(bytes st) {
 ${unpack(EXEC_STATE_BYTES)}
         bytes v = tx.inputs[4].unlockingBytecode;
-        bytes w = v.split(v.length - ${backTerminal + 96})[0].split(v.length - ${backTerminal + 160})[1];
+        bytes w = v.split(v.length - ${backTerminal + 160})[1].split(64)[0];
         int k = this.activeInputIndex;
         int from = ${cuts[0]}; int to = ${cuts[1]}; int next = 1; int back = ${backExec};
         if (k == 1) { from = ${cuts[1]}; to = ${cuts[2]}; next = 2; }
         if (k == 2) { from = ${cuts[2]}; to = ${cuts[3]}; next = 4; back = ${backTerminal}; }
 ${straus('from', 'to')}
         bytes u = tx.inputs[next].unlockingBytecode;
-        require(u.split(u.length - back)[0].split(u.length - back - ${EXEC_STATE_BYTES})[1] ==
+        require(u.split(u.length - back - ${EXEC_STATE_BYTES})[1].split(${EXEC_STATE_BYTES})[0] ==
             toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32));
     }
 }

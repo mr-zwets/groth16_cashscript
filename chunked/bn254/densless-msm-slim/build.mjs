@@ -3,9 +3,11 @@ import {createHash} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {sourceA, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
+import {cachePrimeLiterals} from './prime-cache.mjs';
 import {STATE_BYTES, EXEC_STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
-import {sliceGenesis} from '../densless-msm/genesis-slice.mjs';
+import {sliceGenesis} from './genesis-slice.mjs';
 import {carrier, remapFunctionIds} from '../densless-msm/carrier.mjs';
+import {compileTerminalPins, compileTerminalPinsLenOrder, compileTerminalPinsLenOnly, compileTerminalPinsOrderOnly, compileTerminalPinsLenSign} from './malleability-pins.mjs';
 import {OpcodesBCH, decodeAuthenticationInstructions, encodeAuthenticationInstructions, encodeDataPush, bigIntToVmNumber} from '@bitauth/libauth';
 import * as shared from '../densless-recovered/shared.mjs';
 import * as genesis from '../densless-recovered/genesis.mjs';
@@ -59,30 +61,45 @@ export function assemble(body, identifiers, data = {}, extraNumbers = {}) {
 // Sound vk_x: genesis recomputes MSM part A (positions 63..MSM_SPLIT) from its claimed public
 // inputs (genesis pushes 22 n0, 21 n1) and the executors and the terminal carry the remaining
 // positions as a chain of pinned state pushes (vkx-stages.mjs); see README.md.
-export const MSM_SPLIT = Number(process.env.MSM_SPLIT ?? 27);
+export const MSM_SPLIT = Number(process.env.MSM_SPLIT ?? 31);
 // Witness-byte cuts: genesis runs [0, CUTS[0]), executor k runs [CUTS[k], CUTS[k + 1]), the
 // terminal runs [CUTS[3], 64) and finishes. CUTS[0] = 64 - MSM_SPLIT.
-export const CUTS = (process.env.MSM_CUTS ?? `${64 - MSM_SPLIT},45,54,60`).split(',').map(Number);
-// Every input's op-cost must fit its budget ((41 + unlocking) * 800) at the worst case where
-// every 4-bit table index is nonzero. The cuts are sized from a linear fit of op-cost against the
-// number of table adds over 37 fresh proofs (standard VM), evaluated at that worst case, plus the
-// fit's largest residual, plus 1%; worst-case spare in budget bytes: exec0 573, exec1 906,
-// exec2 700, genesis 125, terminal 1035, so no input needs a zero pad. Re-fit after changing
-// MSM_SPLIT or CUTS. With n0, n1 moved to the terminal genesis's unlocking (so its budget) shrank by
-// 189 B, so one Straus position moved from genesis to exec0 and one from exec0 to exec1
-// (split 27, cuts 37,45,54,60); peaks on the shipped fixtures: 90.4, 87.6, 85.9, 89.8, 84.2%.
-// (GENESIS_PAD / STAGE_PADS buy 800 op per byte if a split needs it).
+export const CUTS = (process.env.MSM_CUTS ?? `${64 - MSM_SPLIT},43,54,60`).split(',').map(Number);
+// Default repartition: genesis consumes positions0..32, executors33..42,
+// 43..53 and54..59; terminal60..63. Full MADD caching reduces genesis bytes
+// and its budget, so four positions move to executors0and1. The archived
+// dense corpus fits without padding; no universal resource bound is claimed.
+// GENESIS_PAD/STAGE_PADS remain explicit resource-budget options.
 export const GENESIS_PAD = Number(process.env.GENESIS_PAD ?? 0);
 export const STAGE_PADS = (process.env.STAGE_PADS ?? '0,0,0,0').split(',').map(Number);
+export const PIN_MODE = process.env.SLIM_PINS ?? 'full';
 // Carried function identifiers: the MSM helpers (dbl, madd, tab0, tab64) are defined once in
 // genesis; the stages read that definition block out of the genesis redeem and run it as
 // function LOADER_ID. Clear of genesis (0..29), shared (0..25), terminal (-1, 0..36) and the
 // executor loader (-1, 100).
 const MSM_ID_OFFSET = 200, LOADER_ID = 199n;
 const redeemPushBytes = (length) => length + (length < 76 ? 1 : length < 256 ? 2 : 3);
+// This layout is bound to the compiled MADD body, independently proved in NU.
+const MADD_CACHE_COUNT = 13;
+const MADD_LAYOUT = {"originalBodyBytes":607,"originalBodySha256":"9c2975213310d43a593686563feb627098e886e03c2271f69d60cd8dcd15720e","arity":5,"outputs":3,"primeSites":[{"offset":4,"depth":6},{"offset":42,"depth":6},{"offset":85,"depth":6},{"offset":122,"depth":5},{"offset":156,"depth":5},{"offset":232,"depth":6},{"offset":272,"depth":7},{"offset":308,"depth":8},{"offset":350,"depth":7},{"offset":390,"depth":7},{"offset":426,"depth":7},{"offset":537,"depth":4},{"offset":573,"depth":3}],"prologue":["P","OP_5","OP_ROLL","OP_2ROT","OP_2ROT"],"cleanup":["OP_3","OP_ROLL","OP_DROP"],"forecastFullCacheBodyBytes":244,"primeHex":"47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430"};
+function cacheMadd(bytecode) {
+  const instructions = decodeAuthenticationInstructions(bytecode);
+  const key = Buffer.from(encodeDataPush(bigIntToVmNumber(202n)));
+  let target = -1;
+  for (let i = 0; i + 2 < instructions.length && instructions[i + 2].opcode === OpcodesBCH.OP_DEFINE; i += 3) {
+    if (!Buffer.from(encodeAuthenticationInstructions([instructions[i + 1]])).equals(key)) continue;
+    assert.equal(target, -1, 'duplicate MADD definition');
+    assert(instructions[i].data !== undefined, 'MADD body must be a literal push');
+    target = i;
+  }
+  assert(target >= 0, 'MADD definition missing');
+  return Buffer.concat(instructions.map((instruction, i) => Buffer.from(i === target
+    ? encodeDataPush(cachePrimeLiterals(instruction.data, MADD_LAYOUT, MADD_CACHE_COUNT))
+    : encodeAuthenticationInstructions([instruction]))));
+}
 const cashCache = new Map();
 const cash = (source) => {
-  if (!cashCache.has(source)) cashCache.set(source, remapFunctionIds(compileCash(source), MSM_ID_OFFSET));
+  if (!cashCache.has(source)) cashCache.set(source, cacheMadd(remapFunctionIds(compileCash(source), MSM_ID_OFFSET)));
   return cashCache.get(source);
 };
 // Split compiled CashScript into its leading function-definition block and its main code.
@@ -161,6 +178,20 @@ function buildWith({backExec, backTerminal}) {
   // terminal: the densless terminal, then the final MSM stage on its parked pushes (zInv, state)
   ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminal, constants));
   programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
+  // Malleability pins (length / order / sign-bit) run before the densless terminal, paid once.
+  const layoutExec = [
+    { shared: layout.fragmentLengths[0], witness: 2560, table: 928 },
+    { shared: layout.fragmentLengths[1], witness: 2304, table: 832 },
+    { shared: layout.fragmentLengths[2], witness: 2560, table: 928 },
+  ];
+  const pinMode = PIN_MODE;
+  const pins = pinMode === '0' ? Buffer.alloc(0)
+    : pinMode === 'lenonly' ? compileTerminalPinsLenOnly()
+    : pinMode === 'lensign' ? compileTerminalPinsLenSign(layoutExec)
+    : pinMode === 'orderonly' ? compileTerminalPinsOrderOnly()
+    : pinMode === 'lenorder' ? compileTerminalPinsLenOrder(layoutExec)
+    : compileTerminalPins(layoutExec);
+  programs.terminalBase = Buffer.concat([pins, programs.terminalBase]);
   programs.terminal = Buffer.concat([terminalPadded ? Buffer.from([OpcodesBCH.OP_ROT, OpcodesBCH.OP_DROP]) : Buffer.alloc(0),
     carrier(programs.terminalBase, programs.msmFinal, 4)]);
   delete programs.terminalBase;

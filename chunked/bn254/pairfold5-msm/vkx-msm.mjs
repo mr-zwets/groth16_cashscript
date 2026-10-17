@@ -83,7 +83,7 @@ ${helpers}
 contract VkxMsmA() {
     function spend(${pinN ? '' : `${ownInputs ? 'int n0, int n1, ' : ''}bytes wa${noPad ? '' : ', bytes unused pad'}`}) {
 ${pinN ? `        bytes un = tx.inputs[${pinN.idx}].unlockingBytecode;
-        bytes wa = un.split(un.length - ${pinN.back + 160 - (64 - split)})[0].split(un.length - ${pinN.back + 160})[1];
+        bytes wa = un.split(un.length - ${pinN.back + 160})[1].split(${64 - split})[0];
 ` : `        require(wa.length == ${64 - split});
 `}
 ${ownInputs || pinN ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingBytecode;
@@ -117,7 +117,7 @@ ${pinN ? `        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toP
 ` : `        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) +
             toPaddedBytes(n0, 32) + toPaddedBytes(n1, 32) + wa;
 `}${pinEnd ? `        bytes u = tx.inputs[${pinEnd.idx}].unlockingBytecode;
-        require(u.split(u.length - ${pinEnd.back})[0].split(u.length - ${pinEnd.back + pinEnd.size})[1]${pinN ? '' : `.split(${stateBytes(split)})[0]`} == st);`
+        require(${pinN ? `u.split(u.length - ${pinEnd.back + pinEnd.size})[1].split(${pinEnd.size})[0]` : `u.split(u.length - ${pinEnd.back})[0].split(u.length - ${pinEnd.back + pinEnd.size})[1].split(${stateBytes(split)})[0]`} == st);`
   : `        require(tx.inputs[${bIdx}].unlockingBytecode.split(${65 + 2 + stateBytes(split)})[0].split(65)[1] == ${stateHeader(split)} + st);`}
     }
 }
