@@ -15,7 +15,7 @@ input i+1:  <inBlob = f0(x)>        redeem: out = f1(f0(x)); ... (verdict)
 
 Input `i` recomputes its chunk and `require`s that input `i+1`'s incoming argument equals that output — a raw byte-equality check across sibling inputs (the "verify `arg01 == arg10`" pattern). This shards one running computation across the inputs of a single transaction and binds it end-to-end, with the verdict asserted by the last input.
 
-Compared with the across-transactions covenant below, this needs **no NFT-commitment hand-off and no hashing**, the intermediate state is **not limited to 128 bytes** (it is just a pushed argument, any size), and the whole computation is **one transaction** instead of a chain of them — so no per-step block/mempool hop. Each input still gets its own op-cost budget and 10,000-byte script cap. The plain and BLS constructions remain larger non-standard transactions; the optimized BN254 quotient-torus construction fits 13 inputs into one standard 99,993-byte transaction. These are implemented in [`chunked/intratx`](chunked/intratx) and benchmarked as the `bch-{pairing,groth16}-intratx` (and `-bls12381-`) entries.
+Compared with the across-transactions covenant below, this needs **no NFT-commitment hand-off and no hashing**, the intermediate state is **not limited to 128 bytes** (it is just a pushed argument, any size), and the whole computation is **one transaction** instead of a chain of them — so no per-step block/mempool hop. Each input still gets its own op-cost budget and 10,000-byte script cap. The plain and BLS constructions remain larger non-standard transactions; the optimized BN254 constructions fit one standard transaction: 11 inputs / 86,950 B for the quotient-torus residue build, and 5 inputs / 35,143 B for the current frontier (`bch-groth16-intratx-pairfold5-densless-msm-slim`). These are implemented in [`chunked/intratx`](chunked/intratx) and benchmarked as the `bch-{pairing,groth16}-intratx` (and `-bls12381-`) entries.
 
 > Earlier revisions of this document claimed intra-transaction sharing was "not viable" because inputs cannot pass state. That was wrong: they cannot share a stack, but they can read each other's arguments by introspection, which is enough.
 
@@ -73,18 +73,18 @@ A reduction of the [base instruction cost](https://github.com/bitjson/bch-vm-lim
 
 ## Why keep the singleton: the unchunked ideal
 
-The repo keeps a single-transaction verifier (`singleton/`, benchmarked as `bch-groth16-singleton`) even though it cannot run on BCH. It needs about 157 inputs' worth of op-cost budget and busts the 10,000-byte script cap, so it is not deployable. It is kept on purpose, for two reasons.
+The repo keeps a single-transaction verifier (`singleton/`, benchmarked as `bch-groth16-singleton`) even though it cannot run on BCH. Its bytecode now fits under the 10,000-byte script cap (8,145 B), but it needs about 96 inputs' worth of op-cost budget (771M), so it is not deployable. It is kept on purpose, for two reasons.
 
 First, it is the simplest expression of the verifier. One contract computes `vk_x` on-chain, runs the four pairings, and asserts the product is the F_p¹² identity, with none of the chaining workarounds the chunked version needs: no `hash256` state hand-off between transactions, no per-chunk function prologues, no zero-padding to buy budget, no step counter. That makes it the readable algorithmic reference, and the correctness oracle the chunked steps are graded against.
 
-Second, it anchors what the chunking actually costs. Comparing the two benchmark entries:
+Second, it anchors what the chunking actually costs. Comparing the two plain BN254 benchmark entries (`results.json`, 2026-10-17):
 
-| | singleton | chunked |
+| | singleton | chunked (covenant chain) |
 |---|---|---|
-| bytes | ~21.9 KB | ~1.59 MB |
-| total op-cost | ~1.26B | ~789M |
-| steps | 1 | 116 |
+| bytes | 8,145 | 239,773 |
+| total op-cost | ~771M | ~183M |
+| steps | 1 | 32 |
 
-The gap is almost entirely bytes, not compute. The ~73x byte blow-up is the chunking tax: roughly half is zero-padding that buys each input's op-cost budget (`(41 + len) * 800`), about a third is the per-chunk function prologues re-shipped in every independent transaction, and the rest is the re-provided, re-hashed state plus transaction skeletons. The only compute overhead chunking adds is the per-step `hash256` of the carried state, in and out, across 116 steps, which is small next to the field arithmetic.
+The gap is almost entirely bytes, not compute. The ~29x byte blow-up is the chunking tax: about 29 % of the chunked total is zero-padding that buys each input's op-cost budget (`(41 + len) * 800`), and most of the rest is per-chunk code re-shipped in every independent transaction plus the re-provided, re-hashed state and transaction skeletons. The intra-tx and residue constructions in [verifiers.md](verifiers.md) cut that tax sharply (down to 35,143 B in 5 inputs), which is where the project's effort has gone since.
 
-One caveat on the op-cost numbers. Counter-intuitively the chunked total (~789M) is *lower* than the singleton's (~1.26B), so the singleton is not literally the op-cost floor the chunks improve on. That is an artifact, not a real inversion: the chunked code received two optimizations that were never back-ported to the singleton, namely a dedicated F_p¹² squaring (`fp12Sqr`, which uses 2 `fp6Mul` instead of the 3 in a full `fp12Mul`) and lazy add-reduction (dropping the `% p` from additions). The singleton's `groth16.cash` and `verify.cash` still use the old reducing `addFp` and the old `fp12Sqr` wrapper. Back-porting both would pull the singleton's op-cost below the chunked total and make it a clean apples-to-apples floor, with the chunked sitting just above it by the per-step hashing cost. Those two back-ports are the remaining work on the singleton; until they land, read it as the byte floor and the algorithmic reference, not as the current op-cost floor.
+One caveat on the op-cost numbers. The chunked total is far *lower* than the singleton's, so the singleton is not the op-cost floor the chunks improve on. The chunked builds use a different algorithm (a prepared, batched Miller loop with the fixed `e(alpha, beta)` and VK lines baked in, lazy reduction), while the plain singleton stays the direct, readable reference and is compiled for bytes. The op-cost-optimised single-script reference is `bch-groth16-singleton-minop` (~65M op). Read the plain singleton as the byte floor and the algorithmic reference, not as the op-cost floor.

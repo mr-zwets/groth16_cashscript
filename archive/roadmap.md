@@ -1,10 +1,12 @@
-Breaking the Groth16 verifier into manageable steps helps structure the work and stay within the BCH VM limits. Loops and shift operators now exist (CashScript v0.13.0 / CHIP-2021-05 Loops), so the binding constraints are the BCH [script & transaction limits](README.md#bch-shortcomings), chiefly the 10,000-byte unlocking bytecode limit and the op-cost budget it caps. The roadmap below minimizes op-cost and bytecode size while splitting the verifier into functional chunks.
+> **Historical (June 2026).** The original build plan. Steps 1–6 are implemented; the op-cost and step counts below predate the compiler fork's later branches and the intra-tx constructions. Current entries and numbers: [verifiers.md](../verifiers.md).
+
+Breaking the Groth16 verifier into manageable steps helps structure the work and stay within the BCH VM limits. Loops and shift operators now exist (CashScript v0.13.0 / CHIP-2021-05 Loops), so the binding constraints are the BCH [script & transaction limits](../README.md#bch-shortcomings), chiefly the 10,000-byte unlocking bytecode limit and the op-cost budget it caps. The roadmap below minimizes op-cost and bytecode size while splitting the verifier into functional chunks.
 
 ### 0. **Foundations Already in Place**
    - **Objective**: The language features and tooling the verifier is built on.
    - **Done**:
      - Adopted CashScript v0.13.0 loops (`for`) and shift operators (`<<`, `>>`), replacing the old `unroll(N)` placeholders.
-     - Forked `cashc` to add **reusable (user-defined) functions** plus multi-return functions, the language feature the whole field tower depends on. See [The CashScript Compiler Fork](cashscript-compiler-fork.md).
+     - Forked `cashc` to add **reusable (user-defined) functions** plus multi-return functions, the language feature the whole field tower depends on. See [The CashScript Compiler Fork](../cashscript-compiler-fork.md).
      - The complete verifier now **compiles and runs** on the loosened BCH 2026 VM and is validated against `py_ecc` / `@noble/curves`: a single-transaction reference (`singleton/`) and a BCH-limit-viable multi-transaction form (`chunked/`).
    - **Note**: The roadmap below is the historical build plan. Steps 1–6 are now implemented in `singleton/bn254/` and `chunked/`; the file/function references in each step have been updated to point at the real code. The remaining open item is broader deployment tooling (step 7).
 

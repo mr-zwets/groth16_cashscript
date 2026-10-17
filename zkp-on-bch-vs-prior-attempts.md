@@ -92,7 +92,7 @@ mainnet*:
   no soft fork required.
 - **Loops** and **bit-shift opcodes** (shifts via CHIP-2025-05 Bitwise, active
   May 2026): the repeated structure of Miller's loop, tower multiplications, and
-  final exponentiation can be expressed directly (see [roadmap.md](roadmap.md)).
+  final exponentiation can be expressed directly (see [roadmap.md](archive/roadmap.md)).
 - A **10,000-byte stack-element limit** (up from 520 bytes), enough to hold
   packed F_p², F_p⁶ and F_p¹² tower elements.
 
@@ -148,8 +148,7 @@ rather than porting verbatim.
 
 So neither approach is blocked on BCH by a missing instruction, only by the
 resource limits BCH retains. BCH's challenge is not "can the VM express it" but
-"can it be made to fit," which is what forces the multi-step covenant design
-below.
+"can it be made to fit," which is what forces the multi-step designs below.
 
 ### The BSV artifacts are open and reproducible
 
@@ -166,12 +165,16 @@ sCrypt (**BN256**, the same curve this repo's
 (**BLS12-381** / MNT4-753), so per-opcode counts and field-element sizes line up
 for the former but not the latter.
 
-## The BCH-unique approach: split across sequential stateful transactions
+## The BCH-unique approach: split across inputs and transactions
 
-Because the limits are *per input per transaction*, the only way to exceed them
-is to spread the computation across a **chain of transactions**, carrying state
-forward in a stateful covenant. This repo's design (see
-[multi-step-computation.md](multi-step-computation.md)) does exactly that:
+Because the limits are *per input*, the way to exceed them is to spread the
+computation across many inputs, each with its own budget. There are two forms
+(see [multi-step-computation.md](multi-step-computation.md)): sibling **inputs of
+one transaction** that forward-check each other's unlocking bytecode, which is
+what the current best verifiers use (BN254: 5 inputs in one standard 35,143-byte
+transaction), and a **chain of transactions** carrying state forward in a
+stateful covenant, which was the first design and still serves graphs too large
+for one standard transaction. The covenant chain works like this:
 
 1. Each transaction performs one chunk sized to fit that step's op-cost and
    bytecode budget.
@@ -205,30 +208,29 @@ space, not compute: the curve, algorithm, and field-operation count are
 identical to BSV's, and a 64-iteration loop still costs 64 iterations of op-cost
 budget.
 
-**Aggregate footprint is likely smaller too, not larger.** Each BCH step is
-hard-capped at the ~10,000-byte P2SH unlocking limit (which already includes the
-redeem script, provided state, and signatures), so total footprint is bounded by
-`N_steps × ≤10 KB`. The crossover against BSV is therefore roughly ~150 steps to
-match the ~1.5 MB optimised transaction (and ~50 to match nChain's ~500 KB
-locking script, though that mixes locking-script and whole-transaction
-measurements, so treat it as order-of-magnitude). The completed chunked verifier
-lands at ~116 steps (see below), just under that ~150-step crossover. The
-per-step state-carrying overhead is small in bytes (~600 B of working state plus
-a few hundred bytes of tx skeleton).
+**Aggregate footprint is smaller too, not larger.** Each BCH step is
+hard-capped at the ~10,000-byte P2SH unlocking limit, so total footprint is
+bounded by `N_steps × ≤10 KB`, and the steps only need to fit the op-cost the
+verifier actually spends. Measured on the benchmark (`results.json`,
+2026-10-17), the best deployable BCH verifier is **35,143 bytes** (BN254, 5
+inputs, one standard transaction, ~25M op-cost). That is ~330x smaller than
+sCrypt's BN254 verifier as measured by the benchmark (11.7 MB) and ~15x smaller
+than nChain's BLS12-381 verifier (522,564 B), across curves; on the same curve
+as nChain, the best BLS12-381 BCH verifier is 69,947 B in one standard
+transaction (a Fiat-Shamir construction; 202,594 B in 3 standard transactions
+for the unconditional one). The single-script BCH singletons, which are not
+deployable, are 3.7 to 8 KB.
+
+The early covenant-chain build was much larger (~116 steps and ~789M op-cost in
+mid-2026, most steps zero-padded to buy budget). The gains since came from
+algorithm changes (prepared batched Miller loop, witnessed final-exponentiation
+residues, GLV `vk_x`), from packing steps as inputs of one transaction, and from
+the compiler fork's op-cost work; see [verifiers.md](verifiers.md).
 
 The real costs of the multi-step approach are therefore not aggregate bytes but
-latency (one mempool/block hop per step), per-step fees and dust, and the
-op-cost spent re-hashing the full state each step.
-
-The one number that was still open, `N_steps`, is now pinned by the completed
-chunked verifier: the full Groth16 verifier splits into roughly **116 sequential
-steps** at about **789M total op-cost**, with **every** step inside the per-input
-limits (≤10,000 bytes, ≤8.03M op-cost). At a hard cap of ≤10 KB of unlocking
-bytecode per step that is on the order of ~1 MB of verifier bytecode in
-aggregate, comparable to sCrypt's optimised ~1.5 MB single transaction but spread
-across many small inputs instead of one. It also confirms that, with loops, the
-binding per-input limit is op-cost rather than bytecode size; most steps are
-op-cost-bound and zero-padded to buy their budget.
+the engineering of binding every step to the same proof, plus, for the
+covenant-chain form, latency (one mempool/block hop per step), per-step fees and
+dust, and re-hashing the carried state each step.
 
 ## Comparison at a glance
 
@@ -239,7 +241,7 @@ op-cost-bound and zero-padded to buy their budget.
 | **BTC** StarkWare 2024 (Signet) | STARK (hash-based) | In-Script, requires `OP_CAT` | No (~11 txs, ~4 MB) | BCH has native arithmetic on mainnet; no soft fork / `OP_CAT` needed |
 | **BTC** BitcoinOS 2024 | (Merkle Mesh) | **Off-chain** | n/a | BCH verifies in consensus, not off-chain |
 | **BTC** BitVMX 2024 | STARK + Groth16 | **Off-chain + on-chain attestation** | n/a | BCH verifies the proof itself, no fraud-proof/challenge game |
-| **BCH** this repo | Groth16, BN256 | In-Script, native big-int, **limited per tx** | **No, multi-step covenant** | Decompose across sequential NFT-covenant transactions |
+| **BCH** this repo | Groth16, BN254 and BLS12-381 | In-Script, native big-int, **limited per input** | **Yes, one standard tx** (BN254: 5 inputs, 35 KB) | Decompose across linked inputs of one transaction, or a covenant chain for larger graphs |
 
 ## Takeaway
 
@@ -250,8 +252,9 @@ on a testnet opcode, or with off-chain attestation. BCH is the only chain that
 both **has native big-integer arithmetic on mainnet** *and* **keeps tight
 anti-DoS limits**, so its unique contribution is showing that an in-consensus,
 no-soft-fork Groth16 verifier is achievable by **decomposing the verifier
-across a chain of stateful covenant transactions**, rather than by removing
-limits or leaving consensus.
+across many limited inputs** (linked inputs of one standard transaction, or a
+chain of covenant transactions), rather than by removing limits or leaving
+consensus.
 
 ---
 

@@ -1,11 +1,12 @@
 # BN254 singleton libraries
 
 Shared CashScript function files for the BN254 Groth16 verifier, consumed by the contracts in the
-parent directory (`../*.cash`). These rely on the custom cashc fork's top-level (global) functions +
-`import` support (branch `compiler-optimizations-5`): a library file is just a bag of plain top-level
+parent directory (`../*.cash`). These rely on CashScript v0.14's top-level (global) functions +
+`import` support (upstream; the verifiers compile with the fork branch `compiler-optimizations-8`,
+see [cashscript-compiler-fork.md](../../../cashscript-compiler-fork.md)): a library file is just a bag of plain top-level
 `function`s (no `library` wrapper, no `internal` keyword, no `contract`), and `import "./X.cash";`
-brings its functions into scope unqualified. Top-level `constant`s are supported by the fork (folded
-to literals; still fork-only pending upstream #264); the field prime is otherwise written as a
+brings its functions into scope unqualified. Top-level `constant`s are supported upstream since
+v0.14 (#426, folded to literals); the field prime is otherwise written as a
 literal at each use site and folded by the compiler.
 
 ## Why a `contract` per layer

@@ -2,10 +2,13 @@
 
 > Status: landed. The Tier-2 rescheduling proposed below now ships in the compiler
 > fork as the `rescheduleStacks` pass, described in
-> [rescheduling-stacks.md](rescheduling-stacks.md) and used by the builds as described
-> in [chunked/rescheduler/README.md](chunked/rescheduler/README.md). This doc remains
+> [rescheduling-stacks.md](../rescheduling-stacks.md) and used by the builds as described
+> in [chunked/rescheduler/README.md](../chunked/rescheduler/README.md). This doc remains
 > the diagnosis behind it. The `golf/` recompiler referenced here is the standalone
-> prototype the pass was ported from.
+> prototype the pass was ported from; it is no longer in the repo. The emitReplace
+> re-insertion cost diagnosed here is also fixed inside the compiler itself since
+> `compiler-optimizations-7` (scoped reassignment, see
+> [cashscript-compiler-fork.md](../cashscript-compiler-fork.md)). Archived July 2026.
 
 How CashScript's code generator could do more optimal stack placement / stack
 management: a diagnosis grounded in the actual compiler source

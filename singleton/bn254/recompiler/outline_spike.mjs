@@ -5,7 +5,7 @@
 //   APPLY=1 node outline_spike.mjs [vector-json]  also rewrite the artifact and verify
 //     (accept valid / reject tampered / all multiproof witnesses) on the loose VM.
 // Default artifact: the flagship byte-scored groth16-singleton-opcode-optimized vectors.
-// See cashc-optimization-roadmap.md items 6-7 for the measured numbers and verdicts.
+// See archive/cashc-optimization-roadmap.md items 6-7 for the measured numbers and verdicts.
 import { readFileSync } from 'node:fs';
 import { parse } from './asm.mjs';
 

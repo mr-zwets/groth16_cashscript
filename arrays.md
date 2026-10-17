@@ -4,7 +4,7 @@ This note covers whether the Groth16 verifier needs arrays, which array operatio
 
 ## Can the verifier be built without arrays?
 
-Yes. The current pseudo-code already does it by carrying every composite value as individual `int`s:
+Yes. The verifiers in `singleton/` and `chunked/` already do it by carrying every composite value as individual `int`s through multi-return functions:
 
 - F_p2 = 2 ints, F_p6 = 6, F_p12 = 12 ints
 - G1 = 2 ints, G2 = 4 ints
@@ -19,7 +19,7 @@ The cost of going without them:
 
 ### Workaround that exists today (no arrays)
 
-CashScript v0.13 has `bytes` with `.slice(start, end)`, `.split()`, and `toPaddedBytes(int, len)` plus int casts. A tower element can be packed into a single `bytes` blob (12 x 32-byte chunks) and sliced apart, instead of using 12-arg signatures. This is essentially the same representation arrays would compile to (see below).
+CashScript (since v0.13) has `bytes` with `.slice(start, end)`, `.split()`, and `toPaddedBytes(int, len)` plus int casts. A tower element can be packed into a single `bytes` blob (12 x 32-byte chunks) and sliced apart, instead of using 12-arg signatures. This is essentially the same representation arrays would compile to (see below).
 
 ## What array support would need
 
