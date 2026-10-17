@@ -223,6 +223,7 @@ const recipes = {
 export const cacheProfile = process.env.SLIM_CACHE ?? 'floating';
 const rawBodies = new Map([
   ['floating', []],
+  ['orbit', []],
   ['raw-dbl', [dblSha]],
   ['raw-madd', [maddSha]],
   ['raw-both', [dblSha, maddSha]],

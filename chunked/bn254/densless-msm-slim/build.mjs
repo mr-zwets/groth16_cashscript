@@ -6,6 +6,7 @@ import {sourceA, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
 import {cachePrimeLiterals, cacheProfile} from './prime-cache.mjs';
 import {compactInverseCopy} from './terminal-copies.mjs';
 import {compactExecutorCleanup} from './executor-cleanup.mjs';
+import {compressOrbitTables} from './table-orbits.mjs';
 import {STATE_BYTES, EXEC_STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
 import {sliceGenesis} from './genesis-slice.mjs';
 import {carrier, remapFunctionIds} from '../densless-msm/carrier.mjs';
@@ -63,10 +64,10 @@ export function assemble(body, identifiers, data = {}, extraNumbers = {}) {
 // Sound vk_x: genesis recomputes MSM part A (positions 63..MSM_SPLIT) from its claimed public
 // inputs (genesis pushes 22 n0, 21 n1) and the executors and the terminal carry the remaining
 // positions as a chain of pinned state pushes (vkx-stages.mjs); see README.md.
-export const MSM_SPLIT = Number(process.env.MSM_SPLIT ?? 31);
+export const MSM_SPLIT = Number(process.env.MSM_SPLIT ?? (cacheProfile === 'orbit' ? 37 : 31));
 // Witness-byte cuts: genesis runs [0, CUTS[0]), executor k runs [CUTS[k], CUTS[k + 1]), the
 // terminal runs [CUTS[3], 64) and finishes. CUTS[0] = 64 - MSM_SPLIT.
-export const CUTS = (process.env.MSM_CUTS ?? `${64 - MSM_SPLIT},43,54,60`).split(',').map(Number);
+export const CUTS = (process.env.MSM_CUTS ?? (cacheProfile === 'orbit' ? `${64 - MSM_SPLIT},36,47,55` : `${64 - MSM_SPLIT},43,54,60`)).split(',').map(Number);
 // Default repartition: genesis consumes positions0..32, executors33..42,
 // 43..53 and54..59; terminal60..63. Full MADD caching reduces genesis bytes
 // and its budget, so four positions move to executors0and1. The archived
@@ -98,7 +99,10 @@ function cachePrimeDefinition(bytecode, id) {
 }
 const cashCache = new Map();
 const cash = (source) => {
-  if (!cashCache.has(source)) cashCache.set(source, cachePrimeDefinition(cachePrimeDefinition(remapFunctionIds(compileCash(source), MSM_ID_OFFSET), 202n), 200n));
+  if (!cashCache.has(source)) {
+    const bytecode = cachePrimeDefinition(cachePrimeDefinition(remapFunctionIds(compileCash(source), MSM_ID_OFFSET), 202n), 200n);
+    cashCache.set(source, cacheProfile === 'orbit' ? compressOrbitTables(bytecode) : bytecode);
+  }
   return cashCache.get(source);
 };
 // Split compiled CashScript into its leading function-definition block and its main code.
