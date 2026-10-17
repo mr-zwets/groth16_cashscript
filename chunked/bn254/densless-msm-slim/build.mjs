@@ -4,7 +4,7 @@ import {writeFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {sourceA, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
 import {STATE_BYTES, EXEC_STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
-import {sliceGenesis} from '../densless-msm/genesis-slice.mjs';
+import {sliceGenesis} from './genesis-slice.mjs';
 import {carrier, remapFunctionIds} from '../densless-msm/carrier.mjs';
 import {compileTerminalPins, compileTerminalPinsLenOrder, compileTerminalPinsLenOnly, compileTerminalPinsOrderOnly, compileTerminalPinsLenSign} from './malleability-pins.mjs';
 import {OpcodesBCH, decodeAuthenticationInstructions, encodeAuthenticationInstructions, encodeDataPush, bigIntToVmNumber} from '@bitauth/libauth';

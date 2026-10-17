@@ -14,15 +14,17 @@ Here:
 
 **Malleability pins** (`malleability-pins.mjs`, default `SLIM_PINS=full`): prepended once to the densless half of the terminal redeem. They pin PUSHDATA2 lengths on the terminal header/quot and each executor quot, enforce non-decreasing order on terminal limbs 2..11, and require fixed-table sign bits clear on all three executors. The order reader follows actual minimally encoded VM-number pushes, including OP_0, small integer opcodes and 31/32-byte payloads. Its helper key 151 is disjoint from sign helper 150 and the existing base/MSM namespaces. The builder and witness producer share `PIN_MODE`, so an unset environment reproduces explicit `full` output. Modes remain `0`, `lenonly`, `orderonly`, `lensign`, `lenorder`, `full`.
 
-The five archived fixtures with full pins use **35,773 script bytes / 36,008 score**, including 235 bytes of transaction overhead. This is 31 bytes below the initial pinned submission, 649 above unpinned slim (35,359), and 127 above the original densless-msm entry (35,881). The five archived mathematical proofs and public inputs are unchanged.
+The five archived fixtures with full pins use **35,438 script bytes / 35,673 score**, including 235 bytes of transaction overhead. This saves 335 bytes from the previous 36,008 pinned revision, and is 314 above unpinned slim (35,359) / 208 below the original densless-msm entry (35,881). The five archived mathematical proofs and public inputs are unchanged. Primary corrected-native cost is **24,825,908 consensus / 24,895,284 standard**, down 310,340 / 310,980 units from that pinned revision.
+
+**Size and copy-cost reductions.** The slim-only `genesis-slice.mjs` removes eleven unused neutral function registrations, with exact input and body hashes guarding the reviewed omission. Witness and state readers split at the start of the needed window before taking its length. Terminal pins combine fixed skips, consume checked push headers directly, and bound the copied order-reader prefix to the fixed pushes plus 33 bytes per canonical nonnegative number. All length/order/sign checks remain enabled by default. The common reader retains its previous expression for non-slim callers; the parent slicer is unchanged.
 
 **Dense-witness resource sample.** `sweep.mjs` deterministically generates 30 proofs under the fixture VK using seed `densless-msm-slim-v1`. Each public-input pair is selected by a 20,000-candidate search for few zero Straus nibbles. These samples have 5–7 zero nibbles; no global structural minimum or universal resource bound is claimed. Every input must pass `stateSuccess`, and every complete transaction must pass standard BCH2026 `verify()`; a failure exits nonzero. All 30 pass. Peak standard-VM budget percentages (input order 0..4):
 
 | exec0 | exec1 | exec2 | genesis | terminal |
 |---|---|---|---|---|
-| 92.6% | 89.9% | 90.4% | 96.6% | 86.9% |
+| 92.3% | 89.6% | 90.1% | 99.6% | 84.4% |
 
-`sweep-results.txt` records this run and seed. `SWEEP_JSON` optionally saves the exact proofs, public inputs and outcomes for independent replay. These are finite libauth measurements; corrected-native verification is reported separately in the PR.
+`sweep-results.txt` records the earlier 36,008-byte run and seed. The table above comes from re-encoding those same 30 archived proofs with the current source, without regenerating any proof or public input. All 30 also pass consensus VM and corrected-native checks in both modes. The minimum dense-sample native input margin is **19,961 cost units**; genesis has less budget headroom after shrinking its unlocking script. `SWEEP_JSON` optionally saves exact proofs, public inputs and outcomes for independent replay. These finite measurements do not establish universal resource fit, producer completeness or full statement soundness.
 
 **Regression and attack coverage.** `regression.mjs` checks default/full byte identity, all five archived fixtures, the independently pairing-checked `short-number-fixture.json`, and the public order-pin contract over zero, small integer opcodes and 31/32-byte values in both consensus and standard modes. It also refreshes the original 36 attack cases against the new code and adds all eight issue-39 cases (44 total). The first 26 originate in `redteam.mjs` as submitter suggestions; the next ten retain the upstream maintainer cases. The refresh is attributed to GPT-6.1 Sol at Kallisti's request and remains subject to upstream maintainer review. It does not claim fresh independent maintainer authorship.
 
@@ -38,4 +40,4 @@ VERIFIER_DIR=<zk-verifier-bench checkout> node regression.mjs /tmp/slim-regressi
 VERIFIER_DIR=<zk-verifier-bench checkout> SWEEP_N=30 SWEEP_SEED=densless-msm-slim-v1 SWEEP_JSON=/tmp/slim-sweep.json node sweep.mjs
 ```
 
-Parent `densless-msm` and `densless-msm-spec` source and vector outputs remain unchanged. Follow-up fixes and validation: **GPT-6.1 Sol**, at Kallisti's request.
+Parent `densless-msm` and `densless-msm-spec` source and vector outputs remain unchanged. Original malleability pins: **Grothy (Grok Bot AI assistant), operated by kzKallisti**. Follow-up fixes, optimizations and validation: **GPT-6.1 Sol**, at Kallisti's request.

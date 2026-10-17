@@ -29,19 +29,13 @@ export function sortLimbsBE(list) {
   });
 }
 
-function skipPush(len) {
-  const h = len < 76 ? 1 : len < 256 ? 2 : 3;
-  return cat(pushN(h + len), op(OpcodesBCH.OP_SPLIT), op(OpcodesBCH.OP_NIP));
-}
-
 function requirePushData2Len(len) {
   const le = Buffer.alloc(2); le.writeUInt16LE(len);
   return cat(
-    op(OpcodesBCH.OP_DUP), pushN(3), op(OpcodesBCH.OP_SPLIT),
+    pushN(3), op(OpcodesBCH.OP_SPLIT),
     op(OpcodesBCH.OP_SWAP),
     Buffer.from(encodeDataPush(Buffer.concat([Buffer.from([0x4d]), le]))),
     op(OpcodesBCH.OP_EQUALVERIFY),
-    op(OpcodesBCH.OP_NIP),
     pushN(len), op(OpcodesBCH.OP_SPLIT), op(OpcodesBCH.OP_NIP),
   );
 }
@@ -91,10 +85,10 @@ function invokeSignFn() {
 
 function pinOneExecTable(inputIdx, shared, witness, table, { signs = true, quot = true } = {}) {
   const th = table < 256 ? 2 : 3;
+  const skip = [296, shared, witness].reduce((sum, len) => sum + redeemPushBytes(len), th);
   const parts = [
     pushN(inputIdx), op(OpcodesBCH.OP_INPUTBYTECODE),
-    skipPush(296), skipPush(shared), skipPush(witness),
-    pushN(th), op(OpcodesBCH.OP_SPLIT), op(OpcodesBCH.OP_NIP),
+    pushN(skip), op(OpcodesBCH.OP_SPLIT), op(OpcodesBCH.OP_NIP),
     pushN(table), op(OpcodesBCH.OP_SPLIT),
     op(OpcodesBCH.OP_TOALTSTACK), // rest on alt; table on stack
   ];
@@ -108,10 +102,9 @@ function pinOneExecTable(inputIdx, shared, witness, table, { signs = true, quot 
   parts.push(op(OpcodesBCH.OP_FROMALTSTACK));
   if (quot) {
     parts.push(cat(
-      op(OpcodesBCH.OP_DUP), pushN(3), op(OpcodesBCH.OP_SPLIT), op(OpcodesBCH.OP_SWAP),
+      pushN(3), op(OpcodesBCH.OP_SPLIT), op(OpcodesBCH.OP_SWAP),
       Buffer.from(encodeDataPush(Buffer.from([0x4d, 0xe0, 0x04]))),
       op(OpcodesBCH.OP_EQUALVERIFY),
-      op(OpcodesBCH.OP_NIP),
       pushN(1248), op(OpcodesBCH.OP_SPLIT),
       op(OpcodesBCH.OP_DROP),
       op(OpcodesBCH.OP_DROP),
@@ -123,15 +116,9 @@ function pinOneExecTable(inputIdx, shared, witness, table, { signs = true, quot 
 }
 
 function pinOwnHeaderQuotAndOrder(ordered) {
-  const parts = [
-    Buffer.from(encodeDataPush(numberBody())), pushN(NUMBER_FN), op(OpcodesBCH.OP_DEFINE),
-    op(OpcodesBCH.OP_INPUTINDEX), op(OpcodesBCH.OP_INPUTBYTECODE),
-    requirePushData2Len(296),
-    requirePushData2Len(2336),
-  ];
-  parts.push(extractNumberKeepRest(), op(OpcodesBCH.OP_TOALTSTACK));
+  const numberChecks = [cat(extractNumberKeepRest(), op(OpcodesBCH.OP_TOALTSTACK))];
   for (let i = 1; i < ordered; i++) {
-    parts.push(cat(
+    numberChecks.push(cat(
       extractNumberKeepRest(), // [rest][curr]
       op(OpcodesBCH.OP_DUP), op(OpcodesBCH.OP_FROMALTSTACK), // [rest][curr][curr][prev]
       op(OpcodesBCH.OP_SWAP), // [rest][curr][prev][curr]
@@ -139,8 +126,18 @@ function pinOwnHeaderQuotAndOrder(ordered) {
       op(OpcodesBCH.OP_TOALTSTACK), // curr limb
     ));
   }
-  parts.push(op(OpcodesBCH.OP_DROP), op(OpcodesBCH.OP_FROMALTSTACK), op(OpcodesBCH.OP_DROP));
-  return cat(...parts);
+  // Fixed data pushes plus at most33bytes per canonical nonnegative number.
+  // The unparsed remainder is discarded after these checks.
+  const prefixBytes = 3 + 296 + 3 + 2336 + 33 * numberChecks.length;
+  return cat(
+    Buffer.from(encodeDataPush(numberBody())), pushN(NUMBER_FN), op(OpcodesBCH.OP_DEFINE),
+    op(OpcodesBCH.OP_INPUTINDEX), op(OpcodesBCH.OP_INPUTBYTECODE),
+    op(OpcodesBCH.OP_SIZE), pushN(prefixBytes),
+    op(OpcodesBCH.OP_MIN, OpcodesBCH.OP_SPLIT, OpcodesBCH.OP_DROP),
+    requirePushData2Len(296), requirePushData2Len(2336),
+    ...numberChecks,
+    op(OpcodesBCH.OP_DROP), op(OpcodesBCH.OP_FROMALTSTACK), op(OpcodesBCH.OP_DROP),
+  );
 }
 
 export function compileTerminalPins(layoutExec, ordered = 10) {
