@@ -121,16 +121,10 @@ call fp_mul
 end
 
 function outline_18 18
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 OP_2SWAP
 call outline_6
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 OP_2ROT
 call outline_6
 call outline_59
@@ -560,16 +554,10 @@ OP_16
 OP_ROLL
 push 11
 OP_ROLL
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 OP_2SWAP
 call outline_3
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 OP_2ROT
 call outline_3
 call outline_59
@@ -942,10 +930,7 @@ OP_SWAP
 call outline_5
 OP_2SWAP
 OP_SWAP
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 call outline_6
 OP_SWAP
 call outline_5
@@ -1064,18 +1049,12 @@ OP_PICK
 call fp_mul
 OP_DUP
 OP_3
-call fp_mul
-OP_DUP
-OP_OVER
-call fp_mul
+call outline_70
 OP_13
 OP_PICK
 OP_14
 OP_PICK
-call fp_mul
-OP_DUP
-OP_OVER
-call fp_mul
+call outline_70
 OP_DUP
 OP_8
 call fp_mul
@@ -1095,10 +1074,7 @@ OP_OVER
 OP_OVER
 call fp_sub_top_minus_next
 OP_2
-call fp_mul
-OP_DUP
-OP_OVER
-call fp_mul
+call outline_70
 OP_5
 OP_PICK
 OP_5
@@ -1246,18 +1222,12 @@ OP_OVER
 call fp_mul
 OP_DUP
 OP_3
-call fp_mul
-OP_DUP
-OP_OVER
-call fp_mul
+call outline_70
 OP_4
 OP_PICK
 OP_5
 OP_PICK
-call fp_mul
-OP_DUP
-OP_OVER
-call fp_mul
+call outline_70
 OP_DUP
 OP_8
 call fp_mul
@@ -1364,18 +1334,9 @@ function outline_44 44
 call outline_68
 call outline_68
 call outline_68
-push 11
-OP_PICK
-push 11
-OP_PICK
-push 11
-OP_PICK
-push 11
-OP_PICK
-push 11
-OP_PICK
-push 11
-OP_PICK
+call outline_71
+call outline_71
+call outline_71
 call outline_28
 end
 
@@ -1421,7 +1382,7 @@ function prime 0
 constant P
 end
 
-function outline_15 15
+function outline_15 68
 push 11
 OP_ROLL
 push 11
@@ -1685,14 +1646,8 @@ call outline_65
 end
 
 function outline_59 59
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
+call outline_69
 end
 
 function outline_60 60
@@ -1869,6 +1824,30 @@ OP_NUMEQUALVERIFY
 OP_SWAP
 end
 
+# VE: share 10 exact straight-line sequences; static inverse qualified separately.
+function outline_69 15
+OP_7
+OP_ROLL
+OP_7
+OP_ROLL
+end
+
+# VE: share 5 exact straight-line sequences; static inverse qualified separately.
+function outline_70 69
+call fp_mul
+OP_DUP
+OP_OVER
+call fp_mul
+end
+
+# VE: share 5 exact straight-line sequences; static inverse qualified separately.
+function outline_71 70
+push 11
+OP_PICK
+push 11
+OP_PICK
+end
+
 main
 # Public inputs must be canonical scalars, 0 <= n < r (n1 is push 0, n0 push 1: depths 9, 8).
 # Without this n + r gives the same vk_x, so one proof verifies two claimed integers.
@@ -1890,17 +1869,11 @@ OP_LESSTHAN
 OP_VERIFY
 # Decode C, then A, restoring the original ten-item stack before G2 checks.
 call g1_decompress
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 call g1_decompress
 OP_2ROT
 OP_2ROT
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 OP_2ROT
 OP_2ROT
 OP_2OVER
@@ -1955,10 +1928,7 @@ OP_ROLL
 call outline_58
 call outline_41
 call outline_33
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 OP_IF
 OP_12
 OP_PICK
@@ -2004,10 +1974,7 @@ OP_PICK
 call outline_5
 OP_2DUP
 OP_SWAP
-push 11
-OP_PICK
-push 11
-OP_PICK
+call outline_71
 call fp2_mul
 OP_15
 OP_PICK
@@ -2053,10 +2020,7 @@ call outline_33
 call outline_12
 call outline_12
 OP_ELSE
-push 11
-OP_PICK
-push 11
-OP_PICK
+call outline_71
 OP_2
 OP_PICK
 OP_4

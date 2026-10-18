@@ -1,7 +1,7 @@
 # Reconstructed BN254 genpow assembly
 
 This directory owns a readable low-level reconstruction of the published BN254
-singleton genpow leader. `verifier.asm` contains all 69 function bodies and the
+singleton genpow leader. `verifier.asm` contains all 72 function bodies and the
 main program as explicit instructions, symbolic calls and named field constants.
 `build.mjs` assembles that source; it does not read or patch an existing program.
 The fixture files contain public proofs and inputs from the official benchmark.
@@ -152,10 +152,29 @@ loop; unused trailing squares and the explicit iteration counter are removed.
 The zero-exponent case returns one. All other 68 function bodies, identifiers,
 the main program, scalar guard, decoder and archived witnesses remain exact.
 
-The current program has 4,223 locking bytes, a 208-byte witness and 85-byte
+The VG/A program has 4,223 locking bytes, a 208-byte witness and 85-byte
 transaction overhead: **4,516 total**, nine bytes below UY. Its locking SHA256 is
 `11562df7a32468c8417741d5a512709fbe5184edb49b538e388671e8a7cdf3e5`.
 Independent mathematical review and direct VM cases cover the loop boundary;
 whole-verifier proof and cost measurements are recorded separately by the
 release jobs. This remains relaxed-VM research with the same canonical G1
 witness representation and existing subgroup posture.
+
+Additional exact outlines (VJ/B, Oct 18, 2026): three repeated instruction sequences
+are now named helpers. `outline_69` uses short ID 15 at ten static call sites;
+the original `outline_15` moves to ID 68. `outline_70` uses ID 69 at five sites,
+and `outline_71` uses ID 70 at five sites. Expanding these three helpers and
+restoring the original ID 15 reconstructs the exact 4,223-byte VG/A program
+above, including its 41-byte exponent-driven `fp_pow`. The scalar guard,
+G1 decoder, proof coordinates and witness representation remain unchanged.
+
+The current program has 72 functions, maximum call depth 11, and 4,207 locking
+bytes plus the same 208-byte witness and 85-byte overhead: **4,500 total**, 16
+bytes below VG/A. The additional invocation frames require separate whole-proof
+and resource-cost qualification; static recovery does not establish those results.
+
+The builder derives `outlinedAdditionalFunctions` from the parsed declarations
+and symbolic calls in all function bodies and main. The manifest records each
+`outline_66` through `outline_71` with its actual ID and static occurrence count;
+`outline_65` remains covered by its earlier provenance field. Export tooling
+consumes this manifest metadata without maintaining a second helper list.

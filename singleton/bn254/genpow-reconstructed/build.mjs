@@ -69,7 +69,15 @@ export function assemble(source) {
     ...bodies.flatMap(fn => [push(fn.bytecode), integer(fn.id), Buffer.from([O.OP_DEFINE])]),
     compile(main.lines),
   ]);
-  return {bytecode, bodies};
+  const callCounts = new Map();
+  for (const {command, args} of [...functions.values(), main].flatMap(fn => fn.lines)) {
+    if (command === 'call') callCounts.set(args[0], (callCounts.get(args[0]) ?? 0) + 1);
+  }
+  const outlinedAdditionalFunctions = [...functions].filter(([name]) => {
+    const match = /^outline_(\d+)$/.exec(name);
+    return match && Number(match[1]) >= 66;
+  }).map(([name, fn]) => ({function: name, id: fn.id, occurrences: callCounts.get(name) ?? 0}));
+  return {bytecode, bodies, outlinedAdditionalFunctions};
 }
 
 // Fixed fixtures retain their original proof coordinates; only the exported
@@ -95,7 +103,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   assert.equal(process.argv.length, 3, 'usage: node build.mjs OUTPUT_DIRECTORY');
   const here = new URL('./', import.meta.url);
   const source = readFileSync(new URL('verifier.asm', here), 'utf8');
-  const {bytecode, bodies} = assemble(source);
+  const {bytecode, bodies, outlinedAdditionalFunctions} = assemble(source);
   const output = resolve(process.argv[2]);
   mkdirSync(output, {recursive: true});
   const lockingOK = bytecode.toString('hex');
@@ -123,6 +131,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     lockingBytes: bytecode.length,
     lockingSha256: hash(bytecode),
     functions: bodies.map(({name, id, bytecode: body}) => ({name, id, bytes: body.length, sha256: hash(body)})),
+    outlinedAdditionalFunctions,
   };
   writeFileSync(resolve(output, 'build-manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
   console.log(JSON.stringify(manifest, null, 2));
