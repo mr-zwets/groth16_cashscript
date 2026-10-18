@@ -178,3 +178,21 @@ and symbolic calls in all function bodies and main. The manifest records each
 `outline_66` through `outline_71` with its actual ID and static occurrence count;
 `outline_65` remains covered by its earlier provenance field. Export tooling
 consumes this manifest metadata without maintaining a second helper list.
+
+Posttest exponent loop (VX, Oct 18, 2026): `fp_pow` keeps identifier 66 but
+shrinks from the VJ 41-byte pretest body to a 36-byte body. Each iteration shifts
+the remaining nonnegative exponent, then tests whether it is zero. For exponent
+zero, the posttest loop returns one after a discarded square; the pretest body
+returns one without that square. Both actual callers use the positive constants
+`p - 2` and `(p + 1) / 4`. Negative exponents are outside this contract, and the
+extra zero-exponent square prevents a universal resource-equivalence claim.
+
+The program now has 4,202 locking bytes (SHA256
+`25ed09e4a4645ce245032d6ecbd6b5eedf8e097da4bb8317f2387b9dd8903ee2`),
+plus the unchanged 208-byte primary witness and 85-byte overhead: **4,495 total**.
+Restoring only the old `fp_pow` body reconstructs the exact 4,207-byte VJ program.
+All other 71 bodies, identifiers, complete main, G1 decoder and 32-byte range
+guard remain unchanged. The builder, its six derived outline metadata entries,
+and raw proof archives are unchanged. Actual operation cost and whole-proof
+acceptance require separate qualification; this source change makes no native
+or relay admission claim.
