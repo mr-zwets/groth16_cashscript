@@ -124,7 +124,29 @@ const primeSourceForProfile = source => sharedPrimeEnabled ? {
   functions: source.functions.map(f => f.originalId === Number(SHARED_PRIME_ID)
     ? {...f, originalId: DISPLACED_PRIME_ID} : f),
 } : source;
-const sharedSource = primeSourceForProfile(shared);
+// Only the retained shared-prime profile compacts these reviewed opaque rotations.
+const rotateHelperBodies = (source, expected) => {
+  if (!sharedPrimeEnabled) return source;
+  const pattern = 'OP_SWAP OP_TOALTSTACK OP_SWAP OP_FROMALTSTACK';
+  const remaining = new Set(Object.keys(expected));
+  const functions = source.functions.map(f => {
+    if (!Object.hasOwn(expected, f.name)) return f;
+    assert(remaining.delete(f.name), `duplicate helper ${f.name}`);
+    const [id, digest, count] = expected[f.name];
+    const body = f.body.trim().split(/\s+/).join(' ');
+    assert.equal(f.originalId, id, `unexpected helper key ${f.name}`);
+    assert.equal(createHash('sha256').update(body).digest('hex'), digest, `unexpected helper body ${f.name}`);
+    assert.equal(body.split(pattern).length - 1, count, `unexpected rotation count ${f.name}`);
+    return {...f, body: body.replaceAll(pattern, 'OP_ROT OP_ROT')};
+  });
+  assert.equal(remaining.size, 0, 'missing rotation helper');
+  return {...source, functions};
+};
+const sharedSource = primeSourceForProfile(rotateHelperBodies(shared, {
+  millerEvent: [16, '60fd4eddbe305d33a07a5275d0e6e348fd67ff06372b3e386e8ba08548788cff', 3],
+  sharedSequence10: [19, '8ced1f9b3d18ec16e2ae94e6ded7e4934bb7dab6963ff903db6de5c31d23ab1a', 2],
+  sharedSequence11: [0, '10d38744632c996cd081cc046b2b5a2f299148ee5ec4f5a8ebdf1efc076d3eae', 1],
+}));
 if (sharedPrimeEnabled) {
   const loops = sharedSource.main.match(/\bOP_BEGIN\b[\s\S]*?\bOP_UNTIL\b/g) ?? [];
   assert.equal(loops.length, 1, 'shared Miller loop count changed');
@@ -160,7 +182,9 @@ const terminalSourceForProfile = source => {
   });
   return {...source, functions};
 };
-const terminalSource = terminalSourceForProfile(primeSourceForProfile(terminal));
+const terminalSource = terminalSourceForProfile(primeSourceForProfile(rotateHelperBodies(terminal, {
+  terminalSequence21: [6, '1a333aa618a0b9fd48d05f73a1fdd766a5f17d6240a17e7c5d6d8eed172607de', 1],
+})));
 if (sharedPrimeEnabled) {
   const existingIds = [...sourceIds(sharedSource), ...sourceIds(terminalSource), -1, 100, Number(LOADER_ID), MSM_ID_OFFSET];
   assert(!existingIds.includes(Number(SHARED_PRIME_ID)), 'shared-prime namespace key is already occupied');
