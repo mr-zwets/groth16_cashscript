@@ -2320,7 +2320,7 @@ const fusedQuotientSource = quotientSource(
   TEMPLATE_TOTAL_INPUTS,
   fusedQuotientTailBytes,
 );
-const fusedQuotientRedeem = compileNamed(
+let fusedQuotientRedeem = compileNamed(
   fusedQuotientSource,
   'fused block-4 quotient verifier',
   { optimizeFor: 'size' },
@@ -2954,6 +2954,28 @@ const PIC_BLOCK4_INPUT = PIC_BLOCK4_INDEX + 1;
 const picBaseBlock4Redeem = templateBlockRedeems[PIC_BLOCK4_INDEX];
 const picAuthHelperPush = encodeDataPush(picAuthHelper);
 const picFixedBlobPush = encodeDataPush(picFixedBlob);
+if (arithmeticLeafId === -1) {
+  const fixedFinalEvaluation = Uint8Array.from(Buffer.from(
+    '0115ca0244057f7701317f75517f7701307f7501007e81', 'hex',
+  ));
+  const offset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(fixedFinalEvaluation));
+  const boundaries = new Set([0]);
+  let instructionOffset = 0;
+  decodeAuthenticationInstructions(fusedQuotientRedeem).forEach((instruction) => {
+    instructionOffset += encodeAuthenticationInstructions([instruction]).length;
+    boundaries.add(instructionOffset);
+  });
+  assert(offset >= 0 &&
+    Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(fixedFinalEvaluation), offset + 1) < 0 &&
+    [offset, offset + 15, offset + 19, offset + fixedFinalEvaluation.length]
+      .every((position) => boundaries.has(position)),
+  'fused quotient fixed-width final evaluation changed');
+  // split(49)[0].split(1)[1] already leaves exactly 48 bytes.
+  // Keep both extraction bounds and the unsigned conversion unchanged.
+  fusedQuotientRedeem = concat(
+    fusedQuotientRedeem.slice(0, offset + 15), fusedQuotientRedeem.slice(offset + 19),
+  );
+}
 const fusedQuotientOpcodes = decodeAuthenticationInstructions(fusedQuotientRedeem)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
 assert(!fusedQuotientOpcodes.some((opcode) => [
