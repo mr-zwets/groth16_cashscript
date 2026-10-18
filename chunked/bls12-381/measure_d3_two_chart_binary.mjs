@@ -2665,6 +2665,30 @@ templateClasses.forEach((template) => {
   `${template.name} arithmetic library prefix differs from its carrier`);
   template.core = concat(templateArithmeticBody,
     remapArithmeticRemainder(template.core.slice(templateArithmeticOriginalLength)));
+  if (arithmeticLeafId === -1 && template.name === 'Terminal') {
+    const guardedPsi = Uint8Array.from(Buffer.from(
+      '82770250019d01417902f0007f7502c0007f7701007e810142790220017f7502f0007f7701007e8101437a0250017f750220017f77',
+      'hex',
+    ));
+    const offset = Buffer.from(template.core).indexOf(Buffer.from(guardedPsi));
+    const boundaries = new Set([0]);
+    let instructionOffset = 0;
+    decodeAuthenticationInstructions(template.core).forEach((instruction) => {
+      instructionOffset += encodeAuthenticationInstructions([instruction]).length;
+      boundaries.add(instructionOffset);
+    });
+    assert(offset >= 0 &&
+      Buffer.from(template.core).indexOf(Buffer.from(guardedPsi), offset + 1) < 0 &&
+      boundaries.has(offset) && boundaries.has(offset + guardedPsi.length - 10) &&
+      boundaries.has(offset + guardedPsi.length),
+    'Terminal guarded psiYb suffix changed');
+    // The preceding exact 336-byte guard makes split(336)[0] redundant.
+    template.core = concat(
+      template.core.slice(0, offset + guardedPsi.length - 10),
+      Uint8Array.of(0x02, 0x20, 0x01, 0x7f, 0x77),
+      template.core.slice(offset + guardedPsi.length),
+    );
+  }
   template.digest = sha256(template.core);
   template.arithmeticRemainder = template.core.slice(templateArithmeticLength);
 });
