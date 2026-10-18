@@ -224,6 +224,7 @@ export const cacheProfile = process.env.SLIM_CACHE ?? 'floating';
 const rawBodies = new Map([
   ['floating', []],
   ['orbit', []],
+  ['orbit-retained', []],
   ['raw-dbl', [dblSha]],
   ['raw-madd', [maddSha]],
   ['raw-both', [dblSha, maddSha]],

@@ -56,6 +56,21 @@ Independent Python/JavaScript source contracts classify13 numeric caller rebindi
 
 Finite qualification covers five core, one short-number and30 archived dense proofs in both actualVM and pinned-native modes, plus owning4proof/5invalid/44attack/4binding/9public/type/nativeDEFINE, archived off-curveG2 and unchanged parent/spec exports. Original17/fresh17 jobs pass with325 reconstructed source files and173 owning files;24 scientific artifacts match exactly plus one authenticated configuration-path hash difference. Public integration is checked separately against that exact compiled source. These are finite conditional results; full pairing/PIT/EIP197/subgroup mathematics, exceptional completeness, arbitrary accepted aliases, universal producer/resource/memory fit and admission remain open.
 
+**Retained-prime table companion.** `SLIM_CACHE=orbit-retained` keeps one field-prime value within each lookup's owned frame. It emits747-byte tables instead of the direct orbit's774-byte tables, saving54 primary bytes at higher native cost. It defaults to split37/cuts27,36,47,55. `SLIM_CACHE=orbit` and every earlier profile/default remain byte-exact. The source-owned table transform accepts a validated boolean retained option; the existing cache-profile owner selects it.
+
+| profile | primary score (bytes) | native consensus | native standard | minimum sampled native input margin |
+|---|---:|---:|---:|---:|
+| orbit | 34,701 | 25,265,653 | 25,333,109 | 107,427 |
+| orbit-retained | 34,647 | 25,319,310 | 25,386,638 | 96,688 |
+
+Run `SLIM_CACHE=orbit-retained VERIFIER_DIR=<benchmark checkout> node export.mjs vectors.json`. Explicit `MSM_SPLIT=37 MSM_CUTS=27,36,47,55` produces the same programs. The benchmark adds `bch-groth16-intratx-pairfold5-densless-msm-slim-orbit-retained`. Against direct orbit, this adds53,657 consensus /53,529 standard native units. Against floating, it saves478bytes and adds477,077 /476,181 native units. Raw-both remains the lower-cost companion. Full pins, zero padding and the fixed public statement remain.
+
+Helpers are262/747/235/747, registry2018bytes and registration3199VM units. The two retained lookup bodies match the independently checked fixed-table prototypes and return all15 original public points. Arithmetic helpers, cuts and every Straus/Horner body stay exact. Python and independent JavaScript recompute all16,384 current counter/byte typed costs and frames, plus current readers, guards, namespaces, roots and terminal segments; no direct774 numeric cost table or whole-MSM envelope transfers unchanged.
+
+All five core, one short-number and30 archived dense proofs pass both actualVM and pinned-native modes. Every pre-redeem value, including all XYZ states, witness/scalars/header/root/quotient/auxiliary/challenge values, matches the direct-orbit anchors exactly; existing finite field-state bindings transfer by identity. No new proof, witness, scalar choice or field trajectory is selected.
+
+Finite source qualification has17 original and17 freshly reconstructed jobs:325 source files and173 private owning benchmark files,24 exact artifacts plus one authenticated configuration-path hash difference. Actual owning4proof/5invalid/44attack/4binding/9public/type/nativeDEFINE, archived off-curveG2 and parent/spec checks pass. Public integration is separately checked against those exact programs while preserving all earlier public profiles. These remain conditional finite results; full pairing/PIT/EIP197/subgroup mathematics, exceptional completeness, arbitrary accepted aliases, universal producer/resource/memory fit and admission remain open.
+
 **Dense-witness resource sample.** `sweep.mjs` deterministically generates 30 proofs under the fixture VK using seed `densless-msm-slim-v1`. Each public-input pair is selected by a 20,000-candidate search for few zero Straus nibbles. These samples have 5–7 zero nibbles; no global structural minimum or universal resource bound is claimed. Every input must pass `stateSuccess`, and every complete transaction must pass standard BCH2026 `verify()`; a failure exits nonzero. All 30 pass. Peak standard-VM budget percentages (input order 0..4):
 
 | exec0 | exec1 | exec2 | genesis | terminal |

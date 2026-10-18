@@ -62,7 +62,8 @@ const originalHashes = {"201": "ef86a7e4834b2463e17e666406d2393e5a411747db16a20f
 
 // Replace the two fixed public-table definitions before the shared loader block
 // is split. Every entry reconstructs exactly; the emitted lookup keeps its ABI.
-export function compressOrbitTables(bytecode) {
+export function compressOrbitTables(bytecode, retainPrime = false) {
+  assert.equal(typeof retainPrime, 'boolean');
   const instructions = lib.decodeAuthenticationInstructions(bytecode);
   const replacements = new Map();
   for (let i = 0; i + 2 < instructions.length && instructions[i + 2].opcode === lib.OpcodesBCH.OP_DEFINE; i += 3) {
@@ -73,8 +74,8 @@ export function compressOrbitTables(bytecode) {
     assert.equal(createHash('sha256').update(body).digest('hex'), originalHashes[String(identifier)]);
     const blobs = lib.decodeAuthenticationInstructions(body).filter(instruction => instruction.data?.length === 960);
     assert.equal(blobs.length, 1);
-    const emitted = emitOrbitHelper(lib, Uint8Array.from(blobs[0].data), prime, beta, false);
-    assert.equal(emitted.bytecode.length, 774);
+    const emitted = emitOrbitHelper(lib, Uint8Array.from(blobs[0].data), prime, beta, retainPrime);
+    assert.equal(emitted.bytecode.length, retainPrime ? 747 : 774);
     assert(!replacements.has(String(identifier)));
     replacements.set(String(identifier), i);
     instructions[i] = {opcode: lib.OpcodesBCH.OP_PUSHDATA_2, data: emitted.bytecode};
