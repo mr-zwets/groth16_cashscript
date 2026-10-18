@@ -127,8 +127,14 @@ const primeSourceForProfile = source => sharedPrimeEnabled ? {
 const sharedSource = primeSourceForProfile(shared);
 const terminalSourceForProfile = source => {
   if (!sharedPrimeEnabled) return source;
-  const functions = source.functions.map(f => f.name === 'terminalSequence0'
-    ? {...f, originalId: Number(TERMINAL_SEQUENCE0_ID)}
+  const identifiers = new Map([
+    ['terminalSequence0', Number(TERMINAL_SEQUENCE0_ID)],
+    ['terminalSubsequenceA', 10],
+    ['terminalSequence12', 33],
+    ['terminalSequence29', 35],
+  ]);
+  const functions = source.functions.map(f => identifiers.has(f.name)
+    ? {...f, originalId: identifiers.get(f.name)}
     : f);
   assert(!functions.some(f => f.name === 'terminalScalarOrder'), 'terminal scalar helper already present');
   functions.push({
