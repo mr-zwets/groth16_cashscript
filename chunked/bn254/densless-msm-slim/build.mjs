@@ -103,10 +103,10 @@ const SHARED_PRIME_NAMESPACE_KEY = Buffer.from(bigIntToVmNumber(SHARED_PRIME_ID)
 const SHARED_PRIME = Buffer.from('47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430', 'hex');
 const SHARED_PRIME_BODY = Buffer.concat([Buffer.from([SHARED_PRIME.length]), SHARED_PRIME]);
 const SHARED_PRIME_CALL = Buffer.from([...SHARED_PRIME_KEY, OpcodesBCH.OP_INVOKE]);
-const SCALAR_ORDER_ID = 38n;
+const SCALAR_ORDER_ID = sharedPrimeEnabled ? 16n : 38n;
+const TERMINAL_SEQUENCE0_ID = 38n;
 const SCALAR_ORDER_KEY = Buffer.from(encodeDataPush(bigIntToVmNumber(SCALAR_ORDER_ID)));
 const SCALAR_ORDER_BYTES = Buffer.from(bigIntToVmNumber(SCALAR_FIELD));
-const SCALAR_ORDER_BODY = Buffer.from(encodeDataPush(SCALAR_ORDER_BYTES));
 const SCALAR_ORDER_CALL = Buffer.from([...SCALAR_ORDER_KEY, OpcodesBCH.OP_INVOKE]);
 const SHARED_PRIME_HELPERS = new Map([
   ['c800', {oldBytes: 262, oldSha256: '4e3b86b609032b3cda1823349f40433ef8912c082951bba7d42fbfecef0ceaca', sites: 4, newBytes: 142, newSha256: '8bacc2b3e0ecb73e367094f7871d470f3975e8c0e74ad63648d6be28e25e3140'}],
@@ -116,9 +116,25 @@ const SHARED_PRIME_HELPERS = new Map([
 ]);
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const sourceIds = source => source.functions.map(f => f.originalId);
+const terminalSourceForProfile = source => {
+  if (!sharedPrimeEnabled) return source;
+  const functions = source.functions.map(f => f.name === 'terminalSequence0'
+    ? {...f, originalId: Number(TERMINAL_SEQUENCE0_ID)}
+    : f);
+  assert(!functions.some(f => f.name === 'terminalScalarOrder'), 'terminal scalar helper already present');
+  functions.push({
+    name: 'terminalScalarOrder',
+    originalId: Number(SCALAR_ORDER_ID),
+    body: `OP_PUSHBYTES_${SCALAR_ORDER_BYTES.length} 0x${SCALAR_ORDER_BYTES.toString('hex')}`,
+  });
+  return {...source, functions};
+};
+const terminalSource = terminalSourceForProfile(terminal);
 if (sharedPrimeEnabled) {
-  const existingIds = [...sourceIds(shared), ...sourceIds(genesis), ...sourceIds(terminal), -1, 100, Number(LOADER_ID), MSM_ID_OFFSET];
+  const existingIds = [...sourceIds(shared), ...sourceIds(genesis), ...sourceIds(terminalSource), -1, 100, Number(LOADER_ID), MSM_ID_OFFSET];
   assert(!existingIds.includes(Number(SHARED_PRIME_ID)), 'function37 namespace key is already occupied');
+  assert.equal(sourceIds(terminalSource).filter(id => id === 16).length, 1, 'terminal scalar id16 must be unique');
+  assert.equal(sourceIds(terminalSource).filter(id => id === Number(TERMINAL_SEQUENCE0_ID)).length, 1, 'terminal sequence0 id38 must be unique');
 }
 function cachePrimeDefinition(bytecode, id) {
   const instructions = decodeAuthenticationInstructions(bytecode);
@@ -228,18 +244,6 @@ function reuseTerminalScalarOrder(bytecode) {
   assert.equal(replaced, 4, 'TA-a1 terminal must contain exactly four scalar-order literals');
   return Buffer.from(encodeAuthenticationInstructions(next));
 }
-function addTerminalScalarOrderDefinition(bytecode) {
-  if (!sharedPrimeEnabled) return bytecode;
-  const instructions = decodeAuthenticationInstructions(bytecode);
-  let main = 0;
-  while (main + 2 < instructions.length && instructions[main + 2].opcode === OpcodesBCH.OP_DEFINE) main += 3;
-  const declaration = decodeAuthenticationInstructions(Buffer.concat([
-    Buffer.from(encodeDataPush(SCALAR_ORDER_BODY)), SCALAR_ORDER_KEY, Buffer.from([OpcodesBCH.OP_DEFINE]),
-  ]));
-  return Buffer.from(encodeAuthenticationInstructions([
-    ...instructions.slice(0, main), ...declaration, ...instructions.slice(main),
-  ]));
-}
 const cashCache = new Map();
 const cash = (source) => {
   if (!cashCache.has(source)) {
@@ -346,8 +350,7 @@ function buildWith({backExec, backTerminal}) {
     .map(redeem => assemble(p2sh, new Map(), {redeemHash256: hash256(redeem)}));
   constants.workerLockingRoot = hash256(Buffer.concat(workerLockings.map(hash256)));
   // terminal: the densless terminal, then the final MSM stage on its parked pushes (zInv, state)
-  ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminal, constants));
-  programs.terminalBase = addTerminalScalarOrderDefinition(programs.terminalBase);
+  ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminalSource, constants));
   programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
   programs.msmFinal = compactInverseCopy(programs.msmFinal);
   programs.msmFinal = reuseFinalPrimeCalls(programs.msmFinal);
