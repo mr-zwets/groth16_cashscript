@@ -4,15 +4,15 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {resolve,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {buildProfile, inlinedFunctions as defaultInlinedFunctions, outlinedFunction, outlinedOccurrences, outlinedSequence,
+import {buildProfile, candidateIdentifiers, inlinedFunctions as defaultInlinedFunctions, outlinedFunction, outlinedOccurrences, outlinedSequence,
   outlinedExtraFunction, outlinedExtraOccurrences,
   outlinedThirdFunction, outlinedThirdOccurrences, outlinedThirdSequence,
   outlinedFourthFunction, outlinedFourthOccurrences, outlinedFourthSequence} from './compact.mjs';
 
 const benchmarkArg = process.argv[2];
-assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark [bytes|balanced|cost|combined|expanded|aggressive|extended]');
+assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57]');
 const profile = process.argv[3] ?? 'bytes';
-const {program, inlinedFunctions, outlinedStackSequences} = buildProfile(profile);
+const {program, identifiers, inlinedFunctions, outlinedStackSequences} = buildProfile(profile);
 const retained = new Set(program.declarations.map(f => f.name));
 const benchmark = resolve(benchmarkArg);
 const source = fileURLToPath(new URL('../../../', import.meta.url));
@@ -78,7 +78,9 @@ else {
   provenance.profile = profile;
   const names = inlinedFunctions.slice(defaultInlinedFunctions.length);
   const keys = names.length === 1 ? 'its displaced short key' : 'their displaced short keys';
-  provenance.change += `; ${profile} profile inlines ${names.join(' and ')} and restores ${keys}, producing ${program.bytecode.length} bytes`;
+  const restoredKeys = [...identifiers].filter(([name, id]) => candidateIdentifiers.get(name) !== id);
+  const restored = restoredKeys.length === names.length ? keys : `${restoredKeys.length} displaced short keys`;
+  provenance.change += `; ${profile} profile inlines ${names.join(' and ')} and restores ${restored}, producing ${program.bytecode.length} bytes`;
 }
 const outputs = inputs.map(input => {
   const data = {...input.data, contract: 'leader-recovered/program.mjs (full genpow, compact function IDs, range-checked public inputs, SZ-a1 inlining, SM/TB/TJ/TR/TW/UE/UR static outlines and ID packing)',

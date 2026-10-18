@@ -300,6 +300,10 @@ export const program = candidateProgram;
 const inlineKeys = {
   stackSequence53: {displaced: 'fp6Mul', from: 19, to: -1, occurrences: outlinedThirdTotal},
   stackSequence54: {displaced: 'fp2Scale', from: 31, to: 14, occurrences: outlinedFourthTotal},
+  stackSequence55: {displaced: 'stackSequence15', from: 33, to: 15,
+    occurrences: stackOutlines.find(f => f.function === 'stackSequence55').occurrences},
+  stackSequence57: {id: 52, byteLength: 8,
+    occurrences: stackOutlines.find(f => f.function === 'stackSequence57').occurrences},
   stackSequence56: {displaced: 'stackSequence16', from: 35, to: 16,
     occurrences: stackOutlines.find(f => f.function === 'stackSequence56').occurrences},
   stackSequence58: {displaced: 'fp2MulXi', from: 53, to: 13,
@@ -312,6 +316,9 @@ const profileInlines = {
   expanded: ['stackSequence54', 'stackSequence56', 'stackSequence58'],
   aggressive: ['stackSequence53', 'stackSequence56', 'stackSequence58'],
   extended: ['stackSequence53', 'stackSequence54', 'stackSequence56', 'stackSequence58'],
+  extended55: ['stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence58'],
+  extended57: ['stackSequence53', 'stackSequence54', 'stackSequence56', 'stackSequence57', 'stackSequence58'],
+  'extended55-57': ['stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58'],
 };
 export function buildProfile(profile = 'bytes') {
   assert(profile === 'bytes' || Object.hasOwn(profileInlines, profile), `unknown profile: ${profile}`);
@@ -321,16 +328,29 @@ export function buildProfile(profile = 'bytes') {
   let functions = candidateFunctions;
   let main = candidateMain;
   for (const name of names) {
-    const {displaced, from, to, occurrences: expectedOccurrences} = inlineKeys[name];
+    const {displaced, from, to, id = to, byteLength = 4, occurrences: expectedOccurrences} = inlineKeys[name];
     const helper = candidateFunctions.find(f => f.name === name);
     assert(helper, `missing profile helper: ${name}`);
-    assert.equal(assemble(helper.body, candidateIdentifiers).length, 4);
-    assert(helper.body.trim().split(/\s+/).every(token => /^OP_(?:[0-9]+|PICK|ROLL)$/.test(token)),
-      `profile helper must remain a straight-line stack sequence: ${name}`);
-    assert.equal(candidateIdentifiers.get(name), to);
-    assert.equal(candidateIdentifiers.get(displaced), from);
+    const helperBytecode = Buffer.from(assemble(helper.body, candidateIdentifiers));
+    assert.equal(helperBytecode.length, byteLength);
+    if (name === 'stackSequence55') {
+      // Exact opaque permutation: 2SWAP SWAP 2ROT SWAP; no arithmetic or calls.
+      assert.equal(helperBytecode.toString('hex'), '727c717c');
+    } else if (name === 'stackSequence57') {
+      // PUSH23 PICK PUSH23 PICK PUSH23; numeric key52 has no displaced owner.
+      assert.equal(helperBytecode.toString('hex'), '0117790117790117');
+      assert.equal(expectedOccurrences, 3);
+      assert.equal(displaced, undefined);
+    } else {
+      assert(helper.body.trim().split(/\s+/).every(token => /^OP_(?:[0-9]+|PICK|ROLL)$/.test(token)),
+        `profile helper must remain a straight-line stack sequence: ${name}`);
+    }
+    assert.equal(candidateIdentifiers.get(name), id);
     identifiers.delete(name);
-    identifiers.set(displaced, to);
+    if (displaced) {
+      assert.equal(candidateIdentifiers.get(displaced), from);
+      identifiers.set(displaced, to);
+    }
     assert.equal(new Set([...identifiers.values()]).size, identifiers.size);
     const pattern = new RegExp(`\\bCALL ${name}\\b`, 'g');
     let occurrences = 0;
@@ -348,7 +368,7 @@ export function buildProfile(profile = 'bytes') {
     outlinedStackSequences: outlinedStackSequences.filter(f => retained.has(f.function))};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended]');
+  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57]');
   const profile = process.argv[3] ?? 'bytes';
   const selected = buildProfile(profile);
   const selectedSha256 = createHash('sha256').update(selected.program.bytecode).digest('hex');
