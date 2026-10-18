@@ -3,7 +3,7 @@ import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {OpcodesBCH as O, encodeDataPush, bigIntToVmNumber} from '@bitauth/libauth';
+import {OpcodesBCH as O, encodeDataPush, bigIntToVmNumber, decodeAuthenticationInstructions, encodeAuthenticationInstruction, vmNumberToBigInt} from '@bitauth/libauth';
 
 const constants = {
   P: 21888242871839275222246405745257275088696311157297823662689037894645226208583n,
@@ -72,6 +72,25 @@ export function assemble(source) {
   return {bytecode, bodies};
 }
 
+// Fixed fixtures retain their original proof coordinates; only the exported
+// witness representation changes. A/C y occupy pushes 2/8, with x at 3/9.
+function compressG1Witness(hex) {
+  const instructions = decodeAuthenticationInstructions(Buffer.from(hex, 'hex'));
+  assert.equal(instructions.length, 10, 'expected ten fixed witness pushes');
+  assert(instructions.every(instruction => instruction.data !== undefined && !instruction.malformed),
+    'fixed witness must contain well-formed data pushes');
+  return Buffer.concat(instructions.map((instruction, index) => {
+    if (index !== 2 && index !== 8) return Buffer.from(encodeAuthenticationInstruction(instruction));
+    const y = vmNumberToBigInt(instruction.data, {maximumVmNumberByteLength: 32});
+    assert(typeof y === 'bigint' && y >= 0n && y < constants.P, 'G1 y must be canonical');
+    const x = vmNumberToBigInt(instructions[index + 1].data, {maximumVmNumberByteLength: 32});
+    assert(typeof x === 'bigint', 'G1 x must be a valid fixed coordinate');
+    const rhs = (((x * x) % constants.P * x) % constants.P + 3n) % constants.P;
+    assert.equal(y * y % constants.P, rhs, 'fixed G1 point must be on curve');
+    return integer(y & 1n);
+  })).toString('hex');
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   assert.equal(process.argv.length, 3, 'usage: node build.mjs OUTPUT_DIRECTORY');
   const here = new URL('./', import.meta.url);
@@ -83,7 +102,19 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   for (const [name, fixture] of [['groth16-singleton-genpow-vectors.json', 'committed-fixtures.json'], ['groth16-singleton-genpow-multiproof-vectors.json', 'multiproof-fixtures.json']]) {
     const vectors = JSON.parse(readFileSync(new URL(fixture, here)));
     assert(!Object.hasOwn(vectors, 'lockingOK'), 'fixtures must not supply the program');
-    writeFileSync(resolve(output, name), JSON.stringify({...vectors, lockingOK}, null, 2) + '\n');
+    const encodeProof = proof => ({...proof,
+      unlocking: compressG1Witness(proof.unlocking),
+      invalidUnlocking: compressG1Witness(proof.invalidUnlocking),
+    });
+    const encoded = vectors.proofs
+      ? {...vectors, proofs: vectors.proofs.map(encodeProof)}
+      : encodeProof(vectors);
+    const exported = {...encoded, lockingOK,
+      contract: 'genpow-reconstructed/verifier.asm (BN254 genpow, G1 parity compression)',
+      description: 'Fixed proof and public-input integers with A/C y represented by parity. The verifier reconstructs and checks each exact canonical G1 point before unchanged later arithmetic. Relaxed VM research; native compatibility requires independent qualification.',
+      witnessEncoding: 'g1-a-c-x-parity-v1',
+    };
+    writeFileSync(resolve(output, name), JSON.stringify(exported, null, 2) + '\n');
   }
   const manifest = {
     emitter: 'explicit symbolic assembly; no CashScript compiler or replay optimizer',

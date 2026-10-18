@@ -1,7 +1,7 @@
 # Reconstructed BN254 genpow assembly
 
 This directory owns a readable low-level reconstruction of the published BN254
-singleton genpow leader. `verifier.asm` contains all 61 function bodies and the
+singleton genpow leader. `verifier.asm` contains all 69 function bodies and the
 main program as explicit instructions, symbolic calls and named field constants.
 `build.mjs` assembles that source; it does not read or patch an existing program.
 The fixture files contain public proofs and inputs from the official benchmark.
@@ -117,3 +117,27 @@ The candidate has 64 functions, 4,217 locking bytes, and SHA256
 decoded inverse expands `outline_65`, restores the published 4,225-byte program
 byte-for-byte, and preserves the 32-byte range prefix. Runtime cost and proof
 gates remain separate release evidence.
+
+G1 parity compression (Oct 18, 2026): the normal build CLI exports A/C y pushes
+2 and 8 as parity bits, preserving each original x and every other witness push.
+The archived fixture files keep their original coordinates. The encoder requires
+canonical y and checks the original on-curve equation before discarding y; one
+encoder owns both primary and multiproof exports. No proof or public-input
+integer is regenerated.
+
+`g1_decompress` maps `[parity,x]` to `[canonicalY,originalX]`. It shares the
+unchanged 254-step `fp_pow` loop with inversion, computes a square-root candidate
+using `(P+1)/4`, verifies its square against the original reduced curve equation,
+and selects the requested parity. The final parity check rejects signs outside
+0/1 and parity 1 for a zero root. The decoder adds no x canonicality restriction.
+This codec is reversible for canonical G1 coordinates; it does not preserve the
+old unrestricted integer or byte-string language. Its root check owns the two
+removed standalone A/C on-curve predicates. The public scalar guard, G2 checks,
+and later arithmetic remain unchanged.
+
+The candidate is 4,232 locking bytes plus a 208-byte witness and 85-byte overhead:
+4,525 total, 32 bytes below the 4,557-byte UE control. Static recovery of the
+unchanged arithmetic and direct decoder VM cases are separate from whole-proof
+qualification. This remains relaxed BCH VM research; neither the byte saving nor
+decoder checks establish native consensus or relay compatibility. Historical
+reverse-expansion certificates above describe their respective earlier stages.

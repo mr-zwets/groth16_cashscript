@@ -1780,6 +1780,101 @@ push 17
 OP_PICK
 end
 
+# Shared 254-bit exponentiation. Input a, p, e; output a^e mod p.
+function fp_pow 66
+OP_1
+OP_3
+OP_ROLL
+OP_3
+OP_PICK
+OP_MOD
+OP_0
+OP_BEGIN
+OP_DUP
+push fe00
+OP_LESSTHAN
+OP_DUP
+OP_TOALTSTACK
+OP_IF
+OP_3
+OP_PICK
+OP_OVER
+OP_RSHIFTNUM
+OP_2
+OP_MOD
+OP_1
+OP_NUMEQUAL
+OP_IF
+OP_ROT
+OP_2
+OP_PICK
+OP_MUL
+OP_4
+OP_PICK
+OP_MOD
+OP_ROT
+OP_ROT
+OP_ENDIF
+OP_OVER
+OP_ROT
+OP_MUL
+OP_4
+OP_PICK
+OP_MOD
+OP_SWAP
+OP_1ADD
+OP_ENDIF
+OP_FROMALTSTACK
+OP_NOT
+OP_UNTIL
+OP_2DROP
+OP_NIP
+OP_NIP
+end
+
+function g1_decompress 67
+# Input: parity, x. Output: exact canonical y selected by parity, original x.
+# x keeps the original verifier's integer domain. Root verification owns G1 membership.
+OP_DUP
+OP_DUP
+call fp_mul
+OP_OVER
+call fp_mul
+OP_3
+call fp_add
+OP_DUP
+call prime
+OP_DUP
+OP_1ADD
+OP_4
+OP_DIV
+call fp_pow
+# parity x rhs root -> parity x root, checking a square root really exists.
+OP_DUP
+OP_DUP
+call fp_mul
+OP_ROT
+OP_NUMEQUALVERIFY
+# Select the requested parity; modular negation keeps zero canonical.
+OP_DUP
+OP_2
+OP_MOD
+OP_3
+OP_PICK
+OP_NUMNOTEQUAL
+OP_IF
+call outline_35
+OP_ENDIF
+# Enforce sign 0/1, including rejection of parity 1 for a zero root.
+OP_DUP
+OP_2
+OP_MOD
+OP_3
+OP_ROLL
+OP_NUMEQUALVERIFY
+OP_SWAP
+end
+
 main
 # Public inputs must be canonical scalars, 0 <= n < r (n1 is push 0, n0 push 1: depths 9, 8).
 # Without this n + r gives the same vk_x, so one proof verifies two claimed integers.
@@ -1799,38 +1894,21 @@ constant G2_SUBGROUP_SCALAR
 OP_SUB
 OP_LESSTHAN
 OP_VERIFY
-# Proof and public-input checks, point arithmetic and Miller accumulation.
-OP_OVER
-OP_2
-OP_PICK
-call fp_mul
-OP_3
-OP_2
-OP_PICK
-OP_3
-OP_PICK
-OP_4
-OP_PICK
-call fp_mul
-call fp_mul
-call fp_add
-OP_NUMEQUALVERIFY
+# Decode C, then A, restoring the original ten-item stack before G2 checks.
+call g1_decompress
 OP_7
-OP_PICK
-OP_8
-OP_PICK
-call fp_mul
-OP_3
-OP_8
-OP_PICK
-OP_9
-OP_PICK
-OP_10
-OP_PICK
-call fp_mul
-call fp_mul
-call fp_add
-OP_NUMEQUALVERIFY
+OP_ROLL
+OP_7
+OP_ROLL
+call g1_decompress
+OP_2ROT
+OP_2ROT
+OP_7
+OP_ROLL
+OP_7
+OP_ROLL
+OP_2ROT
+OP_2ROT
 OP_2OVER
 call outline_5
 OP_5
@@ -2191,54 +2269,7 @@ call prime
 OP_DUP
 OP_2
 OP_SUB
-OP_1
-OP_3
-OP_ROLL
-OP_3
-OP_PICK
-OP_MOD
-OP_0
-OP_BEGIN
-OP_DUP
-push fe00
-OP_LESSTHAN
-OP_DUP
-OP_TOALTSTACK
-OP_IF
-OP_3
-OP_PICK
-OP_OVER
-OP_RSHIFTNUM
-OP_2
-OP_MOD
-OP_1
-OP_NUMEQUAL
-OP_IF
-OP_ROT
-OP_2
-OP_PICK
-OP_MUL
-OP_4
-OP_PICK
-OP_MOD
-OP_ROT
-OP_ROT
-OP_ENDIF
-OP_OVER
-OP_ROT
-OP_MUL
-OP_4
-OP_PICK
-OP_MOD
-OP_SWAP
-OP_1ADD
-OP_ENDIF
-OP_FROMALTSTACK
-OP_NOT
-OP_UNTIL
-OP_2DROP
-OP_NIP
-OP_NIP
+call fp_pow
 OP_DUP
 OP_OVER
 call fp_mul

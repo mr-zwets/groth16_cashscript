@@ -231,6 +231,18 @@ outlineStackSequence({
   pattern: /CALL fp2Mul\s+OP_SWAP\s+OP_2SWAP\s+OP_SWAP\s+CALL fp2Add/g,
   counts: new Map([['fp6Mul', 2], ['stackSequence45', 1]]), total: 3, id: 56,
 });
+outlineStackSequence({
+  label: 'UR-a1', name: 'stackSequence62',
+  sequence: 'OP_3 OP_PICK OP_MOD CALL sqrtFp OP_DUP OP_5 OP_ROLL OP_1 OP_NUMEQUAL',
+  pattern: /OP_3\s+OP_PICK\s+OP_MOD\s+CALL sqrtFp\s+OP_DUP\s+OP_5\s+OP_ROLL\s+OP_1\s+OP_NUMEQUAL/g,
+  counts: new Map([['decompressG2', 2]]), total: 2, id: 57,
+});
+outlineStackSequence({
+  label: 'UR-a1-chain', name: 'stackSequence63',
+  sequence: 'OP_ROLL OP_2SWAP OP_SWAP OP_2ROT CALL stackSequence8 CALL stackSequence10 CALL millerAccumulate',
+  pattern: /OP_ROLL\s+OP_2SWAP\s+OP_SWAP\s+OP_2ROT\s+CALL stackSequence8\s+CALL stackSequence10\s+CALL millerAccumulate/g,
+  counts: new Map(), total: 2, mainCount: 2, id: 58,
+});
 export const outlinedStackSequences = stackOutlines;
 
 const buildCandidate = () => {
@@ -248,9 +260,9 @@ const buildCandidate = () => {
 };
 export const candidateProgram = buildCandidate();
 const candidateSha256 = createHash('sha256').update(candidateProgram.bytecode).digest('hex');
-assert.equal(candidateFunctions.length, 58);
-assert.equal(candidateProgram.bytecode.length, 3310);
-assert.equal(candidateSha256, '24f462b2345f79354be7ea5aa0ec70deb28282001eb6efe53fd7e955accdf360');
+assert.equal(candidateFunctions.length, 60);
+assert.equal(candidateProgram.bytecode.length, 3308);
+assert.equal(candidateSha256, '3ef0a31623a2322afed809f40ee4245365b8f5f10c86142853408b27edacd4d1');
 assert.equal(candidateFunctions.some(f => inlineSet.has(f.name)), false);
 assert.equal(candidateMain.includes('OP_DEFINE'), false);
 assert.equal(candidateMain.includes('OP_INVOKE'), false);
