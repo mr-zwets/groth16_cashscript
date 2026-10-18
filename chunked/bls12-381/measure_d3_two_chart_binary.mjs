@@ -2689,6 +2689,29 @@ templateClasses.forEach((template) => {
       template.core.slice(offset + guardedPsi.length),
     );
   }
+  const evaluationRoll = { First: 71, AdditionTail: 68, AdditionMiddle: 78, Terminal: 68 }[template.name];
+  if (arithmeticLeafId === -1 && evaluationRoll !== undefined) {
+    const guardedEvaluation = concat(
+      Uint8Array.of(0x01, evaluationRoll, 0x7a, 0x01, 0x30, 0x7f, 0x75,
+        0x01, 0x00, 0x7e, 0x81, 0x76, 0x00),
+      encodeDataPush(bigIntToVmNumber(P)), Uint8Array.of(0xa5, 0x69),
+    );
+    const offset = Buffer.from(template.core).indexOf(Buffer.from(guardedEvaluation));
+    const boundaries = new Set([0]);
+    let instructionOffset = 0;
+    decodeAuthenticationInstructions(template.core).forEach((instruction) => {
+      instructionOffset += encodeAuthenticationInstructions([instruction]).length;
+      boundaries.add(instructionOffset);
+    });
+    assert(offset >= 0 &&
+      Buffer.from(template.core).indexOf(Buffer.from(guardedEvaluation), offset + 1) < 0 &&
+      [offset, offset + 3, offset + 7, offset + guardedEvaluation.length]
+        .every((position) => boundaries.has(position)),
+    `${template.name} guarded expectedTotal conversion changed`);
+    // The unchanged spend-entry guard fixes evaluationBlob to exactly 48 bytes.
+    // Keep its ROLL, unsigned conversion and expectedTotal range check exact.
+    template.core = concat(template.core.slice(0, offset + 3), template.core.slice(offset + 7));
+  }
   template.digest = sha256(template.core);
   template.arithmeticRemainder = template.core.slice(templateArithmeticLength);
 });
