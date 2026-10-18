@@ -7,7 +7,7 @@ import {functions, main} from './program.mjs';
 import {assemble, build} from './build.mjs';
 
 // Function identifiers are raw byte keys. Empty and 0x81 identifiers have the
-// single-byte OP_0 and OP_1NEGATE encodings. Keep every other binding unchanged.
+// single-byte OP_0 and OP_1NEGATE encodings. The published compact map is retained except for the reviewed two-ID reassignment.
 export const identifiers = new Map(functions.map(f => [f.name, f.originalId]));
 identifiers.set('fieldPrime', 0);
 identifiers.set('fp6Add', 1);
@@ -43,16 +43,15 @@ const replaceInlineCalls = text => {
   return output;
 };
 const retainedFunctions = functions.filter(f => !inlineSet.has(f.name));
-// Derive the candidate namespace from retained functions so an inlined identifier cannot
-// collide with a promoted callee. Keep the established compact bindings exactly as published.
+// Derive the candidate namespace from retained functions, then apply the reviewed two-ID
+// reassignment: the outlined helper takes 7 and decompressG2 takes 17.
 export const candidateIdentifiers = new Map(retainedFunctions.map(f => [f.name, identifiers.get(f.name)]));
-candidateIdentifiers.set('decompressG2', 7);
+candidateIdentifiers.set('decompressG2', 17);
 assert.equal(candidateIdentifiers.size, retainedFunctions.length);
 assert.equal(new Set([...candidateIdentifiers.values()].map(value =>
   Buffer.from(bigIntToVmNumber(BigInt(value))).toString('hex'))).size, retainedFunctions.length);
-// SM-a2: outline one repeated straight-line stack move under the first unused
-// long identifier. Existing function identifiers, the range guard, and the four
-// SZ-a1 inlines remain byte-for-byte owned by this candidate derivation.
+// SM-a2: outline one repeated straight-line stack move. SV-a2 then swaps its raw
+// identifier with decompressG2; all function bodies, calls, guards, and values remain fixed.
 const outlinedName = 'stackSequence52';
 export const outlinedSequence = 'OP_PUSHBYTES_1 0x11 OP_ROLL OP_PUSHBYTES_1 0x11 OP_ROLL';
 const outlinedPattern = /OP_PUSHBYTES_1 0x11\s+OP_ROLL\s+OP_PUSHBYTES_1 0x11\s+OP_ROLL/g;
@@ -71,9 +70,9 @@ const candidateFunctions = retainedFunctions.map(f => {
   assert.equal(count, 0, `unexpected SM-a2 outline occurrence in ${f.name}`);
   return {...f, body: expanded};
 });
-candidateIdentifiers.set(outlinedName, 17);
+candidateIdentifiers.set(outlinedName, 7);
 assert.equal(candidateIdentifiers.size, retainedFunctions.length + 1);
-assert(!retainedFunctions.some(f => identifiers.get(f.name) === 17));
+assert(!retainedFunctions.some(f => candidateIdentifiers.get(f.name) === 7));
 candidateFunctions.push({name: outlinedName, body: outlinedSequence});
 assert.equal(candidateFunctions.length, 48);
 assert.equal(outlinedTotal, 6);
@@ -94,8 +93,8 @@ const buildCandidate = () => {
 export const candidateProgram = buildCandidate();
 const candidateSha256 = createHash('sha256').update(candidateProgram.bytecode).digest('hex');
 assert.equal(candidateFunctions.length, 48);
-assert.equal(candidateProgram.bytecode.length, 3414);
-assert.equal(candidateSha256, '5863870d053b3ba98bf14798227baaa6d48cbd72084498a6a97b12b3e8af5ccb');
+assert.equal(candidateProgram.bytecode.length, 3412);
+assert.equal(candidateSha256, '5a3f91a1d952faee50eef13401fcdeb46b2bbe7bd88c15379013cdbade30cad0');
 assert.equal(candidateFunctions.some(f => inlineSet.has(f.name)), false);
 assert.equal(candidateMain.includes('OP_DEFINE'), false);
 assert.equal(candidateMain.includes('OP_INVOKE'), false);
