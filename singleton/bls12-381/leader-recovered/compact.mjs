@@ -50,7 +50,33 @@ candidateIdentifiers.set('decompressG2', 7);
 assert.equal(candidateIdentifiers.size, retainedFunctions.length);
 assert.equal(new Set([...candidateIdentifiers.values()].map(value =>
   Buffer.from(bigIntToVmNumber(BigInt(value))).toString('hex'))).size, retainedFunctions.length);
-const candidateFunctions = retainedFunctions.map(f => ({...f, body: replaceInlineCalls(f.body)}));
+// SM-a2: outline one repeated straight-line stack move under the first unused
+// long identifier. Existing function identifiers, the range guard, and the four
+// SZ-a1 inlines remain byte-for-byte owned by this candidate derivation.
+const outlinedName = 'stackSequence52';
+export const outlinedSequence = 'OP_PUSHBYTES_1 0x11 OP_ROLL OP_PUSHBYTES_1 0x11 OP_ROLL';
+const outlinedPattern = /OP_PUSHBYTES_1 0x11\s+OP_ROLL\s+OP_PUSHBYTES_1 0x11\s+OP_ROLL/g;
+const outlinedTargets = new Set(['towerSequence38', 'millerLoop', 'stackSequence15']);
+const outlineCount = text => text.match(outlinedPattern)?.length ?? 0;
+let outlinedTotal = 0;
+const candidateFunctions = retainedFunctions.map(f => {
+  const expanded = replaceInlineCalls(f.body);
+  const count = outlineCount(expanded);
+  if (outlinedTargets.has(f.name)) {
+    assert(count === (f.name === 'stackSequence15' ? 3 : f.name === 'millerLoop' ? 2 : 1),
+      `unexpected SM-a2 outline count in ${f.name}: ${count}`);
+    outlinedTotal += count;
+    return {...f, body: expanded.replace(outlinedPattern, `CALL ${outlinedName}`)};
+  }
+  assert.equal(count, 0, `unexpected SM-a2 outline occurrence in ${f.name}`);
+  return {...f, body: expanded};
+});
+candidateIdentifiers.set(outlinedName, 17);
+assert.equal(candidateIdentifiers.size, retainedFunctions.length + 1);
+assert(!retainedFunctions.some(f => identifiers.get(f.name) === 17));
+candidateFunctions.push({name: outlinedName, body: outlinedSequence});
+assert.equal(candidateFunctions.length, 48);
+assert.equal(outlinedTotal, 6);
 const candidateMain = replaceInlineCalls(main);
 const buildCandidate = () => {
   const declarations = candidateFunctions.map(f => ({...f, bytecode: assemble(f.body, candidateIdentifiers)}));
@@ -67,19 +93,21 @@ const buildCandidate = () => {
 };
 export const candidateProgram = buildCandidate();
 const candidateSha256 = createHash('sha256').update(candidateProgram.bytecode).digest('hex');
-assert.equal(candidateFunctions.length, 47);
-assert.equal(candidateProgram.bytecode.length, 3422);
-assert.equal(candidateSha256, 'f765c89b1e98342ab58bdb80eb36b643c972346fe98c11cb36d45bd2242f8eaa');
+assert.equal(candidateFunctions.length, 48);
+assert.equal(candidateProgram.bytecode.length, 3414);
+assert.equal(candidateSha256, '5863870d053b3ba98bf14798227baaa6d48cbd72084498a6a97b12b3e8af5ccb');
 assert.equal(candidateFunctions.some(f => inlineSet.has(f.name)), false);
 assert.equal(candidateMain.includes('OP_DEFINE'), false);
 assert.equal(candidateMain.includes('OP_INVOKE'), false);
+export const outlinedFunction = outlinedName;
+export const outlinedOccurrences = outlinedTotal;
 // The public source export is the reviewed candidate. baselineProgram remains available for
 // byte-for-byte regression checks without making the unoptimized program the default output.
 export const program = candidateProgram;
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   assert(process.argv[2], 'usage: node compact.mjs output.json');
   writeFileSync(process.argv[2], JSON.stringify({
-    status: 'recovered program with compact function identifiers and SZ-a1 inlining; gates reported separately',
+    status: 'recovered program with compact function identifiers, SZ-a1 inlining, and SM-a2 outlining; gates reported separately',
     identifiers: Object.fromEntries(candidateIdentifiers),
     functionCount: candidateFunctions.length,
     baselineLockingBytes: bytecode.length, baselineLockingSha256: sha256,
