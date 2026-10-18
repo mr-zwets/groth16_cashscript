@@ -2789,7 +2789,7 @@ const templateBlockRedeems = blockRecords.map((record, index) => {
 
 // Experimental compact-record layout padding. This is outside the frozen
 // resource profile; retain the old audited <=76-byte Regular option unchanged.
-const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_DENSITY_PADDING ?? '{"3":439,"5":426,"6":380,"7":387,"8":371,"9":378,"10":380,"11":388,"12":380,"13":389,"14":390,"16":413,"17":385,"18":387,"19":395}');
+const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_DENSITY_PADDING ?? '{"3":437,"5":424,"6":378,"7":385,"8":369,"9":376,"10":378,"11":386,"12":378,"13":387,"14":388,"16":411,"17":383,"18":385,"19":393}');
 Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   const index = Number(block);
   assert(Number.isInteger(index) && String(index) === block && index !== 2 &&
