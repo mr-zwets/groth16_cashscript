@@ -2500,25 +2500,30 @@ const selectivePrimeSites = new Map([
   ['0a', new Set([8, 28, 37])],
 ]);
 // The default profile retains the byte-best UD namespace: the selective prime
-// leaf owns raw key 0x11. The opt-in 12 profile uses the exact 0x0c <-> 0x11
-// bijection from VD; the map is applied only to literal DEFINE/INVOKE keys.
+// leaf owns raw key 0x11. Opt-in profiles 12 and 5 apply the exact arithmetic
+// owner bijection recursively to literal DEFINE/INVOKE keys and remainders;
+// profile 5 displaces its occupied arithmetic owner from raw key 0x05 to 0x11.
 const arithmeticProfileKey = process.env.RPA_COMPACT_ARITHMETIC_PRIME_KEY ?? '17';
-assert(['12', '17'].includes(arithmeticProfileKey),
-  'RPA_COMPACT_ARITHMETIC_PRIME_KEY must be 17 or 12');
+assert(['5', '12', '17'].includes(arithmeticProfileKey),
+  'RPA_COMPACT_ARITHMETIC_PRIME_KEY must be 5, 12, or 17');
 const arithmeticLeafSourceId = 17;
 const arithmeticLeafId = Number(arithmeticProfileKey);
 const arithmeticNamespaceMap = arithmeticLeafId === 12
   ? new Map([['0c', '11'], ['11', '0c']])
-  : new Map();
+  : arithmeticLeafId === 5
+    ? new Map([['05', '11'], ['11', '05']])
+    : new Map();
 const arithmeticProfile = {
   key: arithmeticProfileKey,
   leafId: arithmeticLeafId,
   leafRawKey: Uint8Array.of(arithmeticLeafId),
   namespaceMap: arithmeticNamespaceMap,
-  expectedLibraryBytes: arithmeticLeafId === 12 ? 617 : 621,
+  expectedLibraryBytes: arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
   expectedLibrarySha256: arithmeticLeafId === 12
     ? '716398743a5a131e1906e462716026526caa12b228c6f1d207974e131039b254'
-    : 'a4cc53fe1d7fd736b1a058335d4f83884d603c237ce9626bb219acd61e9767b6',
+    : arithmeticLeafId === 5
+      ? '2632cd31885564ac9caf294c3aaa21f4f5cd775e37f365db5e30f7cc2f39b0e9'
+      : 'a4cc53fe1d7fd736b1a058335d4f83884d603c237ce9626bb219acd61e9767b6',
 };
 const arithmeticLeafRawKey = arithmeticProfile.leafRawKey;
 const leafCallInstructions = decodeAuthenticationInstructions(
