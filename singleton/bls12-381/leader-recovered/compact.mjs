@@ -295,16 +295,22 @@ export const outlinedFourthOccurrences = outlinedFourthTotal;
 // byte-for-byte regression checks without making the unoptimized program the default output.
 export const program = candidateProgram;
 
-// Keep the byte-best program as the default. Cost profiles undo one existing
-// outline, or both, using each helper's sole body owner and restoring its displaced key.
+// Keep the byte-best program as the default. Cost profiles undo selected existing
+// outlines using each helper's sole body owner and restoring its displaced key.
 const inlineKeys = {
-  stackSequence58: {displaced: 'fp2MulXi', from: 53, to: 13},
-  stackSequence56: {displaced: 'stackSequence16', from: 35, to: 16},
+  stackSequence53: {displaced: 'fp6Mul', from: 19, to: -1, occurrences: outlinedThirdTotal},
+  stackSequence54: {displaced: 'fp2Scale', from: 31, to: 14, occurrences: outlinedFourthTotal},
+  stackSequence56: {displaced: 'stackSequence16', from: 35, to: 16,
+    occurrences: stackOutlines.find(f => f.function === 'stackSequence56').occurrences},
+  stackSequence58: {displaced: 'fp2MulXi', from: 53, to: 13,
+    occurrences: stackOutlines.find(f => f.function === 'stackSequence58').occurrences},
 };
 const profileInlines = {
   balanced: ['stackSequence58'],
   cost: ['stackSequence56'],
   combined: ['stackSequence56', 'stackSequence58'],
+  expanded: ['stackSequence54', 'stackSequence56', 'stackSequence58'],
+  aggressive: ['stackSequence53', 'stackSequence56', 'stackSequence58'],
 };
 export function buildProfile(profile = 'bytes') {
   assert(profile === 'bytes' || Object.hasOwn(profileInlines, profile), `unknown profile: ${profile}`);
@@ -314,7 +320,7 @@ export function buildProfile(profile = 'bytes') {
   let functions = candidateFunctions;
   let main = candidateMain;
   for (const name of names) {
-    const {displaced, from, to} = inlineKeys[name];
+    const {displaced, from, to, occurrences: expectedOccurrences} = inlineKeys[name];
     const helper = candidateFunctions.find(f => f.name === name);
     assert(helper, `missing profile helper: ${name}`);
     assert.equal(assemble(helper.body, candidateIdentifiers).length, 4);
@@ -333,7 +339,7 @@ export function buildProfile(profile = 'bytes') {
     };
     functions = functions.filter(f => f.name !== name).map(f => ({...f, body: inline(f.body)}));
     main = inline(main);
-    assert.equal(occurrences, 8, `unexpected profile call count: ${name}`);
+    assert.equal(occurrences, expectedOccurrences, `unexpected profile call count: ${name}`);
   }
   const selected = buildCandidate(functions, identifiers, main);
   const retained = new Set(selected.declarations.map(f => f.name));
@@ -341,7 +347,7 @@ export function buildProfile(profile = 'bytes') {
     outlinedStackSequences: outlinedStackSequences.filter(f => retained.has(f.function))};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined]');
+  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive]');
   const profile = process.argv[3] ?? 'bytes';
   const selected = buildProfile(profile);
   const selectedSha256 = createHash('sha256').update(selected.program.bytecode).digest('hex');

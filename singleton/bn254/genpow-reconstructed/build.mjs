@@ -20,6 +20,9 @@ export function assemble(source, {profile = 'bytes'} = {}) {
     bytes: [],
     balanced: ['outline_70', 'outline_71'],
     cost: ['outline_69', 'outline_70', 'outline_71'],
+    light: ['outline_71'],
+    selective: ['outline_69'],
+    expanded: ['outline_69', 'outline_71'],
   };
   assert(Object.hasOwn(profiles, profile), `unknown assembly profile: ${profile}`);
   const functions = new Map();
@@ -135,7 +138,7 @@ function compressG1Witness(hex) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   assert([3, 4].includes(process.argv.length),
-    'usage: node build.mjs OUTPUT_DIRECTORY [bytes|balanced|cost]');
+    'usage: node build.mjs OUTPUT_DIRECTORY [bytes|balanced|cost|light|selective|expanded]');
   const profile = process.argv[3] ?? 'bytes';
   const here = new URL('./', import.meta.url);
   const source = readFileSync(new URL('verifier.asm', here), 'utf8');

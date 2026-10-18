@@ -10,9 +10,10 @@ import {buildProfile, inlinedFunctions as defaultInlinedFunctions, outlinedFunct
   outlinedFourthFunction, outlinedFourthOccurrences, outlinedFourthSequence} from './compact.mjs';
 
 const benchmarkArg = process.argv[2];
-assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark [bytes|balanced|cost|combined]');
+assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark [bytes|balanced|cost|combined|expanded|aggressive]');
 const profile = process.argv[3] ?? 'bytes';
 const {program, inlinedFunctions, outlinedStackSequences} = buildProfile(profile);
+const retained = new Set(program.declarations.map(f => f.name));
 const benchmark = resolve(benchmarkArg);
 const source = fileURLToPath(new URL('../../../', import.meta.url));
 assert.equal(execFileSync('git', ['-C', source, 'status', '--porcelain'], {encoding: 'utf8'}), '',
@@ -58,14 +59,18 @@ const provenance = {
   outlinedExtraFunction,
   outlinedExtraOccurrences,
   shortIdSwap: {function: 'fp6Add', before: 1, after: 18, helper: 'mulFp', helperId: 1},
-  outlinedThirdFunction,
-  outlinedThirdOccurrences,
-  outlinedThirdSequence,
-  thirdOutlineIdSwap: {function: 'fp6Mul', before: -1, after: 19, helper: 'stackSequence53', helperId: -1},
-  outlinedFourthFunction,
-  outlinedFourthOccurrences,
-  outlinedFourthSequence,
-  fourthOutlineIdSwap: {function: 'fp2Scale', before: 14, after: 31, helper: 'stackSequence54', helperId: 14},
+  ...(retained.has(outlinedThirdFunction) ? {
+    outlinedThirdFunction,
+    outlinedThirdOccurrences,
+    outlinedThirdSequence,
+    thirdOutlineIdSwap: {function: 'fp6Mul', before: -1, after: 19, helper: 'stackSequence53', helperId: -1},
+  } : {}),
+  ...(retained.has(outlinedFourthFunction) ? {
+    outlinedFourthFunction,
+    outlinedFourthOccurrences,
+    outlinedFourthSequence,
+    fourthOutlineIdSwap: {function: 'fp2Scale', before: 14, after: 31, helper: 'stackSequence54', helperId: 14},
+  } : {}),
   stackOutlines: outlinedStackSequences,
 };
 if (profile === 'bytes') assert.equal(provenance.lockingSha256, 'c5b4cf41459b7ec2f4c84fef0eb8cba5dfffee09ad03da909c9d31378a9d5ece');
