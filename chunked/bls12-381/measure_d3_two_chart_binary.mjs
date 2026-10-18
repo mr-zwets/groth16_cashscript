@@ -2502,8 +2502,8 @@ const selectivePrimeSites = new Map([
 // The default profile retains the byte-best UD namespace: the selective prime
 // leaf owns raw key 0x11. Opt-in profiles -1, 12, and 5 apply the exact
 // arithmetic owner bijection recursively to literal DEFINE/INVOKE keys and
-// remainders; profile -1 also moves the imported arithmetic wrapper from raw
-// key 0x81 to 0x11 so the leaf can own OP_1NEGATE without a duplicate.
+// remainders; profile -1 also moves the imported arithmetic wrapper to a
+// template-owned key so the leaf can own OP_1NEGATE without a duplicate.
 // Profiles 12 and 5 displace their occupied arithmetic owners to raw 0x11.
 const arithmeticProfileKey = process.env.RPA_COMPACT_ARITHMETIC_PRIME_KEY ?? '17';
 assert(['-1', '5', '12', '17'].includes(arithmeticProfileKey),
@@ -2532,8 +2532,8 @@ const arithmeticProfile = {
         : 'a4cc53fe1d7fd736b1a058335d4f83884d603c237ce9626bb219acd61e9767b6',
 };
 const arithmeticLeafRawKey = arithmeticProfile.leafRawKey;
-const templateArithmeticFunctionId = arithmeticLeafId === -1
-  ? 17
+const templateArithmeticFunctionId = (template) => arithmeticLeafId === -1
+  ? template.name === 'Regular' ? 15 : template.name === 'Terminal' ? 14 : 17
   : DEFAULT_TEMPLATE_ARITHMETIC_FUNCTION_ID;
 const leafCallInstructions = decodeAuthenticationInstructions(
   concat(pushVmNumber(arithmeticLeafSourceId), Uint8Array.of(OP.INVOKE)),
@@ -2746,9 +2746,9 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
           templateCarrierLengths.get(templateCommonCarrier.name),
           templateCommonCarrier.coreStart,
           templateCommonCarrier.coreStart + templateArithmeticLength,
-          templateArithmeticFunctionId,
+          templateArithmeticFunctionId(template),
         ),
-        pushVmNumber(templateArithmeticFunctionId),
+        pushVmNumber(templateArithmeticFunctionId(template)),
         Uint8Array.of(OP.INVOKE),
         template.arithmeticRemainder,
       );
@@ -2957,24 +2957,31 @@ const picCarrierRedeemLoader = concat(
   pushVmNumber(picBlock4Redeem.length),
   Uint8Array.of(OP.SUB, OP.SPLIT, OP.NIP),
 );
-const picAuthLoader = concat(
+// Regular's representative defines its PIC helper before the shared core.
+// Move that helper to 17 so the profile -1 core can own short key 15.
+const picAuthFunctionId = (firstWindow) => arithmeticLeafId === -1 &&
+  firstWindow === picAuthBatches[3].firstWindow ? 17 : PIC_AUTH_FUNCTION_ID;
+const picAuthLoader = (functionId) => concat(
   picCarrierRedeemLoader,
   sliceTopBytes(picHelperStart, picHelperEnd),
-  pushVmNumber(PIC_AUTH_FUNCTION_ID),
+  pushVmNumber(functionId),
   Uint8Array.of(OP.DEFINE),
 );
-const picAuthWrapper = (firstWindow, windowCount, retainCarrierRedeem = false) => concat(
-  ...(retainCarrierRedeem ? [picCarrierRedeemLoader, Uint8Array.of(OP.DUP)] : [picAuthLoader]),
-  ...(retainCarrierRedeem ? [
-    sliceTopBytes(picHelperStart, picHelperEnd),
-    pushVmNumber(PIC_AUTH_FUNCTION_ID),
-    Uint8Array.of(OP.DEFINE),
-  ] : []),
-  pushVmNumber(windowCount),
-  pushVmNumber(firstWindow),
-  pushVmNumber(PIC_AUTH_FUNCTION_ID),
-  Uint8Array.of(OP.INVOKE, OP.ONE, OP.EQUALVERIFY),
-);
+const picAuthWrapper = (firstWindow, windowCount, retainCarrierRedeem = false) => {
+  const functionId = picAuthFunctionId(firstWindow);
+  return concat(
+    ...(retainCarrierRedeem ? [picCarrierRedeemLoader, Uint8Array.of(OP.DUP)] : [picAuthLoader(functionId)]),
+    ...(retainCarrierRedeem ? [
+      sliceTopBytes(picHelperStart, picHelperEnd),
+      pushVmNumber(functionId),
+      Uint8Array.of(OP.DEFINE),
+    ] : []),
+    pushVmNumber(windowCount),
+    pushVmNumber(firstWindow),
+    pushVmNumber(functionId),
+    Uint8Array.of(OP.INVOKE, OP.ONE, OP.EQUALVERIFY),
+  );
+};
 const picBlock0AuthWrapper = picAuthWrapper(
   picAuthBatches[1].firstWindow,
   picAuthBatches[1].windowCount,
@@ -3806,13 +3813,19 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     templateCommonCarrier,
     templateCommonCarrier.coreStart,
     templateCommonCarrier.coreStart + templateArithmeticLength,
-    templateArithmeticFunctionId,
+    templateArithmeticFunctionId(arithmeticMutationTemplate),
+  );
+  const firstArithmeticLoaderLayout = templateLoaderLayout(
+    templateCommonCarrier,
+    templateCommonCarrier.coreStart,
+    templateCommonCarrier.coreStart + templateArithmeticLength,
+    templateArithmeticFunctionId(firstArithmeticMutationTemplate),
   );
   const firstPicLoaderLayout = templateLoaderLayout(
     { name: 'PIC authentication', representative: PIC_BLOCK4_INDEX },
     picHelperStart, picHelperEnd, PIC_AUTH_FUNCTION_ID, picBlock4Redeem.length,
   );
-  assert(equalBytes(firstPicLoaderLayout.loader, picAuthLoader),
+  assert(equalBytes(firstPicLoaderLayout.loader, picAuthLoader(PIC_AUTH_FUNCTION_ID)),
     'First PIC loader layout differs from authenticated wrapper');
   const arithmeticLoaderOffset = templateInputs[arithmeticMutationTarget].redeem.length -
     arithmeticMutationTemplate.representativeRedeem.length + arithmeticMutationTemplate.coreStart;
@@ -3885,7 +3898,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       loaderOffset: arithmeticLoaderOffset,
       mutationOffset: arithmeticLoaderLayout.functionIdOffset,
       before: arithmeticLoaderLayout.functionIdPush,
-      after: pushVmNumber(templateArithmeticFunctionId + 1),
+      after: pushVmNumber(templateArithmeticFunctionId(arithmeticMutationTemplate) + 1),
     },
     {
       name: 'changed-template-arithmetic-loader-source-input',
@@ -3973,6 +3986,14 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     {
       ...fixture,
       name: fixture.name.replace('template-arithmetic-', 'template-first-arithmetic-'),
+      layout: firstArithmeticLoaderLayout,
+      mutationOffset: fixture.mutationOffset === arithmeticLoaderLayout.functionIdOffset
+        ? firstArithmeticLoaderLayout.functionIdOffset : fixture.mutationOffset,
+      before: fixture.mutationOffset === arithmeticLoaderLayout.functionIdOffset
+        ? firstArithmeticLoaderLayout.functionIdPush : fixture.before,
+      after: fixture.mutationOffset === arithmeticLoaderLayout.functionIdOffset
+        ? pushVmNumber(templateArithmeticFunctionId(firstArithmeticMutationTemplate) + 1)
+        : fixture.after,
       targetInput: firstArithmeticMutationTarget,
       loaderOffset: firstArithmeticLoaderOffset,
     },
@@ -4721,6 +4742,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       wrapperBytes: picAuthBatches.map((batch) => ({
         ...batch,
         bytes: picAuthWrapper(batch.firstWindow, batch.windowCount).length,
+        ...(arithmeticLeafId === -1 ? { functionId: picAuthFunctionId(batch.firstWindow) } : {}),
       })),
       batches: picAuthBatches,
       fixtureGate: picAuthFixtureRows,
@@ -4782,7 +4804,11 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
         profileKey: arithmeticProfile.key,
         leafId: arithmeticProfile.leafId,
         namespaceMap: Object.fromEntries(arithmeticProfile.namespaceMap),
-        functionId: templateArithmeticFunctionId,
+        ...(arithmeticLeafId === -1 ? {
+          functionIdsByTemplate: Object.fromEntries(templateClasses
+            .filter((template) => templateArithmeticImports.has(template.name))
+            .map((template) => [template.name, templateArithmeticFunctionId(template)])),
+        } : { functionId: DEFAULT_TEMPLATE_ARITHMETIC_FUNCTION_ID }),
         bodyBytes: templateArithmeticLength,
         bodySha256: hex(sha256(templateArithmeticBody)),
         definitions: candidateArithmeticInstructions.length / 3,
