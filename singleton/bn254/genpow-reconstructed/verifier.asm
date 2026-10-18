@@ -581,12 +581,7 @@ push 15
 OP_ROLL
 call outline_38
 OP_DUP
-OP_2
-OP_PICK
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_63
 OP_8
 OP_PICK
 OP_10
@@ -934,12 +929,7 @@ push 16
 OP_ROLL
 call outline_31
 OP_DUP
-OP_2
-OP_PICK
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_63
 call outline_31
 OP_SWAP
 call outline_22
@@ -1828,6 +1818,15 @@ OP_0
 OP_0
 end
 
+# Exact repeated six-op stack sequence outlined at four call sites.
+function outline_63 17
+OP_2
+OP_PICK
+OP_4
+OP_PICK
+OP_6
+OP_PICK
+end
 main
 # Public inputs must be canonical scalars, 0 <= n < r (n1 is push 0, n0 push 1: depths 9, 8).
 # Without this n + r gives the same vk_x, so one proof verifies two claimed integers.
@@ -2105,12 +2104,7 @@ OP_2
 call fp_mul
 call outline_5
 OP_DUP
-OP_2
-OP_PICK
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_63
 call fp2_mul
 OP_DUP
 OP_2
@@ -2424,12 +2418,7 @@ OP_MOD
 OP_1
 OP_NUMEQUAL
 OP_IF
-OP_2
-OP_PICK
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_63
 OP_8
 OP_PICK
 OP_10
