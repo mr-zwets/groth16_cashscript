@@ -109,3 +109,11 @@ unchanged 272-byte witness and 87-byte overhead: **4,595 total bytes** and
 5 cost units**. The historical 4,587-byte figure precedes that range check and is
 not this comparison's baseline. Four supplied proofs, the original invalid proof
 and all nine current public-input mutations pass the unchanged official gates.
+
+TW static frontier (Oct 18, 2026): `outline_65=13` shares eleven exact
+`OP_6 OP_ROLL OP_7 OP_ROLL` sequences and moves `outline_13` to raw key `47`.
+The candidate has 64 functions, 4,217 locking bytes, and SHA256
+`6229f2e5784b8f78c7b89fc6075c8de37a4ab9938bb04eb244459a4fa5a07bf6`. An actual
+decoded inverse expands `outline_65`, restores the published 4,225-byte program
+byte-for-byte, and preserves the 32-byte range prefix. Runtime cost and proof
+gates remain separate release evidence.

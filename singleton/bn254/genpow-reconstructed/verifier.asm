@@ -311,10 +311,7 @@ OP_ROLL
 OP_2SWAP
 OP_SWAP
 call outline_3
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 OP_2SWAP
 OP_SWAP
 call outline_6
@@ -769,10 +766,7 @@ OP_ROT
 OP_3
 OP_ROLL
 call outline_3
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 OP_12
 OP_ROLL
 OP_13
@@ -1013,10 +1007,7 @@ OP_SWAP
 call outline_3
 OP_2DUP
 OP_SWAP
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 call outline_3
 OP_SWAP
 OP_2ROT
@@ -1358,10 +1349,7 @@ OP_ROLL
 end
 
 function outline_7 7
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 OP_8
 OP_ROLL
 OP_9
@@ -1372,7 +1360,7 @@ OP_11
 OP_ROLL
 end
 
-function outline_13 13
+function outline_13 47
 push 17
 OP_ROLL
 push 17
@@ -1643,10 +1631,7 @@ OP_ROLL
 OP_9
 OP_ROLL
 call fp2_mul
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 push 19
 OP_PICK
 push 19
@@ -1737,10 +1722,7 @@ OP_4
 OP_ROLL
 OP_5
 OP_ROLL
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 end
 
 function outline_59 59
@@ -1806,6 +1788,14 @@ OP_4
 OP_PICK
 OP_6
 OP_PICK
+end
+
+# TW-a1: share eleven exact OP_6/OP_ROLL/OP_7/OP_ROLL sequences.
+function outline_65 13
+OP_6
+OP_ROLL
+OP_7
+OP_ROLL
 end
 
 main
@@ -1926,10 +1916,7 @@ OP_12
 OP_PICK
 OP_5
 OP_ROLL
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 OP_8
 OP_ROLL
 OP_9
@@ -2092,20 +2079,14 @@ OP_ROLL
 OP_11
 OP_ROLL
 call outline_3
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 call outline_50
 OP_OVER
 OP_3
 OP_PICK
 call outline_9
 OP_SWAP
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 call outline_3
 OP_DUP
 OP_2
@@ -2167,19 +2148,13 @@ call outline_11
 call outline_31
 call outline_64
 call outline_5
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 OP_2OVER
 OP_SWAP
 call fp2_mul
 OP_2SWAP
 OP_SWAP
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 call fp2_mul
 OP_2SWAP
 OP_SWAP

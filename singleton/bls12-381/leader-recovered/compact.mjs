@@ -98,7 +98,7 @@ candidateFunctions.push({name: outlinedExtraName, body: outlinedExtraSequence});
 assert.equal(candidateFunctions.length, 49);
 assert.equal(outlinedTotal, 6);
 const expandedMain = replaceInlineCalls(main);
-const candidateMain = expandedMain.replace(outlinedExtraPattern, `CALL ${outlinedExtraName}`);
+let candidateMain = expandedMain.replace(outlinedExtraPattern, `CALL ${outlinedExtraName}`);
 outlinedExtraTotal += outlineExtraCount(expandedMain);
 assert.equal(outlinedExtraTotal, 41);
 
@@ -158,6 +158,63 @@ assert.equal(candidateIdentifiers.size, 51);
 assert.equal(new Set([...candidateIdentifiers.values()].map(value =>
   Buffer.from(bigIntToVmNumber(BigInt(value))).toString('hex'))).size, 51);
 
+// TW-a1 through TW-a4: outline four measured straight-line sequences through one
+// local owner so each transformation checks its source counts, ID reassignment and main sites.
+const twOutlines = [];
+const outlineTw = ({label, name, sequence, pattern, counts, total, mainCount = 0, demotion, id}) => {
+  let occurrences = 0;
+  for (const f of candidateFunctions) {
+    const count = f.body.match(pattern)?.length ?? 0;
+    assert.equal(count, counts.get(f.name) ?? 0,
+      `unexpected ${label} outline count in ${f.name}: ${count}`);
+    occurrences += count;
+    f.body = f.body.replace(pattern, `CALL ${name}`);
+  }
+  const mainOccurrences = candidateMain.match(pattern)?.length ?? 0;
+  assert.equal(mainOccurrences, mainCount, `${label} main occurrence count`);
+  candidateMain = candidateMain.replace(pattern, `CALL ${name}`);
+  occurrences += mainOccurrences;
+  assert.equal(occurrences, total);
+  if (demotion) {
+    assert.equal(candidateIdentifiers.get(demotion.name), demotion.from);
+    assert(![...candidateIdentifiers.values()].includes(demotion.to));
+    candidateIdentifiers.set(demotion.name, demotion.to);
+  }
+  assert(![...candidateIdentifiers.values()].includes(id));
+  candidateIdentifiers.set(name, id);
+  candidateFunctions.push({name, body: sequence});
+  assert.equal(candidateIdentifiers.size, candidateFunctions.length);
+  assert.equal(new Set([...candidateIdentifiers.values()].map(value =>
+    Buffer.from(bigIntToVmNumber(BigInt(value))).toString('hex'))).size, candidateFunctions.length);
+  twOutlines.push({function: name, occurrences, sequence});
+};
+
+outlineTw({
+  label: 'TW-a1', name: 'stackSequence55', sequence: 'OP_2SWAP OP_SWAP OP_2ROT OP_SWAP',
+  pattern: /OP_2SWAP\s+OP_SWAP\s+OP_2ROT\s+OP_SWAP/g,
+  counts: new Map([['fp12Mul', 4], ['towerSequence38', 1], ['millerAccumulate', 1], ['millerLoop', 1]]),
+  total: 9, mainCount: 2, demotion: {name: 'stackSequence15', from: 15, to: 33}, id: 15,
+});
+outlineTw({
+  label: 'TW-a2', name: 'stackSequence56', sequence: 'OP_11 OP_PICK OP_11 OP_PICK',
+  pattern: /OP_11\s+OP_PICK\s+OP_11\s+OP_PICK/g,
+  counts: new Map([['fp6Mul', 2], ['towerSequence37', 2], ['stackSequence29', 3], ['stackSequence45', 1]]),
+  total: 8, demotion: {name: 'stackSequence16', from: 16, to: 35}, id: 16,
+});
+outlineTw({
+  label: 'TW-a3', name: 'stackSequence57',
+  sequence: 'OP_PUSHBYTES_1 0x17 OP_PICK OP_PUSHBYTES_1 0x17 OP_PICK OP_PUSHBYTES_1 0x17',
+  pattern: /OP_PUSHBYTES_1 0x17\s+OP_PICK\s+OP_PUSHBYTES_1 0x17\s+OP_PICK\s+OP_PUSHBYTES_1 0x17/g,
+  counts: new Map([['fp12Mul', 2], ['towerSequence38', 1]]), total: 3, id: 52,
+});
+outlineTw({
+  label: 'TW-a4', name: 'stackSequence58', sequence: 'OP_12 OP_ROLL OP_13 OP_ROLL',
+  pattern: /OP_12\s+OP_ROLL\s+OP_13\s+OP_ROLL/g,
+  counts: new Map([['towerSequence38', 1], ['millerLoop', 5], ['stackSequence10', 1]]),
+  total: 8, mainCount: 1, demotion: {name: 'fp2MulXi', from: 13, to: 53}, id: 13,
+});
+export const outlinedTw = twOutlines;
+
 const buildCandidate = () => {
   const declarations = candidateFunctions.map(f => ({...f, bytecode: assemble(f.body, candidateIdentifiers)}));
   const mainBytecode = assemble(`${rangeCheck} ${candidateMain}`, candidateIdentifiers);
@@ -173,9 +230,9 @@ const buildCandidate = () => {
 };
 export const candidateProgram = buildCandidate();
 const candidateSha256 = createHash('sha256').update(candidateProgram.bytecode).digest('hex');
-assert.equal(candidateFunctions.length, 51);
-assert.equal(candidateProgram.bytecode.length, 3328);
-assert.equal(candidateSha256, 'd0dc12d1b7ac3d50c0ba0b07462ec8b63cf9f813d0107b3c0102f5c81f695118');
+assert.equal(candidateFunctions.length, 55);
+assert.equal(candidateProgram.bytecode.length, 3315);
+assert.equal(candidateSha256, '85669084e36988ea5e35db6f95e3cc7eb64bd429de38b93f66f29c026eb509f3');
 assert.equal(candidateFunctions.some(f => inlineSet.has(f.name)), false);
 assert.equal(candidateMain.includes('OP_DEFINE'), false);
 assert.equal(candidateMain.includes('OP_INVOKE'), false);
