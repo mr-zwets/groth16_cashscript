@@ -158,10 +158,10 @@ assert.equal(candidateIdentifiers.size, 51);
 assert.equal(new Set([...candidateIdentifiers.values()].map(value =>
   Buffer.from(bigIntToVmNumber(BigInt(value))).toString('hex'))).size, 51);
 
-// TW-a1 through TW-a4: outline four measured straight-line sequences through one
-// local owner so each transformation checks its source counts, ID reassignment and main sites.
-const twOutlines = [];
-const outlineTw = ({label, name, sequence, pattern, counts, total, mainCount = 0, demotion, id}) => {
+// TW/UE measured straight-line sequences share one local owner so each transformation checks
+// its source counts, ID reassignment and main sites.
+const stackOutlines = [];
+const outlineStackSequence = ({label, name, sequence, pattern, counts, total, mainCount = 0, demotion, id}) => {
   let occurrences = 0;
   for (const f of candidateFunctions) {
     const count = f.body.match(pattern)?.length ?? 0;
@@ -186,34 +186,52 @@ const outlineTw = ({label, name, sequence, pattern, counts, total, mainCount = 0
   assert.equal(candidateIdentifiers.size, candidateFunctions.length);
   assert.equal(new Set([...candidateIdentifiers.values()].map(value =>
     Buffer.from(bigIntToVmNumber(BigInt(value))).toString('hex'))).size, candidateFunctions.length);
-  twOutlines.push({function: name, occurrences, sequence});
+  stackOutlines.push({function: name, occurrences, sequence});
 };
 
-outlineTw({
+outlineStackSequence({
   label: 'TW-a1', name: 'stackSequence55', sequence: 'OP_2SWAP OP_SWAP OP_2ROT OP_SWAP',
   pattern: /OP_2SWAP\s+OP_SWAP\s+OP_2ROT\s+OP_SWAP/g,
   counts: new Map([['fp12Mul', 4], ['towerSequence38', 1], ['millerAccumulate', 1], ['millerLoop', 1]]),
   total: 9, mainCount: 2, demotion: {name: 'stackSequence15', from: 15, to: 33}, id: 15,
 });
-outlineTw({
+outlineStackSequence({
   label: 'TW-a2', name: 'stackSequence56', sequence: 'OP_11 OP_PICK OP_11 OP_PICK',
   pattern: /OP_11\s+OP_PICK\s+OP_11\s+OP_PICK/g,
   counts: new Map([['fp6Mul', 2], ['towerSequence37', 2], ['stackSequence29', 3], ['stackSequence45', 1]]),
   total: 8, demotion: {name: 'stackSequence16', from: 16, to: 35}, id: 16,
 });
-outlineTw({
+outlineStackSequence({
   label: 'TW-a3', name: 'stackSequence57',
   sequence: 'OP_PUSHBYTES_1 0x17 OP_PICK OP_PUSHBYTES_1 0x17 OP_PICK OP_PUSHBYTES_1 0x17',
   pattern: /OP_PUSHBYTES_1 0x17\s+OP_PICK\s+OP_PUSHBYTES_1 0x17\s+OP_PICK\s+OP_PUSHBYTES_1 0x17/g,
   counts: new Map([['fp12Mul', 2], ['towerSequence38', 1]]), total: 3, id: 52,
 });
-outlineTw({
+outlineStackSequence({
   label: 'TW-a4', name: 'stackSequence58', sequence: 'OP_12 OP_ROLL OP_13 OP_ROLL',
   pattern: /OP_12\s+OP_ROLL\s+OP_13\s+OP_ROLL/g,
   counts: new Map([['towerSequence38', 1], ['millerLoop', 5], ['stackSequence10', 1]]),
   total: 8, mainCount: 1, demotion: {name: 'fp2MulXi', from: 13, to: 53}, id: 13,
 });
-export const outlinedTw = twOutlines;
+outlineStackSequence({
+  label: 'UE-a1', name: 'stackSequence59',
+  sequence: 'OP_PUSHBYTES_1 0x37 OP_ROLL OP_PUSHBYTES_1 0x37 OP_ROLL',
+  pattern: /OP_PUSHBYTES_1 0x37\s+OP_ROLL\s+OP_PUSHBYTES_1 0x37\s+OP_ROLL/g,
+  counts: new Map([['millerLoop', 1], ['stackSequence12', 3]]), total: 4, id: 54,
+});
+outlineStackSequence({
+  label: 'UE-a2', name: 'stackSequence60',
+  sequence: 'OP_PICK OP_2ROT OP_SWAP OP_6 OP_ROLL CALL g1Add OP_4 OP_ROLL OP_4 OP_ROLL',
+  pattern: /OP_PICK\s+OP_2ROT\s+OP_SWAP\s+OP_6\s+OP_ROLL\s+CALL g1Add\s+OP_4\s+OP_ROLL\s+OP_4\s+OP_ROLL/g,
+  counts: new Map(), total: 2, mainCount: 2, id: 55,
+});
+outlineStackSequence({
+  label: 'UE-a3', name: 'stackSequence61',
+  sequence: 'CALL fp2Mul OP_SWAP OP_2SWAP OP_SWAP CALL fp2Add',
+  pattern: /CALL fp2Mul\s+OP_SWAP\s+OP_2SWAP\s+OP_SWAP\s+CALL fp2Add/g,
+  counts: new Map([['fp6Mul', 2], ['stackSequence45', 1]]), total: 3, id: 56,
+});
+export const outlinedStackSequences = stackOutlines;
 
 const buildCandidate = () => {
   const declarations = candidateFunctions.map(f => ({...f, bytecode: assemble(f.body, candidateIdentifiers)}));
@@ -230,9 +248,9 @@ const buildCandidate = () => {
 };
 export const candidateProgram = buildCandidate();
 const candidateSha256 = createHash('sha256').update(candidateProgram.bytecode).digest('hex');
-assert.equal(candidateFunctions.length, 55);
-assert.equal(candidateProgram.bytecode.length, 3315);
-assert.equal(candidateSha256, '85669084e36988ea5e35db6f95e3cc7eb64bd429de38b93f66f29c026eb509f3');
+assert.equal(candidateFunctions.length, 58);
+assert.equal(candidateProgram.bytecode.length, 3310);
+assert.equal(candidateSha256, '24f462b2345f79354be7ea5aa0ec70deb28282001eb6efe53fd7e955accdf360');
 assert.equal(candidateFunctions.some(f => inlineSet.has(f.name)), false);
 assert.equal(candidateMain.includes('OP_DEFINE'), false);
 assert.equal(candidateMain.includes('OP_INVOKE'), false);
