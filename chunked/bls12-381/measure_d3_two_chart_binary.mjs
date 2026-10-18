@@ -2358,7 +2358,10 @@ const sliceTopBytes = (start, end) => concat(
 );
 const TEMPLATE_FUNCTION_ID = 16;
 const TEMPLATE_COMMON_FUNCTION_ID = 102;
-const TEMPLATE_EXTRA_FUNCTION_ID = 103;
+const TEMPLATE_EXTRA_FUNCTION_ID = 14;
+const templateCommonFunctionId = (template) => template.name === 'AdditionTail'
+  ? 13
+  : TEMPLATE_COMMON_FUNCTION_ID;
 const TEMPLATE_ARITHMETIC_FUNCTION_ID = -1;
 const PIC_AUTH_FUNCTION_ID = 15;
 const templateCommonOffsets = new Map([
@@ -2449,7 +2452,7 @@ assert(!templateExtraOpcodes.some((opcode) => [
   }
   template.core = concat(
     template.core.slice(0, offset),
-    pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID),
+    pushVmNumber(templateCommonFunctionId(template)),
     Uint8Array.of(OP.INVOKE),
     ...(extraOffset === undefined ? [] : [
       pushVmNumber(TEMPLATE_EXTRA_FUNCTION_ID),
@@ -2593,7 +2596,7 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
     if (template === templateCommonCarrier) {
       definitions.push(concat(
         templateCommonBodyPush,
-        pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID),
+        pushVmNumber(templateCommonFunctionId(template)),
         Uint8Array.of(OP.DEFINE),
       ));
     }
@@ -2610,7 +2613,7 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
         templateCarrierLengths.get(templateCommonCarrier.name),
         templateCommonStart,
         templateCommonEnd,
-        TEMPLATE_COMMON_FUNCTION_ID,
+        templateCommonFunctionId(template),
       ));
     }
     if (templateExtraOffsets.has(template.name) && template !== templateExtraCarrier) {
@@ -2656,12 +2659,12 @@ templateClasses.forEach((template) => {
     (templateCarrierLengths.get(template.name) ?? template.representativeRedeem.length),
   `${template.name} representative redeem length changed after convergence`);
 });
-const loadTemplateCommonBody = () => loadTemplateBody(
+const loadTemplateCommonBody = (template) => loadTemplateBody(
   templateCommonCarrier,
   templateCarrierLengths.get(templateCommonCarrier.name),
   templateCommonStart,
   templateCommonEnd,
-  TEMPLATE_COMMON_FUNCTION_ID,
+  templateCommonFunctionId(template),
 );
 const loadTemplateExtraBody = () => loadTemplateBody(
   templateExtraCarrier,
@@ -2679,7 +2682,7 @@ const templateBlockRedeems = blockRecords.map((record, index) => {
   const coreStart = template.coreStart;
   const coreEnd = coreStart + template.core.length;
   const redeem = concat(
-    ...(templateCommonOffsets.has(template.name) ? [loadTemplateCommonBody()] : []),
+    ...(templateCommonOffsets.has(template.name) ? [loadTemplateCommonBody(template)] : []),
     ...(templateExtraOffsets.has(template.name) ? [loadTemplateExtraBody()] : []),
     pushVmNumber(template.representative + 1),
     Uint8Array.of(OP.INPUTBYTECODE),
@@ -3514,7 +3517,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
   );
   const extraCarrierPrefix = changedExtraCarrierRedeem.length -
     templateExtraCarrier.representativeRedeem.length;
-  const extraBodyOffset = extraCarrierPrefix + loadTemplateCommonBody().length +
+  const extraBodyOffset = extraCarrierPrefix + loadTemplateCommonBody(templateExtraCarrier).length +
     templateExtraStart;
   assert(extraCarrierPrefix >= 0 && changedExtraCarrierRedeem[extraBodyOffset] !== 0x6a,
     'extra shared template helper mutation is invalid');
@@ -3599,7 +3602,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     templateCommonCarrier,
     templateCommonStart,
     templateCommonEnd,
-    TEMPLATE_COMMON_FUNCTION_ID,
+    templateCommonFunctionId(firstArithmeticMutationTemplate),
   );
   const extraLoaderLayout = templateLoaderLayout(
     templateExtraCarrier,
@@ -3625,7 +3628,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     firstArithmeticMutationTemplate.representativeRedeem.length +
     firstArithmeticMutationTemplate.coreStart;
   const commonDefinitionBytes = templateCommonBodyPush.length +
-    pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID).length + 1;
+    pushVmNumber(templateCommonFunctionId(templateCommonCarrier)).length + 1;
   const extraLoaderOffset = templateInputs[extraMutationTarget].redeem.length -
     templateCommonCarrier.representativeRedeem.length + commonDefinitionBytes;
   [
@@ -3726,7 +3729,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       loaderOffset: firstCommonLoaderOffset,
       mutationOffset: commonLoaderLayout.functionIdOffset,
       before: commonLoaderLayout.functionIdPush,
-      after: pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID + 1),
+      after: pushVmNumber(templateCommonFunctionId(firstArithmeticMutationTemplate) + 1),
     },
     {
       name: 'changed-template-common-loader-source-input',
@@ -4546,7 +4549,9 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     templateFactoring: {
       functions: [
         {
-          functionId: TEMPLATE_COMMON_FUNCTION_ID,
+          functionIdsByTemplate: Object.fromEntries(templateClasses
+            .filter(({ name }) => templateCommonOffsets.has(name))
+            .map((template) => [template.name, templateCommonFunctionId(template)])),
           bodyBytes: templateCommonBody.length,
           bodySha256: hex(sha256(templateCommonBody)),
           instructionCount: templateCommonOpcodes.length,
@@ -4572,7 +4577,10 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
           originalOffsets: Object.fromEntries(templateExtraOffsets),
         },
       ],
-      replacementBytesPerInvocation: pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID).length + 1,
+      replacementBytesPerInvocationByTemplate: Object.fromEntries(templateClasses
+        .filter(({ name }) => templateCommonOffsets.has(name))
+        .map((template) => [template.name,
+          pushVmNumber(templateCommonFunctionId(template)).length + 1])),
       carrierLengthsConverged: templateCarrierLengthsStable,
       carrierRedeemLengths: Object.fromEntries(templateCarrierLengths),
       additionTailDensityPaddingBytes: templateTailDensityPadding.length,
