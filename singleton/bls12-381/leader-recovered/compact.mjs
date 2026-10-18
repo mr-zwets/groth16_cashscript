@@ -314,6 +314,8 @@ const inlineKeys = {
     occurrences: stackOutlines.find(f => f.function === 'stackSequence59').occurrences},
   stackSequence61: {id: 56, byteLength: 7,
     occurrences: stackOutlines.find(f => f.function === 'stackSequence61').occurrences},
+  stackSequence62: {id: 57, byteLength: 11,
+    occurrences: stackOutlines.find(f => f.function === 'stackSequence62').occurrences},
 };
 const profileInlines = {
   balanced: ['stackSequence58'],
@@ -328,6 +330,7 @@ const profileInlines = {
   'extended52-55-57': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58'],
   'extended52-55-57-61': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence61'],
   'extended52-55-57-59-61': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence59', 'stackSequence61'],
+  'extended52-55-57-59-61-62': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence59', 'stackSequence61', 'stackSequence62'],
 };
 export function buildProfile(profile = 'bytes') {
   assert(profile === 'bytes' || Object.hasOwn(profileInlines, profile), `unknown profile: ${profile}`);
@@ -359,6 +362,17 @@ export function buildProfile(profile = 'bytes') {
       assert.equal(candidateIdentifiers.get('fp2Add'), 4);
       assert.equal(expectedOccurrences, 3);
       assert.equal(displaced, undefined);
+    } else if (name === 'stackSequence62') {
+      // Preserve MOD, sqrtFp and the comparison in their decoder-local order.
+      assert.equal(helperBytecode.toString('hex'), '537997011c8a76557a519c');
+      assert.equal(candidateIdentifiers.get('sqrtFp'), 28);
+      assert.equal(expectedOccurrences, 2);
+      assert.equal(displaced, undefined);
+      const decoder = functions.find(f => f.name === 'decompressG2');
+      assert(decoder);
+      assert.equal(decoder.body.match(/\bCALL stackSequence62\b/g)?.length ?? 0, 2);
+      assert(functions.filter(f => f.name !== 'decompressG2').every(f => !/\bCALL stackSequence62\b/.test(f.body)));
+      assert(!/\bCALL stackSequence62\b/.test(main));
     } else if (name === 'stackSequence55') {
       // Exact opaque permutation: 2SWAP SWAP 2ROT SWAP; no arithmetic or calls.
       assert.equal(helperBytecode.toString('hex'), '727c717c');
@@ -394,7 +408,7 @@ export function buildProfile(profile = 'bytes') {
     outlinedStackSequences: outlinedStackSequences.filter(f => retained.has(f.function))};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61|extended52-55-57-59-61]');
+  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61|extended52-55-57-59-61|extended52-55-57-59-61-62]');
   const profile = process.argv[3] ?? 'bytes';
   const selected = buildProfile(profile);
   const selectedSha256 = createHash('sha256').update(selected.program.bytecode).digest('hex');

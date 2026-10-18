@@ -81,10 +81,8 @@ function outline_5 5
 OP_2DUP
 OP_2OVER
 call fp2_mul
-OP_ROT
-OP_DROP
-OP_ROT
-OP_DROP
+OP_2SWAP
+OP_2DROP
 end
 
 function outline_23 23
@@ -804,10 +802,8 @@ OP_PICK
 push 20
 OP_PICK
 call outline_22
-OP_ROT
-OP_DROP
-OP_ROT
-OP_DROP
+OP_2SWAP
+OP_2DROP
 OP_ENDIF
 OP_SWAP
 push 1e
