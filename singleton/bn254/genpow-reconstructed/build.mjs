@@ -26,9 +26,11 @@ export function assemble(source) {
     if (command === 'function') {
       assert(!current && !main && args.length === 2, where);
       const [name, encodedId] = args;
-      assert(/^[a-z][a-z0-9_]*$/.test(name) && /^\d+$/.test(encodedId), where);
+      // The compact namespace reserves -1 for a proven-unused raw key. Other
+      // IDs retain the original non-negative byte-domain contract.
+      assert(/^[a-z][a-z0-9_]*$/.test(name) && /^(?:-1|\d+)$/.test(encodedId), where);
       const id = Number(encodedId);
-      assert(Number.isSafeInteger(id) && id <= 255 && !functions.has(name), where);
+      assert((id === -1 || (Number.isSafeInteger(id) && id >= 0 && id <= 255)) && !functions.has(name), where);
       assert(![...functions.values()].some(fn => fn.id === id), where);
       current = {id, lines: []};
       functions.set(name, current);

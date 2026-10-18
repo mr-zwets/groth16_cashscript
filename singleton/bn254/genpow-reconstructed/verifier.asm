@@ -120,7 +120,7 @@ OP_ROT
 call fp_mul
 end
 
-function outline_18 18
+function outline_18 -1
 OP_7
 OP_ROLL
 OP_7

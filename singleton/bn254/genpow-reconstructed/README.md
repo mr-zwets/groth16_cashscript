@@ -88,9 +88,24 @@ the existing range-prefix and prime-sharing reverse expansion to the official
 4,292-byte artifact. The current program is assembled directly from its readable
 source; the reverse expansion is a separate verification step.
 
+Compact namespace-ID packing (Oct 18, 2026): `outline_18` uses the proven-unused raw
+ID `-1`, encoded as the one-byte `OP_1NEGATE`, while all other IDs retain the original
+non-negative byte-domain and uniqueness checks. Its five static call sites are rewritten
+back to ID 18 in the certificate before any duplicate-body expansion. This isolates the
+exact 4,242-byte control with SHA256
+`8537de8922c6e4711357e4390fd0e1a2006015a16e7b93a7f1d5a88c7d0d58a2`; the next stage
+restores `outline_17` and its five calls to obtain the exact 4,260-byte range-checked
+hash `6d884ee69b1ec0f6b20e749d64422a4f0c779f756a1b01bb1b8edb9b40836e80`. The existing
+range-prefix removal and P-sharing expansion then produce the 4,228-byte post-sharing
+candidate and the pinned 4,292-byte historical artifact. This remains a relaxed-VM
+singleton and does not claim BCH-native input-resource admission.
+
 Matched current public measurements retain the 32-byte range check in both
 programs: baseline 4,619 bytes / 5,505,567,176 relaxed VM cost; duplicate sharing
-4,601 bytes / 5,505,566,861. The improvement is **18 bytes and 315 cost units**.
-The historical 4,587-byte figure precedes that range check and is not this
-comparison's baseline. Four supplied proofs, the original invalid proof and all
-nine current public-input mutations pass the unchanged official gates.
+4,601 bytes / 5,505,566,861. The duplicate-sharing improvement is **18 bytes and
+315 cost units**. The current compact-ID candidate is 4,236 locking bytes plus the
+unchanged 272-byte witness and 87-byte overhead: **4,595 total bytes** and
+5,505,566,856 relaxed VM cost, improving the 4,601-byte control by **6 bytes and
+5 cost units**. The historical 4,587-byte figure precedes that range check and is
+not this comparison's baseline. Four supplied proofs, the original invalid proof
+and all nine current public-input mutations pass the unchanged official gates.

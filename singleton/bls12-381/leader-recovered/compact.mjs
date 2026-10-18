@@ -30,11 +30,11 @@ const mainStart = unchecked.bytecode.length - unchecked.mainBytecode.length;
 assert.deepEqual(Buffer.from(bytecode.subarray(0, mainStart)), Buffer.from(unchecked.bytecode.subarray(0, mainStart)), 'declarations unchanged');
 assert.deepEqual(Buffer.from(bytecode.subarray(bytecode.length - unchecked.mainBytecode.length)), Buffer.from(unchecked.mainBytecode), 'main unchanged after the prefix');
 
-// SX-b2: inline only helpers whose body expansion beats their declaration and call-site
-// overhead. The recovered program.mjs remains the semantic source owner; this stage derives
-// the candidate from its symbolic bodies, keeps the compact identifier map and preserves the
-// exact range-check prefix above.
-export const inlinedFunctions = ['stackSequence33', 'negFp', 'inverseFp'];
+// SZ-a1: inline helpers whose body expansion beats their declaration and call-site overhead.
+// The recovered program.mjs remains the semantic source owner; this stage derives the candidate
+// from its symbolic bodies and preserves the exact range-check prefix above. fp2Sqr's identifier
+// is reassigned to decompressG2 after inlining; every other retained binding is unchanged.
+export const inlinedFunctions = ['stackSequence33', 'negFp', 'inverseFp', 'fp2Sqr'];
 const inlineSet = new Set(inlinedFunctions);
 const bodies = new Map(functions.map(f => [f.name, f.body]));
 const replaceInlineCalls = text => {
@@ -42,15 +42,23 @@ const replaceInlineCalls = text => {
   for (const name of inlinedFunctions) output = output.replaceAll(`CALL ${name}`, bodies.get(name));
   return output;
 };
-const candidateFunctions = functions.filter(f => !inlineSet.has(f.name)).map(f => ({...f, body: replaceInlineCalls(f.body)}));
+const retainedFunctions = functions.filter(f => !inlineSet.has(f.name));
+// Derive the candidate namespace from retained functions so an inlined identifier cannot
+// collide with a promoted callee. Keep the established compact bindings exactly as published.
+export const candidateIdentifiers = new Map(retainedFunctions.map(f => [f.name, identifiers.get(f.name)]));
+candidateIdentifiers.set('decompressG2', 7);
+assert.equal(candidateIdentifiers.size, retainedFunctions.length);
+assert.equal(new Set([...candidateIdentifiers.values()].map(value =>
+  Buffer.from(bigIntToVmNumber(BigInt(value))).toString('hex'))).size, retainedFunctions.length);
+const candidateFunctions = retainedFunctions.map(f => ({...f, body: replaceInlineCalls(f.body)}));
 const candidateMain = replaceInlineCalls(main);
 const buildCandidate = () => {
-  const declarations = candidateFunctions.map(f => ({...f, bytecode: assemble(f.body, identifiers)}));
-  const mainBytecode = assemble(`${rangeCheck} ${candidateMain}`, identifiers);
+  const declarations = candidateFunctions.map(f => ({...f, bytecode: assemble(f.body, candidateIdentifiers)}));
+  const mainBytecode = assemble(`${rangeCheck} ${candidateMain}`, candidateIdentifiers);
   const candidateBytecode = Uint8Array.from([
     ...declarations.flatMap(f => [
       ...encodeDataPush(f.bytecode),
-      ...encodeDataPush(bigIntToVmNumber(BigInt(identifiers.get(f.name)))),
+      ...encodeDataPush(bigIntToVmNumber(BigInt(candidateIdentifiers.get(f.name)))),
       OpcodesBCH.OP_DEFINE,
     ]),
     ...mainBytecode,
@@ -59,9 +67,9 @@ const buildCandidate = () => {
 };
 export const candidateProgram = buildCandidate();
 const candidateSha256 = createHash('sha256').update(candidateProgram.bytecode).digest('hex');
-assert.equal(candidateFunctions.length, 48);
-assert.equal(candidateProgram.bytecode.length, 3424);
-assert.equal(candidateSha256, '24c86240f9b4721d699ae7b76938b0b03bd1b80061d48e52b2374a7a4a5b6d34');
+assert.equal(candidateFunctions.length, 47);
+assert.equal(candidateProgram.bytecode.length, 3422);
+assert.equal(candidateSha256, 'f765c89b1e98342ab58bdb80eb36b643c972346fe98c11cb36d45bd2242f8eaa');
 assert.equal(candidateFunctions.some(f => inlineSet.has(f.name)), false);
 assert.equal(candidateMain.includes('OP_DEFINE'), false);
 assert.equal(candidateMain.includes('OP_INVOKE'), false);
@@ -71,8 +79,9 @@ export const program = candidateProgram;
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   assert(process.argv[2], 'usage: node compact.mjs output.json');
   writeFileSync(process.argv[2], JSON.stringify({
-    status: 'recovered program with compact function identifiers; gates reported separately',
-    identifiers: Object.fromEntries(identifiers),
+    status: 'recovered program with compact function identifiers and SZ-a1 inlining; gates reported separately',
+    identifiers: Object.fromEntries(candidateIdentifiers),
+    functionCount: candidateFunctions.length,
     baselineLockingBytes: bytecode.length, baselineLockingSha256: sha256,
     lockingBytes: candidateProgram.bytecode.length, lockingSha256: candidateSha256,
     inlinedFunctions,
