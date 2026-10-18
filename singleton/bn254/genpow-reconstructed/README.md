@@ -126,7 +126,7 @@ encoder owns both primary and multiproof exports. No proof or public-input
 integer is regenerated.
 
 `g1_decompress` maps `[parity,x]` to `[canonicalY,originalX]`. It shares the
-unchanged 254-step `fp_pow` loop with inversion, computes a square-root candidate
+original 254-step `fp_pow` loop with inversion in the UY profile, computes a square-root candidate
 using `(P+1)/4`, verifies its square against the original reduced curve equation,
 and selects the requested parity. The final parity check rejects signs outside
 0/1 and parity 1 for a zero root. The decoder adds no x canonicality restriction.
@@ -135,9 +135,27 @@ old unrestricted integer or byte-string language. Its root check owns the two
 removed standalone A/C on-curve predicates. The public scalar guard, G2 checks,
 and later arithmetic remain unchanged.
 
-The candidate is 4,232 locking bytes plus a 208-byte witness and 85-byte overhead:
+The UY parity profile uses 4,232 locking bytes plus a 208-byte witness and 85-byte overhead:
 4,525 total, 32 bytes below the 4,557-byte UE control. Static recovery of the
 unchanged arithmetic and direct decoder VM cases are separate from whole-proof
 qualification. This remains relaxed BCH VM research; neither the byte saving nor
 decoder checks establish native consensus or relay compatibility. Historical
 reverse-expansion certificates above describe their respective earlier stages.
+
+Exponent-driven power (VG, Oct 18, 2026): the shared `fp_pow` routine now shifts
+the remaining exponent until zero. Its loop state `[p,r,b,e]` preserves
+`r * b^e = a^E (mod p)`, starting with `r=1` and `b=a mod p`. Each iteration
+conditionally multiplies `r` by `b`, squares `b`, and shifts `e` right by one.
+Both call sites construct fixed positive exponents below `2^254`: `P-2` for
+inversion and `(P+1)/4` for square roots. Multiplication order matches the old
+loop; unused trailing squares and the explicit iteration counter are removed.
+The zero-exponent case returns one. All other 68 function bodies, identifiers,
+the main program, scalar guard, decoder and archived witnesses remain exact.
+
+The current program has 4,223 locking bytes, a 208-byte witness and 85-byte
+transaction overhead: **4,516 total**, nine bytes below UY. Its locking SHA256 is
+`11562df7a32468c8417741d5a512709fbe5184edb49b538e388671e8a7cdf3e5`.
+Independent mathematical review and direct VM cases cover the loop boundary;
+whole-verifier proof and cost measurements are recorded separately by the
+release jobs. This remains relaxed-VM research with the same canonical G1
+witness representation and existing subgroup posture.

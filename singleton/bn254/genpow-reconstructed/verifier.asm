@@ -1780,7 +1780,8 @@ push 17
 OP_PICK
 end
 
-# Shared 254-bit exponentiation. Input a, p, e; output a^e mod p.
+# Exponent-driven modular power. Input a, p, nonnegative e; output a^e mod p.
+# Loop stack p, r, b, e maintains r*b^e = a^E (mod p); e=0 returns 1.
 function fp_pow 66
 OP_1
 OP_3
@@ -1788,47 +1789,40 @@ OP_ROLL
 OP_3
 OP_PICK
 OP_MOD
-OP_0
+OP_ROT
 OP_BEGIN
 OP_DUP
-push fe00
-OP_LESSTHAN
 OP_DUP
 OP_TOALTSTACK
 OP_IF
-OP_3
-OP_PICK
-OP_OVER
-OP_RSHIFTNUM
+OP_DUP
 OP_2
 OP_MOD
-OP_1
-OP_NUMEQUAL
 OP_IF
 OP_ROT
 OP_2
 OP_PICK
 OP_MUL
-OP_4
+OP_3
 OP_PICK
 OP_MOD
 OP_ROT
 OP_ROT
 OP_ENDIF
-OP_OVER
-OP_ROT
+OP_SWAP
+OP_DUP
 OP_MUL
-OP_4
+OP_3
 OP_PICK
 OP_MOD
 OP_SWAP
-OP_1ADD
+OP_1
+OP_RSHIFTNUM
 OP_ENDIF
 OP_FROMALTSTACK
 OP_NOT
 OP_UNTIL
 OP_2DROP
-OP_NIP
 OP_NIP
 end
 
