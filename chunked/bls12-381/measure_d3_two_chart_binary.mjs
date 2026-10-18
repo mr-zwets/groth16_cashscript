@@ -2975,6 +2975,20 @@ if (arithmeticLeafId === -1) {
   fusedQuotientRedeem = concat(
     fusedQuotientRedeem.slice(0, offset + 15), fusedQuotientRedeem.slice(offset + 19),
   );
+  const loopSplit = Uint8Array.from(Buffer.from('7801307f75527901307f77537a757c6b7c6c', 'hex'));
+  const loopOffset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(loopSplit));
+  // These endpoints precede the final-evaluation cut, so the original boundaries apply.
+  assert(loopOffset >= 0 && loopOffset + loopSplit.length <= offset + 15 &&
+    Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(loopSplit), loopOffset + 1) < 0 &&
+    [loopOffset, loopOffset + loopSplit.length].every((position) => boundaries.has(position)),
+  'fused quotient loop split changed');
+  // S, remaining, index -> S, suffix, index, prefix48; preserve the alternate stack.
+  // Keep the split bound, unsigned conversion, coefficient range and loop arithmetic.
+  fusedQuotientRedeem = concat(
+    fusedQuotientRedeem.slice(0, loopOffset),
+    Uint8Array.from(Buffer.from('7c01307f7b7b', 'hex')),
+    fusedQuotientRedeem.slice(loopOffset + loopSplit.length),
+  );
 }
 const fusedQuotientOpcodes = decodeAuthenticationInstructions(fusedQuotientRedeem)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
