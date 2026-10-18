@@ -7,12 +7,36 @@ In `../densless-msm`, every stage ends with a 224-byte state push (X, Y, Z, n0, 
 Here:
 
 - **The public inputs are terminal pushes.** The claimed n0, n1 are the terminal's own number pushes, just below zInv and its state push. The terminal range-checks them (`0 <= n < r`) and checks the GLV decomposition of w against them. Genesis no longer carries n0, n1. The bench `publicInputs` are input 4, pushes 53 (n0) and 52 (n1).
-- **w lives only in the terminal state.** The terminal's state push is w, X, Y, Z (160 bytes), and the terminal requires that exact length. It is the last push before the terminal redeem, whose length is fixed by the locking's hash. So the 160 bytes that end `back` bytes before the end of input 4's unlocking are exactly that push. Genesis reads its 33 witness bytes from this window. Each executor reads its own range from it.
+- **w lives only in the terminal state.** The terminal's state push is w, X, Y, Z (160 bytes), and the terminal requires that exact length. It is the last push before the terminal redeem, whose length is fixed by the locking's hash. So the 160 bytes that end `back` bytes before the end of input 4's unlocking are exactly that push. Genesis reads its configured witness prefix from this window (33 bytes for floating,27 for the orbit profiles). Each executor reads its own range from it.
 - **Executor state pushes are X, Y, Z only** (96 bytes). As before, each stage pins the next stage's push from the end of the receiver's unlocking: input 0 → 1 → 2 → 4, and genesis → input 0.
 - **Soundness argument** (same shape as the parent). All stages consume one w. The terminal binds that w to its claimed n0, n1 mod r. The X, Y, Z chain is pinned stage to stage. The terminal checks the final affine point against the genesis vk_x, which the Miller loop consumes. So a proof verifies only for the claimed inputs.
 - **Rebalance.** Full MADD prime caching shrinks the genesis unlocking script and its op budget. The default Straus split is 31 (genesis runs positions 63..31), with witness-byte cuts 33,43,54,60. Four positions move from genesis to the executors, two each to exec0 and exec1. Global and stage padding remain zero. The two 96-byte derived states at the first two stage boundaries move from seams 37/45 to 33/43; proof, public input, quotient and auxiliary values stay fixed.
 
 **Malleability pins** (`malleability-pins.mjs`, default `SLIM_PINS=full`): prepended once to the densless half of the terminal redeem. They pin PUSHDATA2 lengths on the terminal header/quot and each executor quot, enforce non-decreasing order on terminal limbs 2..11, and require fixed-table sign bits clear on all three executors. The order reader follows actual minimally encoded VM-number pushes, including OP_0, small integer opcodes and 31/32-byte payloads. Its helper key 151 is disjoint from sign helper 150 and the existing base/MSM namespaces. The builder and witness producer share `PIN_MODE`, so an unset environment reproduces explicit `full` output. Modes remain `0`, `lenonly`, `orderonly`, `lensign`, `lenorder`, `full`.
+
+## Current stack cleanup
+
+Every cache profile uses the checked executor cleanup and terminal inverse-copy identities. The executor replaces `DROP 4 ROLL DROP 4 ROLL DROP 4 ROLL DROP` with `7 ROLL 2DROP 2ROT 2DROP`; both consume eight owned raw words and retain words3..6. The terminal replaces `6 PICK 7 PICK` with `6 PICK DUP`, copying the same arbitrary raw word twice with seven owned words. Both preserve lower main/ALT/function-table prefixes. The existing unique whole-block fingerprints and instruction-boundary checks guard each transform.
+
+Floating, raw-dbl, raw-madd, direct orbit and retained orbit each save16 primary bytes and2,049 native units in both modes. All72 paired archived mode contexts per profile have those deltas. Raw-both already used both rules and retains its programs at explicit27 and default31 schedules. The cache-profile API, full-pin default and zero-padding defaults are unchanged.
+
+| profile / split | primary score (bytes) | native consensus | native standard | minimum sampled native input margin |
+|---|---:|---:|---:|---:|
+| floating (default31) | 35,109 | 24,840,184 | 24,908,408 | 86,670 |
+| raw-dbl31 | 35,266 | 24,828,520 | 24,897,128 | 88,287 |
+| raw-madd31 | 35,480 | 24,688,942 | 24,757,934 | 113,592 |
+| orbit37 | 34,685 | 25,263,604 | 25,331,060 | 104,025 |
+| orbit-retained37 | 34,631 | 25,317,261 | 25,384,589 | 93,286 |
+| raw-both27 / cuts37,43,51,52 | 35,636 | 24,669,602 | 24,738,978 | 61,094 |
+| raw-both31 / cuts33,43,54,60 | 35,636 | 24,670,766 | 24,740,142 | 116,228 |
+
+The first three profiles default to split31/cuts33,43,54,60; the two orbit profiles default to37/cuts27,36,47,55. Explicit overrides remain available. Each executor redeem is five bytes shorter and the terminal is one byte shorter for the five changed profiles. Their helper bodies, registry, shared/loader programs and every Straus/Horner body/control remain exact per prior profile. Current readers, same-width tail literals, namespaces and worker commitments are checked against the prior code. Local executor savings are500/500/507 and the inverse-copy saving101; native whole-transaction measurements own the2,049 aggregate saving.
+
+All36 fixed core/short/dense proofs pass both actualVM and pinned-native modes before and after each changed profile, with all reached budgets and DEFINE comparisons retained. Every pre-redeem proof/witness/scalar/XYZ/header/root/quotient/auxiliary/challenge byte remains fixed per prior schedule. Source-generated vectors retain all44 attack cases. The public release gate additionally requires actual owning invalid/binding/public-input/type/G2/parent-spec checks and fresh reconstruction. These are finite, conditional results; no whole-MSM/input/native envelope, universal producer/resource fit, full pairing/PIT/EIP197/subgroup mathematics, exceptional/physical-alias completeness, memory or admission claim follows.
+
+## Earlier qualification snapshots
+
+The byte/native figures below record earlier compiler, cache and orbit milestones. Current build metrics are in the table above.
 
 The primary archived fixture with full pins uses **34,890 script bytes / 35,125 score**, including 235 bytes of transaction overhead. Co8 saves **18 bytes** and **124,441 native units in both modes** from the merged 35,143 revision. Minimal-number encodings make sizes vary across proofs; the five core fixtures score 35,067–35,126. Primary corrected-native cost is **24,842,233 consensus / 24,910,457 standard**. Every mathematical proof, public input, witness, quotient, auxiliary, challenge, header and derived-state byte stays fixed in this update.
 

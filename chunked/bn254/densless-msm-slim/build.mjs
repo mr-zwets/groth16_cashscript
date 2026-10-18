@@ -174,7 +174,7 @@ function buildWith({backExec, backTerminal}) {
   ]);
   programs.loader = Buffer.concat([fragmentReaderDeclaration, assemble(executor, loaderIdentifiers, constants)]);
   programs.msmExec = stage(cash(sourceExec({cuts: CUTS, backExec, backTerminal})), definitions, programs.msmA.length);
-  if (cacheProfile === 'raw-both') programs.msmExec = compactExecutorCleanup(programs.msmExec);
+  programs.msmExec = compactExecutorCleanup(programs.msmExec);
   programs.executor = Buffer.concat([execPadded ? Buffer.from([OpcodesBCH.OP_NIP]) : Buffer.alloc(0),
     carrier(programs.loader, programs.msmExec, 1)]);
   const workerLockings = [programs.executor, programs.executor, programs.executor, programs.genesis]
@@ -183,7 +183,7 @@ function buildWith({backExec, backTerminal}) {
   // terminal: the densless terminal, then the final MSM stage on its parked pushes (zInv, state)
   ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminal, constants));
   programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
-  if (cacheProfile === 'raw-both') programs.msmFinal = compactInverseCopy(programs.msmFinal);
+  programs.msmFinal = compactInverseCopy(programs.msmFinal);
   // Malleability pins (length / order / sign-bit) run before the densless terminal, paid once.
   const layoutExec = [
     { shared: layout.fragmentLengths[0], witness: 2560, table: 928 },
