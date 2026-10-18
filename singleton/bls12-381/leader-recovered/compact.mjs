@@ -311,6 +311,7 @@ const profileInlines = {
   combined: ['stackSequence56', 'stackSequence58'],
   expanded: ['stackSequence54', 'stackSequence56', 'stackSequence58'],
   aggressive: ['stackSequence53', 'stackSequence56', 'stackSequence58'],
+  extended: ['stackSequence53', 'stackSequence54', 'stackSequence56', 'stackSequence58'],
 };
 export function buildProfile(profile = 'bytes') {
   assert(profile === 'bytes' || Object.hasOwn(profileInlines, profile), `unknown profile: ${profile}`);
@@ -347,7 +348,7 @@ export function buildProfile(profile = 'bytes') {
     outlinedStackSequences: outlinedStackSequences.filter(f => retained.has(f.function))};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive]');
+  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended]');
   const profile = process.argv[3] ?? 'bytes';
   const selected = buildProfile(profile);
   const selectedSha256 = createHash('sha256').update(selected.program.bytecode).digest('hex');
