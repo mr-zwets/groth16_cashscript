@@ -12,7 +12,7 @@ export const redeemPushBytes = (length) => length + (length < 76 ? 1 : length < 
 
 /** One owner for malleability-pin namespace selection. Defaults preserve every existing profile. */
 export const defaultPinIds = Object.freeze({sign: 150, number: 151});
-export const compactPinIds = Object.freeze({sign: 34, number: 35});
+export const compactPinIds = Object.freeze({sign: 16, number: 35});
 
 export function canonicalizeLimbs(buf) {
   const out = Buffer.from(buf);

@@ -104,7 +104,7 @@ const SHARED_PRIME_NAMESPACE_KEY = Buffer.from(bigIntToVmNumber(SHARED_PRIME_ID)
 const SHARED_PRIME = Buffer.from('47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430', 'hex');
 const SHARED_PRIME_BODY = Buffer.concat([Buffer.from([SHARED_PRIME.length]), SHARED_PRIME]);
 const SHARED_PRIME_CALL = Buffer.from([...SHARED_PRIME_KEY, OpcodesBCH.OP_INVOKE]);
-const SCALAR_ORDER_ID = sharedPrimeEnabled ? 16n : 38n;
+const SCALAR_ORDER_ID = sharedPrimeEnabled ? 34n : 38n;
 const TERMINAL_SEQUENCE0_ID = 38n;
 const SCALAR_ORDER_KEY = Buffer.from(encodeDataPush(bigIntToVmNumber(SCALAR_ORDER_ID)));
 const SCALAR_ORDER_BYTES = Buffer.from(bigIntToVmNumber(SCALAR_FIELD));
@@ -142,7 +142,7 @@ const terminalSource = terminalSourceForProfile(primeSourceForProfile(terminal))
 if (sharedPrimeEnabled) {
   const existingIds = [...sourceIds(sharedSource), ...sourceIds(terminalSource), -1, 100, Number(LOADER_ID), MSM_ID_OFFSET];
   assert(!existingIds.includes(Number(SHARED_PRIME_ID)), 'shared-prime namespace key is already occupied');
-  assert.equal(sourceIds(terminalSource).filter(id => id === 16).length, 1, 'terminal scalar id16 must be unique');
+  assert.equal(sourceIds(terminalSource).filter(id => id === Number(SCALAR_ORDER_ID)).length, 1, 'terminal scalar identifier must be unique');
   assert.equal(sourceIds(terminalSource).filter(id => id === Number(TERMINAL_SEQUENCE0_ID)).length, 1, 'terminal sequence0 id38 must be unique');
 }
 function cachePrimeDefinition(bytecode, id) {
@@ -317,7 +317,7 @@ const functionKeys = bytecode => {
   return keys;
 };
 const assertPinFunctionNamespace = (ids, bytecodes) => {
-  const used = bytecodes.flatMap(functionKeys);
+  const used = [...bytecodes.flatMap(functionKeys), Buffer.from(bigIntToVmNumber(LOADER_ID)).toString('hex')];
   const selected = [ids.sign, ids.number].map(id => Buffer.from(bigIntToVmNumber(BigInt(id))).toString('hex'));
   assert.equal(new Set(selected).size, selected.length, 'selected pin function identifiers must be distinct');
   for (const key of selected) assert(!used.includes(key), `selected pin function identifier collides with compiled namespace: ${key}`);
@@ -403,7 +403,8 @@ function buildWith({backExec, backTerminal}) {
   programs.msmFinal = compactInverseCopy(programs.msmFinal);
   programs.msmFinal = reuseFinalPrimeCalls(programs.msmFinal);
   programs.msmFinal = reuseTerminalScalarOrder(programs.msmFinal);
-  assertPinFunctionNamespace(selectedPinIds, [programs.shared, programs.genesis, programs.loader, programs.msmA, programs.msmExec, programs.msmFinal, programs.terminalBase]);
+  // Pins coexist with the terminal module, imported MSM definitions, and stage loader only.
+  assertPinFunctionNamespace(selectedPinIds, [programs.terminalBase, definitions]);
   // Malleability pins (length / order / sign-bit) run before the densless terminal, paid once.
   const pinMode = PIN_MODE;
   const pins = pinMode === '0' ? Buffer.alloc(0)
