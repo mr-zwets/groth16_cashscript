@@ -2362,7 +2362,7 @@ const TEMPLATE_EXTRA_FUNCTION_ID = 14;
 const templateCommonFunctionId = (template) => template.name === 'AdditionTail'
   ? 13
   : TEMPLATE_COMMON_FUNCTION_ID;
-const TEMPLATE_ARITHMETIC_FUNCTION_ID = -1;
+const DEFAULT_TEMPLATE_ARITHMETIC_FUNCTION_ID = -1;
 const PIC_AUTH_FUNCTION_ID = 15;
 const templateCommonOffsets = new Map([
   ['First', 921],
@@ -2500,32 +2500,41 @@ const selectivePrimeSites = new Map([
   ['0a', new Set([8, 28, 37])],
 ]);
 // The default profile retains the byte-best UD namespace: the selective prime
-// leaf owns raw key 0x11. Opt-in profiles 12 and 5 apply the exact arithmetic
-// owner bijection recursively to literal DEFINE/INVOKE keys and remainders;
-// profile 5 displaces its occupied arithmetic owner from raw key 0x05 to 0x11.
+// leaf owns raw key 0x11. Opt-in profiles -1, 12, and 5 apply the exact
+// arithmetic owner bijection recursively to literal DEFINE/INVOKE keys and
+// remainders; profile -1 also moves the imported arithmetic wrapper from raw
+// key 0x81 to 0x11 so the leaf can own OP_1NEGATE without a duplicate.
+// Profiles 12 and 5 displace their occupied arithmetic owners to raw 0x11.
 const arithmeticProfileKey = process.env.RPA_COMPACT_ARITHMETIC_PRIME_KEY ?? '17';
-assert(['5', '12', '17'].includes(arithmeticProfileKey),
-  'RPA_COMPACT_ARITHMETIC_PRIME_KEY must be 5, 12, or 17');
+assert(['-1', '5', '12', '17'].includes(arithmeticProfileKey),
+  'RPA_COMPACT_ARITHMETIC_PRIME_KEY must be -1, 5, 12, or 17');
 const arithmeticLeafSourceId = 17;
 const arithmeticLeafId = Number(arithmeticProfileKey);
-const arithmeticNamespaceMap = arithmeticLeafId === 12
-  ? new Map([['0c', '11'], ['11', '0c']])
-  : arithmeticLeafId === 5
-    ? new Map([['05', '11'], ['11', '05']])
-    : new Map();
+const arithmeticNamespaceMap = arithmeticLeafId === -1
+  ? new Map([['11', '81'], ['81', '11']])
+  : arithmeticLeafId === 12
+    ? new Map([['0c', '11'], ['11', '0c']])
+    : arithmeticLeafId === 5
+      ? new Map([['05', '11'], ['11', '05']])
+      : new Map();
 const arithmeticProfile = {
   key: arithmeticProfileKey,
   leafId: arithmeticLeafId,
-  leafRawKey: Uint8Array.of(arithmeticLeafId),
+  leafRawKey: arithmeticLeafId === -1 ? '81' : arithmeticLeafId.toString(16).padStart(2, '0'),
   namespaceMap: arithmeticNamespaceMap,
-  expectedLibraryBytes: arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
-  expectedLibrarySha256: arithmeticLeafId === 12
-    ? '716398743a5a131e1906e462716026526caa12b228c6f1d207974e131039b254'
-    : arithmeticLeafId === 5
-      ? '2632cd31885564ac9caf294c3aaa21f4f5cd775e37f365db5e30f7cc2f39b0e9'
-      : 'a4cc53fe1d7fd736b1a058335d4f83884d603c237ce9626bb219acd61e9767b6',
+  expectedLibraryBytes: arithmeticLeafId === -1 ? 615 : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
+  expectedLibrarySha256: arithmeticLeafId === -1
+    ? '1d801dec6edcae14f6f8bbadfde7f9f7342754302683e445f13d3d2abc773f3d'
+    : arithmeticLeafId === 12
+      ? '716398743a5a131e1906e462716026526caa12b228c6f1d207974e131039b254'
+      : arithmeticLeafId === 5
+        ? '2632cd31885564ac9caf294c3aaa21f4f5cd775e37f365db5e30f7cc2f39b0e9'
+        : 'a4cc53fe1d7fd736b1a058335d4f83884d603c237ce9626bb219acd61e9767b6',
 };
 const arithmeticLeafRawKey = arithmeticProfile.leafRawKey;
+const templateArithmeticFunctionId = arithmeticLeafId === -1
+  ? 17
+  : DEFAULT_TEMPLATE_ARITHMETIC_FUNCTION_ID;
 const leafCallInstructions = decodeAuthenticationInstructions(
   concat(pushVmNumber(arithmeticLeafSourceId), Uint8Array.of(OP.INVOKE)),
 );
@@ -2581,8 +2590,9 @@ const arithmeticFunctionKey = (instruction) => instruction.data !== undefined
       : instruction.opcode >= 81 && instruction.opcode <= 96
         ? (instruction.opcode - 80).toString(16).padStart(2, '0')
         : undefined;
-const arithmeticRawKeyInstruction = (rawKey) =>
-  decodeAuthenticationInstructions(encodeDataPush(
+const arithmeticRawKeyInstruction = (rawKey) => rawKey === '81'
+  ? decodeAuthenticationInstructions(Uint8Array.of(0x4f))[0]
+  : decodeAuthenticationInstructions(encodeDataPush(
     Uint8Array.from(Buffer.from(rawKey, 'hex')),
   ))[0];
 const arithmeticNamespaceInstructions = new Map(
@@ -2625,7 +2635,10 @@ assert(templateArithmeticLength === arithmeticProfile.expectedLibraryBytes,
   `${arithmeticProfile.key} arithmetic library length changed`);
 assert(hex(sha256(templateArithmeticBody)) === arithmeticProfile.expectedLibrarySha256,
   `${arithmeticProfile.key} arithmetic library selective leaf changed`);
-assert(arithmeticLeafRawKey[0] === arithmeticLeafId && arithmeticLeafSourceId === 17,
+const expectedArithmeticLeafRawKey = arithmeticFunctionKey(
+  decodeAuthenticationInstructions(pushVmNumber(arithmeticLeafId))[0],
+);
+assert(arithmeticLeafRawKey === expectedArithmeticLeafRawKey && arithmeticLeafSourceId === 17,
   'arithmetic leaf raw key changed');
 const remapArithmeticRemainder = (remainder) => arithmeticNamespaceMap.size === 0
   ? remainder
@@ -2733,9 +2746,9 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
           templateCarrierLengths.get(templateCommonCarrier.name),
           templateCommonCarrier.coreStart,
           templateCommonCarrier.coreStart + templateArithmeticLength,
-          TEMPLATE_ARITHMETIC_FUNCTION_ID,
+          templateArithmeticFunctionId,
         ),
-        pushVmNumber(TEMPLATE_ARITHMETIC_FUNCTION_ID),
+        pushVmNumber(templateArithmeticFunctionId),
         Uint8Array.of(OP.INVOKE),
         template.arithmeticRemainder,
       );
@@ -3793,7 +3806,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     templateCommonCarrier,
     templateCommonCarrier.coreStart,
     templateCommonCarrier.coreStart + templateArithmeticLength,
-    TEMPLATE_ARITHMETIC_FUNCTION_ID,
+    templateArithmeticFunctionId,
   );
   const firstPicLoaderLayout = templateLoaderLayout(
     { name: 'PIC authentication', representative: PIC_BLOCK4_INDEX },
@@ -3872,7 +3885,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       loaderOffset: arithmeticLoaderOffset,
       mutationOffset: arithmeticLoaderLayout.functionIdOffset,
       before: arithmeticLoaderLayout.functionIdPush,
-      after: pushVmNumber(TEMPLATE_ARITHMETIC_FUNCTION_ID + 1),
+      after: pushVmNumber(templateArithmeticFunctionId + 1),
     },
     {
       name: 'changed-template-arithmetic-loader-source-input',
@@ -4769,7 +4782,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
         profileKey: arithmeticProfile.key,
         leafId: arithmeticProfile.leafId,
         namespaceMap: Object.fromEntries(arithmeticProfile.namespaceMap),
-        functionId: TEMPLATE_ARITHMETIC_FUNCTION_ID,
+        functionId: templateArithmeticFunctionId,
         bodyBytes: templateArithmeticLength,
         bodySha256: hex(sha256(templateArithmeticBody)),
         definitions: candidateArithmeticInstructions.length / 3,
