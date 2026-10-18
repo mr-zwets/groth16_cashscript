@@ -310,6 +310,8 @@ const inlineKeys = {
     occurrences: stackOutlines.find(f => f.function === 'stackSequence56').occurrences},
   stackSequence58: {displaced: 'fp2MulXi', from: 53, to: 13,
     occurrences: stackOutlines.find(f => f.function === 'stackSequence58').occurrences},
+  stackSequence61: {id: 56, byteLength: 7,
+    occurrences: stackOutlines.find(f => f.function === 'stackSequence61').occurrences},
 };
 const profileInlines = {
   balanced: ['stackSequence58'],
@@ -322,6 +324,7 @@ const profileInlines = {
   extended57: ['stackSequence53', 'stackSequence54', 'stackSequence56', 'stackSequence57', 'stackSequence58'],
   'extended55-57': ['stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58'],
   'extended52-55-57': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58'],
+  'extended52-55-57-61': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence61'],
 };
 export function buildProfile(profile = 'bytes') {
   assert(profile === 'bytes' || Object.hasOwn(profileInlines, profile), `unknown profile: ${profile}`);
@@ -341,6 +344,13 @@ export function buildProfile(profile = 'bytes') {
       assert.equal(helperBytecode.toString('hex'), '01117a01117a');
       assert.equal(expectedOccurrences, 6);
       assert.equal(main.match(/\bCALL decompressG2\b/g)?.length ?? 0, 4);
+    } else if (name === 'stackSequence61') {
+      // Preserve both arithmetic calls and the intervening opaque stack permutation.
+      assert.equal(helperBytecode.toString('hex'), '528a7c727c548a');
+      assert.equal(candidateIdentifiers.get('fp2Mul'), 2);
+      assert.equal(candidateIdentifiers.get('fp2Add'), 4);
+      assert.equal(expectedOccurrences, 3);
+      assert.equal(displaced, undefined);
     } else if (name === 'stackSequence55') {
       // Exact opaque permutation: 2SWAP SWAP 2ROT SWAP; no arithmetic or calls.
       assert.equal(helperBytecode.toString('hex'), '727c717c');
@@ -376,7 +386,7 @@ export function buildProfile(profile = 'bytes') {
     outlinedStackSequences: outlinedStackSequences.filter(f => retained.has(f.function))};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57]');
+  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61]');
   const profile = process.argv[3] ?? 'bytes';
   const selected = buildProfile(profile);
   const selectedSha256 = createHash('sha256').update(selected.program.bytecode).digest('hex');

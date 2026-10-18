@@ -25,6 +25,7 @@ export function assemble(source, {profile = 'bytes'} = {}) {
     expanded: ['outline_69', 'outline_71'],
     lean: ['outline_68'],
     'lean-expanded': ['outline_68', 'outline_69', 'outline_71'],
+    'lean-expanded64': ['outline_64', 'outline_68', 'outline_69', 'outline_71'],
   };
   assert(Object.hasOwn(profiles, profile), `unknown assembly profile: ${profile}`);
   const functions = new Map();
@@ -62,7 +63,7 @@ export function assemble(source, {profile = 'bytes'} = {}) {
     const inline = new Map(profiles[profile].map(name => [name, functions.get(name)]));
     const lines = [...functions.values(), main].flatMap(fn => fn.lines);
     for (const [name, id, occurrences] of [
-      ['outline_68', 65, 5],
+      ['outline_64', -1, 11], ['outline_68', 65, 5],
       ['outline_69', 15, 10], ['outline_70', 69, 5], ['outline_71', 70, 5],
     ]) {
       if (!inline.has(name)) continue;
@@ -70,10 +71,16 @@ export function assemble(source, {profile = 'bytes'} = {}) {
       assert(fn && fn.id === id, `${name}: expected profile helper ID ${id}`);
       assert.equal(lines.filter(line => line.command === 'call' && line.args[0] === name).length,
         occurrences, `${name}: expected profile call sites`);
-      assert(fn.lines.every(({command, args}) => command === 'call'
-        ? args[0] === 'fp_mul'
-        : command === 'push' || ['OP_7', 'OP_ROLL', 'OP_DUP', 'OP_OVER', 'OP_PICK'].includes(command)),
-      `${name}: profile inlining requires a straight-line stack/arithmetic helper`);
+      if (name === 'outline_64') {
+        assert.deepEqual(fn.lines.map(({command, args}) => [command, ...args]),
+          [['OP_4'], ['OP_PICK'], ['OP_6'], ['OP_PICK']],
+          'outline_64: expected exact four/six-pick sequence');
+      } else {
+        assert(fn.lines.every(({command, args}) => command === 'call'
+          ? args[0] === 'fp_mul'
+          : command === 'push' || ['OP_7', 'OP_ROLL', 'OP_DUP', 'OP_OVER', 'OP_PICK'].includes(command)),
+        `${name}: profile inlining requires a straight-line stack/arithmetic helper`);
+      }
     }
     for (const fn of [...functions.values(), main]) {
       fn.lines = fn.lines.flatMap(line => line.command === 'call' && inline.has(line.args[0])
@@ -85,6 +92,12 @@ export function assemble(source, {profile = 'bytes'} = {}) {
       assert(displaced && displaced.id === 68 && ![...functions.values()].some(fn => fn.id === 15),
         'outline_15: expected displaced ID 68 and released ID 15');
       displaced.id = 15;
+    }
+    if (inline.has('outline_64')) {
+      const displaced = functions.get('outline_18');
+      assert(displaced && displaced.id === 18 && ![...functions.values()].some(fn => fn.id === -1),
+        'outline_18: expected displaced ID 18 and released ID -1');
+      displaced.id = -1;
     }
   }
   const compile = lines => Buffer.concat(lines.flatMap(({command, args, where}) => {
@@ -141,7 +154,7 @@ function compressG1Witness(hex) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   assert([3, 4].includes(process.argv.length),
-    'usage: node build.mjs OUTPUT_DIRECTORY [bytes|balanced|cost|light|selective|expanded|lean|lean-expanded]');
+    'usage: node build.mjs OUTPUT_DIRECTORY [bytes|balanced|cost|light|selective|expanded|lean|lean-expanded|lean-expanded64]');
   const profile = process.argv[3] ?? 'bytes';
   const here = new URL('./', import.meta.url);
   const source = readFileSync(new URL('verifier.asm', here), 'utf8');
