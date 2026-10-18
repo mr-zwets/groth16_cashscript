@@ -103,6 +103,11 @@ const SHARED_PRIME_NAMESPACE_KEY = Buffer.from(bigIntToVmNumber(SHARED_PRIME_ID)
 const SHARED_PRIME = Buffer.from('47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430', 'hex');
 const SHARED_PRIME_BODY = Buffer.concat([Buffer.from([SHARED_PRIME.length]), SHARED_PRIME]);
 const SHARED_PRIME_CALL = Buffer.from([...SHARED_PRIME_KEY, OpcodesBCH.OP_INVOKE]);
+const SCALAR_ORDER_ID = 38n;
+const SCALAR_ORDER_KEY = Buffer.from(encodeDataPush(bigIntToVmNumber(SCALAR_ORDER_ID)));
+const SCALAR_ORDER_BYTES = Buffer.from(bigIntToVmNumber(SCALAR_FIELD));
+const SCALAR_ORDER_BODY = Buffer.from(encodeDataPush(SCALAR_ORDER_BYTES));
+const SCALAR_ORDER_CALL = Buffer.from([...SCALAR_ORDER_KEY, OpcodesBCH.OP_INVOKE]);
 const SHARED_PRIME_HELPERS = new Map([
   ['c800', {oldBytes: 262, oldSha256: '4e3b86b609032b3cda1823349f40433ef8912c082951bba7d42fbfecef0ceaca', sites: 4, newBytes: 142, newSha256: '8bacc2b3e0ecb73e367094f7871d470f3975e8c0e74ad63648d6be28e25e3140'}],
   ['c900', {oldBytes: 747, oldSha256: '7fa0b44ce7ca69604aaed156c32264d4251083d8157903ae0d076a337d79a303', sites: 1, newBytes: 717, newSha256: 'c460fb54b43e02d585058264c1ce885dc7952642b2d4e2c34e022452955483af'}],
@@ -211,6 +216,30 @@ function reuseFinalPrimeCalls(bytecode) {
   assert.equal(replaced, 5, 'SU-a1 final MSM must contain exactly five P literals');
   return Buffer.from(encodeAuthenticationInstructions(next));
 }
+function reuseTerminalScalarOrder(bytecode) {
+  if (!sharedPrimeEnabled) return bytecode;
+  const instructions = decodeAuthenticationInstructions(bytecode);
+  let replaced = 0;
+  const next = instructions.flatMap(instruction => {
+    if (instruction.data === undefined || !Buffer.from(instruction.data).equals(SCALAR_ORDER_BYTES)) return [instruction];
+    replaced += 1;
+    return decodeAuthenticationInstructions(SCALAR_ORDER_CALL);
+  });
+  assert.equal(replaced, 4, 'TA-a1 terminal must contain exactly four scalar-order literals');
+  return Buffer.from(encodeAuthenticationInstructions(next));
+}
+function addTerminalScalarOrderDefinition(bytecode) {
+  if (!sharedPrimeEnabled) return bytecode;
+  const instructions = decodeAuthenticationInstructions(bytecode);
+  let main = 0;
+  while (main + 2 < instructions.length && instructions[main + 2].opcode === OpcodesBCH.OP_DEFINE) main += 3;
+  const declaration = decodeAuthenticationInstructions(Buffer.concat([
+    Buffer.from(encodeDataPush(SCALAR_ORDER_BODY)), SCALAR_ORDER_KEY, Buffer.from([OpcodesBCH.OP_DEFINE]),
+  ]));
+  return Buffer.from(encodeAuthenticationInstructions([
+    ...instructions.slice(0, main), ...declaration, ...instructions.slice(main),
+  ]));
+}
 const cashCache = new Map();
 const cash = (source) => {
   if (!cashCache.has(source)) {
@@ -318,9 +347,11 @@ function buildWith({backExec, backTerminal}) {
   constants.workerLockingRoot = hash256(Buffer.concat(workerLockings.map(hash256)));
   // terminal: the densless terminal, then the final MSM stage on its parked pushes (zInv, state)
   ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminal, constants));
+  programs.terminalBase = addTerminalScalarOrderDefinition(programs.terminalBase);
   programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
   programs.msmFinal = compactInverseCopy(programs.msmFinal);
   programs.msmFinal = reuseFinalPrimeCalls(programs.msmFinal);
+  programs.msmFinal = reuseTerminalScalarOrder(programs.msmFinal);
   assertPinFunctionNamespace(selectedPinIds, [programs.shared, programs.genesis, programs.loader, programs.msmA, programs.msmExec, programs.msmFinal, programs.terminalBase]);
   // Malleability pins (length / order / sign-bit) run before the densless terminal, paid once.
   const layoutExec = [
