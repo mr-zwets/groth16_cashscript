@@ -2464,14 +2464,20 @@ assert(!templateExtraOpcodes.some((opcode) => [
   );
   template.digest = sha256(template.core);
 });
-const templateArithmeticLength = 799;
+const templateArithmeticOriginalLength = 799;
 const templateArithmeticImports = new Set(['First', 'Regular', 'AdditionMiddle', 'Terminal']);
-const templateArithmeticBody = templateCommonCarrier.core.slice(0, templateArithmeticLength);
-const templateArithmeticInstructions = decodeAuthenticationInstructions(templateArithmeticBody);
-assert(templateArithmeticInstructions.length === 13 * 3 && equalBytes(
-  encodeAuthenticationInstructions(templateArithmeticInstructions), templateArithmeticBody,
+const templateArithmeticCarrier = 'AdditionTail';
+const templateArithmeticOriginalBody = templateCommonCarrier.core.slice(
+  0, templateArithmeticOriginalLength,
+);
+const templateArithmeticOriginalInstructions = decodeAuthenticationInstructions(
+  templateArithmeticOriginalBody,
+);
+assert(templateArithmeticOriginalInstructions.length === 13 * 3 && equalBytes(
+  encodeAuthenticationInstructions(templateArithmeticOriginalInstructions),
+  templateArithmeticOriginalBody,
 ), 'arithmetic library prefix does not end at the expected instruction boundary');
-templateArithmeticInstructions.forEach((instruction, index) => {
+templateArithmeticOriginalInstructions.forEach((instruction, index) => {
   if (index % 3 === 0) {
     assert(instruction.data !== undefined && instruction.data.length > 0,
       'arithmetic library definition body changed');
@@ -2484,13 +2490,87 @@ templateArithmeticInstructions.forEach((instruction, index) => {
       'arithmetic library prefix contains executable work outside definitions');
   }
 });
-assert(hex(sha256(templateArithmeticBody)) ===
+assert(hex(sha256(templateArithmeticOriginalBody)) ===
   '11113485fc60b9d279e6531bf901ae1bba89d340f8ed9422da78b1b878a2548b',
 'arithmetic library compiled definitions changed');
+const selectivePrime = Uint8Array.from(bigIntToVmNumber(P));
+const selectivePrimeSites = new Map([
+  ['06', new Set([0])],
+  ['07', new Set([1])],
+  ['0a', new Set([8, 28, 37])],
+]);
+const arithmeticLeafId = 17;
+const arithmeticLeafRawKey = Uint8Array.of(0x11);
+const leafCallInstructions = decodeAuthenticationInstructions(
+  concat(pushVmNumber(arithmeticLeafId), Uint8Array.of(OP.INVOKE)),
+);
+const selectiveInstructions = [];
+for (let offset = 0; offset < templateArithmeticOriginalInstructions.length; offset += 3) {
+  const body = templateArithmeticOriginalInstructions[offset];
+  const id = templateArithmeticOriginalInstructions[offset + 1];
+  const definition = templateArithmeticOriginalInstructions[offset + 2];
+  const key = id.data !== undefined
+    ? binToHex(id.data)
+    : id.opcode === 0
+      ? ''
+      : id.opcode === 79
+        ? '81'
+        : id.opcode >= 81 && id.opcode <= 96
+          ? (id.opcode - 80).toString(16).padStart(2, '0')
+          : undefined;
+  assert(key !== undefined, 'arithmetic library key is not a canonical raw push');
+  const sites = selectivePrimeSites.get(key);
+  if (sites === undefined) {
+    selectiveInstructions.push(body, id, definition);
+    continue;
+  }
+  const bodyInstructions = decodeAuthenticationInstructions(body.data);
+  const transformed = [];
+  bodyInstructions.forEach((instruction, instructionIndex) => {
+    if (!sites.has(instructionIndex)) {
+      transformed.push(instruction);
+      return;
+    }
+    assert(instruction.data !== undefined && equalBytes(instruction.data, selectivePrime),
+      `selective prime site ${key}:${instructionIndex} changed`);
+    transformed.push(...leafCallInstructions);
+  });
+  selectiveInstructions.push(
+    ...decodeAuthenticationInstructions(encodeDataPush(
+      encodeAuthenticationInstructions(transformed),
+    )), id, definition,
+  );
+}
+const arithmeticLeafBody = concat(Uint8Array.of(0x30), selectivePrime);
+const arithmeticLeafDefinition = decodeAuthenticationInstructions(concat(
+  encodeDataPush(arithmeticLeafBody),
+  pushVmNumber(arithmeticLeafId),
+  Uint8Array.of(OP.DEFINE),
+));
+const templateArithmeticBody = encodeAuthenticationInstructions(
+  [...selectiveInstructions, ...arithmeticLeafDefinition],
+);
+const templateArithmeticLength = templateArithmeticBody.length;
+const candidateArithmeticInstructions = decodeAuthenticationInstructions(templateArithmeticBody);
+assert(candidateArithmeticInstructions.length === 14 * 3 &&
+  candidateArithmeticInstructions.every((instruction, index) =>
+    index % 3 === 0 ? instruction.data !== undefined :
+      index % 3 === 2 ? instruction.opcode === OP.DEFINE : true),
+'arithmetic library must contain exactly fourteen literal definitions');
+assert(templateArithmeticLength === 621, 'selective arithmetic library length changed');
+assert(hex(sha256(templateArithmeticBody)) ===
+  'a4cc53fe1d7fd736b1a058335d4f83884d603c237ce9626bb219acd61e9767b6',
+'arithmetic library selective leaf changed');
+assert(arithmeticLeafRawKey[0] === 0x11 && arithmeticLeafId === 17,
+  'arithmetic leaf raw key changed');
 templateClasses.forEach((template) => {
-  if (!templateArithmeticImports.has(template.name)) return;
-  assert(equalBytes(template.core.slice(0, templateArithmeticLength), templateArithmeticBody),
-    `${template.name} arithmetic library prefix differs from its carrier`);
+  if (!templateArithmeticImports.has(template.name) && template.name !== templateArithmeticCarrier) return;
+  assert(equalBytes(template.core.slice(0, templateArithmeticOriginalLength),
+    templateArithmeticOriginalBody),
+  `${template.name} arithmetic library prefix differs from its carrier`);
+  template.core = concat(templateArithmeticBody,
+    template.core.slice(templateArithmeticOriginalLength));
+  template.digest = sha256(template.core);
   template.arithmeticRemainder = template.core.slice(templateArithmeticLength);
 });
 const templateForBlock = (index) => templateClasses.find(({ members }) => members.includes(index));
@@ -2709,7 +2789,7 @@ const templateBlockRedeems = blockRecords.map((record, index) => {
 
 // Experimental compact-record layout padding. This is outside the frozen
 // resource profile; retain the old audited <=76-byte Regular option unchanged.
-const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_DENSITY_PADDING ?? '{"3":429,"5":416,"6":370,"7":377,"8":361,"9":368,"10":370,"11":378,"12":370,"13":379,"14":380,"16":404,"17":375,"18":377,"19":385}');
+const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_DENSITY_PADDING ?? '{"3":439,"5":426,"6":380,"7":387,"8":371,"9":378,"10":380,"11":388,"12":380,"13":389,"14":390,"16":413,"17":385,"18":387,"19":395}');
 Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   const index = Number(block);
   assert(Number.isInteger(index) && String(index) === block && index !== 2 &&
@@ -3068,6 +3148,36 @@ const validData = verificationData(inputs);
 const wireBytes = encodeTransactionBch(validData.transaction).length;
 const wholeConsensusVerified = consensusVm.verify(validData) === true;
 const wholeStandardVerified = standardVm.verify(validData) === true;
+
+// Diagnostic-only path: capture complete relaxed costs and the density frame
+// before the unchanged strict assertions below. This never changes a strict
+// result and is enabled only for a separately labelled cost diagnostic.
+if (process.env.RPA_DIAGNOSTIC_RELAXED_COST_ONLY === '1') {
+  const diagnosticConsensus = inputs.map((_, index) =>
+    evaluateInput(inputs, index, measurementConsensusVm));
+  const diagnosticStandard = inputs.map((_, index) =>
+    evaluateInput(inputs, index, measurementStandardVm));
+  const diagnosticRows = inputs.map((input, index) => ({
+    index,
+    role: input.role,
+    lockingBytes: input.locking.length,
+    unlockingBytes: input.unlocking.length,
+    consensusOperationCost: diagnosticConsensus[index].operationCost,
+    standardOperationCost: diagnosticStandard[index].operationCost,
+    consensusAcceptedRelaxed: diagnosticConsensus[index].accepted,
+    standardAcceptedRelaxed: diagnosticStandard[index].accepted,
+    densityControlLength: diagnosticConsensus[index].metrics.densityControlLength,
+    consensusMetrics: diagnosticConsensus[index].metrics,
+    standardMetrics: diagnosticStandard[index].metrics,
+  }));
+  writeFileSync(process.env.RPA_DIAGNOSTIC_RESULT, `${JSON.stringify({
+    label: 'DIAGNOSTIC_RELAXED_COST_ONLY',
+    strictGateRemainsBelow: true,
+    inputCount: inputs.length,
+    rows: diagnosticRows,
+    formula: 'actualDensityBudget = densityControlLength * 800; relaxedMargin = actualDensityBudget - operationCost',
+  }, null, 2)}\n`);
+}
 
 assert(inputs.every((input) => input.locking.length <= 10_000), 'locking bytecode exceeds 10,000 bytes');
 assert(inputs.every((input) => input.unlocking.length <= 10_000), 'unlocking bytecode exceeds 10,000 bytes');
@@ -4590,7 +4700,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
         functionId: TEMPLATE_ARITHMETIC_FUNCTION_ID,
         bodyBytes: templateArithmeticLength,
         bodySha256: hex(sha256(templateArithmeticBody)),
-        definitions: 13,
+        definitions: candidateArithmeticInstructions.length / 3,
         carrierTemplate: templateCommonCarrier.name,
         carrierBlockIndex: templateCommonCarrier.representative,
         carrierCoreStart: templateCommonCarrier.coreStart,
