@@ -194,6 +194,23 @@ function sharePrimeDefinition(bytecode) {
     main,
   ]);
 }
+
+// SU-a2 final candidate: reuse the already carried function-37 prime in the final MSM body.
+// This is opt-in only; the reviewed source profiles retain their exact bytecode.
+function reuseFinalPrimeCalls(bytecode) {
+  if (!sharedPrimeEnabled) return bytecode;
+  const instructions = decodeAuthenticationInstructions(bytecode);
+  let definitionEnd = 0;
+  while (definitionEnd + 2 < instructions.length && instructions[definitionEnd + 2].opcode === OpcodesBCH.OP_DEFINE) definitionEnd += 3;
+  let replaced = 0;
+  const next = instructions.flatMap((instruction, i) => {
+    if (i < definitionEnd || instruction.data === undefined || !Buffer.from(instruction.data).equals(SHARED_PRIME)) return [instruction];
+    replaced += 1;
+    return decodeAuthenticationInstructions(SHARED_PRIME_CALL);
+  });
+  assert.equal(replaced, 5, 'SU-a1 final MSM must contain exactly five P literals');
+  return Buffer.from(encodeAuthenticationInstructions(next));
+}
 const cashCache = new Map();
 const cash = (source) => {
   if (!cashCache.has(source)) {
@@ -303,6 +320,7 @@ function buildWith({backExec, backTerminal}) {
   ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminal, constants));
   programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
   programs.msmFinal = compactInverseCopy(programs.msmFinal);
+  programs.msmFinal = reuseFinalPrimeCalls(programs.msmFinal);
   assertPinFunctionNamespace(selectedPinIds, [programs.shared, programs.genesis, programs.loader, programs.msmA, programs.msmExec, programs.msmFinal, programs.terminalBase]);
   // Malleability pins (length / order / sign-bit) run before the densless terminal, paid once.
   const layoutExec = [
