@@ -310,6 +310,8 @@ const inlineKeys = {
     occurrences: stackOutlines.find(f => f.function === 'stackSequence56').occurrences},
   stackSequence58: {displaced: 'fp2MulXi', from: 53, to: 13,
     occurrences: stackOutlines.find(f => f.function === 'stackSequence58').occurrences},
+  stackSequence59: {id: 54, byteLength: 6,
+    occurrences: stackOutlines.find(f => f.function === 'stackSequence59').occurrences},
   stackSequence61: {id: 56, byteLength: 7,
     occurrences: stackOutlines.find(f => f.function === 'stackSequence61').occurrences},
 };
@@ -325,6 +327,7 @@ const profileInlines = {
   'extended55-57': ['stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58'],
   'extended52-55-57': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58'],
   'extended52-55-57-61': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence61'],
+  'extended52-55-57-59-61': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence59', 'stackSequence61'],
 };
 export function buildProfile(profile = 'bytes') {
   assert(profile === 'bytes' || Object.hasOwn(profileInlines, profile), `unknown profile: ${profile}`);
@@ -344,6 +347,11 @@ export function buildProfile(profile = 'bytes') {
       assert.equal(helperBytecode.toString('hex'), '01117a01117a');
       assert.equal(expectedOccurrences, 6);
       assert.equal(main.match(/\bCALL decompressG2\b/g)?.length ?? 0, 4);
+    } else if (name === 'stackSequence59') {
+      // Exact opaque stack moves: PUSH55 ROLL twice; no arithmetic or calls.
+      assert.equal(helperBytecode.toString('hex'), '01377a01377a');
+      assert.equal(expectedOccurrences, 4);
+      assert.equal(displaced, undefined);
     } else if (name === 'stackSequence61') {
       // Preserve both arithmetic calls and the intervening opaque stack permutation.
       assert.equal(helperBytecode.toString('hex'), '528a7c727c548a');
@@ -386,7 +394,7 @@ export function buildProfile(profile = 'bytes') {
     outlinedStackSequences: outlinedStackSequences.filter(f => retained.has(f.function))};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61]');
+  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61|extended52-55-57-59-61]');
   const profile = process.argv[3] ?? 'bytes';
   const selected = buildProfile(profile);
   const selectedSha256 = createHash('sha256').update(selected.program.bytecode).digest('hex');
