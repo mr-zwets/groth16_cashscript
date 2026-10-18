@@ -83,6 +83,37 @@ export const PIN_MODE = process.env.SLIM_PINS ?? 'full';
 // executor loader (-1, 100).
 const MSM_ID_OFFSET = 200, LOADER_ID = 199n;
 const redeemPushBytes = (length) => length + (length < 76 ? 1 : length < 256 ? 2 : 3);
+// The shared-prime companion is deliberately scoped to the reviewed retained-orbit schedule.  The
+// profile is opt-in and rejects accidental reuse for any other source profile.
+export const SHARED_PRIME_PROFILE = process.env.SHARED_PRIME_PROFILE ?? 'off';
+assert(['off', 'orbit-retained'].includes(SHARED_PRIME_PROFILE), 'unknown shared-prime profile');
+const sharedPrimeEnabled = SHARED_PRIME_PROFILE === 'orbit-retained';
+if (sharedPrimeEnabled) {
+  assert.equal(cacheProfile, 'orbit-retained', 'shared-prime requires retained-orbit cache');
+  assert.equal(MSM_SPLIT, 37, 'shared-prime requires split37');
+  assert.deepEqual(CUTS, [27, 36, 47, 55], 'shared-prime requires the reviewed cuts');
+  assert.equal(PIN_MODE, 'full', 'shared-prime requires full pins');
+  assert.deepEqual(STAGE_PADS, [0, 0, 0, 0], 'shared-prime requires zero stage pads');
+  assert.equal(GENESIS_PAD, 0, 'shared-prime requires zero genesis pad');
+}
+const SHARED_PRIME_ID = 37n;
+const SHARED_PRIME_KEY = Buffer.from(encodeDataPush(bigIntToVmNumber(SHARED_PRIME_ID)));
+const SHARED_PRIME_NAMESPACE_KEY = Buffer.from(bigIntToVmNumber(SHARED_PRIME_ID));
+const SHARED_PRIME = Buffer.from('47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430', 'hex');
+const SHARED_PRIME_BODY = Buffer.concat([Buffer.from([SHARED_PRIME.length]), SHARED_PRIME]);
+const SHARED_PRIME_CALL = Buffer.from([...SHARED_PRIME_KEY, OpcodesBCH.OP_INVOKE]);
+const SHARED_PRIME_HELPERS = new Map([
+  ['c800', {oldBytes: 262, oldSha256: '4e3b86b609032b3cda1823349f40433ef8912c082951bba7d42fbfecef0ceaca', sites: 4, newBytes: 142, newSha256: '8bacc2b3e0ecb73e367094f7871d470f3975e8c0e74ad63648d6be28e25e3140'}],
+  ['c900', {oldBytes: 747, oldSha256: '7fa0b44ce7ca69604aaed156c32264d4251083d8157903ae0d076a337d79a303', sites: 1, newBytes: 717, newSha256: 'c460fb54b43e02d585058264c1ce885dc7952642b2d4e2c34e022452955483af'}],
+  ['ca00', {oldBytes: 235, oldSha256: 'd08b357f43e3b9df7c7ae60f997042f69761de6a491d4275a4e9683d654f59db', sites: 1, newBytes: 205, newSha256: '494bcc157ffb0df016844324327fac3c663ab9ec79d52d0aa1f10bb5fc94463f'}],
+  ['cb00', {oldBytes: 747, oldSha256: '5090c25c63de08861f8c123e200f8855356e2a935a896a65d5a9433765975221', sites: 1, newBytes: 717, newSha256: 'c743f37b48c6a3403b6a66003d89fb12d42b58c4a46ef5128c222c738ddc8fa4'}],
+]);
+const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
+const sourceIds = source => source.functions.map(f => f.originalId);
+if (sharedPrimeEnabled) {
+  const existingIds = [...sourceIds(shared), ...sourceIds(genesis), ...sourceIds(terminal), -1, 100, Number(LOADER_ID), MSM_ID_OFFSET];
+  assert(!existingIds.includes(Number(SHARED_PRIME_ID)), 'function37 namespace key is already occupied');
+}
 function cachePrimeDefinition(bytecode, id) {
   const instructions = decodeAuthenticationInstructions(bytecode);
   const key = Buffer.from(encodeDataPush(bigIntToVmNumber(id)));
@@ -98,11 +129,76 @@ function cachePrimeDefinition(bytecode, id) {
     ? encodeDataPush(cachePrimeLiterals(instruction.data))
     : encodeAuthenticationInstructions([instruction]))));
 }
+function sharePrimeDefinition(bytecode) {
+  if (!sharedPrimeEnabled) return bytecode;
+  const instructions = decodeAuthenticationInstructions(bytecode);
+  assert(Array.isArray(instructions));
+  const before = new Map();
+  const helperIndices = new Set();
+  for (let i = 0; i + 2 < instructions.length && instructions[i + 2].opcode === OpcodesBCH.OP_DEFINE; i += 3) {
+    const id = Buffer.from(instructions[i + 1].data ?? []).toString('hex');
+    assert.notEqual(id, SHARED_PRIME_NAMESPACE_KEY.toString('hex'), 'function37 key unexpectedly occupied in helper block');
+    if (!SHARED_PRIME_HELPERS.has(id)) continue;
+    assert(!before.has(id), `duplicate shared-prime helper ${id}`);
+    const body = Buffer.from(instructions[i].data ?? []);
+    const expected = SHARED_PRIME_HELPERS.get(id);
+    assert.equal(body.length, expected.oldBytes, `unexpected ${id} helper length`);
+    assert.equal(sha256(body), expected.oldSha256, `unexpected ${id} helper hash`);
+    before.set(id, body);
+    helperIndices.add(i);
+  }
+  assert.deepEqual([...before.keys()].sort(), [...SHARED_PRIME_HELPERS.keys()].sort(), 'shared-prime helper set changed');
+  let changed = 0;
+  const rewritten = instructions.map((instruction, i) => {
+    if (!helperIndices.has(i)) return instruction;
+    const id = Buffer.from(instructions[i + 1].data).toString('hex');
+    const expected = SHARED_PRIME_HELPERS.get(id);
+    const body = decodeAuthenticationInstructions(Buffer.from(instruction.data));
+    assert(Array.isArray(body));
+    let local = 0;
+    const next = body.flatMap(item => {
+      if (item.data && Buffer.from(item.data).equals(SHARED_PRIME)) {
+        local += 1; changed += 1;
+        return decodeAuthenticationInstructions(SHARED_PRIME_CALL);
+      }
+      return [item];
+    });
+    assert.equal(local, expected.sites, `unexpected ${id} literal count`);
+    const encodedBody = Buffer.from(encodeAuthenticationInstructions(next));
+    const candidate = Buffer.from(encodeDataPush(encodedBody));
+    assert.equal(encodedBody.length, expected.newBytes, `unexpected ${id} candidate body length`);
+    assert.equal(sha256(encodedBody), expected.newSha256, `unexpected ${id} candidate body hash`);
+    const expanded = [];
+    const candidateInstructions = decodeAuthenticationInstructions(encodedBody);
+    for (let j = 0; j < candidateInstructions.length; j += 1) {
+      const item = candidateInstructions[j];
+      if (item.data && Buffer.from(item.data).equals(Buffer.from([0x25])) && candidateInstructions[j + 1]?.opcode === OpcodesBCH.OP_INVOKE) {
+        expanded.push({opcode: SHARED_PRIME.length, data: SHARED_PRIME});
+        j += 1;
+      } else expanded.push(item);
+    }
+    assert(Buffer.from(encodeAuthenticationInstructions(expanded)).equals(before.get(id)), `${id} macro expansion changed`);
+    return decodeAuthenticationInstructions(candidate)[0];
+  });
+  assert.equal(changed, 7, 'shared-prime candidate must rewrite seven helper literals');
+  let firstMain = 0;
+  while (firstMain + 2 < rewritten.length && rewritten[firstMain + 2].opcode === OpcodesBCH.OP_DEFINE) firstMain += 3;
+  const prefix = Buffer.concat(rewritten.slice(0, firstMain).map(instruction => Buffer.from(encodeAuthenticationInstructions([instruction]))));
+  const main = Buffer.concat(rewritten.slice(firstMain).map(instruction => Buffer.from(encodeAuthenticationInstructions([instruction]))));
+  return Buffer.concat([
+    prefix,
+    Buffer.from(encodeDataPush(SHARED_PRIME_BODY)),
+    Buffer.from(encodeDataPush(bigIntToVmNumber(SHARED_PRIME_ID))),
+    Buffer.from([OpcodesBCH.OP_DEFINE]),
+    main,
+  ]);
+}
 const cashCache = new Map();
 const cash = (source) => {
   if (!cashCache.has(source)) {
     const bytecode = cachePrimeDefinition(cachePrimeDefinition(remapFunctionIds(compileCash(source), MSM_ID_OFFSET), 202n), 200n);
-    cashCache.set(source, orbitProfile ? compressOrbitTables(bytecode, cacheProfile === 'orbit-retained') : bytecode);
+    const compressed = orbitProfile ? compressOrbitTables(bytecode, cacheProfile === 'orbit-retained') : bytecode;
+    cashCache.set(source, sharePrimeDefinition(compressed));
   }
   return cashCache.get(source);
 };
