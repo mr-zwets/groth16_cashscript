@@ -55,9 +55,16 @@ assert.equal(new Set([...candidateIdentifiers.values()].map(value =>
 const outlinedName = 'stackSequence52';
 export const outlinedSequence = 'OP_PUSHBYTES_1 0x11 OP_ROLL OP_PUSHBYTES_1 0x11 OP_ROLL';
 const outlinedPattern = /OP_PUSHBYTES_1 0x11\s+OP_ROLL\s+OP_PUSHBYTES_1 0x11\s+OP_ROLL/g;
+const outlinedExtraName = 'mulFp';
+// TB-a1: outline the repeated straight-line multiply/reduce sequence; TB-a2 assigns
+// its 41-call helper the short ID 1 and moves fp6Add to the two-byte ID 18.
+export const outlinedExtraSequence = 'OP_MUL CALL fieldPrime OP_MOD';
+const outlinedExtraPattern = /OP_MUL\s+CALL fieldPrime\s+OP_MOD/g;
 const outlinedTargets = new Set(['towerSequence38', 'millerLoop', 'stackSequence15']);
 const outlineCount = text => text.match(outlinedPattern)?.length ?? 0;
+const outlineExtraCount = text => text.match(outlinedExtraPattern)?.length ?? 0;
 let outlinedTotal = 0;
+let outlinedExtraTotal = 0;
 const candidateFunctions = retainedFunctions.map(f => {
   const expanded = replaceInlineCalls(f.body);
   const count = outlineCount(expanded);
@@ -65,18 +72,35 @@ const candidateFunctions = retainedFunctions.map(f => {
     assert(count === (f.name === 'stackSequence15' ? 3 : f.name === 'millerLoop' ? 2 : 1),
       `unexpected SM-a2 outline count in ${f.name}: ${count}`);
     outlinedTotal += count;
-    return {...f, body: expanded.replace(outlinedPattern, `CALL ${outlinedName}`)};
+    const withExistingOutline = expanded.replace(outlinedPattern, `CALL ${outlinedName}`);
+    outlinedExtraTotal += outlineExtraCount(expanded);
+    return {...f, body: withExistingOutline.replace(outlinedExtraPattern, `CALL ${outlinedExtraName}`)};
   }
   assert.equal(count, 0, `unexpected SM-a2 outline occurrence in ${f.name}`);
+  const extraCount = outlineExtraCount(expanded);
+  if (extraCount > 0) {
+    outlinedExtraTotal += extraCount;
+    return {...f, body: expanded.replace(outlinedExtraPattern, `CALL ${outlinedExtraName}`)};
+  }
   return {...f, body: expanded};
 });
 candidateIdentifiers.set(outlinedName, 7);
 assert.equal(candidateIdentifiers.size, retainedFunctions.length + 1);
 assert(!retainedFunctions.some(f => candidateIdentifiers.get(f.name) === 7));
 candidateFunctions.push({name: outlinedName, body: outlinedSequence});
+// TB-a2: give the 41-call helper the former fp6Add short ID 1 and demote fp6Add to 18.
+candidateIdentifiers.set('fp6Add', 18);
+candidateIdentifiers.set(outlinedExtraName, 1);
+assert.equal(new Set([...candidateIdentifiers.values()].map(value =>
+  Buffer.from(bigIntToVmNumber(BigInt(value))).toString('hex'))).size, retainedFunctions.length + 2);
 assert.equal(candidateFunctions.length, 48);
+candidateFunctions.push({name: outlinedExtraName, body: outlinedExtraSequence});
+assert.equal(candidateFunctions.length, 49);
 assert.equal(outlinedTotal, 6);
-const candidateMain = replaceInlineCalls(main);
+const expandedMain = replaceInlineCalls(main);
+const candidateMain = expandedMain.replace(outlinedExtraPattern, `CALL ${outlinedExtraName}`);
+outlinedExtraTotal += outlineExtraCount(expandedMain);
+assert.equal(outlinedExtraTotal, 41);
 const buildCandidate = () => {
   const declarations = candidateFunctions.map(f => ({...f, bytecode: assemble(f.body, candidateIdentifiers)}));
   const mainBytecode = assemble(`${rangeCheck} ${candidateMain}`, candidateIdentifiers);
@@ -92,14 +116,16 @@ const buildCandidate = () => {
 };
 export const candidateProgram = buildCandidate();
 const candidateSha256 = createHash('sha256').update(candidateProgram.bytecode).digest('hex');
-assert.equal(candidateFunctions.length, 48);
-assert.equal(candidateProgram.bytecode.length, 3412);
-assert.equal(candidateSha256, '5a3f91a1d952faee50eef13401fcdeb46b2bbe7bd88c15379013cdbade30cad0');
+assert.equal(candidateFunctions.length, 49);
+assert.equal(candidateProgram.bytecode.length, 3341);
+assert.equal(candidateSha256, '167e1ab1647f8b41b12bcde2cbf17068671192d56a11be68d105254a4a28515a');
 assert.equal(candidateFunctions.some(f => inlineSet.has(f.name)), false);
 assert.equal(candidateMain.includes('OP_DEFINE'), false);
 assert.equal(candidateMain.includes('OP_INVOKE'), false);
 export const outlinedFunction = outlinedName;
 export const outlinedOccurrences = outlinedTotal;
+export const outlinedExtraFunction = outlinedExtraName;
+export const outlinedExtraOccurrences = outlinedExtraTotal;
 // The public source export is the reviewed candidate. baselineProgram remains available for
 // byte-for-byte regression checks without making the unoptimized program the default output.
 export const program = candidateProgram;
