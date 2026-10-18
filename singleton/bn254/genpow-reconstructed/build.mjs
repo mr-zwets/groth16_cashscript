@@ -15,7 +15,13 @@ const push = value => Buffer.from(encodeDataPush(value));
 const integer = value => push(bigIntToVmNumber(BigInt(value)));
 const hash = value => createHash('sha256').update(value).digest('hex');
 
-export function assemble(source) {
+export function assemble(source, {profile = 'bytes'} = {}) {
+  const profiles = {
+    bytes: [],
+    balanced: ['outline_70', 'outline_71'],
+    cost: ['outline_69', 'outline_70', 'outline_71'],
+  };
+  assert(Object.hasOwn(profiles, profile), `unknown assembly profile: ${profile}`);
   const functions = new Map();
   let main, current;
   for (const [index, raw] of source.split('\n').entries()) {
@@ -47,6 +53,34 @@ export function assemble(source) {
     }
   }
   assert(main && !current && functions.size > 0, 'complete assembly required');
+  if (profile !== 'bytes') {
+    const inline = new Map(profiles[profile].map(name => [name, functions.get(name)]));
+    const lines = [...functions.values(), main].flatMap(fn => fn.lines);
+    for (const [name, id, occurrences] of [
+      ['outline_69', 15, 10], ['outline_70', 69, 5], ['outline_71', 70, 5],
+    ]) {
+      if (!inline.has(name)) continue;
+      const fn = inline.get(name);
+      assert(fn && fn.id === id, `${name}: expected profile helper ID ${id}`);
+      assert.equal(lines.filter(line => line.command === 'call' && line.args[0] === name).length,
+        occurrences, `${name}: expected profile call sites`);
+      assert(fn.lines.every(({command, args}) => command === 'call'
+        ? args[0] === 'fp_mul'
+        : command === 'push' || ['OP_7', 'OP_ROLL', 'OP_DUP', 'OP_OVER', 'OP_PICK'].includes(command)),
+      `${name}: profile inlining requires a straight-line stack/arithmetic helper`);
+    }
+    for (const fn of [...functions.values(), main]) {
+      fn.lines = fn.lines.flatMap(line => line.command === 'call' && inline.has(line.args[0])
+        ? inline.get(line.args[0]).lines : [line]);
+    }
+    for (const name of inline.keys()) functions.delete(name);
+    if (inline.has('outline_69')) {
+      const displaced = functions.get('outline_15');
+      assert(displaced && displaced.id === 68 && ![...functions.values()].some(fn => fn.id === 15),
+        'outline_15: expected displaced ID 68 and released ID 15');
+      displaced.id = 15;
+    }
+  }
   const compile = lines => Buffer.concat(lines.flatMap(({command, args, where}) => {
     if (command === 'call') {
       assert(args.length === 1 && functions.has(args[0]), where);
@@ -100,10 +134,12 @@ function compressG1Witness(hex) {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  assert.equal(process.argv.length, 3, 'usage: node build.mjs OUTPUT_DIRECTORY');
+  assert([3, 4].includes(process.argv.length),
+    'usage: node build.mjs OUTPUT_DIRECTORY [bytes|balanced|cost]');
+  const profile = process.argv[3] ?? 'bytes';
   const here = new URL('./', import.meta.url);
   const source = readFileSync(new URL('verifier.asm', here), 'utf8');
-  const {bytecode, bodies, outlinedAdditionalFunctions} = assemble(source);
+  const {bytecode, bodies, outlinedAdditionalFunctions} = assemble(source, {profile});
   const output = resolve(process.argv[2]);
   mkdirSync(output, {recursive: true});
   const lockingOK = bytecode.toString('hex');
@@ -125,6 +161,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     writeFileSync(resolve(output, name), JSON.stringify(exported, null, 2) + '\n');
   }
   const manifest = {
+    ...(profile === 'bytes' ? {} : {profile}),
     emitter: 'explicit symbolic assembly; no CashScript compiler or replay optimizer',
     node: process.version,
     assemblySha256: hash(source),

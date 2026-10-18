@@ -196,3 +196,29 @@ guard remain unchanged. The builder, its six derived outline metadata entries,
 and raw proof archives are unchanged. Actual operation cost and whole-proof
 acceptance require separate qualification; this source change makes no native
 or relay admission claim.
+
+Optional outline profiles (WG, Oct 18, 2026): the normal builder accepts
+`node build.mjs OUTPUT_DIRECTORY [bytes|balanced|cost]`, and the assembly API
+accepts `assemble(source, {profile})`. The default `bytes` profile preserves the
+VX program and its normal exports and manifest exactly. Unknown profiles fail.
+The master assembly remains the sole owner of each helper body.
+
+| Profile | Retained recent outlines | Locking bytes | Primary witness + overhead | Total |
+| --- | --- | ---: | ---: | ---: |
+| `bytes` (default) | 69, 70, 71 | 4,202 | 208 + 85 | 4,495 |
+| `balanced` | 69 | 4,212 | 208 + 85 | 4,505 |
+| `cost` | none | 4,218 | 208 + 85 | 4,511 |
+
+Before compilation, the alternate profiles inline the selected straight-line
+helper bodies at their symbolic call sites and remove their declarations. The
+`cost` profile also restores the displaced `outline_15` from ID 68 to ID 15.
+Function IDs and occurrence counts in `outlinedAdditionalFunctions` are derived
+after this transformation. Alternate manifests identify their selected profile.
+The 36-byte power routine, G1 decoder, 32-byte public-input guard and all proof
+and witness values remain fixed; a decoded inverse restores the exact default program.
+
+A bounded pilot verified the same committed primary proof once per profile.
+Its operation costs were 5,534,299,258 (`bytes`), 5,528,763,523 (`balanced`) and
+5,520,406,248 (`cost`) in the pinned relaxed BCH VM. These are single-proof
+measurements, not complete alternate-profile qualification. Additional proofs,
+rejection gates and native resource or relay admission require separate evidence.
