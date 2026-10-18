@@ -130,6 +130,34 @@ assert.equal(candidateIdentifiers.size, 50);
 assert.equal(new Set([...candidateIdentifiers.values()].map(value =>
   Buffer.from(bigIntToVmNumber(BigInt(value))).toString('hex'))).size, 50);
 
+// TR-a2: share nine exact six/seven-roll sequences; fp2Scale supplies the short key.
+const outlinedFourthName = 'stackSequence54';
+export const outlinedFourthSequence = 'OP_6 OP_ROLL OP_7 OP_ROLL';
+const outlinedFourthPattern = /OP_6\s+OP_ROLL\s+OP_7\s+OP_ROLL/g;
+const outlinedFourthCounts = new Map([
+  ['fp6Mul', 2], ['towerSequence37', 2], ['millerLoop', 2],
+  ['g1Add', 2], ['stackSequence8', 1],
+]);
+let outlinedFourthTotal = 0;
+for (const f of candidateFunctions) {
+  const count = f.body.match(outlinedFourthPattern)?.length ?? 0;
+  assert.equal(count, outlinedFourthCounts.get(f.name) ?? 0,
+    `unexpected TR-a2 outline count in ${f.name}`);
+  outlinedFourthTotal += count;
+  f.body = f.body.replace(outlinedFourthPattern, `CALL ${outlinedFourthName}`);
+}
+assert.equal(candidateMain.match(outlinedFourthPattern)?.length ?? 0, 0,
+  'TR-a2 must preserve the complete main and range guard');
+assert.equal(outlinedFourthTotal, 9);
+assert.equal(candidateIdentifiers.get('fp2Scale'), 14);
+assert(![...candidateIdentifiers.values()].includes(31));
+candidateIdentifiers.set('fp2Scale', 31);
+candidateIdentifiers.set(outlinedFourthName, 14);
+candidateFunctions.push({name: outlinedFourthName, body: outlinedFourthSequence});
+assert.equal(candidateIdentifiers.size, 51);
+assert.equal(new Set([...candidateIdentifiers.values()].map(value =>
+  Buffer.from(bigIntToVmNumber(BigInt(value))).toString('hex'))).size, 51);
+
 const buildCandidate = () => {
   const declarations = candidateFunctions.map(f => ({...f, bytecode: assemble(f.body, candidateIdentifiers)}));
   const mainBytecode = assemble(`${rangeCheck} ${candidateMain}`, candidateIdentifiers);
@@ -145,9 +173,9 @@ const buildCandidate = () => {
 };
 export const candidateProgram = buildCandidate();
 const candidateSha256 = createHash('sha256').update(candidateProgram.bytecode).digest('hex');
-assert.equal(candidateFunctions.length, 50);
-assert.equal(candidateProgram.bytecode.length, 3333);
-assert.equal(candidateSha256, 'ed8909fd0ed4f6ca058eb0144eac660741bea1e5b55d0f97b6506bfe44212eaf');
+assert.equal(candidateFunctions.length, 51);
+assert.equal(candidateProgram.bytecode.length, 3328);
+assert.equal(candidateSha256, 'd0dc12d1b7ac3d50c0ba0b07462ec8b63cf9f813d0107b3c0102f5c81f695118');
 assert.equal(candidateFunctions.some(f => inlineSet.has(f.name)), false);
 assert.equal(candidateMain.includes('OP_DEFINE'), false);
 assert.equal(candidateMain.includes('OP_INVOKE'), false);
@@ -157,13 +185,15 @@ export const outlinedExtraFunction = outlinedExtraName;
 export const outlinedExtraOccurrences = outlinedExtraTotal;
 export const outlinedThirdFunction = outlinedThirdName;
 export const outlinedThirdOccurrences = outlinedThirdTotal;
+export const outlinedFourthFunction = outlinedFourthName;
+export const outlinedFourthOccurrences = outlinedFourthTotal;
 // The public source export is the reviewed candidate. baselineProgram remains available for
 // byte-for-byte regression checks without making the unoptimized program the default output.
 export const program = candidateProgram;
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   assert(process.argv[2], 'usage: node compact.mjs output.json');
   writeFileSync(process.argv[2], JSON.stringify({
-    status: 'recovered program with compact identifiers, SZ-a1 inlining, and SM/TB/TJ outlining; gates reported separately',
+    status: 'recovered program with compact identifiers, SZ-a1 inlining, and SM/TB/TJ/TR outlining; gates reported separately',
     identifiers: Object.fromEntries(candidateIdentifiers),
     functionCount: candidateFunctions.length,
     baselineLockingBytes: bytecode.length, baselineLockingSha256: sha256,
