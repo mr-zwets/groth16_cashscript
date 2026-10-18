@@ -296,42 +296,52 @@ export const outlinedFourthOccurrences = outlinedFourthTotal;
 export const program = candidateProgram;
 
 // Keep the byte-best program as the default. Cost profiles undo one existing
-// outline, using that helper's sole body owner and restoring its displaced key.
+// outline, or both, using each helper's sole body owner and restoring its displaced key.
+const inlineKeys = {
+  stackSequence58: {displaced: 'fp2MulXi', from: 53, to: 13},
+  stackSequence56: {displaced: 'stackSequence16', from: 35, to: 16},
+};
 const profileInlines = {
-  balanced: {name: 'stackSequence58', displaced: 'fp2MulXi', from: 53, to: 13},
-  cost: {name: 'stackSequence56', displaced: 'stackSequence16', from: 35, to: 16},
+  balanced: ['stackSequence58'],
+  cost: ['stackSequence56'],
+  combined: ['stackSequence56', 'stackSequence58'],
 };
 export function buildProfile(profile = 'bytes') {
   assert(profile === 'bytes' || Object.hasOwn(profileInlines, profile), `unknown profile: ${profile}`);
   if (profile === 'bytes') return {program, identifiers: candidateIdentifiers, inlinedFunctions, outlinedStackSequences};
-  const {name, displaced, from, to} = profileInlines[profile];
-  const helper = candidateFunctions.find(f => f.name === name);
-  assert(helper, `missing profile helper: ${name}`);
-  assert.equal(assemble(helper.body, candidateIdentifiers).length, 4);
-  assert(helper.body.trim().split(/\s+/).every(token => /^OP_(?:[0-9]+|PICK|ROLL)$/.test(token)),
-    `profile helper must remain a straight-line stack sequence: ${name}`);
-  assert.equal(candidateIdentifiers.get(name), to);
-  assert.equal(candidateIdentifiers.get(displaced), from);
+  const names = profileInlines[profile];
   const identifiers = new Map(candidateIdentifiers);
-  identifiers.delete(name);
-  identifiers.set(displaced, to);
-  assert.equal(new Set([...identifiers.values()]).size, identifiers.size);
-  const pattern = new RegExp(`\\bCALL ${name}\\b`, 'g');
-  let occurrences = 0;
-  const inline = body => {
-    occurrences += body.match(pattern)?.length ?? 0;
-    return body.replace(pattern, helper.body);
-  };
-  const functions = candidateFunctions.filter(f => f.name !== name).map(f => ({...f, body: inline(f.body)}));
-  const main = inline(candidateMain);
-  assert.equal(occurrences, 8, `unexpected profile call count: ${name}`);
+  let functions = candidateFunctions;
+  let main = candidateMain;
+  for (const name of names) {
+    const {displaced, from, to} = inlineKeys[name];
+    const helper = candidateFunctions.find(f => f.name === name);
+    assert(helper, `missing profile helper: ${name}`);
+    assert.equal(assemble(helper.body, candidateIdentifiers).length, 4);
+    assert(helper.body.trim().split(/\s+/).every(token => /^OP_(?:[0-9]+|PICK|ROLL)$/.test(token)),
+      `profile helper must remain a straight-line stack sequence: ${name}`);
+    assert.equal(candidateIdentifiers.get(name), to);
+    assert.equal(candidateIdentifiers.get(displaced), from);
+    identifiers.delete(name);
+    identifiers.set(displaced, to);
+    assert.equal(new Set([...identifiers.values()]).size, identifiers.size);
+    const pattern = new RegExp(`\\bCALL ${name}\\b`, 'g');
+    let occurrences = 0;
+    const inline = body => {
+      occurrences += body.match(pattern)?.length ?? 0;
+      return body.replace(pattern, helper.body);
+    };
+    functions = functions.filter(f => f.name !== name).map(f => ({...f, body: inline(f.body)}));
+    main = inline(main);
+    assert.equal(occurrences, 8, `unexpected profile call count: ${name}`);
+  }
   const selected = buildCandidate(functions, identifiers, main);
   const retained = new Set(selected.declarations.map(f => f.name));
-  return {program: selected, identifiers, inlinedFunctions: [...inlinedFunctions, name],
+  return {program: selected, identifiers, inlinedFunctions: [...inlinedFunctions, ...names],
     outlinedStackSequences: outlinedStackSequences.filter(f => retained.has(f.function))};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost]');
+  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined]');
   const profile = process.argv[3] ?? 'bytes';
   const selected = buildProfile(profile);
   const selectedSha256 = createHash('sha256').update(selected.program.bytecode).digest('hex');

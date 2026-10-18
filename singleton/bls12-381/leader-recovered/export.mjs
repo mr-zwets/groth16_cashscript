@@ -4,13 +4,13 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {resolve,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {buildProfile, outlinedFunction, outlinedOccurrences, outlinedSequence,
+import {buildProfile, inlinedFunctions as defaultInlinedFunctions, outlinedFunction, outlinedOccurrences, outlinedSequence,
   outlinedExtraFunction, outlinedExtraOccurrences,
   outlinedThirdFunction, outlinedThirdOccurrences, outlinedThirdSequence,
   outlinedFourthFunction, outlinedFourthOccurrences, outlinedFourthSequence} from './compact.mjs';
 
 const benchmarkArg = process.argv[2];
-assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark [bytes|balanced|cost]');
+assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark [bytes|balanced|cost|combined]');
 const profile = process.argv[3] ?? 'bytes';
 const {program, inlinedFunctions, outlinedStackSequences} = buildProfile(profile);
 const benchmark = resolve(benchmarkArg);
@@ -71,7 +71,9 @@ const provenance = {
 if (profile === 'bytes') assert.equal(provenance.lockingSha256, 'c5b4cf41459b7ec2f4c84fef0eb8cba5dfffee09ad03da909c9d31378a9d5ece');
 else {
   provenance.profile = profile;
-  provenance.change += `; ${profile} profile inlines ${inlinedFunctions.at(-1)} and restores its displaced short key, producing ${program.bytecode.length} bytes`;
+  const names = inlinedFunctions.slice(defaultInlinedFunctions.length);
+  const keys = names.length === 1 ? 'its displaced short key' : 'their displaced short keys';
+  provenance.change += `; ${profile} profile inlines ${names.join(' and ')} and restores ${keys}, producing ${program.bytecode.length} bytes`;
 }
 const outputs = inputs.map(input => {
   const data = {...input.data, contract: 'leader-recovered/program.mjs (full genpow, compact function IDs, range-checked public inputs, SZ-a1 inlining, SM/TB/TJ/TR/TW/UE/UR static outlines and ID packing)',
