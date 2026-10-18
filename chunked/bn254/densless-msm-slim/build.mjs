@@ -97,7 +97,8 @@ if (sharedPrimeEnabled) {
   assert.deepEqual(STAGE_PADS, [0, 0, 0, 0], 'shared-prime requires zero stage pads');
   assert.equal(GENESIS_PAD, 0, 'shared-prime requires zero genesis pad');
 }
-const SHARED_PRIME_ID = 37n;
+const SHARED_PRIME_ID = 11n;
+const DISPLACED_PRIME_ID = 37;
 const SHARED_PRIME_KEY = Buffer.from(encodeDataPush(bigIntToVmNumber(SHARED_PRIME_ID)));
 const SHARED_PRIME_NAMESPACE_KEY = Buffer.from(bigIntToVmNumber(SHARED_PRIME_ID));
 const SHARED_PRIME = Buffer.from('47fd7cd8168c203c8dca7168916a81975d588181b64550b829a031e1724e6430', 'hex');
@@ -109,13 +110,21 @@ const SCALAR_ORDER_KEY = Buffer.from(encodeDataPush(bigIntToVmNumber(SCALAR_ORDE
 const SCALAR_ORDER_BYTES = Buffer.from(bigIntToVmNumber(SCALAR_FIELD));
 const SCALAR_ORDER_CALL = Buffer.from([...SCALAR_ORDER_KEY, OpcodesBCH.OP_INVOKE]);
 const SHARED_PRIME_HELPERS = new Map([
-  ['c800', {oldBytes: 262, oldSha256: '4e3b86b609032b3cda1823349f40433ef8912c082951bba7d42fbfecef0ceaca', sites: 4, newBytes: 142, newSha256: '8bacc2b3e0ecb73e367094f7871d470f3975e8c0e74ad63648d6be28e25e3140'}],
-  ['c900', {oldBytes: 747, oldSha256: '7fa0b44ce7ca69604aaed156c32264d4251083d8157903ae0d076a337d79a303', sites: 1, newBytes: 717, newSha256: 'c460fb54b43e02d585058264c1ce885dc7952642b2d4e2c34e022452955483af'}],
-  ['ca00', {oldBytes: 235, oldSha256: 'd08b357f43e3b9df7c7ae60f997042f69761de6a491d4275a4e9683d654f59db', sites: 1, newBytes: 205, newSha256: '494bcc157ffb0df016844324327fac3c663ab9ec79d52d0aa1f10bb5fc94463f'}],
-  ['cb00', {oldBytes: 747, oldSha256: '5090c25c63de08861f8c123e200f8855356e2a935a896a65d5a9433765975221', sites: 1, newBytes: 717, newSha256: 'c743f37b48c6a3403b6a66003d89fb12d42b58c4a46ef5128c222c738ddc8fa4'}],
+  ['c800', {oldBytes: 262, oldSha256: '4e3b86b609032b3cda1823349f40433ef8912c082951bba7d42fbfecef0ceaca', sites: 4, newBytes: 138, newSha256: 'd6ecc3dbfe51ea41765084768b2fd72c5274487ce8f6c7b59e2355108b245369'}],
+  ['c900', {oldBytes: 747, oldSha256: '7fa0b44ce7ca69604aaed156c32264d4251083d8157903ae0d076a337d79a303', sites: 1, newBytes: 716, newSha256: '464a31b1cfb88e500b817fc229ec8eb075bacef3e1ede2ffdadedf2c5951edbd'}],
+  ['ca00', {oldBytes: 235, oldSha256: 'd08b357f43e3b9df7c7ae60f997042f69761de6a491d4275a4e9683d654f59db', sites: 1, newBytes: 204, newSha256: 'b1fe20e8f1f9b5a3a696de6cc34baa2964ede6f5f2eb71b8345079f2998368f5'}],
+  ['cb00', {oldBytes: 747, oldSha256: '5090c25c63de08861f8c123e200f8855356e2a935a896a65d5a9433765975221', sites: 1, newBytes: 716, newSha256: '817edef7656ceab2d5bc3bea169580801f1484b8b7f829d6d3e93a11b28e6fa2'}],
 ]);
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const sourceIds = source => source.functions.map(f => f.originalId);
+// Relocate the occupied short key symbolically, including every nested CALL.
+// The reviewed genesis slicer already omits its uncalled key11 declaration.
+const primeSourceForProfile = source => sharedPrimeEnabled ? {
+  ...source,
+  functions: source.functions.map(f => f.originalId === Number(SHARED_PRIME_ID)
+    ? {...f, originalId: DISPLACED_PRIME_ID} : f),
+} : source;
+const sharedSource = primeSourceForProfile(shared);
 const terminalSourceForProfile = source => {
   if (!sharedPrimeEnabled) return source;
   const functions = source.functions.map(f => f.name === 'terminalSequence0'
@@ -129,10 +138,10 @@ const terminalSourceForProfile = source => {
   });
   return {...source, functions};
 };
-const terminalSource = terminalSourceForProfile(terminal);
+const terminalSource = terminalSourceForProfile(primeSourceForProfile(terminal));
 if (sharedPrimeEnabled) {
-  const existingIds = [...sourceIds(shared), ...sourceIds(genesis), ...sourceIds(terminalSource), -1, 100, Number(LOADER_ID), MSM_ID_OFFSET];
-  assert(!existingIds.includes(Number(SHARED_PRIME_ID)), 'function37 namespace key is already occupied');
+  const existingIds = [...sourceIds(sharedSource), ...sourceIds(terminalSource), -1, 100, Number(LOADER_ID), MSM_ID_OFFSET];
+  assert(!existingIds.includes(Number(SHARED_PRIME_ID)), 'shared-prime namespace key is already occupied');
   assert.equal(sourceIds(terminalSource).filter(id => id === 16).length, 1, 'terminal scalar id16 must be unique');
   assert.equal(sourceIds(terminalSource).filter(id => id === Number(TERMINAL_SEQUENCE0_ID)).length, 1, 'terminal sequence0 id38 must be unique');
 }
@@ -159,7 +168,7 @@ function sharePrimeDefinition(bytecode) {
   const helperIndices = new Set();
   for (let i = 0; i + 2 < instructions.length && instructions[i + 2].opcode === OpcodesBCH.OP_DEFINE; i += 3) {
     const id = Buffer.from(instructions[i + 1].data ?? []).toString('hex');
-    assert.notEqual(id, SHARED_PRIME_NAMESPACE_KEY.toString('hex'), 'function37 key unexpectedly occupied in helper block');
+    assert.notEqual(id, SHARED_PRIME_NAMESPACE_KEY.toString('hex'), 'shared-prime key unexpectedly occupied in helper block');
     if (!SHARED_PRIME_HELPERS.has(id)) continue;
     assert(!before.has(id), `duplicate shared-prime helper ${id}`);
     const body = Buffer.from(instructions[i].data ?? []);
@@ -194,7 +203,7 @@ function sharePrimeDefinition(bytecode) {
     const candidateInstructions = decodeAuthenticationInstructions(encodedBody);
     for (let j = 0; j < candidateInstructions.length; j += 1) {
       const item = candidateInstructions[j];
-      if (item.data && Buffer.from(item.data).equals(Buffer.from([0x25])) && candidateInstructions[j + 1]?.opcode === OpcodesBCH.OP_INVOKE) {
+      if (candidateInstructions[j + 1]?.opcode === OpcodesBCH.OP_INVOKE && rawPushKey(item).equals(SHARED_PRIME_NAMESPACE_KEY)) {
         expanded.push({opcode: SHARED_PRIME.length, data: SHARED_PRIME});
         j += 1;
       } else expanded.push(item);
@@ -272,20 +281,20 @@ const stage = (bytecode, definitions, back) => {
   main]);
 };
 
-const compileModule = (source, constants) => {
+const compileModule = (source, constants, extraNumbers = {}) => {
   const identifiers = new Map(source.functions.map(f => [f.name, f.originalId]));
   assert.equal(identifiers.size, source.functions.length, 'duplicate function name');
   const keys = [...identifiers.values()].map(id => Buffer.from(bigIntToVmNumber(BigInt(id))).toString('hex'));
   assert.equal(new Set(keys).size, source.functions.length, 'duplicate function identifier');
   const declarations = source.functions.map(f => ({
-    name: f.name, id: f.originalId, bytecode: assemble(f.body, identifiers, constants),
+    name: f.name, id: f.originalId, bytecode: assemble(f.body, identifiers, constants, extraNumbers),
   }));
   const program = Buffer.concat([
-    assemble(source.prefix, identifiers, constants),
+    assemble(source.prefix, identifiers, constants, extraNumbers),
     ...declarations.map(f => Buffer.from([
       ...encodeDataPush(f.bytecode), ...encodeDataPush(bigIntToVmNumber(BigInt(f.id))), OpcodesBCH.OP_DEFINE,
     ])),
-    assemble(source.main, identifiers, constants),
+    assemble(source.main, identifiers, constants, extraNumbers),
   ]);
   return {declarations, program};
 };
@@ -316,14 +325,53 @@ const assertPinFunctionNamespace = (ids, bytecodes) => {
 
 function buildWith({backExec, backTerminal}) {
   const programs = {}, declarations = {}, constants = {deploymentTag};
-  ({declarations: declarations.shared, program: programs.shared} = compileModule(shared, constants));
+  ({declarations: declarations.shared, program: programs.shared} = compileModule(sharedSource, constants));
+  // Keep the first two carriers fixed; derive the final fragment and every reader
+  // from the assembled shared program, rather than duplicating its byte growth.
+  const fragmentLengths = [...layout.fragmentLengths];
+  if (sharedPrimeEnabled) fragmentLengths[2] = programs.shared.length - fragmentLengths[0] - fragmentLengths[1];
+  const wireLayout = {...layout, fragmentLengths};
+  const layoutExec = [
+    { shared: fragmentLengths[0], witness: 2560, table: 928 },
+    { shared: fragmentLengths[1], witness: 2304, table: 832 },
+    { shared: fragmentLengths[2], witness: 2560, table: 928 },
+  ];
+  const last = layoutExec[2];
+  const tableOffset = wireLayout.fragmentOffset + last.shared + redeemPushBytes(last.witness)
+    + redeemPushBytes(last.table) - last.table;
+  const extraNumbers = {
+    ...Object.fromEntries(fragmentLengths.map((length, i) => [`FRAGMENT_${i}_BYTES`, BigInt(length)])),
+    TABLE_2_OFFSET: BigInt(tableOffset),
+    QUOTIENT_2_OFFSET: BigInt(tableOffset + last.table
+      + redeemPushBytes(wireLayout.quotientLengths[2]) - wireLayout.quotientLengths[2]),
+  };
+  let terminalWithLayout = terminalSource;
+  if (sharedPrimeEnabled) {
+    const tableReader = 'OP_PUSHBYTES_2 0xa003 OP_PUSHBYTES_2 0x630d OP_2 CALL readBoundedInputSlice';
+    const quotientReader = 'OP_INPUTBYTECODE OP_PUSHBYTES_2 0x0611 OP_SPLIT OP_NIP OP_PUSHBYTES_2 0xe004 OP_SPLIT OP_DROP';
+    assert.equal(sharedSource.main.split(tableReader).length, 2, 'shared input2 table reader changed');
+    assert.equal(terminalSource.main.split(quotientReader).length, 2, 'terminal input2 quotient reader changed');
+    const sharedWithLayout = {...sharedSource, main: sharedSource.main.replace(tableReader,
+      'OP_PUSHBYTES_2 0xa003 NUM TABLE_2_OFFSET OP_2 CALL readBoundedInputSlice')};
+    terminalWithLayout = {...terminalSource, main: terminalSource.main.replace(quotientReader,
+      'OP_INPUTBYTECODE NUM QUOTIENT_2_OFFSET OP_SPLIT OP_NIP OP_PUSHBYTES_2 0xe004 OP_SPLIT OP_DROP')};
+    const length = programs.shared.length;
+    ({declarations: declarations.shared, program: programs.shared} = compileModule(sharedWithLayout, constants, extraNumbers));
+    assert.equal(programs.shared.length, length, 'shared reader offset changed its encoded width');
+  }
   constants.sharedHash256 = hash256(programs.shared);
   ({declarations: declarations.genesis, program: programs.genesisUnsliced} = compileModule(genesis, constants));
   // genesis: the sliced program (dead vk_x auxiliary predicate dropped, see genesis-slice.mjs),
   // then MSM part A on its parked pushes (wa, n1, n0); part A pins input 0's state push
   programs.msmA = cash(sourceA({split: MSM_SPLIT, ownInputs: true, noPad: true,
     pinEnd: {idx: 0, back: backExec, size: EXEC_STATE_BYTES}, pinN: {idx: 4, back: backTerminal}}));
-  programs.genesis = carrier(sliceGenesis(programs.genesisUnsliced), programs.msmA, 0);
+  const slicedGenesis = sliceGenesis(programs.genesisUnsliced);
+  if (sharedPrimeEnabled) {
+    assert.equal(slicedGenesis[0], OpcodesBCH.OP_DROP);
+    assert(!functionKeys(slicedGenesis.subarray(1)).includes(SHARED_PRIME_NAMESPACE_KEY.toString('hex')),
+      'shared-prime key occupied in the emitted genesis namespace');
+  }
+  programs.genesis = carrier(slicedGenesis, programs.msmA, 0);
   delete programs.genesisUnsliced;
   const [definitions] = splitDefinitions(programs.msmA);
   // executors: the shared-program loader, then the executor MSM stage on its parked state push
@@ -331,7 +379,7 @@ function buildWith({backExec, backTerminal}) {
   const loaderIdentifiers = new Map([['fragmentReader', -1], ['sharedProgram', 100]]);
   const globalFunctionKeys = [
     ...loaderIdentifiers.values(),
-    ...shared.functions.map(f => f.originalId),
+    ...sharedSource.functions.map(f => f.originalId),
   ].map(id => Buffer.from(bigIntToVmNumber(BigInt(id))).toString('hex'));
   assert.equal(new Set(globalFunctionKeys).size, globalFunctionKeys.length,
     'loader/shared function identifier byte collision');
@@ -341,7 +389,7 @@ function buildWith({backExec, backTerminal}) {
     ...encodeDataPush(bigIntToVmNumber(-1n)),
     OpcodesBCH.OP_DEFINE,
   ]);
-  programs.loader = Buffer.concat([fragmentReaderDeclaration, assemble(executor, loaderIdentifiers, constants)]);
+  programs.loader = Buffer.concat([fragmentReaderDeclaration, assemble(executor, loaderIdentifiers, constants, extraNumbers)]);
   programs.msmExec = stage(cash(sourceExec({cuts: CUTS, backExec, backTerminal})), definitions, programs.msmA.length);
   programs.msmExec = compactExecutorCleanup(programs.msmExec);
   programs.executor = Buffer.concat([execPadded ? Buffer.from([OpcodesBCH.OP_NIP]) : Buffer.alloc(0),
@@ -350,18 +398,13 @@ function buildWith({backExec, backTerminal}) {
     .map(redeem => assemble(p2sh, new Map(), {redeemHash256: hash256(redeem)}));
   constants.workerLockingRoot = hash256(Buffer.concat(workerLockings.map(hash256)));
   // terminal: the densless terminal, then the final MSM stage on its parked pushes (zInv, state)
-  ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminalSource, constants));
+  ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminalWithLayout, constants, extraNumbers));
   programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
   programs.msmFinal = compactInverseCopy(programs.msmFinal);
   programs.msmFinal = reuseFinalPrimeCalls(programs.msmFinal);
   programs.msmFinal = reuseTerminalScalarOrder(programs.msmFinal);
   assertPinFunctionNamespace(selectedPinIds, [programs.shared, programs.genesis, programs.loader, programs.msmA, programs.msmExec, programs.msmFinal, programs.terminalBase]);
   // Malleability pins (length / order / sign-bit) run before the densless terminal, paid once.
-  const layoutExec = [
-    { shared: layout.fragmentLengths[0], witness: 2560, table: 928 },
-    { shared: layout.fragmentLengths[1], witness: 2304, table: 832 },
-    { shared: layout.fragmentLengths[2], witness: 2560, table: 928 },
-  ];
   const pinMode = PIN_MODE;
   const pins = pinMode === '0' ? Buffer.alloc(0)
     : pinMode === 'lenonly' ? compileTerminalPinsLenOnly()
@@ -373,7 +416,7 @@ function buildWith({backExec, backTerminal}) {
   programs.terminal = Buffer.concat([terminalPadded ? Buffer.from([OpcodesBCH.OP_ROT, OpcodesBCH.OP_DROP]) : Buffer.alloc(0),
     carrier(programs.terminalBase, programs.msmFinal, 4)]);
   delete programs.terminalBase;
-  return {programs, declarations};
+  return {programs, declarations, layout: wireLayout};
 }
 
 export function build() {
@@ -390,7 +433,7 @@ export function build() {
   throw new Error('redeem lengths did not converge');
 }
 
-function finish({programs, declarations}) {
+function finish({programs, declarations, layout}) {
   const redeems = [programs.executor, programs.executor, programs.executor, programs.genesis, programs.terminal];
   const lockings = redeems.map(redeem => assemble(p2sh, new Map(), {redeemHash256: hash256(redeem)}));
   let offset = 0;
