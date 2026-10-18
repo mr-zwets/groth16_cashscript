@@ -158,6 +158,10 @@ if (sharedPrimeEnabled) {
     ? {...f, body: f.body.replace(sizeCheck, compactSizeCheck)} : f);
   assert.equal(sharedSource.main.split(sizeCheck).length - 1, 1, 'shared main size check changed');
   sharedSource.main = sharedSource.main.replace(sizeCheck, compactSizeCheck);
+  const exhausted = 'OP_SWAP OP_SIZE OP_NIP OP_0 OP_NUMEQUAL OP_SWAP OP_SIZE OP_NIP OP_0 OP_NUMEQUAL OP_BOOLAND OP_VERIFY';
+  const emptyPair = 'OP_SWAP OP_0 OP_EQUAL OP_SWAP OP_0 OP_EQUAL OP_BOOLAND OP_VERIFY';
+  assert.equal(sharedSource.main.split(exhausted).length - 1, 1, 'shared buffer exhaustion predicate changed');
+  sharedSource.main = sharedSource.main.replace(exhausted, emptyPair);
   const loops = sharedSource.main.match(/\bOP_BEGIN\b[\s\S]*?\bOP_UNTIL\b/g) ?? [];
   assert.equal(loops.length, 1, 'shared Miller loop count changed');
   let pairs = 0, doubles = 0;
