@@ -120,7 +120,7 @@ OP_ROT
 call fp_mul
 end
 
-function outline_18 -1
+function outline_18 18
 OP_7
 OP_ROLL
 OP_7
@@ -258,10 +258,7 @@ OP_SWAP
 call outline_3
 OP_SWAP
 call outline_23
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 OP_2SWAP
 OP_SWAP
 call outline_6
@@ -294,10 +291,7 @@ OP_PICK
 OP_2SWAP
 OP_SWAP
 call outline_3
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 OP_2SWAP
 OP_SWAP
 call outline_3
@@ -369,28 +363,19 @@ OP_11
 OP_ROLL
 OP_11
 OP_ROLL
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 call fp2_mul
 OP_13
 OP_ROLL
 OP_13
 OP_ROLL
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 call fp2_mul
 OP_SWAP
 OP_2SWAP
 OP_SWAP
 call outline_3
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 call outline_22
 OP_5
 OP_PICK
@@ -421,10 +406,7 @@ OP_3
 OP_PICK
 call outline_9
 OP_SWAP
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 call outline_3
 OP_14
 OP_PICK
@@ -680,10 +662,7 @@ call outline_9
 OP_SWAP
 call outline_43
 call fp2_mul
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 OP_2
 OP_PICK
 OP_4
@@ -1000,10 +979,7 @@ OP_ROLL
 call outline_6
 OP_SWAP
 call outline_5
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 OP_2SWAP
 OP_SWAP
 call outline_3
@@ -1822,11 +1798,16 @@ end
 function outline_63 17
 OP_2
 OP_PICK
+call outline_64
+end
+# Share eleven four/six-pick sequences; outline_18 supplies the short key.
+function outline_64 -1
 OP_4
 OP_PICK
 OP_6
 OP_PICK
 end
+
 main
 # Public inputs must be canonical scalars, 0 <= n < r (n1 is push 0, n0 push 1: depths 9, 8).
 # Without this n + r gives the same vk_x, so one proof verifies two claimed integers.
@@ -1991,10 +1972,7 @@ OP_15
 OP_PICK
 OP_15
 OP_PICK
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 call fp2_mul
 OP_2DUP
 OP_SWAP
@@ -2187,10 +2165,7 @@ OP_UNTIL
 OP_DROP
 call outline_11
 call outline_31
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 call outline_5
 OP_6
 OP_ROLL
