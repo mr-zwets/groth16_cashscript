@@ -2522,9 +2522,9 @@ const arithmeticProfile = {
   leafId: arithmeticLeafId,
   leafRawKey: arithmeticLeafId === -1 ? '81' : arithmeticLeafId.toString(16).padStart(2, '0'),
   namespaceMap: arithmeticNamespaceMap,
-  expectedLibraryBytes: arithmeticLeafId === -1 ? 615 : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
+  expectedLibraryBytes: arithmeticLeafId === -1 ? 612 : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
   expectedLibrarySha256: arithmeticLeafId === -1
-    ? '1d801dec6edcae14f6f8bbadfde7f9f7342754302683e445f13d3d2abc773f3d'
+    ? 'f822aa84b668224057cac2f83205de35fefa5089a9b04a86d748c2a709ecfce5'
     : arithmeticLeafId === 12
       ? '716398743a5a131e1906e462716026526caa12b228c6f1d207974e131039b254'
       : arithmeticLeafId === 5
@@ -2621,9 +2621,22 @@ const remapArithmeticNamespace = (instructions) => {
   }
   return remapped;
 };
-const templateArithmeticBody = encodeAuthenticationInstructions(
-  [...remapArithmeticNamespace(selectiveInstructions), ...arithmeticLeafDefinition],
-);
+const arithmeticInstructions = [
+  ...remapArithmeticNamespace(selectiveInstructions), ...arithmeticLeafDefinition,
+];
+if (arithmeticLeafId === -1) {
+  const lineEval = arithmeticInstructions[30];
+  const disposal = Uint8Array.of(0x6b, 0x6b, 0x6d, 0x6c, 0x6c);
+  assert(arithmeticFunctionKey(arithmeticInstructions[31]) === '0a' &&
+    arithmeticInstructions[32].opcode === OP.DEFINE && lineEval.data?.length === 62 &&
+    equalBytes(lineEval.data.slice(-disposal.length), disposal),
+  'lineEval pair return disposal changed');
+  // Both forms map [x,y,a,b] to [a,b], preserving the caller's alternate stack.
+  arithmeticInstructions[30] = decodeAuthenticationInstructions(encodeDataPush(concat(
+    lineEval.data.slice(0, -disposal.length), Uint8Array.of(0x72, 0x6d),
+  )))[0];
+}
+const templateArithmeticBody = encodeAuthenticationInstructions(arithmeticInstructions);
 const templateArithmeticLength = templateArithmeticBody.length;
 const candidateArithmeticInstructions = decodeAuthenticationInstructions(templateArithmeticBody);
 assert(candidateArithmeticInstructions.length === 14 * 3 &&
