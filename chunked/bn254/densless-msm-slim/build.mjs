@@ -148,6 +148,16 @@ const sharedSource = primeSourceForProfile(rotateHelperBodies(shared, {
   sharedSequence11: [0, '10d38744632c996cd081cc046b2b5a2f299148ee5ec4f5a8ebdf1efc076d3eae', 1],
 }));
 if (sharedPrimeEnabled) {
+  const sizeCheck = 'OP_PUSHBYTES_1 0x20 OP_SPLIT OP_DUP OP_SIZE OP_NIP OP_PUSHBYTES_1 0x20 OP_NUMEQUALVERIFY';
+  const compactSizeCheck = 'OP_PUSHBYTES_1 0x20 OP_SPLIT OP_SIZE OP_PUSHBYTES_1 0x20 OP_NUMEQUALVERIFY';
+  const sizeHelpers = sharedSource.functions.filter(f => f.name === 'sharedSequence10');
+  assert.equal(sizeHelpers.length, 1, 'shared size helper count changed');
+  assert.equal(sizeHelpers[0].originalId, 19, 'shared size helper key changed');
+  assert.equal(sizeHelpers[0].body.split(sizeCheck).length - 1, 1, 'shared helper size check changed');
+  sharedSource.functions = sharedSource.functions.map(f => f === sizeHelpers[0]
+    ? {...f, body: f.body.replace(sizeCheck, compactSizeCheck)} : f);
+  assert.equal(sharedSource.main.split(sizeCheck).length - 1, 1, 'shared main size check changed');
+  sharedSource.main = sharedSource.main.replace(sizeCheck, compactSizeCheck);
   const loops = sharedSource.main.match(/\bOP_BEGIN\b[\s\S]*?\bOP_UNTIL\b/g) ?? [];
   assert.equal(loops.length, 1, 'shared Miller loop count changed');
   let pairs = 0, doubles = 0;
