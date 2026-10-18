@@ -2499,10 +2499,30 @@ const selectivePrimeSites = new Map([
   ['07', new Set([1])],
   ['0a', new Set([8, 28, 37])],
 ]);
-const arithmeticLeafId = 17;
-const arithmeticLeafRawKey = Uint8Array.of(0x11);
+// The default profile retains the byte-best UD namespace: the selective prime
+// leaf owns raw key 0x11. The opt-in 12 profile uses the exact 0x0c <-> 0x11
+// bijection from VD; the map is applied only to literal DEFINE/INVOKE keys.
+const arithmeticProfileKey = process.env.RPA_COMPACT_ARITHMETIC_PRIME_KEY ?? '17';
+assert(['12', '17'].includes(arithmeticProfileKey),
+  'RPA_COMPACT_ARITHMETIC_PRIME_KEY must be 17 or 12');
+const arithmeticLeafSourceId = 17;
+const arithmeticLeafId = Number(arithmeticProfileKey);
+const arithmeticNamespaceMap = arithmeticLeafId === 12
+  ? new Map([['0c', '11'], ['11', '0c']])
+  : new Map();
+const arithmeticProfile = {
+  key: arithmeticProfileKey,
+  leafId: arithmeticLeafId,
+  leafRawKey: Uint8Array.of(arithmeticLeafId),
+  namespaceMap: arithmeticNamespaceMap,
+  expectedLibraryBytes: arithmeticLeafId === 12 ? 617 : 621,
+  expectedLibrarySha256: arithmeticLeafId === 12
+    ? '716398743a5a131e1906e462716026526caa12b228c6f1d207974e131039b254'
+    : 'a4cc53fe1d7fd736b1a058335d4f83884d603c237ce9626bb219acd61e9767b6',
+};
+const arithmeticLeafRawKey = arithmeticProfile.leafRawKey;
 const leafCallInstructions = decodeAuthenticationInstructions(
-  concat(pushVmNumber(arithmeticLeafId), Uint8Array.of(OP.INVOKE)),
+  concat(pushVmNumber(arithmeticLeafSourceId), Uint8Array.of(OP.INVOKE)),
 );
 const selectiveInstructions = [];
 for (let offset = 0; offset < templateArithmeticOriginalInstructions.length; offset += 3) {
@@ -2547,8 +2567,47 @@ const arithmeticLeafDefinition = decodeAuthenticationInstructions(concat(
   pushVmNumber(arithmeticLeafId),
   Uint8Array.of(OP.DEFINE),
 ));
+const arithmeticFunctionKey = (instruction) => instruction.data !== undefined
+  ? binToHex(instruction.data)
+  : instruction.opcode === 0
+    ? ''
+    : instruction.opcode === 79
+      ? '81'
+      : instruction.opcode >= 81 && instruction.opcode <= 96
+        ? (instruction.opcode - 80).toString(16).padStart(2, '0')
+        : undefined;
+const arithmeticRawKeyInstruction = (rawKey) =>
+  decodeAuthenticationInstructions(encodeDataPush(
+    Uint8Array.from(Buffer.from(rawKey, 'hex')),
+  ))[0];
+const arithmeticNamespaceInstructions = new Map(
+  [...arithmeticNamespaceMap].map(([from, to]) => [from, arithmeticRawKeyInstruction(to)]),
+);
+const remapArithmeticId = (instruction) =>
+  arithmeticNamespaceInstructions.get(arithmeticFunctionKey(instruction)) ?? instruction;
+const remapArithmeticNamespace = (instructions) => {
+  if (arithmeticNamespaceMap.size === 0) return instructions;
+  const remapped = instructions.map((instruction) => instruction);
+  for (let index = 1; index < remapped.length; index += 1) {
+    if (remapped[index].opcode === OP.INVOKE) {
+      remapped[index - 1] = remapArithmeticId(remapped[index - 1]);
+      continue;
+    }
+    if (remapped[index].opcode !== OP.DEFINE || index < 2) continue;
+    const bodyPush = remapped[index - 2];
+    if (bodyPush.data === undefined) continue;
+    const body = remapArithmeticNamespace(
+      decodeAuthenticationInstructions(bodyPush.data),
+    );
+    remapped[index - 2] = decodeAuthenticationInstructions(encodeDataPush(
+      encodeAuthenticationInstructions(body),
+    ))[0];
+    remapped[index - 1] = remapArithmeticId(remapped[index - 1]);
+  }
+  return remapped;
+};
 const templateArithmeticBody = encodeAuthenticationInstructions(
-  [...selectiveInstructions, ...arithmeticLeafDefinition],
+  [...remapArithmeticNamespace(selectiveInstructions), ...arithmeticLeafDefinition],
 );
 const templateArithmeticLength = templateArithmeticBody.length;
 const candidateArithmeticInstructions = decodeAuthenticationInstructions(templateArithmeticBody);
@@ -2557,19 +2616,24 @@ assert(candidateArithmeticInstructions.length === 14 * 3 &&
     index % 3 === 0 ? instruction.data !== undefined :
       index % 3 === 2 ? instruction.opcode === OP.DEFINE : true),
 'arithmetic library must contain exactly fourteen literal definitions');
-assert(templateArithmeticLength === 621, 'selective arithmetic library length changed');
-assert(hex(sha256(templateArithmeticBody)) ===
-  'a4cc53fe1d7fd736b1a058335d4f83884d603c237ce9626bb219acd61e9767b6',
-'arithmetic library selective leaf changed');
-assert(arithmeticLeafRawKey[0] === 0x11 && arithmeticLeafId === 17,
+assert(templateArithmeticLength === arithmeticProfile.expectedLibraryBytes,
+  `${arithmeticProfile.key} arithmetic library length changed`);
+assert(hex(sha256(templateArithmeticBody)) === arithmeticProfile.expectedLibrarySha256,
+  `${arithmeticProfile.key} arithmetic library selective leaf changed`);
+assert(arithmeticLeafRawKey[0] === arithmeticLeafId && arithmeticLeafSourceId === 17,
   'arithmetic leaf raw key changed');
+const remapArithmeticRemainder = (remainder) => arithmeticNamespaceMap.size === 0
+  ? remainder
+  : encodeAuthenticationInstructions(remapArithmeticNamespace(
+    decodeAuthenticationInstructions(remainder),
+  ));
 templateClasses.forEach((template) => {
   if (!templateArithmeticImports.has(template.name) && template.name !== templateArithmeticCarrier) return;
   assert(equalBytes(template.core.slice(0, templateArithmeticOriginalLength),
     templateArithmeticOriginalBody),
   `${template.name} arithmetic library prefix differs from its carrier`);
   template.core = concat(templateArithmeticBody,
-    template.core.slice(templateArithmeticOriginalLength));
+    remapArithmeticRemainder(template.core.slice(templateArithmeticOriginalLength)));
   template.digest = sha256(template.core);
   template.arithmeticRemainder = template.core.slice(templateArithmeticLength);
 });
@@ -4697,6 +4761,9 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       additionMiddleDensityPaddingBytes: templateFactorDensityPaddingBytes,
       terminalDensityPaddingBytes: templateTerminalDensityPaddingBytes,
       arithmeticLibrary: {
+        profileKey: arithmeticProfile.key,
+        leafId: arithmeticProfile.leafId,
+        namespaceMap: Object.fromEntries(arithmeticProfile.namespaceMap),
         functionId: TEMPLATE_ARITHMETIC_FUNCTION_ID,
         bodyBytes: templateArithmeticLength,
         bodySha256: hex(sha256(templateArithmeticBody)),
