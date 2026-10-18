@@ -125,6 +125,19 @@ const primeSourceForProfile = source => sharedPrimeEnabled ? {
     ? {...f, originalId: DISPLACED_PRIME_ID} : f),
 } : source;
 const sharedSource = primeSourceForProfile(shared);
+if (sharedPrimeEnabled) {
+  const loops = sharedSource.main.match(/\bOP_BEGIN\b[\s\S]*?\bOP_UNTIL\b/g) ?? [];
+  assert.equal(loops.length, 1, 'shared Miller loop count changed');
+  let pairs = 0, doubles = 0;
+  const loop = loops[0].replace(/OP_SWAP (OP_TOALTSTACK OP_TOALTSTACK OP_FROMALTSTACK OP_FROMALTSTACK|OP_TOALTSTACK OP_FROMALTSTACK)/g, (_, moves) => {
+    if (moves.split(' ').length === 4) doubles += 1;
+    else pairs += 1;
+    return 'OP_SWAP';
+  });
+  assert.equal(pairs, 8, 'shared Miller stack pair count changed');
+  assert.equal(doubles, 1, 'shared Miller double stack pair count changed');
+  sharedSource.main = sharedSource.main.replace(loops[0], loop);
+}
 const terminalSourceForProfile = source => {
   if (!sharedPrimeEnabled) return source;
   const identifiers = new Map([
