@@ -10,9 +10,9 @@ const op = (...xs) => Buffer.from(xs);
 const cat = (...bufs) => Buffer.concat(bufs);
 export const redeemPushBytes = (length) => length + (length < 76 ? 1 : length < 256 ? 2 : 3);
 
-/** Sign-check subroutine id — must not collide with densless fragment/loader ids. */
-const SIGN_FN = 150;
-const NUMBER_FN = 151;
+/** One owner for malleability-pin namespace selection. Defaults preserve every existing profile. */
+export const defaultPinIds = Object.freeze({sign: 150, number: 151});
+export const compactPinIds = Object.freeze({sign: 34, number: 35});
 
 export function canonicalizeLimbs(buf) {
   const out = Buffer.from(buf);
@@ -56,8 +56,8 @@ function numberBody() {
   );
 }
 
-function extractNumberKeepRest() {
-  return cat(pushN(NUMBER_FN), op(OpcodesBCH.OP_INVOKE));
+function extractNumberKeepRest(ids = defaultPinIds) {
+  return cat(pushN(ids.number), op(OpcodesBCH.OP_INVOKE));
 }
 
 /** One-limb sign check body: table-rest on stack → consume 32 B, VERIFY bit7 clear. */
@@ -71,19 +71,19 @@ function signLimbBody() {
   );
 }
 
-function defineSignFn() {
+function defineSignFn(ids = defaultPinIds) {
   return cat(
     Buffer.from(encodeDataPush(signLimbBody())),
-    pushN(SIGN_FN),
+    pushN(ids.sign),
     op(OpcodesBCH.OP_DEFINE),
   );
 }
 
-function invokeSignFn() {
-  return cat(pushN(SIGN_FN), op(OpcodesBCH.OP_INVOKE));
+function invokeSignFn(ids = defaultPinIds) {
+  return cat(pushN(ids.sign), op(OpcodesBCH.OP_INVOKE));
 }
 
-function pinOneExecTable(inputIdx, shared, witness, table, { signs = true, quot = true } = {}) {
+function pinOneExecTable(inputIdx, shared, witness, table, { signs = true, quot = true, ids = defaultPinIds } = {}) {
   const th = table < 256 ? 2 : 3;
   const skip = [296, shared, witness].reduce((sum, len) => sum + redeemPushBytes(len), th);
   const parts = [
@@ -94,7 +94,7 @@ function pinOneExecTable(inputIdx, shared, witness, table, { signs = true, quot 
   ];
   if (signs) {
     const limbs = table / 32;
-    for (let i = 0; i < limbs; i++) parts.push(invokeSignFn());
+    for (let i = 0; i < limbs; i++) parts.push(invokeSignFn(ids));
     parts.push(op(OpcodesBCH.OP_DROP));
   } else {
     parts.push(op(OpcodesBCH.OP_DROP)); // drop table unchecked
@@ -115,11 +115,11 @@ function pinOneExecTable(inputIdx, shared, witness, table, { signs = true, quot 
   return cat(...parts);
 }
 
-function pinOwnHeaderQuotAndOrder(ordered) {
-  const numberChecks = [cat(extractNumberKeepRest(), op(OpcodesBCH.OP_TOALTSTACK))];
+function pinOwnHeaderQuotAndOrder(ordered, ids = defaultPinIds) {
+  const numberChecks = [cat(extractNumberKeepRest(ids), op(OpcodesBCH.OP_TOALTSTACK))];
   for (let i = 1; i < ordered; i++) {
     numberChecks.push(cat(
-      extractNumberKeepRest(), // [rest][curr]
+      extractNumberKeepRest(ids), // [rest][curr]
       op(OpcodesBCH.OP_DUP), op(OpcodesBCH.OP_FROMALTSTACK), // [rest][curr][curr][prev]
       op(OpcodesBCH.OP_SWAP), // [rest][curr][prev][curr]
       op(OpcodesBCH.OP_LESSTHANOREQUAL), op(OpcodesBCH.OP_VERIFY),
@@ -130,7 +130,7 @@ function pinOwnHeaderQuotAndOrder(ordered) {
   // The unparsed remainder is discarded after these checks.
   const prefixBytes = 3 + 296 + 3 + 2336 + 33 * numberChecks.length;
   return cat(
-    Buffer.from(encodeDataPush(numberBody())), pushN(NUMBER_FN), op(OpcodesBCH.OP_DEFINE),
+    Buffer.from(encodeDataPush(numberBody())), pushN(ids.number), op(OpcodesBCH.OP_DEFINE),
     op(OpcodesBCH.OP_INPUTINDEX), op(OpcodesBCH.OP_INPUTBYTECODE),
     op(OpcodesBCH.OP_SIZE), pushN(prefixBytes),
     op(OpcodesBCH.OP_MIN, OpcodesBCH.OP_SPLIT, OpcodesBCH.OP_DROP),
@@ -140,13 +140,13 @@ function pinOwnHeaderQuotAndOrder(ordered) {
   );
 }
 
-export function compileTerminalPins(layoutExec, ordered = 10) {
+export function compileTerminalPins(layoutExec, ordered = 10, ids = defaultPinIds) {
   return cat(
-    defineSignFn(),
-    pinOwnHeaderQuotAndOrder(ordered),
-    pinOneExecTable(0, layoutExec[0].shared, layoutExec[0].witness, layoutExec[0].table),
-    pinOneExecTable(1, layoutExec[1].shared, layoutExec[1].witness, layoutExec[1].table),
-    pinOneExecTable(2, layoutExec[2].shared, layoutExec[2].witness, layoutExec[2].table),
+    defineSignFn(ids),
+    pinOwnHeaderQuotAndOrder(ordered, ids),
+    pinOneExecTable(0, layoutExec[0].shared, layoutExec[0].witness, layoutExec[0].table, {ids}),
+    pinOneExecTable(1, layoutExec[1].shared, layoutExec[1].witness, layoutExec[1].table, {ids}),
+    pinOneExecTable(2, layoutExec[2].shared, layoutExec[2].witness, layoutExec[2].table, {ids}),
   );
 }
 

@@ -10,7 +10,7 @@ import {compressOrbitTables} from './table-orbits.mjs';
 import {STATE_BYTES, EXEC_STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
 import {sliceGenesis} from './genesis-slice.mjs';
 import {carrier, remapFunctionIds} from '../densless-msm/carrier.mjs';
-import {compileTerminalPins, compileTerminalPinsLenOrder, compileTerminalPinsLenOnly, compileTerminalPinsOrderOnly, compileTerminalPinsLenSign} from './malleability-pins.mjs';
+import {compileTerminalPins, compileTerminalPinsLenOrder, compileTerminalPinsLenOnly, compileTerminalPinsOrderOnly, compileTerminalPinsLenSign, defaultPinIds, compactPinIds} from './malleability-pins.mjs';
 import {OpcodesBCH, decodeAuthenticationInstructions, encodeAuthenticationInstructions, encodeDataPush, bigIntToVmNumber} from '@bitauth/libauth';
 import * as shared from '../densless-recovered/shared.mjs';
 import * as genesis from '../densless-recovered/genesis.mjs';
@@ -88,6 +88,7 @@ const redeemPushBytes = (length) => length + (length < 76 ? 1 : length < 256 ? 2
 export const SHARED_PRIME_PROFILE = process.env.SHARED_PRIME_PROFILE ?? 'off';
 assert(['off', 'orbit-retained'].includes(SHARED_PRIME_PROFILE), 'unknown shared-prime profile');
 const sharedPrimeEnabled = SHARED_PRIME_PROFILE === 'orbit-retained';
+const selectedPinIds = sharedPrimeEnabled ? compactPinIds : defaultPinIds;
 if (sharedPrimeEnabled) {
   assert.equal(cacheProfile, 'orbit-retained', 'shared-prime requires retained-orbit cache');
   assert.equal(MSM_SPLIT, 37, 'shared-prime requires split37');
@@ -241,6 +242,28 @@ const compileModule = (source, constants) => {
 
 const execPadded = STAGE_PADS.slice(0, 3).some(Boolean), terminalPadded = STAGE_PADS[3] > 0;
 
+const rawPushKey = instruction => {
+  if (instruction.opcode === OpcodesBCH.OP_0) return Buffer.alloc(0);
+  if (instruction.opcode === OpcodesBCH.OP_1NEGATE) return Buffer.from([0x81]);
+  if (instruction.opcode >= OpcodesBCH.OP_1 && instruction.opcode <= OpcodesBCH.OP_16) return Buffer.from([instruction.opcode - OpcodesBCH.OP_1 + 1]);
+  if (instruction.data !== undefined && instruction.opcode <= OpcodesBCH.OP_PUSHDATA_4) return Buffer.from(instruction.data);
+  throw new Error(`malformed function namespace push opcode: ${instruction.opcode}`);
+};
+const functionKeys = bytecode => {
+  const instructions = decodeAuthenticationInstructions(bytecode);
+  const keys = [];
+  for (let i = 0; i + 2 < instructions.length && instructions[i + 2].opcode === OpcodesBCH.OP_DEFINE; i += 3) {
+    keys.push(rawPushKey(instructions[i + 1]).toString('hex'));
+  }
+  return keys;
+};
+const assertPinFunctionNamespace = (ids, bytecodes) => {
+  const used = bytecodes.flatMap(functionKeys);
+  const selected = [ids.sign, ids.number].map(id => Buffer.from(bigIntToVmNumber(BigInt(id))).toString('hex'));
+  assert.equal(new Set(selected).size, selected.length, 'selected pin function identifiers must be distinct');
+  for (const key of selected) assert(!used.includes(key), `selected pin function identifier collides with compiled namespace: ${key}`);
+};
+
 function buildWith({backExec, backTerminal}) {
   const programs = {}, declarations = {}, constants = {deploymentTag};
   ({declarations: declarations.shared, program: programs.shared} = compileModule(shared, constants));
@@ -280,6 +303,7 @@ function buildWith({backExec, backTerminal}) {
   ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminal, constants));
   programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
   programs.msmFinal = compactInverseCopy(programs.msmFinal);
+  assertPinFunctionNamespace(selectedPinIds, [programs.shared, programs.genesis, programs.loader, programs.msmA, programs.msmExec, programs.msmFinal, programs.terminalBase]);
   // Malleability pins (length / order / sign-bit) run before the densless terminal, paid once.
   const layoutExec = [
     { shared: layout.fragmentLengths[0], witness: 2560, table: 928 },
@@ -292,7 +316,7 @@ function buildWith({backExec, backTerminal}) {
     : pinMode === 'lensign' ? compileTerminalPinsLenSign(layoutExec)
     : pinMode === 'orderonly' ? compileTerminalPinsOrderOnly()
     : pinMode === 'lenorder' ? compileTerminalPinsLenOrder(layoutExec)
-    : compileTerminalPins(layoutExec);
+    : compileTerminalPins(layoutExec, 10, selectedPinIds);
   programs.terminalBase = Buffer.concat([pins, programs.terminalBase]);
   programs.terminal = Buffer.concat([terminalPadded ? Buffer.from([OpcodesBCH.OP_ROT, OpcodesBCH.OP_DROP]) : Buffer.alloc(0),
     carrier(programs.terminalBase, programs.msmFinal, 4)]);
