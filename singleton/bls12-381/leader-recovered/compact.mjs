@@ -298,6 +298,8 @@ export const program = candidateProgram;
 // Keep the byte-best program as the default. Cost profiles undo selected existing
 // outlines using each helper's sole body owner and restoring its displaced key.
 const inlineKeys = {
+  stackSequence52: {displaced: 'decompressG2', from: 17, to: 7, byteLength: 6,
+    occurrences: outlinedTotal},
   stackSequence53: {displaced: 'fp6Mul', from: 19, to: -1, occurrences: outlinedThirdTotal},
   stackSequence54: {displaced: 'fp2Scale', from: 31, to: 14, occurrences: outlinedFourthTotal},
   stackSequence55: {displaced: 'stackSequence15', from: 33, to: 15,
@@ -319,6 +321,7 @@ const profileInlines = {
   extended55: ['stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence58'],
   extended57: ['stackSequence53', 'stackSequence54', 'stackSequence56', 'stackSequence57', 'stackSequence58'],
   'extended55-57': ['stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58'],
+  'extended52-55-57': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58'],
 };
 export function buildProfile(profile = 'bytes') {
   assert(profile === 'bytes' || Object.hasOwn(profileInlines, profile), `unknown profile: ${profile}`);
@@ -333,7 +336,12 @@ export function buildProfile(profile = 'bytes') {
     assert(helper, `missing profile helper: ${name}`);
     const helperBytecode = Buffer.from(assemble(helper.body, candidateIdentifiers));
     assert.equal(helperBytecode.length, byteLength);
-    if (name === 'stackSequence55') {
+    if (name === 'stackSequence52') {
+      // Exact opaque stack moves: PUSH17 ROLL twice; restore the decoder's short key.
+      assert.equal(helperBytecode.toString('hex'), '01117a01117a');
+      assert.equal(expectedOccurrences, 6);
+      assert.equal(main.match(/\bCALL decompressG2\b/g)?.length ?? 0, 4);
+    } else if (name === 'stackSequence55') {
       // Exact opaque permutation: 2SWAP SWAP 2ROT SWAP; no arithmetic or calls.
       assert.equal(helperBytecode.toString('hex'), '727c717c');
     } else if (name === 'stackSequence57') {
@@ -368,7 +376,7 @@ export function buildProfile(profile = 'bytes') {
     outlinedStackSequences: outlinedStackSequences.filter(f => retained.has(f.function))};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57]');
+  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57]');
   const profile = process.argv[3] ?? 'bytes';
   const selected = buildProfile(profile);
   const selectedSha256 = createHash('sha256').update(selected.program.bytecode).digest('hex');
