@@ -18,19 +18,21 @@ Here:
 
 Every cache profile uses the checked executor cleanup and terminal inverse-copy identities. The executor replaces `DROP 4 ROLL DROP 4 ROLL DROP 4 ROLL DROP` with `7 ROLL 2DROP 2ROT 2DROP`; both consume eight owned raw words and retain words3..6. The terminal replaces `6 PICK 7 PICK` with `6 PICK DUP`, copying the same arbitrary raw word twice with seven owned words. Both preserve lower main/ALT/function-table prefixes. The existing unique whole-block fingerprints and instruction-boundary checks guard each transform.
 
-Floating, raw-dbl, raw-madd, direct orbit and retained orbit each save16 primary bytes and2,049 native units in both modes. All72 paired archived mode contexts per profile have those deltas. Raw-both already used both rules and retains its programs at explicit27 and default31 schedules. The cache-profile API, full-pin default and zero-padding defaults are unchanged.
+The common stack-cleanup step saved16 primary bytes and2,049 native units in both modes for floating, raw-dbl, raw-madd, direct orbit and retained orbit. All72 paired archived mode contexts per profile have those deltas. Raw-both already used both rules and retains its programs at explicit27 and default31 schedules. The cache-profile API, full-pin default and zero-padding defaults are unchanged.
 
 | profile / split | primary score (bytes) | native consensus | native standard | minimum sampled native input margin |
 |---|---:|---:|---:|---:|
 | floating (default31) | 35,109 | 24,840,184 | 24,908,408 | 86,670 |
-| raw-dbl31 | 35,266 | 24,828,520 | 24,897,128 | 88,287 |
+| raw-dbl31 | 35,265 | 24,822,008 | 24,890,616 | 89,306 |
 | raw-madd31 | 35,480 | 24,688,942 | 24,757,934 | 113,592 |
 | orbit37 | 34,685 | 25,263,604 | 25,331,060 | 104,025 |
 | orbit-retained37 | 34,631 | 25,317,261 | 25,384,589 | 93,286 |
 | raw-both27 / cuts37,43,51,52 | 35,636 | 24,669,602 | 24,738,978 | 61,094 |
 | raw-both31 / cuts33,43,54,60 | 35,636 | 24,670,766 | 24,740,142 | 116,228 |
 
-The first three profiles default to split31/cuts33,43,54,60; the two orbit profiles default to37/cuts27,36,47,55. Explicit overrides remain available. Each executor redeem is five bytes shorter and the terminal is one byte shorter for the five changed profiles. Their helper bodies, registry, shared/loader programs and every Straus/Horner body/control remain exact per prior profile. Current readers, same-width tail literals, namespaces and worker commitments are checked against the prior code. Local executor savings are500/500/507 and the inverse-copy saving101; native whole-transaction measurements own the2,049 aggregate saving.
+Raw-dbl additionally uses the existing checked `2 PICK 3 PICK` to `2 PICK DUP` rule: its raw DBL body419->418bytes, registry2653->2652. The raw-helper list owns recipe selection for both raw-dbl and raw-both; cached DBL and raw MADD choices stay exact. At unchanged31/cuts33,43,54,60/fullpins/zero pads, every one of72 archived mode contexts saves another1byte and6,512native units. Primary35,265/24,822,008cons/24,890,616std; minimum sampled input margin89,306. All proof/witness/scalar/XYZ values stay fixed. Current independent Python/JS helper/typed-loop/reader/frame/namespace/root contracts and original17+fresh17 owning source jobs pass; actual public release/fresh qualification remains required. All other public profile programs retain their previous bytes.
+
+The first three profiles default to split31/cuts33,43,54,60; the two orbit profiles default to37/cuts27,36,47,55. Explicit overrides remain available. In that common stack-cleanup step, each executor redeem became five bytes shorter and the terminal became one byte shorter for the five changed profiles. That step kept each profile's helper bodies, registry, shared/loader programs and Straus/Horner bodies and controls byte-exact. Current readers, same-width tail literals, namespaces and worker commitments are checked against the prior code. Local executor savings are500/500/507 and the inverse-copy saving101; native whole-transaction measurements own the2,049 aggregate saving.
 
 All36 fixed core/short/dense proofs pass both actualVM and pinned-native modes before and after each changed profile, with all reached budgets and DEFINE comparisons retained. Every pre-redeem proof/witness/scalar/XYZ/header/root/quotient/auxiliary/challenge byte remains fixed per prior schedule. Source-generated vectors retain all44 attack cases. The public release gate additionally requires actual owning invalid/binding/public-input/type/G2/parent-spec checks and fresh reconstruction. These are finite, conditional results; no whole-MSM/input/native envelope, universal producer/resource fit, full pairing/PIT/EIP197/subgroup mathematics, exceptional/physical-alias completeness, memory or admission claim follows.
 

@@ -236,8 +236,8 @@ export function cachePrimeLiterals(body) {
   const inputSha = sha(body);
   const cached = recipes[inputSha];
   assert(cached, 'unreviewed prime-cache helper body');
-  // Raw-both also removes a duplicate index selection: 2PICK3PICK -> 2PICKDUP.
-  const recipe = cacheProfile === 'raw-both' && inputSha === dblSha
+  // Raw DBL also removes a duplicate index selection: 2PICK3PICK -> 2PICKDUP.
+  const recipe = rawBodies.includes(inputSha) && inputSha === dblSha
     ? {bodySha256: '75f3585c32c76cd97deb5b40319ddd8ebf20578e099263de2fca365b5dc80612', edits: [[39, 41, '76']]}
     : rawBodies.includes(inputSha) ? {bodySha256: inputSha, edits: []} : cached;
   const parts = [];
