@@ -99,15 +99,6 @@ call fp_mul
 call fp_add
 end
 
-function outline_17 17
-OP_2
-OP_PICK
-OP_SWAP
-call fp_mul
-OP_ROT
-OP_ROT
-call fp_mul
-end
 
 function outline_9 9
 OP_2
@@ -428,7 +419,7 @@ OP_2
 OP_OVER
 OP_3
 OP_PICK
-call outline_17
+call outline_9
 OP_SWAP
 OP_4
 OP_PICK
@@ -690,7 +681,7 @@ OP_3
 OP_OVER
 OP_3
 OP_PICK
-call outline_17
+call outline_9
 OP_SWAP
 call outline_43
 call fp2_mul
@@ -711,7 +702,7 @@ call outline_5
 OP_3
 OP_SWAP
 OP_ROT
-call outline_17
+call outline_9
 OP_15
 OP_ROLL
 OP_15
@@ -748,7 +739,7 @@ OP_9
 OP_PICK
 OP_11
 OP_PICK
-call outline_17
+call outline_9
 OP_DUP
 OP_2
 OP_PICK
@@ -783,7 +774,7 @@ call outline_5
 OP_3
 OP_SWAP
 OP_ROT
-call outline_17
+call outline_9
 OP_4
 OP_ROLL
 OP_5

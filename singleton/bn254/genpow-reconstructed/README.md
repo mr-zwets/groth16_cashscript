@@ -1,7 +1,7 @@
 # Reconstructed BN254 genpow assembly
 
 This directory owns a readable low-level reconstruction of the published BN254
-singleton genpow leader. `verifier.asm` contains all 62 function bodies and the
+singleton genpow leader. `verifier.asm` contains all 61 function bodies and the
 main program as explicit instructions, symbolic calls and named field constants.
 `build.mjs` assembles that source; it does not read or patch an existing program.
 The fixture files contain public proofs and inputs from the official benchmark.
@@ -73,3 +73,24 @@ original verification predicates, is fixed. The additional invocation changes
 resource accounting and call depth; the equivalence claim is about stack values
 and predicates, conditional on execution resources. It does not prove that every
 possible witness fits a limit waived by the official singleton environment.
+
+Duplicate-body sharing (Oct 17, 2026): `outline_17` and `outline_9` had identical
+instruction bodies and identical static `fp_mul` targets. The current assembly
+removes definition 17 and retargets five calls to definition 9; all other IDs and
+instructions stay exact. This reduces locking bytecode from 4,260 to **4,242 bytes**
+and the committed singleton score from 4,619 to **4,601 bytes**. The witness and
+public values remain unchanged. This improves singleton size and cost; it does
+not establish BCH input-budget compliance or stronger point-validation semantics.
+
+The standalone certificate first restores the duplicate definition and its five
+calls, requiring the exact 4,260-byte range-checked hash above. It then performs
+the existing range-prefix and prime-sharing reverse expansion to the official
+4,292-byte artifact. The current program is assembled directly from its readable
+source; the reverse expansion is a separate verification step.
+
+Matched current public measurements retain the 32-byte range check in both
+programs: baseline 4,619 bytes / 5,505,567,176 relaxed VM cost; duplicate sharing
+4,601 bytes / 5,505,566,861. The improvement is **18 bytes and 315 cost units**.
+The historical 4,587-byte figure precedes that range check and is not this
+comparison's baseline. Four supplied proofs, the original invalid proof and all
+nine current public-input mutations pass the unchanged official gates.

@@ -7,7 +7,44 @@ import {createHash} from 'node:crypto';
 import {OpcodesBCH as O, decodeAuthenticationInstructions as decode, encodeAuthenticationInstructions as encode, encodeDataPush, bigIntToVmNumber, vmNumberToBigInt} from '@bitauth/libauth';
 import {assemble} from './build.mjs';
 
-const {bytecode, bodies} = assemble(readFileSync(new URL('verifier.asm', import.meta.url), 'utf8'));
+const deduplicated = assemble(readFileSync(new URL('verifier.asm', import.meta.url), 'utf8'));
+assert.equal(deduplicated.bodies.length, 61);
+assert.equal(deduplicated.bytecode.length, 4242);
+assert.equal(createHash('sha256').update(deduplicated.bytecode).digest('hex'),
+  '8537de8922c6e4711357e4390fd0e1a2006015a16e7b93a7f1d5a88c7d0d58a2');
+assert(!deduplicated.bodies.some(body => body.id === 17));
+const duplicate = deduplicated.bodies.find(body => body.name === 'outline_9');
+assert(duplicate && duplicate.id === 9);
+const callsToRestore = new Map([['outline_30', 1], ['outline_40', 4]]);
+const restoredBodies = [];
+let restoredDuplicateCalls = 0;
+for (const body of deduplicated.bodies) {
+  if (body.id === 9) restoredBodies.push({...body, name: 'outline_17', id: 17});
+  const code = decode(body.bytecode);
+  let restoredCalls = 0;
+  if (callsToRestore.has(body.name)) {
+    for (let ip = 0; ip + 1 < code.length; ip++) {
+      if (code[ip].opcode === O.OP_9 && code[ip + 1].opcode === O.OP_INVOKE) {
+        code[ip] = decode(encodeDataPush(bigIntToVmNumber(17n)))[0];
+        restoredCalls++;
+      }
+    }
+    assert.equal(restoredCalls, callsToRestore.get(body.name));
+  }
+  restoredDuplicateCalls += restoredCalls;
+  restoredBodies.push({...body, bytecode: Buffer.from(encode(code))});
+}
+assert.equal(restoredDuplicateCalls, 5);
+const oldMain = decode(deduplicated.bytecode).slice(deduplicated.bodies.length * 3);
+const bytecode = Buffer.concat([
+  ...restoredBodies.flatMap(body => [Buffer.from(encodeDataPush(body.bytecode)),
+    Buffer.from(encodeDataPush(bigIntToVmNumber(BigInt(body.id)))), Buffer.from([O.OP_DEFINE])]),
+  Buffer.from(encode(oldMain)),
+]);
+const bodies = restoredBodies;
+assert.equal(bytecode.length, 4260);
+assert.equal(createHash('sha256').update(bytecode).digest('hex'),
+  '6d884ee69b1ec0f6b20e749d64422a4f0c779f756a1b01bb1b8edb9b40836e80');
 const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
 const number = instruction => instruction.data !== undefined
   ? vmNumberToBigInt(instruction.data, {maximumVmNumberByteLength: 10000})
@@ -78,4 +115,4 @@ assert.equal(restored.length, 4292);
 assert.equal(hash(restored), '61c451d0bf8835e6ab850a02c325775d3769dbff92b87ba2d564c8f1f8494c83');
 assert.equal(candidate.length, 4228);
 assert.equal(hash(candidate), 'a7686356eba90eb594d2a05189e645111506e67fc3c52007144081761d357cd0');
-console.log(JSON.stringify({status: 'PASS', rangeCheckBytes: rangeCheck.length, lockingBytes: bytecode.length, lockingSha256: hash(bytecode), candidateBytes: candidate.length, originalBytes: restored.length, restoredLiterals, restoredPairs, definitions: bodies.length, candidateSha256: hash(candidate), originalSha256: hash(restored)}));
+console.log(JSON.stringify({status: 'PASS', rangeCheckBytes: rangeCheck.length, lockingBytes: deduplicated.bytecode.length, lockingSha256: hash(deduplicated.bytecode), expandedLockingBytes: bytecode.length, restoredDuplicateCalls, currentDefinitions: deduplicated.bodies.length, candidateBytes: candidate.length, originalBytes: restored.length, restoredLiterals, restoredPairs, definitions: bodies.length, candidateSha256: hash(candidate), originalSha256: hash(restored)}));
