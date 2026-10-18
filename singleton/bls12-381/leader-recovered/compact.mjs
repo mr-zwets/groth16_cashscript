@@ -245,6 +245,23 @@ outlineStackSequence({
 });
 export const outlinedStackSequences = stackOutlines;
 
+// VO-a1: shift the remaining nonnegative exponent rather than a fixed loop counter.
+// The frame [p, r, b, e] maintains r * b^e = a^E (mod p); E=0 returns 1.
+// Only the compact body changes; program.mjs retains the recovered baseline.
+const powFp = candidateFunctions.find(f => f.name === 'powFp');
+assert(powFp, 'missing powFp source owner');
+powFp.body = `
+  CALL fieldPrime OP_TUCK OP_MOD OP_1 OP_SWAP OP_3 OP_ROLL
+  OP_BEGIN
+    OP_DUP OP_2 OP_MOD OP_IF
+      OP_ROT OP_2 OP_PICK OP_MUL OP_3 OP_PICK OP_MOD OP_ROT OP_ROT
+    OP_ENDIF
+    OP_SWAP OP_DUP OP_MUL OP_3 OP_PICK OP_MOD OP_SWAP OP_1 OP_RSHIFTNUM
+    OP_DUP OP_NOT
+  OP_UNTIL
+  OP_2DROP OP_NIP
+`;
+
 const buildCandidate = () => {
   const declarations = candidateFunctions.map(f => ({...f, bytecode: assemble(f.body, candidateIdentifiers)}));
   const mainBytecode = assemble(`${rangeCheck} ${candidateMain}`, candidateIdentifiers);
@@ -261,8 +278,8 @@ const buildCandidate = () => {
 export const candidateProgram = buildCandidate();
 const candidateSha256 = createHash('sha256').update(candidateProgram.bytecode).digest('hex');
 assert.equal(candidateFunctions.length, 60);
-assert.equal(candidateProgram.bytecode.length, 3308);
-assert.equal(candidateSha256, '3ef0a31623a2322afed809f40ee4245365b8f5f10c86142853408b27edacd4d1');
+assert.equal(candidateProgram.bytecode.length, 3295);
+assert.equal(candidateSha256, 'c5b4cf41459b7ec2f4c84fef0eb8cba5dfffee09ad03da909c9d31378a9d5ece');
 assert.equal(candidateFunctions.some(f => inlineSet.has(f.name)), false);
 assert.equal(candidateMain.includes('OP_DEFINE'), false);
 assert.equal(candidateMain.includes('OP_INVOKE'), false);
@@ -280,7 +297,7 @@ export const program = candidateProgram;
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   assert(process.argv[2], 'usage: node compact.mjs output.json');
   writeFileSync(process.argv[2], JSON.stringify({
-    status: 'recovered program with compact identifiers, SZ-a1 inlining, and SM/TB/TJ/TR outlining; gates reported separately',
+    status: 'recovered program with compact identifiers, SZ-a1 inlining, SM/TB/TJ/TR outlining, and exponent-driven powFp; gates reported separately',
     identifiers: Object.fromEntries(candidateIdentifiers),
     functionCount: candidateFunctions.length,
     baselineLockingBytes: bytecode.length, baselineLockingSha256: sha256,
