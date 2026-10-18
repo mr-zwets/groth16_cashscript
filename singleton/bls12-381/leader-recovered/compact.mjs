@@ -262,20 +262,20 @@ powFp.body = `
   OP_2DROP OP_NIP
 `;
 
-const buildCandidate = () => {
-  const declarations = candidateFunctions.map(f => ({...f, bytecode: assemble(f.body, candidateIdentifiers)}));
-  const mainBytecode = assemble(`${rangeCheck} ${candidateMain}`, candidateIdentifiers);
+const buildCandidate = (functions, identifiers, main) => {
+  const declarations = functions.map(f => ({...f, bytecode: assemble(f.body, identifiers)}));
+  const mainBytecode = assemble(`${rangeCheck} ${main}`, identifiers);
   const candidateBytecode = Uint8Array.from([
     ...declarations.flatMap(f => [
       ...encodeDataPush(f.bytecode),
-      ...encodeDataPush(bigIntToVmNumber(BigInt(candidateIdentifiers.get(f.name)))),
+      ...encodeDataPush(bigIntToVmNumber(BigInt(identifiers.get(f.name)))),
       OpcodesBCH.OP_DEFINE,
     ]),
     ...mainBytecode,
   ]);
   return {bytecode: candidateBytecode, declarations, mainBytecode};
 };
-export const candidateProgram = buildCandidate();
+export const candidateProgram = buildCandidate(candidateFunctions, candidateIdentifiers, candidateMain);
 const candidateSha256 = createHash('sha256').update(candidateProgram.bytecode).digest('hex');
 assert.equal(candidateFunctions.length, 60);
 assert.equal(candidateProgram.bytecode.length, 3295);
@@ -294,16 +294,57 @@ export const outlinedFourthOccurrences = outlinedFourthTotal;
 // The public source export is the reviewed candidate. baselineProgram remains available for
 // byte-for-byte regression checks without making the unoptimized program the default output.
 export const program = candidateProgram;
+
+// Keep the byte-best program as the default. Cost profiles undo one existing
+// outline, using that helper's sole body owner and restoring its displaced key.
+const profileInlines = {
+  balanced: {name: 'stackSequence58', displaced: 'fp2MulXi', from: 53, to: 13},
+  cost: {name: 'stackSequence56', displaced: 'stackSequence16', from: 35, to: 16},
+};
+export function buildProfile(profile = 'bytes') {
+  assert(profile === 'bytes' || Object.hasOwn(profileInlines, profile), `unknown profile: ${profile}`);
+  if (profile === 'bytes') return {program, identifiers: candidateIdentifiers, inlinedFunctions, outlinedStackSequences};
+  const {name, displaced, from, to} = profileInlines[profile];
+  const helper = candidateFunctions.find(f => f.name === name);
+  assert(helper, `missing profile helper: ${name}`);
+  assert.equal(assemble(helper.body, candidateIdentifiers).length, 4);
+  assert(helper.body.trim().split(/\s+/).every(token => /^OP_(?:[0-9]+|PICK|ROLL)$/.test(token)),
+    `profile helper must remain a straight-line stack sequence: ${name}`);
+  assert.equal(candidateIdentifiers.get(name), to);
+  assert.equal(candidateIdentifiers.get(displaced), from);
+  const identifiers = new Map(candidateIdentifiers);
+  identifiers.delete(name);
+  identifiers.set(displaced, to);
+  assert.equal(new Set([...identifiers.values()]).size, identifiers.size);
+  const pattern = new RegExp(`\\bCALL ${name}\\b`, 'g');
+  let occurrences = 0;
+  const inline = body => {
+    occurrences += body.match(pattern)?.length ?? 0;
+    return body.replace(pattern, helper.body);
+  };
+  const functions = candidateFunctions.filter(f => f.name !== name).map(f => ({...f, body: inline(f.body)}));
+  const main = inline(candidateMain);
+  assert.equal(occurrences, 8, `unexpected profile call count: ${name}`);
+  const selected = buildCandidate(functions, identifiers, main);
+  const retained = new Set(selected.declarations.map(f => f.name));
+  return {program: selected, identifiers, inlinedFunctions: [...inlinedFunctions, name],
+    outlinedStackSequences: outlinedStackSequences.filter(f => retained.has(f.function))};
+}
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  assert(process.argv[2], 'usage: node compact.mjs output.json');
+  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost]');
+  const profile = process.argv[3] ?? 'bytes';
+  const selected = buildProfile(profile);
+  const selectedSha256 = createHash('sha256').update(selected.program.bytecode).digest('hex');
   writeFileSync(process.argv[2], JSON.stringify({
     status: 'recovered program with compact identifiers, SZ-a1 inlining, SM/TB/TJ/TR outlining, and exponent-driven powFp; gates reported separately',
-    identifiers: Object.fromEntries(candidateIdentifiers),
-    functionCount: candidateFunctions.length,
+    identifiers: Object.fromEntries(selected.identifiers),
+    functionCount: selected.program.declarations.length,
     baselineLockingBytes: bytecode.length, baselineLockingSha256: sha256,
-    lockingBytes: candidateProgram.bytecode.length, lockingSha256: candidateSha256,
-    inlinedFunctions,
-    lockingHex: Buffer.from(program.bytecode).toString('hex'),
+    lockingBytes: selected.program.bytecode.length, lockingSha256: selectedSha256,
+    inlinedFunctions: selected.inlinedFunctions,
+    lockingHex: Buffer.from(selected.program.bytecode).toString('hex'),
+    ...(profile === 'bytes' ? {} : {profile}),
   }, null, 2) + '\n');
-  console.log(JSON.stringify({lockingBytes: candidateProgram.bytecode.length, sha256: candidateSha256}));
+  console.log(JSON.stringify({lockingBytes: selected.program.bytecode.length, sha256: selectedSha256,
+    ...(profile === 'bytes' ? {} : {profile})}));
 }

@@ -4,14 +4,15 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {resolve,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {inlinedFunctions, outlinedFunction, outlinedOccurrences, outlinedSequence,
+import {buildProfile, outlinedFunction, outlinedOccurrences, outlinedSequence,
   outlinedExtraFunction, outlinedExtraOccurrences,
   outlinedThirdFunction, outlinedThirdOccurrences, outlinedThirdSequence,
-  outlinedFourthFunction, outlinedFourthOccurrences, outlinedFourthSequence,
-  outlinedStackSequences, program} from './compact.mjs';
+  outlinedFourthFunction, outlinedFourthOccurrences, outlinedFourthSequence} from './compact.mjs';
 
 const benchmarkArg = process.argv[2];
-assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark');
+assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark [bytes|balanced|cost]');
+const profile = process.argv[3] ?? 'bytes';
+const {program, inlinedFunctions, outlinedStackSequences} = buildProfile(profile);
 const benchmark = resolve(benchmarkArg);
 const source = fileURLToPath(new URL('../../../', import.meta.url));
 assert.equal(execFileSync('git', ['-C', source, 'status', '--porcelain'], {encoding: 'utf8'}), '',
@@ -20,8 +21,8 @@ const sourceRevision = execFileSync('git', ['-C', source, 'rev-parse', 'HEAD'], 
 // Accepted baselines include official and published vectors, including the current parity encoding.
 // Each export preserves the supplied baseline witness representation exactly.
 const files = [
-  ['groth16-bls12381-singleton-genpow-vectors.json', ['d75b8ea17bb56bddc5420f96c2933498ff4e8ff54a10b79355025c0fabed1b80', '0c1d47ee3772c3d4bf1cf7c69f5ff1678200cb71dcf4814f9487a9f0c6e059a8', '6bb11665750ee24b383ba4a92eb0d07c82c633b9dd3903e7f4ca25bc3f1196f0', '67818aa4189195183d5cb1bd9349f2b746e8aba6d314532343957e07929e2bee', '160ef41128b09c3e6bce23ddf58ae37ea1ec5f53cc8abfae15bf29d29e758023', 'f9fce5647702fe7b514b27acbeca57f1455c4dbc06821d414e7948b0291f14af', '73a70c14b6b90feac414a17f384f12c589811a0fc29de7e45cf1a22030e01431', '8cb68f07b7a7825f415b302989a7376f08d807d2e7c949f722d4f3165154af4b', '0386735950884a07061a2a578570c355f17b38c670bf518f5a3acd741d20544c', '3f832a9db9c796cf4ff45b53edd0761213ba2f07652dc4b086b0dc675b2be88d', 'd821f4201985f530e00b23fef1ff68eb123f30d52946656218da99213d8f8c56', '9564d8c386cf16deef4f18248c8570afcec449bc843e3f34c02f8302df38b450', '072a0a04eb36dce03fccee9f4304ebfb4d9eed0a2ce7bf1be8f9905b5c215b3b']],
-  ['groth16-bls12381-singleton-genpow-multiproof-vectors.json', ['6ada2bdf04a21520dcae2432acd77bd25aa165927a101c2d7babb37166167186', '294a5cb74cc3ef8389bfb2738de77d2c830d215dc1b7105396aba316993df3a8', 'e12fe62c2a4d421b7c5b3433e5be3b21e333070e52939e08c0a6b2becab8912e', 'a873b017d6ddd3d73c99fe5717f69daa3bb3f9ba68c667108947f1f2d9508cc9', '21566c1a91e359334b405b529994776b666e9f78a51ec670300097fd8a6aef50', '98bf887f43c410759860d66ee8bf2e0c04ba9c5462454301c135127927cf1ab2', '087eaf111cfdd34fb7f9b63788518e383db492ef81a8ee9f46743eb3bc1e55eb', '653f5ec381d19cc0b7d0efc6cab4475e1ca6b137ddc9ea5ac85de2666a425f40', 'd101f4cce8d13f2ec0af13a83b5985b52ab619376724b68cff56a0e1f1cf9d0b', '9d6cd5c900e5bf706e5c664d7c00506b76299231f99a5e5c3959eaaba2c00cb0', '2d6158ab1184af57acf7fb0ed7679e902d87555ccabc87b2f957239e40e17233', 'bb10b05c20113ac775d4283a62c7f3d1b7d19e835342ed94b3f9f659102a648c', 'ddc65f8853eeb33cb3d8b657fb7ddb954a467c4811ee894b208ef10a36e540df']],
+  ['groth16-bls12381-singleton-genpow-vectors.json', ['d75b8ea17bb56bddc5420f96c2933498ff4e8ff54a10b79355025c0fabed1b80', '0c1d47ee3772c3d4bf1cf7c69f5ff1678200cb71dcf4814f9487a9f0c6e059a8', '6bb11665750ee24b383ba4a92eb0d07c82c633b9dd3903e7f4ca25bc3f1196f0', '67818aa4189195183d5cb1bd9349f2b746e8aba6d314532343957e07929e2bee', '160ef41128b09c3e6bce23ddf58ae37ea1ec5f53cc8abfae15bf29d29e758023', 'f9fce5647702fe7b514b27acbeca57f1455c4dbc06821d414e7948b0291f14af', '73a70c14b6b90feac414a17f384f12c589811a0fc29de7e45cf1a22030e01431', '8cb68f07b7a7825f415b302989a7376f08d807d2e7c949f722d4f3165154af4b', '0386735950884a07061a2a578570c355f17b38c670bf518f5a3acd741d20544c', '3f832a9db9c796cf4ff45b53edd0761213ba2f07652dc4b086b0dc675b2be88d', 'd821f4201985f530e00b23fef1ff68eb123f30d52946656218da99213d8f8c56', '9564d8c386cf16deef4f18248c8570afcec449bc843e3f34c02f8302df38b450', '072a0a04eb36dce03fccee9f4304ebfb4d9eed0a2ce7bf1be8f9905b5c215b3b', '6b2eb1b5f6b454f001578327bb20c8075acd3b18849ea5db9bd267e5e586aa08']],
+  ['groth16-bls12381-singleton-genpow-multiproof-vectors.json', ['6ada2bdf04a21520dcae2432acd77bd25aa165927a101c2d7babb37166167186', '294a5cb74cc3ef8389bfb2738de77d2c830d215dc1b7105396aba316993df3a8', 'e12fe62c2a4d421b7c5b3433e5be3b21e333070e52939e08c0a6b2becab8912e', 'a873b017d6ddd3d73c99fe5717f69daa3bb3f9ba68c667108947f1f2d9508cc9', '21566c1a91e359334b405b529994776b666e9f78a51ec670300097fd8a6aef50', '98bf887f43c410759860d66ee8bf2e0c04ba9c5462454301c135127927cf1ab2', '087eaf111cfdd34fb7f9b63788518e383db492ef81a8ee9f46743eb3bc1e55eb', '653f5ec381d19cc0b7d0efc6cab4475e1ca6b137ddc9ea5ac85de2666a425f40', 'd101f4cce8d13f2ec0af13a83b5985b52ab619376724b68cff56a0e1f1cf9d0b', '9d6cd5c900e5bf706e5c664d7c00506b76299231f99a5e5c3959eaaba2c00cb0', '2d6158ab1184af57acf7fb0ed7679e902d87555ccabc87b2f957239e40e17233', 'bb10b05c20113ac775d4283a62c7f3d1b7d19e835342ed94b3f9f659102a648c', 'ddc65f8853eeb33cb3d8b657fb7ddb954a467c4811ee894b208ef10a36e540df', 'ed5c97338ebd9fe7c3dba57519b63d11d622499df21a9846c8de8f8249686d8c']],
 ];
 const inputs = files.map(([name, hashes]) => {
   const path = join(benchmark, 'src/bch', name);
@@ -35,7 +36,7 @@ assert.equal(inputs[0].data.lockingOK, inputs[1].data.lockingOK);
 assert(['44d79298047a012b2a1d132949f55c1bbd1c803d28197b2e63366eb54614e4c1', 'b982a3db459ec4bbb0a9742b54c2181919881af4d3af24b456e5b5825ba85558', 'b994fd7c4646465636bb88a9ff0f4437bb744758d94fd734b90e2b9429d34e46']
   .concat(['24c86240f9b4721d699ae7b76938b0b03bd1b80061d48e52b2374a7a4a5b6d34', 'f765c89b1e98342ab58bdb80eb36b643c972346fe98c11cb36d45bd2242f8eaa', '5863870d053b3ba98bf14798227baaa6d48cbd72084498a6a97b12b3e8af5ccb', 'd0dc12d1b7ac3d50c0ba0b07462ec8b63cf9f813d0107b3c0102f5c81f695118'])
   .concat(['5a3f91a1d952faee50eef13401fcdeb46b2bbe7bd88c15379013cdbade30cad0', '167e1ab1647f8b41b12bcde2cbf17068671192d56a11be68d105254a4a28515a', 'ed8909fd0ed4f6ca058eb0144eac660741bea1e5b55d0f97b6506bfe44212eaf', '85669084e36988ea5e35db6f95e3cc7eb64bd429de38b93f66f29c026eb509f3', '24f462b2345f79354be7ea5aa0ec70deb28282001eb6efe53fd7e955accdf360'])
-  .concat(['3ef0a31623a2322afed809f40ee4245365b8f5f10c86142853408b27edacd4d1'])
+  .concat(['3ef0a31623a2322afed809f40ee4245365b8f5f10c86142853408b27edacd4d1', 'c5b4cf41459b7ec2f4c84fef0eb8cba5dfffee09ad03da909c9d31378a9d5ece'])
   .includes(createHash('sha256').update(Buffer.from(inputs[0].data.lockingOK, 'hex')).digest('hex')));
 const committed = inputs[1].data.proofs.filter(p => p.committed);
 assert.equal(committed.length, 1);
@@ -67,7 +68,11 @@ const provenance = {
   fourthOutlineIdSwap: {function: 'fp2Scale', before: 14, after: 31, helper: 'stackSequence54', helperId: 14},
   stackOutlines: outlinedStackSequences,
 };
-assert.equal(provenance.lockingSha256, 'c5b4cf41459b7ec2f4c84fef0eb8cba5dfffee09ad03da909c9d31378a9d5ece');
+if (profile === 'bytes') assert.equal(provenance.lockingSha256, 'c5b4cf41459b7ec2f4c84fef0eb8cba5dfffee09ad03da909c9d31378a9d5ece');
+else {
+  provenance.profile = profile;
+  provenance.change += `; ${profile} profile inlines ${inlinedFunctions.at(-1)} and restores its displaced short key, producing ${program.bytecode.length} bytes`;
+}
 const outputs = inputs.map(input => {
   const data = {...input.data, contract: 'leader-recovered/program.mjs (full genpow, compact function IDs, range-checked public inputs, SZ-a1 inlining, SM/TB/TJ/TR/TW/UE/UR static outlines and ID packing)',
     lockingOK: Buffer.from(program.bytecode).toString('hex'),
@@ -83,4 +88,5 @@ for (const output of outputs) writeFileSync(output.path, output.bytes);
 console.log(JSON.stringify({sourceRevision, candidateMode: true, lockingBytes: program.bytecode.length,
   lockingSha256: provenance.lockingSha256,
   outputs: outputs.map(o => ({file: o.name, sha256: createHash('sha256').update(o.bytes).digest('hex')})),
-  witnessBytesChanged: false, originalPipelineRecovered: false}, null, 2));
+  witnessBytesChanged: false, originalPipelineRecovered: false,
+  ...(profile === 'bytes' ? {} : {profile})}, null, 2));
