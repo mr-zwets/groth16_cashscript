@@ -148,6 +148,14 @@ const sharedSource = primeSourceForProfile(rotateHelperBodies(shared, {
   sharedSequence11: [0, '10d38744632c996cd081cc046b2b5a2f299148ee5ec4f5a8ebdf1efc076d3eae', 1],
 }));
 if (sharedPrimeEnabled) {
+  const sliceHelpers = sharedSource.functions.filter(f => f.name === 'sharedSequence20');
+  assert.equal(sliceHelpers.length, 1, 'shared fixed-prefix helper count changed');
+  assert.equal(sliceHelpers[0].originalId, DISPLACED_PRIME_ID, 'shared fixed-prefix helper key changed');
+  assert.equal(sliceHelpers[0].body.trim().split(/\s+/).join(' '),
+    'OP_PUSHBYTES_1 0x20 OP_SPLIT OP_SWAP OP_SIZE OP_NIP OP_PUSHBYTES_1 0x20 OP_NUMEQUALVERIFY',
+    'shared fixed-prefix helper body changed');
+  sharedSource.functions = sharedSource.functions.map(f => f === sliceHelpers[0]
+    ? {...f, body: 'OP_PUSHBYTES_1 0x20 OP_SPLIT OP_NIP'} : f);
   const emptyCheck = 'OP_SIZE OP_NIP OP_0 OP_NUMEQUALVERIFY';
   const emptyBytes = 'OP_0 OP_EQUALVERIFY';
   const eventHelpers = sharedSource.functions.filter(f => f.name === 'millerEvent');
