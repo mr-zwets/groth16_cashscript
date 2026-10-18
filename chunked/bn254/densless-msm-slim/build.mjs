@@ -148,6 +148,16 @@ const sharedSource = primeSourceForProfile(rotateHelperBodies(shared, {
   sharedSequence11: [0, '10d38744632c996cd081cc046b2b5a2f299148ee5ec4f5a8ebdf1efc076d3eae', 1],
 }));
 if (sharedPrimeEnabled) {
+  const emptyCheck = 'OP_SIZE OP_NIP OP_0 OP_NUMEQUALVERIFY';
+  const emptyBytes = 'OP_0 OP_EQUALVERIFY';
+  const eventHelpers = sharedSource.functions.filter(f => f.name === 'millerEvent');
+  assert.equal(eventHelpers.length, 1, 'shared event helper count changed');
+  assert.equal(eventHelpers[0].originalId, 16, 'shared event helper key changed');
+  assert.equal(eventHelpers[0].body.split(emptyCheck).length - 1, 3, 'shared event empty checks changed');
+  sharedSource.functions = sharedSource.functions.map(f => f === eventHelpers[0]
+    ? {...f, body: f.body.replaceAll(emptyCheck, emptyBytes)} : f);
+  assert.equal(sharedSource.main.split(emptyCheck).length - 1, 2, 'shared parser empty checks changed');
+  sharedSource.main = sharedSource.main.replaceAll(emptyCheck, emptyBytes);
   const sizeCheck = 'OP_PUSHBYTES_1 0x20 OP_SPLIT OP_DUP OP_SIZE OP_NIP OP_PUSHBYTES_1 0x20 OP_NUMEQUALVERIFY';
   const compactSizeCheck = 'OP_PUSHBYTES_1 0x20 OP_SPLIT OP_SIZE OP_PUSHBYTES_1 0x20 OP_NUMEQUALVERIFY';
   const sizeHelpers = sharedSource.functions.filter(f => f.name === 'sharedSequence10');
