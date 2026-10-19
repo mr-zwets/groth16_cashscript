@@ -9,6 +9,7 @@
 // ten-fixture result and resource artifacts.
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import {
   bigIntToVmNumber,
   binToHex,
@@ -2152,12 +2153,95 @@ const compileNamed = (source, label, compilerOptions = {}) => {
     throw new Error(`${label} compile failed:\n${numbered}`, { cause: error });
   }
 };
+// Keep the qualified arithmetic interface while scheduling the surrounding source.
+const scheduledCompilerEntry = process.env.RPA_TEMPLATE_CASHC;
+const scheduledCompiler = scheduledCompilerEntry
+  ? await import(pathToFileURL(scheduledCompilerEntry).href) : null;
+const arithmeticCompiler = scheduledCompilerEntry ? await import('cashc') : null;
+if (scheduledCompilerEntry) {
+  assert(process.env.RPA_COMPACT_ARITHMETIC_PRIME_KEY === '-1',
+    'scheduled templates require the qualified minus1 arithmetic profile');
+  assert(process.env.RESCHEDULE !== 'off', 'scheduled templates require stack scheduling');
+  assert(typeof scheduledCompiler.compileString === 'function', 'template compiler entry changed');
+}
+const compileScheduledTemplate = (source, original) => {
+  if (scheduledCompiler === null) return original;
+  const baseline = arithmeticCompiler.compileString(source, {rescheduleStacks: true});
+  assert(equalBytes(Uint8Array.from(Buffer.from(baseline.debug.bytecode, 'hex')), original),
+    'arithmetic compiler differs from the original template compiler');
+  const candidate = scheduledCompiler.compileString(source, {
+    rescheduleStacks: true, renumberFunctionIds: false,
+  });
+  const declared = artifact => artifact.debug.functions.filter(fn => Number.isInteger(fn.id));
+  const oldFunctions = declared(baseline), newFunctions = declared(candidate);
+  const oldByName = new Map(oldFunctions.map(fn => [fn.name, fn]));
+  assert(oldByName.size === oldFunctions.length && newFunctions.length === oldFunctions.length,
+    'scheduled template declaration set changed');
+  const rawKey = instruction => instruction.data !== undefined
+    ? hex(instruction.data) : instruction.opcode === 0 ? '' : instruction.opcode === 79 ? '81'
+      : instruction.opcode >= 81 && instruction.opcode <= 96
+        ? (instruction.opcode - 80).toString(16).padStart(2, '0') : undefined;
+  const keyFor = id => hex(bigIntToVmNumber(BigInt(id)));
+  const mapping = new Map();
+  newFunctions.forEach(fn => {
+    const old = oldByName.get(fn.name);
+    assert(old && JSON.stringify(fn.inputs) === JSON.stringify(old.inputs),
+      `scheduled template declaration interface changed: ${fn.name}`);
+    mapping.set(keyFor(fn.id), old.id);
+  });
+  assert(mapping.size === oldFunctions.length, 'scheduled function identifiers are not unique');
+  const rename = (bytecode, ids) => {
+    const instructions = decodeAuthenticationInstructions(bytecode);
+    for (let index = 0; index < instructions.length; index += 1) {
+      const opcode = instructions[index].opcode;
+      if (opcode !== OpcodesBCH.OP_DEFINE && opcode !== OpcodesBCH.OP_INVOKE) continue;
+      assert(index > 0 && ids.has(rawKey(instructions[index - 1])),
+        'scheduled template contains a nonliteral or unknown function key');
+      if (opcode === OpcodesBCH.OP_DEFINE) {
+        assert(index >= 2 && instructions[index - 2].data !== undefined,
+          'scheduled template definition is not literal');
+        instructions[index - 2] = decodeAuthenticationInstructions(encodeDataPush(
+          rename(instructions[index - 2].data, ids),
+        ))[0];
+      }
+      instructions[index - 1] = decodeAuthenticationInstructions(encodeDataPush(
+        bigIntToVmNumber(BigInt(ids.get(rawKey(instructions[index - 1])))),
+      ))[0];
+    }
+    return encodeAuthenticationInstructions(instructions);
+  };
+  const next = Uint8Array.from(Buffer.from(candidate.debug.bytecode, 'hex'));
+  const renamed = rename(next, mapping);
+  const inverse = new Map(newFunctions.map(fn => [keyFor(oldByName.get(fn.name).id), fn.id]));
+  assert(equalBytes(rename(renamed, inverse), next), 'scheduled namespace inverse changed');
+  const before = decodeAuthenticationInstructions(original);
+  const after = decodeAuthenticationInstructions(renamed);
+  const definitions = [];
+  let end = 0;
+  while (end + 2 < after.length && after[end + 2].opcode === OpcodesBCH.OP_DEFINE) {
+    const id = oldFunctions.find(fn => keyFor(fn.id) === rawKey(after[end + 1]))?.id;
+    assert(Number.isInteger(id), 'scheduled definition owner missing');
+    definitions.push({id, instructions: after.slice(end, end + 3)});
+    end += 3;
+  }
+  assert(definitions.length === oldFunctions.length, 'scheduled definition framing changed');
+  const arithmetic = encodeAuthenticationInstructions(before.slice(0, 39));
+  assert(arithmetic.length === 799 &&
+    hex(sha256(arithmetic)) === '11113485fc60b9d279e6531bf901ae1bba89d340f8ed9422da78b1b878a2548b',
+    'qualified source arithmetic prefix changed');
+  return concat(...definitions.sort((a, b) => a.id - b.id).map(definition =>
+    encodeAuthenticationInstructions(definition.id < 13
+      ? before.slice(definition.id * 3, definition.id * 3 + 3)
+      : definition.instructions)), encodeAuthenticationInstructions(after.slice(end)));
+};
+
 const blockSources = blockRecords.map((record) => blockSource(record));
 const blockRedeems = blockSources.map((source, index) => compileNamed(source, `block ${index}`));
 templateClasses.forEach((template) => {
   const representative = blockRecords[template.representative];
   template.source = templateBlockSource(representative, template);
   template.core = compileNamed(template.source, `${template.name} template`);
+  template.core = compileScheduledTemplate(template.source, template.core);
   template.digest = sha256(template.core);
   assert(template.core.length <= 10_000,
     `${template.name} template exceeds the 10,000-byte script element limit`);
@@ -2380,7 +2464,8 @@ const templateCommonOffsets = new Map([
   ['AdditionTail', 822],
   ['AdditionMiddle', 837],
 ]);
-const templateCommonLength = 823;
+// Scheduled parsing differs only by the independently proved two-item cleanup.
+const templateCommonLength = scheduledCompilerEntry ? 821 : 823;
 const templateCommonCarrier = templateClasses.find(({ name }) => name === 'AdditionTail');
 const templateExtraOffsets = new Map([
   ['AdditionTail', 822 + templateCommonLength],
@@ -2397,7 +2482,9 @@ const templateCommonBody = templateCommonCarrier.core.slice(
 assert(templateCommonBody.length === templateCommonLength,
   'shared template body length changed');
 assert(hex(sha256(templateCommonBody)) ===
-  '33d339834e8264157b76d17f383d12674889607127c9370887e51659be4a24ee',
+  (scheduledCompilerEntry
+    ? '7148122f7a27c8f55a5f301ac9007d363b4d286a9ca5543b234ebe195ae117a6'
+    : '33d339834e8264157b76d17f383d12674889607127c9370887e51659be4a24ee'),
 'shared template canonical parsing body changed');
 const templateCommonOpcodes = decodeAuthenticationInstructions(templateCommonBody)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
