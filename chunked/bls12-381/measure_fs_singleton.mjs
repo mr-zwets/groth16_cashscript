@@ -1119,6 +1119,7 @@ const COMMON_SOURCE = `pragma cashscript ^0.14.0;
 function mAdd(int x, int y) returns (int) { return (x + y) % ${P}; }
 function mSub(int x, int y) returns (int) { return (x - y + ${P}) % ${P}; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${P}; }
+function mulAddFp(int x, int y, int z) returns (int) { return (x * y + z) % ${P}; }
 function mSqr(int x) returns (int) { return (x * x) % ${P}; }
 
 function r2Sub(int a0,int a1,int b0,int b1) returns (int,int) {
@@ -1128,40 +1129,37 @@ function r2Sc(int a0,int a1,int k) returns (int,int) {
     return mulFp(a0,k),mulFp(a1,k);
 }
 function r2Mul(int a0,int a1,int b0,int b1) returns (int,int) {
-    return mSub(mulFp(a0,b0),mulFp(a1,b1)),mAdd(mulFp(a0,b1),mulFp(a1,b0));
+    return mulAddFp(a0,b0,(${P}-a1)*b1),mulAddFp(a0,b1,a1*b0);
 }
 function r2Sqr(int a0,int a1) returns (int,int) {
-    return mulFp(mAdd(a0,a1),mSub(a0,a1)),mulFp(mAdd(a0,a0),a1);
+    return mulFp(a0+a1,a0+${P}-a1),mulFp(2*a0,a1);
 }
 
 function eval6(int c0,int c1,int c2,int c3,int c4,int c5,int a) returns (int) {
     int result = c5;
-    result = mAdd(mulFp(result,a),c4);
-    result = mAdd(mulFp(result,a),c3);
-    result = mAdd(mulFp(result,a),c2);
-    result = mAdd(mulFp(result,a),c1);
-    result = mAdd(mulFp(result,a),c0);
+    result = mulAddFp(result,a,c4);
+    result = mulAddFp(result,a,c3);
+    result = mulAddFp(result,a,c2);
+    result = mulAddFp(result,a,c1);
+    result = mulAddFp(result,a,c0);
     return result;
 }
 function pairSquareEval(int x,int y,int a) returns (int,int) {
-    return mAdd(mSqr(x),mulFp(a,mSqr(y))),mulFp(mAdd(x,x),y);
+    return mulAddFp(a*y,y,x*x),mulFp(2*x,y);
 }
 function pairMulEval(int x,int y,int t,int a) returns (int,int) {
-    return mAdd(x,mulFp(a,mulFp(y,t))),mAdd(y,mulFp(x,t));
+    return mulAddFp(a,mulFp(y,t),x),mulAddFp(x,t,y);
 }
 function lineEval(
     int x,int y,int d0a,int d0b,int ma,int mb,int u,int v,
     int a,int a2,int a4,int a5
 ) returns (int,int) {
-    int qa = mulFp(mSub(0,mAdd(d0a,d0b)),v);
-    int qb = mulFp(mSub(d0a,d0b),v);
-    int ra = mulFp(mAdd(ma,mb),u);
-    int rb = mulFp(mSub(mb,ma),u);
-    int t = mAdd(
-        mAdd(mulFp(mSub(qa,qb),a),mulFp(mSub(ra,rb),a2)),
-        mAdd(mulFp(qb,a4),mulFp(rb,a5))
-    );
-    return mAdd(x,mulFp(a,mulFp(y,t))),mAdd(y,mulFp(x,t));
+    // Expand the line coefficients before reducing. Added multiples of P keep
+    // the numerator nonnegative for canonical operands.
+    int t = mAdd(v*(d0a*(a4+2*${P} - 2*a)+(${P}-d0b)*a4),
+        u*(ma*(2*a2+${P}-a5)+mb*a5));
+    (int nextX,int nextY) = pairMulEval(x,y,t,a);
+    return nextX,nextY;
 }
 function pointDoubleAffine(
     int xa,int xb,int ya,int yb,int ma,int mb
@@ -2485,7 +2483,7 @@ if (process.env.FS_SOURCE_OUT !== undefined) fsWriteFileSync(process.env.FS_SOUR
 
 const fsCompileStarted = Date.now();
 const fsRedeem = compileNamed(fsSource, 'fs singleton',
-  FS_RESCHEDULE ? { rescheduleStacks: true } : { rescheduleStacks: false });
+  { rescheduleStacks: FS_RESCHEDULE, optimizeFor: 'size' });
 const fsCompileMs = Date.now() - fsCompileStarted;
 
 // Witness and measurement on the loosened BCH 2026 VM.
