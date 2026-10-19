@@ -2532,9 +2532,9 @@ const arithmeticProfile = {
   leafId: arithmeticLeafId,
   leafRawKey: arithmeticLeafId === -1 ? '81' : arithmeticLeafId.toString(16).padStart(2, '0'),
   namespaceMap: arithmeticNamespaceMap,
-  expectedLibraryBytes: arithmeticLeafId === -1 ? 631 : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
+  expectedLibraryBytes: arithmeticLeafId === -1 ? 538 : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
   expectedLibrarySha256: arithmeticLeafId === -1
-    ? '0437d619ad29fc2d380583654b461137a0021264c38f2a120e55439a54f29364'
+    ? 'd89d40c72947263599e0050f24117224879ce34775e47b0405e17222981e8450'
     : arithmeticLeafId === 12
       ? '716398743a5a131e1906e462716026526caa12b228c6f1d207974e131039b254'
       : arithmeticLeafId === 5
@@ -2656,6 +2656,15 @@ if (arithmeticLeafId === -1) {
   // Canonical Fp operands permit three products; normalize the signed real remainder.
   arithmeticInstructions[18] = decodeAuthenticationInstructions(encodeDataPush(
     Uint8Array.from(Buffer.from('7653799552795579956e944f8a9776009f634f8a9368537a547a93719395537a947b944f8a97', 'hex')),
+  ))[0];
+  const subtraction = arithmeticInstructions[27];
+  assert(arithmeticFunctionKey(arithmeticInstructions[28]) === '09' &&
+    arithmeticInstructions[29].opcode === OP.DEFINE && subtraction.data?.length === 102 &&
+    hex(sha256(subtraction.data)) === 'c83029276fb4adb317126b0bf4b287a8342de83127d08175d77a6389e5631ea4',
+  'canonical subtraction definition changed');
+  // Both operands are canonical Fp values, so one conditional addition normalizes x-y.
+  arithmeticInstructions[27] = decodeAuthenticationInstructions(encodeDataPush(
+    Uint8Array.from(Buffer.from('7c9476009f634f8a9368', 'hex')),
   ))[0];
 }
 const templateArithmeticBody = encodeAuthenticationInstructions(arithmeticInstructions);
@@ -2955,7 +2964,7 @@ const templateBlockRedeems = blockRecords.map((record, index) => {
 // resource profile; retain the old audited <=76-byte Regular option unchanged.
 const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_DENSITY_PADDING ??
   (arithmeticLeafId === -1
-    ? '{"3":428,"5":414,"6":369,"7":377,"8":360,"9":367,"10":369,"11":378,"12":371,"13":378,"14":379,"16":403,"17":374,"18":376,"19":384}'
+    ? '{"3":378,"5":365,"6":320,"7":328,"8":311,"9":317,"10":318,"11":326,"12":321,"13":328,"14":329,"16":352,"17":324,"18":326,"19":333}'
     : '{"3":436,"5":423,"6":377,"7":385,"8":369,"9":376,"10":377,"11":386,"12":377,"13":386,"14":388,"16":411,"17":383,"18":384,"19":393}'));
 Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   const index = Number(block);
