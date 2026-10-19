@@ -2989,6 +2989,29 @@ if (arithmeticLeafId === -1) {
     Uint8Array.from(Buffer.from('7c01307f7b7b', 'hex')),
     fusedQuotientRedeem.slice(loopOffset + loopSplit.length),
   );
+  const loopCleanup = Uint8Array.from(Buffer.from(
+    '7c6b7c6b7c6b7c6c6c6c52798b537a757c6b7c6c6d', 'hex',
+  ));
+  const cleanupOffset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(loopCleanup));
+  const cleanupBoundaries = new Set([0]);
+  let cleanupInstructionOffset = 0;
+  decodeAuthenticationInstructions(fusedQuotientRedeem).forEach((instruction) => {
+    cleanupInstructionOffset += encodeAuthenticationInstructions([instruction]).length;
+    cleanupBoundaries.add(cleanupInstructionOffset);
+  });
+  assert(fusedQuotientRedeem.length === 222 && hex(sha256(fusedQuotientRedeem)) ===
+    'd8e36fa3293ecf497befcf51cb467248920382c30d5273fac7ff8f5c0ec93353' &&
+    cleanupOffset === 134 &&
+    Buffer.from(fusedQuotientRedeem).lastIndexOf(Buffer.from(loopCleanup)) === cleanupOffset &&
+    [cleanupOffset, cleanupOffset + loopCleanup.length].every((position) => cleanupBoundaries.has(position)),
+  'fused quotient loop cleanup changed');
+  // S,a,index,c,d,e -> S,e,a,index+1 with five entry items and unchanged ALT.
+  // Preserve 1ADD and all preceding unsigned conversion, range and arithmetic checks.
+  fusedQuotientRedeem = concat(
+    fusedQuotientRedeem.slice(0, cleanupOffset),
+    Uint8Array.from(Buffer.from('7b757c757b7b8b', 'hex')),
+    fusedQuotientRedeem.slice(cleanupOffset + loopCleanup.length),
+  );
 }
 const fusedQuotientOpcodes = decodeAuthenticationInstructions(fusedQuotientRedeem)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
