@@ -1508,17 +1508,8 @@ end
 
 function outline_33 33
 OP_5
-OP_ROLL
-OP_5
-OP_ROLL
-OP_5
-OP_ROLL
-OP_5
-OP_ROLL
-OP_5
-OP_ROLL
-OP_5
-OP_ROLL
+OP_PICK
+OP_DROP
 end
 
 function outline_34 34

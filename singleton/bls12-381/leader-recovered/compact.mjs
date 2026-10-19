@@ -316,6 +316,8 @@ const inlineKeys = {
     occurrences: stackOutlines.find(f => f.function === 'stackSequence61').occurrences},
   stackSequence62: {id: 57, byteLength: 11,
     occurrences: stackOutlines.find(f => f.function === 'stackSequence62').occurrences},
+  stackSequence63: {id: 58, byteLength: 11,
+    occurrences: stackOutlines.find(f => f.function === 'stackSequence63').occurrences},
 };
 const profileInlines = {
   balanced: ['stackSequence58'],
@@ -331,6 +333,7 @@ const profileInlines = {
   'extended52-55-57-61': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence61'],
   'extended52-55-57-59-61': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence59', 'stackSequence61'],
   'extended52-55-57-59-61-62': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence59', 'stackSequence61', 'stackSequence62'],
+  'extended52-55-57-59-61-62-63': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence59', 'stackSequence61', 'stackSequence62', 'stackSequence63'],
 };
 export function buildProfile(profile = 'bytes') {
   assert(profile === 'bytes' || Object.hasOwn(profileInlines, profile), `unknown profile: ${profile}`);
@@ -373,6 +376,16 @@ export function buildProfile(profile = 'bytes') {
       assert.equal(decoder.body.match(/\bCALL stackSequence62\b/g)?.length ?? 0, 2);
       assert(functions.filter(f => f.name !== 'decompressG2').every(f => !/\bCALL stackSequence62\b/.test(f.body)));
       assert(!/\bCALL stackSequence62\b/.test(main));
+    } else if (name === 'stackSequence63') {
+      // Expand only the two main calls; preserve the ROLL operand and nested callees.
+      assert.equal(helperBytecode.toString('hex'), '7a727c71588a5a8a011a8a');
+      assert.equal(candidateIdentifiers.get('stackSequence8'), 8);
+      assert.equal(candidateIdentifiers.get('stackSequence10'), 10);
+      assert.equal(candidateIdentifiers.get('millerAccumulate'), 26);
+      assert.equal(expectedOccurrences, 2);
+      assert.equal(displaced, undefined);
+      assert.equal(main.match(/\bCALL stackSequence63\b/g)?.length ?? 0, 2);
+      assert(functions.every(f => !/\bCALL stackSequence63\b/.test(f.body)));
     } else if (name === 'stackSequence55') {
       // Exact opaque permutation: 2SWAP SWAP 2ROT SWAP; no arithmetic or calls.
       assert.equal(helperBytecode.toString('hex'), '727c717c');
@@ -408,7 +421,7 @@ export function buildProfile(profile = 'bytes') {
     outlinedStackSequences: outlinedStackSequences.filter(f => retained.has(f.function))};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61|extended52-55-57-59-61|extended52-55-57-59-61-62]');
+  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61|extended52-55-57-59-61|extended52-55-57-59-61-62|extended52-55-57-59-61-62-63]');
   const profile = process.argv[3] ?? 'bytes';
   const selected = buildProfile(profile);
   const selectedSha256 = createHash('sha256').update(selected.program.bytecode).digest('hex');

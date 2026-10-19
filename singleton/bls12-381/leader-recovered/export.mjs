@@ -10,7 +10,7 @@ import {buildProfile, candidateIdentifiers, inlinedFunctions as defaultInlinedFu
   outlinedFourthFunction, outlinedFourthOccurrences, outlinedFourthSequence} from './compact.mjs';
 
 const benchmarkArg = process.argv[2];
-assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61|extended52-55-57-59-61|extended52-55-57-59-61-62]');
+assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61|extended52-55-57-59-61|extended52-55-57-59-61-62|extended52-55-57-59-61-62-63]');
 const profile = process.argv[3] ?? 'bytes';
 const {program, identifiers, inlinedFunctions, outlinedStackSequences} = buildProfile(profile);
 const retained = new Set(program.declarations.map(f => f.name));
