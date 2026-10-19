@@ -111,9 +111,9 @@ const SCALAR_ORDER_BYTES = Buffer.from(bigIntToVmNumber(SCALAR_FIELD));
 const SCALAR_ORDER_CALL = Buffer.from([...SCALAR_ORDER_KEY, OpcodesBCH.OP_INVOKE]);
 const SHARED_PRIME_HELPERS = new Map([
   ['c800', {oldBytes: 262, oldSha256: '4e3b86b609032b3cda1823349f40433ef8912c082951bba7d42fbfecef0ceaca', sites: 4, newBytes: 138, newSha256: 'd6ecc3dbfe51ea41765084768b2fd72c5274487ce8f6c7b59e2355108b245369'}],
-  ['c900', {oldBytes: 747, oldSha256: '7fa0b44ce7ca69604aaed156c32264d4251083d8157903ae0d076a337d79a303', sites: 1, newBytes: 716, newSha256: '464a31b1cfb88e500b817fc229ec8eb075bacef3e1ede2ffdadedf2c5951edbd'}],
+  ['c900', {oldBytes: 683, oldSha256: '05736bde068f4f8d8a0595cd3a06a36351d19d02509e22dd5379021d60f4457e', sites: 1, newBytes: 652, newSha256: '1edf97182891b362488cd2f99485c84bd328d3252905bc573e4035d0301004da'}],
   ['ca00', {oldBytes: 235, oldSha256: 'd08b357f43e3b9df7c7ae60f997042f69761de6a491d4275a4e9683d654f59db', sites: 1, newBytes: 204, newSha256: 'b1fe20e8f1f9b5a3a696de6cc34baa2964ede6f5f2eb71b8345079f2998368f5'}],
-  ['cb00', {oldBytes: 747, oldSha256: '5090c25c63de08861f8c123e200f8855356e2a935a896a65d5a9433765975221', sites: 1, newBytes: 716, newSha256: '817edef7656ceab2d5bc3bea169580801f1484b8b7f829d6d3e93a11b28e6fa2'}],
+  ['cb00', {oldBytes: 683, oldSha256: '25b32d3d5d4e7949676c91c9ba2e78a40e02e7988d1779df852bf2204de58d19', sites: 1, newBytes: 652, newSha256: 'f2cb2c2ab48660947ca7deac7c3db51d94a77035b56b06d3f955da4f3185589d'}],
 ]);
 const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 const sourceIds = source => source.functions.map(f => f.originalId);
@@ -353,7 +353,7 @@ const cashCache = new Map();
 const cash = (source) => {
   if (!cashCache.has(source)) {
     const bytecode = cachePrimeDefinition(cachePrimeDefinition(remapFunctionIds(compileCash(source), MSM_ID_OFFSET), 202n), 200n);
-    const compressed = orbitProfile ? compressOrbitTables(bytecode, cacheProfile === 'orbit-retained') : bytecode;
+    const compressed = orbitProfile ? compressOrbitTables(bytecode, cacheProfile === 'orbit-retained', sharedPrimeEnabled) : bytecode;
     cashCache.set(source, sharePrimeDefinition(compressed));
   }
   return cashCache.get(source);
@@ -508,7 +508,7 @@ function buildWith({backExec, backTerminal}) {
     : pinMode === 'lensign' ? compileTerminalPinsLenSign(layoutExec)
     : pinMode === 'orderonly' ? compileTerminalPinsOrderOnly()
     : pinMode === 'lenorder' ? compileTerminalPinsLenOrder(layoutExec)
-    : compileTerminalPins(layoutExec, 10, selectedPinIds);
+    : compileTerminalPins(layoutExec, 10, selectedPinIds, sharedPrimeEnabled);
   programs.terminalBase = Buffer.concat([pins, programs.terminalBase]);
   programs.terminal = Buffer.concat([terminalPadded ? Buffer.from([OpcodesBCH.OP_ROT, OpcodesBCH.OP_DROP]) : Buffer.alloc(0),
     carrier(programs.terminalBase, programs.msmFinal, 4)]);

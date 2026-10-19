@@ -3,15 +3,17 @@ import {createHash} from 'node:crypto';
 
 // A source-owned lookup emitter. Constants come from the fixed public table,
 // and every reconstructed entry is checked before any bytecode is emitted.
-export function emitOrbitHelper(lib, table, prime, beta, retainPrime) {
+export function emitOrbitHelper(lib, table, prime, beta, retainPrime, compactOrbits = false) {
   assert.equal(table.length, 960);
   assert(beta > 1n && beta < prime && beta * beta % prime * beta % prime === 1n);
-  const representatives = [1, 4, 5, 6, 7, 9, 11, 13, 14];
+  assert.equal(typeof compactOrbits, 'boolean');
+  const representatives = compactOrbits ? [1, 4, 5, 6, 7, 9, 13, 14] : [1, 4, 5, 6, 7, 9, 11, 13, 14];
   const mapping = new Map(representatives.map((index, position) => [index, [position, 0]]));
   for (const [first, second, third] of [[1, 2, 3], [4, 8, 12], [5, 10, 15]]) {
     mapping.set(second, [representatives.indexOf(first), 1]);
     mapping.set(third, [representatives.indexOf(first), 2]);
   }
+  if (compactOrbits) mapping.set(11, [representatives.indexOf(13), 2]);
   const packed = lib.flattenBinArray(representatives.map(index => table.slice((index - 1) * 64, index * 64)));
   const descriptors = Uint8Array.from({length: 15}, (_, i) => {
     const [position, transform] = mapping.get(i + 1);
@@ -62,7 +64,7 @@ const originalHashes = {"201": "ef86a7e4834b2463e17e666406d2393e5a411747db16a20f
 
 // Replace the two fixed public-table definitions before the shared loader block
 // is split. Every entry reconstructs exactly; the emitted lookup keeps its ABI.
-export function compressOrbitTables(bytecode, retainPrime = false) {
+export function compressOrbitTables(bytecode, retainPrime = false, compactOrbits = false) {
   assert.equal(typeof retainPrime, 'boolean');
   const instructions = lib.decodeAuthenticationInstructions(bytecode);
   const replacements = new Map();
@@ -74,8 +76,8 @@ export function compressOrbitTables(bytecode, retainPrime = false) {
     assert.equal(createHash('sha256').update(body).digest('hex'), originalHashes[String(identifier)]);
     const blobs = lib.decodeAuthenticationInstructions(body).filter(instruction => instruction.data?.length === 960);
     assert.equal(blobs.length, 1);
-    const emitted = emitOrbitHelper(lib, Uint8Array.from(blobs[0].data), prime, beta, retainPrime);
-    assert.equal(emitted.bytecode.length, retainPrime ? 747 : 774);
+    const emitted = emitOrbitHelper(lib, Uint8Array.from(blobs[0].data), prime, beta, retainPrime, compactOrbits);
+    assert.equal(emitted.bytecode.length, (retainPrime ? 747 : 774) - (compactOrbits ? 64 : 0));
     assert(!replacements.has(String(identifier)));
     replacements.set(String(identifier), i);
     instructions[i] = {opcode: lib.OpcodesBCH.OP_PUSHDATA_2, data: emitted.bytecode};

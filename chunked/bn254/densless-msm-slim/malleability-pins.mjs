@@ -71,9 +71,26 @@ function signLimbBody() {
   );
 }
 
-function defineSignFn(ids = defaultPinIds) {
+/** Fixed table → empty: check bit7 of each limb's last byte using a 1024-byte mask. */
+function signTableBody() {
   return cat(
-    Buffer.from(encodeDataPush(signLimbBody())),
+    op(OpcodesBCH.OP_0), pushN(31), op(OpcodesBCH.OP_NUM2BIN),
+    encodeDataPush(Uint8Array.of(0x80)), op(OpcodesBCH.OP_CAT),
+    op(OpcodesBCH.OP_DUP, OpcodesBCH.OP_CAT,
+      OpcodesBCH.OP_DUP, OpcodesBCH.OP_CAT,
+      OpcodesBCH.OP_DUP, OpcodesBCH.OP_CAT,
+      OpcodesBCH.OP_DUP, OpcodesBCH.OP_CAT,
+      OpcodesBCH.OP_DUP, OpcodesBCH.OP_CAT),
+    op(OpcodesBCH.OP_OVER, OpcodesBCH.OP_SIZE, OpcodesBCH.OP_NIP,
+      OpcodesBCH.OP_SPLIT, OpcodesBCH.OP_DROP, OpcodesBCH.OP_AND),
+    op(OpcodesBCH.OP_SIZE, OpcodesBCH.OP_0, OpcodesBCH.OP_SWAP,
+      OpcodesBCH.OP_NUM2BIN, OpcodesBCH.OP_EQUALVERIFY, OpcodesBCH.OP_0),
+  );
+}
+
+function defineSignFn(ids = defaultPinIds, batchSigns = false) {
+  return cat(
+    Buffer.from(encodeDataPush(batchSigns ? signTableBody() : signLimbBody())),
     pushN(ids.sign),
     op(OpcodesBCH.OP_DEFINE),
   );
@@ -83,7 +100,7 @@ function invokeSignFn(ids = defaultPinIds) {
   return cat(pushN(ids.sign), op(OpcodesBCH.OP_INVOKE));
 }
 
-function pinOneExecTable(inputIdx, shared, witness, table, { signs = true, quot = true, ids = defaultPinIds } = {}) {
+function pinOneExecTable(inputIdx, shared, witness, table, { signs = true, quot = true, ids = defaultPinIds, batchSigns = false } = {}) {
   const th = table < 256 ? 2 : 3;
   const skip = [296, shared, witness].reduce((sum, len) => sum + redeemPushBytes(len), th);
   const parts = [
@@ -93,8 +110,12 @@ function pinOneExecTable(inputIdx, shared, witness, table, { signs = true, quot 
     op(OpcodesBCH.OP_TOALTSTACK), // rest on alt; table on stack
   ];
   if (signs) {
-    const limbs = table / 32;
-    for (let i = 0; i < limbs; i++) parts.push(invokeSignFn(ids));
+    if (batchSigns) {
+      parts.push(invokeSignFn(ids));
+    } else {
+      const limbs = table / 32;
+      for (let i = 0; i < limbs; i++) parts.push(invokeSignFn(ids));
+    }
     parts.push(op(OpcodesBCH.OP_DROP));
   } else {
     parts.push(op(OpcodesBCH.OP_DROP)); // drop table unchecked
@@ -140,13 +161,13 @@ function pinOwnHeaderQuotAndOrder(ordered, ids = defaultPinIds) {
   );
 }
 
-export function compileTerminalPins(layoutExec, ordered = 10, ids = defaultPinIds) {
+export function compileTerminalPins(layoutExec, ordered = 10, ids = defaultPinIds, batchSigns = false) {
   return cat(
-    defineSignFn(ids),
+    defineSignFn(ids, batchSigns),
     pinOwnHeaderQuotAndOrder(ordered, ids),
-    pinOneExecTable(0, layoutExec[0].shared, layoutExec[0].witness, layoutExec[0].table, {ids}),
-    pinOneExecTable(1, layoutExec[1].shared, layoutExec[1].witness, layoutExec[1].table, {ids}),
-    pinOneExecTable(2, layoutExec[2].shared, layoutExec[2].witness, layoutExec[2].table, {ids}),
+    pinOneExecTable(0, layoutExec[0].shared, layoutExec[0].witness, layoutExec[0].table, {ids, batchSigns}),
+    pinOneExecTable(1, layoutExec[1].shared, layoutExec[1].witness, layoutExec[1].table, {ids, batchSigns}),
+    pinOneExecTable(2, layoutExec[2].shared, layoutExec[2].witness, layoutExec[2].table, {ids, batchSigns}),
   );
 }
 
