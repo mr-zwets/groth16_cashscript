@@ -88,6 +88,9 @@ const redeemPushBytes = (length) => length + (length < 76 ? 1 : length < 256 ? 2
 export const SHARED_PRIME_PROFILE = process.env.SHARED_PRIME_PROFILE ?? 'off';
 assert(['off', 'orbit-retained'].includes(SHARED_PRIME_PROFILE), 'unknown shared-prime profile');
 const sharedPrimeEnabled = SHARED_PRIME_PROFILE === 'orbit-retained';
+export const MSM_SIGNED_RESIDUE = process.env.MSM_SIGNED_RESIDUE ?? 'off';
+assert(['off', 'madd-ny'].includes(MSM_SIGNED_RESIDUE), 'unknown signed-residue profile');
+assert(MSM_SIGNED_RESIDUE === 'off' || sharedPrimeEnabled, 'signed-residue requires shared prime');
 const selectedPinIds = sharedPrimeEnabled ? compactPinIds : defaultPinIds;
 if (sharedPrimeEnabled) {
   assert.equal(cacheProfile, 'orbit-retained', 'shared-prime requires retained-orbit cache');
@@ -95,7 +98,7 @@ if (sharedPrimeEnabled) {
   assert.deepEqual(CUTS, [27, 36, 47, 55], 'shared-prime requires the reviewed cuts');
   assert.equal(PIN_MODE, 'full', 'shared-prime requires full pins');
   assert.deepEqual(STAGE_PADS, [0, 0, 0, 0], 'shared-prime requires zero stage pads');
-  assert.equal(GENESIS_PAD, 0, 'shared-prime requires zero genesis pad');
+  assert.equal(GENESIS_PAD, MSM_SIGNED_RESIDUE === 'madd-ny' ? 23 : 0, 'unexpected shared-prime genesis pad');
 }
 const SHARED_PRIME_ID = 11n;
 const DISPLACED_PRIME_ID = 37;
@@ -349,12 +352,37 @@ function reuseTerminalScalarOrder(bytecode) {
   assert.equal(replaced, 4, 'TA-a1 terminal must contain exactly four scalar-order literals');
   return Buffer.from(encodeAuthenticationInstructions(next));
 }
+// Canonical ny uses a signed remainder and the retained prime instead of a P-squared bias.
+function normalizeMixedAddNy(bytecode) {
+  if (MSM_SIGNED_RESIDUE === 'off') return bytecode;
+  const instructions = decodeAuthenticationInstructions(bytecode);
+  let changed = 0;
+  let definitionEnd = 0;
+  while (definitionEnd + 2 < instructions.length && instructions[definitionEnd + 2].opcode === OpcodesBCH.OP_DEFINE) definitionEnd += 3;
+  const next = instructions.map((instruction, i) => {
+    if (i >= definitionEnd || i % 3 !== 0 || instructions[i + 2]?.opcode !== OpcodesBCH.OP_DEFINE ||
+        Buffer.from(instructions[i + 1].data ?? []).toString('hex') !== 'ca00') return instruction;
+    const body = Buffer.from(instruction.data);
+    assert.equal(body.length, 204, 'unexpected MADD body length');
+    assert.equal(sha256(body), 'b1fe20e8f1f9b5a3a696de6cc34baa2964ede6f5f2eb71b8345079f2998368f5', 'unexpected MADD body');
+    const normalizer = Buffer.from('76009f63789368', 'hex');
+    const candidate = Buffer.concat([body.subarray(0, 121), body.subarray(187, 197), normalizer, body.subarray(197)]);
+    assert.equal(candidate.length, 145);
+    assert.equal(sha256(candidate), '6d5cbba716993b231aafad6de09d139ffcfa365d73a79c937e7802030bc870ef');
+    const inverse = Buffer.concat([candidate.subarray(0, 121), body.subarray(121, 187), candidate.subarray(121, 131), candidate.subarray(138)]);
+    assert(inverse.equals(body), 'MADD inverse changed');
+    changed += 1;
+    return decodeAuthenticationInstructions(encodeDataPush(candidate))[0];
+  });
+  assert.equal(changed, 1, 'expected one MADD definition');
+  return Buffer.from(encodeAuthenticationInstructions(next));
+}
 const cashCache = new Map();
 const cash = (source) => {
   if (!cashCache.has(source)) {
     const bytecode = cachePrimeDefinition(cachePrimeDefinition(remapFunctionIds(compileCash(source), MSM_ID_OFFSET), 202n), 200n);
     const compressed = orbitProfile ? compressOrbitTables(bytecode, cacheProfile === 'orbit-retained', sharedPrimeEnabled) : bytecode;
-    cashCache.set(source, sharePrimeDefinition(compressed));
+    cashCache.set(source, normalizeMixedAddNy(sharePrimeDefinition(compressed)));
   }
   return cashCache.get(source);
 };
