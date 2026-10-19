@@ -148,6 +148,15 @@ const sharedSource = primeSourceForProfile(rotateHelperBodies(shared, {
   sharedSequence11: [0, '10d38744632c996cd081cc046b2b5a2f299148ee5ec4f5a8ebdf1efc076d3eae', 1],
 }));
 if (sharedPrimeEnabled) {
+  const cycleHelpers = sharedSource.functions.filter(f => f.name === 'sharedSequence28');
+  assert.equal(cycleHelpers.length, 1, 'shared eleven-cycle helper count changed');
+  assert.equal(cycleHelpers[0].originalId, 22, 'shared eleven-cycle helper key changed');
+  const cycleBody = cycleHelpers[0].body.trim().split(/\s+/).join(' ');
+  assert.equal(sha256(cycleBody), 'd32590810168d3028ae743b4fe41e2c60fbf0a7425b0a628f0e98357177c5c52', 'shared eleven-cycle helper body changed');
+  const cycle = Array(11).fill('OP_10 OP_ROLL').join(' ');
+  assert.equal(cycleBody, `OP_PICK CALL sharedSequence10 ${cycle}`, 'shared eleven-cycle prefix or tail changed');
+  sharedSource.functions = sharedSource.functions.map(f => f === cycleHelpers[0]
+    ? {...f, body: 'OP_PICK CALL sharedSequence10 OP_10 OP_PICK OP_DROP'} : f);
   const remainderHelpers = sharedSource.functions.filter(f => f.name === 'sharedSequence14');
   assert.equal(remainderHelpers.length, 1, 'shared discarded-remainder helper count changed');
   assert.equal(remainderHelpers[0].originalId, 24, 'shared discarded-remainder helper key changed');
