@@ -93,6 +93,10 @@ assert(['off', 'madd-ny'].includes(MSM_SIGNED_RESIDUE), 'unknown signed-residue 
 assert(MSM_SIGNED_RESIDUE === 'off' || sharedPrimeEnabled, 'signed-residue requires shared prime');
 // Opt-in WIP compiler profile: the current cached/signed helper library stays exact.
 const msmCompilerEntry = process.env.MSM_CASHC;
+const msmConstantHoisting = process.env.MSM_CONSTANT_HOISTING ?? 'off';
+assert(['off', 'all'].includes(msmConstantHoisting), 'unknown MSM constant-hoisting profile');
+assert(msmConstantHoisting === 'off' || msmCompilerEntry,
+  'MSM constant hoisting requires the scheduled compiler');
 assert(!msmCompilerEntry || sharedPrimeEnabled && MSM_SIGNED_RESIDUE === 'madd-ny',
   'scheduled MSM mains require the qualified retained-orbit signed profile');
 const msmCompiler = msmCompilerEntry ? await import(pathToFileURL(msmCompilerEntry).href) : null;
@@ -106,7 +110,11 @@ if (sharedPrimeEnabled) {
   assert.equal(MSM_SPLIT, 37, 'shared-prime requires split37');
   assert.deepEqual(CUTS, [27, 36, 47, 55], 'shared-prime requires the reviewed cuts');
   assert.equal(PIN_MODE, 'full', 'shared-prime requires full pins');
-  assert.deepEqual(STAGE_PADS, [0, 0, 0, 0], 'shared-prime requires zero stage pads');
+  assert.equal(STAGE_PADS.length, 4, 'unexpected stage pad count');
+  assert.deepEqual(STAGE_PADS.slice(0, 3), [0, 0, 0], 'shared-prime requires zero executor pads');
+  assert(Number.isInteger(STAGE_PADS[3]) && STAGE_PADS[3] >= 0 &&
+    STAGE_PADS[3] <= (msmConstantHoisting === 'all' ? 64 : 0),
+  'unexpected shared-prime terminal padding');
   assert.equal(GENESIS_PAD, MSM_SIGNED_RESIDUE === 'madd-ny' ? 23 : 0, 'unexpected shared-prime genesis pad');
 }
 const SHARED_PRIME_ID = 11n;
@@ -346,7 +354,7 @@ function reuseFinalPrimeCalls(bytecode) {
     replaced += 1;
     return decodeAuthenticationInstructions(SHARED_PRIME_CALL);
   });
-  assert.equal(replaced, 5, 'unexpected final MSM P literal count for selected compiler');
+  assert.equal(replaced, msmConstantHoisting === 'all' ? 1 : 5, 'unexpected final MSM P literal count for selected compiler');
   return Buffer.from(encodeAuthenticationInstructions(next));
 }
 function reuseTerminalScalarOrder(bytecode) {
@@ -358,7 +366,7 @@ function reuseTerminalScalarOrder(bytecode) {
     replaced += 1;
     return decodeAuthenticationInstructions(SCALAR_ORDER_CALL);
   });
-  assert.equal(replaced, 4, 'unexpected terminal scalar-order literal count for selected compiler');
+  assert.equal(replaced, msmConstantHoisting === 'all' ? 1 : 4, 'unexpected terminal scalar-order literal count for selected compiler');
   return Buffer.from(encodeAuthenticationInstructions(next));
 }
 // Canonical ny uses a signed remainder and the retained prime instead of a P-squared bias.
@@ -397,6 +405,7 @@ const compileMsm = (source) => {
     'original MSM compiler metadata differs from the active compiler');
   const candidate = msmCompiler.compileString(source, {
     rescheduleStacks: true, disableInlining: true, renumberFunctionIds: false,
+    ...(msmConstantHoisting === 'all' ? {constantHoisting: 'all'} : {}),
   });
   assert.deepEqual(candidate.abi, before.abi, 'MSM spend interface changed');
   assert.deepEqual(candidate.constructorInputs, before.constructorInputs,
@@ -595,7 +604,7 @@ function buildWith({backExec, backTerminal}) {
   // terminal: the densless terminal, then the final MSM stage on its parked pushes (zInv, state)
   ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminalWithLayout, constants, extraNumbers));
   programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
-  programs.msmFinal = compactInverseCopy(programs.msmFinal);
+  if (msmConstantHoisting === 'off') programs.msmFinal = compactInverseCopy(programs.msmFinal);
   programs.msmFinal = reuseFinalPrimeCalls(programs.msmFinal);
   programs.msmFinal = reuseTerminalScalarOrder(programs.msmFinal);
   // Pins coexist with the terminal module, imported MSM definitions, and stage loader only.
@@ -609,7 +618,11 @@ function buildWith({backExec, backTerminal}) {
     : pinMode === 'lenorder' ? compileTerminalPinsLenOrder(layoutExec)
     : compileTerminalPins(layoutExec, 10, selectedPinIds, sharedPrimeEnabled);
   programs.terminalBase = Buffer.concat([pins, programs.terminalBase]);
-  programs.terminal = Buffer.concat([terminalPadded ? Buffer.from([OpcodesBCH.OP_ROT, OpcodesBCH.OP_DROP]) : Buffer.alloc(0),
+  // The hoisted profile's pad sits below n1, n0, zInv and the carried state.
+  const terminalPadPrefix = msmConstantHoisting === 'all'
+    ? Buffer.from([OpcodesBCH.OP_4, OpcodesBCH.OP_ROLL, OpcodesBCH.OP_DROP])
+    : Buffer.from([OpcodesBCH.OP_ROT, OpcodesBCH.OP_DROP]);
+  programs.terminal = Buffer.concat([terminalPadded ? terminalPadPrefix : Buffer.alloc(0),
     carrier(programs.terminalBase, programs.msmFinal, 4)]);
   delete programs.terminalBase;
   return {programs, declarations, layout: wireLayout};
