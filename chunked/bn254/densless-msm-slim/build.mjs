@@ -148,6 +148,15 @@ const sharedSource = primeSourceForProfile(rotateHelperBodies(shared, {
   sharedSequence11: [0, '10d38744632c996cd081cc046b2b5a2f299148ee5ec4f5a8ebdf1efc076d3eae', 1],
 }));
 if (sharedPrimeEnabled) {
+  const remainderHelpers = sharedSource.functions.filter(f => f.name === 'sharedSequence14');
+  assert.equal(remainderHelpers.length, 1, 'shared discarded-remainder helper count changed');
+  assert.equal(remainderHelpers[0].originalId, 24, 'shared discarded-remainder helper key changed');
+  const remainderBody = remainderHelpers[0].body.trim().split(/\s+/).join(' ');
+  assert.equal(sha256(remainderBody), 'c72297ab9035dfc154f1a2580df875f1095b310d1bfc9128df7545d6fe1e7e5f', 'shared discarded-remainder helper body changed');
+  const discardedRemainder = 'OP_OVER OP_MOD OP_DUP OP_NUMEQUALVERIFY';
+  assert.equal(remainderBody.split(discardedRemainder).length - 1, 1, 'shared discarded-remainder count changed');
+  sharedSource.functions = sharedSource.functions.map(f => f === remainderHelpers[0]
+    ? {...f, body: remainderBody.replace(discardedRemainder, 'OP_DROP')} : f);
   const sliceHelpers = sharedSource.functions.filter(f => f.name === 'sharedSequence20');
   assert.equal(sliceHelpers.length, 1, 'shared fixed-prefix helper count changed');
   assert.equal(sliceHelpers[0].originalId, DISPLACED_PRIME_ID, 'shared fixed-prefix helper key changed');
