@@ -3012,6 +3012,29 @@ if (arithmeticLeafId === -1) {
     Uint8Array.from(Buffer.from('7b757c757b7b8b', 'hex')),
     fusedQuotientRedeem.slice(cleanupOffset + loopCleanup.length),
   );
+  const loopLifetime = Uint8Array.from(Buffer.from(
+    '7601007e817657799f6954795679957893577997557a757b757c757b7b8b', 'hex',
+  ));
+  const lifetimeOffset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(loopLifetime));
+  const lifetimeBoundaries = new Set([0]);
+  let lifetimeInstructionOffset = 0;
+  decodeAuthenticationInstructions(fusedQuotientRedeem).forEach((instruction) => {
+    lifetimeInstructionOffset += encodeAuthenticationInstructions([instruction]).length;
+    lifetimeBoundaries.add(lifetimeInstructionOffset);
+  });
+  assert(fusedQuotientRedeem.length === 208 && hex(sha256(fusedQuotientRedeem)) ===
+    'd937ca47bdd7b2577404a1566b4770ce21cfd1833de6d15c971dfed1f5e954d2' &&
+    lifetimeOffset === 111 &&
+    Buffer.from(fusedQuotientRedeem).lastIndexOf(Buffer.from(loopLifetime)) === lifetimeOffset &&
+    [lifetimeOffset, lifetimeOffset + loopLifetime.length].every((position) => lifetimeBoundaries.has(position)),
+  'fused quotient coefficient lifetime changed');
+  // Consume coefficientBytes and coefficient once; keep unsigned conversion, range,
+  // MUL/ADD/MOD order and index increment. S,p,a,acc,suffix,i,prefix -> S,p,a,next,suffix,i+1.
+  fusedQuotientRedeem = concat(
+    fusedQuotientRedeem.slice(0, lifetimeOffset),
+    Uint8Array.from(Buffer.from('01007e817656799f69537955799593557997537a757b7b8b', 'hex')),
+    fusedQuotientRedeem.slice(lifetimeOffset + loopLifetime.length),
+  );
 }
 const fusedQuotientOpcodes = decodeAuthenticationInstructions(fusedQuotientRedeem)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
