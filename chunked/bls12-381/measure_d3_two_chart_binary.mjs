@@ -2939,11 +2939,16 @@ Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   assert(Number.isInteger(byteCount) && byteCount >= 0 && byteCount <= 1000,
     'compact Regular padding exceeds the bounded experiment');
   let padding = new Uint8Array();
-  while (padding.length < byteCount) {
-    const remaining = byteCount - padding.length;
-    assert(remaining >= 2, 'compact padding cannot encode a one-byte tail');
-    const chunk = Math.min(remaining === 77 ? 75 : 76, remaining);
-    padding = concat(padding, encodeDataPush(new Uint8Array(chunk - 2)), Uint8Array.of(OP.DROP));
+  if (arithmeticLeafId === -1 && byteCount >= 260) {
+    // One PUSHDATA2 and DROP retain the complete padding prefix length.
+    padding = concat(encodeDataPush(new Uint8Array(byteCount - 4)), Uint8Array.of(OP.DROP));
+  } else {
+    while (padding.length < byteCount) {
+      const remaining = byteCount - padding.length;
+      assert(remaining >= 2, 'compact padding cannot encode a one-byte tail');
+      const chunk = Math.min(remaining === 77 ? 75 : 76, remaining);
+      padding = concat(padding, encodeDataPush(new Uint8Array(chunk - 2)), Uint8Array.of(OP.DROP));
+    }
   }
   assert(padding.length === byteCount, 'compact padding byte count changed');
   templateBlockRedeems[index] = concat(padding, templateBlockRedeems[index]);
