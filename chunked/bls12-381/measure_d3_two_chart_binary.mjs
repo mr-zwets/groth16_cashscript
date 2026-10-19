@@ -2755,6 +2755,26 @@ templateClasses.forEach((template) => {
     // Keep its ROLL, unsigned conversion and expectedTotal range check exact.
     template.core = concat(template.core.slice(0, offset + 3), template.core.slice(offset + 7));
   }
+  if (arithmeticLeafId === -1) {
+    const bounds = { First: [9, 3], AdditionTail: [1, 1], AdditionMiddle: [7, 7], Terminal: [1, 1] }[template.name];
+    if (bounds !== undefined) {
+      const instructions = decodeAuthenticationInstructions(template.core);
+      const sites = instructions.flatMap((instruction, index) =>
+        instruction.data !== undefined && equalBytes(instruction.data, selectivePrime) &&
+        instructions[index + 1]?.opcode === 0xa5 ? [index] : []);
+      assert(sites.length === bounds[0], `${template.name} prime range-check sites changed`);
+      const selected = new Set(sites.slice(0, bounds[1]));
+      // The arithmetic prefix defines the same P leaf before these range checks run.
+      const primeCall = decodeAuthenticationInstructions(concat(
+        pushVmNumber(arithmeticLeafId), Uint8Array.of(OP.INVOKE),
+      ));
+      const transformed = encodeAuthenticationInstructions(instructions.flatMap((instruction, index) =>
+        selected.has(index) ? primeCall : [instruction]));
+      assert(template.core.length - transformed.length === 47 * bounds[1],
+        `${template.name} prime range-check replacement length changed`);
+      template.core = transformed;
+    }
+  }
   template.digest = sha256(template.core);
   template.arithmeticRemainder = template.core.slice(templateArithmeticLength);
 });
