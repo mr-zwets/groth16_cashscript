@@ -1527,9 +1527,9 @@ call outline_29
 end
 
 function outline_21 21
-call outline_10
-call outline_10
-call outline_10
+OP_11
+OP_PICK
+OP_DROP
 end
 
 function outline_50 50

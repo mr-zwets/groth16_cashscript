@@ -298,6 +298,7 @@ export const program = candidateProgram;
 // Keep the byte-best program as the default. Cost profiles undo selected existing
 // outlines using each helper's sole body owner and restoring its displaced key.
 const inlineKeys = {
+  stackSequence49: {id: 49, byteLength: 6, occurrences: 3},
   stackSequence52: {displaced: 'decompressG2', from: 17, to: 7, byteLength: 6,
     occurrences: outlinedTotal},
   stackSequence53: {displaced: 'fp6Mul', from: 19, to: -1, occurrences: outlinedThirdTotal},
@@ -334,6 +335,7 @@ const profileInlines = {
   'extended52-55-57-59-61': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence59', 'stackSequence61'],
   'extended52-55-57-59-61-62': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence59', 'stackSequence61', 'stackSequence62'],
   'extended52-55-57-59-61-62-63': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence59', 'stackSequence61', 'stackSequence62', 'stackSequence63'],
+  'extended52-55-57-59-61-62-63-49': ['stackSequence52', 'stackSequence53', 'stackSequence54', 'stackSequence55', 'stackSequence56', 'stackSequence57', 'stackSequence58', 'stackSequence59', 'stackSequence61', 'stackSequence62', 'stackSequence63', 'stackSequence49'],
 };
 export function buildProfile(profile = 'bytes') {
   assert(profile === 'bytes' || Object.hasOwn(profileInlines, profile), `unknown profile: ${profile}`);
@@ -386,6 +388,21 @@ export function buildProfile(profile = 'bytes') {
       assert.equal(displaced, undefined);
       assert.equal(main.match(/\bCALL stackSequence63\b/g)?.length ?? 0, 2);
       assert(functions.every(f => !/\bCALL stackSequence63\b/.test(f.body)));
+    } else if (name === 'stackSequence49') {
+      // Preserve MOD, DUP and both exact nested calls at the three point-arithmetic sites.
+      assert.equal(helperBytecode.toString('hex'), '008a9776518a');
+      assert.equal(candidateIdentifiers.get('fieldPrime'), 0);
+      assert.equal(candidateIdentifiers.get('mulFp'), 1);
+      assert.equal(expectedOccurrences, 3);
+      assert.equal(displaced, undefined);
+      const double = functions.find(f => f.name === 'g1Double');
+      const add = functions.find(f => f.name === 'g1Add');
+      assert(double && add);
+      assert.equal(double.body.match(/\bCALL stackSequence49\b/g)?.length ?? 0, 1);
+      assert.equal(add.body.match(/\bCALL stackSequence49\b/g)?.length ?? 0, 2);
+      assert(functions.filter(f => !['g1Double', 'g1Add'].includes(f.name))
+        .every(f => !/\bCALL stackSequence49\b/.test(f.body)));
+      assert(!/\bCALL stackSequence49\b/.test(main));
     } else if (name === 'stackSequence55') {
       // Exact opaque permutation: 2SWAP SWAP 2ROT SWAP; no arithmetic or calls.
       assert.equal(helperBytecode.toString('hex'), '727c717c');
@@ -421,7 +438,7 @@ export function buildProfile(profile = 'bytes') {
     outlinedStackSequences: outlinedStackSequences.filter(f => retained.has(f.function))};
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61|extended52-55-57-59-61|extended52-55-57-59-61-62|extended52-55-57-59-61-62-63]');
+  assert(process.argv[2], 'usage: node compact.mjs output.json [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61|extended52-55-57-59-61|extended52-55-57-59-61-62|extended52-55-57-59-61-62-63|extended52-55-57-59-61-62-63-49]');
   const profile = process.argv[3] ?? 'bytes';
   const selected = buildProfile(profile);
   const selectedSha256 = createHash('sha256').update(selected.program.bytecode).digest('hex');
