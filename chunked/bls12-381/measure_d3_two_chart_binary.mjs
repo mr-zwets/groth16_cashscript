@@ -2532,9 +2532,9 @@ const arithmeticProfile = {
   leafId: arithmeticLeafId,
   leafRawKey: arithmeticLeafId === -1 ? '81' : arithmeticLeafId.toString(16).padStart(2, '0'),
   namespaceMap: arithmeticNamespaceMap,
-  expectedLibraryBytes: arithmeticLeafId === -1 ? 612 : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
+  expectedLibraryBytes: arithmeticLeafId === -1 ? 631 : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
   expectedLibrarySha256: arithmeticLeafId === -1
-    ? 'f822aa84b668224057cac2f83205de35fefa5089a9b04a86d748c2a709ecfce5'
+    ? '0437d619ad29fc2d380583654b461137a0021264c38f2a120e55439a54f29364'
     : arithmeticLeafId === 12
       ? '716398743a5a131e1906e462716026526caa12b228c6f1d207974e131039b254'
       : arithmeticLeafId === 5
@@ -2645,6 +2645,18 @@ if (arithmeticLeafId === -1) {
   arithmeticInstructions[30] = decodeAuthenticationInstructions(encodeDataPush(concat(
     lineEval.data.slice(0, -disposal.length), Uint8Array.of(0x72, 0x6d),
   )))[0];
+}
+if (arithmeticLeafId === -1) {
+  const multiplication = arithmeticInstructions[18];
+  assert(arithmeticFunctionKey(arithmeticInstructions[19]) === '06' &&
+    arithmeticInstructions[20].opcode === OP.DEFINE &&
+    multiplication.data?.length === 19 &&
+    hex(sha256(multiplication.data)) === '7cb117a6b61597c660748fc52ea1a91865f3c04a37d3179f91a68fe042a10404',
+  'Fp2 multiplication definition changed');
+  // Canonical Fp operands permit three products; normalize the signed real remainder.
+  arithmeticInstructions[18] = decodeAuthenticationInstructions(encodeDataPush(
+    Uint8Array.from(Buffer.from('7653799552795579956e944f8a9776009f634f8a9368537a547a93719395537a947b944f8a97', 'hex')),
+  ))[0];
 }
 const templateArithmeticBody = encodeAuthenticationInstructions(arithmeticInstructions);
 const templateArithmeticLength = templateArithmeticBody.length;
@@ -2941,7 +2953,10 @@ const templateBlockRedeems = blockRecords.map((record, index) => {
 
 // Experimental compact-record layout padding. This is outside the frozen
 // resource profile; retain the old audited <=76-byte Regular option unchanged.
-const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_DENSITY_PADDING ?? '{"3":436,"5":423,"6":377,"7":385,"8":369,"9":376,"10":377,"11":386,"12":377,"13":386,"14":388,"16":411,"17":383,"18":384,"19":393}');
+const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_DENSITY_PADDING ??
+  (arithmeticLeafId === -1
+    ? '{"3":428,"5":414,"6":369,"7":377,"8":360,"9":367,"10":369,"11":378,"12":371,"13":378,"14":379,"16":403,"17":374,"18":376,"19":384}'
+    : '{"3":436,"5":423,"6":377,"7":385,"8":369,"9":376,"10":377,"11":386,"12":377,"13":386,"14":388,"16":411,"17":383,"18":384,"19":393}'));
 Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   const index = Number(block);
   assert(Number.isInteger(index) && String(index) === block && index !== 2 &&
@@ -3221,7 +3236,7 @@ const templateSiblingLockings = templateBlockRedeems.map(
   (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)),
 );
 const templateSiblingLockingDigest = sha256(concat(...templateSiblingLockings));
-const templateCoordinatorCore = compileNamed(
+let templateCoordinatorCore = compileNamed(
   coordinatorSource(
     templateSiblingLockingDigest,
     true,
@@ -3231,6 +3246,35 @@ const templateCoordinatorCore = compileNamed(
   'template coordinator',
   { optimizeFor: 'size' },
 );
+if (arithmeticLeafId === -1) {
+  let primeSites = 0;
+  const poolCoordinatorPrime = (instructions) => instructions.map((instruction, index) => {
+    if (instruction.data !== undefined && instructions[index + 2]?.opcode === OP.DEFINE) {
+      return decodeAuthenticationInstructions(encodeDataPush(encodeAuthenticationInstructions(
+        poolCoordinatorPrime(decodeAuthenticationInstructions(instruction.data)).flat(),
+      )))[0];
+    }
+    if (instruction.opcode === OP.INVOKE) {
+      assert(instructions[index - 1]?.opcode !== 0x4f,
+        'coordinator prime key is already owned');
+    }
+    if (instruction.data !== undefined && equalBytes(instruction.data, selectivePrime)) {
+      primeSites += 1;
+      return decodeAuthenticationInstructions(concat(
+        pushVmNumber(arithmeticLeafId), Uint8Array.of(OP.INVOKE),
+      ));
+    }
+    return instruction;
+  });
+  // A constant leaf replaces identical P pushes, including those in private helpers.
+  const pooled = encodeAuthenticationInstructions(poolCoordinatorPrime(
+    decodeAuthenticationInstructions(templateCoordinatorCore),
+  ).flat());
+  assert(primeSites === 4, 'coordinator field-prime sites changed');
+  templateCoordinatorCore = concat(
+    encodeAuthenticationInstructions(arithmeticLeafDefinition), pooled,
+  );
+}
 const templateCoordinatorCoreRedeem = concat(
   picAuthWrapper(
     picAuthBatches[0].firstWindow,
