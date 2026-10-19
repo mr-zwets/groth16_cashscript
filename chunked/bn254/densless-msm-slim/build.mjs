@@ -91,6 +91,15 @@ const sharedPrimeEnabled = SHARED_PRIME_PROFILE === 'orbit-retained';
 export const MSM_SIGNED_RESIDUE = process.env.MSM_SIGNED_RESIDUE ?? 'off';
 assert(['off', 'madd-ny'].includes(MSM_SIGNED_RESIDUE), 'unknown signed-residue profile');
 assert(MSM_SIGNED_RESIDUE === 'off' || sharedPrimeEnabled, 'signed-residue requires shared prime');
+// Opt-in WIP compiler profile: the current cached/signed helper library stays exact.
+const msmCompilerEntry = process.env.MSM_CASHC;
+assert(!msmCompilerEntry || sharedPrimeEnabled && MSM_SIGNED_RESIDUE === 'madd-ny',
+  'scheduled MSM mains require the qualified retained-orbit signed profile');
+const msmCompiler = msmCompilerEntry ? await import(pathToFileURL(msmCompilerEntry).href) : null;
+const originalMsmCompiler = msmCompilerEntry ? await import('cashc') : null;
+if (msmCompiler) assert.equal(typeof msmCompiler.compileString, 'function',
+  'scheduled MSM compiler entry changed');
+
 const selectedPinIds = sharedPrimeEnabled ? compactPinIds : defaultPinIds;
 if (sharedPrimeEnabled) {
   assert.equal(cacheProfile, 'orbit-retained', 'shared-prime requires retained-orbit cache');
@@ -337,7 +346,7 @@ function reuseFinalPrimeCalls(bytecode) {
     replaced += 1;
     return decodeAuthenticationInstructions(SHARED_PRIME_CALL);
   });
-  assert.equal(replaced, 5, 'SU-a1 final MSM must contain exactly five P literals');
+  assert.equal(replaced, 5, 'unexpected final MSM P literal count for selected compiler');
   return Buffer.from(encodeAuthenticationInstructions(next));
 }
 function reuseTerminalScalarOrder(bytecode) {
@@ -349,7 +358,7 @@ function reuseTerminalScalarOrder(bytecode) {
     replaced += 1;
     return decodeAuthenticationInstructions(SCALAR_ORDER_CALL);
   });
-  assert.equal(replaced, 4, 'TA-a1 terminal must contain exactly four scalar-order literals');
+  assert.equal(replaced, 4, 'unexpected terminal scalar-order literal count for selected compiler');
   return Buffer.from(encodeAuthenticationInstructions(next));
 }
 // Canonical ny uses a signed remainder and the retained prime instead of a P-squared bias.
@@ -377,10 +386,71 @@ function normalizeMixedAddNy(bytecode) {
   assert.equal(changed, 1, 'expected one MADD definition');
   return Buffer.from(encodeAuthenticationInstructions(next));
 }
+// Retain the qualified arithmetic implementation; schedule only the stage mains.
+const compileMsm = (source) => {
+  const original = compileCash(source);
+  if (!msmCompiler) return original;
+  const before = originalMsmCompiler.compileString(source, {
+    rescheduleStacks: true, disableInlining: true,
+  });
+  assert(original.equals(Buffer.from(before.debug.bytecode, 'hex')),
+    'original MSM compiler metadata differs from the active compiler');
+  const candidate = msmCompiler.compileString(source, {
+    rescheduleStacks: true, disableInlining: true, renumberFunctionIds: false,
+  });
+  assert.deepEqual(candidate.abi, before.abi, 'MSM spend interface changed');
+  assert.deepEqual(candidate.constructorInputs, before.constructorInputs,
+    'MSM constructor interface changed');
+  const [originalDefinitions] = splitDefinitions(original);
+  assert.equal(originalDefinitions.length, 3016, 'original MSM helper prefix length changed');
+  assert.equal(sha256(originalDefinitions), '07e596d5b6a7dac66d7a2cc51621c42e5dc5f063bb98e0474e791114b83aaa54',
+    'original MSM helper prefix changed');
+  const [definitions, main] = splitDefinitions(Buffer.from(candidate.debug.bytecode, 'hex'));
+  assert.equal(decodeAuthenticationInstructions(definitions).length, 12,
+    'scheduled MSM definition framing changed');
+  const declared = artifact => artifact.debug.functions.filter(fn => Number.isInteger(fn.id));
+  const oldFunctions = declared(before), newFunctions = declared(candidate);
+  const oldByName = new Map(oldFunctions.map(fn => [fn.name, fn]));
+  assert.equal(oldByName.size, 4, 'original MSM helper set changed');
+  assert.equal(oldFunctions.length, 4, 'original MSM helper names are not unique');
+  assert.equal(newFunctions.length, 4, 'scheduled MSM helper set changed');
+  assert.equal(new Set(newFunctions.map(fn => fn.name)).size, 4,
+    'scheduled MSM helper names are not unique');
+  const keyFor = id => Buffer.from(bigIntToVmNumber(BigInt(id))).toString('hex');
+  const mapping = new Map(), inverse = new Map();
+  newFunctions.forEach(fn => {
+    const old = oldByName.get(fn.name);
+    assert(old, `unknown scheduled MSM helper: ${fn.name}`);
+    assert.deepEqual(fn.inputs, old.inputs, `scheduled MSM helper interface changed: ${fn.name}`);
+    mapping.set(keyFor(fn.id), old.id);
+    inverse.set(keyFor(old.id), fn.id);
+  });
+  assert.equal(mapping.size, 4, 'scheduled MSM helper keys are not unique');
+  assert.equal(inverse.size, 4, 'original MSM helper keys are not unique');
+  const rename = (bytecode, identifiers) => {
+    const instructions = decodeAuthenticationInstructions(bytecode);
+    for (let index = 0; index < instructions.length; index += 1) {
+      assert.notEqual(instructions[index].opcode, OpcodesBCH.OP_DEFINE,
+        'scheduled MSM main unexpectedly defines a function');
+      if (instructions[index].opcode !== OpcodesBCH.OP_INVOKE) continue;
+      assert(index > 0, 'scheduled MSM call has no key');
+      const key = rawPushKey(instructions[index - 1]).toString('hex');
+      assert(identifiers.has(key), 'scheduled MSM main contains an unknown call key');
+      instructions[index - 1] = decodeAuthenticationInstructions(encodeDataPush(
+        bigIntToVmNumber(BigInt(identifiers.get(key))),
+      ))[0];
+    }
+    return Buffer.from(encodeAuthenticationInstructions(instructions));
+  };
+  const renamed = rename(main, mapping);
+  assert(rename(renamed, inverse).equals(main), 'scheduled MSM namespace inverse changed');
+  return Buffer.concat([originalDefinitions, renamed]);
+};
+
 const cashCache = new Map();
 const cash = (source) => {
   if (!cashCache.has(source)) {
-    const bytecode = cachePrimeDefinition(cachePrimeDefinition(remapFunctionIds(compileCash(source), MSM_ID_OFFSET), 202n), 200n);
+    const bytecode = cachePrimeDefinition(cachePrimeDefinition(remapFunctionIds(compileMsm(source), MSM_ID_OFFSET), 202n), 200n);
     const compressed = orbitProfile ? compressOrbitTables(bytecode, cacheProfile === 'orbit-retained', sharedPrimeEnabled) : bytecode;
     cashCache.set(source, normalizeMixedAddNy(sharePrimeDefinition(compressed)));
   }
@@ -515,7 +585,8 @@ function buildWith({backExec, backTerminal}) {
   ]);
   programs.loader = Buffer.concat([fragmentReaderDeclaration, assemble(executor, loaderIdentifiers, constants, extraNumbers)]);
   programs.msmExec = stage(cash(sourceExec({cuts: CUTS, backExec, backTerminal})), definitions, programs.msmA.length);
-  programs.msmExec = compactExecutorCleanup(programs.msmExec);
+  // The selected compiler emits its own stage cleanup; legacy rewrites retain their guards.
+  if (!msmCompiler) programs.msmExec = compactExecutorCleanup(programs.msmExec);
   programs.executor = Buffer.concat([execPadded ? Buffer.from([OpcodesBCH.OP_NIP]) : Buffer.alloc(0),
     carrier(programs.loader, programs.msmExec, 1)]);
   const workerLockings = [programs.executor, programs.executor, programs.executor, programs.genesis]
