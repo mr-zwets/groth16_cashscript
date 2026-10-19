@@ -2532,9 +2532,9 @@ const arithmeticProfile = {
   leafId: arithmeticLeafId,
   leafRawKey: arithmeticLeafId === -1 ? '81' : arithmeticLeafId.toString(16).padStart(2, '0'),
   namespaceMap: arithmeticNamespaceMap,
-  expectedLibraryBytes: arithmeticLeafId === -1 ? 538 : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
+  expectedLibraryBytes: arithmeticLeafId === -1 ? 535 : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
   expectedLibrarySha256: arithmeticLeafId === -1
-    ? 'd89d40c72947263599e0050f24117224879ce34775e47b0405e17222981e8450'
+    ? '5d7a6fef8614b007dbf2420212cd63e5fb3e16fa61a75a4d665be9a59458906c'
     : arithmeticLeafId === 12
       ? '716398743a5a131e1906e462716026526caa12b228c6f1d207974e131039b254'
       : arithmeticLeafId === 5
@@ -2665,6 +2665,18 @@ if (arithmeticLeafId === -1) {
   // Both operands are canonical Fp values, so one conditional addition normalizes x-y.
   arithmeticInstructions[27] = decodeAuthenticationInstructions(encodeDataPush(
     Uint8Array.from(Buffer.from('7c9476009f634f8a9368', 'hex')),
+  ))[0];
+}
+if (arithmeticLeafId === -1) {
+  const lineEval = arithmeticInstructions[30];
+  assert(arithmeticFunctionKey(arithmeticInstructions[31]) === '0a' &&
+    arithmeticInstructions[32].opcode === OP.DEFINE && lineEval.data?.length === 59 &&
+    hex(sha256(lineEval.data)) === '89300edab3657dc91293f84c83fd8ad76df9fafedb05a2ae6dbdf1eadd150176',
+  'signed line evaluation definition changed');
+  // Remove multiples of P from the polynomial and normalize its signed remainder.
+  // The twelve-argument ABI and canonical pair output remain unchanged.
+  arithmeticInstructions[30] = decodeAuthenticationInstructions(encodeDataPush(
+    Uint8Array.from(Buffer.from('567a557a525a7a955b799495567a5a79959395557a547a5779525879959495557a57799594955b8a76009f634f8a9368537a7c725c8a726d', 'hex')),
   ))[0];
 }
 const templateArithmeticBody = encodeAuthenticationInstructions(arithmeticInstructions);
@@ -2964,7 +2976,7 @@ const templateBlockRedeems = blockRecords.map((record, index) => {
 // resource profile; retain the old audited <=76-byte Regular option unchanged.
 const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_DENSITY_PADDING ??
   (arithmeticLeafId === -1
-    ? '{"3":378,"5":365,"6":320,"7":328,"8":311,"9":317,"10":318,"11":326,"12":321,"13":328,"14":329,"16":352,"17":324,"18":326,"19":333}'
+    ? '{"3":370,"5":356,"6":311,"7":318,"8":301,"9":307,"10":309,"11":317,"12":312,"13":318,"14":320,"16":343,"17":315,"18":316,"19":324}'
     : '{"3":436,"5":423,"6":377,"7":385,"8":369,"9":376,"10":377,"11":386,"12":377,"13":386,"14":388,"16":411,"17":383,"18":384,"19":393}'));
 Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   const index = Number(block);
