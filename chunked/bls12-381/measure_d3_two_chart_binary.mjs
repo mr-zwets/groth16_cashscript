@@ -67,6 +67,9 @@ const FUSE_CARRIER_PAIR=process.env.RPA_FUSE_CARRIER_PAIR==='1';
 const FUSE_MIDDLE_PAIR=process.env.RPA_FUSE_MIDDLE_PAIR==='1';
 const FUSE_FIRST_TAIL_PAIR=process.env.RPA_FUSE_FIRST_TAIL_PAIR==='1';
 const ARITHMETIC_REGULAR_CARRIER=process.env.RPA_ARITHMETIC_REGULAR_CARRIER==='1';
+const BUNDLE_REGULAR_MAIN=process.env.RPA_BUNDLE_REGULAR_MAIN==='1';
+const REGULAR_INITIALIZER_ID=BUNDLE_REGULAR_MAIN?15n:-300n;
+if(BUNDLE_REGULAR_MAIN&&!ARITHMETIC_REGULAR_CARRIER)throw new Error('Regular main bundle requires the Regular arithmetic carrier');
 if(ARITHMETIC_REGULAR_CARRIER&&!FUSE_MIDDLE_PAIR)throw new Error('Regular arithmetic carrier requires the middle-pair profile');
 if(FUSE_FIRST_TAIL_PAIR&&!ARITHMETIC_REGULAR_CARRIER)throw new Error('first-tail pair requires the Regular arithmetic carrier');
 if(FUSE_MIDDLE_PAIR&&!FUSE_CARRIER_PAIR)throw new Error('middle pair requires the carrier-pair profile');
@@ -88,6 +91,7 @@ if(FUSE_CARRIER_PAIR){regularGroups.unshift({members:[2,3],first:2,last:3,fundin
 if(FUSE_MIDDLE_PAIR){regularGroups.splice(regularGroups.findIndex(group=>group.first===16),0,{members:[14,15],first:14,last:15,funding:0,kind:'middle'});regularGroups.find(group=>group.first===16).funding+=13;}
 if(FUSE_FIRST_TAIL_PAIR)regularGroups.unshift({members:[0,1],first:0,last:1,funding:0,kind:'first-tail'});
 if(ARITHMETIC_REGULAR_CARRIER)for(const[first,bytes]of[[5,14],[8,14],[11,14],[16,13]])regularGroups.find(group=>group.first===first).funding-=bytes;
+if(BUNDLE_REGULAR_MAIN)for(const[first,bytes]of[[5,13],[8,13],[11,13],[16,12]])regularGroups.find(group=>group.first===first).funding+=bytes;
 if(regularGroups.some(({funding})=>!Number.isInteger(funding)||funding<0||funding>1000))throw new Error('Regular group funding is outside0..1000');
 const groupFrames = new Map(regularGroups.flatMap(group=>group.members.map((block,ordinal)=>[block,{group,ordinal}])));
 const frameOrdinal = block => block===20&&FUSE_FINAL_PAIR?1:groupFrames.get(block)?.ordinal??0;
@@ -3210,6 +3214,20 @@ const remapFusedPrivate = (bytecode, inverse = false) => {
   };
   return remap(bytecode);
 };
+const assertRegularInitializerNamespace = (bytecode) => {
+  const instructions = decodeAuthenticationInstructions(bytecode);
+  assert(instructions.every(instruction => !instruction.malformed), 'Regular initializer instructions');
+  for (let index = 0; index < instructions.length; index += 1) {
+    const instruction = instructions[index];
+    if (instruction.opcode !== OP.DEFINE && instruction.opcode !== OP.INVOKE) continue;
+    const key = arithmeticFunctionKey(instructions[index - 1]);
+    assert(key !== undefined && key !== '0f', 'Regular cache identifier must be unused by existing definitions and calls');
+    if (instruction.opcode === OP.DEFINE) {
+      assert(instructions[index - 2]?.data !== undefined, 'Regular initializer literal definition');
+      assertRegularInitializerNamespace(instructions[index - 2].data);
+    }
+  }
+};
 for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration += 1) {
   templateLayoutOrder.forEach((template) => {
     const record = blockRecords[template.representative];
@@ -3247,11 +3265,18 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
       const main=encodeAuthenticationInstructions(remainder.slice(end));
       template.regularInitializer=template.core.slice(0,template.core.length-main.length);
       template.core=main;
+      if(BUNDLE_REGULAR_MAIN){
+        assertRegularInitializerNamespace(template.regularInitializer);
+        assertRegularInitializerNamespace(main);
+        const mainPush=encodeDataPush(main);
+        template.bundledMainOffset=template.regularInitializer.length+mainPush.length-main.length;
+        template.regularInitializer=concat(template.regularInitializer,mainPush,pushVmNumber(TEMPLATE_FUNCTION_ID),Uint8Array.of(OP.DEFINE));
+      }
     }
     template.digest=sha256(template.core);
     const definitions = [];
     if(FUSE_REGULAR_PAIR && template.name==='Regular'){
-      const bodyPush=encodeDataPush(template.regularInitializer),key=encodeDataPush(bigIntToVmNumber(-300n));
+      const bodyPush=encodeDataPush(template.regularInitializer),key=encodeDataPush(bigIntToVmNumber(REGULAR_INITIALIZER_ID));
       template.regularInitializerStart=bodyPush.length-template.regularInitializer.length;
       template.regularInitializerEnd=bodyPush.length;
       definitions.push(concat(bodyPush,key,Uint8Array.of(OP.DEFINE),key,Uint8Array.of(OP.INVOKE)));
@@ -3296,15 +3321,17 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
           ? templateTerminalDensityPadding
           : new Uint8Array();
     const corePush = encodeDataPush(template.core);
-    template.coreStart = commonDefinition.length + factorDensityPadding.length +
-      corePush.length - template.core.length;
+    const regularMainBundled=BUNDLE_REGULAR_MAIN&&template.name==='Regular';
+    template.coreStart = regularMainBundled
+      ?template.regularInitializerStart+template.bundledMainOffset
+      :commonDefinition.length+factorDensityPadding.length+corePush.length-template.core.length;
+    if(regularMainBundled)assert(equalBytes(template.regularInitializer.slice(template.bundledMainOffset,template.bundledMainOffset+template.core.length),template.core),'bundled Regular main exact body');
     template.representativeRedeem = concat(
       commonDefinition,
       factorDensityPadding,
-      corePush,
+      ...(regularMainBundled?[]:[corePush]),
       ...(FUSE_FIRST_TAIL_PAIR&&template.name==='AdditionTail'?[pushVmNumber(template.core.length-template.arithmeticRemainder.length),Uint8Array.of(OP.SPLIT,OP.NIP)]:[]),
-      pushVmNumber(templateFunctionId(template.representative)),
-      Uint8Array.of(OP.DEFINE),
+      ...(regularMainBundled?[]:[pushVmNumber(templateFunctionId(template.representative)),Uint8Array.of(OP.DEFINE)]),
       templateConfig(record, template.representative),
     );
   });
@@ -3350,10 +3377,10 @@ const templateBlockRedeems = blockRecords.map((record, index) => {
   const coreEnd = coreStart + template.core.length;
   const redeem = FUSE_REGULAR_PAIR && template.name==='Regular' ? concat(
     pushVmNumber(physicalBlock(template.representative)),Uint8Array.of(OP.INPUTBYTECODE,OP.SIZE),
-    pushVmNumber(representativeRedeem.length+regularCarrierSuffix.length),Uint8Array.of(OP.SUB,OP.SPLIT,OP.NIP,OP.DUP),
+    pushVmNumber(representativeRedeem.length+regularCarrierSuffix.length),Uint8Array.of(OP.SUB,OP.SPLIT,OP.NIP,...(BUNDLE_REGULAR_MAIN?[]:[OP.DUP])),
     sliceTopBytes(template.regularInitializerStart,template.regularInitializerEnd),
-    encodeDataPush(bigIntToVmNumber(-300n)),Uint8Array.of(OP.DEFINE),encodeDataPush(bigIntToVmNumber(-300n)),Uint8Array.of(OP.INVOKE),
-    sliceTopBytes(coreStart,coreEnd),pushVmNumber(TEMPLATE_FUNCTION_ID),Uint8Array.of(OP.DEFINE),
+    encodeDataPush(bigIntToVmNumber(REGULAR_INITIALIZER_ID)),Uint8Array.of(OP.DEFINE),encodeDataPush(bigIntToVmNumber(REGULAR_INITIALIZER_ID)),Uint8Array.of(OP.INVOKE),
+    ...(BUNDLE_REGULAR_MAIN?[]:[sliceTopBytes(coreStart,coreEnd),pushVmNumber(TEMPLATE_FUNCTION_ID),Uint8Array.of(OP.DEFINE)]),
     templateConfig(record,index),
   ) : concat(
     ...(templateCommonOffsets.has(template.name) ? [loadTemplateCommonBody(template)] : []),
@@ -4087,7 +4114,7 @@ if (FUSE_FINAL_PAIR) {
   const report={construction:FUSE_FIRST_TAIL_PAIR?'native-regular-initializer-first-tail-and-existing-groups':ARITHMETIC_REGULAR_CARRIER?'native-regular-initializer-and-existing-groups':FUSE_MIDDLE_PAIR?'native-fused-middle-carrier-pairs-regular-triples-and-final-pair':FUSE_CARRIER_PAIR?'native-fused-carrier-pair-regular-triples-and-final-pair':FUSE_REGULAR_TRIPLES?'native-fused-regular-triples-and-final-pair':FUSE_REGULAR_PAIRS?'native-fused-multiple-regular-and-final-pairs':FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
     coordinatorScheduled:SCHEDULE_COORDINATOR,
       ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
-    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_TRIPLES ? {regularTriplesFused:true,...(FUSE_CARRIER_PAIR?{carrierPairFused:true}:{}),...(FUSE_MIDDLE_PAIR?{middlePairFused:true}:{}),...(ARITHMETIC_REGULAR_CARRIER?{arithmeticRegularCarrier:true}:{}),...(FUSE_FIRST_TAIL_PAIR?{firstTailPairFused:true}:{}),regularGroups} : FUSE_REGULAR_PAIRS ? {regularPairsFused:true,...(PACK_REGULAR_PAIR_MAPS?{packedRegularMaps:true}:{}),regularGroups:regularGroups.map(({first,last,funding})=>({first,second:last,funding}))} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:frameOrdinal(index)}))} : {}),
+    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_TRIPLES ? {regularTriplesFused:true,...(FUSE_CARRIER_PAIR?{carrierPairFused:true}:{}),...(FUSE_MIDDLE_PAIR?{middlePairFused:true}:{}),...(ARITHMETIC_REGULAR_CARRIER?{arithmeticRegularCarrier:true}:{}),...(BUNDLE_REGULAR_MAIN?{regularMainBundled:true,regularInitializerId:Number(REGULAR_INITIALIZER_ID)}:{}),...(FUSE_FIRST_TAIL_PAIR?{firstTailPairFused:true}:{}),regularGroups} : FUSE_REGULAR_PAIRS ? {regularPairsFused:true,...(PACK_REGULAR_PAIR_MAPS?{packedRegularMaps:true}:{}),regularGroups:regularGroups.map(({first,last,funding})=>({first,second:last,funding}))} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:frameOrdinal(index)}))} : {}),
     inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
     maximumUnlockingBytes:Math.max(...inputs.map(input=>input.unlocking.length)),
     wholeConsensus:true,wholeStandard:true,outcomes,controls,
