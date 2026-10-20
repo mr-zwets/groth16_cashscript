@@ -68,6 +68,8 @@ const FUSE_MIDDLE_PAIR=process.env.RPA_FUSE_MIDDLE_PAIR==='1';
 const FUSE_FIRST_TAIL_PAIR=process.env.RPA_FUSE_FIRST_TAIL_PAIR==='1';
 const ARITHMETIC_REGULAR_CARRIER=process.env.RPA_ARITHMETIC_REGULAR_CARRIER==='1';
 const BUNDLE_REGULAR_MAIN=process.env.RPA_BUNDLE_REGULAR_MAIN==='1';
+const LAZY_PAIR_PRODUCT=process.env.RPA_LAZY_PAIR_PRODUCT==='1';
+if(LAZY_PAIR_PRODUCT&&(!ARITHMETIC_REGULAR_CARRIER||!BUNDLE_REGULAR_MAIN||process.env.RPA_COMPACT_ARITHMETIC_PRIME_KEY!=='-1'))throw new Error('lazy pair product requires the bundled Regular minus-one arithmetic profile');
 const REGULAR_INITIALIZER_ID=BUNDLE_REGULAR_MAIN?15n:-300n;
 if(BUNDLE_REGULAR_MAIN&&!ARITHMETIC_REGULAR_CARRIER)throw new Error('Regular main bundle requires the Regular arithmetic carrier');
 if(ARITHMETIC_REGULAR_CARRIER&&!FUSE_MIDDLE_PAIR)throw new Error('Regular arithmetic carrier requires the middle-pair profile');
@@ -92,6 +94,7 @@ if(FUSE_MIDDLE_PAIR){regularGroups.splice(regularGroups.findIndex(group=>group.f
 if(FUSE_FIRST_TAIL_PAIR)regularGroups.unshift({members:[0,1],first:0,last:1,funding:0,kind:'first-tail'});
 if(ARITHMETIC_REGULAR_CARRIER)for(const[first,bytes]of[[5,14],[8,14],[11,14],[16,13]])regularGroups.find(group=>group.first===first).funding-=bytes;
 if(BUNDLE_REGULAR_MAIN)for(const[first,bytes]of[[5,13],[8,13],[11,13],[16,12]])regularGroups.find(group=>group.first===first).funding+=bytes;
+if(LAZY_PAIR_PRODUCT)for(const[first,bytes]of[[5,26],[8,25],[11,25],[16,26]])regularGroups.find(group=>group.first===first).funding-=bytes;
 if(regularGroups.some(({funding})=>!Number.isInteger(funding)||funding<0||funding>1000))throw new Error('Regular group funding is outside0..1000');
 const groupFrames = new Map(regularGroups.flatMap(group=>group.members.map((block,ordinal)=>[block,{group,ordinal}])));
 const frameOrdinal = block => block===20&&FUSE_FINAL_PAIR?1:groupFrames.get(block)?.ordinal??0;
@@ -2743,9 +2746,9 @@ const arithmeticProfile = {
   leafId: arithmeticLeafId,
   leafRawKey: arithmeticLeafId === -1 ? '81' : arithmeticLeafId.toString(16).padStart(2, '0'),
   namespaceMap: arithmeticNamespaceMap,
-  expectedLibraryBytes: arithmeticLeafId === -1 ? 535 : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
+  expectedLibraryBytes: arithmeticLeafId === -1 ? (LAZY_PAIR_PRODUCT?534:535) : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
   expectedLibrarySha256: arithmeticLeafId === -1
-    ? '5d7a6fef8614b007dbf2420212cd63e5fb3e16fa61a75a4d665be9a59458906c'
+    ? (LAZY_PAIR_PRODUCT?'2b1df34c2029962cd5852ddfb2d512ecf1e23022e9d5590fcba8c5a5e7f4798a':'5d7a6fef8614b007dbf2420212cd63e5fb3e16fa61a75a4d665be9a59458906c')
     : arithmeticLeafId === 12
       ? '716398743a5a131e1906e462716026526caa12b228c6f1d207974e131039b254'
       : arithmeticLeafId === 5
@@ -2774,6 +2777,15 @@ for (let offset = 0; offset < templateArithmeticOriginalInstructions.length; off
           ? (id.opcode - 80).toString(16).padStart(2, '0')
           : undefined;
   assert(key !== undefined, 'arithmetic library key is not a canonical raw push');
+  // For nonnegative pair arguments, deferring (y*t)%P preserves both final
+  // field residues. The unsigned parser and canonical state updates own that
+  // domain; this is a verifier-specific lowering, not a signed-integer identity.
+  if(LAZY_PAIR_PRODUCT&&key==='0c'){
+    assert(hex(body.data)==='7670008a557a528a727c537a528a','exact canonical pair-product body');
+    const next=Uint8Array.from(Buffer.from('767095557a528a727c537a528a','hex'));
+    selectiveInstructions.push(...decodeAuthenticationInstructions(encodeDataPush(next)),id,definition);
+    continue;
+  }
   const sites = selectivePrimeSites.get(key);
   if (sites === undefined) {
     selectiveInstructions.push(body, id, definition);
@@ -4114,7 +4126,7 @@ if (FUSE_FINAL_PAIR) {
   const report={construction:FUSE_FIRST_TAIL_PAIR?'native-regular-initializer-first-tail-and-existing-groups':ARITHMETIC_REGULAR_CARRIER?'native-regular-initializer-and-existing-groups':FUSE_MIDDLE_PAIR?'native-fused-middle-carrier-pairs-regular-triples-and-final-pair':FUSE_CARRIER_PAIR?'native-fused-carrier-pair-regular-triples-and-final-pair':FUSE_REGULAR_TRIPLES?'native-fused-regular-triples-and-final-pair':FUSE_REGULAR_PAIRS?'native-fused-multiple-regular-and-final-pairs':FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
     coordinatorScheduled:SCHEDULE_COORDINATOR,
       ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
-    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_TRIPLES ? {regularTriplesFused:true,...(FUSE_CARRIER_PAIR?{carrierPairFused:true}:{}),...(FUSE_MIDDLE_PAIR?{middlePairFused:true}:{}),...(ARITHMETIC_REGULAR_CARRIER?{arithmeticRegularCarrier:true}:{}),...(BUNDLE_REGULAR_MAIN?{regularMainBundled:true,regularInitializerId:Number(REGULAR_INITIALIZER_ID)}:{}),...(FUSE_FIRST_TAIL_PAIR?{firstTailPairFused:true}:{}),regularGroups} : FUSE_REGULAR_PAIRS ? {regularPairsFused:true,...(PACK_REGULAR_PAIR_MAPS?{packedRegularMaps:true}:{}),regularGroups:regularGroups.map(({first,last,funding})=>({first,second:last,funding}))} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:frameOrdinal(index)}))} : {}),
+    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_TRIPLES ? {regularTriplesFused:true,...(FUSE_CARRIER_PAIR?{carrierPairFused:true}:{}),...(FUSE_MIDDLE_PAIR?{middlePairFused:true}:{}),...(ARITHMETIC_REGULAR_CARRIER?{arithmeticRegularCarrier:true}:{}),...(BUNDLE_REGULAR_MAIN?{regularMainBundled:true,regularInitializerId:Number(REGULAR_INITIALIZER_ID)}:{}),...(LAZY_PAIR_PRODUCT?{lazyPairProduct:true}:{}),...(FUSE_FIRST_TAIL_PAIR?{firstTailPairFused:true}:{}),regularGroups} : FUSE_REGULAR_PAIRS ? {regularPairsFused:true,...(PACK_REGULAR_PAIR_MAPS?{packedRegularMaps:true}:{}),regularGroups:regularGroups.map(({first,last,funding})=>({first,second:last,funding}))} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:frameOrdinal(index)}))} : {}),
     inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
     maximumUnlockingBytes:Math.max(...inputs.map(input=>input.unlocking.length)),
     wholeConsensus:true,wholeStandard:true,outcomes,controls,
