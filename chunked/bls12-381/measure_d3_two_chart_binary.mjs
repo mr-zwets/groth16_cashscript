@@ -63,25 +63,31 @@ const SCHEDULE_COORDINATOR = process.env.RPA_SCHEDULE_COORDINATOR === '1';
 const SCHEDULE_PIC_AUTH = process.env.RPA_SCHEDULE_PIC_AUTH === '1';
 // Group membership owns every logical-to-physical index and frame ordinal.
 const FUSE_REGULAR_TRIPLES = process.env.RPA_FUSE_REGULAR_TRIPLES === '1';
+const PACK_REGULAR_PAIR_MAPS = process.env.RPA_PACK_REGULAR_PAIR_MAPS === '1';
+const PACK_REGULAR_MAPS = FUSE_REGULAR_TRIPLES || PACK_REGULAR_PAIR_MAPS;
 const FUSE_REGULAR_PAIRS = process.env.RPA_FUSE_REGULAR_PAIRS === '1' || FUSE_REGULAR_TRIPLES;
 const FUSE_REGULAR_PAIR = process.env.RPA_FUSE_REGULAR_PAIR === '1' || FUSE_REGULAR_PAIRS;
+if(PACK_REGULAR_PAIR_MAPS&&!FUSE_REGULAR_PAIRS)throw new Error('packed pair maps require the regular-pairs profile');
 const regularGroups = (FUSE_REGULAR_TRIPLES
   ? [[[5,6,7],795],[[8,9,10],736],[[11,12,13],764],[[16,17,18],777]]
   : FUSE_REGULAR_PAIRS
-    ? [[[5,6],544],[[7,8],486],[[9,10],485],[[11,12],495],[[13,14],505],[[16,17],528]]
+    ? (PACK_REGULAR_PAIR_MAPS
+      ? [[[5,6],532],[[7,8],482],[[9,10],479],[[11,12],490],[[13,14],500],[[16,17],517]]
+      : [[[5,6],544],[[7,8],486],[[9,10],485],[[11,12],495],[[13,14],505],[[16,17],528]])
     : FUSE_REGULAR_PAIR ? [[[7,8],Number(process.env.RPA_GROUP_DENSITY_PADDING??0)]] : []
 ).map(([members,funding])=>({members,first:members[0],last:members.at(-1),funding}));
 if(regularGroups.some(({funding})=>!Number.isInteger(funding)||funding<0||funding>1000))throw new Error('Regular group funding is outside0..1000');
 const groupFrames = new Map(regularGroups.flatMap(group=>group.members.map((block,ordinal)=>[block,{group,ordinal}])));
 const frameOrdinal = block => block===20&&FUSE_FINAL_PAIR?1:groupFrames.get(block)?.ordinal??0;
+const ordinalBits=regularGroups.some(group=>group.members.length>2)?2:1;
 const groupContinuations = new Map([...groupFrames].filter(([,frame])=>frame.ordinal>0));
 const physicalInput = logicalInput => FUSE_REGULAR_PAIR
   ? logicalInput-regularGroups.reduce((sum,group)=>sum+Math.min(Math.max(logicalInput-(group.first+1),0),group.members.length-1),0)-(logicalInput===21?1:0)
   : logicalInput;
 const physicalBlock = blockIndex => physicalInput(blockIndex+1);
 const physicalIndices = Array.from({length:21},(_,block)=>physicalBlock(block));
-if(FUSE_REGULAR_TRIPLES&&physicalIndices.some(index=>index<0||index>15))throw new Error('physical indices do not fit fourbits');
-const physicalIndexSource = indent => FUSE_REGULAR_TRIPLES
+if(PACK_REGULAR_MAPS&&physicalIndices.some(index=>index<0||index>15))throw new Error('physical indices do not fit fourbits');
+const physicalIndexSource = indent => PACK_REGULAR_MAPS
   ? indent+`int physicalIndex=(${physicalIndices.reduce((mask,index,block)=>mask+(BigInt(index)<<(4n*BigInt(block))),0n)}>>(blockIndex*4))%16;`
   : FUSE_REGULAR_PAIRS
     ? indent+`int physicalIndex=int(0x${Buffer.from(physicalIndices).toString('hex')}.split(blockIndex+1)[0].split(blockIndex)[1]+0x00);`
@@ -2429,8 +2435,8 @@ contract PicBatchAuth() {
             }
 ${FUSE_REGULAR_PAIR ? `${physicalIndexSource('            ')}
             bytes producer=tx.inputs[physicalIndex].unlockingBytecode;
-${FUSE_REGULAR_TRIPLES?`            int frames=(${Array.from({length:21},(_,block)=>BigInt(frameOrdinal(block))<<(2n*BigInt(block))).reduce((sum,value)=>sum+value,0n)}>>(blockIndex*2))%4;
-${[1,2].map(ordinal=>`            if(frames>=${ordinal}){
+${PACK_REGULAR_MAPS?`            int frames=(${Array.from({length:21},(_,block)=>BigInt(frameOrdinal(block))<<(BigInt(ordinalBits)*BigInt(block))).reduce((sum,value)=>sum+value,0n)}>>${ordinalBits===1?'blockIndex':'(blockIndex*2)'})%${2**ordinalBits};
+${[1,2].filter(ordinal=>regularGroups.some(group=>group.members.length>ordinal)).map(ordinal=>`            if(frames>=${ordinal}){
                 int firstLength=int(producer.split(3)[0].split(1)[1]+0x00);
                 producer=producer.split(firstLength+52)[1];
             }
@@ -4010,7 +4016,7 @@ if (FUSE_FINAL_PAIR) {
   const report={construction:FUSE_REGULAR_TRIPLES?'native-fused-regular-triples-and-final-pair':FUSE_REGULAR_PAIRS?'native-fused-multiple-regular-and-final-pairs':FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
     coordinatorScheduled:SCHEDULE_COORDINATOR,
       ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
-    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_TRIPLES ? {regularTriplesFused:true,regularGroups} : FUSE_REGULAR_PAIRS ? {regularPairsFused:true,regularGroups:regularGroups.map(({first,last,funding})=>({first,second:last,funding}))} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:frameOrdinal(index)}))} : {}),
+    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_TRIPLES ? {regularTriplesFused:true,regularGroups} : FUSE_REGULAR_PAIRS ? {regularPairsFused:true,...(PACK_REGULAR_PAIR_MAPS?{packedRegularMaps:true}:{}),regularGroups:regularGroups.map(({first,last,funding})=>({first,second:last,funding}))} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:frameOrdinal(index)}))} : {}),
     inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
     maximumUnlockingBytes:Math.max(...inputs.map(input=>input.unlocking.length)),
     wholeConsensus:true,wholeStandard:true,outcomes,controls,
