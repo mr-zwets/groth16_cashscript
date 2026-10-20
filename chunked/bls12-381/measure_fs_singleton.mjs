@@ -56,7 +56,8 @@ import {
 // This file is a derived single-script variant of measure_d3_two_chart_binary.mjs:
 // lines above/below the appended "FS singleton" section are the unmodified shared
 // prelude of that source (same trace, payloads, relations, and transcript).
-const { fileURLToPath: fsFileURLToPath } = await import('node:url');
+const { fileURLToPath: fsFileURLToPath, pathToFileURL: fsPathToFileURL } =
+  await import('node:url');
 process.env.RPA_INVERSES = 'off';
 process.env.RPA_SKIP_GAMMA = '1';
 process.env.RPA_PIC32 = '1';
@@ -2481,9 +2482,17 @@ fs.push(
 const fsSource = `${COMMON_SOURCE}${fs.join('\n')}\n`;
 if (process.env.FS_SOURCE_OUT !== undefined) fsWriteFileSync(process.env.FS_SOURCE_OUT, fsSource);
 
+const fsCompilerEntry = process.env.FS_CASHC;
+assert(fsCompilerEntry === undefined || FS_RESCHEDULE,
+  'FS_CASHC requires FS_RESCHEDULE=on');
+const fsCompiler = fsCompilerEntry === undefined
+  ? null
+  : await import(fsPathToFileURL(fsCompilerEntry).href);
 const fsCompileStarted = Date.now();
-const fsRedeem = compileNamed(fsSource, 'fs singleton',
-  { rescheduleStacks: FS_RESCHEDULE, optimizeFor: 'size' });
+const fsCompileOptions = { rescheduleStacks: FS_RESCHEDULE, optimizeFor: 'size' };
+const fsRedeem = fsCompiler === null
+  ? compileNamed(fsSource, 'fs singleton', fsCompileOptions)
+  : fsCompiler.utils.asmToBytecode(fsCompiler.compileString(fsSource, fsCompileOptions).bytecode);
 const fsCompileMs = Date.now() - fsCompileStarted;
 
 // Witness and measurement on the loosened BCH 2026 VM.
