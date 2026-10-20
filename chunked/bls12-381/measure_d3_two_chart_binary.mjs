@@ -2874,9 +2874,33 @@ const templateConfig = (record, index) => concat(
   pushVmNumber(TEMPLATE_FUNCTION_ID),
   Uint8Array.of(OP.INVOKE),
 );
-const templateCommonBodyPush = encodeDataPush(templateCommonBody);
-const templateCommonStart = templateCommonBodyPush.length - templateCommonBody.length;
-const templateCommonEnd = templateCommonStart + templateCommonBody.length;
+const templateCommonPrimePool = process.env.RPA_TEMPLATE_COMMON_PRIME_POOL ?? 'off';
+assert(['off', 'on'].includes(templateCommonPrimePool),
+  'RPA_TEMPLATE_COMMON_PRIME_POOL must be off or on');
+let templateCommonProgram = templateCommonBody;
+if (templateCommonPrimePool === 'on') {
+  assert(scheduledCompilerEntry && arithmeticLeafId === -1,
+    'shared parser prime pooling requires the scheduled minus1 arithmetic profile');
+  // Keep the raw parser extraction, identity and context-free guards above exact.
+  // Each consumer installs the unchanged arithmetic library before invoking this
+  // derived parser; its -1 leaf maps A to A || [P] and preserves the alternate stack.
+  const instructions = decodeAuthenticationInstructions(templateCommonBody);
+  const sites = instructions.flatMap((instruction, index) =>
+    instruction.data !== undefined && equalBytes(instruction.data, selectivePrime) ? [index] : []);
+  assert(sites.length === 1, 'shared parser prime literal changed');
+  const primeCall = decodeAuthenticationInstructions(concat(
+    Uint8Array.of(0x4f, OP.INVOKE),
+  ));
+  templateCommonProgram = encodeAuthenticationInstructions(instructions.flatMap((instruction, index) =>
+    index === sites[0] ? primeCall : [instruction]));
+  assert(templateCommonBody.length - templateCommonProgram.length === 47,
+    'shared parser prime pooling length changed');
+  const restored = encodeAuthenticationInstructions(instructions.flatMap((instruction) => [instruction]));
+  assert(equalBytes(restored, templateCommonBody), 'shared parser instruction round-trip changed');
+}
+const templateCommonBodyPush = encodeDataPush(templateCommonProgram);
+const templateCommonStart = templateCommonBodyPush.length - templateCommonProgram.length;
+const templateCommonEnd = templateCommonStart + templateCommonProgram.length;
 const templateExtraBodyPush = encodeDataPush(templateExtraBody);
 const templateExtraStart = templateExtraBodyPush.length - templateExtraBody.length;
 const templateExtraEnd = templateExtraStart + templateExtraBody.length;
