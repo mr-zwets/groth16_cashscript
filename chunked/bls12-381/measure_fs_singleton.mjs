@@ -2156,17 +2156,62 @@ const {
 const { writeFileSync: fsWriteFileSync } = await import('node:fs');
 
 const FS_RESCHEDULE = process.env.FS_RESCHEDULE !== 'off';
+const FS_FIXED_VK = process.env.FS_FIXED_VK ?? 'witness';
+assert(['witness', 'program', 'slopes'].includes(FS_FIXED_VK), 'unknown FS_FIXED_VK encoding');
+const FS_BAKE_FIXED = FS_FIXED_VK !== 'witness';
+const FS_FIXED_SLOPES = FS_FIXED_VK === 'slopes';
 const FS_EXPORT_VECTORS = process.env.FS_EXPORT_VECTORS === '1';
 const hexByte = (value) => value.toString(16).padStart(2, '0');
 
+const fsFixedTables = blockRecords.map((record) => ({
+  start: record.layout.fixedCoefficients,
+  bytes: serializeLimbs(record.fixedCoefficients),
+}));
+const fsFixedOps = blockRecords.flatMap((record) => record.fixedOps);
+let fsFixedLinesSource = '';
+if (FS_FIXED_SLOPES) {
+  assert(SKIP_GAMMA && fsFixedOps.length === 68 && fsFixedOps.every((op) =>
+    op.j === 3 && !op.neg && ['dl', 'al'].includes(op.t)),
+  'fixed slope encoding requires the 68-line public delta walk');
+  const q = pairs[3].Q.toAffine();
+  const slopes = serializeLimbs(fsFixedOps.flatMap((op) => [op.coeffs[1].c0, op.coeffs[1].c1]));
+  const additions = fsFixedOps.reduce((mask, op, index) =>
+    op.t === 'al' ? mask | (1n << BigInt(index)) : mask, 0n);
+  fsFixedLinesSource = `function fixedVkLines() returns (bytes) {
+    bytes slopes=0x${hex(slopes)};
+    int x0=${q.x.c0}; int x1=${q.x.c1}; int y0=${q.y.c0}; int y1=${q.y.c1};
+    bytes result=0x;
+    for (int i=0;i<68;i=i+1) {
+        int ma=int(slopes.split(i*96+48)[0].split(i*96)[1]+0x00);
+        int mb=int(slopes.split(i*96+96)[0].split(i*96+48)[1]+0x00);
+        int da=0; int db=0;
+        if ((${additions}>>i)%2==0) {
+            (da,db,x0,x1,y0,y1)=pointDoubleAffine(x0,x1,y0,y1,ma,mb);
+        } else {
+            (da,db,x0,x1,y0,y1)=pointAddAffine(x0,x1,y0,y1,${q.x.c0},${q.x.c1},${q.y.c0},${q.y.c1},ma,mb);
+        }
+        result=result+toPaddedBytes(da,48)+toPaddedBytes(db,48)+toPaddedBytes(ma,48)+toPaddedBytes(mb,48);
+    }
+    return result;
+}
+`;
+}
 const fsArgNames = [
   'bytes statementBlob',
-  ...blockPayloads.map((_, index) => `bytes payload${index}`),
+  ...blockPayloads.map((_, index) =>
+    `bytes payload${index}${FS_BAKE_FIXED && fsFixedTables[index].bytes.length !== 0 ? 'Wire' : ''}`),
   'bytes quotientBlob',
 ];
 const fs = [
   'contract Groth16FsSingleton() {',
   `    function spend(${fsArgNames.join(',')}) {`,
+  ...(FS_FIXED_SLOPES ? ['        bytes fixedVkAll=fixedVkLines();'] : []),
+  ...(FS_BAKE_FIXED ? fsFixedTables.flatMap((fixed, index) => fixed.bytes.length === 0 ? [] : [
+    `        bytes fixedVkTable${index}=${FS_FIXED_SLOPES
+      ? `fixedVkAll.split(${sum(fsFixedTables.slice(0, index + 1), (table) => table.bytes.length)})[0].split(${sum(fsFixedTables.slice(0, index), (table) => table.bytes.length)})[1]`
+      : `0x${hex(fixed.bytes)}`};`,
+    `        bytes payload${index}=payload${index}Wire.split(${fixed.start})[0]+fixedVkTable${index}+payload${index}Wire.split(${fixed.start})[1];`,
+  ]) : []),
   `        require(statementBlob.length==${statementBytes.length});`,
 ];
 blockPayloads.forEach((payload, index) => {
@@ -2305,16 +2350,25 @@ const emitFsBlock = (record) => {
   });
   record.fixedOps.forEach((_, index) => {
     ['d0a', 'd0b', 'ma', 'mb'].forEach((suffix, limbIndex) => {
-      declareLimb(lines, pfx(`f${index}${suffix}`), pv,
-        record.layout.fixedCoefficients + (index * 4 + limbIndex) * W, false);
+      const offset = (index * 4 + limbIndex) * W;
+      if (FS_BAKE_FIXED) {
+        lines.push(`        int ${pfx(`f${index}${suffix}`)} = int(fixedVkTable${B}.split(${offset + W})[0].split(${offset})[1] + 0x00);`);
+      } else {
+        declareLimb(lines, pfx(`f${index}${suffix}`), pv,
+          record.layout.fixedCoefficients + offset, false);
+      }
     });
   });
-  const fixedEnd = record.layout.fixedCoefficients + record.fixedCoefficients.length * W;
-  lines.push(
-    `        bytes ${pfx('fixedBlob')} = ${pv}.split(${fixedEnd})[0]` +
-      `.split(${record.layout.fixedCoefficients})[1];`,
-    `        require(sha256(${pfx('fixedBlob')}) == 0x${hex(record.fixedCommitment)});`,
-  );
+  if (FS_BAKE_FIXED) {
+    lines.push(`        // Public VK fixed coefficients baked for block ${B}.`);
+  } else {
+    const fixedEnd = record.layout.fixedCoefficients + record.fixedCoefficients.length * W;
+    lines.push(
+      `        bytes ${pfx('fixedBlob')} = ${pv}.split(${fixedEnd})[0]` +
+        `.split(${record.layout.fixedCoefficients})[1];`,
+      `        require(sha256(${pfx('fixedBlob')}) == 0x${hex(record.fixedCommitment)});`,
+    );
+  }
   let liftOffset = record.layout.liftRecords;
   record.liftRecords.forEach((liftRecord, factorIndex) => {
     Array.from({ length: 6 }, (_, limbIndex) => {
@@ -2479,7 +2533,7 @@ fs.push(
   '    }',
   '}',
 );
-const fsSource = `${COMMON_SOURCE}${fs.join('\n')}\n`;
+const fsSource = `${COMMON_SOURCE}${fsFixedLinesSource}${fs.join('\n')}\n`;
 if (process.env.FS_SOURCE_OUT !== undefined) fsWriteFileSync(process.env.FS_SOURCE_OUT, fsSource);
 
 const fsCompilerEntry = process.env.FS_CASHC;
@@ -2496,7 +2550,12 @@ const fsRedeem = fsCompiler === null
 const fsCompileMs = Date.now() - fsCompileStarted;
 
 // Witness and measurement on the loosened BCH 2026 VM.
-const fsArgs = [statementBytes, ...blockPayloads, quotientBytes];
+const fsPayloadArgs = blockPayloads.map((payload, index) => {
+  if (!FS_BAKE_FIXED) return payload;
+  const fixed = fsFixedTables[index];
+  return concat(payload.slice(0, fixed.start), payload.slice(fixed.start + fixed.bytes.length));
+});
+const fsArgs = [statementBytes, ...fsPayloadArgs, quotientBytes];
 assert(fsArgs.length === fsArgNames.length, 'fs singleton arg shape changed');
 const fsUnlockingFor = (args) => concat(...args.slice().reverse().map(
   (arg) => encodeDataPush(arg),
@@ -2549,6 +2608,7 @@ const fsMutated = (argIndex, transform) => {
 };
 const STATEMENT_ARG = 0;
 const QUOTIENT_ARG = fsArgs.length - 1;
+const fsPicOffset = (offset) => offset - (FS_BAKE_FIXED ? fsFixedTables[2].bytes.length : 0);
 const fsRejections = [
   ['changed-public-input', fsMutated(STATEMENT_ARG, (blob) => {
     blob[statementLayout[statementIndex.public0].offset] ^= 1;
@@ -2572,10 +2632,10 @@ const fsRejections = [
     blob[blockRecords[7].layout.outputU] ^= 1;
   })],
   ['changed-authenticated-PIC-factor', fsMutated(1 + 2, (blob) => {
-    blob[PIC_RECORD_REGION_OFFSET] ^= 1;
+    blob[fsPicOffset(PIC_RECORD_REGION_OFFSET)] ^= 1;
   })],
   ['changed-authenticated-PIC-path', fsMutated(1 + 2, (blob) => {
-    blob[PIC_RECORD_REGION_OFFSET + PIC_FACTOR_BYTES] ^= 1;
+    blob[fsPicOffset(PIC_RECORD_REGION_OFFSET + PIC_FACTOR_BYTES)] ^= 1;
   })],
   ['changed-q132-coefficient', fsMutated(QUOTIENT_ARG, (blob) => {
     blob[blob.length - 1] ^= 1;
