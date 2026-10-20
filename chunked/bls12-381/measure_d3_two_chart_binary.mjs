@@ -60,6 +60,7 @@ const DEPTH = 3;
 // Opt-in native point: Regular19 and Terminal20 share one physical input.
 const FUSE_FINAL_PAIR = process.env.RPA_FUSE_FINAL_PAIR === '1';
 const SCHEDULE_COORDINATOR = process.env.RPA_SCHEDULE_COORDINATOR === '1';
+const SCHEDULE_PIC_AUTH = process.env.RPA_SCHEDULE_PIC_AUTH === '1';
 const INVERSE_RELATIONS = process.env.RPA_INVERSES !== 'off';
 const SKIP_GAMMA = process.env.RPA_SKIP_GAMMA === '1';
 const PIC32_RECORDS = SKIP_GAMMA && process.env.RPA_PIC32 === '1';
@@ -2409,10 +2410,26 @@ ${picBatchCommitmentSelection}
     }
 }
 `;
-const picAuthHelper = compileNamed(picAuthHelperSource, 'v4 PIC batch authentication helper', {
+let picAuthHelper = compileNamed(picAuthHelperSource, 'v4 PIC batch authentication helper', {
   rescheduleStacks: false,
   optimizeFor: 'size',
 });
+if (SCHEDULE_PIC_AUTH) {
+  assert(scheduledCompiler, 'PIC authentication scheduling requires RPA_TEMPLATE_CASHC');
+  const artifact = scheduledCompiler.compileString(picAuthHelperSource, {
+    rescheduleStacks: true, renumberFunctionIds: false, optimizeFor: 'size',
+  });
+  assert(Array.isArray(artifact.abi) && JSON.stringify(artifact.abi) === JSON.stringify([
+    {name: 'spend', inputs: [{name: 'firstWindow', type: 'int'}, {name: 'windowCount', type: 'int'}]},
+  ]), 'scheduled PIC authentication interface changed');
+  assert(typeof artifact.debug.bytecode === 'string' && /^(?:[0-9a-f]{2})+$/.test(artifact.debug.bytecode),
+    'scheduled PIC authentication bytecode missing');
+  const bytecode = Uint8Array.from(Buffer.from(artifact.debug.bytecode, 'hex'));
+  assert(decodeAuthenticationInstructions(bytecode).every(instruction => !instruction.malformed &&
+    instruction.opcode !== OpcodesBCH.OP_DEFINE && instruction.opcode !== OpcodesBCH.OP_INVOKE),
+  'scheduled PIC authentication must not introduce function identifiers');
+  picAuthHelper = bytecode;
+}
 assert(picAuthHelper.length <= 1000, 'v4 PIC batch authentication helper unexpectedly expanded');
 const picBatchCommitmentOffsets = picBatchCommitments.map((commitment, index) => {
   const offset = Buffer.from(picAuthHelper).indexOf(Buffer.from(commitment));
@@ -3786,6 +3803,7 @@ if (FUSE_FINAL_PAIR) {
   const data=verificationData(inputs),wire=encodeTransactionBch(data.transaction).length;
   const report={construction:'native-fused-final-pair',fixture:activeFixtureName,
     coordinatorScheduled:SCHEDULE_COORDINATOR,
+      ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
     inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
     maximumUnlockingBytes:Math.max(...inputs.map(input=>input.unlocking.length)),
     wholeConsensus:true,wholeStandard:true,outcomes,controls,
@@ -5106,6 +5124,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
   writeFileSync(1, `${JSON.stringify({
     construction: 'atomic-validation-hoist-plus-five-exact-unrolled-classes',
     coordinatorScheduled: SCHEDULE_COORDINATOR,
+    ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
     fixture: activeFixtureName,
     cacheFixture: activeFixture.cacheName,
     publicInputs: activePublicInputs.map(String),
