@@ -57,6 +57,8 @@ import {
 
 const W = 48;
 const DEPTH = 3;
+// Opt-in native point: Regular19 and Terminal20 share one physical input.
+const FUSE_FINAL_PAIR = process.env.RPA_FUSE_FINAL_PAIR === '1';
 const INVERSE_RELATIONS = process.env.RPA_INVERSES !== 'off';
 const SKIP_GAMMA = process.env.RPA_SKIP_GAMMA === '1';
 const PIC32_RECORDS = SKIP_GAMMA && process.env.RPA_PIC32 === '1';
@@ -1294,7 +1296,7 @@ const FUSED_QUOTIENT_BLOCK_INDEX = 4;
 const FUSED_QUOTIENT_INPUT_INDEX = FUSED_QUOTIENT_BLOCK_INDEX + 1;
 const FUSED_QUOTIENT_TAIL_BLOCK_INDEX = 15;
 const FUSED_QUOTIENT_TAIL_INPUT_INDEX = FUSED_QUOTIENT_TAIL_BLOCK_INDEX + 1;
-const TEMPLATE_TOTAL_INPUTS = 1 + blockPayloads.length;
+const TEMPLATE_TOTAL_INPUTS = 1 + blockPayloads.length - (FUSE_FINAL_PAIR ? 1 : 0);
 const rangeLine = (name, upperBound = P) => `        require(within(${name},0,${upperBound}));`;
 const declareLimb = (lines, name, blob, offset, requireRange = true, upperBound = P) => {
   lines.push(`        int ${name} = ${limbExpression(blob, offset)};`);
@@ -1828,6 +1830,12 @@ const templateBlockSource = (record, template) => {
         bytes previousPayload = tx.inputs[blockIndex].unlockingBytecode.split(previousLength+3)[0].split(3)[1];`, 'compact predecessor length');
     source = replaceExactlyOnce(source, 'tx.inputs[blockIndex].unlockingBytecode.split(previousPayloadLength+3)[1].split(49)[0].split(1)[1]', 'tx.inputs[blockIndex].unlockingBytecode.split(previousLength+3)[1].split(49)[0].split(1)[1]', 'compact predecessor evaluation');
   }
+  if (FUSE_FINAL_PAIR && name === 'Terminal') {
+    source = replaceExactlyOnce(source,
+      '        require(this.activeInputIndex == blockIndex + 1);',
+      '        require(blockIndex==20); require(this.activeInputIndex==20);',
+      'Terminal physical input20');
+  }
   return source;
 };
 const templateClasses = [
@@ -1909,7 +1917,7 @@ const quotientSource = (
     );
   }
   if (index === quotientPayloads.length - 1) {
-    const lastBlockInput = blockPayloads.length;
+    const lastBlockInput = blockPayloads.length - (FUSE_FINAL_PAIR ? 1 : 0);
     lines.push(
       `        bytes finalBlockEvaluation=${secondPushExpression(
         lastBlockInput,
@@ -2061,7 +2069,9 @@ const coordinatorSource = (
         lines.push(`        if (((public0>>${shift})%256)+((public1>>${shift})%256)==0) { ${length}=${length}+32; } else { ${length}=${length}+704; }`);
       }
     }
-    lines.push(`        bytes rawInput${index}=tx.inputs[${index + 1}].unlockingBytecode;`);
+    lines.push(FUSE_FINAL_PAIR && index===20
+      ? '        bytes rawInput20=rawInput19.split(blockLength19+52)[1];'
+      : `        bytes rawInput${index}=tx.inputs[${index+1}].unlockingBytecode;`);
     lines.push(`        require(rawInput${index}.split(3)[0]==0x4d+toPaddedBytes(${length},2));`);
     lines.push(`        require(rawInput${index}.split(${length}+4)[0].split(${length}+3)[1]==0x30);`);
     lines.push(`        bytes ${variable}=rawInput${index}.split(${length}+3)[0].split(3)[1];`);
@@ -2158,6 +2168,10 @@ const scheduledCompilerEntry = process.env.RPA_TEMPLATE_CASHC;
 const scheduledCompiler = scheduledCompilerEntry
   ? await import(pathToFileURL(scheduledCompilerEntry).href) : null;
 const arithmeticCompiler = scheduledCompilerEntry ? await import('cashc') : null;
+if (FUSE_FINAL_PAIR) {
+  assert(scheduledCompilerEntry && arithmeticProfileKey === '-1',
+    'final-pair fusion requires the scheduled minus1 arithmetic profile');
+}
 if (scheduledCompilerEntry) {
   assert(process.env.RPA_COMPACT_ARITHMETIC_PRIME_KEY === '-1',
     'scheduled templates require the qualified minus1 arithmetic profile');
@@ -2236,7 +2250,7 @@ const compileScheduledTemplate = (source, original) => {
 };
 
 const blockSources = blockRecords.map((record) => blockSource(record));
-const blockRedeems = blockSources.map((source, index) => compileNamed(source, `block ${index}`));
+const blockRedeems = FUSE_FINAL_PAIR ? [] : blockSources.map((source, index) => compileNamed(source, `block ${index}`));
 templateClasses.forEach((template) => {
   const representative = blockRecords[template.representative];
   template.source = templateBlockSource(representative, template);
@@ -2452,6 +2466,9 @@ const sliceTopBytes = (start, end) => concat(
   ]),
 );
 const TEMPLATE_FUNCTION_ID = 16;
+const FUSED_TERMINAL_HELPER_ID = 113;
+const FUSED_TERMINAL_AUTH_ID = 115;
+const FUSED_TERMINAL_FUNCTION_ID = 116;
 const TEMPLATE_COMMON_FUNCTION_ID = 102;
 const TEMPLATE_EXTRA_FUNCTION_ID = 14;
 const templateCommonFunctionId = (template) => template.name === 'AdditionTail'
@@ -2892,7 +2909,7 @@ const templateConfig = (record, index) => concat(
   pushVmNumber(index === 0 ? 0 : blockRecords[index - 1].payload.length),
   encodeDataPush(record.fixedCommitment),
   ...(index === 20 ? [Uint8Array.of(OP.FROMALTSTACK)] : []),
-  pushVmNumber(TEMPLATE_FUNCTION_ID),
+  pushVmNumber(FUSE_FINAL_PAIR && index === 20 ? FUSED_TERMINAL_FUNCTION_ID : TEMPLATE_FUNCTION_ID),
   Uint8Array.of(OP.INVOKE),
 );
 const templateCommonPrimePool = process.env.RPA_TEMPLATE_COMMON_PRIME_POOL ?? 'off';
@@ -2989,10 +3006,45 @@ const templateLayoutOrder = [
   templateCommonCarrier,
   ...templateClasses.filter((template) => template !== templateCommonCarrier),
 ];
+// Regular installs the shared arithmetic once. Terminal's only remaining
+// private helper moves out of Regular's namespace; the inverse pins its ABI.
+const remapTerminalPrivate = (bytecode, inverse = false) => {
+  const from = inverse ? FUSED_TERMINAL_HELPER_ID : 13;
+  const to = inverse ? 13 : FUSED_TERMINAL_HELPER_ID;
+  const raw = value => hex(bigIntToVmNumber(BigInt(value)));
+  const remap = bytes => {
+    const instructions = decodeAuthenticationInstructions(bytes);
+    for (let index = 0; index < instructions.length; index += 1) {
+      const instruction = instructions[index];
+      if (instruction.opcode !== OP.DEFINE && instruction.opcode !== OP.INVOKE) continue;
+      if (instruction.opcode === OP.DEFINE) {
+        assert(index >= 2 && instructions[index - 2].data !== undefined,
+          'Terminal literal helper definition');
+        instructions[index - 2] = decodeAuthenticationInstructions(encodeDataPush(
+          remap(instructions[index - 2].data),
+        ))[0];
+      }
+      if (arithmeticFunctionKey(instructions[index - 1]) === raw(from)) {
+        instructions[index - 1] = decodeAuthenticationInstructions(pushVmNumber(to))[0];
+      }
+    }
+    return encodeAuthenticationInstructions(instructions);
+  };
+  return remap(bytecode);
+};
 for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration += 1) {
   templateLayoutOrder.forEach((template) => {
     const record = blockRecords[template.representative];
-    if (templateArithmeticImports.has(template.name)) {
+    if (FUSE_FINAL_PAIR && template.name === 'Terminal') {
+      const instructions = decodeAuthenticationInstructions(template.arithmeticRemainder);
+      assert(instructions[0].data?.length === 12 && instructions[1].opcode === 0x5d &&
+        instructions[2].opcode === OP.DEFINE && instructions[5]?.opcode !== OP.DEFINE,
+      'Terminal sole private helper13 ABI');
+      template.core = remapTerminalPrivate(template.arithmeticRemainder);
+      assert(equalBytes(remapTerminalPrivate(template.core, true), template.arithmeticRemainder),
+        'Terminal private namespace inverse');
+      template.digest = sha256(template.core);
+    } else if (templateArithmeticImports.has(template.name)) {
       assert(Number.isInteger(templateCommonCarrier.coreStart),
         'arithmetic library carrier must be laid out before its consumers');
       template.core = concat(
@@ -3057,7 +3109,7 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
       commonDefinition,
       factorDensityPadding,
       corePush,
-      pushVmNumber(TEMPLATE_FUNCTION_ID),
+      pushVmNumber(FUSE_FINAL_PAIR && template.name === 'Terminal' ? FUSED_TERMINAL_FUNCTION_ID : TEMPLATE_FUNCTION_ID),
       Uint8Array.of(OP.DEFINE),
       templateConfig(record, template.representative),
     );
@@ -3130,6 +3182,7 @@ const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_
   (arithmeticLeafId === -1
     ? '{"3":370,"5":356,"6":311,"7":318,"8":301,"9":307,"10":309,"11":317,"12":312,"13":318,"14":320,"16":343,"17":315,"18":316,"19":324}'
     : '{"3":436,"5":423,"6":377,"7":385,"8":369,"9":376,"10":377,"11":386,"12":377,"13":386,"14":388,"16":411,"17":383,"18":384,"19":393}'));
+if (FUSE_FINAL_PAIR) compactRegularDensityPadding['19'] = 0;
 Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   const index = Number(block);
   assert(Number.isInteger(index) && String(index) === block && index !== 2 &&
@@ -3158,8 +3211,22 @@ const picBaseBlock4Redeem = templateBlockRedeems[PIC_BLOCK4_INDEX];
 const picAuthHelperPush = encodeDataPush(picAuthHelper);
 const picFixedBlobPush = encodeDataPush(picFixedBlob);
 if (arithmeticLeafId === -1) {
+  const restoreQuotientIdentity=bytecode=>{
+    const instructions=decodeAuthenticationInstructions(bytecode);let inputSites=0,countSites=0;
+    const restored=instructions.map((instruction,index)=>{
+      if(instructions[index+1]?.opcode===OP.INPUTBYTECODE && instruction.data?.length===1 && instruction.data[0]===20){
+        inputSites+=1; return decodeAuthenticationInstructions(pushVmNumber(21))[0];
+      }
+      if(instructions[index-1]?.opcode===OpcodesBCH.OP_TXINPUTCOUNT && instruction.data?.length===1 && instruction.data[0]===21){
+        countSites+=1; return decodeAuthenticationInstructions(pushVmNumber(22))[0];
+      }
+      return instruction;
+    });
+    assert(inputSites===1&&countSites===1,'quotient logical-to-physical inverse sites');
+    return encodeAuthenticationInstructions(restored);
+  };
   const fixedFinalEvaluation = Uint8Array.from(Buffer.from(
-    '0115ca0244057f7701317f75517f7701307f7501007e81', 'hex',
+    (FUSE_FINAL_PAIR ? '0114ca' : '0115ca') + '0244057f7701317f75517f7701307f7501007e81', 'hex',
   ));
   const offset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(fixedFinalEvaluation));
   const boundaries = new Set([0]);
@@ -3202,7 +3269,7 @@ if (arithmeticLeafId === -1) {
     cleanupInstructionOffset += encodeAuthenticationInstructions([instruction]).length;
     cleanupBoundaries.add(cleanupInstructionOffset);
   });
-  assert(fusedQuotientRedeem.length === 222 && hex(sha256(fusedQuotientRedeem)) ===
+  assert(fusedQuotientRedeem.length === 222 && hex(sha256(FUSE_FINAL_PAIR ? restoreQuotientIdentity(fusedQuotientRedeem) : fusedQuotientRedeem)) ===
     'd8e36fa3293ecf497befcf51cb467248920382c30d5273fac7ff8f5c0ec93353' &&
     cleanupOffset === 134 &&
     Buffer.from(fusedQuotientRedeem).lastIndexOf(Buffer.from(loopCleanup)) === cleanupOffset &&
@@ -3225,7 +3292,7 @@ if (arithmeticLeafId === -1) {
     lifetimeInstructionOffset += encodeAuthenticationInstructions([instruction]).length;
     lifetimeBoundaries.add(lifetimeInstructionOffset);
   });
-  assert(fusedQuotientRedeem.length === 208 && hex(sha256(fusedQuotientRedeem)) ===
+  assert(fusedQuotientRedeem.length === 208 && hex(sha256(FUSE_FINAL_PAIR ? restoreQuotientIdentity(fusedQuotientRedeem) : fusedQuotientRedeem)) ===
     'd937ca47bdd7b2577404a1566b4770ce21cfd1833de6d15c971dfed1f5e954d2' &&
     lifetimeOffset === 111 &&
     Buffer.from(fusedQuotientRedeem).lastIndexOf(Buffer.from(loopLifetime)) === lifetimeOffset &&
@@ -3238,6 +3305,23 @@ if (arithmeticLeafId === -1) {
     Uint8Array.from(Buffer.from('01007e817656799f69537955799593557997537a757b7b8b', 'hex')),
     fusedQuotientRedeem.slice(lifetimeOffset + loopLifetime.length),
   );
+}
+if (FUSE_FINAL_PAIR) {
+  const mixedFinalRead = Uint8Array.from(Buffer.from(
+    '0114ca0244057f7701317f75517f7701007e81', 'hex',
+  ));
+  const offset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(mixedFinalRead));
+  assert(offset >= 0 &&
+    Buffer.from(fusedQuotientRedeem).lastIndexOf(Buffer.from(mixedFinalRead)) === offset,
+  'optimized final evaluation reader');
+  // Duplicate the input, decode its canonical uint16 payload length, add the
+  // three-byte first push and49-byte evaluation push, then retain frame two.
+  // The coordinator independently checks both canonical producer prefixes.
+  const skip = Uint8Array.from(Buffer.from('76537f75517f7701007e810134937f77', 'hex'));
+  const before = fusedQuotientRedeem;
+  fusedQuotientRedeem = concat(before.slice(0, offset + 3), skip, before.slice(offset + 3));
+  assert(equalBytes(concat(fusedQuotientRedeem.slice(0, offset + 3),
+    fusedQuotientRedeem.slice(offset + 3 + skip.length)), before), 'mixed reader inverse');
 }
 const fusedQuotientOpcodes = decodeAuthenticationInstructions(fusedQuotientRedeem)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
@@ -3304,7 +3388,7 @@ const picCarrierRedeemLoader = concat(
 );
 // Regular's representative defines its PIC helper before the shared core.
 // Move that helper to 17 so the profile -1 core can own short key 15.
-const picAuthFunctionId = (firstWindow) => arithmeticLeafId === -1 &&
+const picAuthFunctionId = (firstWindow) => FUSE_FINAL_PAIR && firstWindow === picAuthBatches[5].firstWindow ? FUSED_TERMINAL_AUTH_ID : arithmeticLeafId === -1 &&
   firstWindow === picAuthBatches[3].firstWindow ? 17 : PIC_AUTH_FUNCTION_ID;
 const picAuthLoader = (functionId) => concat(
   picCarrierRedeemLoader,
@@ -3405,7 +3489,16 @@ templateBlockRedeems[15] = concat(
   Uint8Array.of(OP.VERIFY),
   templateBlockRedeems[15],
 );
-const templateSiblingLockings = templateBlockRedeems.map(
+// OP_2SWAP exposes Regular19's arguments; its verified result is consumed
+// before Terminal20 runs with the arithmetic definitions already installed.
+const mixedRedeem = FUSE_FINAL_PAIR ? concat(
+  Uint8Array.of(0x72), templateBlockRedeems[19],
+  Uint8Array.of(OP.VERIFY), templateBlockRedeems[20],
+) : null;
+if (FUSE_FINAL_PAIR) templateBlockRedeems[19] = mixedRedeem;
+const templateSiblingLockings = templateBlockRedeems.filter(
+  (_, index) => !FUSE_FINAL_PAIR || index !== 20,
+).map(
   (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)),
 );
 const templateSiblingLockingDigest = sha256(concat(...templateSiblingLockings));
@@ -3529,40 +3622,49 @@ const makeTemplateBlockUnlocking = (payload, evaluation, quotientChunk, redeem) 
   ...(quotientChunk === null ? [] : [encodeDataPush(quotientChunk)]),
   encodeDataPush(redeem),
 );
-const makeTemplateInputs = () => [{
-  role: 'coordinator-template-classes',
-  payload: null,
-  evaluation: null,
-  redeem: templateCoordinatorRedeem,
-  locking: encodeLockingBytecodeP2sh32(hash256(templateCoordinatorRedeem)),
-  unlocking: concat(
-    encodeDataPush(transcriptHeader),
-    encodeDataPush(statementBytes),
-    encodeDataPush(templateCoordinatorRedeem),
-  ),
-}, ...blockPayloads.map((payload, index) => {
-  const evaluation = blockEvaluationPayloads[index];
-  const redeem = templateBlockRedeems[index];
-  const quotientChunk = index === FUSED_QUOTIENT_BLOCK_INDEX
-    ? fusedQuotientHeadPayload
-    : index === FUSED_QUOTIENT_TAIL_BLOCK_INDEX
-      ? fusedQuotientTailPayload
-      : null;
-  return {
-    role: `block-${index}-template-${templateForBlock(index).name}`,
-    payload,
-    evaluation,
-    quotientChunk,
-    quotientChunkRole: index === FUSED_QUOTIENT_BLOCK_INDEX
-      ? 'head'
+const makeTemplateInputs = () => {
+  const logicalInputs = [{
+    role: 'coordinator-template-classes',
+    payload: null,
+    evaluation: null,
+    redeem: templateCoordinatorRedeem,
+    locking: encodeLockingBytecodeP2sh32(hash256(templateCoordinatorRedeem)),
+    unlocking: concat(
+      encodeDataPush(transcriptHeader),
+      encodeDataPush(statementBytes),
+      encodeDataPush(templateCoordinatorRedeem),
+    ),
+  }, ...blockPayloads.map((payload, index) => {
+    const evaluation = blockEvaluationPayloads[index];
+    const redeem = templateBlockRedeems[index];
+    const quotientChunk = index === FUSED_QUOTIENT_BLOCK_INDEX
+      ? fusedQuotientHeadPayload
       : index === FUSED_QUOTIENT_TAIL_BLOCK_INDEX
-        ? 'tail'
-        : null,
-    redeem,
-    locking: encodeLockingBytecodeP2sh32(hash256(redeem)),
-    unlocking: makeTemplateBlockUnlocking(payload, evaluation, quotientChunk, redeem),
-  };
-})];
+        ? fusedQuotientTailPayload
+        : null;
+    return {
+      role: `block-${index}-template-${templateForBlock(index).name}`,
+      payload,
+      evaluation,
+      quotientChunk,
+      quotientChunkRole: index === FUSED_QUOTIENT_BLOCK_INDEX
+        ? 'head'
+        : index === FUSED_QUOTIENT_TAIL_BLOCK_INDEX
+          ? 'tail'
+          : null,
+      redeem,
+      locking: encodeLockingBytecodeP2sh32(hash256(redeem)),
+      unlocking: makeTemplateBlockUnlocking(payload, evaluation, quotientChunk, redeem),
+    };
+  })];
+  if (!FUSE_FINAL_PAIR) return logicalInputs;
+  logicalInputs[20].unlocking = concat(
+    encodeDataPush(blockPayloads[19]), encodeDataPush(blockEvaluationPayloads[19]),
+    encodeDataPush(blockPayloads[20]), encodeDataPush(blockEvaluationPayloads[20]),
+    encodeDataPush(mixedRedeem),
+  );
+  return logicalInputs.slice(0, 21);
+};
 
 const verificationData = (inputs) => {
   const transaction = {
@@ -3604,6 +3706,78 @@ const evaluateInput = (inputs, inputIndex, vm) => {
 
 // The compact construction is the actual 22-input template graph. Apply the
 // preliminary strict input/whole-transaction gates to that same constructor.
+if (FUSE_FINAL_PAIR) {
+  const inputs = makeTemplateInputs();
+  const grade = (changed, target, vm) => {
+    const own = evaluateInput(changed, target, vm);
+    return {accepted:own.accepted,error:own.error,
+      wholeAccepted:vm.verify(verificationData(changed))===true};
+  };
+  const outcomes = {};
+  for (const [mode,vm] of [['consensus',consensusVm],['standard',standardVm]]) {
+    outcomes[mode]=inputs.map((_,index)=>{
+      const result=evaluateInput(inputs,index,vm);
+      return {index,accepted:result.accepted,error:result.error,
+        cost:result.accepted?Number(result.operationCost):null,
+        definedBodyBytes:Object.values(result.functionTable??{}).reduce((n,body)=>n+body.length,0),
+        unlockingBytes:inputs[index].unlocking.length};
+    });
+    assert(outcomes[mode].every(result=>result.accepted),
+      `${mode} fused graph input failure: ${JSON.stringify(outcomes[mode].filter(row=>!row.accepted))}`);
+    assert(vm.verify(verificationData(inputs))===true,`${mode} whole fused graph rejected`);
+  }
+  const pushData = instruction => instruction.data!==undefined?instruction.data:
+    instruction.opcode===0?new Uint8Array():undefined;
+  const mutatePush = (inputIndex,pushIndex,offset) => {
+    const changed=inputs.map(input=>({...input}));
+    const instructions=decodeAuthenticationInstructions(changed[inputIndex].unlocking);
+    const bytes=Uint8Array.from(pushData(instructions[pushIndex]));bytes[offset]^=1;
+    instructions[pushIndex]=decodeAuthenticationInstructions(encodeDataPush(bytes))[0];
+    changed[inputIndex].unlocking=encodeAuthenticationInstructions(instructions);
+    return changed;
+  };
+  const controls=[];
+  const reject = (label,changed,target) => {
+    for(const [mode,vm] of [['consensus',consensusVm],['standard',standardVm]]){
+      const result=grade(changed,target,vm);
+      assert(!result.accepted&&!result.wholeAccepted,`${mode} accepted fused control ${label}`);
+      controls.push({label,mode,target,ownRejected:!result.accepted,wholeRejected:!result.wholeAccepted,error:result.error});
+    }
+  };
+  for(let stage=0;stage<2;stage++){
+    for(const [label,slot,offset] of [['output',stage*2,0],['runtime-slope',stage*2,481],['fixed-line',stage*2,769],['evaluation',stage*2+1,0]]){
+      reject(`stage-${stage}/${label}`,mutatePush(20,slot,offset),20);
+    }
+  }
+  const first=decodeAuthenticationInstructions(inputs[20].unlocking);
+  reject('PIC record',mutatePush(20,0,pushData(first[0]).length-1),20);
+  const swapped=inputs.map(input=>({...input}));
+  swapped[20].unlocking=encodeAuthenticationInstructions([first[2],first[3],first[0],first[1],first[4]]);
+  reject('swapped logical stages',swapped,20);
+  const truncated=inputs.map(input=>({...input}));
+  truncated[20].unlocking=concat(encodeDataPush(pushData(first[0])),encodeDataPush(pushData(first[1])),encodeDataPush(pushData(first[2]).slice(0,-1)),encodeDataPush(pushData(first[3])),encodeDataPush(pushData(first[4])));
+  reject('truncated second frame',truncated,0);
+  const nonminimal=inputs.map(input=>({...input}));
+  nonminimal[20].unlocking=concat(Uint8Array.of(0x4e),u32(pushData(first[0]).length),pushData(first[0]),...first.slice(1).map(instruction=>encodeAuthenticationInstructions([instruction])));
+  reject('nonminimal first frame',nonminimal,0);
+  reject('public input',mutatePush(0,1,193),0);
+  reject('commitment root',mutatePush(0,0,0),0);
+  reject('quotient head',mutatePush(5,2,0),5);
+  reject('quotient tail',mutatePush(16,2,0),5);
+  const changedLocking=inputs.map(input=>({...input}));
+  changedLocking[20].locking=Uint8Array.from(changedLocking[20].locking);changedLocking[20].locking[2]^=1;
+  reject('sibling locking',changedLocking,0);
+  const data=verificationData(inputs),wire=encodeTransactionBch(data.transaction).length;
+  const report={construction:'native-fused-final-pair',fixture:activeFixtureName,
+    inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
+    maximumUnlockingBytes:Math.max(...inputs.map(input=>input.unlocking.length)),
+    wholeConsensus:true,wholeStandard:true,outcomes,controls,
+    resource:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?inputs.map(input=>({role:input.role,locking:hex(input.locking),unlocking:hex(input.unlocking)})):undefined,
+    securityModel:'Fiat-Shamir PIT; exact G2; pairing-equivalent G1; same fixed proof/public/root/quotient/auxiliary values',
+  };
+  writeFileSync(1,JSON.stringify(report,null,2)+'\n');process.exit(0);
+}
+
 const inputs = makeTemplateInputs();
 const consensusOutcomes = inputs.map((_, index) => evaluateInput(inputs, index, consensusVm));
 const standardOutcomes = inputs.map((_, index) => evaluateInput(inputs, index, standardVm));
