@@ -81,10 +81,8 @@ function outline_5 5
 OP_2DUP
 OP_2OVER
 call fp2_mul
-OP_ROT
-OP_DROP
-OP_ROT
-OP_DROP
+OP_2SWAP
+OP_2DROP
 end
 
 function outline_23 23
@@ -99,15 +97,6 @@ call fp_mul
 call fp_add
 end
 
-function outline_17 17
-OP_2
-OP_PICK
-OP_SWAP
-call fp_mul
-OP_ROT
-OP_ROT
-call fp_mul
-end
 
 function outline_9 9
 OP_2
@@ -130,16 +119,10 @@ call fp_mul
 end
 
 function outline_18 18
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 OP_2SWAP
 call outline_6
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 OP_2ROT
 call outline_6
 call outline_59
@@ -262,15 +245,10 @@ OP_SWAP
 call fp2_mul
 OP_2OVER
 OP_SWAP
-OP_2SWAP
-OP_SWAP
-call outline_3
+call outline_67
 OP_SWAP
 call outline_23
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 OP_2SWAP
 OP_SWAP
 call outline_6
@@ -300,16 +278,9 @@ OP_6
 OP_PICK
 OP_8
 OP_PICK
-OP_2SWAP
-OP_SWAP
-call outline_3
-OP_4
-OP_PICK
-OP_6
-OP_PICK
-OP_2SWAP
-OP_SWAP
-call outline_3
+call outline_67
+call outline_64
+call outline_67
 call outline_10
 call outline_6
 OP_11
@@ -323,13 +294,8 @@ OP_8
 OP_ROLL
 OP_9
 OP_ROLL
-OP_2SWAP
-OP_SWAP
-call outline_3
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_67
+call outline_65
 OP_2SWAP
 OP_SWAP
 call outline_6
@@ -378,28 +344,17 @@ OP_11
 OP_ROLL
 OP_11
 OP_ROLL
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 call fp2_mul
 OP_13
 OP_ROLL
 OP_13
 OP_ROLL
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 call fp2_mul
 OP_SWAP
-OP_2SWAP
-OP_SWAP
-call outline_3
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_67
+call outline_64
 call outline_22
 OP_5
 OP_PICK
@@ -428,12 +383,9 @@ OP_2
 OP_OVER
 OP_3
 OP_PICK
-call outline_17
+call outline_9
 OP_SWAP
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 call outline_3
 OP_14
 OP_PICK
@@ -480,9 +432,7 @@ OP_8
 OP_PICK
 call fp2_mul
 OP_SWAP
-OP_2SWAP
-OP_SWAP
-call outline_3
+call outline_67
 OP_2ROT
 OP_SWAP
 OP_13
@@ -534,28 +484,19 @@ call outline_11
 call outline_11
 call outline_11
 call outline_18
-push 13
-OP_PICK
-push 13
-OP_PICK
+call outline_66
 OP_9
 OP_ROLL
 OP_9
 OP_ROLL
 call fp2_mul
-push 13
-OP_PICK
-push 13
-OP_PICK
+call outline_66
 OP_11
 OP_ROLL
 OP_11
 OP_ROLL
 call fp2_mul
-push 13
-OP_PICK
-push 13
-OP_PICK
+call outline_66
 OP_13
 OP_ROLL
 OP_13
@@ -570,10 +511,7 @@ OP_ROLL
 push 15
 OP_ROLL
 call outline_6
-push 17
-OP_PICK
-push 17
-OP_PICK
+call outline_68
 OP_ROT
 OP_3
 OP_ROLL
@@ -590,12 +528,7 @@ push 15
 OP_ROLL
 call outline_38
 OP_DUP
-OP_2
-OP_PICK
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_63
 OP_8
 OP_PICK
 OP_10
@@ -619,16 +552,10 @@ OP_16
 OP_ROLL
 push 11
 OP_ROLL
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 OP_2SWAP
 call outline_3
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 OP_2ROT
 call outline_3
 call outline_59
@@ -690,14 +617,11 @@ OP_3
 OP_OVER
 OP_3
 OP_PICK
-call outline_17
+call outline_9
 OP_SWAP
 call outline_43
 call fp2_mul
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 OP_2
 OP_PICK
 OP_4
@@ -711,7 +635,7 @@ call outline_5
 OP_3
 OP_SWAP
 OP_ROT
-call outline_17
+call outline_9
 OP_15
 OP_ROLL
 OP_15
@@ -748,7 +672,7 @@ OP_9
 OP_PICK
 OP_11
 OP_PICK
-call outline_17
+call outline_9
 OP_DUP
 OP_2
 OP_PICK
@@ -783,7 +707,7 @@ call outline_5
 OP_3
 OP_SWAP
 OP_ROT
-call outline_17
+call outline_9
 OP_4
 OP_ROLL
 OP_5
@@ -804,10 +728,7 @@ OP_ROT
 OP_3
 OP_ROLL
 call outline_3
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 OP_12
 OP_ROLL
 OP_13
@@ -881,10 +802,8 @@ OP_PICK
 push 20
 OP_PICK
 call outline_22
-OP_ROT
-OP_DROP
-OP_ROT
-OP_DROP
+OP_2SWAP
+OP_2DROP
 OP_ENDIF
 OP_SWAP
 push 1e
@@ -943,12 +862,7 @@ push 16
 OP_ROLL
 call outline_31
 OP_DUP
-OP_2
-OP_PICK
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_63
 call outline_31
 OP_SWAP
 call outline_22
@@ -1012,25 +926,15 @@ OP_SWAP
 call outline_5
 OP_2SWAP
 OP_SWAP
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 call outline_6
 OP_SWAP
 call outline_5
-OP_4
-OP_PICK
-OP_6
-OP_PICK
-OP_2SWAP
-OP_SWAP
-call outline_3
+call outline_64
+call outline_67
 OP_2OVER
 OP_SWAP
-OP_2SWAP
-OP_SWAP
-call outline_3
+call outline_67
 OP_2
 OP_SWAP
 OP_ROT
@@ -1051,15 +955,10 @@ OP_7
 OP_PICK
 call outline_9
 OP_SWAP
-OP_2SWAP
-OP_SWAP
-call outline_3
+call outline_67
 OP_2DUP
 OP_SWAP
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 call outline_3
 OP_SWAP
 OP_2ROT
@@ -1072,9 +971,7 @@ OP_6
 OP_ROLL
 call outline_9
 OP_SWAP
-OP_2SWAP
-OP_SWAP
-call outline_3
+call outline_67
 call outline_59
 call fp2_mul
 OP_2
@@ -1148,18 +1045,12 @@ OP_PICK
 call fp_mul
 OP_DUP
 OP_3
-call fp_mul
-OP_DUP
-OP_OVER
-call fp_mul
+call outline_70
 OP_13
 OP_PICK
 OP_14
 OP_PICK
-call fp_mul
-OP_DUP
-OP_OVER
-call fp_mul
+call outline_70
 OP_DUP
 OP_8
 call fp_mul
@@ -1179,10 +1070,7 @@ OP_OVER
 OP_OVER
 call fp_sub_top_minus_next
 OP_2
-call fp_mul
-OP_DUP
-OP_OVER
-call fp_mul
+call outline_70
 OP_5
 OP_PICK
 OP_5
@@ -1330,18 +1218,12 @@ OP_OVER
 call fp_mul
 OP_DUP
 OP_3
-call fp_mul
-OP_DUP
-OP_OVER
-call fp_mul
+call outline_70
 OP_4
 OP_PICK
 OP_5
 OP_PICK
-call fp_mul
-OP_DUP
-OP_OVER
-call fp_mul
+call outline_70
 OP_DUP
 OP_8
 call fp_mul
@@ -1401,10 +1283,7 @@ OP_ROLL
 end
 
 function outline_7 7
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 OP_8
 OP_ROLL
 OP_9
@@ -1415,7 +1294,7 @@ OP_11
 OP_ROLL
 end
 
-function outline_13 13
+function outline_13 47
 push 17
 OP_ROLL
 push 17
@@ -1448,34 +1327,16 @@ OP_ROLL
 end
 
 function outline_44 44
-push 17
-OP_PICK
-push 17
-OP_PICK
-push 17
-OP_PICK
-push 17
-OP_PICK
-push 17
-OP_PICK
-push 17
-OP_PICK
-push 11
-OP_PICK
-push 11
-OP_PICK
-push 11
-OP_PICK
-push 11
-OP_PICK
-push 11
-OP_PICK
-push 11
-OP_PICK
+call outline_68
+call outline_68
+call outline_68
+call outline_71
+call outline_71
+call outline_71
 call outline_28
 end
 
-function outline_14 14
+function outline_14 64
 OP_SWAP
 OP_ROT
 OP_3
@@ -1517,7 +1378,7 @@ function prime 0
 constant P
 end
 
-function outline_15 15
+function outline_15 68
 push 11
 OP_ROLL
 push 11
@@ -1616,9 +1477,6 @@ OP_DROP
 OP_9
 OP_ROLL
 OP_DROP
-OP_ROT
-OP_ROT
-OP_ROT
 OP_8
 OP_ROLL
 OP_8
@@ -1647,17 +1505,8 @@ end
 
 function outline_33 33
 OP_5
-OP_ROLL
-OP_5
-OP_ROLL
-OP_5
-OP_ROLL
-OP_5
-OP_ROLL
-OP_5
-OP_ROLL
-OP_5
-OP_ROLL
+OP_PICK
+OP_DROP
 end
 
 function outline_34 34
@@ -1675,9 +1524,9 @@ call outline_29
 end
 
 function outline_21 21
-call outline_10
-call outline_10
-call outline_10
+OP_11
+OP_PICK
+OP_DROP
 end
 
 function outline_50 50
@@ -1686,10 +1535,7 @@ OP_ROLL
 OP_9
 OP_ROLL
 call fp2_mul
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 push 19
 OP_PICK
 push 19
@@ -1780,21 +1626,12 @@ OP_4
 OP_ROLL
 OP_5
 OP_ROLL
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 end
 
 function outline_59 59
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
+call outline_69
 end
 
 function outline_60 60
@@ -1837,6 +1674,159 @@ OP_0
 OP_0
 end
 
+# Exact repeated six-op stack sequence outlined at four call sites.
+function outline_63 17
+OP_2
+OP_PICK
+call outline_64
+end
+# Share eleven four/six-pick sequences; outline_18 supplies the short key.
+function outline_64 -1
+OP_4
+OP_PICK
+OP_6
+OP_PICK
+end
+
+# TW-a1: share eleven exact OP_6/OP_ROLL/OP_7/OP_ROLL sequences.
+function outline_65 13
+OP_6
+OP_ROLL
+OP_7
+OP_ROLL
+end
+
+# UE-a1: share six exact two-pick sequences across outline_24 and main.
+function outline_66 63
+push 13
+OP_PICK
+push 13
+OP_PICK
+end
+
+# UE-a2: share ten OP_2SWAP/OP_SWAP/outline_3 sequences and demote outline_14.
+function outline_67 14
+OP_2SWAP
+OP_SWAP
+call outline_3
+end
+
+# UE-a3: share five exact 0x17 two-pick sequences across outline_24, outline_44 and main.
+function outline_68 65
+push 17
+OP_PICK
+push 17
+OP_PICK
+end
+
+# Exponent-driven modular power. Input a, p, nonnegative e; output a^e mod p.
+# Loop stack p, r, b, e maintains r*b^e = a^E (mod p); e=0 returns 1.
+function fp_pow 66
+OP_1
+OP_3
+OP_ROLL
+OP_3
+OP_PICK
+OP_MOD
+OP_ROT
+OP_BEGIN
+OP_DUP
+OP_2
+OP_MOD
+OP_IF
+OP_ROT
+OP_2
+OP_PICK
+OP_MUL
+OP_3
+OP_PICK
+OP_MOD
+OP_ROT
+OP_ROT
+OP_ENDIF
+OP_SWAP
+OP_DUP
+OP_MUL
+OP_3
+OP_PICK
+OP_MOD
+OP_SWAP
+OP_1
+OP_RSHIFTNUM
+OP_DUP
+OP_NOT
+OP_UNTIL
+OP_2DROP
+OP_NIP
+end
+
+function g1_decompress 67
+# Input: parity, x. Output: exact canonical y selected by parity, original x.
+# x keeps the original verifier's integer domain. Root verification owns G1 membership.
+OP_DUP
+OP_DUP
+call fp_mul
+OP_OVER
+call fp_mul
+OP_3
+call fp_add
+OP_DUP
+call prime
+OP_DUP
+OP_1ADD
+OP_4
+OP_DIV
+call fp_pow
+# parity x rhs root -> parity x root, checking a square root really exists.
+OP_DUP
+OP_DUP
+call fp_mul
+OP_ROT
+OP_NUMEQUALVERIFY
+# Select the requested parity; modular negation keeps zero canonical.
+OP_DUP
+OP_2
+OP_MOD
+OP_3
+OP_PICK
+OP_NUMNOTEQUAL
+OP_IF
+call outline_35
+OP_ENDIF
+# Enforce sign 0/1, including rejection of parity 1 for a zero root.
+OP_DUP
+OP_2
+OP_MOD
+OP_3
+OP_ROLL
+OP_NUMEQUALVERIFY
+OP_SWAP
+end
+
+# VE: share 10 exact straight-line sequences; static inverse qualified separately.
+function outline_69 15
+OP_7
+OP_ROLL
+OP_7
+OP_ROLL
+end
+
+# VE: share 5 exact straight-line sequences; static inverse qualified separately.
+function outline_70 69
+call fp_mul
+OP_DUP
+OP_OVER
+call fp_mul
+end
+
+# VE: share 5 exact straight-line sequences; static inverse qualified separately.
+function outline_71 70
+push 11
+OP_PICK
+push 11
+OP_PICK
+end
+
 main
 # Public inputs must be canonical scalars, 0 <= n < r (n1 is push 0, n0 push 1: depths 9, 8).
 # Without this n + r gives the same vk_x, so one proof verifies two claimed integers.
@@ -1856,38 +1846,15 @@ constant G2_SUBGROUP_SCALAR
 OP_SUB
 OP_LESSTHAN
 OP_VERIFY
-# Proof and public-input checks, point arithmetic and Miller accumulation.
-OP_OVER
-OP_2
-OP_PICK
-call fp_mul
-OP_3
-OP_2
-OP_PICK
-OP_3
-OP_PICK
-OP_4
-OP_PICK
-call fp_mul
-call fp_mul
-call fp_add
-OP_NUMEQUALVERIFY
-OP_7
-OP_PICK
-OP_8
-OP_PICK
-call fp_mul
-OP_3
-OP_8
-OP_PICK
-OP_9
-OP_PICK
-OP_10
-OP_PICK
-call fp_mul
-call fp_mul
-call fp_add
-OP_NUMEQUALVERIFY
+# Decode C, then A, restoring the original ten-item stack before G2 checks.
+call g1_decompress
+call outline_69
+call g1_decompress
+OP_2ROT
+OP_2ROT
+call outline_69
+OP_2ROT
+OP_2ROT
 OP_2OVER
 call outline_5
 OP_5
@@ -1940,10 +1907,7 @@ OP_ROLL
 call outline_58
 call outline_41
 call outline_33
-OP_7
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_69
 OP_IF
 OP_12
 OP_PICK
@@ -1955,10 +1919,7 @@ OP_12
 OP_PICK
 OP_5
 OP_ROLL
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 OP_8
 OP_ROLL
 OP_9
@@ -1992,26 +1953,17 @@ OP_PICK
 call outline_5
 OP_2DUP
 OP_SWAP
-push 11
-OP_PICK
-push 11
-OP_PICK
+call outline_71
 call fp2_mul
 OP_15
 OP_PICK
 OP_15
 OP_PICK
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 call fp2_mul
 OP_2DUP
 OP_SWAP
-push 17
-OP_PICK
-push 17
-OP_PICK
+call outline_68
 call fp2_mul
 OP_14
 OP_PICK
@@ -2037,18 +1989,9 @@ OP_PICK
 OP_NUMEQUAL
 OP_BOOLAND
 OP_IF
-push 13
-OP_PICK
-push 13
-OP_PICK
-push 13
-OP_PICK
-push 13
-OP_PICK
-push 13
-OP_PICK
-push 13
-OP_PICK
+call outline_66
+call outline_66
+call outline_66
 call outline_41
 call outline_27
 call outline_27
@@ -2056,10 +1999,7 @@ call outline_33
 call outline_12
 call outline_12
 OP_ELSE
-push 11
-OP_PICK
-push 11
-OP_PICK
+call outline_71
 OP_2
 OP_PICK
 OP_4
@@ -2114,12 +2054,7 @@ OP_2
 call fp_mul
 call outline_5
 OP_DUP
-OP_2
-OP_PICK
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_63
 call fp2_mul
 OP_DUP
 OP_2
@@ -2129,20 +2064,14 @@ OP_ROLL
 OP_11
 OP_ROLL
 call outline_3
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 call outline_50
 OP_OVER
 OP_3
 OP_PICK
 call outline_9
 OP_SWAP
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 call outline_3
 OP_DUP
 OP_2
@@ -2202,24 +2131,15 @@ OP_UNTIL
 OP_DROP
 call outline_11
 call outline_31
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_64
 call outline_5
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 OP_2OVER
 OP_SWAP
 call fp2_mul
 OP_2SWAP
 OP_SWAP
-OP_6
-OP_ROLL
-OP_7
-OP_ROLL
+call outline_65
 call fp2_mul
 OP_2SWAP
 OP_SWAP
@@ -2286,54 +2206,7 @@ call prime
 OP_DUP
 OP_2
 OP_SUB
-OP_1
-OP_3
-OP_ROLL
-OP_3
-OP_PICK
-OP_MOD
-OP_0
-OP_BEGIN
-OP_DUP
-push fe00
-OP_LESSTHAN
-OP_DUP
-OP_TOALTSTACK
-OP_IF
-OP_3
-OP_PICK
-OP_OVER
-OP_RSHIFTNUM
-OP_2
-OP_MOD
-OP_1
-OP_NUMEQUAL
-OP_IF
-OP_ROT
-OP_2
-OP_PICK
-OP_MUL
-OP_4
-OP_PICK
-OP_MOD
-OP_ROT
-OP_ROT
-OP_ENDIF
-OP_OVER
-OP_ROT
-OP_MUL
-OP_4
-OP_PICK
-OP_MOD
-OP_SWAP
-OP_1ADD
-OP_ENDIF
-OP_FROMALTSTACK
-OP_NOT
-OP_UNTIL
-OP_2DROP
-OP_NIP
-OP_NIP
+call fp_pow
 OP_DUP
 OP_OVER
 call fp_mul
@@ -2418,27 +2291,14 @@ OP_1SUB
 OP_SWAP
 OP_DIV
 # Full generic final exponentiation and Fp12 identity check.
+# Shift the remaining positive exponent; keep the unused counter slot for the field ABI.
 OP_0
 OP_BEGIN
-OP_DUP
-push e60a
-OP_LESSTHAN
-OP_DUP
-OP_TOALTSTACK
-OP_IF
-OP_2DUP
-OP_RSHIFTNUM
+OP_OVER
 OP_2
 OP_MOD
-OP_1
-OP_NUMEQUAL
 OP_IF
-OP_2
-OP_PICK
-OP_4
-OP_PICK
-OP_6
-OP_PICK
+call outline_63
 OP_8
 OP_PICK
 OP_10
@@ -2469,7 +2329,6 @@ OP_ROLL
 push 19
 OP_ROLL
 OP_ENDIF
-OP_1ADD
 OP_ROT
 OP_3
 OP_ROLL
@@ -2488,8 +2347,11 @@ OP_13
 OP_ROLL
 OP_13
 OP_ROLL
-OP_ENDIF
-OP_FROMALTSTACK
+OP_SWAP
+OP_1
+OP_RSHIFTNUM
+OP_SWAP
+OP_OVER
 OP_NOT
 OP_UNTIL
 OP_DROP
