@@ -14,7 +14,29 @@ Here:
 
 **Malleability pins** (`malleability-pins.mjs`, default `SLIM_PINS=full`): prepended once to the densless half of the terminal redeem. They pin PUSHDATA2 lengths on the terminal header/quot and each executor quot, enforce non-decreasing order on terminal limbs 2..11, and require fixed-table sign bits clear on all three executors. The order reader follows actual minimally encoded VM-number pushes, including OP_0, small integer opcodes and 31/32-byte payloads. Its helper key 151 is disjoint from sign helper 150 and the existing base/MSM namespaces. The builder and witness producer share `PIN_MODE`, so an unset environment reproduces explicit `full` output. Modes remain `0`, `lenonly`, `orderonly`, `lensign`, `lenorder`, `full`.
 
-## Current stack cleanup
+## Current shared-prime profiles and resource limits
+
+The registered shared-prime options use the scheduled compiler, constant hoisting,
+packed digit reads and packed GLV components. The minimum-byte option is 33,561
+total bytes; `MSM_GLV_PAIRS=1` adds a lower-cost 33,566-byte option. Both use
+`GENESIS_PAD=10`, `STAGE_PADS=0,0,0,0`, full pins and split37/cuts27,36,47,55.
+Their minimum observed standard native margins are 87 and 67 cost units,
+respectively. These finite fixture results do not establish arbitrary-proof
+resource admissibility.
+
+**The earlier 33,641-byte signed-residue configuration is not admissible for
+arbitrary valid proofs.** With `MSM_SIGNED_RESIDUE=madd-ny`, `GENESIS_PAD=23`
+and the original compiler, the maintainer's `review-a` through `review-d` dense
+sweeps found genesis budget failures. In `review-a`, proof 2 costs 4,807,314
+standard VM units against a 4,807,200 limit. The arithmetic normalization remains
+sound; the failure is insufficient per-input resource budget. See the
+[maintainer reproduction](https://github.com/mr-zwets/groth16_cashscript/pull/22#issuecomment-6277938413).
+Do not treat the older 271-unit supplied-corpus margin as a universal bound or
+transfer it to the later compiler profiles. The registered 33,561/33,566-byte
+options have separate compiled programs and finite qualification evidence; no
+dense-sweep or arbitrary-proof guarantee follows for those options either.
+
+## Earlier stack-cleanup qualification
 
 Every cache profile uses the checked executor cleanup and terminal inverse-copy identities. The executor replaces `DROP 4 ROLL DROP 4 ROLL DROP 4 ROLL DROP` with `7 ROLL 2DROP 2ROT 2DROP`; both consume eight owned raw words and retain words3..6. The terminal replaces `6 PICK 7 PICK` with `6 PICK DUP`, copying the same arbitrary raw word twice with seven owned words. Both preserve lower main/ALT/function-table prefixes. The existing unique whole-block fingerprints and instruction-boundary checks guard each transform.
 
