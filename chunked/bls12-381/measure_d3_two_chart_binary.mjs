@@ -61,24 +61,31 @@ const DEPTH = 3;
 const FUSE_FINAL_PAIR = process.env.RPA_FUSE_FINAL_PAIR === '1';
 const SCHEDULE_COORDINATOR = process.env.RPA_SCHEDULE_COORDINATOR === '1';
 const SCHEDULE_PIC_AUTH = process.env.RPA_SCHEDULE_PIC_AUTH === '1';
-// The six-pair profile retains the arithmetic carrier and all21 logical stages.
-const FUSE_REGULAR_PAIRS = process.env.RPA_FUSE_REGULAR_PAIRS === '1';
+// Group membership owns every logical-to-physical index and frame ordinal.
+const FUSE_REGULAR_TRIPLES = process.env.RPA_FUSE_REGULAR_TRIPLES === '1';
+const FUSE_REGULAR_PAIRS = process.env.RPA_FUSE_REGULAR_PAIRS === '1' || FUSE_REGULAR_TRIPLES;
 const FUSE_REGULAR_PAIR = process.env.RPA_FUSE_REGULAR_PAIR === '1' || FUSE_REGULAR_PAIRS;
-const regularGroups = FUSE_REGULAR_PAIRS
-  ? [[5,6,544],[7,8,486],[9,10,485],[11,12,495],[13,14,505],[16,17,528]]
-    .map(([first,second,funding])=>({first,second,funding}))
-  : FUSE_REGULAR_PAIR ? [{first:7,second:8,funding:Number(process.env.RPA_GROUP_DENSITY_PADDING??0)}] : [];
-if (regularGroups.some(({funding})=>!Number.isInteger(funding)||funding<0||funding>1000)) {
-  throw new Error('Regular group funding is outside0..1000');
-}
-const groupBySecond = new Map(regularGroups.map(group=>[group.second,group]));
+const regularGroups = (FUSE_REGULAR_TRIPLES
+  ? [[[5,6,7],795],[[8,9,10],736],[[11,12,13],764],[[16,17,18],777]]
+  : FUSE_REGULAR_PAIRS
+    ? [[[5,6],544],[[7,8],486],[[9,10],485],[[11,12],495],[[13,14],505],[[16,17],528]]
+    : FUSE_REGULAR_PAIR ? [[[7,8],Number(process.env.RPA_GROUP_DENSITY_PADDING??0)]] : []
+).map(([members,funding])=>({members,first:members[0],last:members.at(-1),funding}));
+if(regularGroups.some(({funding})=>!Number.isInteger(funding)||funding<0||funding>1000))throw new Error('Regular group funding is outside0..1000');
+const groupFrames = new Map(regularGroups.flatMap(group=>group.members.map((block,ordinal)=>[block,{group,ordinal}])));
+const frameOrdinal = block => block===20&&FUSE_FINAL_PAIR?1:groupFrames.get(block)?.ordinal??0;
+const groupContinuations = new Map([...groupFrames].filter(([,frame])=>frame.ordinal>0));
 const physicalInput = logicalInput => FUSE_REGULAR_PAIR
-  ? logicalInput-regularGroups.filter(group=>logicalInput>=group.second+1).length-(logicalInput===21?1:0)
+  ? logicalInput-regularGroups.reduce((sum,group)=>sum+Math.min(Math.max(logicalInput-(group.first+1),0),group.members.length-1),0)-(logicalInput===21?1:0)
   : logicalInput;
 const physicalBlock = blockIndex => physicalInput(blockIndex+1);
-const physicalIndexSource = indent => FUSE_REGULAR_PAIRS
-  ? indent+`int physicalIndex=int(0x${Buffer.from(Array.from({length:21},(_,index)=>physicalBlock(index))).toString('hex')}.split(blockIndex+1)[0].split(blockIndex)[1]+0x00);`
-  : indent+'int physicalIndex=blockIndex+1; if(blockIndex>=8){physicalIndex=physicalIndex - 1;}';
+const physicalIndices = Array.from({length:21},(_,block)=>physicalBlock(block));
+if(FUSE_REGULAR_TRIPLES&&physicalIndices.some(index=>index<0||index>15))throw new Error('physical indices do not fit fourbits');
+const physicalIndexSource = indent => FUSE_REGULAR_TRIPLES
+  ? indent+`int physicalIndex=(${physicalIndices.reduce((mask,index,block)=>mask+(BigInt(index)<<(4n*BigInt(block))),0n)}>>(blockIndex*4))%16;`
+  : FUSE_REGULAR_PAIRS
+    ? indent+`int physicalIndex=int(0x${Buffer.from(physicalIndices).toString('hex')}.split(blockIndex+1)[0].split(blockIndex)[1]+0x00);`
+    : indent+'int physicalIndex=blockIndex+1; if(blockIndex>=8){physicalIndex=physicalIndex - 1;}';
 const skipFirstFrameBytes = Uint8Array.from(Buffer.from('76537f75517f7701007e810134937f77','hex'));
 const INVERSE_RELATIONS = process.env.RPA_INVERSES !== 'off';
 const SKIP_GAMMA = process.env.RPA_SKIP_GAMMA === '1';
@@ -1317,7 +1324,7 @@ const FUSED_QUOTIENT_BLOCK_INDEX = 4;
 const FUSED_QUOTIENT_INPUT_INDEX = FUSED_QUOTIENT_BLOCK_INDEX + 1;
 const FUSED_QUOTIENT_TAIL_BLOCK_INDEX = 15;
 const FUSED_QUOTIENT_TAIL_INPUT_INDEX = FUSED_QUOTIENT_TAIL_BLOCK_INDEX + 1;
-const TEMPLATE_TOTAL_INPUTS = 1 + blockPayloads.length - (FUSE_FINAL_PAIR?1:0) - regularGroups.length;
+const TEMPLATE_TOTAL_INPUTS = 1 + blockPayloads.length - (FUSE_FINAL_PAIR?1:0) - regularGroups.reduce((sum,group)=>sum+group.members.length-1,0);
 const rangeLine = (name, upperBound = P) => `        require(within(${name},0,${upperBound}));`;
 const declareLimb = (lines, name, blob, offset, requireRange = true, upperBound = P) => {
   lines.push(`        int ${name} = ${limbExpression(blob, offset)};`);
@@ -2103,7 +2110,7 @@ const coordinatorSource = (
         lines.push(`        if (((public0>>${shift})%256)+((public1>>${shift})%256)==0) { ${length}=${length}+32; } else { ${length}=${length}+704; }`);
       }
     }
-    lines.push(groupBySecond.has(index)
+    lines.push(groupContinuations.has(index)
       ? `        bytes rawInput${index}=rawInput${index-1}.split(blockLength${index-1}+52)[1];`
       : FUSE_FINAL_PAIR && index===20
         ? '        bytes rawInput20=rawInput19.split(blockLength19+52)[1];'
@@ -2422,11 +2429,16 @@ contract PicBatchAuth() {
             }
 ${FUSE_REGULAR_PAIR ? `${physicalIndexSource('            ')}
             bytes producer=tx.inputs[physicalIndex].unlockingBytecode;
-            if(${regularGroups.map(g=>`blockIndex==${g.second}`).join(' || ')}){
+${FUSE_REGULAR_TRIPLES?`            int frames=(${Array.from({length:21},(_,block)=>BigInt(frameOrdinal(block))<<(2n*BigInt(block))).reduce((sum,value)=>sum+value,0n)}>>(blockIndex*2))%4;
+${[1,2].map(ordinal=>`            if(frames>=${ordinal}){
                 int firstLength=int(producer.split(3)[0].split(1)[1]+0x00);
                 producer=producer.split(firstLength+52)[1];
             }
-            bytes record=producer.split(recordOffset+recordLength)[0].split(recordOffset)[1];` : `            bytes record=tx.inputs[blockIndex+1].unlockingBytecode.split(recordOffset+recordLength)[0].split(recordOffset)[1];`}
+`).join('')}`:`            if(${regularGroups.map(group=>`blockIndex==${group.last}`).join(' || ')}){
+                int firstLength=int(producer.split(3)[0].split(1)[1]+0x00);
+                producer=producer.split(firstLength+52)[1];
+            }
+`}            bytes record=producer.split(recordOffset+recordLength)[0].split(recordOffset)[1];` : `            bytes record=tx.inputs[blockIndex+1].unlockingBytecode.split(recordOffset+recordLength)[0].split(recordOffset)[1];`}
             bytes root=record;
             if(!zero){
             (bytes factor,bytes path)=record.split(${PIC_FACTOR_BYTES});
@@ -2974,14 +2986,14 @@ templateClasses.forEach((template) => {
     const before=template.core,original=decodeAuthenticationInstructions(before),mapped=[],ledger=[];
     const activeHops=template.members.map(i=>(i===20?20:i+1)-physicalBlock(i));
     const previousHops=template.members.map(i=>i-physicalBlock(i-1));
-    const skip=template.members.map(i=>groupBySecond.has(i-1));
+    const skip=template.members.map(i=>frameOrdinal(i-1));
     assert(new Set(activeHops).size===1&&new Set(previousHops).size===1&&new Set(skip).size===1,'late context must share one map');
     const shift=(amount,subtract)=>amount===0?[]:amount===1?[{opcode:subtract?0x8c:0x8b}]:[...decodeAuthenticationInstructions(pushVmNumber(amount)),{opcode:subtract?OP.SUB:OpcodesBCH.OP_ADD}];
     let activeSites=0,previousSites=0;
     for(let i=0;i<original.length;i++){
       const instruction=original[i],previous=instruction.opcode===OpcodesBCH.OP_INPUTBYTECODE&&original[i-1]?.opcode!==OpcodesBCH.OP_0;
       const active=instruction.opcode===OpcodesBCH.OP_INPUTINDEX;
-      const prefix=previous?shift(previousHops[0],true):[],suffix=active?shift(activeHops[0],false):previous&&skip[0]?decodeAuthenticationInstructions(skipFirstFrameBytes):[];
+      const prefix=previous?shift(previousHops[0],true):[],suffix=active?shift(activeHops[0],false):previous?Array.from({length:skip[0]},()=>decodeAuthenticationInstructions(skipFirstFrameBytes)).flat():[];
       activeSites+=Number(active);previousSites+=Number(previous);ledger.push({prefix,suffix});mapped.push(...prefix,instruction,...suffix);
     }
     assert(activeSites===1&&previousSites===2,'late-template context sites changed');
@@ -3010,11 +3022,12 @@ const templateForBlock = (index) => templateClasses.find(({ members }) => member
 // independently enforced for every logical leaf by the committing coordinator.
 const loadPredecessor = previousBlock => concat(
   pushVmNumber(physicalBlock(previousBlock)),Uint8Array.of(OP.INPUTBYTECODE),
-  ...(groupBySecond.has(previousBlock) ? [skipFirstFrameBytes] : []),
+  ...Array.from({length:frameOrdinal(previousBlock)},()=>skipFirstFrameBytes),
   Uint8Array.from(Buffer.from('76537f75517f7701007e8153937f7c537f777c517f7701307f75','hex')),
 );
-const templateConfig = (record,index) => FUSE_REGULAR_PAIR && templateForBlock(index).name==='Regular' ? concat(
-  ...(groupBySecond.has(index) ? [Uint8Array.of(OP.FROMALTSTACK,OP.FROMALTSTACK)] : [loadPredecessor(index-1)]),
+const templateConfig = (record,index,forward=false) => FUSE_REGULAR_PAIR && templateForBlock(index).name==='Regular' ? concat(
+  ...(groupContinuations.has(index) ? [Uint8Array.of(OP.FROMALTSTACK,OP.FROMALTSTACK)] : [loadPredecessor(index-1)]),
+  ...(forward?[Uint8Array.of(OpcodesBCH.OP_2OVER,OP.TOALTSTACK,OP.TOALTSTACK)]:[]),
   pushVmNumber(index),encodeDataPush(record.fixedCommitment),pushVmNumber(TEMPLATE_FUNCTION_ID),Uint8Array.of(OP.INVOKE),
 ) : concat(
   pushVmNumber(index),
@@ -3316,7 +3329,7 @@ const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_
     : '{"3":436,"5":423,"6":377,"7":385,"8":369,"9":376,"10":377,"11":386,"12":377,"13":386,"14":388,"16":411,"17":383,"18":384,"19":393}'));
 if (FUSE_FINAL_PAIR) compactRegularDensityPadding['19'] = 0;
 if (FUSE_REGULAR_PAIR) {
-  regularGroups.forEach(g=>{compactRegularDensityPadding[String(g.first)]=0;compactRegularDensityPadding[String(g.second)]=0;});
+  regularGroups.forEach(group=>group.members.forEach(block=>{compactRegularDensityPadding[String(block)]=0;}));
 }
 Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   const index = Number(block);
@@ -3650,11 +3663,18 @@ for(const group of regularGroups){
   if(groupFundingBytes>=260)groupFunding=concat(encodeDataPush(new Uint8Array(groupFundingBytes-4)),Uint8Array.of(OP.DROP));
   while(groupFunding.length<groupFundingBytes){const remaining=groupFundingBytes-groupFunding.length;assert(remaining>=2,'one-byte group funding tail');const n=Math.min(remaining===77?75:76,remaining);groupFunding=concat(groupFunding,encodeDataPush(new Uint8Array(n-2)),Uint8Array.of(OP.DROP));}
   assert(groupFunding.length===groupFundingBytes,'group funding byte count');
-  const redeem=concat(groupFunding,Uint8Array.of(0x72,0x6e,OP.TOALTSTACK,OP.TOALTSTACK),templateBlockRedeems[group.first],Uint8Array.of(OP.VERIFY),templateConfig(blockRecords[group.second],group.second));
+  const redeem=concat(groupFunding,
+    Uint8Array.of(group.members.length===2?OpcodesBCH.OP_2SWAP:OpcodesBCH.OP_2ROT,OpcodesBCH.OP_2DUP,OP.TOALTSTACK,OP.TOALTSTACK),
+    templateBlockRedeems[group.first],Uint8Array.of(OP.VERIFY),
+    ...group.members.slice(1).map((block,index,remaining)=>{
+      const forward=index<remaining.length-1;
+      return concat(...(forward?[Uint8Array.of(OpcodesBCH.OP_2SWAP)]:[]),
+        templateConfig(blockRecords[block],block,forward),...(forward?[Uint8Array.of(OP.VERIFY)]:[]));
+    }));
   groupedRegularRedeems.set(group.first,redeem);templateBlockRedeems[group.first]=redeem;
 }
 const templateSiblingLockings = templateBlockRedeems.filter(
-  (_, index) => !groupBySecond.has(index) && (!FUSE_FINAL_PAIR || index!==20),
+  (_, index) => !groupContinuations.has(index) && (!FUSE_FINAL_PAIR || index!==20),
 ).map(
   (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)),
 );
@@ -3823,7 +3843,7 @@ const makeTemplateInputs = () => {
     };
   })];
   for(const group of regularGroups){
-    logicalInputs[group.first+1].unlocking=concat(encodeDataPush(blockPayloads[group.first]),encodeDataPush(blockEvaluationPayloads[group.first]),encodeDataPush(blockPayloads[group.second]),encodeDataPush(blockEvaluationPayloads[group.second]),encodeDataPush(groupedRegularRedeems.get(group.first)));
+    logicalInputs[group.first+1].unlocking=concat(...group.members.flatMap(block=>[encodeDataPush(blockPayloads[block]),encodeDataPush(blockEvaluationPayloads[block])]),encodeDataPush(groupedRegularRedeems.get(group.first)));
   }
   if (!FUSE_FINAL_PAIR) return logicalInputs;
   logicalInputs[20].unlocking = concat(
@@ -3831,7 +3851,7 @@ const makeTemplateInputs = () => {
     encodeDataPush(blockPayloads[20]), encodeDataPush(blockEvaluationPayloads[20]),
     encodeDataPush(mixedRedeem),
   );
-  return logicalInputs.slice(0, 21).filter((_, index) => !groupBySecond.has(index-1));
+  return logicalInputs.slice(0, 21).filter((_, index) => !groupContinuations.has(index-1));
 };
 
 const verificationData = (inputs) => {
@@ -3941,17 +3961,18 @@ if (FUSE_FINAL_PAIR) {
   const changedLocking=inputs.map(input=>({...input}));
   changedLocking[finalInput].locking=Uint8Array.from(changedLocking[finalInput].locking);changedLocking[finalInput].locking[2]^=1;
   reject('sibling locking',changedLocking,0);
-  for (const {first:GROUP_FIRST,second:GROUP_SECOND} of regularGroups) {
-    const groupLabel = FUSE_REGULAR_PAIRS ? `regular-pair-${GROUP_FIRST}-${GROUP_SECOND}` : 'regular-pair';
+  for (const group of regularGroups) {
+    const {first:GROUP_FIRST,last:GROUP_SECOND,members}=group;
+    const groupLabel = FUSE_REGULAR_TRIPLES ? `regular-triple-${members.join('-')}` : FUSE_REGULAR_PAIRS ? `regular-pair-${GROUP_FIRST}-${GROUP_SECOND}` : 'regular-pair';
     const groupInput = physicalBlock(GROUP_FIRST), nextInput = physicalBlock(GROUP_SECOND + 1);
-    for(let stage=0;stage<2;stage++){
+    for(let stage=0;stage<members.length;stage++){
       for(const [label,slot,offset] of [['output',stage*2,0],['runtime-slope',stage*2,481],['fixed-line',stage*2,769],['evaluation',stage*2+1,0]]){
         reject(`${groupLabel}/stage-${stage}/${label}`,mutatePush(groupInput,slot,offset),groupInput);
       }
     }
     const first=decodeAuthenticationInstructions(inputs[groupInput].unlocking);
-    for (let stage=0;stage<2;stage++) {
-      const carrier=regularPicCarrierBlocks.indexOf(GROUP_FIRST+stage);
+    for (let stage=0;stage<members.length;stage++) {
+      const carrier=regularPicCarrierBlocks.indexOf(members[stage]);
       assert(carrier>=0, 'grouped PIC record has no window carrier');
       const window=carrier*2+1;
       const batch=picAuthBatches.find(batch=>window>=batch.firstWindow && window<batch.firstWindow+batch.windowCount);
@@ -3961,29 +3982,35 @@ if (FUSE_FINAL_PAIR) {
       reject(`${groupLabel}/stage-${stage}/PIC record`,
         mutatePush(groupInput,stage*2,pushData(first[stage*2]).length-1),owner);
     }
-    const swapped=inputs.map(input=>({...input}));
-    swapped[groupInput].unlocking=encodeAuthenticationInstructions([first[2],first[3],first[0],first[1],first[4]]);
-    reject(`${groupLabel}/swapped logical stages`,swapped,groupInput);
-    const truncated=inputs.map(input=>({...input}));
-    truncated[groupInput].unlocking=concat(encodeDataPush(pushData(first[0])),encodeDataPush(pushData(first[1])),encodeDataPush(pushData(first[2]).slice(0,-1)),encodeDataPush(pushData(first[3])),encodeDataPush(pushData(first[4])));
-    reject(`${groupLabel}/truncated second frame`,truncated,0);
-    const nonminimal=inputs.map(input=>({...input}));
-    nonminimal[groupInput].unlocking=concat(Uint8Array.of(0x4e),u32(pushData(first[0]).length),pushData(first[0]),...first.slice(1).map(instruction=>encodeAuthenticationInstructions([instruction])));
-    reject(`${groupLabel}/nonminimal first frame`,nonminimal,0);
-    const nonminimalSecond=inputs.map(input=>({...input}));
-    nonminimalSecond[groupInput].unlocking=concat(...first.slice(0,2).map(instruction=>encodeAuthenticationInstructions([instruction])),Uint8Array.of(0x4e),u32(pushData(first[2]).length),pushData(first[2]),...first.slice(3).map(instruction=>encodeAuthenticationInstructions([instruction])));
-    reject(`${groupLabel}/nonminimal second frame`,nonminimalSecond,0);
-    reject(`${groupLabel}/next-worker predecessor payload`,mutatePush(groupInput,2,0),nextInput);
-    reject(`${groupLabel}/next-worker predecessor evaluation`,mutatePush(groupInput,3,0),nextInput);
+    for(let stage=0;stage<members.length-1;stage++){
+      const swapped=inputs.map(input=>({...input})),instructions=first.slice();
+      instructions.splice(stage*2,4,...first.slice(stage*2+2,stage*2+4),...first.slice(stage*2,stage*2+2));
+      swapped[groupInput].unlocking=encodeAuthenticationInstructions(instructions);
+      reject(members.length===2?`${groupLabel}/swapped logical stages`:`${groupLabel}/swapped stages-${stage}-${stage+1}`,swapped,groupInput);
+    }
+    for(const stage of members.length===2?[1]:[0,1,2]){
+      const truncated=inputs.map(input=>({...input})),instructions=first.slice();
+      instructions[stage*2]=decodeAuthenticationInstructions(encodeDataPush(pushData(first[stage*2]).slice(0,-1)))[0];
+      truncated[groupInput].unlocking=encodeAuthenticationInstructions(instructions);
+      reject(members.length===2?`${groupLabel}/truncated second frame`:`${groupLabel}/truncated frame-${stage}`,truncated,0);
+    }
+    for(let stage=0;stage<members.length;stage++){
+      const nonminimal=inputs.map(input=>({...input}));
+      nonminimal[groupInput].unlocking=concat(...first.slice(0,stage*2).map(instruction=>encodeAuthenticationInstructions([instruction])),Uint8Array.of(0x4e),u32(pushData(first[stage*2]).length),pushData(first[stage*2]),...first.slice(stage*2+1).map(instruction=>encodeAuthenticationInstructions([instruction])));
+      reject(members.length===2?`${groupLabel}/nonminimal ${stage===0?'first':'second'} frame`:`${groupLabel}/nonminimal frame-${stage}`,nonminimal,0);
+    }
+    const lastSlot=(members.length-1)*2;
+    reject(`${groupLabel}/next-worker predecessor payload`,mutatePush(groupInput,lastSlot,0),nextInput);
+    reject(`${groupLabel}/next-worker predecessor evaluation`,mutatePush(groupInput,lastSlot+1,0),nextInput);
     const sibling=inputs.map(input=>({...input}));
     sibling[groupInput].locking=Uint8Array.from(sibling[groupInput].locking);sibling[groupInput].locking[2]^=1;
     reject(`${groupLabel}/sibling locking`,sibling,0);
   }
   const data=verificationData(inputs),wire=encodeTransactionBch(data.transaction).length;
-  const report={construction:FUSE_REGULAR_PAIRS?'native-fused-multiple-regular-and-final-pairs':FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
+  const report={construction:FUSE_REGULAR_TRIPLES?'native-fused-regular-triples-and-final-pair':FUSE_REGULAR_PAIRS?'native-fused-multiple-regular-and-final-pairs':FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
     coordinatorScheduled:SCHEDULE_COORDINATOR,
       ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
-    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_PAIRS ? {regularPairsFused:true,regularGroups} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:groupBySecond.has(index)||index===20?1:0}))} : {}),
+    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_TRIPLES ? {regularTriplesFused:true,regularGroups} : FUSE_REGULAR_PAIRS ? {regularPairsFused:true,regularGroups:regularGroups.map(({first,last,funding})=>({first,second:last,funding}))} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:frameOrdinal(index)}))} : {}),
     inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
     maximumUnlockingBytes:Math.max(...inputs.map(input=>input.unlocking.length)),
     wholeConsensus:true,wholeStandard:true,outcomes,controls,
