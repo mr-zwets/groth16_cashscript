@@ -2788,6 +2788,11 @@ const remapArithmeticRemainder = (remainder) => arithmeticNamespaceMap.size === 
   : encodeAuthenticationInstructions(remapArithmeticNamespace(
     decodeAuthenticationInstructions(remainder),
   ));
+const terminalPrimePool = process.env.RPA_TEMPLATE_TERMINAL_PRIME_POOL ?? 'off';
+assert(['off', 'on'].includes(terminalPrimePool),
+  'RPA_TEMPLATE_TERMINAL_PRIME_POOL must be off or on');
+assert(terminalPrimePool === 'off' || scheduledCompilerEntry && arithmeticLeafId === -1,
+  'terminal prime pooling requires the scheduled minus1 arithmetic profile');
 templateClasses.forEach((template) => {
   if (!templateArithmeticImports.has(template.name) && template.name !== templateArithmeticCarrier) return;
   assert(equalBytes(template.core.slice(0, templateArithmeticOriginalLength),
@@ -2861,6 +2866,22 @@ templateClasses.forEach((template) => {
         `${template.name} prime range-check replacement length changed`);
       template.core = transformed;
     }
+  }
+  if (terminalPrimePool === 'on' && template.name === 'Terminal') {
+    const instructions = decodeAuthenticationInstructions(template.core);
+    const sites = instructions.flatMap((instruction, index) =>
+      instruction.data !== undefined && equalBytes(instruction.data, selectivePrime) ? [index] : []);
+    assert(sites.length === 1 && instructions[sites[0] + 1]?.data?.length === 1 &&
+      instructions[sites[0] + 1].data[0] === 22 &&
+      instructions[sites[0] + 2]?.opcode === OpcodesBCH.OP_PICK,
+      'terminal remaining prime site changed');
+    // The exact arithmetic prefix installs -1 before this main-body constant use.
+    const primeCall = decodeAuthenticationInstructions(Uint8Array.of(0x4f, OP.INVOKE));
+    const transformed = encodeAuthenticationInstructions(instructions.flatMap((instruction, index) =>
+      index === sites[0] ? primeCall : [instruction]));
+    assert(template.core.length - transformed.length === 47,
+      'terminal prime replacement length changed');
+    template.core = transformed;
   }
   template.digest = sha256(template.core);
   template.arithmeticRemainder = template.core.slice(templateArithmeticLength);
