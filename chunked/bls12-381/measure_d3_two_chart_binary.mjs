@@ -61,6 +61,13 @@ const DEPTH = 3;
 const FUSE_FINAL_PAIR = process.env.RPA_FUSE_FINAL_PAIR === '1';
 const SCHEDULE_COORDINATOR = process.env.RPA_SCHEDULE_COORDINATOR === '1';
 const SCHEDULE_PIC_AUTH = process.env.RPA_SCHEDULE_PIC_AUTH === '1';
+// Opt-in native layout: Regular7/8 share input8; the final pair still shares its input.
+const FUSE_REGULAR_PAIR = process.env.RPA_FUSE_REGULAR_PAIR === '1';
+const GROUP_FIRST = 7, GROUP_SECOND = 8;
+const physicalInput = logicalInput => FUSE_REGULAR_PAIR
+  ? logicalInput - (logicalInput >= GROUP_SECOND + 1 ? 1 : 0) - (logicalInput === 21 ? 1 : 0)
+  : logicalInput;
+const physicalBlock = blockIndex => physicalInput(blockIndex + 1);
 const INVERSE_RELATIONS = process.env.RPA_INVERSES !== 'off';
 const SKIP_GAMMA = process.env.RPA_SKIP_GAMMA === '1';
 const PIC32_RECORDS = SKIP_GAMMA && process.env.RPA_PIC32 === '1';
@@ -1139,20 +1146,20 @@ assert(mod(quotientAccumulator * modulusAtAlpha) === evaluationSum,
 const pushHeaderLength = (payloadLength) => encodeDataPush(new Uint8Array(payloadLength)).length - payloadLength;
 const firstPushExpression = (inputIndex, payloadLength) => {
   const headerLength = pushHeaderLength(payloadLength);
-  return `tx.inputs[${inputIndex}].unlockingBytecode.split(${payloadLength + headerLength})[0]` +
+  return `tx.inputs[${physicalInput(inputIndex)}].unlockingBytecode.split(${payloadLength + headerLength})[0]` +
     `.split(${headerLength})[1]`;
 };
 const secondPushExpression = (inputIndex, firstLength, secondLength) => {
   const firstTotal = firstLength + pushHeaderLength(firstLength);
   const secondHeader = pushHeaderLength(secondLength);
-  return `tx.inputs[${inputIndex}].unlockingBytecode.split(${firstTotal})[1]` +
+  return `tx.inputs[${physicalInput(inputIndex)}].unlockingBytecode.split(${firstTotal})[1]` +
     `.split(${secondLength + secondHeader})[0].split(${secondHeader})[1]`;
 };
 const thirdPushExpression = (inputIndex, firstLength, secondLength, thirdLength) => {
   const firstTotal = firstLength + pushHeaderLength(firstLength);
   const secondTotal = secondLength + pushHeaderLength(secondLength);
   const thirdHeader = pushHeaderLength(thirdLength);
-  return `tx.inputs[${inputIndex}].unlockingBytecode.split(${firstTotal + secondTotal})[1]` +
+  return `tx.inputs[${physicalInput(inputIndex)}].unlockingBytecode.split(${firstTotal + secondTotal})[1]` +
     `.split(${thirdLength + thirdHeader})[0].split(${thirdHeader})[1]`;
 };
 const coordinatorHeaderExpression = firstPushExpression(0, transcriptHeader.length);
@@ -1298,7 +1305,7 @@ const FUSED_QUOTIENT_BLOCK_INDEX = 4;
 const FUSED_QUOTIENT_INPUT_INDEX = FUSED_QUOTIENT_BLOCK_INDEX + 1;
 const FUSED_QUOTIENT_TAIL_BLOCK_INDEX = 15;
 const FUSED_QUOTIENT_TAIL_INPUT_INDEX = FUSED_QUOTIENT_TAIL_BLOCK_INDEX + 1;
-const TEMPLATE_TOTAL_INPUTS = 1 + blockPayloads.length - (FUSE_FINAL_PAIR ? 1 : 0);
+const TEMPLATE_TOTAL_INPUTS = 1 + blockPayloads.length - (FUSE_FINAL_PAIR ? 1 : 0) - (FUSE_REGULAR_PAIR ? 1 : 0);
 const rangeLine = (name, upperBound = P) => `        require(within(${name},0,${upperBound}));`;
 const declareLimb = (lines, name, blob, offset, requireRange = true, upperBound = P) => {
   lines.push(`        int ${name} = ${limbExpression(blob, offset)};`);
@@ -1838,6 +1845,19 @@ const templateBlockSource = (record, template) => {
       '        require(blockIndex==20); require(this.activeInputIndex==20);',
       'Terminal physical input20');
   }
+  if(FUSE_REGULAR_PAIR && name==='Regular') {
+    source=replaceExactlyOnce(source,
+      'bytes fixedCommitment,int previousPayloadLength,int blockIndex,bytes evaluationBlob,bytes payload',
+      'bytes fixedCommitment,int blockIndex,bytes previousEvaluation,bytes previousPayload,bytes evaluationBlob,bytes payload',
+      'group local predecessor ABI');
+    const previous=source.match(/        int previousLength=previousPayloadLength;[\s\S]*?        bytes previousPayload = tx\.inputs\[blockIndex\][^;]*;/);
+    assert(previous,'Regular predecessor source');source=replaceExactlyOnce(source,previous[0],'','group local predecessor');
+    const evaluation=source.match(/        bytes previousEvaluation = tx\.inputs\[blockIndex\][^;]*;/);
+    assert(evaluation,'Regular predecessor evaluation');source=replaceExactlyOnce(source,evaluation[0],'','group local predecessor evaluation');
+    assert(!source.includes('previousPayloadLength'),'no old predecessor length ABI');
+    source=replaceExactlyOnce(source,'        require(this.activeInputIndex == blockIndex + 1);',
+      '        int physicalIndex=blockIndex+1; if(blockIndex>=8){physicalIndex=physicalIndex - 1;}\n        require(this.activeInputIndex==physicalIndex);','Regular physical input');
+  }
   return source;
 };
 const templateClasses = [
@@ -1919,7 +1939,7 @@ const quotientSource = (
     );
   }
   if (index === quotientPayloads.length - 1) {
-    const lastBlockInput = blockPayloads.length - (FUSE_FINAL_PAIR ? 1 : 0);
+    const lastBlockInput = blockPayloads.length - (FUSE_FINAL_PAIR && !FUSE_REGULAR_PAIR ? 1 : 0);
     lines.push(
       `        bytes finalBlockEvaluation=${secondPushExpression(
         lastBlockInput,
@@ -2071,9 +2091,11 @@ const coordinatorSource = (
         lines.push(`        if (((public0>>${shift})%256)+((public1>>${shift})%256)==0) { ${length}=${length}+32; } else { ${length}=${length}+704; }`);
       }
     }
-    lines.push(FUSE_FINAL_PAIR && index===20
-      ? '        bytes rawInput20=rawInput19.split(blockLength19+52)[1];'
-      : `        bytes rawInput${index}=tx.inputs[${index+1}].unlockingBytecode;`);
+    lines.push(FUSE_REGULAR_PAIR && index===GROUP_SECOND
+      ? `        bytes rawInput${index}=rawInput${GROUP_FIRST}.split(blockLength${GROUP_FIRST}+52)[1];`
+      : FUSE_FINAL_PAIR && index===20
+        ? '        bytes rawInput20=rawInput19.split(blockLength19+52)[1];'
+        : `        bytes rawInput${index}=tx.inputs[${physicalBlock(index)}].unlockingBytecode;`);
     lines.push(`        require(rawInput${index}.split(3)[0]==0x4d+toPaddedBytes(${length},2));`);
     lines.push(`        require(rawInput${index}.split(${length}+4)[0].split(${length}+3)[1]==0x30);`);
     lines.push(`        bytes ${variable}=rawInput${index}.split(${length}+3)[0].split(3)[1];`);
@@ -2115,7 +2137,7 @@ const coordinatorSource = (
       lines.push(
         `        require(tx.inputs[${FUSED_QUOTIENT_INPUT_INDEX}].unlockingBytecode.length==` +
           `${expectedHeadUnlockingBytes});`,
-        `        require(tx.inputs[${FUSED_QUOTIENT_TAIL_INPUT_INDEX}].unlockingBytecode.length==` +
+        `        require(tx.inputs[${physicalInput(FUSED_QUOTIENT_TAIL_INPUT_INDEX)}].unlockingBytecode.length==` +
           `${expectedTailUnlockingBytes});`,
         `        bytes ${headVariable}=${headExpression};`,
         `        require(${headVariable}.length==${fusedQuotientHeadPayload.length});`,
@@ -2182,6 +2204,11 @@ if (scheduledCompilerEntry) {
     'scheduled templates require the qualified minus1 arithmetic profile');
   assert(process.env.RESCHEDULE !== 'off', 'scheduled templates require stack scheduling');
   assert(typeof scheduledCompiler.compileString === 'function', 'template compiler entry changed');
+}
+if (FUSE_REGULAR_PAIR) {
+  assert(FUSE_FINAL_PAIR && SCHEDULE_COORDINATOR && SCHEDULE_PIC_AUTH &&
+    PIC32_RECORDS && !INVERSE_RELATIONS,
+  'Regular pair requires the qualified final-pair/PIC/coordinator profile');
 }
 const rawFunctionKey = instruction => instruction.data !== undefined
   ? hex(instruction.data) : instruction.opcode === 0 ? '' : instruction.opcode === 79 ? '81'
@@ -2381,7 +2408,13 @@ contract PicBatchAuth() {
                     +scalar1.split(window)[0].split(window - 1)[1];
                 if(priorDigits==0x0000){recordOffset=recordOffset+32;}else{recordOffset=recordOffset+704;}
             }
-            bytes record=tx.inputs[blockIndex+1].unlockingBytecode.split(recordOffset+recordLength)[0].split(recordOffset)[1];
+${FUSE_REGULAR_PAIR ? `            int physicalIndex=blockIndex+1; if(blockIndex>=8){physicalIndex=physicalIndex - 1;}
+            bytes producer=tx.inputs[physicalIndex].unlockingBytecode;
+            if(blockIndex==8){
+                int firstLength=int(producer.split(3)[0].split(1)[1]+0x00);
+                producer=producer.split(firstLength+52)[1];
+            }
+            bytes record=producer.split(recordOffset+recordLength)[0].split(recordOffset)[1];` : `            bytes record=tx.inputs[blockIndex+1].unlockingBytecode.split(recordOffset+recordLength)[0].split(recordOffset)[1];`}
             bytes root=record;
             if(!zero){
             (bytes factor,bytes path)=record.split(${PIC_FACTOR_BYTES});
@@ -2925,11 +2958,39 @@ templateClasses.forEach((template) => {
       'terminal prime replacement length changed');
     template.core = transformed;
   }
+  if(FUSE_REGULAR_PAIR && ['AdditionMiddle','Terminal'].includes(template.name)){
+    assert(template.members.every(i=>i>GROUP_SECOND),'late template map range');
+    const before=template.core,a=decodeAuthenticationInstructions(before),mapped=[];let activeSites=0,previousSites=0;
+    for(let i=0;i<a.length;i++){
+      if(a[i].opcode===OpcodesBCH.OP_INPUTBYTECODE && a[i-1]?.opcode!==OpcodesBCH.OP_0){mapped.push({opcode:0x8c});previousSites++;}
+      mapped.push(a[i]);
+      if(a[i].opcode===OpcodesBCH.OP_INPUTINDEX){mapped.push({opcode:0x8b});activeSites++;}
+    }
+    assert(activeSites===1&&previousSites===2,`${template.name} context-only index sites ${activeSites}/${previousSites}`);
+    template.core=encodeAuthenticationInstructions(mapped);
+    const restored=[];
+    for(let i=0;i<mapped.length;i++){
+      if(mapped[i].opcode===OpcodesBCH.OP_INPUTINDEX){restored.push(mapped[i]);assert(mapped[++i].opcode===0x8b,'mapped active increment');continue;}
+      if(mapped[i].opcode===0x8c && mapped[i+1]?.opcode===OpcodesBCH.OP_INPUTBYTECODE)continue;
+      restored.push(mapped[i]);
+    }
+    assert(equalBytes(encodeAuthenticationInstructions(restored),before),`${template.name} context map inverse`);
+  }
   template.digest = sha256(template.core);
   template.arithmeticRemainder = template.core.slice(templateArithmeticLength);
 });
 const templateForBlock = (index) => templateClasses.find(({ members }) => members.includes(index));
-const templateConfig = (record, index) => concat(
+// Return the exact preceding logical payload/evaluation; canonical framing is
+// independently enforced for every logical leaf by the committing coordinator.
+const loadPredecessor = previousBlock => concat(
+  pushVmNumber(physicalBlock(previousBlock)),Uint8Array.of(OP.INPUTBYTECODE),
+  ...(previousBlock===GROUP_SECOND ? [Uint8Array.from(Buffer.from('76537f75517f7701007e810134937f77','hex'))] : []),
+  Uint8Array.from(Buffer.from('76537f75517f7701007e8153937f7c537f777c517f7701307f75','hex')),
+);
+const templateConfig = (record,index) => FUSE_REGULAR_PAIR && templateForBlock(index).name==='Regular' ? concat(
+  ...(index===GROUP_SECOND ? [Uint8Array.of(OP.FROMALTSTACK,OP.FROMALTSTACK)] : [loadPredecessor(index-1)]),
+  pushVmNumber(index),encodeDataPush(record.fixedCommitment),pushVmNumber(TEMPLATE_FUNCTION_ID),Uint8Array.of(OP.INVOKE),
+) : concat(
   pushVmNumber(index),
   pushVmNumber(index === 0 ? 0 : blockRecords[index - 1].payload.length),
   encodeDataPush(record.fixedCommitment),
@@ -3013,12 +3074,12 @@ for (let payloadLength = 0;
 assert(templateTerminalDensityPadding.length === templateTerminalDensityPaddingBytes,
   'Terminal template density padding cannot be encoded');
 const loadTemplateBody = (carrier, carrierRedeemLength, start, end, functionId) => concat(
-  pushVmNumber(carrier.representative + 1),
+  pushVmNumber(physicalBlock(carrier.representative)),
   Uint8Array.of(OP.INPUTBYTECODE, OP.SIZE),
   pushVmNumber(carrierRedeemLength),
   Uint8Array.of(OP.SUB, OP.SPLIT, OP.NIP),
   sliceTopBytes(start, end),
-  pushVmNumber(functionId),
+  encodeDataPush(bigIntToVmNumber(BigInt(functionId))),
   Uint8Array.of(OP.DEFINE),
 );
 let templateCarrierLengths = new Map([
@@ -3084,9 +3145,22 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
         Uint8Array.of(OP.INVOKE),
         template.arithmeticRemainder,
       );
+      if(FUSE_REGULAR_PAIR && template.name==='Regular'){
+        const remainder=decodeAuthenticationInstructions(template.arithmeticRemainder);let end=0;
+        while(end+2<remainder.length && remainder[end+2].opcode===OP.DEFINE){assert(remainder[end].data!==undefined,'literal Regular initializer');end+=3;}
+        const main=encodeAuthenticationInstructions(remainder.slice(end));
+        template.regularInitializer=template.core.slice(0,template.core.length-main.length);
+        template.core=main;
+      }
       template.digest = sha256(template.core);
     }
     const definitions = [];
+    if(FUSE_REGULAR_PAIR && template.name==='Regular'){
+      const bodyPush=encodeDataPush(template.regularInitializer),key=encodeDataPush(bigIntToVmNumber(-300n));
+      template.regularInitializerStart=bodyPush.length-template.regularInitializer.length;
+      template.regularInitializerEnd=bodyPush.length;
+      definitions.push(concat(bodyPush,key,Uint8Array.of(OP.DEFINE),key,Uint8Array.of(OP.INVOKE)));
+    }
     if (template === templateCommonCarrier) {
       definitions.push(concat(
         templateCommonBodyPush,
@@ -3175,10 +3249,17 @@ const templateBlockRedeems = blockRecords.map((record, index) => {
   const representativeRedeem = template.representativeRedeem;
   const coreStart = template.coreStart;
   const coreEnd = coreStart + template.core.length;
-  const redeem = concat(
+  const redeem = FUSE_REGULAR_PAIR && template.name==='Regular' ? concat(
+    pushVmNumber(physicalBlock(template.representative)),Uint8Array.of(OP.INPUTBYTECODE,OP.SIZE),
+    pushVmNumber(representativeRedeem.length),Uint8Array.of(OP.SUB,OP.SPLIT,OP.NIP,OP.DUP),
+    sliceTopBytes(template.regularInitializerStart,template.regularInitializerEnd),
+    encodeDataPush(bigIntToVmNumber(-300n)),Uint8Array.of(OP.DEFINE),encodeDataPush(bigIntToVmNumber(-300n)),Uint8Array.of(OP.INVOKE),
+    sliceTopBytes(coreStart,coreEnd),pushVmNumber(TEMPLATE_FUNCTION_ID),Uint8Array.of(OP.DEFINE),
+    templateConfig(record,index),
+  ) : concat(
     ...(templateCommonOffsets.has(template.name) ? [loadTemplateCommonBody(template)] : []),
     ...(templateExtraOffsets.has(template.name) ? [loadTemplateExtraBody()] : []),
-    pushVmNumber(template.representative + 1),
+    pushVmNumber(physicalBlock(template.representative)),
     Uint8Array.of(OP.INPUTBYTECODE),
     Uint8Array.of(OP.SIZE),
     pushVmNumber(representativeRedeem.length),
@@ -3208,6 +3289,10 @@ const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_
     ? '{"3":370,"5":356,"6":311,"7":318,"8":301,"9":307,"10":309,"11":317,"12":312,"13":318,"14":320,"16":343,"17":315,"18":316,"19":324}'
     : '{"3":436,"5":423,"6":377,"7":385,"8":369,"9":376,"10":377,"11":386,"12":377,"13":386,"14":388,"16":411,"17":383,"18":384,"19":393}'));
 if (FUSE_FINAL_PAIR) compactRegularDensityPadding['19'] = 0;
+if (FUSE_REGULAR_PAIR) {
+  compactRegularDensityPadding[String(GROUP_FIRST)] = 0;
+  compactRegularDensityPadding[String(GROUP_SECOND)] = 0;
+}
 Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   const index = Number(block);
   assert(Number.isInteger(index) && String(index) === block && index !== 2 &&
@@ -3239,10 +3324,10 @@ if (arithmeticLeafId === -1) {
   const restoreQuotientIdentity=bytecode=>{
     const instructions=decodeAuthenticationInstructions(bytecode);let inputSites=0,countSites=0;
     const restored=instructions.map((instruction,index)=>{
-      if(instructions[index+1]?.opcode===OP.INPUTBYTECODE && instruction.data?.length===1 && instruction.data[0]===20){
+      if(instructions[index+1]?.opcode===OP.INPUTBYTECODE && instruction.data?.length===1 && instruction.data[0]===(FUSE_REGULAR_PAIR?19:20)){
         inputSites+=1; return decodeAuthenticationInstructions(pushVmNumber(21))[0];
       }
-      if(instructions[index-1]?.opcode===OpcodesBCH.OP_TXINPUTCOUNT && instruction.data?.length===1 && instruction.data[0]===21){
+      if(instructions[index-1]?.opcode===OpcodesBCH.OP_TXINPUTCOUNT && instruction.data?.length===1 && instruction.data[0]===(FUSE_REGULAR_PAIR?20:21)){
         countSites+=1; return decodeAuthenticationInstructions(pushVmNumber(22))[0];
       }
       return instruction;
@@ -3251,7 +3336,7 @@ if (arithmeticLeafId === -1) {
     return encodeAuthenticationInstructions(restored);
   };
   const fixedFinalEvaluation = Uint8Array.from(Buffer.from(
-    (FUSE_FINAL_PAIR ? '0114ca' : '0115ca') + '0244057f7701317f75517f7701307f7501007e81', 'hex',
+    (FUSE_FINAL_PAIR ? (FUSE_REGULAR_PAIR ? '0113ca' : '0114ca') : '0115ca') + '0244057f7701317f75517f7701307f7501007e81', 'hex',
   ));
   const offset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(fixedFinalEvaluation));
   const boundaries = new Set([0]);
@@ -3333,7 +3418,7 @@ if (arithmeticLeafId === -1) {
 }
 if (FUSE_FINAL_PAIR) {
   const mixedFinalRead = Uint8Array.from(Buffer.from(
-    '0114ca0244057f7701317f75517f7701007e81', 'hex',
+    (FUSE_REGULAR_PAIR ? '0113ca' : '0114ca') + '0244057f7701317f75517f7701007e81', 'hex',
   ));
   const offset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(mixedFinalRead));
   assert(offset >= 0 &&
@@ -3365,7 +3450,7 @@ const fusedQuotientTailStart = encodeDataPush(
   fusedQuotientTailPayload.length);
 const fusedQuotientTailEnd = fusedQuotientTailStart + fusedQuotientTailPayload.length;
 const fusedQuotientTailLoader = concat(
-  pushVmNumber(FUSED_QUOTIENT_TAIL_INPUT_INDEX),
+  pushVmNumber(physicalInput(FUSED_QUOTIENT_TAIL_INPUT_INDEX)),
   Uint8Array.of(OP.INPUTBYTECODE),
   sliceTopBytes(fusedQuotientTailStart, fusedQuotientTailEnd),
 );
@@ -3521,8 +3606,25 @@ const mixedRedeem = FUSE_FINAL_PAIR ? concat(
   Uint8Array.of(OP.VERIFY), templateBlockRedeems[20],
 ) : null;
 if (FUSE_FINAL_PAIR) templateBlockRedeems[19] = mixedRedeem;
+let groupFundingBytes = 0, groupedRegularRedeem;
+if (FUSE_REGULAR_PAIR) {
+  groupFundingBytes=Number(process.env.RPA_GROUP_DENSITY_PADDING ?? 0);
+  assert(Number.isInteger(groupFundingBytes)&&groupFundingBytes>=0&&groupFundingBytes<=1000,'group funding range');
+  let groupFunding=new Uint8Array();
+  if(groupFundingBytes>=260)groupFunding=concat(encodeDataPush(new Uint8Array(groupFundingBytes-4)),Uint8Array.of(OP.DROP));
+  while(groupFunding.length<groupFundingBytes){
+    const remaining=groupFundingBytes-groupFunding.length;assert(remaining>=2,'one-byte group funding tail');
+    const n=Math.min(remaining===77?75:76,remaining);groupFunding=concat(groupFunding,encodeDataPush(new Uint8Array(n-2)),Uint8Array.of(OP.DROP));
+  }
+  assert(groupFunding.length===groupFundingBytes,'group funding byte count');
+  groupedRegularRedeem=concat(groupFunding,
+    Uint8Array.of(0x72,0x6e,OP.TOALTSTACK,OP.TOALTSTACK),
+    templateBlockRedeems[GROUP_FIRST],Uint8Array.of(OP.VERIFY),templateConfig(blockRecords[GROUP_SECOND],GROUP_SECOND),
+  );
+  templateBlockRedeems[GROUP_FIRST]=groupedRegularRedeem;
+}
 const templateSiblingLockings = templateBlockRedeems.filter(
-  (_, index) => !FUSE_FINAL_PAIR || index !== 20,
+  (_, index) => (!FUSE_REGULAR_PAIR || index !== GROUP_SECOND) && (!FUSE_FINAL_PAIR || index !== 20),
 ).map(
   (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)),
 );
@@ -3690,13 +3792,19 @@ const makeTemplateInputs = () => {
       unlocking: makeTemplateBlockUnlocking(payload, evaluation, quotientChunk, redeem),
     };
   })];
+  if (FUSE_REGULAR_PAIR) {
+    logicalInputs[GROUP_FIRST+1].unlocking=concat(
+      encodeDataPush(blockPayloads[GROUP_FIRST]),encodeDataPush(blockEvaluationPayloads[GROUP_FIRST]),
+      encodeDataPush(blockPayloads[GROUP_SECOND]),encodeDataPush(blockEvaluationPayloads[GROUP_SECOND]),encodeDataPush(groupedRegularRedeem),
+    );
+  }
   if (!FUSE_FINAL_PAIR) return logicalInputs;
   logicalInputs[20].unlocking = concat(
     encodeDataPush(blockPayloads[19]), encodeDataPush(blockEvaluationPayloads[19]),
     encodeDataPush(blockPayloads[20]), encodeDataPush(blockEvaluationPayloads[20]),
     encodeDataPush(mixedRedeem),
   );
-  return logicalInputs.slice(0, 21);
+  return logicalInputs.slice(0, 21).filter((_, index) => !FUSE_REGULAR_PAIR || index !== GROUP_SECOND + 1);
 };
 
 const verificationData = (inputs) => {
@@ -3741,6 +3849,7 @@ const evaluateInput = (inputs, inputIndex, vm) => {
 // preliminary strict input/whole-transaction gates to that same constructor.
 if (FUSE_FINAL_PAIR) {
   const inputs = makeTemplateInputs();
+  const finalInput = inputs.length - 1;
   const grade = (changed, target, vm) => {
     const own = evaluateInput(changed, target, vm);
     return {accepted:own.accepted,error:own.error,
@@ -3769,8 +3878,13 @@ if (FUSE_FINAL_PAIR) {
     changed[inputIndex].unlocking=encodeAuthenticationInstructions(instructions);
     return changed;
   };
-  const controls=[];
+  const controls=[], rejectionPatches=[];
   const reject = (label,changed,target) => {
+    if (FUSE_REGULAR_PAIR && process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1') {
+      rejectionPatches.push({label,target,inputs:changed.flatMap((input,index)=>
+        equalBytes(input.locking,inputs[index].locking) && equalBytes(input.unlocking,inputs[index].unlocking)
+          ? [] : [{index,locking:hex(input.locking),unlocking:hex(input.unlocking)}])});
+    }
     for(const [mode,vm] of [['consensus',consensusVm],['standard',standardVm]]){
       const result=grade(changed,target,vm);
       assert(!result.accepted&&!result.wholeAccepted,`${mode} accepted fused control ${label}`);
@@ -3779,31 +3893,69 @@ if (FUSE_FINAL_PAIR) {
   };
   for(let stage=0;stage<2;stage++){
     for(const [label,slot,offset] of [['output',stage*2,0],['runtime-slope',stage*2,481],['fixed-line',stage*2,769],['evaluation',stage*2+1,0]]){
-      reject(`stage-${stage}/${label}`,mutatePush(20,slot,offset),20);
+      reject(`stage-${stage}/${label}`,mutatePush(finalInput,slot,offset),finalInput);
     }
   }
-  const first=decodeAuthenticationInstructions(inputs[20].unlocking);
-  reject('PIC record',mutatePush(20,0,pushData(first[0]).length-1),20);
+  const first=decodeAuthenticationInstructions(inputs[finalInput].unlocking);
+  reject('PIC record',mutatePush(finalInput,0,pushData(first[0]).length-1),finalInput);
   const swapped=inputs.map(input=>({...input}));
-  swapped[20].unlocking=encodeAuthenticationInstructions([first[2],first[3],first[0],first[1],first[4]]);
-  reject('swapped logical stages',swapped,20);
+  swapped[finalInput].unlocking=encodeAuthenticationInstructions([first[2],first[3],first[0],first[1],first[4]]);
+  reject('swapped logical stages',swapped,finalInput);
   const truncated=inputs.map(input=>({...input}));
-  truncated[20].unlocking=concat(encodeDataPush(pushData(first[0])),encodeDataPush(pushData(first[1])),encodeDataPush(pushData(first[2]).slice(0,-1)),encodeDataPush(pushData(first[3])),encodeDataPush(pushData(first[4])));
+  truncated[finalInput].unlocking=concat(encodeDataPush(pushData(first[0])),encodeDataPush(pushData(first[1])),encodeDataPush(pushData(first[2]).slice(0,-1)),encodeDataPush(pushData(first[3])),encodeDataPush(pushData(first[4])));
   reject('truncated second frame',truncated,0);
   const nonminimal=inputs.map(input=>({...input}));
-  nonminimal[20].unlocking=concat(Uint8Array.of(0x4e),u32(pushData(first[0]).length),pushData(first[0]),...first.slice(1).map(instruction=>encodeAuthenticationInstructions([instruction])));
+  nonminimal[finalInput].unlocking=concat(Uint8Array.of(0x4e),u32(pushData(first[0]).length),pushData(first[0]),...first.slice(1).map(instruction=>encodeAuthenticationInstructions([instruction])));
   reject('nonminimal first frame',nonminimal,0);
   reject('public input',mutatePush(0,1,193),0);
   reject('commitment root',mutatePush(0,0,0),0);
   reject('quotient head',mutatePush(5,2,0),5);
-  reject('quotient tail',mutatePush(16,2,0),5);
+  reject('quotient tail',mutatePush(physicalInput(FUSED_QUOTIENT_TAIL_INPUT_INDEX),2,0),5);
   const changedLocking=inputs.map(input=>({...input}));
-  changedLocking[20].locking=Uint8Array.from(changedLocking[20].locking);changedLocking[20].locking[2]^=1;
+  changedLocking[finalInput].locking=Uint8Array.from(changedLocking[finalInput].locking);changedLocking[finalInput].locking[2]^=1;
   reject('sibling locking',changedLocking,0);
+  if (FUSE_REGULAR_PAIR) {
+    const groupInput = physicalBlock(GROUP_FIRST), nextInput = physicalBlock(GROUP_SECOND + 1);
+    for(let stage=0;stage<2;stage++){
+      for(const [label,slot,offset] of [['output',stage*2,0],['runtime-slope',stage*2,481],['fixed-line',stage*2,769],['evaluation',stage*2+1,0]]){
+        reject(`regular-pair/stage-${stage}/${label}`,mutatePush(groupInput,slot,offset),groupInput);
+      }
+    }
+    const first=decodeAuthenticationInstructions(inputs[groupInput].unlocking);
+    for (let stage=0;stage<2;stage++) {
+      const carrier=regularPicCarrierBlocks.indexOf(GROUP_FIRST+stage);
+      assert(carrier>=0, 'grouped PIC record has no window carrier');
+      const window=carrier*2+1;
+      const batch=picAuthBatches.find(batch=>window>=batch.firstWindow && window<batch.firstWindow+batch.windowCount);
+      assert(batch && (batch.host==='coordinator' || /^block-\d+$/.test(batch.host)),
+        'grouped PIC record has no authentication owner');
+      const owner=batch.host==='coordinator'?0:physicalBlock(Number(batch.host.slice(6)));
+      reject(`regular-pair/stage-${stage}/PIC record`,
+        mutatePush(groupInput,stage*2,pushData(first[stage*2]).length-1),owner);
+    }
+    const swapped=inputs.map(input=>({...input}));
+    swapped[groupInput].unlocking=encodeAuthenticationInstructions([first[2],first[3],first[0],first[1],first[4]]);
+    reject('regular-pair/swapped logical stages',swapped,groupInput);
+    const truncated=inputs.map(input=>({...input}));
+    truncated[groupInput].unlocking=concat(encodeDataPush(pushData(first[0])),encodeDataPush(pushData(first[1])),encodeDataPush(pushData(first[2]).slice(0,-1)),encodeDataPush(pushData(first[3])),encodeDataPush(pushData(first[4])));
+    reject('regular-pair/truncated second frame',truncated,0);
+    const nonminimal=inputs.map(input=>({...input}));
+    nonminimal[groupInput].unlocking=concat(Uint8Array.of(0x4e),u32(pushData(first[0]).length),pushData(first[0]),...first.slice(1).map(instruction=>encodeAuthenticationInstructions([instruction])));
+    reject('regular-pair/nonminimal first frame',nonminimal,0);
+    const nonminimalSecond=inputs.map(input=>({...input}));
+    nonminimalSecond[groupInput].unlocking=concat(...first.slice(0,2).map(instruction=>encodeAuthenticationInstructions([instruction])),Uint8Array.of(0x4e),u32(pushData(first[2]).length),pushData(first[2]),...first.slice(3).map(instruction=>encodeAuthenticationInstructions([instruction])));
+    reject('regular-pair/nonminimal second frame',nonminimalSecond,0);
+    reject('regular-pair/next-worker predecessor payload',mutatePush(groupInput,2,0),nextInput);
+    reject('regular-pair/next-worker predecessor evaluation',mutatePush(groupInput,3,0),nextInput);
+    const sibling=inputs.map(input=>({...input}));
+    sibling[groupInput].locking=Uint8Array.from(sibling[groupInput].locking);sibling[groupInput].locking[2]^=1;
+    reject('regular-pair/sibling locking',sibling,0);
+  }
   const data=verificationData(inputs),wire=encodeTransactionBch(data.transaction).length;
-  const report={construction:'native-fused-final-pair',fixture:activeFixtureName,
+  const report={construction:FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
     coordinatorScheduled:SCHEDULE_COORDINATOR,
       ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
+    ...(FUSE_REGULAR_PAIR ? {regularPairFused:true,groupFundingBytes,regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:[GROUP_SECOND,20].includes(index)?1:0}))} : {}),
     inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
     maximumUnlockingBytes:Math.max(...inputs.map(input=>input.unlocking.length)),
     wholeConsensus:true,wholeStandard:true,outcomes,controls,
