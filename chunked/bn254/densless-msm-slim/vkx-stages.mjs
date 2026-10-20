@@ -59,7 +59,7 @@ ${straus('from', 'to', packedDigits)}
 `;
 
 // Carried pushes (bottom to top): n1, n0, zInv, st.
-export const sourceFinal = ({ from, genIdx = 3, packedDigits = false, glvComponents = false }) => `pragma cashscript ^0.14.0;
+export const sourceFinal = ({ from, genIdx = 3, packedDigits = false, glvComponents = false, glvPairs = false }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmFinal() {
     function spend(bytes st, int zInv, int n0, int n1) {
@@ -74,7 +74,17 @@ ${straus(from, 64, packedDigits)}
         require(g.split(3)[0] == 0x4dc001);
         require((rX * zi2) % ${P} == int(g.split(163)[0].split(131)[1]));
         require((rY * (zi2 * zInv % ${P})) % ${P} == int(g.split(195)[0].split(163)[1]));
-${glvComponents ? `        // Four packed components keep low/high binary halves at offsets 0 and 64.
+${glvComponents ? glvPairs ? `        // Each accumulator packs two unsigned 128-bit components.
+        // After t<=64 steps each low/high half has at most t bits; no carry crosses a lane.
+        int k01=0; int k23=0;
+        for (int t=0; t<64; t=t+1) {
+            int b=(digitWord>>(t*8))%256;
+            int lo=b%16; int hi=b/16;
+            k01=2*k01+lo%2+((hi%2)<<64)+((lo/2%2+((hi/2%2)<<64))<<128);
+            k23=2*k23+lo/4%2+((hi/4%2)<<64)+((lo/8+((hi/8)<<64))<<128);
+        }
+        require((k01+${BigInt(LAM)-(1n<<128n)}*(k01>>128))%${R}==n0);
+        require((k23+${BigInt(LAM)-(1n<<128n)}*(k23>>128))%${R}==n1);` : `        // Four packed components keep low/high binary halves at offsets 0 and 64.
         // The low half has at most t bits after t<=64 iterations, so no carry crosses bit64.
         int k0=0; int k1=0; int k2=0; int k3=0;
         for (int t=0; t<64; t=t+1) {

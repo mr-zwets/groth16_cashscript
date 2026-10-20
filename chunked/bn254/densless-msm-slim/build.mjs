@@ -96,6 +96,8 @@ const msmCompilerEntry = process.env.MSM_CASHC;
 const msmConstantHoisting = process.env.MSM_CONSTANT_HOISTING ?? 'off';
 const packedDigits = process.env.MSM_PACKED_DIGITS === '1';
 const glvComponents = process.env.MSM_GLV_COMPONENTS === '1';
+const glvPairs = process.env.MSM_GLV_PAIRS === '1';
+assert(!glvPairs || glvComponents, 'GLV pairs require packed GLV components');
 assert(!glvComponents || packedDigits, 'GLV components require packed MSM digits');
 assert(!packedDigits || msmCompilerEntry && msmConstantHoisting === 'all',
   'packed MSM digits require the qualified hoisted compiler profile');
@@ -610,7 +612,7 @@ function buildWith({backExec, backTerminal}) {
   constants.workerLockingRoot = hash256(Buffer.concat(workerLockings.map(hash256)));
   // terminal: the densless terminal, then the final MSM stage on its parked pushes (zInv, state)
   ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminalWithLayout, constants, extraNumbers));
-  programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3], packedDigits, glvComponents})), definitions, programs.msmA.length);
+  programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3], packedDigits, glvComponents, glvPairs})), definitions, programs.msmA.length);
   if (msmConstantHoisting === 'off') programs.msmFinal = compactInverseCopy(programs.msmFinal);
   programs.msmFinal = reuseFinalPrimeCalls(programs.msmFinal);
   programs.msmFinal = reuseTerminalScalarOrder(programs.msmFinal);
