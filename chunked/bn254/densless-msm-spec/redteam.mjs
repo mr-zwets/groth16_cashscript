@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync, writeFileSync} from 'node:fs';
-import {bigIntToVmNumber, decodeAuthenticationInstructions, encodeDataPush} from '@bitauth/libauth';
+import {bigIntToVmNumber, decodeAuthenticationInstructions, encodeDataPush, OpcodesBCH} from '@bitauth/libauth';
 import {build} from './build.mjs';
 import {witness as msmWitness, P} from '../pairfold5-msm/vkx-msm-asm.mjs';
 
@@ -20,7 +20,12 @@ const num = (x) => Buffer.from(bigIntToVmNumber(x));
 const [n0, n1] = fixtures.fixtures[0].publicInputs.map(BigInt);
 const R = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 
-const pushes = decodeAuthenticationInstructions(Buffer.from(steps[3].unlocking, 'hex')).map((x) => Buffer.from(x.data ?? []));
+// decodeAuthenticationInstructions attaches no data to the number opcodes (OP_1NEGATE,
+// OP_1..OP_16); recover the pushed byte from the opcode so re-encoding round-trips.
+const numberPushData = (opcode) => opcode === OpcodesBCH.OP_1NEGATE ? Buffer.from([0x81])
+  : opcode >= OpcodesBCH.OP_1 && opcode <= OpcodesBCH.OP_16 ? Buffer.from([opcode - OpcodesBCH.OP_1 + 1])
+  : undefined;
+const pushes = decodeAuthenticationInstructions(Buffer.from(steps[3].unlocking, 'hex')).map((x) => Buffer.from(x.data ?? numberPushData(x.opcode) ?? []));
 assert.equal(pushes.length, 25, 'unexpected genesis layout');
 const genesisWith = ({push0 = pushes[0], pad = Buffer.alloc(0), zInv, w, c1, c0}) =>
   Buffer.concat([push0, ...pushes.slice(1, 19), pad, num(zInv), w, num(c1), num(c0), program.redeems[3]].map(enc)).toString('hex');
