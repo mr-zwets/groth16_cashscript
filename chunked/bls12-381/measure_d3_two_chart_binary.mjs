@@ -59,6 +59,7 @@ const W = 48;
 const DEPTH = 3;
 // Opt-in native point: Regular19 and Terminal20 share one physical input.
 const FUSE_FINAL_PAIR = process.env.RPA_FUSE_FINAL_PAIR === '1';
+const SCHEDULE_COORDINATOR = process.env.RPA_SCHEDULE_COORDINATOR === '1';
 const INVERSE_RELATIONS = process.env.RPA_INVERSES !== 'off';
 const SKIP_GAMMA = process.env.RPA_SKIP_GAMMA === '1';
 const PIC32_RECORDS = SKIP_GAMMA && process.env.RPA_PIC32 === '1';
@@ -2168,6 +2169,9 @@ const scheduledCompilerEntry = process.env.RPA_TEMPLATE_CASHC;
 const scheduledCompiler = scheduledCompilerEntry
   ? await import(pathToFileURL(scheduledCompilerEntry).href) : null;
 const arithmeticCompiler = scheduledCompilerEntry ? await import('cashc') : null;
+if (SCHEDULE_COORDINATOR) {
+  assert(scheduledCompilerEntry, 'coordinator scheduling requires RPA_TEMPLATE_CASHC');
+}
 if (FUSE_FINAL_PAIR) {
   assert(scheduledCompilerEntry && arithmeticProfileKey === '-1',
     'final-pair fusion requires the scheduled minus1 arithmetic profile');
@@ -2178,30 +2182,29 @@ if (scheduledCompilerEntry) {
   assert(process.env.RESCHEDULE !== 'off', 'scheduled templates require stack scheduling');
   assert(typeof scheduledCompiler.compileString === 'function', 'template compiler entry changed');
 }
-const compileScheduledTemplate = (source, original) => {
-  if (scheduledCompiler === null) return original;
-  const baseline = arithmeticCompiler.compileString(source, {rescheduleStacks: true});
+const rawFunctionKey = instruction => instruction.data !== undefined
+  ? hex(instruction.data) : instruction.opcode === 0 ? '' : instruction.opcode === 79 ? '81'
+    : instruction.opcode >= 81 && instruction.opcode <= 96
+      ? (instruction.opcode - 80).toString(16).padStart(2, '0') : undefined;
+const functionKey = id => hex(bigIntToVmNumber(BigInt(id)));
+const compileScheduledSource = (source, original, compilerOptions = {}) => {
+  const baseline = arithmeticCompiler.compileString(source, {rescheduleStacks: true, ...compilerOptions});
   assert(equalBytes(Uint8Array.from(Buffer.from(baseline.debug.bytecode, 'hex')), original),
-    'arithmetic compiler differs from the original template compiler');
+    'baseline compiler differs from the original source compiler');
   const candidate = scheduledCompiler.compileString(source, {
-    rescheduleStacks: true, renumberFunctionIds: false,
+    rescheduleStacks: true, renumberFunctionIds: false, ...compilerOptions,
   });
   const declared = artifact => artifact.debug.functions.filter(fn => Number.isInteger(fn.id));
   const oldFunctions = declared(baseline), newFunctions = declared(candidate);
   const oldByName = new Map(oldFunctions.map(fn => [fn.name, fn]));
   assert(oldByName.size === oldFunctions.length && newFunctions.length === oldFunctions.length,
-    'scheduled template declaration set changed');
-  const rawKey = instruction => instruction.data !== undefined
-    ? hex(instruction.data) : instruction.opcode === 0 ? '' : instruction.opcode === 79 ? '81'
-      : instruction.opcode >= 81 && instruction.opcode <= 96
-        ? (instruction.opcode - 80).toString(16).padStart(2, '0') : undefined;
-  const keyFor = id => hex(bigIntToVmNumber(BigInt(id)));
+    'scheduled source declaration set changed');
   const mapping = new Map();
   newFunctions.forEach(fn => {
     const old = oldByName.get(fn.name);
     assert(old && JSON.stringify(fn.inputs) === JSON.stringify(old.inputs),
-      `scheduled template declaration interface changed: ${fn.name}`);
-    mapping.set(keyFor(fn.id), old.id);
+      `scheduled source declaration interface changed: ${fn.name}`);
+    mapping.set(functionKey(fn.id), old.id);
   });
   assert(mapping.size === oldFunctions.length, 'scheduled function identifiers are not unique');
   const rename = (bytecode, ids) => {
@@ -2209,31 +2212,36 @@ const compileScheduledTemplate = (source, original) => {
     for (let index = 0; index < instructions.length; index += 1) {
       const opcode = instructions[index].opcode;
       if (opcode !== OpcodesBCH.OP_DEFINE && opcode !== OpcodesBCH.OP_INVOKE) continue;
-      assert(index > 0 && ids.has(rawKey(instructions[index - 1])),
-        'scheduled template contains a nonliteral or unknown function key');
+      assert(index > 0 && ids.has(rawFunctionKey(instructions[index - 1])),
+        'scheduled source contains a nonliteral or unknown function key');
       if (opcode === OpcodesBCH.OP_DEFINE) {
         assert(index >= 2 && instructions[index - 2].data !== undefined,
-          'scheduled template definition is not literal');
+          'scheduled source definition is not literal');
         instructions[index - 2] = decodeAuthenticationInstructions(encodeDataPush(
           rename(instructions[index - 2].data, ids),
         ))[0];
       }
       instructions[index - 1] = decodeAuthenticationInstructions(encodeDataPush(
-        bigIntToVmNumber(BigInt(ids.get(rawKey(instructions[index - 1])))),
+        bigIntToVmNumber(BigInt(ids.get(rawFunctionKey(instructions[index - 1])))),
       ))[0];
     }
     return encodeAuthenticationInstructions(instructions);
   };
   const next = Uint8Array.from(Buffer.from(candidate.debug.bytecode, 'hex'));
   const renamed = rename(next, mapping);
-  const inverse = new Map(newFunctions.map(fn => [keyFor(oldByName.get(fn.name).id), fn.id]));
+  const inverse = new Map(newFunctions.map(fn => [functionKey(oldByName.get(fn.name).id), fn.id]));
   assert(equalBytes(rename(renamed, inverse), next), 'scheduled namespace inverse changed');
+  return {renamed, oldFunctions};
+};
+const compileScheduledTemplate = (source, original) => {
+  if (scheduledCompiler === null) return original;
+  const {renamed, oldFunctions} = compileScheduledSource(source, original);
   const before = decodeAuthenticationInstructions(original);
   const after = decodeAuthenticationInstructions(renamed);
   const definitions = [];
   let end = 0;
   while (end + 2 < after.length && after[end + 2].opcode === OpcodesBCH.OP_DEFINE) {
-    const id = oldFunctions.find(fn => keyFor(fn.id) === rawKey(after[end + 1]))?.id;
+    const id = oldFunctions.find(fn => functionKey(fn.id) === rawFunctionKey(after[end + 1]))?.id;
     assert(Number.isInteger(id), 'scheduled definition owner missing');
     definitions.push({id, instructions: after.slice(end, end + 3)});
     end += 3;
@@ -3502,16 +3510,24 @@ const templateSiblingLockings = templateBlockRedeems.filter(
   (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)),
 );
 const templateSiblingLockingDigest = sha256(concat(...templateSiblingLockings));
+const templateCoordinatorSource = coordinatorSource(
+  templateSiblingLockingDigest,
+  true,
+  TEMPLATE_TOTAL_INPUTS,
+  true,
+);
 let templateCoordinatorCore = compileNamed(
-  coordinatorSource(
-    templateSiblingLockingDigest,
-    true,
-    TEMPLATE_TOTAL_INPUTS,
-    true,
-  ),
+  templateCoordinatorSource,
   'template coordinator',
   { optimizeFor: 'size' },
 );
+if (SCHEDULE_COORDINATOR) {
+  // This core owns its arithmetic helpers; only their private identifiers need
+  // the same declaration/ABI mapping used by the scheduled template mains.
+  templateCoordinatorCore = compileScheduledSource(
+    templateCoordinatorSource, templateCoordinatorCore, {optimizeFor: 'size'},
+  ).renamed;
+}
 if (arithmeticLeafId === -1) {
   let primeSites = 0;
   const poolCoordinatorPrime = (instructions) => instructions.map((instruction, index) => {
@@ -3769,6 +3785,7 @@ if (FUSE_FINAL_PAIR) {
   reject('sibling locking',changedLocking,0);
   const data=verificationData(inputs),wire=encodeTransactionBch(data.transaction).length;
   const report={construction:'native-fused-final-pair',fixture:activeFixtureName,
+    coordinatorScheduled:SCHEDULE_COORDINATOR,
     inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
     maximumUnlockingBytes:Math.max(...inputs.map(input=>input.unlocking.length)),
     wholeConsensus:true,wholeStandard:true,outcomes,controls,
@@ -5088,6 +5105,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
   };
   writeFileSync(1, `${JSON.stringify({
     construction: 'atomic-validation-hoist-plus-five-exact-unrolled-classes',
+    coordinatorScheduled: SCHEDULE_COORDINATOR,
     fixture: activeFixtureName,
     cacheFixture: activeFixture.cacheName,
     publicInputs: activePublicInputs.map(String),
