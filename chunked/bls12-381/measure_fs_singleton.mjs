@@ -56,7 +56,8 @@ import {
 // This file is a derived single-script variant of measure_d3_two_chart_binary.mjs:
 // lines above/below the appended "FS singleton" section are the unmodified shared
 // prelude of that source (same trace, payloads, relations, and transcript).
-const { fileURLToPath: fsFileURLToPath } = await import('node:url');
+const { fileURLToPath: fsFileURLToPath, pathToFileURL: fsPathToFileURL } =
+  await import('node:url');
 process.env.RPA_INVERSES = 'off';
 process.env.RPA_SKIP_GAMMA = '1';
 process.env.RPA_PIC32 = '1';
@@ -1119,6 +1120,7 @@ const COMMON_SOURCE = `pragma cashscript ^0.14.0;
 function mAdd(int x, int y) returns (int) { return (x + y) % ${P}; }
 function mSub(int x, int y) returns (int) { return (x - y + ${P}) % ${P}; }
 function mulFp(int x, int y) returns (int) { return (x * y) % ${P}; }
+function mulAddFp(int x, int y, int z) returns (int) { return (x * y + z) % ${P}; }
 function mSqr(int x) returns (int) { return (x * x) % ${P}; }
 
 function r2Sub(int a0,int a1,int b0,int b1) returns (int,int) {
@@ -1128,40 +1130,37 @@ function r2Sc(int a0,int a1,int k) returns (int,int) {
     return mulFp(a0,k),mulFp(a1,k);
 }
 function r2Mul(int a0,int a1,int b0,int b1) returns (int,int) {
-    return mSub(mulFp(a0,b0),mulFp(a1,b1)),mAdd(mulFp(a0,b1),mulFp(a1,b0));
+    return mulAddFp(a0,b0,(${P}-a1)*b1),mulAddFp(a0,b1,a1*b0);
 }
 function r2Sqr(int a0,int a1) returns (int,int) {
-    return mulFp(mAdd(a0,a1),mSub(a0,a1)),mulFp(mAdd(a0,a0),a1);
+    return mulFp(a0+a1,a0+${P}-a1),mulFp(2*a0,a1);
 }
 
 function eval6(int c0,int c1,int c2,int c3,int c4,int c5,int a) returns (int) {
     int result = c5;
-    result = mAdd(mulFp(result,a),c4);
-    result = mAdd(mulFp(result,a),c3);
-    result = mAdd(mulFp(result,a),c2);
-    result = mAdd(mulFp(result,a),c1);
-    result = mAdd(mulFp(result,a),c0);
+    result = mulAddFp(result,a,c4);
+    result = mulAddFp(result,a,c3);
+    result = mulAddFp(result,a,c2);
+    result = mulAddFp(result,a,c1);
+    result = mulAddFp(result,a,c0);
     return result;
 }
 function pairSquareEval(int x,int y,int a) returns (int,int) {
-    return mAdd(mSqr(x),mulFp(a,mSqr(y))),mulFp(mAdd(x,x),y);
+    return mulAddFp(a*y,y,x*x),mulFp(2*x,y);
 }
 function pairMulEval(int x,int y,int t,int a) returns (int,int) {
-    return mAdd(x,mulFp(a,mulFp(y,t))),mAdd(y,mulFp(x,t));
+    return mulAddFp(a,mulFp(y,t),x),mulAddFp(x,t,y);
 }
 function lineEval(
     int x,int y,int d0a,int d0b,int ma,int mb,int u,int v,
     int a,int a2,int a4,int a5
 ) returns (int,int) {
-    int qa = mulFp(mSub(0,mAdd(d0a,d0b)),v);
-    int qb = mulFp(mSub(d0a,d0b),v);
-    int ra = mulFp(mAdd(ma,mb),u);
-    int rb = mulFp(mSub(mb,ma),u);
-    int t = mAdd(
-        mAdd(mulFp(mSub(qa,qb),a),mulFp(mSub(ra,rb),a2)),
-        mAdd(mulFp(qb,a4),mulFp(rb,a5))
-    );
-    return mAdd(x,mulFp(a,mulFp(y,t))),mAdd(y,mulFp(x,t));
+    // Expand the line coefficients before reducing. Added multiples of P keep
+    // the numerator nonnegative for canonical operands.
+    int t = mAdd(v*(d0a*(a4+2*${P} - 2*a)+(${P}-d0b)*a4),
+        u*(ma*(2*a2+${P}-a5)+mb*a5));
+    (int nextX,int nextY) = pairMulEval(x,y,t,a);
+    return nextX,nextY;
 }
 function pointDoubleAffine(
     int xa,int xb,int ya,int yb,int ma,int mb
@@ -1204,28 +1203,9 @@ function absorbRelation(int power,int total,int residual,int beta) returns (int,
 function torusFrobFlat(
     int u0,int u1,int u2,int u3,int u4,int u5
 ) returns (int,int,int,int,int,int) {
-    int x0a=mAdd(u0,u3); int x0b=u3;
-    int x1a=mAdd(u1,u4); int x1b=u4;
-    int x2a=mAdd(u2,u5); int x2b=u5;
-    int c0a=x0a; int c0b=mSub(0,x0b);
-    int c1a=x1a; int c1b=mSub(0,x1b);
-    int c2a=x2a; int c2b=mSub(0,x2b);
-    (int d1a,int d1b)=r2Mul(c1a,c1b,
-        0,
-        4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436);
-    (int d2a,int d2b)=r2Mul(c2a,c2b,
-        4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437,
-        0);
-    (int f0a,int f0b)=r2Mul(c0a,c0b,
-        3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760,
-        151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
-    (int f1a,int f1b)=r2Mul(d1a,d1b,
-        3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760,
-        151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
-    (int f2a,int f2b)=r2Mul(d2a,d2b,
-        3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760,
-        151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
-    return mSub(f0a,f0b),mSub(f1a,f1b),mSub(f2a,f2b),f0b,f1b,f2b;
+    // Fold the fixed Fp2 factors and conjugation into the flat-basis map.
+    return mulFp(3699099184852670630486504326366823957760732022002356992020042909103225195948437585701677765097109891745284740289733,u0+u3),mulFp(2057464292470212699950648958431590554769679873859515792311286236065221686597310451751142621105086029381756709738514,u4),mulFp(1754153922101215937019363459062510355973529075922864898999271009044415232054910173010132757073180257089147177468460,u2+u5),
+        mulFp(151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027,u0+2*u3),mulFp(1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257,u1),mulFp(3125332594171059424908108096204648978570118281977575435832422631601824034463382777937621250592425535493320683825557,u2+2*u5);
 }
 `;
 
@@ -2176,17 +2156,62 @@ const {
 const { writeFileSync: fsWriteFileSync } = await import('node:fs');
 
 const FS_RESCHEDULE = process.env.FS_RESCHEDULE !== 'off';
+const FS_FIXED_VK = process.env.FS_FIXED_VK ?? 'witness';
+assert(['witness', 'program', 'slopes'].includes(FS_FIXED_VK), 'unknown FS_FIXED_VK encoding');
+const FS_BAKE_FIXED = FS_FIXED_VK !== 'witness';
+const FS_FIXED_SLOPES = FS_FIXED_VK === 'slopes';
 const FS_EXPORT_VECTORS = process.env.FS_EXPORT_VECTORS === '1';
 const hexByte = (value) => value.toString(16).padStart(2, '0');
 
+const fsFixedTables = blockRecords.map((record) => ({
+  start: record.layout.fixedCoefficients,
+  bytes: serializeLimbs(record.fixedCoefficients),
+}));
+const fsFixedOps = blockRecords.flatMap((record) => record.fixedOps);
+let fsFixedLinesSource = '';
+if (FS_FIXED_SLOPES) {
+  assert(SKIP_GAMMA && fsFixedOps.length === 68 && fsFixedOps.every((op) =>
+    op.j === 3 && !op.neg && ['dl', 'al'].includes(op.t)),
+  'fixed slope encoding requires the 68-line public delta walk');
+  const q = pairs[3].Q.toAffine();
+  const slopes = serializeLimbs(fsFixedOps.flatMap((op) => [op.coeffs[1].c0, op.coeffs[1].c1]));
+  const additions = fsFixedOps.reduce((mask, op, index) =>
+    op.t === 'al' ? mask | (1n << BigInt(index)) : mask, 0n);
+  fsFixedLinesSource = `function fixedVkLines() returns (bytes) {
+    bytes slopes=0x${hex(slopes)};
+    int x0=${q.x.c0}; int x1=${q.x.c1}; int y0=${q.y.c0}; int y1=${q.y.c1};
+    bytes result=0x;
+    for (int i=0;i<68;i=i+1) {
+        int ma=int(slopes.split(i*96+48)[0].split(i*96)[1]+0x00);
+        int mb=int(slopes.split(i*96+96)[0].split(i*96+48)[1]+0x00);
+        int da=0; int db=0;
+        if ((${additions}>>i)%2==0) {
+            (da,db,x0,x1,y0,y1)=pointDoubleAffine(x0,x1,y0,y1,ma,mb);
+        } else {
+            (da,db,x0,x1,y0,y1)=pointAddAffine(x0,x1,y0,y1,${q.x.c0},${q.x.c1},${q.y.c0},${q.y.c1},ma,mb);
+        }
+        result=result+toPaddedBytes(da,48)+toPaddedBytes(db,48)+toPaddedBytes(ma,48)+toPaddedBytes(mb,48);
+    }
+    return result;
+}
+`;
+}
 const fsArgNames = [
   'bytes statementBlob',
-  ...blockPayloads.map((_, index) => `bytes payload${index}`),
+  ...blockPayloads.map((_, index) =>
+    `bytes payload${index}${FS_BAKE_FIXED && fsFixedTables[index].bytes.length !== 0 ? 'Wire' : ''}`),
   'bytes quotientBlob',
 ];
 const fs = [
   'contract Groth16FsSingleton() {',
   `    function spend(${fsArgNames.join(',')}) {`,
+  ...(FS_FIXED_SLOPES ? ['        bytes fixedVkAll=fixedVkLines();'] : []),
+  ...(FS_BAKE_FIXED ? fsFixedTables.flatMap((fixed, index) => fixed.bytes.length === 0 ? [] : [
+    `        bytes fixedVkTable${index}=${FS_FIXED_SLOPES
+      ? `fixedVkAll.split(${sum(fsFixedTables.slice(0, index + 1), (table) => table.bytes.length)})[0].split(${sum(fsFixedTables.slice(0, index), (table) => table.bytes.length)})[1]`
+      : `0x${hex(fixed.bytes)}`};`,
+    `        bytes payload${index}=payload${index}Wire.split(${fixed.start})[0]+fixedVkTable${index}+payload${index}Wire.split(${fixed.start})[1];`,
+  ]) : []),
   `        require(statementBlob.length==${statementBytes.length});`,
 ];
 blockPayloads.forEach((payload, index) => {
@@ -2325,16 +2350,25 @@ const emitFsBlock = (record) => {
   });
   record.fixedOps.forEach((_, index) => {
     ['d0a', 'd0b', 'ma', 'mb'].forEach((suffix, limbIndex) => {
-      declareLimb(lines, pfx(`f${index}${suffix}`), pv,
-        record.layout.fixedCoefficients + (index * 4 + limbIndex) * W, false);
+      const offset = (index * 4 + limbIndex) * W;
+      if (FS_BAKE_FIXED) {
+        lines.push(`        int ${pfx(`f${index}${suffix}`)} = int(fixedVkTable${B}.split(${offset + W})[0].split(${offset})[1] + 0x00);`);
+      } else {
+        declareLimb(lines, pfx(`f${index}${suffix}`), pv,
+          record.layout.fixedCoefficients + offset, false);
+      }
     });
   });
-  const fixedEnd = record.layout.fixedCoefficients + record.fixedCoefficients.length * W;
-  lines.push(
-    `        bytes ${pfx('fixedBlob')} = ${pv}.split(${fixedEnd})[0]` +
-      `.split(${record.layout.fixedCoefficients})[1];`,
-    `        require(sha256(${pfx('fixedBlob')}) == 0x${hex(record.fixedCommitment)});`,
-  );
+  if (FS_BAKE_FIXED) {
+    lines.push(`        // Public VK fixed coefficients baked for block ${B}.`);
+  } else {
+    const fixedEnd = record.layout.fixedCoefficients + record.fixedCoefficients.length * W;
+    lines.push(
+      `        bytes ${pfx('fixedBlob')} = ${pv}.split(${fixedEnd})[0]` +
+        `.split(${record.layout.fixedCoefficients})[1];`,
+      `        require(sha256(${pfx('fixedBlob')}) == 0x${hex(record.fixedCommitment)});`,
+    );
+  }
   let liftOffset = record.layout.liftRecords;
   record.liftRecords.forEach((liftRecord, factorIndex) => {
     Array.from({ length: 6 }, (_, limbIndex) => {
@@ -2499,16 +2533,29 @@ fs.push(
   '    }',
   '}',
 );
-const fsSource = `${COMMON_SOURCE}${fs.join('\n')}\n`;
+const fsSource = `${COMMON_SOURCE}${fsFixedLinesSource}${fs.join('\n')}\n`;
 if (process.env.FS_SOURCE_OUT !== undefined) fsWriteFileSync(process.env.FS_SOURCE_OUT, fsSource);
 
+const fsCompilerEntry = process.env.FS_CASHC;
+assert(fsCompilerEntry === undefined || FS_RESCHEDULE,
+  'FS_CASHC requires FS_RESCHEDULE=on');
+const fsCompiler = fsCompilerEntry === undefined
+  ? null
+  : await import(fsPathToFileURL(fsCompilerEntry).href);
 const fsCompileStarted = Date.now();
-const fsRedeem = compileNamed(fsSource, 'fs singleton',
-  FS_RESCHEDULE ? { rescheduleStacks: true } : { rescheduleStacks: false });
+const fsCompileOptions = { rescheduleStacks: FS_RESCHEDULE, optimizeFor: 'size' };
+const fsRedeem = fsCompiler === null
+  ? compileNamed(fsSource, 'fs singleton', fsCompileOptions)
+  : fsCompiler.utils.asmToBytecode(fsCompiler.compileString(fsSource, fsCompileOptions).bytecode);
 const fsCompileMs = Date.now() - fsCompileStarted;
 
 // Witness and measurement on the loosened BCH 2026 VM.
-const fsArgs = [statementBytes, ...blockPayloads, quotientBytes];
+const fsPayloadArgs = blockPayloads.map((payload, index) => {
+  if (!FS_BAKE_FIXED) return payload;
+  const fixed = fsFixedTables[index];
+  return concat(payload.slice(0, fixed.start), payload.slice(fixed.start + fixed.bytes.length));
+});
+const fsArgs = [statementBytes, ...fsPayloadArgs, quotientBytes];
 assert(fsArgs.length === fsArgNames.length, 'fs singleton arg shape changed');
 const fsUnlockingFor = (args) => concat(...args.slice().reverse().map(
   (arg) => encodeDataPush(arg),
@@ -2561,6 +2608,7 @@ const fsMutated = (argIndex, transform) => {
 };
 const STATEMENT_ARG = 0;
 const QUOTIENT_ARG = fsArgs.length - 1;
+const fsPicOffset = (offset) => offset - (FS_BAKE_FIXED ? fsFixedTables[2].bytes.length : 0);
 const fsRejections = [
   ['changed-public-input', fsMutated(STATEMENT_ARG, (blob) => {
     blob[statementLayout[statementIndex.public0].offset] ^= 1;
@@ -2584,10 +2632,10 @@ const fsRejections = [
     blob[blockRecords[7].layout.outputU] ^= 1;
   })],
   ['changed-authenticated-PIC-factor', fsMutated(1 + 2, (blob) => {
-    blob[PIC_RECORD_REGION_OFFSET] ^= 1;
+    blob[fsPicOffset(PIC_RECORD_REGION_OFFSET)] ^= 1;
   })],
   ['changed-authenticated-PIC-path', fsMutated(1 + 2, (blob) => {
-    blob[PIC_RECORD_REGION_OFFSET + PIC_FACTOR_BYTES] ^= 1;
+    blob[fsPicOffset(PIC_RECORD_REGION_OFFSET + PIC_FACTOR_BYTES)] ^= 1;
   })],
   ['changed-q132-coefficient', fsMutated(QUOTIENT_ARG, (blob) => {
     blob[blob.length - 1] ^= 1;
