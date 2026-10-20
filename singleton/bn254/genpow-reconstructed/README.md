@@ -21,6 +21,38 @@ program with SHA256
 and the complete original vector objects. Its fixture origin is benchmark commit
 `464722989363227e5cfc47bbe0d2f2e5a4053d95`.
 
+## Current default export
+
+The default `bytes` profile emits **4,183 locking bytes**, a **208-byte primary
+witness**, and **85 bytes of transaction overhead**: **4,476 bytes total**.
+Locking SHA256:
+`332fdd4dbbd5468afc997a49571e15ed88d04c6dda6ccff5863e1dfb0568e3dd`.
+The same normal builder command above exports both the single-proof and
+multiproof vectors; both use this exact program. The manifest records the
+source hash, each function body and the selected profile. There are 72 function
+bodies in the default profile. Primary relaxed-VM operation cost is 5,519,594,621.
+
+A and C use x plus a one-bit y parity, replacing their full y coordinates
+(primary witness: 272 -> 208 bytes). The verifier recomputes y from
+`sqrt(x^3 + 3)`, checks the curve equation and requested parity, and retains the
+public-input range check. This changes the accepted witness representation;
+canonical G1 coordinates round-trip, but unrestricted byte-string equivalence
+is not claimed. Archived fixture coordinates remain unchanged. The detailed
+codec and exponent-loop contracts below still apply.
+
+The old standalone reverse-expansion script targeted a historical 61-function,
+4,236-byte stage. It does not certify the present 72-function program and has
+been removed; its historical implementation remains in Git history. Current
+reproduction is the source-owned builder and manifest above, with exact
+single-proof/multiproof artifact comparison and separate public VM gates. These
+checks do not constitute a universal equivalence or soundness certificate.
+
+## Historical derivation
+
+The measurements and inverse descriptions below belong to the named historical
+stages. They are retained as provenance, not as current build instructions or
+current-profile measurements.
+
 Arithmetic names denote independently checked local interfaces, with stack order
 bottom to top and all omitted prefix items preserved:
 
@@ -55,24 +87,16 @@ vk_x, so one proof verified for two different claimed integers (the bench's publ
 accepted n0 + r and n1 + r). It builds r as P - 6x^2 from the shared `prime` function and the
 G2 subgroup scalar already in the program. Locking: 4,260 bytes, SHA256
 `6d884ee69b1ec0f6b20e749d64422a4f0c779f756a1b01bb1b8edb9b40836e80`.
-`prove-prime-sharing.mjs` checks that prefix exactly, strips it and runs the reverse
-expansion proof on the remaining 4,228-byte program. The witness (272 bytes) and the
+At that historical stage, a reverse-expansion check stripped the exact prefix
+and checked the remaining 4,228-byte program. The witness (272 bytes) and the
 87-byte transaction overhead are unchanged. Full official gates and independent review must
 accompany any promotion; byte equality alone is insufficient.
 
-Run the standalone reverse-expansion certificate:
-
-```
-node singleton/bn254/genpow-reconstructed/prove-prime-sharing.mjs
-```
-
-It compiles the current source, checks the constant's entire body, restores exactly
-two literal-P sites and two prime-pair callers, and requires the complete restored
-program to match the pinned official hash. Thus all other code, including the
-original verification predicates, is fixed. The additional invocation changes
-resource accounting and call depth; the equivalence claim is about stack values
-and predicates, conditional on execution resources. It does not prove that every
-possible witness fits a limit waived by the official singleton environment.
+That historical check verified the constant's entire body, restored two
+literal-P sites and two prime-pair callers, and compared the complete restored
+program with the pinned official hash. It covered that rewrite's stack values
+and predicates conditional on execution resources, not later changes or every
+possible witness under limits waived by the singleton environment.
 
 Duplicate-body sharing (Oct 17, 2026): `outline_17` and `outline_9` had identical
 instruction bodies and identical static `fp_mul` targets. The current assembly

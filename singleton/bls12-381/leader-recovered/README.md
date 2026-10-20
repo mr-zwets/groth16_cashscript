@@ -19,3 +19,15 @@ TR-a2 adds `stackSequence54=14` for nine exact `OP_6 OP_ROLL OP_7 OP_ROLL` seque
 TW/UE/UR static frontier (Oct 18, 2026): the four TW outlines add 28 call sites; UE-a1 adds `stackSequence59=54` for four exact `0x37 OP_ROLL 0x37 OP_ROLL` sites, UE-a2 adds `stackSequence60=55` for two guarded `g1Add` stack sequences, and UE-a3 adds `stackSequence61=56` for three `fp2Mul/swap/fp2Add` sequences. The resulting UE candidate is 58 functions and 3,310 bytes with SHA256 `24f462b2345f79354be7ea5aa0ec70deb28282001eb6efe53fd7e955accdf360`; the 17-byte range prefix remains exact. An independent actual-decoded inverse expands all three UE helpers and restores the published 3,315-byte TW-a8 program byte-for-byte. The candidate graph remains acyclic at maximum depth 11. UR-a1 then adds `stackSequence62=57` for two exact `OP_3 OP_PICK OP_MOD CALL sqrtFp OP_DUP OP_5 OP_ROLL OP_1 OP_NUMEQUAL` sites in `decompressG2`, and `stackSequence63=58` for two exact `OP_ROLL OP_2SWAP OP_SWAP OP_2ROT CALL stackSequence8 CALL stackSequence10 CALL millerAccumulate` sites in main. The resulting 60-function candidate is 3,308 bytes with SHA256 `3ef0a31623a2322afed809f40ee4245365b8f5f10c86142853408b27edacd4d1`; the 17-byte guard remains exact, the decoded main inverse restores UE byte-for-byte, and the graph remains acyclic at maximum depth 12. Runtime cost and proof gates remain separate evidence.
 
 VO-a1 replaces only the compact `powFp` body (raw key `1e`) with a 37-byte exponent-driven loop. It shifts the remaining exponent after each iteration, retaining the field modulus, accumulator and reduced base; exponent zero returns one. The supported equivalence domain is valid numeric `0 <= E < 2^381`, including the actual exponents `p - 2` and `(p + 1) / 4`; negative exponents are outside this contract. The recovered `program.mjs` and its baseline assertions remain unchanged. Restoring the old 50-byte body reconstructs the published 3,308-byte program exactly: all other 59 bodies, identifiers, complete main, decoder and 17-byte range guard are unchanged. The candidate remains 60 functions and is 3,295 bytes with SHA256 `c5b4cf41459b7ec2f4c84fef0eb8cba5dfffee09ad03da909c9d31378a9d5ece`. With the unchanged 205-byte witness and 85-byte transaction overhead, the score is 3,585 bytes. Actual operation cost and whole-proof acceptance require separate qualification; this source change makes no native or relay admission claim.
+
+## Submitted genpow comparison
+
+Against the merged benchmark baseline, the compact genpow program reduces
+locking bytecode from **3,432 to 3,295 bytes**. Its unchanged 205-byte witness
+and 85-byte transaction overhead give a **3,585-byte score**. This combines
+function inlining, an outlined `MUL P MOD` helper, short function identifiers,
+and the remaining-exponent `powFp` loop described above. The measured primary
+relaxed-VM operation cost rises by approximately **1.4%**; this is a size/cost
+tradeoff. The symbolic source reconstructs both submitted locking programs
+(single-proof and multiproof) exactly. Witness and public-input values remain
+fixed. This remains the unrestricted singleton lane.
