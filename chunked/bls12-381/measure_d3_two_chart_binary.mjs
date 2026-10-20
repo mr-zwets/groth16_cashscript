@@ -61,13 +61,25 @@ const DEPTH = 3;
 const FUSE_FINAL_PAIR = process.env.RPA_FUSE_FINAL_PAIR === '1';
 const SCHEDULE_COORDINATOR = process.env.RPA_SCHEDULE_COORDINATOR === '1';
 const SCHEDULE_PIC_AUTH = process.env.RPA_SCHEDULE_PIC_AUTH === '1';
-// Opt-in native layout: Regular7/8 share input8; the final pair still shares its input.
-const FUSE_REGULAR_PAIR = process.env.RPA_FUSE_REGULAR_PAIR === '1';
-const GROUP_FIRST = 7, GROUP_SECOND = 8;
+// The six-pair profile retains the arithmetic carrier and all21 logical stages.
+const FUSE_REGULAR_PAIRS = process.env.RPA_FUSE_REGULAR_PAIRS === '1';
+const FUSE_REGULAR_PAIR = process.env.RPA_FUSE_REGULAR_PAIR === '1' || FUSE_REGULAR_PAIRS;
+const regularGroups = FUSE_REGULAR_PAIRS
+  ? [[5,6,544],[7,8,486],[9,10,485],[11,12,495],[13,14,505],[16,17,528]]
+    .map(([first,second,funding])=>({first,second,funding}))
+  : FUSE_REGULAR_PAIR ? [{first:7,second:8,funding:Number(process.env.RPA_GROUP_DENSITY_PADDING??0)}] : [];
+if (regularGroups.some(({funding})=>!Number.isInteger(funding)||funding<0||funding>1000)) {
+  throw new Error('Regular group funding is outside0..1000');
+}
+const groupBySecond = new Map(regularGroups.map(group=>[group.second,group]));
 const physicalInput = logicalInput => FUSE_REGULAR_PAIR
-  ? logicalInput - (logicalInput >= GROUP_SECOND + 1 ? 1 : 0) - (logicalInput === 21 ? 1 : 0)
+  ? logicalInput-regularGroups.filter(group=>logicalInput>=group.second+1).length-(logicalInput===21?1:0)
   : logicalInput;
-const physicalBlock = blockIndex => physicalInput(blockIndex + 1);
+const physicalBlock = blockIndex => physicalInput(blockIndex+1);
+const physicalIndexSource = indent => FUSE_REGULAR_PAIRS
+  ? indent+`int physicalIndex=int(0x${Buffer.from(Array.from({length:21},(_,index)=>physicalBlock(index))).toString('hex')}.split(blockIndex+1)[0].split(blockIndex)[1]+0x00);`
+  : indent+'int physicalIndex=blockIndex+1; if(blockIndex>=8){physicalIndex=physicalIndex - 1;}';
+const skipFirstFrameBytes = Uint8Array.from(Buffer.from('76537f75517f7701007e810134937f77','hex'));
 const INVERSE_RELATIONS = process.env.RPA_INVERSES !== 'off';
 const SKIP_GAMMA = process.env.RPA_SKIP_GAMMA === '1';
 const PIC32_RECORDS = SKIP_GAMMA && process.env.RPA_PIC32 === '1';
@@ -1305,7 +1317,7 @@ const FUSED_QUOTIENT_BLOCK_INDEX = 4;
 const FUSED_QUOTIENT_INPUT_INDEX = FUSED_QUOTIENT_BLOCK_INDEX + 1;
 const FUSED_QUOTIENT_TAIL_BLOCK_INDEX = 15;
 const FUSED_QUOTIENT_TAIL_INPUT_INDEX = FUSED_QUOTIENT_TAIL_BLOCK_INDEX + 1;
-const TEMPLATE_TOTAL_INPUTS = 1 + blockPayloads.length - (FUSE_FINAL_PAIR ? 1 : 0) - (FUSE_REGULAR_PAIR ? 1 : 0);
+const TEMPLATE_TOTAL_INPUTS = 1 + blockPayloads.length - (FUSE_FINAL_PAIR?1:0) - regularGroups.length;
 const rangeLine = (name, upperBound = P) => `        require(within(${name},0,${upperBound}));`;
 const declareLimb = (lines, name, blob, offset, requireRange = true, upperBound = P) => {
   lines.push(`        int ${name} = ${limbExpression(blob, offset)};`);
@@ -1725,7 +1737,7 @@ const replaceExactlyOnce = (source, before, after, label) => {
 };
 const templateBlockSource = (record, template) => {
   const { name } = template;
-  let source = blockSource(record, name === 'Terminal', TEMPLATE_TOTAL_INPUTS);
+  let source = blockSource(record, name === 'Terminal', FUSE_REGULAR_PAIRS?20:TEMPLATE_TOTAL_INPUTS);
   source = replaceExactlyOnce(
     source,
     `contract D3TwoChartBlock${record.blockIndex}() {`,
@@ -1856,7 +1868,7 @@ const templateBlockSource = (record, template) => {
     assert(evaluation,'Regular predecessor evaluation');source=replaceExactlyOnce(source,evaluation[0],'','group local predecessor evaluation');
     assert(!source.includes('previousPayloadLength'),'no old predecessor length ABI');
     source=replaceExactlyOnce(source,'        require(this.activeInputIndex == blockIndex + 1);',
-      '        int physicalIndex=blockIndex+1; if(blockIndex>=8){physicalIndex=physicalIndex - 1;}\n        require(this.activeInputIndex==physicalIndex);','Regular physical input');
+      `${physicalIndexSource('        ')}\n        require(this.activeInputIndex==physicalIndex);`,'Regular physical input');
   }
   return source;
 };
@@ -2091,8 +2103,8 @@ const coordinatorSource = (
         lines.push(`        if (((public0>>${shift})%256)+((public1>>${shift})%256)==0) { ${length}=${length}+32; } else { ${length}=${length}+704; }`);
       }
     }
-    lines.push(FUSE_REGULAR_PAIR && index===GROUP_SECOND
-      ? `        bytes rawInput${index}=rawInput${GROUP_FIRST}.split(blockLength${GROUP_FIRST}+52)[1];`
+    lines.push(groupBySecond.has(index)
+      ? `        bytes rawInput${index}=rawInput${index-1}.split(blockLength${index-1}+52)[1];`
       : FUSE_FINAL_PAIR && index===20
         ? '        bytes rawInput20=rawInput19.split(blockLength19+52)[1];'
         : `        bytes rawInput${index}=tx.inputs[${physicalBlock(index)}].unlockingBytecode;`);
@@ -2408,9 +2420,9 @@ contract PicBatchAuth() {
                     +scalar1.split(window)[0].split(window - 1)[1];
                 if(priorDigits==0x0000){recordOffset=recordOffset+32;}else{recordOffset=recordOffset+704;}
             }
-${FUSE_REGULAR_PAIR ? `            int physicalIndex=blockIndex+1; if(blockIndex>=8){physicalIndex=physicalIndex - 1;}
+${FUSE_REGULAR_PAIR ? `${physicalIndexSource('            ')}
             bytes producer=tx.inputs[physicalIndex].unlockingBytecode;
-            if(blockIndex==8){
+            if(${regularGroups.map(g=>`blockIndex==${g.second}`).join(' || ')}){
                 int firstLength=int(producer.split(3)[0].split(1)[1]+0x00);
                 producer=producer.split(firstLength+52)[1];
             }
@@ -2959,22 +2971,36 @@ templateClasses.forEach((template) => {
     template.core = transformed;
   }
   if(FUSE_REGULAR_PAIR && ['AdditionMiddle','Terminal'].includes(template.name)){
-    assert(template.members.every(i=>i>GROUP_SECOND),'late template map range');
-    const before=template.core,a=decodeAuthenticationInstructions(before),mapped=[];let activeSites=0,previousSites=0;
-    for(let i=0;i<a.length;i++){
-      if(a[i].opcode===OpcodesBCH.OP_INPUTBYTECODE && a[i-1]?.opcode!==OpcodesBCH.OP_0){mapped.push({opcode:0x8c});previousSites++;}
-      mapped.push(a[i]);
-      if(a[i].opcode===OpcodesBCH.OP_INPUTINDEX){mapped.push({opcode:0x8b});activeSites++;}
+    const before=template.core,original=decodeAuthenticationInstructions(before),mapped=[],ledger=[];
+    const activeHops=template.members.map(i=>(i===20?20:i+1)-physicalBlock(i));
+    const previousHops=template.members.map(i=>i-physicalBlock(i-1));
+    const skip=template.members.map(i=>groupBySecond.has(i-1));
+    assert(new Set(activeHops).size===1&&new Set(previousHops).size===1&&new Set(skip).size===1,'late context must share one map');
+    const shift=(amount,subtract)=>amount===0?[]:amount===1?[{opcode:subtract?0x8c:0x8b}]:[...decodeAuthenticationInstructions(pushVmNumber(amount)),{opcode:subtract?OP.SUB:OpcodesBCH.OP_ADD}];
+    let activeSites=0,previousSites=0;
+    for(let i=0;i<original.length;i++){
+      const instruction=original[i],previous=instruction.opcode===OpcodesBCH.OP_INPUTBYTECODE&&original[i-1]?.opcode!==OpcodesBCH.OP_0;
+      const active=instruction.opcode===OpcodesBCH.OP_INPUTINDEX;
+      const prefix=previous?shift(previousHops[0],true):[],suffix=active?shift(activeHops[0],false):previous&&skip[0]?decodeAuthenticationInstructions(skipFirstFrameBytes):[];
+      activeSites+=Number(active);previousSites+=Number(previous);ledger.push({prefix,suffix});mapped.push(...prefix,instruction,...suffix);
     }
-    assert(activeSites===1&&previousSites===2,`${template.name} context-only index sites ${activeSites}/${previousSites}`);
-    template.core=encodeAuthenticationInstructions(mapped);
-    const restored=[];
-    for(let i=0;i<mapped.length;i++){
-      if(mapped[i].opcode===OpcodesBCH.OP_INPUTINDEX){restored.push(mapped[i]);assert(mapped[++i].opcode===0x8b,'mapped active increment');continue;}
-      if(mapped[i].opcode===0x8c && mapped[i+1]?.opcode===OpcodesBCH.OP_INPUTBYTECODE)continue;
-      restored.push(mapped[i]);
+    assert(activeSites===1&&previousSites===2,'late-template context sites changed');
+    const restored=[];let cursor=0;
+    for(const{prefix,suffix}of ledger){
+      assert(equalBytes(encodeAuthenticationInstructions(mapped.slice(cursor,cursor+prefix.length)),encodeAuthenticationInstructions(prefix)),'context prefix inverse');cursor+=prefix.length;restored.push(mapped[cursor++]);
+      assert(equalBytes(encodeAuthenticationInstructions(mapped.slice(cursor,cursor+suffix.length)),encodeAuthenticationInstructions(suffix)),'context suffix inverse');cursor+=suffix.length;
     }
-    assert(equalBytes(encodeAuthenticationInstructions(restored),before),`${template.name} context map inverse`);
+    assert(cursor===mapped.length&&equalBytes(encodeAuthenticationInstructions(restored),before),'context map inverse');template.core=encodeAuthenticationInstructions(mapped);
+  }
+  // Preserve the qualified compiler's parsing boundaries; replace only the final
+  // input-count operand after all exact shared fragments have been extracted.
+  if(FUSE_REGULAR_PAIRS){
+    const instructions=decodeAuthenticationInstructions(template.core);let sites=0;
+    const mapped=instructions.flatMap((instruction,index)=>{
+      if(instructions[index-1]?.opcode!==OpcodesBCH.OP_TXINPUTCOUNT)return[instruction];
+      assert(equalBytes(encodeAuthenticationInstructions([instruction]),pushVmNumber(20)),'template original input count');sites++;
+      return decodeAuthenticationInstructions(pushVmNumber(TEMPLATE_TOTAL_INPUTS));
+    });assert(sites===1,'one template input count');template.core=encodeAuthenticationInstructions(mapped);
   }
   template.digest = sha256(template.core);
   template.arithmeticRemainder = template.core.slice(templateArithmeticLength);
@@ -2984,11 +3010,11 @@ const templateForBlock = (index) => templateClasses.find(({ members }) => member
 // independently enforced for every logical leaf by the committing coordinator.
 const loadPredecessor = previousBlock => concat(
   pushVmNumber(physicalBlock(previousBlock)),Uint8Array.of(OP.INPUTBYTECODE),
-  ...(previousBlock===GROUP_SECOND ? [Uint8Array.from(Buffer.from('76537f75517f7701007e810134937f77','hex'))] : []),
+  ...(groupBySecond.has(previousBlock) ? [skipFirstFrameBytes] : []),
   Uint8Array.from(Buffer.from('76537f75517f7701007e8153937f7c537f777c517f7701307f75','hex')),
 );
 const templateConfig = (record,index) => FUSE_REGULAR_PAIR && templateForBlock(index).name==='Regular' ? concat(
-  ...(index===GROUP_SECOND ? [Uint8Array.of(OP.FROMALTSTACK,OP.FROMALTSTACK)] : [loadPredecessor(index-1)]),
+  ...(groupBySecond.has(index) ? [Uint8Array.of(OP.FROMALTSTACK,OP.FROMALTSTACK)] : [loadPredecessor(index-1)]),
   pushVmNumber(index),encodeDataPush(record.fixedCommitment),pushVmNumber(TEMPLATE_FUNCTION_ID),Uint8Array.of(OP.INVOKE),
 ) : concat(
   pushVmNumber(index),
@@ -3290,8 +3316,7 @@ const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_
     : '{"3":436,"5":423,"6":377,"7":385,"8":369,"9":376,"10":377,"11":386,"12":377,"13":386,"14":388,"16":411,"17":383,"18":384,"19":393}'));
 if (FUSE_FINAL_PAIR) compactRegularDensityPadding['19'] = 0;
 if (FUSE_REGULAR_PAIR) {
-  compactRegularDensityPadding[String(GROUP_FIRST)] = 0;
-  compactRegularDensityPadding[String(GROUP_SECOND)] = 0;
+  regularGroups.forEach(g=>{compactRegularDensityPadding[String(g.first)]=0;compactRegularDensityPadding[String(g.second)]=0;});
 }
 Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   const index = Number(block);
@@ -3315,6 +3340,22 @@ Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   templateBlockRedeems[index] = concat(padding, templateBlockRedeems[index]);
 });
 
+// Normalize only public input operands while applying exact historical q cuts.
+const mapQuotientInputs=(bytecode,fromInput,toInput,fromCount,toCount)=>{
+ const instructions=decodeAuthenticationInstructions(bytecode);let inputs=0,counts=0;
+ const mapped=instructions.flatMap((instruction,index)=>{
+  if(instructions[index+1]?.opcode===OP.INPUTBYTECODE&&equalBytes(encodeAuthenticationInstructions([instruction]),pushVmNumber(fromInput))){inputs++;return decodeAuthenticationInstructions(pushVmNumber(toInput));}
+  if(instructions[index-1]?.opcode===OpcodesBCH.OP_TXINPUTCOUNT&&equalBytes(encodeAuthenticationInstructions([instruction]),pushVmNumber(fromCount))){counts++;return decodeAuthenticationInstructions(pushVmNumber(toCount));}
+  return[instruction];
+ });assert(inputs===1&&counts===1,'quotient public input operands');return encodeAuthenticationInstructions(mapped);
+};
+if(FUSE_REGULAR_PAIRS){
+  const originalQuotient=fusedQuotientRedeem;
+  fusedQuotientRedeem=mapQuotientInputs(originalQuotient,physicalBlock(20),19,TEMPLATE_TOTAL_INPUTS,20);
+  assert(equalBytes(mapQuotientInputs(fusedQuotientRedeem,19,physicalBlock(20),20,TEMPLATE_TOTAL_INPUTS),originalQuotient),'quotient operand normalization inverse');
+}
+const quotientFinalInput = FUSE_REGULAR_PAIRS?19:FUSE_FINAL_PAIR?(FUSE_REGULAR_PAIR?19:20):21;
+const quotientInputCount = FUSE_REGULAR_PAIRS?20:TEMPLATE_TOTAL_INPUTS;
 const PIC_BLOCK4_INDEX = 4;
 const PIC_BLOCK4_INPUT = PIC_BLOCK4_INDEX + 1;
 const picBaseBlock4Redeem = templateBlockRedeems[PIC_BLOCK4_INDEX];
@@ -3324,10 +3365,10 @@ if (arithmeticLeafId === -1) {
   const restoreQuotientIdentity=bytecode=>{
     const instructions=decodeAuthenticationInstructions(bytecode);let inputSites=0,countSites=0;
     const restored=instructions.map((instruction,index)=>{
-      if(instructions[index+1]?.opcode===OP.INPUTBYTECODE && instruction.data?.length===1 && instruction.data[0]===(FUSE_REGULAR_PAIR?19:20)){
+      if(instructions[index+1]?.opcode===OP.INPUTBYTECODE && equalBytes(encodeAuthenticationInstructions([instruction]),pushVmNumber(quotientFinalInput))){
         inputSites+=1; return decodeAuthenticationInstructions(pushVmNumber(21))[0];
       }
-      if(instructions[index-1]?.opcode===OpcodesBCH.OP_TXINPUTCOUNT && instruction.data?.length===1 && instruction.data[0]===(FUSE_REGULAR_PAIR?20:21)){
+      if(instructions[index-1]?.opcode===OpcodesBCH.OP_TXINPUTCOUNT && equalBytes(encodeAuthenticationInstructions([instruction]),pushVmNumber(quotientInputCount))){
         countSites+=1; return decodeAuthenticationInstructions(pushVmNumber(22))[0];
       }
       return instruction;
@@ -3335,9 +3376,7 @@ if (arithmeticLeafId === -1) {
     assert(inputSites===1&&countSites===1,'quotient logical-to-physical inverse sites');
     return encodeAuthenticationInstructions(restored);
   };
-  const fixedFinalEvaluation = Uint8Array.from(Buffer.from(
-    (FUSE_FINAL_PAIR ? (FUSE_REGULAR_PAIR ? '0113ca' : '0114ca') : '0115ca') + '0244057f7701317f75517f7701307f7501007e81', 'hex',
-  ));
+  const fixedFinalEvaluation = concat(pushVmNumber(quotientFinalInput),Uint8Array.of(OP.INPUTBYTECODE),Uint8Array.from(Buffer.from('0244057f7701317f75517f7701307f7501007e81','hex')));
   const offset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(fixedFinalEvaluation));
   const boundaries = new Set([0]);
   let instructionOffset = 0;
@@ -3417,9 +3456,7 @@ if (arithmeticLeafId === -1) {
   );
 }
 if (FUSE_FINAL_PAIR) {
-  const mixedFinalRead = Uint8Array.from(Buffer.from(
-    (FUSE_REGULAR_PAIR ? '0113ca' : '0114ca') + '0244057f7701317f75517f7701007e81', 'hex',
-  ));
+  const mixedFinalRead = concat(pushVmNumber(quotientFinalInput),Uint8Array.of(OP.INPUTBYTECODE),Uint8Array.from(Buffer.from('0244057f7701317f75517f7701007e81','hex')));
   const offset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(mixedFinalRead));
   assert(offset >= 0 &&
     Buffer.from(fusedQuotientRedeem).lastIndexOf(Buffer.from(mixedFinalRead)) === offset,
@@ -3433,6 +3470,7 @@ if (FUSE_FINAL_PAIR) {
   assert(equalBytes(concat(fusedQuotientRedeem.slice(0, offset + 3),
     fusedQuotientRedeem.slice(offset + 3 + skip.length)), before), 'mixed reader inverse');
 }
+if(FUSE_REGULAR_PAIRS)fusedQuotientRedeem=mapQuotientInputs(fusedQuotientRedeem,19,physicalBlock(20),20,TEMPLATE_TOTAL_INPUTS);
 const fusedQuotientOpcodes = decodeAuthenticationInstructions(fusedQuotientRedeem)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
 assert(!fusedQuotientOpcodes.some((opcode) => [
@@ -3606,25 +3644,17 @@ const mixedRedeem = FUSE_FINAL_PAIR ? concat(
   Uint8Array.of(OP.VERIFY), templateBlockRedeems[20],
 ) : null;
 if (FUSE_FINAL_PAIR) templateBlockRedeems[19] = mixedRedeem;
-let groupFundingBytes = 0, groupedRegularRedeem;
-if (FUSE_REGULAR_PAIR) {
-  groupFundingBytes=Number(process.env.RPA_GROUP_DENSITY_PADDING ?? 0);
-  assert(Number.isInteger(groupFundingBytes)&&groupFundingBytes>=0&&groupFundingBytes<=1000,'group funding range');
-  let groupFunding=new Uint8Array();
+const groupedRegularRedeems=new Map();
+for(const group of regularGroups){
+  const groupFundingBytes=group.funding;let groupFunding=new Uint8Array();
   if(groupFundingBytes>=260)groupFunding=concat(encodeDataPush(new Uint8Array(groupFundingBytes-4)),Uint8Array.of(OP.DROP));
-  while(groupFunding.length<groupFundingBytes){
-    const remaining=groupFundingBytes-groupFunding.length;assert(remaining>=2,'one-byte group funding tail');
-    const n=Math.min(remaining===77?75:76,remaining);groupFunding=concat(groupFunding,encodeDataPush(new Uint8Array(n-2)),Uint8Array.of(OP.DROP));
-  }
+  while(groupFunding.length<groupFundingBytes){const remaining=groupFundingBytes-groupFunding.length;assert(remaining>=2,'one-byte group funding tail');const n=Math.min(remaining===77?75:76,remaining);groupFunding=concat(groupFunding,encodeDataPush(new Uint8Array(n-2)),Uint8Array.of(OP.DROP));}
   assert(groupFunding.length===groupFundingBytes,'group funding byte count');
-  groupedRegularRedeem=concat(groupFunding,
-    Uint8Array.of(0x72,0x6e,OP.TOALTSTACK,OP.TOALTSTACK),
-    templateBlockRedeems[GROUP_FIRST],Uint8Array.of(OP.VERIFY),templateConfig(blockRecords[GROUP_SECOND],GROUP_SECOND),
-  );
-  templateBlockRedeems[GROUP_FIRST]=groupedRegularRedeem;
+  const redeem=concat(groupFunding,Uint8Array.of(0x72,0x6e,OP.TOALTSTACK,OP.TOALTSTACK),templateBlockRedeems[group.first],Uint8Array.of(OP.VERIFY),templateConfig(blockRecords[group.second],group.second));
+  groupedRegularRedeems.set(group.first,redeem);templateBlockRedeems[group.first]=redeem;
 }
 const templateSiblingLockings = templateBlockRedeems.filter(
-  (_, index) => (!FUSE_REGULAR_PAIR || index !== GROUP_SECOND) && (!FUSE_FINAL_PAIR || index !== 20),
+  (_, index) => !groupBySecond.has(index) && (!FUSE_FINAL_PAIR || index!==20),
 ).map(
   (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)),
 );
@@ -3792,11 +3822,8 @@ const makeTemplateInputs = () => {
       unlocking: makeTemplateBlockUnlocking(payload, evaluation, quotientChunk, redeem),
     };
   })];
-  if (FUSE_REGULAR_PAIR) {
-    logicalInputs[GROUP_FIRST+1].unlocking=concat(
-      encodeDataPush(blockPayloads[GROUP_FIRST]),encodeDataPush(blockEvaluationPayloads[GROUP_FIRST]),
-      encodeDataPush(blockPayloads[GROUP_SECOND]),encodeDataPush(blockEvaluationPayloads[GROUP_SECOND]),encodeDataPush(groupedRegularRedeem),
-    );
+  for(const group of regularGroups){
+    logicalInputs[group.first+1].unlocking=concat(encodeDataPush(blockPayloads[group.first]),encodeDataPush(blockEvaluationPayloads[group.first]),encodeDataPush(blockPayloads[group.second]),encodeDataPush(blockEvaluationPayloads[group.second]),encodeDataPush(groupedRegularRedeems.get(group.first)));
   }
   if (!FUSE_FINAL_PAIR) return logicalInputs;
   logicalInputs[20].unlocking = concat(
@@ -3804,7 +3831,7 @@ const makeTemplateInputs = () => {
     encodeDataPush(blockPayloads[20]), encodeDataPush(blockEvaluationPayloads[20]),
     encodeDataPush(mixedRedeem),
   );
-  return logicalInputs.slice(0, 21).filter((_, index) => !FUSE_REGULAR_PAIR || index !== GROUP_SECOND + 1);
+  return logicalInputs.slice(0, 21).filter((_, index) => !groupBySecond.has(index-1));
 };
 
 const verificationData = (inputs) => {
@@ -3914,11 +3941,12 @@ if (FUSE_FINAL_PAIR) {
   const changedLocking=inputs.map(input=>({...input}));
   changedLocking[finalInput].locking=Uint8Array.from(changedLocking[finalInput].locking);changedLocking[finalInput].locking[2]^=1;
   reject('sibling locking',changedLocking,0);
-  if (FUSE_REGULAR_PAIR) {
+  for (const {first:GROUP_FIRST,second:GROUP_SECOND} of regularGroups) {
+    const groupLabel = FUSE_REGULAR_PAIRS ? `regular-pair-${GROUP_FIRST}-${GROUP_SECOND}` : 'regular-pair';
     const groupInput = physicalBlock(GROUP_FIRST), nextInput = physicalBlock(GROUP_SECOND + 1);
     for(let stage=0;stage<2;stage++){
       for(const [label,slot,offset] of [['output',stage*2,0],['runtime-slope',stage*2,481],['fixed-line',stage*2,769],['evaluation',stage*2+1,0]]){
-        reject(`regular-pair/stage-${stage}/${label}`,mutatePush(groupInput,slot,offset),groupInput);
+        reject(`${groupLabel}/stage-${stage}/${label}`,mutatePush(groupInput,slot,offset),groupInput);
       }
     }
     const first=decodeAuthenticationInstructions(inputs[groupInput].unlocking);
@@ -3930,32 +3958,32 @@ if (FUSE_FINAL_PAIR) {
       assert(batch && (batch.host==='coordinator' || /^block-\d+$/.test(batch.host)),
         'grouped PIC record has no authentication owner');
       const owner=batch.host==='coordinator'?0:physicalBlock(Number(batch.host.slice(6)));
-      reject(`regular-pair/stage-${stage}/PIC record`,
+      reject(`${groupLabel}/stage-${stage}/PIC record`,
         mutatePush(groupInput,stage*2,pushData(first[stage*2]).length-1),owner);
     }
     const swapped=inputs.map(input=>({...input}));
     swapped[groupInput].unlocking=encodeAuthenticationInstructions([first[2],first[3],first[0],first[1],first[4]]);
-    reject('regular-pair/swapped logical stages',swapped,groupInput);
+    reject(`${groupLabel}/swapped logical stages`,swapped,groupInput);
     const truncated=inputs.map(input=>({...input}));
     truncated[groupInput].unlocking=concat(encodeDataPush(pushData(first[0])),encodeDataPush(pushData(first[1])),encodeDataPush(pushData(first[2]).slice(0,-1)),encodeDataPush(pushData(first[3])),encodeDataPush(pushData(first[4])));
-    reject('regular-pair/truncated second frame',truncated,0);
+    reject(`${groupLabel}/truncated second frame`,truncated,0);
     const nonminimal=inputs.map(input=>({...input}));
     nonminimal[groupInput].unlocking=concat(Uint8Array.of(0x4e),u32(pushData(first[0]).length),pushData(first[0]),...first.slice(1).map(instruction=>encodeAuthenticationInstructions([instruction])));
-    reject('regular-pair/nonminimal first frame',nonminimal,0);
+    reject(`${groupLabel}/nonminimal first frame`,nonminimal,0);
     const nonminimalSecond=inputs.map(input=>({...input}));
     nonminimalSecond[groupInput].unlocking=concat(...first.slice(0,2).map(instruction=>encodeAuthenticationInstructions([instruction])),Uint8Array.of(0x4e),u32(pushData(first[2]).length),pushData(first[2]),...first.slice(3).map(instruction=>encodeAuthenticationInstructions([instruction])));
-    reject('regular-pair/nonminimal second frame',nonminimalSecond,0);
-    reject('regular-pair/next-worker predecessor payload',mutatePush(groupInput,2,0),nextInput);
-    reject('regular-pair/next-worker predecessor evaluation',mutatePush(groupInput,3,0),nextInput);
+    reject(`${groupLabel}/nonminimal second frame`,nonminimalSecond,0);
+    reject(`${groupLabel}/next-worker predecessor payload`,mutatePush(groupInput,2,0),nextInput);
+    reject(`${groupLabel}/next-worker predecessor evaluation`,mutatePush(groupInput,3,0),nextInput);
     const sibling=inputs.map(input=>({...input}));
     sibling[groupInput].locking=Uint8Array.from(sibling[groupInput].locking);sibling[groupInput].locking[2]^=1;
-    reject('regular-pair/sibling locking',sibling,0);
+    reject(`${groupLabel}/sibling locking`,sibling,0);
   }
   const data=verificationData(inputs),wire=encodeTransactionBch(data.transaction).length;
-  const report={construction:FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
+  const report={construction:FUSE_REGULAR_PAIRS?'native-fused-multiple-regular-and-final-pairs':FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
     coordinatorScheduled:SCHEDULE_COORDINATOR,
       ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
-    ...(FUSE_REGULAR_PAIR ? {regularPairFused:true,groupFundingBytes,regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:[GROUP_SECOND,20].includes(index)?1:0}))} : {}),
+    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_PAIRS ? {regularPairsFused:true,regularGroups} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:groupBySecond.has(index)||index===20?1:0}))} : {}),
     inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
     maximumUnlockingBytes:Math.max(...inputs.map(input=>input.unlocking.length)),
     wholeConsensus:true,wholeStandard:true,outcomes,controls,
