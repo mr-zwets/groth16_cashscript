@@ -94,6 +94,9 @@ assert(MSM_SIGNED_RESIDUE === 'off' || sharedPrimeEnabled, 'signed-residue requi
 // Opt-in WIP compiler profile: the current cached/signed helper library stays exact.
 const msmCompilerEntry = process.env.MSM_CASHC;
 const msmConstantHoisting = process.env.MSM_CONSTANT_HOISTING ?? 'off';
+const packedDigits = process.env.MSM_PACKED_DIGITS === '1';
+assert(!packedDigits || msmCompilerEntry && msmConstantHoisting === 'all',
+  'packed MSM digits require the qualified hoisted compiler profile');
 assert(['off', 'all'].includes(msmConstantHoisting), 'unknown MSM constant-hoisting profile');
 assert(msmConstantHoisting === 'off' || msmCompilerEntry,
   'MSM constant hoisting requires the scheduled compiler');
@@ -115,7 +118,9 @@ if (sharedPrimeEnabled) {
   assert(Number.isInteger(STAGE_PADS[3]) && STAGE_PADS[3] >= 0 &&
     STAGE_PADS[3] <= (msmConstantHoisting === 'all' ? 64 : 0),
   'unexpected shared-prime terminal padding');
-  assert.equal(GENESIS_PAD, MSM_SIGNED_RESIDUE === 'madd-ny' ? 23 : 0, 'unexpected shared-prime genesis pad');
+  if(packedDigits)assert(Number.isInteger(GENESIS_PAD)&&GENESIS_PAD>=0&&GENESIS_PAD<=23,
+    'packed MSM genesis pad must be within0..23');
+  else assert.equal(GENESIS_PAD, MSM_SIGNED_RESIDUE === 'madd-ny' ? 23 : 0, 'unexpected shared-prime genesis pad');
 }
 const SHARED_PRIME_ID = 11n;
 const DISPLACED_PRIME_ID = 37;
@@ -566,7 +571,7 @@ function buildWith({backExec, backTerminal}) {
   ({declarations: declarations.genesis, program: programs.genesisUnsliced} = compileModule(genesis, constants));
   // genesis: the sliced program (dead vk_x auxiliary predicate dropped, see genesis-slice.mjs),
   // then MSM part A on its parked pushes (wa, n1, n0); part A pins input 0's state push
-  programs.msmA = cash(sourceA({split: MSM_SPLIT, ownInputs: true, noPad: true,
+  programs.msmA = cash(sourceA({split: MSM_SPLIT, ownInputs: true, noPad: true, packedDigits,
     pinEnd: {idx: 0, back: backExec, size: EXEC_STATE_BYTES}, pinN: {idx: 4, back: backTerminal}}));
   const slicedGenesis = sliceGenesis(programs.genesisUnsliced);
   if (sharedPrimeEnabled) {
@@ -593,7 +598,7 @@ function buildWith({backExec, backTerminal}) {
     OpcodesBCH.OP_DEFINE,
   ]);
   programs.loader = Buffer.concat([fragmentReaderDeclaration, assemble(executor, loaderIdentifiers, constants, extraNumbers)]);
-  programs.msmExec = stage(cash(sourceExec({cuts: CUTS, backExec, backTerminal})), definitions, programs.msmA.length);
+  programs.msmExec = stage(cash(sourceExec({cuts: CUTS, backExec, backTerminal, packedDigits})), definitions, programs.msmA.length);
   // The selected compiler emits its own stage cleanup; legacy rewrites retain their guards.
   if (!msmCompiler) programs.msmExec = compactExecutorCleanup(programs.msmExec);
   programs.executor = Buffer.concat([execPadded ? Buffer.from([OpcodesBCH.OP_NIP]) : Buffer.alloc(0),
@@ -603,7 +608,7 @@ function buildWith({backExec, backTerminal}) {
   constants.workerLockingRoot = hash256(Buffer.concat(workerLockings.map(hash256)));
   // terminal: the densless terminal, then the final MSM stage on its parked pushes (zInv, state)
   ({declarations: declarations.terminal, program: programs.terminalBase} = compileModule(terminalWithLayout, constants, extraNumbers));
-  programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3]})), definitions, programs.msmA.length);
+  programs.msmFinal = stage(cash(sourceFinal({from: CUTS[3], packedDigits})), definitions, programs.msmA.length);
   if (msmConstantHoisting === 'off') programs.msmFinal = compactInverseCopy(programs.msmFinal);
   programs.msmFinal = reuseFinalPrimeCalls(programs.msmFinal);
   programs.msmFinal = reuseTerminalScalarOrder(programs.msmFinal);

@@ -23,8 +23,9 @@ export const STATE_BYTES = 160;
 // and every executor reads its witness bytes from there.
 export const EXEC_STATE_BYTES = 96;
 
-const straus = (from, to) => `        for (int t = ${from}; t < ${to}; t = t + 1) {
-            int b = int(w.split(t + 1)[0].split(t)[1] + 0x00);
+// Read original witness bytes as an unsigned little-endian integer; no encoding changes.
+const straus = (from, to, packedDigits = false) => `${packedDigits ? '        int digitWord=int(w+0x00);\n' : ''}        for (int t = ${from}; t < ${to}; t = t + 1) {
+            int b = ${packedDigits ? '(digitWord>>(t*8))%256' : 'int(w.split(t + 1)[0].split(t)[1] + 0x00)'};
             (rX, rY, rZ) = dbl(rX, rY, rZ);
             if (b % 16 != 0) { (int x0, int y0) = tab0(b % 16); (rX, rY, rZ) = madd(rX, rY, rZ, x0, y0); }
             if (b / 16 != 0) { (int x1, int y1) = tab64(b / 16); (rX, rY, rZ) = madd(rX, rY, rZ, x1, y1); }
@@ -38,7 +39,7 @@ const unpack = (size) => `        require(st.length == ${size});
 
 // cuts: [c0, c1, c2, c3]; executor k (input k) runs witness bytes [cuts[k], cuts[k + 1]).
 // backExec / backTerminal: length of the executor / terminal redeem push (header included).
-export const sourceExec = ({ cuts, backExec, backTerminal }) => `pragma cashscript ^0.14.0;
+export const sourceExec = ({ cuts, backExec, backTerminal, packedDigits = false }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmStage() {
     function spend(bytes st) {
@@ -49,7 +50,7 @@ ${unpack(EXEC_STATE_BYTES)}
         int from = ${cuts[0]}; int to = ${cuts[1]}; int next = 1; int back = ${backExec};
         if (k == 1) { from = ${cuts[1]}; to = ${cuts[2]}; next = 2; }
         if (k == 2) { from = ${cuts[2]}; to = ${cuts[3]}; next = 4; back = ${backTerminal}; }
-${straus('from', 'to')}
+${straus('from', 'to', packedDigits)}
         bytes u = tx.inputs[next].unlockingBytecode;
         require(u.split(u.length - back - ${EXEC_STATE_BYTES})[1].split(${EXEC_STATE_BYTES})[0] ==
             toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32));
@@ -58,14 +59,14 @@ ${straus('from', 'to')}
 `;
 
 // Carried pushes (bottom to top): n1, n0, zInv, st.
-export const sourceFinal = ({ from, genIdx = 3 }) => `pragma cashscript ^0.14.0;
+export const sourceFinal = ({ from, genIdx = 3, packedDigits = false }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmFinal() {
     function spend(bytes st, int zInv, int n0, int n1) {
 ${unpack(STATE_BYTES)}
         require(within(n0, 0, ${R})); require(within(n1, 0, ${R}));
         bytes w = st.split(64)[0];
-${straus(from, 64)}
+${straus(from, 64, packedDigits)}
         (rX, rY, rZ) = madd(rX, rY, rZ, ${FINAL.x}, ${FINAL.y});
         require((rZ * zInv) % ${P} == 1);
         int zi2 = (zInv * zInv) % ${P};
@@ -75,7 +76,7 @@ ${straus(from, 64)}
         require((rY * (zi2 * zInv % ${P})) % ${P} == int(g.split(195)[0].split(163)[1]));
         int s0lo = 0; int s1lo = 0; int s0hi = 0; int s1hi = 0;
         for (int t = 0; t < 64; t = t + 1) {
-            int b = int(w.split(t + 1)[0].split(t)[1] + 0x00);
+            int b = ${packedDigits ? '(digitWord>>(t*8))%256' : 'int(w.split(t + 1)[0].split(t)[1] + 0x00)'};
             int lo = b % 16; int hi = b / 16;
             s0lo = 2 * s0lo + lo % 2 + lo / 2 % 2 * ${LAM};
             s1lo = 2 * s1lo + lo / 4 % 2 + lo / 8 * ${LAM};

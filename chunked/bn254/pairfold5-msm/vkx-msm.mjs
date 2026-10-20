@@ -66,8 +66,8 @@ function tab64(int idx) returns (int, int) {
 }`;
 
 // One Straus position per witness byte (MSB-first).
-const straus = (count, wName) => `        for (int t = 0; t < ${count}; t = t + 1) {
-            int b = int(${wName}.split(t + 1)[0].split(t)[1] + 0x00);
+const straus = (count, wName, packedDigits = false) => `${packedDigits ? `        int digitWord=int(${wName}+0x00);\n` : ''}        for (int t = 0; t < ${count}; t = t + 1) {
+            int b = ${packedDigits ? '(digitWord>>(t*8))%256' : `int(${wName}.split(t + 1)[0].split(t)[1] + 0x00)`};
             (rX, rY, rZ) = dbl(rX, rY, rZ);
             if (b % 16 != 0) { (int x0, int y0) = tab0(b % 16); (rX, rY, rZ) = madd(rX, rY, rZ, x0, y0); }
             if (b / 16 != 0) { (int x1, int y1) = tab64(b / 16); (rX, rY, rZ) = madd(rX, rY, rZ, x1, y1); }
@@ -78,7 +78,7 @@ const straus = (count, wName) => `        for (int t = 0; t < ${count}; t = t + 
 // noPad: no pad parameter (when input A's code is carried by another input that has its own pad).
 // pinEnd {idx, back, size}: pin the state as the prefix of input idx's size-byte push that ends
 // `back` bytes before the end of its unlocking (instead of input bIdx's front push).
-export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false, noPad = false, pinEnd = null, pinN = null }) => `pragma cashscript ^0.14.0;
+export const sourceA = ({ split, genIdx, bIdx, genesisRedeemPushBytes, pubIdx = 36, ownInputs = false, noPad = false, pinEnd = null, pinN = null, packedDigits = false }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmA() {
     function spend(${pinN ? '' : `${ownInputs ? 'int n0, int n1, ' : ''}bytes wa${noPad ? '' : ', bytes unused pad'}`}) {
@@ -112,7 +112,7 @@ ${ownInputs || pinN ? '' : `        bytes g = tx.inputs[${genIdx}].unlockingByte
         require(w0.length == l0);
 `}${pinN ? '' : `        require(within(n0, 0, ${R})); require(within(n1, 0, ${R}));`}
         int rX = ${Q0.x}; int rY = ${Q0.y}; int rZ = 1;
-${straus(64 - split, 'wa')}
+${straus(64 - split, 'wa', packedDigits)}
 ${pinN ? `        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32);
 ` : `        bytes st = toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) +
             toPaddedBytes(n0, 32) + toPaddedBytes(n1, 32) + wa;
