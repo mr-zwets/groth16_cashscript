@@ -23,14 +23,22 @@ and the complete original vector objects. Its fixture origin is benchmark commit
 
 ## Current default export
 
-The default `bytes` profile emits **4,183 locking bytes**, a **208-byte primary
-witness**, and **85 bytes of transaction overhead**: **4,476 bytes total**.
+The default `bytes` profile emits **4,174 locking bytes**, a **208-byte primary
+witness**, and **85 bytes of transaction overhead**: **4,467 bytes total**.
 Locking SHA256:
-`332fdd4dbbd5468afc997a49571e15ed88d04c6dda6ccff5863e1dfb0568e3dd`.
+`ad1463ce75596a0b8a5be241930db24ec563777825f22b3bde05d0a27bff0c10`.
 The same normal builder command above exports both the single-proof and
 multiproof vectors; both use this exact program. The manifest records the
 source hash, each function body and the selected profile. There are 72 function
-bodies in the default profile. Primary relaxed-VM operation cost is 5,519,594,621.
+bodies in the default profile. Primary relaxed-VM operation cost is 5,516,862,143.
+
+The final Fp12 exponent loop now shifts its remaining exponent instead of
+shifting the original exponent by an incrementing bit index. The exponent is
+still derived exactly as `(P^12 - 1) / R`; its 2,790 bits and 1,376 set bits
+produce the same multiply/square schedule. The unused counter stack slot remains
+to preserve every field-helper stack index. All 72 function bodies, earlier main
+instructions, and identity checks stay exact. This saves nine program bytes and
+2,732,478 primary op-cost against the previous 4,183-byte program.
 
 A and C use x plus a one-bit y parity, replacing their full y coordinates
 (primary witness: 272 -> 208 bytes). The verifier recomputes y from

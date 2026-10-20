@@ -2291,20 +2291,12 @@ OP_1SUB
 OP_SWAP
 OP_DIV
 # Full generic final exponentiation and Fp12 identity check.
+# Shift the remaining positive exponent; keep the unused counter slot for the field ABI.
 OP_0
 OP_BEGIN
-OP_DUP
-push e60a
-OP_LESSTHAN
-OP_DUP
-OP_TOALTSTACK
-OP_IF
-OP_2DUP
-OP_RSHIFTNUM
+OP_OVER
 OP_2
 OP_MOD
-OP_1
-OP_NUMEQUAL
 OP_IF
 call outline_63
 OP_8
@@ -2337,7 +2329,6 @@ OP_ROLL
 push 19
 OP_ROLL
 OP_ENDIF
-OP_1ADD
 OP_ROT
 OP_3
 OP_ROLL
@@ -2356,8 +2347,11 @@ OP_13
 OP_ROLL
 OP_13
 OP_ROLL
-OP_ENDIF
-OP_FROMALTSTACK
+OP_SWAP
+OP_1
+OP_RSHIFTNUM
+OP_SWAP
+OP_OVER
 OP_NOT
 OP_UNTIL
 OP_DROP
