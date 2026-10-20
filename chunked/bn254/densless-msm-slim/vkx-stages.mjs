@@ -59,7 +59,7 @@ ${straus('from', 'to', packedDigits)}
 `;
 
 // Carried pushes (bottom to top): n1, n0, zInv, st.
-export const sourceFinal = ({ from, genIdx = 3, packedDigits = false }) => `pragma cashscript ^0.14.0;
+export const sourceFinal = ({ from, genIdx = 3, packedDigits = false, glvComponents = false }) => `pragma cashscript ^0.14.0;
 ${helpers}
 contract VkxMsmFinal() {
     function spend(bytes st, int zInv, int n0, int n1) {
@@ -74,7 +74,19 @@ ${straus(from, 64, packedDigits)}
         require(g.split(3)[0] == 0x4dc001);
         require((rX * zi2) % ${P} == int(g.split(163)[0].split(131)[1]));
         require((rY * (zi2 * zInv % ${P})) % ${P} == int(g.split(195)[0].split(163)[1]));
-        int s0lo = 0; int s1lo = 0; int s0hi = 0; int s1hi = 0;
+${glvComponents ? `        // Four packed components keep low/high binary halves at offsets 0 and 64.
+        // The low half has at most t bits after t<=64 iterations, so no carry crosses bit64.
+        int k0=0; int k1=0; int k2=0; int k3=0;
+        for (int t=0; t<64; t=t+1) {
+            int b=(digitWord>>(t*8))%256;
+            int lo=b%16; int hi=b/16;
+            k0=2*k0+lo%2+((hi%2)<<64);
+            k1=2*k1+lo/2%2+((hi/2%2)<<64);
+            k2=2*k2+lo/4%2+((hi/4%2)<<64);
+            k3=2*k3+lo/8+((hi/8)<<64);
+        }
+        require((k0+${LAM}*k1)%${R}==n0);
+        require((k2+${LAM}*k3)%${R}==n1);` : `        int s0lo = 0; int s1lo = 0; int s0hi = 0; int s1hi = 0;
         for (int t = 0; t < 64; t = t + 1) {
             int b = ${packedDigits ? '(digitWord>>(t*8))%256' : 'int(w.split(t + 1)[0].split(t)[1] + 0x00)'};
             int lo = b % 16; int hi = b / 16;
@@ -84,7 +96,7 @@ ${straus(from, 64, packedDigits)}
             s1hi = 2 * s1hi + hi / 4 % 2 + hi / 8 * ${LAM};
         }
         require((s0hi * ${1n << 64n} + s0lo) % ${R} == n0);
-        require((s1hi * ${1n << 64n} + s1lo) % ${R} == n1);
+        require((s1hi * ${1n << 64n} + s1lo) % ${R} == n1);`}
     }
 }
 `;
