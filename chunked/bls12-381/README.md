@@ -37,6 +37,91 @@ also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` 
 - `bch-groth16-bls12381-intratx-residue-large`: 3 inputs / 164,426 script B / 164,579 score B /
   164,474 wire B / 149,814,405 op-cost on the proposed 100 kB-script VM; non-standard by total size.
 
+## Nine-input Fiat-Shamir candidate
+
+`RPA_FUSE_COORDINATOR_HEAD=1 RPA_CACHE_COORDINATOR_PREFIX=1` adds a default-off
+nine-input layout. With the pinned scheduled compiler
+`efc6ab80d9cbbea06c3c364b8fd5e915b9da84b4`, its primary challenge score is
+**60,626 bytes** (60,219 script + 407 overhead; 60,311-byte spend transaction).
+Actual native primary opcost is **37,855,684 consensus / 38,025,924 standard**.
+Relative to the existing ten-input point, this saves **1,626 bytes**, one input,
+and **92,464 / 95,536** primary cost units. The ten- and eleven-input profiles
+remain reproducible with their existing flags.
+
+The quotient head joins the coordinator in root input 0. The root checks the
+ordered eight-worker locking commitment inline before loading the complete
+coordinator arithmetic from four existing funding payloads and a literal data
+push in the First/Tail worker. That imported program excludes the expected
+worker hash, avoiding a cryptographic hash fixed point. The root reuses the
+existing arithmetic library after a guarded ABI remapping. All 21 logical stages
+and all 46 archived proof argument pushes retain their values and encodings.
+
+Each input caches only the first 870 bytes of encoded root header/statement under
+raw function key 67. The installed body is one literal PUSHDATA2 data push;
+witness bytes are never executed. Rewriting is restricted to exact bounded
+header/statement reads. Full-root and quotient readers keep their original
+inputs. The inline ACTIVEBYTECODE framing check and final sibling commitment
+protect the imported program and its offsets.
+
+Qualification covers ten archived fixtures, 3,520 source owning/whole rejection
+checks, and 1,072 actual native contexts: 20 accepted and 1,052 rejected, with all
+180 positive input prices reconciled. All 164 previous invalid cases and 336 direct
+origin records remain represented, including explicit relocation of four old
+carrier attacks. Ten new bad-code/rebound-producer controls cover all five code
+carriers. Maximum sampled native cost is 49,501,698 / 49,850,498; minimum sampled
+per-input headroom is 54,639 / 48,751. Maximum sampled score is 80,786 bytes.
+The cache-disabled normal export is byte-identical to the published ten-input
+profile. These are finite corpus results, not arbitrary-proof resource bounds,
+a universal soundness theorem, or a live-relay result. Existing FS-PIT, G2/G1
+validation grades and campaign limitations remain unchanged.
+
+Run from this directory with the compiler above (the JSON padding is encoded
+funding data reused by the coordinator, not newly added padding):
+
+```sh
+RPA_COORDINATOR_DENSITY_PADDING='0' \
+RPA_EXPORT_RESOURCE_BYTECODES='1' \
+RPA_INVERSES='off' \
+RPA_PIC32='1' \
+RPA_PIC_BLOCK2_DENSITY_PADDING='0' \
+RPA_PIC_BLOCK4_DENSITY_PADDING='0' \
+RPA_PIC_LAYOUT='regular' \
+RPA_Q_TAIL_COEFFICIENTS='22' \
+RPA_REGULAR_DENSITY_PADDING='{}' \
+RPA_SKIP_GAMMA='1' \
+RPA_TEMPLATE_FACTOR_DENSITY_PADDING='0' \
+RPA_TEMPLATE_RUN='1' \
+RPA_TEMPLATE_TAIL_DENSITY_PADDING='0' \
+RPA_TEMPLATE_TERMINAL_DENSITY_PADDING='0' \
+RPA_COMPACT_ARITHMETIC_PRIME_KEY='-1' \
+RESCHEDULE='on' \
+RPA_COMPACT_REGULAR_DENSITY_PADDING='{"3": 288, "5": 281, "6": 229, "7": 0, "8": 0, "9": 225, "10": 226, "11": 234, "12": 229, "13": 236, "14": 252, "16": 262, "17": 232, "18": 236, "19": 0}' \
+RPA_TEMPLATE_COMMON_PRIME_POOL='on' \
+RPA_PROOF_FIXTURE='committed' \
+RPA_TEMPLATE_TERMINAL_PRIME_POOL='on' \
+RPA_FUSE_FINAL_PAIR='1' \
+RPA_SCHEDULE_COORDINATOR='1' \
+RPA_GROUP_DENSITY_PADDING='0' \
+RPA_FUSE_REGULAR_PAIR='1' \
+RPA_SCHEDULE_PIC_AUTH='1' \
+RPA_FUSE_REGULAR_PAIRS='1' \
+RPA_FUSE_REGULAR_TRIPLES='1' \
+RPA_FUSE_CARRIER_PAIR='1' \
+RPA_FUSE_MIDDLE_PAIR='1' \
+RPA_ARITHMETIC_REGULAR_CARRIER='1' \
+RPA_FUSE_FIRST_TAIL_PAIR='1' \
+RPA_BUNDLE_REGULAR_MAIN='1' \
+RPA_LAZY_PAIR_PRODUCT='1' \
+RPA_FUSE_RELATIONS='1' \
+RPA_FINAL_RELATION_TOTAL='1' \
+RPA_EVAL6_PAIRED='1' \
+RPA_COORDINATOR_TAIL_BYTES='0' \
+RPA_FUSE_COORDINATOR_HEAD='1' \
+RPA_CACHE_COORDINATOR_PREFIX='1' \
+RPA_TEMPLATE_CASHC='/path/to/zk-language/packages/cashc/dist/compiler.js' \
+node measure_d3_two_chart_binary.mjs
+```
+
 ## Optimizations (prepared batched Miller + lazy reduction)
 
 The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B op to
