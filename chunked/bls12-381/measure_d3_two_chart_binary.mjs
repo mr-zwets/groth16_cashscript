@@ -8,6 +8,7 @@
 // proof-independent resource certificate compose these measurements into the frozen
 // ten-fixture result and resource artifacts.
 import { createHash } from 'node:crypto';
+import { carryCoordinatorTail } from './_coordinator_tail.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import {
@@ -72,6 +73,9 @@ const LAZY_PAIR_PRODUCT=process.env.RPA_LAZY_PAIR_PRODUCT==='1';
 const FUSE_RELATIONS=process.env.RPA_FUSE_RELATIONS==='1';
 const FINAL_RELATION_TOTAL=process.env.RPA_FINAL_RELATION_TOTAL==='1';
 const EVAL6_PAIRED=process.env.RPA_EVAL6_PAIRED==='1';
+const COORDINATOR_TAIL_BYTES=Number(process.env.RPA_COORDINATOR_TAIL_BYTES??0);
+if(!Number.isInteger(COORDINATOR_TAIL_BYTES)||COORDINATOR_TAIL_BYTES<0)throw new Error('invalid coordinator tail limit');
+if(COORDINATOR_TAIL_BYTES&&(!EVAL6_PAIRED||!FUSE_REGULAR_TRIPLES))throw new Error('coordinator tail requires the paired-eval6 triples profile');
 if(EVAL6_PAIRED&&!FINAL_RELATION_TOTAL)throw new Error('paired eval6 requires the final-total arithmetic profile');
 if(FINAL_RELATION_TOTAL&&!FUSE_RELATIONS)throw new Error('final relation total requires the relation-fusion profile');
 if(FUSE_RELATIONS&&(!LAZY_PAIR_PRODUCT||!process.env.RPA_TEMPLATE_CASHC))throw new Error('relation fusion requires the scheduled lazy-pair Regular profile');
@@ -3893,11 +3897,10 @@ for(const group of regularGroups){
   if(group.first===2)assert(equalBytes(redeem.slice(-regularCarrierSuffix.length),regularCarrierSuffix),'carrier raw suffix owner');
   groupedRegularRedeems.set(group.first,redeem);templateBlockRedeems[group.first]=redeem;
 }
-const templateSiblingLockings = templateBlockRedeems.filter(
-  (_, index) => !groupContinuations.has(index) && (!FUSE_FINAL_PAIR || index!==20),
-).map(
-  (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)),
-);
+const templateWorkerBlocks = templateBlockRedeems.flatMap((_, index) =>
+  !groupContinuations.has(index) && (!FUSE_FINAL_PAIR || index!==20) ? [index] : []);
+const templateSiblingLockings = templateWorkerBlocks.map(index =>
+  encodeLockingBytecodeP2sh32(hash256(templateBlockRedeems[index])));
 const templateSiblingLockingDigest = sha256(concat(...templateSiblingLockings));
 const templateCoordinatorSource = coordinatorSource(
   templateSiblingLockingDigest,
@@ -3969,10 +3972,20 @@ for (let payloadLength = 0;
 assert(COORDINATOR_DENSITY_PADDING === 0 ||
   coordinatorDensityPadding.length === COORDINATOR_DENSITY_PADDING,
 'coordinator density padding cannot be encoded at the requested length');
-const templateCoordinatorRedeem = concat(
+let templateCoordinatorRedeem = concat(
   coordinatorDensityPadding,
   templateCoordinatorCoreRedeem,
 );
+const finalTemplateRedeems = templateBlockRedeems.slice();
+let coordinatorTailCarrier;
+if(COORDINATOR_TAIL_BYTES){
+  const carried=carryCoordinatorTail(templateCoordinatorRedeem,templateWorkerBlocks.map(block=>({
+    block,input:physicalBlock(block),redeem:templateBlockRedeems[block],
+  })),COORDINATOR_TAIL_BYTES);
+  templateCoordinatorRedeem=carried.coordinator;
+  for(const[block,redeem]of carried.workers)finalTemplateRedeems[block]=redeem;
+  coordinatorTailCarrier=carried.info;
+}
 const siblingLockings = [...blockRedeems, ...quotientRedeems].map(
   (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)),
 );
@@ -4041,7 +4054,7 @@ const makeTemplateInputs = () => {
     ),
   }, ...blockPayloads.map((payload, index) => {
     const evaluation = blockEvaluationPayloads[index];
-    const redeem = templateBlockRedeems[index];
+    const redeem = finalTemplateRedeems[index];
     const quotientChunk = index === FUSED_QUOTIENT_BLOCK_INDEX
       ? fusedQuotientHeadPayload
       : index === FUSED_QUOTIENT_TAIL_BLOCK_INDEX
@@ -4063,13 +4076,13 @@ const makeTemplateInputs = () => {
     };
   })];
   for(const group of regularGroups){
-    logicalInputs[group.first+1].unlocking=concat(...group.members.flatMap(block=>[encodeDataPush(blockPayloads[block]),encodeDataPush(blockEvaluationPayloads[block]),...(logicalInputs[block+1].quotientChunk===null?[]:[encodeDataPush(logicalInputs[block+1].quotientChunk)])]),encodeDataPush(groupedRegularRedeems.get(group.first)));
+    logicalInputs[group.first+1].unlocking=concat(...group.members.flatMap(block=>[encodeDataPush(blockPayloads[block]),encodeDataPush(blockEvaluationPayloads[block]),...(logicalInputs[block+1].quotientChunk===null?[]:[encodeDataPush(logicalInputs[block+1].quotientChunk)])]),encodeDataPush(finalTemplateRedeems[group.first]));
   }
   if (!FUSE_FINAL_PAIR) return logicalInputs;
   logicalInputs[20].unlocking = concat(
     encodeDataPush(blockPayloads[19]), encodeDataPush(blockEvaluationPayloads[19]),
     encodeDataPush(blockPayloads[20]), encodeDataPush(blockEvaluationPayloads[20]),
-    encodeDataPush(mixedRedeem),
+    encodeDataPush(finalTemplateRedeems[19]),
   );
   return logicalInputs.slice(0, 21).filter((_, index) => !groupContinuations.has(index-1));
 };
@@ -4245,6 +4258,7 @@ if (FUSE_FINAL_PAIR) {
   const data=verificationData(inputs),wire=encodeTransactionBch(data.transaction).length;
   const report={construction:FUSE_FIRST_TAIL_PAIR?'native-regular-initializer-first-tail-and-existing-groups':ARITHMETIC_REGULAR_CARRIER?'native-regular-initializer-and-existing-groups':FUSE_MIDDLE_PAIR?'native-fused-middle-carrier-pairs-regular-triples-and-final-pair':FUSE_CARRIER_PAIR?'native-fused-carrier-pair-regular-triples-and-final-pair':FUSE_REGULAR_TRIPLES?'native-fused-regular-triples-and-final-pair':FUSE_REGULAR_PAIRS?'native-fused-multiple-regular-and-final-pairs':FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
     coordinatorScheduled:SCHEDULE_COORDINATOR,
+    ...(coordinatorTailCarrier?{coordinatorTailCarrier}:{}),
       ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
     ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_TRIPLES ? {regularTriplesFused:true,...(FUSE_CARRIER_PAIR?{carrierPairFused:true}:{}),...(FUSE_MIDDLE_PAIR?{middlePairFused:true}:{}),...(ARITHMETIC_REGULAR_CARRIER?{arithmeticRegularCarrier:true}:{}),...(BUNDLE_REGULAR_MAIN?{regularMainBundled:true,regularInitializerId:Number(REGULAR_INITIALIZER_ID)}:{}),...(LAZY_PAIR_PRODUCT?{lazyPairProduct:true}:{}),...(FUSE_RELATIONS?{relationsFused:true}:{}),...(FINAL_RELATION_TOTAL?{finalRelationTotal:true}:{}),...(EVAL6_PAIRED?{eval6Paired:true}:{}),...(FUSE_FIRST_TAIL_PAIR?{firstTailPairFused:true}:{}),regularGroups} : FUSE_REGULAR_PAIRS ? {regularPairsFused:true,...(PACK_REGULAR_PAIR_MAPS?{packedRegularMaps:true}:{}),regularGroups:regularGroups.map(({first,last,funding})=>({first,second:last,funding}))} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:frameOrdinal(index)}))} : {}),
     inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
