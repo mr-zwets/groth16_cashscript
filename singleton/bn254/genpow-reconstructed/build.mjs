@@ -18,6 +18,7 @@ const hash = value => createHash('sha256').update(value).digest('hex');
 export function assemble(source, {profile = 'bytes'} = {}) {
   const profiles = {
     bytes: [],
+    factored: [],
     balanced: ['outline_70', 'outline_71'],
     cost: ['outline_69', 'outline_70', 'outline_71'],
     light: ['outline_71'],
@@ -60,6 +61,71 @@ export function assemble(source, {profile = 'bytes'} = {}) {
     }
   }
   assert(main && !current && functions.size > 0, 'complete assembly required');
+  if (profile === 'factored') {
+    // For canonical f, H=(P^4-P^2+1)/r and h=Frob2(f^H)*f^H give
+    // f^((P^12-1)/r)=1 iff h is a nonzero element of Fp6.
+    // Existing field calls own multiplication; only the final verdict changes.
+    const op = (command, ...args) => ({command, args, where: 'factored final exponent'});
+    const same = line => [line.command, ...line.args];
+    const begin = main.lines.findLastIndex(line => line.command === 'OP_BEGIN');
+    const until = main.lines.findLastIndex(line => line.command === 'OP_UNTIL');
+    assert(begin > 0 && until > begin && main.lines[begin - 1].command === 'OP_0',
+      'expected positive generic Fp12 exponent loop');
+    assert(main.lines.slice(until + 1, until + 15).every(line =>
+      line.command === 'OP_DROP' && line.args.length === 0), 'expected fourteen loop cleanup drops');
+    const tail = ['OP_11', 'OP_ROLL', 'OP_1', 'OP_NUMEQUALVERIFY'];
+    for (let depth = 10; depth >= 3; depth--) tail.push(`OP_${depth}`, 'OP_ROLL', 'OP_0', 'OP_NUMEQUALVERIFY');
+    tail.push('OP_ROT', 'OP_0', 'OP_NUMEQUALVERIFY', 'OP_SWAP', 'OP_0', 'OP_NUMEQUALVERIFY', 'OP_0', 'OP_NUMEQUAL');
+    assert.deepEqual(main.lines.slice(until + 15).map(same), tail.map(command => [command]),
+      'expected complete canonical Fp12 identity verdict');
+    const power = main.lines.slice(begin - 1, until + 15);
+    const prefix = main.lines.slice(0, begin - 1);
+    const oldExponent = ['OP_OVER', 'OP_ROT', 'OP_MUL', 'OP_DUP', 'OP_MUL', 'OP_DUP',
+      'OP_DUP', 'OP_MUL', 'OP_MUL', 'OP_1SUB', 'OP_SWAP', 'OP_DIV'];
+    const hardExponent = ['OP_SWAP', 'OP_DUP', 'OP_MUL', 'OP_DUP', 'OP_DUP', 'OP_MUL',
+      'OP_SWAP', 'OP_SUB', 'OP_1ADD', 'OP_SWAP', 'OP_DIV'];
+    assert.deepEqual(prefix.slice(-oldExponent.length).map(same), oldExponent.map(command => [command]),
+      'expected full exponent derivation from existing P and r');
+    prefix.splice(-oldExponent.length, oldExponent.length, ...hardExponent.map(command => op(command)));
+    for (const [name, id] of [['fp12_frob2', 72], ['fp12_power', 73], ['fp_mul_frob2', 74]]) {
+      assert(!functions.has(name) && ![...functions.values()].some(fn => fn.id === id),
+        `${name}: expected unused function name and ID ${id}`);
+    }
+    // The nontrivial cube root gives the Frob2 diagonal:
+    // 1,1,-(t+1),-(t+1),t,t,-t,-t,-1,-1,t+1,t+1.
+    const u = constants.BN_X;
+    const root = 18n*u**3n + 18n*u**2n + 9n*u + 1n;
+    assert.equal((root*root + root + 1n) % constants.P, 0n);
+    const frobenius = [];
+    const add = (...commands) => frobenius.push(...commands.map(command => op(command)));
+    for (let index = 0; index < 12; index++) {
+      add('OP_11', 'OP_ROLL');
+      if ([2, 3, 10, 11].includes(index)) add('OP_DUP');
+      if ([2, 3, 4, 5, 6, 7, 10, 11].includes(index)) frobenius.push(op('call', 'fp_mul_frob2'));
+      if ([2, 3, 10, 11].includes(index)) frobenius.push(op('call', 'fp_add'));
+      if ([2, 3, 6, 7, 8, 9].includes(index)) {
+        add('OP_0');
+        frobenius.push(op('call', 'fp_sub_top_minus_next'));
+      }
+    }
+    functions.set('fp12_frob2', {id: 72, lines: frobenius});
+    functions.set('fp12_power', {id: 73, lines: power});
+    functions.set('fp_mul_frob2', {id: 74, lines: [
+      op('push', Buffer.from(bigIntToVmNumber(root)).toString('hex')), op('call', 'fp_mul'),
+    ]});
+    const guard = [];
+    for (let depth = 1; depth <= 12; depth++) guard.push(
+      op(`OP_${depth}`), op('OP_PICK'), op('OP_DUP'), op('OP_0'),
+      op('OP_GREATERTHANOREQUAL'), op('OP_VERIFY'), op('call', 'prime'),
+      op('OP_LESSTHAN'), op('OP_VERIFY'),
+    );
+    const duplicate = Array.from({length: 12}, () => [op('OP_11'), op('OP_PICK')]).flat();
+    const subfield = Array.from({length: 6}, () => [op('OP_0'), op('OP_NUMEQUALVERIFY')]).flat();
+    const nonzero = [op('OP_0NOTEQUAL'), ...Array.from({length: 5}, () =>
+      [op('OP_SWAP'), op('OP_0NOTEQUAL'), op('OP_BOOLOR')]).flat()];
+    main.lines = [...prefix, ...guard, op('call', 'fp12_power'), ...duplicate,
+      op('call', 'fp12_frob2'), op('OP_1'), op('call', 'fp12_power'), ...subfield, ...nonzero];
+  }
   if (profile !== 'bytes') {
     const inline = new Map(profiles[profile].map(name => [name, functions.get(name)]));
     const lines = [...functions.values(), main].flatMap(fn => fn.lines);
@@ -165,7 +231,7 @@ function compressG1Witness(hex) {
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   assert([3, 4].includes(process.argv.length),
-    'usage: node build.mjs OUTPUT_DIRECTORY [bytes|balanced|cost|light|selective|expanded|lean|lean-expanded|lean-expanded64|lean-expanded64-65]');
+    'usage: node build.mjs OUTPUT_DIRECTORY [bytes|balanced|cost|light|selective|expanded|lean|lean-expanded|lean-expanded64|lean-expanded64-65|factored]');
   const profile = process.argv[3] ?? 'bytes';
   const here = new URL('./', import.meta.url);
   const source = readFileSync(new URL('verifier.asm', here), 'utf8');

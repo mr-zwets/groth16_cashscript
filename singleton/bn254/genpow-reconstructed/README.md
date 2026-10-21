@@ -23,22 +23,25 @@ and the complete original vector objects. Its fixture origin is benchmark commit
 
 ## Current default export
 
-The default `bytes` profile emits **4,174 locking bytes**, a **208-byte primary
-witness**, and **85 bytes of transaction overhead**: **4,467 bytes total**.
+The default `bytes` profile emits **4,152 locking bytes**, a **208-byte primary
+witness**, and **85 bytes of transaction overhead**: **4,445 bytes total**.
 Locking SHA256:
-`ad1463ce75596a0b8a5be241930db24ec563777825f22b3bde05d0a27bff0c10`.
+`0e2ec0dc2ba7c23307385b6b742f89903c278c5ab095561a4350914953c65b2f`.
 The same normal builder command above exports both the single-proof and
 multiproof vectors; both use this exact program. The manifest records the
 source hash, each function body and the selected profile. There are 72 function
-bodies in the default profile. Primary relaxed-VM operation cost is 5,516,862,143.
+bodies in the default profile. Primary relaxed-VM operation cost is 5,516,859,822.
 
 The final Fp12 exponent loop now shifts its remaining exponent instead of
 shifting the original exponent by an incrementing bit index. The exponent is
 still derived exactly as `(P^12 - 1) / R`; its 2,790 bits and 1,376 set bits
 produce the same multiply/square schedule. The unused counter stack slot remains
-to preserve every field-helper stack index. All 72 function bodies, earlier main
-instructions, and identity checks stay exact. This saves nine program bytes and
-2,732,478 primary op-cost against the previous 4,183-byte program.
+to preserve every field-helper stack index. All 72 function bodies and identity checks stay exact. The earlier loop update
+saved nine program bytes and 2,732,478 primary op-cost against the 4,183-byte
+program. The current verdict tail also removes eleven depth-10 rolls: rotating
+the top eleven items eleven times is identity. The following depth-11 roll
+remains and preserves the short-stack rejection boundary. This saves another
+22 program bytes and 2,321 primary cost units.
 
 A and C use x plus a one-bit y parity, replacing their full y coordinates
 (primary witness: 272 -> 208 bytes). The verifier recomputes y from
@@ -54,6 +57,48 @@ been removed; its historical implementation remains in Git history. Current
 reproduction is the source-owned builder and manifest above, with exact
 single-proof/multiproof artifact comparison and separate public VM gates. These
 checks do not constitute a universal equivalence or soundness certificate.
+
+## Factored alternate export
+
+```
+node singleton/bn254/genpow-reconstructed/build.mjs /tmp/genpow-factored factored
+```
+
+The `factored` profile emits **4,408 locking bytes**, the same **208-byte witness**,
+and **85 bytes overhead**: **4,701 bytes total**. Primary relaxed-VM operation
+cost is **2,049,440,569**, compared with 5,516,859,822 for the 4,445-byte default.
+It spends 256 more bytes for about 63% less cost. Locking SHA256:
+`955865f3ea49d9f93e0fb378b7d4f79944dac398c5eada1d8f8cd1cc5a76813d`.
+Both tradeoffs remain available; the default does not use the new field predicate.
+
+Let `r=P-6u^2`, `H=(P^4-P^2+1)/r`, `g=f^H`, and `h=Frob2(g)*g`. For canonical
+`f` in Fp12, `f^((P^12-1)/r)=1` iff `h` is a nonzero element of Fp6. The profile
+checks the upper six limbs of `h` are zero and at least one lower limb is nonzero.
+The explicit nonzero condition rejects `f=0`; no field inverse is needed.
+
+The existing P/r derivation computes H directly instead of the full exponent.
+The unchanged generic multiply/square loop owns exponentiation, with a second
+exponent-one call computing the final product. Frobenius uses one shared root
+`t=18u^3+18u^2+9u+1` and the diagonal
+`1,1,-(t+1),-(t+1),t,t,-t,-t,-1,-1,t+1,t+1`. Three helpers are added to the
+original 72 bodies, giving 75 functions. `build.mjs` owns these source-level
+statements and the guarded main transformation; it does not patch old bytecode.
+
+All twelve incoming final-field limbs must satisfy `0 <= limb < P`. This can
+reject noncanonical encodings accepted by the previous relaxed program. The
+canonical guard, existing proof/input/G2/Miller code, and original proof,
+witness and public values are fixed in the qualification cohort.
+
+Independent checks cover the exact Fp12 multiply/square polynomial on canonical
+limbs, nonnegative modular-reduction intervals, and Frobenius coefficients from
+an independent quotient-ring basis. Actual native helper kernels cover the
+field basis, Frobenius, both exponent constants, canonical boundaries and the
+nonzero predicate. Whole-verifier validation uses the published relaxed VM:
+four fixed valid proofs pass, four fixed invalid witnesses and nine generic
+public-input mutations reject. These establish the stated finite corpus and
+conditional final-field identities, not universal Groth16 soundness or input
+validation. Both profiles exceed current native resource limits; no bch-spec
+admission is claimed. Existing security/input-validation grades stay unchanged.
 
 ## Historical derivation
 
