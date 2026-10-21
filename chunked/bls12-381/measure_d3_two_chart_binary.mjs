@@ -78,7 +78,8 @@ const FUSE_RELATIONS=process.env.RPA_FUSE_RELATIONS==='1';
 const FINAL_RELATION_TOTAL=process.env.RPA_FINAL_RELATION_TOTAL==='1';
 const EVAL6_PAIRED=process.env.RPA_EVAL6_PAIRED==='1';
 const FUSE_COORDINATOR_HEAD=process.env.RPA_FUSE_COORDINATOR_HEAD==='1';
-const CACHE_COORDINATOR_PREFIX=process.env.RPA_CACHE_COORDINATOR_PREFIX==='1';
+const COORDINATOR_PREFIX_MODE=process.env.RPA_CACHE_COORDINATOR_PREFIX;
+const CACHE_COORDINATOR_PREFIX=COORDINATOR_PREFIX_MODE==='1'||COORDINATOR_PREFIX_MODE==='fields';
 if(CACHE_COORDINATOR_PREFIX&&!FUSE_COORDINATOR_HEAD)throw new Error('coordinator prefix cache requires the fused root profile');
 if(FUSE_COORDINATOR_HEAD&&(!FUSE_FIRST_TAIL_PAIR||!EVAL6_PAIRED))throw new Error('coordinator-head fusion requires paired-eval6 First/Tail profile');
 const COORDINATOR_TAIL_BYTES=Number(process.env.RPA_COORDINATOR_TAIL_BYTES??0);
@@ -1215,7 +1216,7 @@ assert(mod(quotientAccumulator * modulusAtAlpha) === evaluationSum,
 
 const pushHeaderLength = (payloadLength) => encodeDataPush(new Uint8Array(payloadLength)).length - payloadLength;
 const coordinatorArgumentBytes=encodeDataPush(transcriptHeader).length+encodeDataPush(statementBytes).length;
-const coordinatorPrefixCache=CACHE_COORDINATOR_PREFIX?coordinatorPrefix(encodeDataPush(transcriptHeader).length,encodeDataPush(statementBytes).length):null;
+const coordinatorPrefixCache=CACHE_COORDINATOR_PREFIX?coordinatorPrefix(encodeDataPush(transcriptHeader).length,encodeDataPush(statementBytes).length,{splitFields:COORDINATOR_PREFIX_MODE==='fields'}):null;
 const rootArgumentBytes=coordinatorArgumentBytes+encodeDataPush(blockPayloads[4]).length+encodeDataPush(blockEvaluationPayloads[4]).length+encodeDataPush(fusedQuotientHeadPayload).length;
 const producerExpression=inputIndex=>`tx.inputs[${physicalInput(inputIndex)}].unlockingBytecode`+(FUSE_COORDINATOR_HEAD&&inputIndex===5?`.split(${coordinatorArgumentBytes})[1]`:'');
 const firstPushExpression = (inputIndex, payloadLength) => {
@@ -3375,7 +3376,7 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
         const sharedKeys=new Set(candidateArithmeticInstructions.filter((_,index)=>index%3===1).map(arithmeticFunctionKey));
         sharedKeys.add(functionKey(templateCommonFunctionId(template)));
         sharedKeys.add(functionKey(TEMPLATE_EXTRA_FUNCTION_ID));
-        if(coordinatorPrefixCache)sharedKeys.add(coordinatorPrefixCache.functionKey);
+        if(coordinatorPrefixCache)for(const key of coordinatorPrefixCache.functionKeys)sharedKeys.add(key);
         for(let index=0;index<instructions.length;index++)if(instructions[index].opcode===OP.INVOKE)
           assert(index>0&&sharedKeys.has(arithmeticFunctionKey(instructions[index-1])),
             'final-total mixed template calls only its shared owners');
@@ -4001,7 +4002,7 @@ if(FUSE_COORDINATOR_HEAD){
   const libraryLoad=concat(loadTemplateBody(arithmeticCarrier,templateCarrierLengths.get(arithmeticCarrier.name)+regularCarrierSuffix.length,arithmeticCarrier.regularInitializerStart,arithmeticCarrier.regularInitializerStart+templateArithmeticLength,17),pushVmNumber(17),Uint8Array.of(OP.INVOKE));
   const fused=fuseCoordinatorHead({argumentBytes:rootArgumentBytes,prefix:concat(picAuthHelperPush,Uint8Array.of(OP.DROP),picFixedBlobPush,Uint8Array.of(OP.DROP)),head,delegated:templateCoordinatorCoreRedeem,libraryLoad,workerPrelude:coordinatorPrefixCache?.initializer,workers:templateWorkerBlocks.map(block=>({block,input:physicalBlock(block),redeem:templateBlockRedeems[block]})),compileBinding:digest=>{const source=`pragma cashscript ^0.14.0;\ncontract CoordinatorWorkerBinding() { function spend() {\n${workerBindingSource(digest,TEMPLATE_TOTAL_INPUTS).join('\n')}\n} }`;const artifact=scheduledCompiler.compileString(source,{rescheduleStacks:true,renumberFunctionIds:false,optimizeFor:'size'});return Uint8Array.from(Buffer.from(artifact.debug.bytecode,'hex'));}});
   templateCoordinatorRedeem=fused.coordinator;for(const[block,redeem]of fused.workers)finalTemplateRedeems[block]=redeem;
-  coordinatorHeadFusion={...fused.info,arithmetic:coordinatorArithmeticRemapping,...(coordinatorPrefixCache?{prefixCache:{functionKey:coordinatorPrefixCache.functionKey,bytes:coordinatorPrefixCache.prefixBytes,initializerBytes:coordinatorPrefixCache.initializer.length}}:{})};
+  coordinatorHeadFusion={...fused.info,arithmetic:coordinatorArithmeticRemapping,...(coordinatorPrefixCache?{prefixCache:{functionKey:coordinatorPrefixCache.functionKey,bytes:coordinatorPrefixCache.prefixBytes,initializerBytes:coordinatorPrefixCache.initializer.length,...(COORDINATOR_PREFIX_MODE==='fields'?{splitFields:true,functionKeys:coordinatorPrefixCache.functionKeys}:{})}}:{})};
 }
 if(COORDINATOR_TAIL_BYTES){
   const carried=carryCoordinatorTail(templateCoordinatorRedeem,templateWorkerBlocks.map(block=>({

@@ -14,7 +14,9 @@ const same = (a, b) => binToHex(a) === binToHex(b);
 const rawKey = Uint8Array.of(0x67);
 
 // Cache a literal data push, never executable bytes supplied by the witness.
-export function coordinatorPrefix(headerBytes, statementBytes) {
+export function coordinatorPrefix(headerBytes, statementBytes, {splitFields = false} = {}) {
+  require(typeof splitFields === 'boolean', 'invalid prefix cache mode');
+  const functionKeys = splitFields ? ['67', '68'] : ['67'];
   const prefixBytes = headerBytes + statementBytes;
   require(Number.isInteger(headerBytes) && headerBytes > 0 &&
     Number.isInteger(statementBytes) && statementBytes > 0 && prefixBytes <= 65535,
@@ -22,17 +24,30 @@ export function coordinatorPrefix(headerBytes, statementBytes) {
   const encoded = encodeDataPush(new Uint8Array(prefixBytes));
   require(encoded.length - prefixBytes === 3 && encoded[0] === OP.OP_PUSHDATA_2,
     'coordinator prefix requires a three-byte PUSHDATA2 header');
-  const initializer = concat(Uint8Array.of(OP.OP_0, OP.OP_INPUTBYTECODE),
+  const wholeInitializer = concat(Uint8Array.of(OP.OP_0, OP.OP_INPUTBYTECODE),
     number(prefixBytes), Uint8Array.of(OP.OP_SPLIT, OP.OP_DROP),
     encodeDataPush(encoded.slice(0, 3)), Uint8Array.of(OP.OP_SWAP, OP.OP_CAT),
     encodeDataPush(rawKey), Uint8Array.of(OP.OP_DEFINE));
-  const call = decodeAuthenticationInstructions(concat(encodeDataPush(rawKey),
-    Uint8Array.of(OP.OP_INVOKE)));
+  const fieldHeader = bytes => {
+    const data = encodeDataPush(new Uint8Array(bytes));
+    return data.slice(0, data.length - bytes);
+  };
+  const defineField = (bytes, id) => concat(encodeDataPush(fieldHeader(bytes)),
+    Uint8Array.of(OP.OP_SWAP, OP.OP_CAT), encodeDataPush(Uint8Array.of(id)),
+    Uint8Array.of(OP.OP_DEFINE));
+  const initializer = splitFields ? concat(
+    Uint8Array.of(OP.OP_0, OP.OP_INPUTBYTECODE), number(prefixBytes),
+    Uint8Array.of(OP.OP_SPLIT, OP.OP_DROP), number(headerBytes),
+    Uint8Array.of(OP.OP_SPLIT), defineField(statementBytes, 0x68),
+    defineField(headerBytes, 0x67),
+  ) : wholeInitializer;
+  const call = id => decodeAuthenticationInstructions(concat(
+    encodeDataPush(Uint8Array.of(id)), Uint8Array.of(OP.OP_INVOKE)));
   const inspectNamespace = instructions => {
     instructions.forEach((instruction, index) => {
       if (![OP.OP_DEFINE, OP.OP_INVOKE].includes(instruction.opcode)) return;
       const id = key(instructions[index - 1]);
-      require(id !== undefined && id !== '67', 'coordinator prefix key is already owned');
+      require(id !== undefined && !functionKeys.includes(id), 'coordinator prefix key is already owned');
       if (instruction.opcode === OP.OP_DEFINE) {
         require(instructions[index - 2]?.data !== undefined,
           'coordinator prefix consumer has a nonliteral definition');
@@ -46,7 +61,7 @@ export function coordinatorPrefix(headerBytes, statementBytes) {
       'malformed coordinator prefix consumer');
     inspectNamespace(instructions);
     const mapped = [];
-    let sites = 0;
+    let sites = 0, removedBytes = 0;
     const literal = (index, value) => instructions[index] !== undefined &&
       same(encodeAuthenticationInstructions([instructions[index]]), number(value));
     for (let index = 0; index < instructions.length; index += 1) {
@@ -63,14 +78,17 @@ export function coordinatorPrefix(headerBytes, statementBytes) {
         instructions[index + 7]?.opcode === OP.OP_DROP;
       require(boundedHeader || boundedStatement,
         'coordinator read consumes more than its header or statement prefix');
-      mapped.push(...call);
+      const count = splitFields ? (boundedHeader ? 5 : 8) : 2;
+      removedBytes += encodeAuthenticationInstructions(instructions.slice(index, index + count)).length;
+      mapped.push(...call(splitFields && boundedStatement ? 0x68 : 0x67));
       sites += 1;
-      index += 1;
+      index += count - 1;
     }
     require(sites === expectedSites, 'coordinator prefix read sites changed');
     const result = encodeAuthenticationInstructions(mapped);
-    require(result.length === bytecode.length + sites, 'coordinator prefix call width changed');
+    require(result.length === bytecode.length - removedBytes + 3 * sites,
+      'coordinator prefix call width changed');
     return result;
   };
-  return { functionKey: '67', prefixBytes, initializer, rewrite };
+  return { functionKey: '67', functionKeys, prefixBytes, initializer, rewrite };
 }

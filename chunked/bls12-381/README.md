@@ -75,6 +75,34 @@ profile. These are finite corpus results, not arbitrary-proof resource bounds,
 a universal soundness theorem, or a live-relay result. Existing FS-PIT, G2/G1
 validation grades and campaign limitations remain unchanged.
 
+### Lower-cost field-cache alternative
+
+Set `RPA_CACHE_COORDINATOR_PREFIX=fields` with the same nine-input build flags
+to cache the encoded header and statement separately. The existing `=1` mode
+remains the minimum-byte option and reproduces its complete prior export exactly.
+
+| Cache mode | Total bytes | Native consensus primary | Native standard primary |
+| --- | ---: | ---: | ---: |
+| Combined prefix (`1`) | **60,626** | 37,855,684 | 38,025,924 |
+| Separate fields (`fields`) | 60,649 | **37,758,450** | **37,928,690** |
+
+The alternative spends 23 bytes for 97,234 fewer native units in either mode.
+Each input installs two literal-only data functions: 130 encoded header bytes
+under raw key `0x67`, and 740 encoded statement bytes under `0x68`. The 28-byte
+initializer splits one root prefix read; exact bounded slice patterns become
+calls to the appropriate function. The second key must be unused in every
+consumer. Header/statement, transcript and proof values remain exact; full-root,
+quotient and predecessor reads retain their original data. The existing framing,
+code-carrier commitment and shared arithmetic remain unchanged.
+
+All ten archived source fixtures pass 3,520 owning/whole rejection checks. Actual
+native replay covers 1,090 contexts: 20 accepted and 1,070 rejected, with 180 positive
+input prices reconciled. Every matched fixture costs 97,234 fewer units; maximum
+sampled cost is 49,404,464 consensus / 49,753,264 standard. Minimum sampled input
+headroom is 75,479 / 69,591. All 173 prior invalid transactions and 350 direct origin
+records are retained, including relocated code-carrier attacks. These finite
+measurements do not establish arbitrary-proof resource fit or universal soundness.
+
 Run from this directory with the compiler above (the JSON padding is encoded
 funding data reused by the coordinator, not newly added padding):
 
