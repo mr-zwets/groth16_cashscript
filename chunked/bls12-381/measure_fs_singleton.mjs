@@ -2157,8 +2157,11 @@ const { writeFileSync: fsWriteFileSync } = await import('node:fs');
 
 const FS_RESCHEDULE = process.env.FS_RESCHEDULE !== 'off';
 const FS_FIXED_VK = process.env.FS_FIXED_VK ?? 'witness';
+const FS_SHARE_PIC = process.env.FS_SHARE_PIC === '1';
+const FS_SHARE_REGULAR = process.env.FS_SHARE_REGULAR === '1';
 assert(['witness', 'program', 'slopes'].includes(FS_FIXED_VK), 'unknown FS_FIXED_VK encoding');
 const FS_BAKE_FIXED = FS_FIXED_VK !== 'witness';
+assert(!FS_SHARE_REGULAR || FS_BAKE_FIXED, 'shared regular blocks require public fixed VK tables');
 const FS_FIXED_SLOPES = FS_FIXED_VK === 'slopes';
 const FS_EXPORT_VECTORS = process.env.FS_EXPORT_VECTORS === '1';
 const hexByte = (value) => value.toString(16).padStart(2, '0');
@@ -2297,9 +2300,37 @@ fs.push(
   `        bytes fsScalar0=statementBlob.split(${public0Offset + 32})[0].split(${public0Offset})[1];`,
   `        bytes fsScalar1=statementBlob.split(${public1Offset + 32})[0].split(${public1Offset})[1];`,
 );
+const fsPicSource = FS_SHARE_PIC ? `function authenticatePic(
+    bytes record,bytes scalar0,bytes scalar1,int window,int carrier,bytes expectedRoot
+) returns (bool) {
+    bytes factor=record.split(${PIC_FACTOR_BYTES})[0];
+    bytes path=record.split(${PIC_FACTOR_BYTES})[1];
+    bytes digit=scalar0.split(window+1)[0].split(window)[1]
+        +scalar1.split(window+1)[0].split(window)[1];
+    bytes node=sha256(0x${hex(PIC_LEAF_TAG)}+toPaddedBytes(carrier,1)
+        +toPaddedBytes(window,1)+digit+factor);
+    int index=int(digit+toPaddedBytes(window,1)+0x00);
+    for (int level=0;level<16;level=level+1) {
+        bytes sibling=path.split(32)[0];
+        path=path.split(32)[1];
+        int parent=index>>1;
+        bytes prefix=0x${hex(PIC_NODE_TAG)}+toPaddedBytes(level+1,1)+toPaddedBytes(parent,4);
+        if (index%2==0) { node=sha256(prefix+node+sibling); }
+        else { node=sha256(prefix+sibling+node); }
+        index=parent;
+    }
+    require(index==window);
+    return node==expectedRoot;
+}
+` : '';
 picCache.windowRoots.forEach((rootHex, window) => {
   const carrierBlock = regularPicWindowBlocks[window];
   const slot = window % 2;
+  if (FS_SHARE_PIC) {
+    fs.push(`        require(authenticatePic(payload${carrierBlock}.split(${PIC_RECORD_REGION_OFFSET})[1]` +
+      `.split(${PIC_RECORD_BYTES})[${slot}],fsScalar0,fsScalar1,${window},${carrierBlock},0x${rootHex}));`);
+    return;
+  }
   fs.push(
     `        bytes fsRec${window}=payload${carrierBlock}.split(${PIC_RECORD_REGION_OFFSET})[1]` +
       `.split(${PIC_RECORD_BYTES})[${slot}];`,
@@ -2513,7 +2544,38 @@ const emitFsBlock = (record) => {
   }
   return lines;
 };
-blockRecords.forEach((record) => fs.push(...emitFsBlock(record)));
+const fsRegularMembers = templateClasses.find(template => template.name === 'Regular').members;
+const fsRegularBody = record => emitFsBlock(record).join('\n')
+  .replaceAll(`fb${record.blockIndex}`, 'fr')
+  .replaceAll(`payload${record.blockIndex}`, 'payload')
+  .replaceAll(`fixedVkTable${record.blockIndex}`, 'fixedTable')
+  .replaceAll(`block ${record.blockIndex}.`, 'block.');
+const fsRegularInputs = ['fsChainEval','fsChainFlag','relationPower','relationTotal',
+  'rXa','rXb','rYa','rYb','pairP0u','pairP0v','p3u','p3v','alpha','alpha2','alpha4','alpha5','beta'];
+const fsRegularOutputs = ['rXa','rXb','rYa','rYb','fsChainEval','fsChainFlag','relationPower','relationTotal'];
+let fsRegularSource = '';
+if (FS_SHARE_REGULAR) {
+  const body=fsRegularBody(blockRecords[fsRegularMembers[0]]);
+  for (const index of fsRegularMembers) {
+    assert(fsRegularBody(blockRecords[index])===body, `regular block ${index} body differs`);
+  }
+  fsRegularSource = `function regularFsBlock(bytes payload,bytes fixedTable,
+    ${fsRegularInputs.map(name => `int ${name}`).join(',')}
+) returns (${fsRegularOutputs.map(() => 'int').join(',')}) {
+    int state0=0; int state1=0;
+${body}
+    return ${fsRegularOutputs.join(',')};
+}
+`;
+}
+blockRecords.forEach(record => {
+  if (FS_SHARE_REGULAR && fsRegularMembers.includes(record.blockIndex)) {
+    fs.push(`        (${fsRegularOutputs.join(',')})=regularFsBlock(payload${record.blockIndex},` +
+      `fixedVkTable${record.blockIndex},${fsRegularInputs.join(',')});`);
+  } else {
+    fs.push(...emitFsBlock(record));
+  }
+});
 
 // Combined quotient: Horner over the single logical q132 blob, then the
 // terminal identity sum(beta^k r_k)(alpha) == q(alpha) * m(alpha).
@@ -2533,7 +2595,7 @@ fs.push(
   '    }',
   '}',
 );
-const fsSource = `${COMMON_SOURCE}${fsFixedLinesSource}${fs.join('\n')}\n`;
+const fsSource = `${COMMON_SOURCE}${fsFixedLinesSource}${fsPicSource}${fsRegularSource}${fs.join('\n')}\n`;
 if (process.env.FS_SOURCE_OUT !== undefined) fsWriteFileSync(process.env.FS_SOURCE_OUT, fsSource);
 
 const fsCompilerEntry = process.env.FS_CASHC;
