@@ -70,6 +70,8 @@ const ARITHMETIC_REGULAR_CARRIER=process.env.RPA_ARITHMETIC_REGULAR_CARRIER==='1
 const BUNDLE_REGULAR_MAIN=process.env.RPA_BUNDLE_REGULAR_MAIN==='1';
 const LAZY_PAIR_PRODUCT=process.env.RPA_LAZY_PAIR_PRODUCT==='1';
 const FUSE_RELATIONS=process.env.RPA_FUSE_RELATIONS==='1';
+const FINAL_RELATION_TOTAL=process.env.RPA_FINAL_RELATION_TOTAL==='1';
+if(FINAL_RELATION_TOTAL&&!FUSE_RELATIONS)throw new Error('final relation total requires the relation-fusion profile');
 if(FUSE_RELATIONS&&(!LAZY_PAIR_PRODUCT||!process.env.RPA_TEMPLATE_CASHC))throw new Error('relation fusion requires the scheduled lazy-pair Regular profile');
 if(LAZY_PAIR_PRODUCT&&(!ARITHMETIC_REGULAR_CARRIER||!BUNDLE_REGULAR_MAIN||process.env.RPA_COMPACT_ARITHMETIC_PRIME_KEY!=='-1'))throw new Error('lazy pair product requires the bundled Regular minus-one arithmetic profile');
 const REGULAR_INITIALIZER_ID=BUNDLE_REGULAR_MAIN?15n:-300n;
@@ -98,6 +100,7 @@ if(ARITHMETIC_REGULAR_CARRIER)for(const[first,bytes]of[[5,14],[8,14],[11,14],[16
 if(BUNDLE_REGULAR_MAIN)for(const[first,bytes]of[[5,13],[8,13],[11,13],[16,12]])regularGroups.find(group=>group.first===first).funding+=bytes;
 if(LAZY_PAIR_PRODUCT)for(const[first,bytes]of[[5,26],[8,25],[11,25],[16,26]])regularGroups.find(group=>group.first===first).funding-=bytes;
 if(FUSE_RELATIONS)for(const[first,bytes]of[[5,11],[8,11],[11,11],[16,10]])regularGroups.find(group=>group.first===first).funding-=bytes;
+if(FINAL_RELATION_TOTAL)for(const[first,bytes]of[[5,27],[8,27],[11,27],[16,28]])regularGroups.find(group=>group.first===first).funding-=bytes;
 if(regularGroups.some(({funding})=>!Number.isInteger(funding)||funding<0||funding>1000))throw new Error('Regular group funding is outside0..1000');
 const groupFrames = new Map(regularGroups.flatMap(group=>group.members.map((block,ordinal)=>[block,{group,ordinal}])));
 const frameOrdinal = block => block===20&&FUSE_FINAL_PAIR?1:groupFrames.get(block)?.ordinal??0;
@@ -1755,6 +1758,12 @@ const blockSource = (
       );
     }
   }
+  if (FINAL_RELATION_TOTAL) {
+    const last = lines.findLastIndex(line => line.startsWith('        (relationPower,relationTotal)=absorbRelation('));
+    const match = /^        \(relationPower,relationTotal\)=absorbRelation\(relationPower,relationTotal,([A-Za-z]+),beta\);$/.exec(lines[last]);
+    assert(match, 'last relation accumulation source shape');
+    lines[last] = `        relationTotal=mulAddFp(relationPower,${match[1]},relationTotal);`;
+  }
   lines.push(
     '        require(relationTotal==expectedTotal);',
     '    }',
@@ -2375,6 +2384,7 @@ const compileRelationTemplate=(template,original,arithmetic,prepared)=>{
     }
     return encodeAuthenticationInstructions(instructions);
   });
+  template.sourceFunctions=current.oldFunctions;
   template.functionMainStart=arithmetic.body.length+privateDefinitions.reduce((sum,bytes)=>sum+bytes.length,0);
   return concat(arithmetic.body,...privateDefinitions,after.main);
 };
@@ -3016,7 +3026,7 @@ templateClasses.forEach((template) => {
     remapArithmeticRemainder(template.core.slice(templateArithmeticOriginalLength)));
   if (arithmeticLeafId === -1 && template.name === 'Terminal') {
     const guardedPsi = Uint8Array.from(Buffer.from(
-      '82770250019d01417902f0007f7502c0007f7701007e810142790220017f7502f0007f7701007e8101437a0250017f750220017f77',
+      FINAL_RELATION_TOTAL ? '82770250019d01407902f0007f7502c0007f7701007e810141790220017f7502f0007f7701007e8101427a0250017f750220017f77' : '82770250019d01417902f0007f7502c0007f7701007e810142790220017f7502f0007f7701007e8101437a0250017f750220017f77',
       'hex',
     ));
     const offset = Buffer.from(template.core).indexOf(Buffer.from(guardedPsi));
@@ -3278,8 +3288,8 @@ const templateLayoutOrder = [
   templateCommonCarrier,
   ...templateClasses.filter(template=>template!==templateCommonCarrier&&(!ARITHMETIC_REGULAR_CARRIER||template!==arithmeticCarrier)),
 ];
-// Regular installs the shared arithmetic once. Terminal's only remaining
-// private helper moves out of Regular's namespace; the inverse pins its ABI.
+// Regular installs the shared arithmetic once. Final-total continuations use
+// only shared calls; other profiles remap their private helper and pin the inverse.
 const remapFusedPrivate = (bytecode, inverse = false) => {
   const from = inverse ? FUSED_TERMINAL_HELPER_ID : 13;
   const to = inverse ? 13 : FUSED_TERMINAL_HELPER_ID;
@@ -3323,10 +3333,24 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
     const record = blockRecords[template.representative];
     if ((FUSE_FINAL_PAIR && template.name === 'Terminal') || (FUSE_MIDDLE_PAIR && template.name === 'AdditionMiddle')) {
       const instructions = decodeAuthenticationInstructions(template.arithmeticRemainder);
+      if(FINAL_RELATION_TOTAL){
+        assert(Array.isArray(template.sourceFunctions)&&template.sourceFunctions.every(fn=>fn.id<13),
+          'final-total mixed template has no private source declarations');
+        assert(instructions.every(instruction=>!instruction.malformed&&instruction.opcode!==OP.DEFINE),
+          'final-total mixed template has no private bytecode definitions');
+        const sharedKeys=new Set(candidateArithmeticInstructions.filter((_,index)=>index%3===1).map(arithmeticFunctionKey));
+        sharedKeys.add(functionKey(templateCommonFunctionId(template)));
+        sharedKeys.add(functionKey(TEMPLATE_EXTRA_FUNCTION_ID));
+        for(let index=0;index<instructions.length;index++)if(instructions[index].opcode===OP.INVOKE)
+          assert(index>0&&sharedKeys.has(arithmeticFunctionKey(instructions[index-1])),
+            'final-total mixed template calls only its shared owners');
+      }else{
       assert((FUSE_RELATIONS ? hex(instructions[0].data??new Uint8Array())==='537a78008a7b72528a' : instructions[0].data?.length===12) && instructions[1].opcode === 0x5d &&
         instructions[2].opcode === OP.DEFINE && instructions[5]?.opcode !== OP.DEFINE,
       'mixed continuation sole private helper13 ABI');
+      }
       template.core = remapFusedPrivate(template.arithmeticRemainder);
+      if(FINAL_RELATION_TOTAL)assert(equalBytes(template.core,template.arithmeticRemainder),'empty private namespace remap must be identity');
       assert(equalBytes(remapFusedPrivate(template.core, true), template.arithmeticRemainder),
         'Terminal private namespace inverse');
       template.digest = sha256(template.core);
@@ -4204,7 +4228,7 @@ if (FUSE_FINAL_PAIR) {
   const report={construction:FUSE_FIRST_TAIL_PAIR?'native-regular-initializer-first-tail-and-existing-groups':ARITHMETIC_REGULAR_CARRIER?'native-regular-initializer-and-existing-groups':FUSE_MIDDLE_PAIR?'native-fused-middle-carrier-pairs-regular-triples-and-final-pair':FUSE_CARRIER_PAIR?'native-fused-carrier-pair-regular-triples-and-final-pair':FUSE_REGULAR_TRIPLES?'native-fused-regular-triples-and-final-pair':FUSE_REGULAR_PAIRS?'native-fused-multiple-regular-and-final-pairs':FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
     coordinatorScheduled:SCHEDULE_COORDINATOR,
       ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
-    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_TRIPLES ? {regularTriplesFused:true,...(FUSE_CARRIER_PAIR?{carrierPairFused:true}:{}),...(FUSE_MIDDLE_PAIR?{middlePairFused:true}:{}),...(ARITHMETIC_REGULAR_CARRIER?{arithmeticRegularCarrier:true}:{}),...(BUNDLE_REGULAR_MAIN?{regularMainBundled:true,regularInitializerId:Number(REGULAR_INITIALIZER_ID)}:{}),...(LAZY_PAIR_PRODUCT?{lazyPairProduct:true}:{}),...(FUSE_RELATIONS?{relationsFused:true}:{}),...(FUSE_FIRST_TAIL_PAIR?{firstTailPairFused:true}:{}),regularGroups} : FUSE_REGULAR_PAIRS ? {regularPairsFused:true,...(PACK_REGULAR_PAIR_MAPS?{packedRegularMaps:true}:{}),regularGroups:regularGroups.map(({first,last,funding})=>({first,second:last,funding}))} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:frameOrdinal(index)}))} : {}),
+    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_TRIPLES ? {regularTriplesFused:true,...(FUSE_CARRIER_PAIR?{carrierPairFused:true}:{}),...(FUSE_MIDDLE_PAIR?{middlePairFused:true}:{}),...(ARITHMETIC_REGULAR_CARRIER?{arithmeticRegularCarrier:true}:{}),...(BUNDLE_REGULAR_MAIN?{regularMainBundled:true,regularInitializerId:Number(REGULAR_INITIALIZER_ID)}:{}),...(LAZY_PAIR_PRODUCT?{lazyPairProduct:true}:{}),...(FUSE_RELATIONS?{relationsFused:true}:{}),...(FINAL_RELATION_TOTAL?{finalRelationTotal:true}:{}),...(FUSE_FIRST_TAIL_PAIR?{firstTailPairFused:true}:{}),regularGroups} : FUSE_REGULAR_PAIRS ? {regularPairsFused:true,...(PACK_REGULAR_PAIR_MAPS?{packedRegularMaps:true}:{}),regularGroups:regularGroups.map(({first,last,funding})=>({first,second:last,funding}))} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:frameOrdinal(index)}))} : {}),
     inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
     maximumUnlockingBytes:Math.max(...inputs.map(input=>input.unlocking.length)),
     wholeConsensus:true,wholeStandard:true,outcomes,controls,
