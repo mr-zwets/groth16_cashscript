@@ -57,7 +57,7 @@ existing arithmetic library after a guarded ABI remapping. All 21 logical stages
 and all 46 archived proof argument pushes retain their values and encodings.
 
 Each input caches only the first 870 bytes of encoded root header/statement under
-raw function key 67. The installed body is one literal PUSHDATA2 data push;
+raw function key `0x67`. The installed body is one literal PUSHDATA2 data push;
 witness bytes are never executed. Rewriting is restricted to exact bounded
 header/statement reads. Full-root and quotient readers keep their original
 inputs. The inline ACTIVEBYTECODE framing check and final sibling commitment
