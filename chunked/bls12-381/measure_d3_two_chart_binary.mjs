@@ -8,7 +8,13 @@
 // proof-independent resource certificate compose these measurements into the frozen
 // ten-fixture result and resource artifacts.
 import { createHash } from 'node:crypto';
+import { carryCoordinatorTail } from './_coordinator_tail.mjs';
+import { workerBindingSource } from './_coordinator_binding.mjs';
+import { rootRedeemLoader } from './_root_frame.mjs';
+import { mapCoordinatorArithmetic, fuseCoordinatorHead } from './_coordinator_head.mjs';
+import { coordinatorPrefix } from './_root_prefix.mjs';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
 import {
   bigIntToVmNumber,
   binToHex,
@@ -56,6 +62,85 @@ import {
 
 const W = 48;
 const DEPTH = 3;
+// Opt-in native point: Regular19 and Terminal20 share one physical input.
+const FUSE_FINAL_PAIR = process.env.RPA_FUSE_FINAL_PAIR === '1';
+const SCHEDULE_COORDINATOR = process.env.RPA_SCHEDULE_COORDINATOR === '1';
+const SCHEDULE_PIC_AUTH = process.env.RPA_SCHEDULE_PIC_AUTH === '1';
+// Group membership owns every logical-to-physical index and frame ordinal.
+const FUSE_REGULAR_TRIPLES = process.env.RPA_FUSE_REGULAR_TRIPLES === '1';
+const FUSE_CARRIER_PAIR=process.env.RPA_FUSE_CARRIER_PAIR==='1';
+const FUSE_MIDDLE_PAIR=process.env.RPA_FUSE_MIDDLE_PAIR==='1';
+const FUSE_FIRST_TAIL_PAIR=process.env.RPA_FUSE_FIRST_TAIL_PAIR==='1';
+const ARITHMETIC_REGULAR_CARRIER=process.env.RPA_ARITHMETIC_REGULAR_CARRIER==='1';
+const BUNDLE_REGULAR_MAIN=process.env.RPA_BUNDLE_REGULAR_MAIN==='1';
+const LAZY_PAIR_PRODUCT=process.env.RPA_LAZY_PAIR_PRODUCT==='1';
+const FUSE_RELATIONS=process.env.RPA_FUSE_RELATIONS==='1';
+const FINAL_RELATION_TOTAL=process.env.RPA_FINAL_RELATION_TOTAL==='1';
+const EVAL6_PAIRED=process.env.RPA_EVAL6_PAIRED==='1';
+const FUSE_COORDINATOR_HEAD=process.env.RPA_FUSE_COORDINATOR_HEAD==='1';
+const PIC_ZERO_MASK=process.env.RPA_PIC_ZERO_MASK==='1';
+if(PIC_ZERO_MASK&&!FUSE_COORDINATOR_HEAD)throw new Error('PIC zero-window mask requires coordinator-head fusion');
+const COORDINATOR_PREFIX_MODE=process.env.RPA_CACHE_COORDINATOR_PREFIX;
+const CACHE_COORDINATOR_PREFIX=COORDINATOR_PREFIX_MODE==='1'||COORDINATOR_PREFIX_MODE==='fields';
+if(CACHE_COORDINATOR_PREFIX&&!FUSE_COORDINATOR_HEAD)throw new Error('coordinator prefix cache requires the fused root profile');
+if(FUSE_COORDINATOR_HEAD&&(!FUSE_FIRST_TAIL_PAIR||!EVAL6_PAIRED))throw new Error('coordinator-head fusion requires paired-eval6 First/Tail profile');
+const COORDINATOR_TAIL_BYTES=Number(process.env.RPA_COORDINATOR_TAIL_BYTES??0);
+if(!Number.isInteger(COORDINATOR_TAIL_BYTES)||COORDINATOR_TAIL_BYTES<0)throw new Error('invalid coordinator tail limit');
+if(FUSE_COORDINATOR_HEAD&&COORDINATOR_TAIL_BYTES)throw new Error('whole coordinator fusion owns code placement');
+if(COORDINATOR_TAIL_BYTES&&(!EVAL6_PAIRED||!FUSE_REGULAR_TRIPLES))throw new Error('coordinator tail requires the paired-eval6 triples profile');
+if(EVAL6_PAIRED&&!FINAL_RELATION_TOTAL)throw new Error('paired eval6 requires the final-total arithmetic profile');
+if(FINAL_RELATION_TOTAL&&!FUSE_RELATIONS)throw new Error('final relation total requires the relation-fusion profile');
+if(FUSE_RELATIONS&&(!LAZY_PAIR_PRODUCT||!process.env.RPA_TEMPLATE_CASHC))throw new Error('relation fusion requires the scheduled lazy-pair Regular profile');
+if(LAZY_PAIR_PRODUCT&&(!ARITHMETIC_REGULAR_CARRIER||!BUNDLE_REGULAR_MAIN||process.env.RPA_COMPACT_ARITHMETIC_PRIME_KEY!=='-1'))throw new Error('lazy pair product requires the bundled Regular minus-one arithmetic profile');
+const REGULAR_INITIALIZER_ID=BUNDLE_REGULAR_MAIN?15n:-300n;
+if(BUNDLE_REGULAR_MAIN&&!ARITHMETIC_REGULAR_CARRIER)throw new Error('Regular main bundle requires the Regular arithmetic carrier');
+if(ARITHMETIC_REGULAR_CARRIER&&!FUSE_MIDDLE_PAIR)throw new Error('Regular arithmetic carrier requires the middle-pair profile');
+if(FUSE_FIRST_TAIL_PAIR&&!ARITHMETIC_REGULAR_CARRIER)throw new Error('first-tail pair requires the Regular arithmetic carrier');
+if(FUSE_MIDDLE_PAIR&&!FUSE_CARRIER_PAIR)throw new Error('middle pair requires the carrier-pair profile');
+if(FUSE_CARRIER_PAIR&&(!FUSE_REGULAR_TRIPLES||!FUSE_FINAL_PAIR))throw new Error('carrier pair requires the regular-triples and final-pair profiles');
+const PACK_REGULAR_PAIR_MAPS = process.env.RPA_PACK_REGULAR_PAIR_MAPS === '1';
+const PACK_REGULAR_MAPS = FUSE_REGULAR_TRIPLES || PACK_REGULAR_PAIR_MAPS;
+const FUSE_REGULAR_PAIRS = process.env.RPA_FUSE_REGULAR_PAIRS === '1' || FUSE_REGULAR_TRIPLES;
+const FUSE_REGULAR_PAIR = process.env.RPA_FUSE_REGULAR_PAIR === '1' || FUSE_REGULAR_PAIRS;
+if(PACK_REGULAR_PAIR_MAPS&&!FUSE_REGULAR_PAIRS)throw new Error('packed pair maps require the regular-pairs profile');
+const regularGroups = (FUSE_REGULAR_TRIPLES
+  ? [[[5,6,7],795],[[8,9,10],736],[[11,12,13],764],[[16,17,18],777]]
+  : FUSE_REGULAR_PAIRS
+    ? (PACK_REGULAR_PAIR_MAPS
+      ? [[[5,6],532],[[7,8],482],[[9,10],479],[[11,12],490],[[13,14],500],[[16,17],517]]
+      : [[[5,6],544],[[7,8],486],[[9,10],485],[[11,12],495],[[13,14],505],[[16,17],528]])
+    : FUSE_REGULAR_PAIR ? [[[7,8],Number(process.env.RPA_GROUP_DENSITY_PADDING??0)]] : []
+).map(([members,funding])=>({members,first:members[0],last:members.at(-1),funding}));
+if(FUSE_CARRIER_PAIR){regularGroups.unshift({members:[2,3],first:2,last:3,funding:0});regularGroups.find(group=>group.first===5).funding+=2;regularGroups.find(group=>group.first===16).funding+=1;}
+if(FUSE_MIDDLE_PAIR){regularGroups.splice(regularGroups.findIndex(group=>group.first===16),0,{members:[14,15],first:14,last:15,funding:0,kind:'middle'});regularGroups.find(group=>group.first===16).funding+=13;}
+if(FUSE_FIRST_TAIL_PAIR)regularGroups.unshift({members:[0,1],first:0,last:1,funding:0,kind:'first-tail'});
+if(ARITHMETIC_REGULAR_CARRIER)for(const[first,bytes]of[[5,14],[8,14],[11,14],[16,13]])regularGroups.find(group=>group.first===first).funding-=bytes;
+if(BUNDLE_REGULAR_MAIN)for(const[first,bytes]of[[5,13],[8,13],[11,13],[16,12]])regularGroups.find(group=>group.first===first).funding+=bytes;
+if(LAZY_PAIR_PRODUCT)for(const[first,bytes]of[[5,26],[8,25],[11,25],[16,26]])regularGroups.find(group=>group.first===first).funding-=bytes;
+if(FUSE_RELATIONS)for(const[first,bytes]of[[5,11],[8,11],[11,11],[16,10]])regularGroups.find(group=>group.first===first).funding-=bytes;
+if(FINAL_RELATION_TOTAL)for(const[first,bytes]of[[5,27],[8,27],[11,27],[16,28]])regularGroups.find(group=>group.first===first).funding-=bytes;
+if(EVAL6_PAIRED)for(const[first,bytes]of[[5,30],[8,31],[11,30],[16,30]])regularGroups.find(group=>group.first===first).funding-=bytes;
+if(regularGroups.some(({funding})=>!Number.isInteger(funding)||funding<0||funding>1000))throw new Error('Regular group funding is outside0..1000');
+const groupFrames = new Map(regularGroups.flatMap(group=>group.members.map((block,ordinal)=>[block,{group,ordinal}])));
+const frameOrdinal = block => block===20&&FUSE_FINAL_PAIR?1:groupFrames.get(block)?.ordinal??0;
+const ordinalBits=regularGroups.some(group=>group.members.length>2)?2:1;
+const groupContinuations = new Map([...groupFrames].filter(([,frame])=>frame.ordinal>0));
+const groupedInput = logicalInput => FUSE_REGULAR_PAIR
+  ? logicalInput-regularGroups.reduce((sum,group)=>sum+Math.min(Math.max(logicalInput-(group.first+1),0),group.members.length-1),0)-(logicalInput===21?1:0)
+  : logicalInput;
+const physicalInput = logicalInput => {
+  const input=groupedInput(logicalInput),head=groupedInput(5);
+  return FUSE_COORDINATOR_HEAD ? input===head?0:input>head?input-1:input : input;
+};
+const physicalBlock = blockIndex => physicalInput(blockIndex+1);
+const physicalIndices = Array.from({length:21},(_,block)=>physicalBlock(block));
+if(PACK_REGULAR_MAPS&&physicalIndices.some(index=>index<0||index>15))throw new Error('physical indices do not fit fourbits');
+const physicalIndexSource = indent => PACK_REGULAR_MAPS
+  ? indent+`int physicalIndex=(${physicalIndices.reduce((mask,index,block)=>mask+(BigInt(index)<<(4n*BigInt(block))),0n)}>>(blockIndex*4))%16;`
+  : FUSE_REGULAR_PAIRS
+    ? indent+`int physicalIndex=int(0x${Buffer.from(physicalIndices).toString('hex')}.split(blockIndex+1)[0].split(blockIndex)[1]+0x00);`
+    : indent+'int physicalIndex=blockIndex+1; if(blockIndex>=8){physicalIndex=physicalIndex - 1;}';
+const skipFirstFrameBytes = Uint8Array.from(Buffer.from('76537f75517f7701007e810134937f77','hex'));
 const INVERSE_RELATIONS = process.env.RPA_INVERSES !== 'off';
 const SKIP_GAMMA = process.env.RPA_SKIP_GAMMA === '1';
 const PIC32_RECORDS = SKIP_GAMMA && process.env.RPA_PIC32 === '1';
@@ -1132,22 +1217,26 @@ assert(mod(quotientAccumulator * modulusAtAlpha) === evaluationSum,
   'combined quotient evaluation does not match the relation sum');
 
 const pushHeaderLength = (payloadLength) => encodeDataPush(new Uint8Array(payloadLength)).length - payloadLength;
+const coordinatorArgumentBytes=encodeDataPush(transcriptHeader).length+encodeDataPush(statementBytes).length;
+const coordinatorPrefixCache=CACHE_COORDINATOR_PREFIX?coordinatorPrefix(encodeDataPush(transcriptHeader).length,encodeDataPush(statementBytes).length,{splitFields:COORDINATOR_PREFIX_MODE==='fields'}):null;
+const rootArgumentBytes=coordinatorArgumentBytes+encodeDataPush(blockPayloads[4]).length+encodeDataPush(blockEvaluationPayloads[4]).length+encodeDataPush(fusedQuotientHeadPayload).length;
+const producerExpression=inputIndex=>`tx.inputs[${physicalInput(inputIndex)}].unlockingBytecode`+(FUSE_COORDINATOR_HEAD&&inputIndex===5?`.split(${coordinatorArgumentBytes})[1]`:'');
 const firstPushExpression = (inputIndex, payloadLength) => {
   const headerLength = pushHeaderLength(payloadLength);
-  return `tx.inputs[${inputIndex}].unlockingBytecode.split(${payloadLength + headerLength})[0]` +
+  return `${producerExpression(inputIndex)}.split(${payloadLength + headerLength})[0]` +
     `.split(${headerLength})[1]`;
 };
 const secondPushExpression = (inputIndex, firstLength, secondLength) => {
   const firstTotal = firstLength + pushHeaderLength(firstLength);
   const secondHeader = pushHeaderLength(secondLength);
-  return `tx.inputs[${inputIndex}].unlockingBytecode.split(${firstTotal})[1]` +
+  return `${producerExpression(inputIndex)}.split(${firstTotal})[1]` +
     `.split(${secondLength + secondHeader})[0].split(${secondHeader})[1]`;
 };
-const thirdPushExpression = (inputIndex, firstLength, secondLength, thirdLength) => {
+const thirdPushExpression = (inputIndex, firstLength, secondLength, thirdLength, producer=null) => {
   const firstTotal = firstLength + pushHeaderLength(firstLength);
   const secondTotal = secondLength + pushHeaderLength(secondLength);
   const thirdHeader = pushHeaderLength(thirdLength);
-  return `tx.inputs[${inputIndex}].unlockingBytecode.split(${firstTotal + secondTotal})[1]` +
+  return `${producer??producerExpression(inputIndex)}.split(${firstTotal + secondTotal})[1]` +
     `.split(${thirdLength + thirdHeader})[0].split(${thirdHeader})[1]`;
 };
 const coordinatorHeaderExpression = firstPushExpression(0, transcriptHeader.length);
@@ -1163,6 +1252,43 @@ const statementLimbExpression = (index) => limbExpression(
   statementLayout[index].offset,
   statementLayout[index].width,
 );
+
+const arithmeticProfileKey = process.env.RPA_COMPACT_ARITHMETIC_PRIME_KEY ?? '17';
+const torusFrobeniusSource = arithmeticProfileKey === '-1'
+  ? `function torusFrobFlat(
+    int u0,int u1,int u2,int u3,int u4,int u5
+) returns (int,int,int,int,int,int) {
+    // Fold the fixed Fp2 factors and conjugation into the flat-basis map.
+    return mulFp(3699099184852670630486504326366823957760732022002356992020042909103225195948437585701677765097109891745284740289733,u0+u3),mulFp(2057464292470212699950648958431590554769679873859515792311286236065221686597310451751142621105086029381756709738514,u4),mulFp(1754153922101215937019363459062510355973529075922864898999271009044415232054910173010132757073180257089147177468460,u2+u5),
+        mulFp(151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027,u0+2*u3),mulFp(1028732146235106349975324479215795277384839936929757896155643118032610843298655225875571310552543014690878354869257,u1),mulFp(3125332594171059424908108096204648978570118281977575435832422631601824034463382777937621250592425535493320683825557,u2+2*u5);
+}`
+  : `function torusFrobFlat(
+    int u0,int u1,int u2,int u3,int u4,int u5
+) returns (int,int,int,int,int,int) {
+    int x0a=mAdd(u0,u3); int x0b=u3;
+    int x1a=mAdd(u1,u4); int x1b=u4;
+    int x2a=mAdd(u2,u5); int x2b=u5;
+    int c0a=x0a; int c0b=mSub(0,x0b);
+    int c1a=x1a; int c1b=mSub(0,x1b);
+    int c2a=x2a; int c2b=mSub(0,x2b);
+    (int d1a,int d1b)=r2Mul(c1a,c1b,
+        0,
+        4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436);
+    (int d2a,int d2b)=r2Mul(c2a,c2b,
+        4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437,
+        0);
+    (int f0a,int f0b)=r2Mul(c0a,c0b,
+        3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760,
+        151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
+    (int f1a,int f1b)=r2Mul(d1a,d1b,
+        3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760,
+        151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
+    (int f2a,int f2b)=r2Mul(d2a,d2b,
+        3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760,
+        151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
+    return mSub(f0a,f0b),mSub(f1a,f1b),mSub(f2a,f2b),f0b,f1b,f2b;
+}
+`;
 
 const COMMON_SOURCE = `pragma cashscript ^0.14.0;
 
@@ -1247,42 +1373,16 @@ function pointAddAffine(
     return d0a,d0b,nXa,nXb,nYa,nYb;
 }
 function absorbRelation(int power,int total,int residual,int beta) returns (int,int) {
-    return mulFp(power,beta),mAdd(total,mulFp(power,residual));
+    return mulFp(power,beta),${FUSE_RELATIONS?'mulAddFp(power,residual,total)':'mAdd(total,mulFp(power,residual))'};
 }
-function torusFrobFlat(
-    int u0,int u1,int u2,int u3,int u4,int u5
-) returns (int,int,int,int,int,int) {
-    int x0a=mAdd(u0,u3); int x0b=u3;
-    int x1a=mAdd(u1,u4); int x1b=u4;
-    int x2a=mAdd(u2,u5); int x2b=u5;
-    int c0a=x0a; int c0b=mSub(0,x0b);
-    int c1a=x1a; int c1b=mSub(0,x1b);
-    int c2a=x2a; int c2b=mSub(0,x2b);
-    (int d1a,int d1b)=r2Mul(c1a,c1b,
-        0,
-        4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939436);
-    (int d2a,int d2b)=r2Mul(c2a,c2b,
-        4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437,
-        0);
-    (int f0a,int f0b)=r2Mul(c0a,c0b,
-        3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760,
-        151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
-    (int f1a,int f1b)=r2Mul(d1a,d1b,
-        3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760,
-        151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
-    (int f2a,int f2b)=r2Mul(d2a,d2b,
-        3850754370037169011952147076051364057158807420970682438676050522613628423219637725072182697113062777891589506424760,
-        151655185184498381465642749684540099398075398968325446656007613510403227271200139370504932015952886146304766135027);
-    return mSub(f0a,f0b),mSub(f1a,f1b),mSub(f2a,f2b),f0b,f1b,f2b;
-}
-`;
+${torusFrobeniusSource}`;
 
 const BASELINE_TOTAL_INPUTS = 1 + blockPayloads.length + quotientPayloads.length;
 const FUSED_QUOTIENT_BLOCK_INDEX = 4;
 const FUSED_QUOTIENT_INPUT_INDEX = FUSED_QUOTIENT_BLOCK_INDEX + 1;
 const FUSED_QUOTIENT_TAIL_BLOCK_INDEX = 15;
 const FUSED_QUOTIENT_TAIL_INPUT_INDEX = FUSED_QUOTIENT_TAIL_BLOCK_INDEX + 1;
-const TEMPLATE_TOTAL_INPUTS = 1 + blockPayloads.length;
+const TEMPLATE_TOTAL_INPUTS = 1 + blockPayloads.length - (FUSE_FINAL_PAIR?1:0) - regularGroups.reduce((sum,group)=>sum+group.members.length-1,0)-(FUSE_COORDINATOR_HEAD?1:0);
 const rangeLine = (name, upperBound = P) => `        require(within(${name},0,${upperBound}));`;
 const declareLimb = (lines, name, blob, offset, requireRange = true, upperBound = P) => {
   lines.push(`        int ${name} = ${limbExpression(blob, offset)};`);
@@ -1685,6 +1785,12 @@ const blockSource = (
       );
     }
   }
+  if (FINAL_RELATION_TOTAL) {
+    const last = lines.findLastIndex(line => line.startsWith('        (relationPower,relationTotal)=absorbRelation('));
+    const match = /^        \(relationPower,relationTotal\)=absorbRelation\(relationPower,relationTotal,([A-Za-z]+),beta\);$/.exec(lines[last]);
+    assert(match, 'last relation accumulation source shape');
+    lines[last] = `        relationTotal=mulAddFp(relationPower,${match[1]},relationTotal);`;
+  }
   lines.push(
     '        require(relationTotal==expectedTotal);',
     '    }',
@@ -1702,7 +1808,7 @@ const replaceExactlyOnce = (source, before, after, label) => {
 };
 const templateBlockSource = (record, template) => {
   const { name } = template;
-  let source = blockSource(record, name === 'Terminal', TEMPLATE_TOTAL_INPUTS);
+  let source = blockSource(record, name === 'Terminal', FUSE_REGULAR_PAIRS?20:TEMPLATE_TOTAL_INPUTS);
   source = replaceExactlyOnce(
     source,
     `contract D3TwoChartBlock${record.blockIndex}() {`,
@@ -1816,6 +1922,25 @@ const templateBlockSource = (record, template) => {
         bytes previousPayload = tx.inputs[blockIndex].unlockingBytecode.split(previousLength+3)[0].split(3)[1];`, 'compact predecessor length');
     source = replaceExactlyOnce(source, 'tx.inputs[blockIndex].unlockingBytecode.split(previousPayloadLength+3)[1].split(49)[0].split(1)[1]', 'tx.inputs[blockIndex].unlockingBytecode.split(previousLength+3)[1].split(49)[0].split(1)[1]', 'compact predecessor evaluation');
   }
+  if (FUSE_FINAL_PAIR && name === 'Terminal') {
+    source = replaceExactlyOnce(source,
+      '        require(this.activeInputIndex == blockIndex + 1);',
+      '        require(blockIndex==20); require(this.activeInputIndex==20);',
+      'Terminal physical input20');
+  }
+  if(FUSE_REGULAR_PAIR && name==='Regular') {
+    source=replaceExactlyOnce(source,
+      'bytes fixedCommitment,int previousPayloadLength,int blockIndex,bytes evaluationBlob,bytes payload',
+      'bytes fixedCommitment,int blockIndex,bytes previousEvaluation,bytes previousPayload,bytes evaluationBlob,bytes payload',
+      'group local predecessor ABI');
+    const previous=source.match(/        int previousLength=previousPayloadLength;[\s\S]*?        bytes previousPayload = tx\.inputs\[blockIndex\][^;]*;/);
+    assert(previous,'Regular predecessor source');source=replaceExactlyOnce(source,previous[0],'','group local predecessor');
+    const evaluation=source.match(/        bytes previousEvaluation = tx\.inputs\[blockIndex\][^;]*;/);
+    assert(evaluation,'Regular predecessor evaluation');source=replaceExactlyOnce(source,evaluation[0],'','group local predecessor evaluation');
+    assert(!source.includes('previousPayloadLength'),'no old predecessor length ABI');
+    source=replaceExactlyOnce(source,'        require(this.activeInputIndex == blockIndex + 1);',
+      `${physicalIndexSource('        ')}\n        require(this.activeInputIndex==physicalIndex);`,'Regular physical input');
+  }
   return source;
 };
 const templateClasses = [
@@ -1897,7 +2022,7 @@ const quotientSource = (
     );
   }
   if (index === quotientPayloads.length - 1) {
-    const lastBlockInput = blockPayloads.length;
+    const lastBlockInput = blockPayloads.length - (FUSE_FINAL_PAIR && !FUSE_REGULAR_PAIR ? 1 : 0);
     lines.push(
       `        bytes finalBlockEvaluation=${secondPushExpression(
         lastBlockInput,
@@ -1956,6 +2081,7 @@ const coordinatorSource = (
   usePicFixedBlob = false,
   totalInputs = BASELINE_TOTAL_INPUTS,
   fusedQuotient = false,
+  bindWorkers = true,
 ) => {
   const lines = [
     'pragma cashscript ^0.14.0;',
@@ -2023,16 +2149,9 @@ const coordinatorSource = (
       `        require(${prefix}v==(4*${prefix}u3+16*${prefix}v3)%${P});`,
     );
   });
-  Array.from({ length: totalInputs - 1 }, (_, index) => index + 1).forEach((inputIndex) => {
-    lines.push(`        require(tx.inputs[${inputIndex}].lockingBytecode.length==35);`);
-  });
-  lines.push(
-    `        bytes siblingLockings=${Array.from(
-      { length: totalInputs - 1 },
-      (_, index) => `tx.inputs[${index + 1}].lockingBytecode`,
-    ).join('+')};`,
-    `        require(sha256(siblingLockings)==0x${hex(siblingLockingDigest)});`,
-  );
+  if(bindWorkers)lines.push(...workerBindingSource(siblingLockingDigest, totalInputs));
+  // Only zero-window detection consumes the union; authenticated digits stay unchanged.
+  if(PIC_ZERO_MASK)lines.push('        int picDigits=int((toPaddedBytes(public0,32)|toPaddedBytes(public1,32))+0x00);');
   const commitmentSpecs = [{
     expression: 'statementBlob',
     payloadLength: statementBytes.length,
@@ -2046,10 +2165,15 @@ const coordinatorSource = (
       lines.push(`        int ${length}=1345;`);
       for (let slot = 0; slot < 2; slot += 1) {
         const shift = (carrier * 2 + slot) * 8;
-        lines.push(`        if (((public0>>${shift})%256)+((public1>>${shift})%256)==0) { ${length}=${length}+32; } else { ${length}=${length}+704; }`);
+        const zero=PIC_ZERO_MASK?`((picDigits>>${shift})%256)==0`:`((public0>>${shift})%256)+((public1>>${shift})%256)==0`;
+        lines.push(`        if (${zero}) { ${length}=${length}+32; } else { ${length}=${length}+704; }`);
       }
     }
-    lines.push(`        bytes rawInput${index}=tx.inputs[${index + 1}].unlockingBytecode;`);
+    lines.push(groupContinuations.has(index)
+      ? `        bytes rawInput${index}=rawInput${index-1}.split(${picCarrierBlocks.includes(index-1)?`blockLength${index-1}`:blockPayloads[index-1].length}+52)[1];`
+      : FUSE_FINAL_PAIR && index===20
+        ? '        bytes rawInput20=rawInput19.split(blockLength19+52)[1];'
+        : `        bytes rawInput${index}=${producerExpression(index+1)};`);
     lines.push(`        require(rawInput${index}.split(3)[0]==0x4d+toPaddedBytes(${length},2));`);
     lines.push(`        require(rawInput${index}.split(${length}+4)[0].split(${length}+3)[1]==0x30);`);
     lines.push(`        bytes ${variable}=rawInput${index}.split(${length}+3)[0].split(3)[1];`);
@@ -2073,6 +2197,7 @@ const coordinatorSource = (
         blockPayloads[FUSED_QUOTIENT_TAIL_BLOCK_INDEX].length,
         blockEvaluationPayloads[FUSED_QUOTIENT_TAIL_BLOCK_INDEX].length,
         fusedQuotientTailPayload.length,
+        FUSE_MIDDLE_PAIR?'rawInput15':null,
       );
       const expectedHeadUnlockingBytes = encodeDataPush(
         blockPayloads[FUSED_QUOTIENT_BLOCK_INDEX],
@@ -2081,18 +2206,18 @@ const coordinatorSource = (
       ).length + encodeDataPush(fusedQuotientHeadPayload).length + encodeDataPush(
         templateBlockRedeems[FUSED_QUOTIENT_BLOCK_INDEX],
       ).length;
+      const quotientTailRedeemOwner=groupFrames.get(FUSED_QUOTIENT_TAIL_BLOCK_INDEX)?.group.first??FUSED_QUOTIENT_TAIL_BLOCK_INDEX;
       const expectedTailUnlockingBytes = encodeDataPush(
         blockPayloads[FUSED_QUOTIENT_TAIL_BLOCK_INDEX],
       ).length + encodeDataPush(
         blockEvaluationPayloads[FUSED_QUOTIENT_TAIL_BLOCK_INDEX],
       ).length + encodeDataPush(fusedQuotientTailPayload).length + encodeDataPush(
-        templateBlockRedeems[FUSED_QUOTIENT_TAIL_BLOCK_INDEX],
-      ).length;
+        templateBlockRedeems[quotientTailRedeemOwner],
+      ).length + (coordinatorPrefixCache?.initializer.length ?? 0);
       lines.push(
-        `        require(tx.inputs[${FUSED_QUOTIENT_INPUT_INDEX}].unlockingBytecode.length==` +
-          `${expectedHeadUnlockingBytes});`,
-        `        require(tx.inputs[${FUSED_QUOTIENT_TAIL_INPUT_INDEX}].unlockingBytecode.length==` +
-          `${expectedTailUnlockingBytes});`,
+        ...(!FUSE_COORDINATOR_HEAD||bindWorkers?[`        require(tx.inputs[${physicalInput(FUSED_QUOTIENT_INPUT_INDEX)}].unlockingBytecode.length==${expectedHeadUnlockingBytes});`]:[]),
+        `        require(tx.inputs[${physicalInput(FUSED_QUOTIENT_TAIL_INPUT_INDEX)}].unlockingBytecode.length==` +
+          `${FUSE_MIDDLE_PAIR?'blockLength14+52+':''}${expectedTailUnlockingBytes});`,
         `        bytes ${headVariable}=${headExpression};`,
         `        require(${headVariable}.length==${fusedQuotientHeadPayload.length});`,
         `        bytes ${tailVariable}=${tailExpression};`,
@@ -2141,16 +2266,186 @@ const compileNamed = (source, label, compilerOptions = {}) => {
     throw new Error(`${label} compile failed:\n${numbered}`, { cause: error });
   }
 };
+// Keep the qualified arithmetic interface while scheduling the surrounding source.
+const scheduledCompilerEntry = process.env.RPA_TEMPLATE_CASHC;
+const scheduledCompiler = scheduledCompilerEntry
+  ? await import(pathToFileURL(scheduledCompilerEntry).href) : null;
+const arithmeticCompiler = scheduledCompilerEntry ? await import('cashc') : null;
+if (SCHEDULE_COORDINATOR) {
+  assert(scheduledCompilerEntry, 'coordinator scheduling requires RPA_TEMPLATE_CASHC');
+}
+if (FUSE_FINAL_PAIR) {
+  assert(scheduledCompilerEntry && arithmeticProfileKey === '-1',
+    'final-pair fusion requires the scheduled minus1 arithmetic profile');
+}
+if (scheduledCompilerEntry) {
+  assert(process.env.RPA_COMPACT_ARITHMETIC_PRIME_KEY === '-1',
+    'scheduled templates require the qualified minus1 arithmetic profile');
+  assert(process.env.RESCHEDULE !== 'off', 'scheduled templates require stack scheduling');
+  assert(typeof scheduledCompiler.compileString === 'function', 'template compiler entry changed');
+}
+if (FUSE_REGULAR_PAIR) {
+  assert(FUSE_FINAL_PAIR && SCHEDULE_COORDINATOR && SCHEDULE_PIC_AUTH &&
+    PIC32_RECORDS && !INVERSE_RELATIONS,
+  'Regular pair requires the qualified final-pair/PIC/coordinator profile');
+}
+const rawFunctionKey = instruction => instruction.data !== undefined
+  ? hex(instruction.data) : instruction.opcode === 0 ? '' : instruction.opcode === 79 ? '81'
+    : instruction.opcode >= 81 && instruction.opcode <= 96
+      ? (instruction.opcode - 80).toString(16).padStart(2, '0') : undefined;
+const functionKey = id => hex(bigIntToVmNumber(BigInt(id)));
+const compileScheduledSource = (source, original, compilerOptions = {}) => {
+  const baseline = arithmeticCompiler.compileString(source, {rescheduleStacks: true, ...compilerOptions});
+  assert(equalBytes(Uint8Array.from(Buffer.from(baseline.debug.bytecode, 'hex')), original),
+    'baseline compiler differs from the original source compiler');
+  const candidate = scheduledCompiler.compileString(source, {
+    rescheduleStacks: true, renumberFunctionIds: false, ...compilerOptions,
+  });
+  const declared = artifact => artifact.debug.functions.filter(fn => Number.isInteger(fn.id));
+  const oldFunctions = declared(baseline), newFunctions = declared(candidate);
+  const oldByName = new Map(oldFunctions.map(fn => [fn.name, fn]));
+  assert(oldByName.size === oldFunctions.length && newFunctions.length === oldFunctions.length,
+    'scheduled source declaration set changed');
+  const mapping = new Map();
+  newFunctions.forEach(fn => {
+    const old = oldByName.get(fn.name);
+    assert(old && JSON.stringify(fn.inputs) === JSON.stringify(old.inputs),
+      `scheduled source declaration interface changed: ${fn.name}`);
+    mapping.set(functionKey(fn.id), old.id);
+  });
+  assert(mapping.size === oldFunctions.length, 'scheduled function identifiers are not unique');
+  const rename = (bytecode, ids) => {
+    const instructions = decodeAuthenticationInstructions(bytecode);
+    for (let index = 0; index < instructions.length; index += 1) {
+      const opcode = instructions[index].opcode;
+      if (opcode !== OpcodesBCH.OP_DEFINE && opcode !== OpcodesBCH.OP_INVOKE) continue;
+      assert(index > 0 && ids.has(rawFunctionKey(instructions[index - 1])),
+        'scheduled source contains a nonliteral or unknown function key');
+      if (opcode === OpcodesBCH.OP_DEFINE) {
+        assert(index >= 2 && instructions[index - 2].data !== undefined,
+          'scheduled source definition is not literal');
+        instructions[index - 2] = decodeAuthenticationInstructions(encodeDataPush(
+          rename(instructions[index - 2].data, ids),
+        ))[0];
+      }
+      instructions[index - 1] = decodeAuthenticationInstructions(encodeDataPush(
+        bigIntToVmNumber(BigInt(ids.get(rawFunctionKey(instructions[index - 1])))),
+      ))[0];
+    }
+    return encodeAuthenticationInstructions(instructions);
+  };
+  const next = Uint8Array.from(Buffer.from(candidate.debug.bytecode, 'hex'));
+  const renamed = rename(next, mapping);
+  const inverse = new Map(newFunctions.map(fn => [functionKey(oldByName.get(fn.name).id), fn.id]));
+  assert(equalBytes(rename(renamed, inverse), next), 'scheduled namespace inverse changed');
+  return {renamed, oldFunctions};
+};
+const compileScheduledTemplate = (source, original) => {
+  if (scheduledCompiler === null) return original;
+  const {renamed, oldFunctions} = compileScheduledSource(source, original);
+  const before = decodeAuthenticationInstructions(original);
+  const after = decodeAuthenticationInstructions(renamed);
+  const definitions = [];
+  let end = 0;
+  while (end + 2 < after.length && after[end + 2].opcode === OpcodesBCH.OP_DEFINE) {
+    const id = oldFunctions.find(fn => functionKey(fn.id) === rawFunctionKey(after[end + 1]))?.id;
+    assert(Number.isInteger(id), 'scheduled definition owner missing');
+    definitions.push({id, instructions: after.slice(end, end + 3)});
+    end += 3;
+  }
+  assert(definitions.length === oldFunctions.length, 'scheduled definition framing changed');
+  const arithmetic = encodeAuthenticationInstructions(before.slice(0, 39));
+  assert(arithmetic.length === 799 &&
+    hex(sha256(arithmetic)) === '11113485fc60b9d279e6531bf901ae1bba89d340f8ed9422da78b1b878a2548b',
+    'qualified source arithmetic prefix changed');
+  return concat(...definitions.sort((a, b) => a.id - b.id).map(definition =>
+    encodeAuthenticationInstructions(definition.id < 13
+      ? before.slice(definition.id * 3, definition.id * 3 + 3)
+      : definition.instructions)), encodeAuthenticationInstructions(after.slice(end)));
+};
+
+// Relation fusion can inline mAdd; select literal IDs rather than positional triples.
+const splitTemplateDefinitions=(bytecode,functions)=>{
+  const instructions=decodeAuthenticationInstructions(bytecode),definitions=new Map();let end=0;
+  while(end+2<instructions.length&&instructions[end+2].opcode===OpcodesBCH.OP_DEFINE){
+    const id=functions.find(fn=>functionKey(fn.id)===rawFunctionKey(instructions[end+1]))?.id;
+    assert(Number.isInteger(id)&&!definitions.has(id)&&instructions[end].data!==undefined,'unique literal template definition');
+    definitions.set(id,instructions.slice(end,end+3));end+=3;
+  }
+  assert(definitions.size===functions.length,'complete template definition framing');
+  return {definitions,main:encodeAuthenticationInstructions(instructions.slice(end))};
+};
+const compileRelationTemplate=(template,original,arithmetic,prepared)=>{
+  const current=prepared??compileScheduledSource(template.source,original);
+  const before=splitTemplateDefinitions(original,current.oldFunctions),after=splitTemplateDefinitions(current.renamed,current.oldFunctions);
+  const missing=Array.from({length:13},(_,id)=>id).filter(id=>!before.definitions.has(id));
+  assert(missing.length===0||missing.length===1&&missing[0]===11,'only arithmetic mAdd may inline');
+  for(const fn of current.oldFunctions.filter(fn=>fn.id<13)){
+    const owner=arithmetic.functions.get(fn.id);
+    assert(owner&&owner.name===fn.name&&JSON.stringify(owner.inputs)===JSON.stringify(fn.inputs),'shared arithmetic declaration ABI');
+  }
+  for(let id=0;id<13;id++){
+    if(missing.includes(id))continue;
+    const expected=arithmetic.definitions.get(id)[0].data,actual=before.definitions.get(id)[0].data;
+    if(id!==10||!missing.includes(11)){assert(equalBytes(actual,expected),'canonical arithmetic body');continue;}
+    const instructions=decodeAuthenticationInstructions(expected),expanded=[];let sites=0;
+    for(let index=0;index<instructions.length;index++){
+      if(rawFunctionKey(instructions[index])===functionKey(11)&&instructions[index+1]?.opcode===OpcodesBCH.OP_INVOKE){
+        expanded.push(...decodeAuthenticationInstructions(arithmetic.definitions.get(11)[0].data));index++;sites++;
+      }else expanded.push(instructions[index]);
+    }
+    assert(sites===1&&equalBytes(encodeAuthenticationInstructions(expanded),actual),'exact mAdd inline expansion');
+  }
+  const privateDefinitions=[...after.definitions].filter(([id])=>id>=13).sort((a,b)=>a[0]-b[0]).map(([id,instructions])=>{
+    const fn=current.oldFunctions.find(fn=>fn.id===id);
+    if(fn.name==='absorbRelation'){
+      const selected=before.definitions.get(id);
+      assert(hex(selected[0].data)==='537a78008a7b72528a','qualified original relation FMA body');
+      return encodeAuthenticationInstructions(selected);
+    }
+    return encodeAuthenticationInstructions(instructions);
+  });
+  template.sourceFunctions=current.oldFunctions;
+  template.functionMainStart=arithmetic.body.length+privateDefinitions.reduce((sum,bytes)=>sum+bytes.length,0);
+  return concat(arithmetic.body,...privateDefinitions,after.main);
+};
+
 const blockSources = blockRecords.map((record) => blockSource(record));
-const blockRedeems = blockSources.map((source, index) => compileNamed(source, `block ${index}`));
+const blockRedeems = FUSE_FINAL_PAIR ? [] : blockSources.map((source, index) => compileNamed(source, `block ${index}`));
+if (FUSE_RELATIONS) {
+  const originals = new Map(templateClasses.map(template => {
+    template.source = templateBlockSource(blockRecords[template.representative], template);
+    return [template, compileNamed(template.source, `${template.name} template`)];
+  }));
+  // Regular still calls mAdd from PIC arithmetic and owns the unchanged library.
+  const owner = templateClasses.find(template => template.name === 'Regular');
+  const scheduled = compileScheduledSource(owner.source, originals.get(owner));
+  const parsed = splitTemplateDefinitions(originals.get(owner), scheduled.oldFunctions);
+  const definitions = new Map(Array.from({length:13}, (_, id) => [id, parsed.definitions.get(id)]));
+  const functions = new Map(scheduled.oldFunctions.filter(fn => fn.id < 13).map(fn => [fn.id, fn]));
+  assert([...definitions.values()].every(Boolean) && functions.size === 13, 'Regular owns complete arithmetic ABI');
+  const body = concat(...[...definitions.values()].map(encodeAuthenticationInstructions));
+  assert(body.length === 799 && hex(sha256(body)) ===
+    '11113485fc60b9d279e6531bf901ae1bba89d340f8ed9422da78b1b878a2548b',
+  'qualified Regular arithmetic owner');
+  const arithmetic = {definitions, functions, body};
+  templateClasses.forEach(template => {
+    template.core = compileRelationTemplate(template, originals.get(template), arithmetic,
+      template === owner ? scheduled : undefined);
+    template.digest = sha256(template.core);
+    assert(template.core.length <= 10_000, `${template.name} template exceeds the 10,000-byte script element limit`);
+  });
+} else {
 templateClasses.forEach((template) => {
   const representative = blockRecords[template.representative];
   template.source = templateBlockSource(representative, template);
   template.core = compileNamed(template.source, `${template.name} template`);
+  template.core = compileScheduledTemplate(template.source, template.core);
   template.digest = sha256(template.core);
   assert(template.core.length <= 10_000,
     `${template.name} template exceeds the 10,000-byte script element limit`);
 });
+}
 
 const PIC_FACTOR_BYTES = PIC_AUTHENTICATED_LIMBS * W;
 const PIC_PATH_BYTES = 512;
@@ -2263,7 +2558,18 @@ contract PicBatchAuth() {
                     +scalar1.split(window)[0].split(window - 1)[1];
                 if(priorDigits==0x0000){recordOffset=recordOffset+32;}else{recordOffset=recordOffset+704;}
             }
-            bytes record=tx.inputs[blockIndex+1].unlockingBytecode.split(recordOffset+recordLength)[0].split(recordOffset)[1];
+${FUSE_REGULAR_PAIR ? `${physicalIndexSource('            ')}
+            bytes producer=tx.inputs[physicalIndex].unlockingBytecode;
+${PACK_REGULAR_MAPS?`            int frames=(${Array.from({length:21},(_,block)=>BigInt(frameOrdinal(block))<<(BigInt(ordinalBits)*BigInt(block))).reduce((sum,value)=>sum+value,0n)}>>${ordinalBits===1?'blockIndex':'(blockIndex*2)'})%${2**ordinalBits};
+${[1,2].filter(ordinal=>regularGroups.some(group=>group.members.length>ordinal)).map(ordinal=>`            if(frames>=${ordinal}){
+                int firstLength=int(producer.split(3)[0].split(1)[1]+0x00);
+                producer=producer.split(firstLength+52)[1];
+            }
+`).join('')}`:`            if(${regularGroups.map(group=>`blockIndex==${group.last}`).join(' || ')}){
+                int firstLength=int(producer.split(3)[0].split(1)[1]+0x00);
+                producer=producer.split(firstLength+52)[1];
+            }
+`}            bytes record=producer.split(recordOffset+recordLength)[0].split(recordOffset)[1];` : `            bytes record=tx.inputs[blockIndex+1].unlockingBytecode.split(recordOffset+recordLength)[0].split(recordOffset)[1];`}
             bytes root=record;
             if(!zero){
             (bytes factor,bytes path)=record.split(${PIC_FACTOR_BYTES});
@@ -2292,10 +2598,27 @@ ${picBatchCommitmentSelection}
     }
 }
 `;
-const picAuthHelper = compileNamed(picAuthHelperSource, 'v4 PIC batch authentication helper', {
+let picAuthHelper = compileNamed(picAuthHelperSource, 'v4 PIC batch authentication helper', {
   rescheduleStacks: false,
   optimizeFor: 'size',
 });
+if (SCHEDULE_PIC_AUTH) {
+  assert(scheduledCompiler, 'PIC authentication scheduling requires RPA_TEMPLATE_CASHC');
+  const artifact = scheduledCompiler.compileString(picAuthHelperSource, {
+    rescheduleStacks: true, renumberFunctionIds: false, optimizeFor: 'size',
+  });
+  assert(Array.isArray(artifact.abi) && JSON.stringify(artifact.abi) === JSON.stringify([
+    {name: 'spend', inputs: [{name: 'firstWindow', type: 'int'}, {name: 'windowCount', type: 'int'}]},
+  ]), 'scheduled PIC authentication interface changed');
+  assert(typeof artifact.debug.bytecode === 'string' && /^(?:[0-9a-f]{2})+$/.test(artifact.debug.bytecode),
+    'scheduled PIC authentication bytecode missing');
+  const bytecode = Uint8Array.from(Buffer.from(artifact.debug.bytecode, 'hex'));
+  assert(decodeAuthenticationInstructions(bytecode).every(instruction => !instruction.malformed &&
+    instruction.opcode !== OpcodesBCH.OP_DEFINE && instruction.opcode !== OpcodesBCH.OP_INVOKE),
+  'scheduled PIC authentication must not introduce function identifiers');
+  picAuthHelper = bytecode;
+}
+if(coordinatorPrefixCache)picAuthHelper=coordinatorPrefixCache.rewrite(picAuthHelper,1);
 assert(picAuthHelper.length <= 1000, 'v4 PIC batch authentication helper unexpectedly expanded');
 const picBatchCommitmentOffsets = picBatchCommitments.map((commitment, index) => {
   const offset = Buffer.from(picAuthHelper).indexOf(Buffer.from(commitment));
@@ -2320,7 +2643,7 @@ const fusedQuotientSource = quotientSource(
   TEMPLATE_TOTAL_INPUTS,
   fusedQuotientTailBytes,
 );
-const fusedQuotientRedeem = compileNamed(
+let fusedQuotientRedeem = compileNamed(
   fusedQuotientSource,
   'fused block-4 quotient verifier',
   { optimizeFor: 'size' },
@@ -2357,20 +2680,33 @@ const sliceTopBytes = (start, end) => concat(
   ]),
 );
 const TEMPLATE_FUNCTION_ID = 16;
+const fusedPrivateNamespace={helper:113,extra:114,auth:115,core:116};
+const FUSED_TERMINAL_HELPER_ID = fusedPrivateNamespace.helper;
+const FUSED_TERMINAL_AUTH_ID = fusedPrivateNamespace.auth;
+const FUSED_TERMINAL_FUNCTION_ID = fusedPrivateNamespace.core;
 const TEMPLATE_COMMON_FUNCTION_ID = 102;
-const TEMPLATE_EXTRA_FUNCTION_ID = 103;
-const TEMPLATE_ARITHMETIC_FUNCTION_ID = -1;
+const TEMPLATE_EXTRA_FUNCTION_ID = FUSE_MIDDLE_PAIR?fusedPrivateNamespace.extra:14;
+const templateCommonFunctionId = (template) => template.name === 'AdditionTail'
+  ? FUSE_FIRST_TAIL_PAIR?TEMPLATE_COMMON_FUNCTION_ID:13
+  : TEMPLATE_COMMON_FUNCTION_ID;
+const DEFAULT_TEMPLATE_ARITHMETIC_FUNCTION_ID = -1;
 const PIC_AUTH_FUNCTION_ID = 15;
-const templateCommonOffsets = new Map([
-  ['First', 921],
-  ['AdditionTail', 822],
-  ['AdditionMiddle', 837],
-]);
-const templateCommonLength = 823;
+// The fused helper changes declaration lengths; locate the same parser bytes.
+const templateCommonLength=scheduledCompilerEntry ? 821 : 823;
+const templateCommonSha256='7148122f7a27c8f55a5f301ac9007d363b4d286a9ca5543b234ebe195ae117a6';
+const findTemplateFragment=(template,length,digest)=>{
+  const instructions=decodeAuthenticationInstructions(template.core);assert(instructions.every(x=>!x.malformed),'valid template instructions');
+  const offsets=[0];for(const instruction of instructions)offsets.push(offsets.at(-1)+encodeAuthenticationInstructions([instruction]).length);
+  const boundaries=new Set(offsets),matches=offsets.filter(offset=>offset>=template.functionMainStart&&boundaries.has(offset+length)&&hex(sha256(template.core.slice(offset,offset+length)))===digest);
+  assert(matches.length===1,`${template.name} must contain one exact shared parser fragment`);return matches[0];
+};
+const templateCommonOffsets=FUSE_RELATIONS
+  ? new Map(['First','AdditionTail','AdditionMiddle'].map(name=>[name,findTemplateFragment(templateClasses.find(template=>template.name===name),templateCommonLength,templateCommonSha256)]))
+  : new Map([['First',921],['AdditionTail',822],['AdditionMiddle',837]]);
 const templateCommonCarrier = templateClasses.find(({ name }) => name === 'AdditionTail');
 const templateExtraOffsets = new Map([
-  ['AdditionTail', 822 + templateCommonLength],
-  ['AdditionMiddle', 837 + templateCommonLength],
+  ['AdditionTail', templateCommonOffsets.get('AdditionTail') + templateCommonLength],
+  ['AdditionMiddle', templateCommonOffsets.get('AdditionMiddle') + templateCommonLength],
 ]);
 const templateExtraLength = 257;
 const templateExtraCarrier = templateClasses.find(({ name }) => name === 'AdditionMiddle');
@@ -2383,7 +2719,8 @@ const templateCommonBody = templateCommonCarrier.core.slice(
 assert(templateCommonBody.length === templateCommonLength,
   'shared template body length changed');
 assert(hex(sha256(templateCommonBody)) ===
-  '33d339834e8264157b76d17f383d12674889607127c9370887e51659be4a24ee',
+  (scheduledCompilerEntry ? templateCommonSha256 :
+    '33d339834e8264157b76d17f383d12674889607127c9370887e51659be4a24ee'),
 'shared template canonical parsing body changed');
 const templateCommonOpcodes = decodeAuthenticationInstructions(templateCommonBody)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
@@ -2412,6 +2749,7 @@ const templateExtraBody = templateExtraCarrier.core.slice(
 );
 assert(templateExtraBody.length === templateExtraLength,
   'extra shared template body length changed');
+if(FUSE_RELATIONS)assert(hex(sha256(templateExtraBody))==='b5a2fb8ea840c6c2f44f2454d0af5188fc1837ae7b2c4043ad2884b497f7836c','exact qualified257-byte extra parser');
 const templateExtraOpcodes = decodeAuthenticationInstructions(templateExtraBody)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
 let templateExtraConditionalDepth = 0;
@@ -2449,7 +2787,7 @@ assert(!templateExtraOpcodes.some((opcode) => [
   }
   template.core = concat(
     template.core.slice(0, offset),
-    pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID),
+    pushVmNumber(templateCommonFunctionId(template)),
     Uint8Array.of(OP.INVOKE),
     ...(extraOffset === undefined ? [] : [
       pushVmNumber(TEMPLATE_EXTRA_FUNCTION_ID),
@@ -2461,14 +2799,20 @@ assert(!templateExtraOpcodes.some((opcode) => [
   );
   template.digest = sha256(template.core);
 });
-const templateArithmeticLength = 799;
-const templateArithmeticImports = new Set(['First', 'Regular', 'AdditionMiddle', 'Terminal']);
-const templateArithmeticBody = templateCommonCarrier.core.slice(0, templateArithmeticLength);
-const templateArithmeticInstructions = decodeAuthenticationInstructions(templateArithmeticBody);
-assert(templateArithmeticInstructions.length === 13 * 3 && equalBytes(
-  encodeAuthenticationInstructions(templateArithmeticInstructions), templateArithmeticBody,
+const templateArithmeticOriginalLength = 799;
+const templateArithmeticImports = new Set(['First', ARITHMETIC_REGULAR_CARRIER?'AdditionTail':'Regular', 'AdditionMiddle', 'Terminal']);
+const templateArithmeticCarrier = ARITHMETIC_REGULAR_CARRIER?'Regular':'AdditionTail';
+const templateArithmeticOriginalBody = templateCommonCarrier.core.slice(
+  0, templateArithmeticOriginalLength,
+);
+const templateArithmeticOriginalInstructions = decodeAuthenticationInstructions(
+  templateArithmeticOriginalBody,
+);
+assert(templateArithmeticOriginalInstructions.length === 13 * 3 && equalBytes(
+  encodeAuthenticationInstructions(templateArithmeticOriginalInstructions),
+  templateArithmeticOriginalBody,
 ), 'arithmetic library prefix does not end at the expected instruction boundary');
-templateArithmeticInstructions.forEach((instruction, index) => {
+templateArithmeticOriginalInstructions.forEach((instruction, index) => {
   if (index % 3 === 0) {
     assert(instruction.data !== undefined && instruction.data.length > 0,
       'arithmetic library definition body changed');
@@ -2481,27 +2825,429 @@ templateArithmeticInstructions.forEach((instruction, index) => {
       'arithmetic library prefix contains executable work outside definitions');
   }
 });
-assert(hex(sha256(templateArithmeticBody)) ===
+assert(hex(sha256(templateArithmeticOriginalBody)) ===
   '11113485fc60b9d279e6531bf901ae1bba89d340f8ed9422da78b1b878a2548b',
 'arithmetic library compiled definitions changed');
+const selectivePrime = Uint8Array.from(bigIntToVmNumber(P));
+const selectivePrimeSites = new Map([
+  ['06', new Set([0])],
+  ['07', new Set([1])],
+  ['0a', new Set([8, 28, 37])],
+]);
+// The default profile retains the byte-best UD namespace: the selective prime
+// leaf owns raw key 0x11. Opt-in profiles -1, 12, and 5 apply the exact
+// arithmetic owner bijection recursively to literal DEFINE/INVOKE keys and
+// remainders; profile -1 also moves the imported arithmetic wrapper to a
+// template-owned key so the leaf can own OP_1NEGATE without a duplicate.
+// Profiles 12 and 5 displace their occupied arithmetic owners to raw 0x11.
+assert(['-1', '5', '12', '17'].includes(arithmeticProfileKey),
+  'RPA_COMPACT_ARITHMETIC_PRIME_KEY must be -1, 5, 12, or 17');
+const arithmeticLeafSourceId = 17;
+const arithmeticLeafId = Number(arithmeticProfileKey);
+const arithmeticNamespaceMap = arithmeticLeafId === -1
+  ? new Map([['11', '81'], ['81', '11']])
+  : arithmeticLeafId === 12
+    ? new Map([['0c', '11'], ['11', '0c']])
+    : arithmeticLeafId === 5
+      ? new Map([['05', '11'], ['11', '05']])
+      : new Map();
+const arithmeticProfile = {
+  key: arithmeticProfileKey,
+  leafId: arithmeticLeafId,
+  leafRawKey: arithmeticLeafId === -1 ? '81' : arithmeticLeafId.toString(16).padStart(2, '0'),
+  namespaceMap: arithmeticNamespaceMap,
+  expectedLibraryBytes: EVAL6_PAIRED ? 528 : arithmeticLeafId === -1 ? (LAZY_PAIR_PRODUCT?534:535) : arithmeticLeafId === 5 ? 619 : arithmeticLeafId === 12 ? 617 : 621,
+  expectedLibrarySha256: EVAL6_PAIRED ? '9b7339fc17c0c562c1a3eef4a5b5769e0b7eb6b92b447cf63b42e0512036254c' : arithmeticLeafId === -1
+    ? (LAZY_PAIR_PRODUCT?'2b1df34c2029962cd5852ddfb2d512ecf1e23022e9d5590fcba8c5a5e7f4798a':'5d7a6fef8614b007dbf2420212cd63e5fb3e16fa61a75a4d665be9a59458906c')
+    : arithmeticLeafId === 12
+      ? '716398743a5a131e1906e462716026526caa12b228c6f1d207974e131039b254'
+      : arithmeticLeafId === 5
+        ? '2632cd31885564ac9caf294c3aaa21f4f5cd775e37f365db5e30f7cc2f39b0e9'
+        : 'a4cc53fe1d7fd736b1a058335d4f83884d603c237ce9626bb219acd61e9767b6',
+};
+const arithmeticLeafRawKey = arithmeticProfile.leafRawKey;
+const templateArithmeticFunctionId = (template) => arithmeticLeafId === -1
+  ? template.name === 'Regular' ? 15 : template.name === 'Terminal' ? 14 : 17
+  : DEFAULT_TEMPLATE_ARITHMETIC_FUNCTION_ID;
+const leafCallInstructions = decodeAuthenticationInstructions(
+  concat(pushVmNumber(arithmeticLeafSourceId), Uint8Array.of(OP.INVOKE)),
+);
+const selectiveInstructions = [];
+for (let offset = 0; offset < templateArithmeticOriginalInstructions.length; offset += 3) {
+  const body = templateArithmeticOriginalInstructions[offset];
+  const id = templateArithmeticOriginalInstructions[offset + 1];
+  const definition = templateArithmeticOriginalInstructions[offset + 2];
+  const key = id.data !== undefined
+    ? binToHex(id.data)
+    : id.opcode === 0
+      ? ''
+      : id.opcode === 79
+        ? '81'
+        : id.opcode >= 81 && id.opcode <= 96
+          ? (id.opcode - 80).toString(16).padStart(2, '0')
+          : undefined;
+  assert(key !== undefined, 'arithmetic library key is not a canonical raw push');
+  // For nonnegative pair arguments, deferring (y*t)%P preserves both final
+  // field residues. The unsigned parser and canonical state updates own that
+  // domain; this is a verifier-specific lowering, not a signed-integer identity.
+  if(LAZY_PAIR_PRODUCT&&key==='0c'){
+    assert(hex(body.data)==='7670008a557a528a727c537a528a','exact canonical pair-product body');
+    const next=Uint8Array.from(Buffer.from('767095557a528a727c537a528a','hex'));
+    selectiveInstructions.push(...decodeAuthenticationInstructions(encodeDataPush(next)),id,definition);
+    continue;
+  }
+  const sites = selectivePrimeSites.get(key);
+  if (sites === undefined) {
+    selectiveInstructions.push(body, id, definition);
+    continue;
+  }
+  const bodyInstructions = decodeAuthenticationInstructions(body.data);
+  const transformed = [];
+  bodyInstructions.forEach((instruction, instructionIndex) => {
+    if (!sites.has(instructionIndex)) {
+      transformed.push(instruction);
+      return;
+    }
+    assert(instruction.data !== undefined && equalBytes(instruction.data, selectivePrime),
+      `selective prime site ${key}:${instructionIndex} changed`);
+    transformed.push(...leafCallInstructions);
+  });
+  selectiveInstructions.push(
+    ...decodeAuthenticationInstructions(encodeDataPush(
+      encodeAuthenticationInstructions(transformed),
+    )), id, definition,
+  );
+}
+const arithmeticLeafBody = concat(Uint8Array.of(0x30), selectivePrime);
+const arithmeticLeafDefinition = decodeAuthenticationInstructions(concat(
+  encodeDataPush(arithmeticLeafBody),
+  pushVmNumber(arithmeticLeafId),
+  Uint8Array.of(OP.DEFINE),
+));
+const arithmeticFunctionKey = (instruction) => instruction.data !== undefined
+  ? binToHex(instruction.data)
+  : instruction.opcode === 0
+    ? ''
+    : instruction.opcode === 79
+      ? '81'
+      : instruction.opcode >= 81 && instruction.opcode <= 96
+        ? (instruction.opcode - 80).toString(16).padStart(2, '0')
+        : undefined;
+const arithmeticRawKeyInstruction = (rawKey) => rawKey === '81'
+  ? decodeAuthenticationInstructions(Uint8Array.of(0x4f))[0]
+  : decodeAuthenticationInstructions(encodeDataPush(
+    Uint8Array.from(Buffer.from(rawKey, 'hex')),
+  ))[0];
+const arithmeticNamespaceInstructions = new Map(
+  [...arithmeticNamespaceMap].map(([from, to]) => [from, arithmeticRawKeyInstruction(to)]),
+);
+const remapArithmeticId = (instruction) =>
+  arithmeticNamespaceInstructions.get(arithmeticFunctionKey(instruction)) ?? instruction;
+const remapArithmeticNamespace = (instructions) => {
+  if (arithmeticNamespaceMap.size === 0) return instructions;
+  const remapped = instructions.map((instruction) => instruction);
+  for (let index = 1; index < remapped.length; index += 1) {
+    if (remapped[index].opcode === OP.INVOKE) {
+      remapped[index - 1] = remapArithmeticId(remapped[index - 1]);
+      continue;
+    }
+    if (remapped[index].opcode !== OP.DEFINE || index < 2) continue;
+    const bodyPush = remapped[index - 2];
+    if (bodyPush.data === undefined) continue;
+    const body = remapArithmeticNamespace(
+      decodeAuthenticationInstructions(bodyPush.data),
+    );
+    remapped[index - 2] = decodeAuthenticationInstructions(encodeDataPush(
+      encodeAuthenticationInstructions(body),
+    ))[0];
+    remapped[index - 1] = remapArithmeticId(remapped[index - 1]);
+  }
+  return remapped;
+};
+const arithmeticInstructions = [
+  ...remapArithmeticNamespace(selectiveInstructions), ...arithmeticLeafDefinition,
+];
+if (arithmeticLeafId === -1) {
+  const lineEval = arithmeticInstructions[30];
+  const disposal = Uint8Array.of(0x6b, 0x6b, 0x6d, 0x6c, 0x6c);
+  assert(arithmeticFunctionKey(arithmeticInstructions[31]) === '0a' &&
+    arithmeticInstructions[32].opcode === OP.DEFINE && lineEval.data?.length === 62 &&
+    equalBytes(lineEval.data.slice(-disposal.length), disposal),
+  'lineEval pair return disposal changed');
+  // Both forms map [x,y,a,b] to [a,b], preserving the caller's alternate stack.
+  arithmeticInstructions[30] = decodeAuthenticationInstructions(encodeDataPush(concat(
+    lineEval.data.slice(0, -disposal.length), Uint8Array.of(0x72, 0x6d),
+  )))[0];
+}
+if (arithmeticLeafId === -1) {
+  const multiplication = arithmeticInstructions[18];
+  assert(arithmeticFunctionKey(arithmeticInstructions[19]) === '06' &&
+    arithmeticInstructions[20].opcode === OP.DEFINE &&
+    multiplication.data?.length === 19 &&
+    hex(sha256(multiplication.data)) === '7cb117a6b61597c660748fc52ea1a91865f3c04a37d3179f91a68fe042a10404',
+  'Fp2 multiplication definition changed');
+  // Canonical Fp operands permit three products; normalize the signed real remainder.
+  arithmeticInstructions[18] = decodeAuthenticationInstructions(encodeDataPush(
+    Uint8Array.from(Buffer.from('7653799552795579956e944f8a9776009f634f8a9368537a547a93719395537a947b944f8a97', 'hex')),
+  ))[0];
+  const subtraction = arithmeticInstructions[27];
+  assert(arithmeticFunctionKey(arithmeticInstructions[28]) === '09' &&
+    arithmeticInstructions[29].opcode === OP.DEFINE && subtraction.data?.length === 102 &&
+    hex(sha256(subtraction.data)) === 'c83029276fb4adb317126b0bf4b287a8342de83127d08175d77a6389e5631ea4',
+  'canonical subtraction definition changed');
+  // Both operands are canonical Fp values, so one conditional addition normalizes x-y.
+  arithmeticInstructions[27] = decodeAuthenticationInstructions(encodeDataPush(
+    Uint8Array.from(Buffer.from('7c9476009f634f8a9368', 'hex')),
+  ))[0];
+}
+if (arithmeticLeafId === -1) {
+  const lineEval = arithmeticInstructions[30];
+  assert(arithmeticFunctionKey(arithmeticInstructions[31]) === '0a' &&
+    arithmeticInstructions[32].opcode === OP.DEFINE && lineEval.data?.length === 59 &&
+    hex(sha256(lineEval.data)) === '89300edab3657dc91293f84c83fd8ad76df9fafedb05a2ae6dbdf1eadd150176',
+  'signed line evaluation definition changed');
+  // Remove multiples of P from the polynomial and normalize its signed remainder.
+  // The twelve-argument ABI and canonical pair output remain unchanged.
+  arithmeticInstructions[30] = decodeAuthenticationInstructions(encodeDataPush(
+    Uint8Array.from(Buffer.from('567a557a525a7a955b799495567a5a79959395557a547a5779525879959495557a57799594955b8a76009f634f8a9368537a7c725c8a726d', 'hex')),
+  ))[0];
+}
+if(EVAL6_PAIRED) {
+  const before=encodeAuthenticationInstructions(arithmeticInstructions);
+  assert(arithmeticLeafId===-1&&before.length===534&&hex(sha256(before))===
+    '2b1df34c2029962cd5852ddfb2d512ecf1e23022e9d5590fcba8c5a5e7f4798a', 'paired eval6 requires the exact qualified arithmetic owner');
+  const evaluation=arithmeticInstructions[3];
+  assert(arithmeticFunctionKey(arithmeticInstructions[4])==='01'&&
+    arithmeticInstructions[5].opcode===OP.DEFINE&&hex(evaluation.data??new Uint8Array())===
+    '547a5679567a528a547a55797b528a537a54797b528a7b53797b528a7c7b7b528a', 'canonical eval6 seven-field ABI changed');
+  // Unsigned parsing and canonical field updates own the nonnegative domain.
+  // Reduce after Horner steps 1, 3 and 5; two-step intermediates retain the same
+  // polynomial modulo P. All other thirteen definitions remain byte-exact.
+  arithmeticInstructions[3]=decodeAuthenticationInstructions(encodeDataPush(
+    Uint8Array.from(Buffer.from('717c5679528a557995547a93537a54797b528a5379957b937b528a', 'hex')),
+  ))[0];
+}
+const templateArithmeticBody = encodeAuthenticationInstructions(arithmeticInstructions);
+const templateArithmeticLength = templateArithmeticBody.length;
+const candidateArithmeticInstructions = decodeAuthenticationInstructions(templateArithmeticBody);
+assert(candidateArithmeticInstructions.length === 14 * 3 &&
+  candidateArithmeticInstructions.every((instruction, index) =>
+    index % 3 === 0 ? instruction.data !== undefined :
+      index % 3 === 2 ? instruction.opcode === OP.DEFINE : true),
+'arithmetic library must contain exactly fourteen literal definitions');
+assert(templateArithmeticLength === arithmeticProfile.expectedLibraryBytes,
+  `${arithmeticProfile.key} arithmetic library length changed`);
+assert(hex(sha256(templateArithmeticBody)) === arithmeticProfile.expectedLibrarySha256,
+  `${arithmeticProfile.key} arithmetic library selective leaf changed`);
+const expectedArithmeticLeafRawKey = arithmeticFunctionKey(
+  decodeAuthenticationInstructions(pushVmNumber(arithmeticLeafId))[0],
+);
+assert(arithmeticLeafRawKey === expectedArithmeticLeafRawKey && arithmeticLeafSourceId === 17,
+  'arithmetic leaf raw key changed');
+const remapArithmeticRemainder = (remainder) => arithmeticNamespaceMap.size === 0
+  ? remainder
+  : encodeAuthenticationInstructions(remapArithmeticNamespace(
+    decodeAuthenticationInstructions(remainder),
+  ));
+const terminalPrimePool = process.env.RPA_TEMPLATE_TERMINAL_PRIME_POOL ?? 'off';
+assert(['off', 'on'].includes(terminalPrimePool),
+  'RPA_TEMPLATE_TERMINAL_PRIME_POOL must be off or on');
+assert(terminalPrimePool === 'off' || scheduledCompilerEntry && arithmeticLeafId === -1,
+  'terminal prime pooling requires the scheduled minus1 arithmetic profile');
 templateClasses.forEach((template) => {
-  if (!templateArithmeticImports.has(template.name)) return;
-  assert(equalBytes(template.core.slice(0, templateArithmeticLength), templateArithmeticBody),
-    `${template.name} arithmetic library prefix differs from its carrier`);
+  if (!templateArithmeticImports.has(template.name) && template.name !== templateArithmeticCarrier) return;
+  assert(equalBytes(template.core.slice(0, templateArithmeticOriginalLength),
+    templateArithmeticOriginalBody),
+  `${template.name} arithmetic library prefix differs from its carrier`);
+  template.core = concat(templateArithmeticBody,
+    remapArithmeticRemainder(template.core.slice(templateArithmeticOriginalLength)));
+  if (arithmeticLeafId === -1 && template.name === 'Terminal') {
+    const guardedPsi = Uint8Array.from(Buffer.from(
+      FINAL_RELATION_TOTAL ? '82770250019d01407902f0007f7502c0007f7701007e810141790220017f7502f0007f7701007e8101427a0250017f750220017f77' : '82770250019d01417902f0007f7502c0007f7701007e810142790220017f7502f0007f7701007e8101437a0250017f750220017f77',
+      'hex',
+    ));
+    const offset = Buffer.from(template.core).indexOf(Buffer.from(guardedPsi));
+    const boundaries = new Set([0]);
+    let instructionOffset = 0;
+    decodeAuthenticationInstructions(template.core).forEach((instruction) => {
+      instructionOffset += encodeAuthenticationInstructions([instruction]).length;
+      boundaries.add(instructionOffset);
+    });
+    assert(offset >= 0 &&
+      Buffer.from(template.core).indexOf(Buffer.from(guardedPsi), offset + 1) < 0 &&
+      boundaries.has(offset) && boundaries.has(offset + guardedPsi.length - 10) &&
+      boundaries.has(offset + guardedPsi.length),
+    'Terminal guarded psiYb suffix changed');
+    // The preceding exact 336-byte guard makes split(336)[0] redundant.
+    template.core = concat(
+      template.core.slice(0, offset + guardedPsi.length - 10),
+      Uint8Array.of(0x02, 0x20, 0x01, 0x7f, 0x77),
+      template.core.slice(offset + guardedPsi.length),
+    );
+  }
+  const evaluationRoll = { First: 71, AdditionTail: 68, AdditionMiddle: 78, Terminal: 68 }[template.name];
+  if (arithmeticLeafId === -1 && evaluationRoll !== undefined) {
+    const guardedEvaluation = concat(
+      Uint8Array.of(0x01, evaluationRoll, 0x7a, 0x01, 0x30, 0x7f, 0x75,
+        0x01, 0x00, 0x7e, 0x81, 0x76, 0x00),
+      encodeDataPush(bigIntToVmNumber(P)), Uint8Array.of(0xa5, 0x69),
+    );
+    const offset = Buffer.from(template.core).indexOf(Buffer.from(guardedEvaluation));
+    const boundaries = new Set([0]);
+    let instructionOffset = 0;
+    decodeAuthenticationInstructions(template.core).forEach((instruction) => {
+      instructionOffset += encodeAuthenticationInstructions([instruction]).length;
+      boundaries.add(instructionOffset);
+    });
+    assert(offset >= 0 &&
+      Buffer.from(template.core).indexOf(Buffer.from(guardedEvaluation), offset + 1) < 0 &&
+      [offset, offset + 3, offset + 7, offset + guardedEvaluation.length]
+        .every((position) => boundaries.has(position)),
+    `${template.name} guarded expectedTotal conversion changed`);
+    // The unchanged spend-entry guard fixes evaluationBlob to exactly 48 bytes.
+    // Keep its ROLL, unsigned conversion and expectedTotal range check exact.
+    template.core = concat(template.core.slice(0, offset + 3), template.core.slice(offset + 7));
+  }
+  if (arithmeticLeafId === -1) {
+    const bounds = { First: [9, 3], AdditionTail: [1, 1], AdditionMiddle: [7, 7], Terminal: [1, 1] }[template.name];
+    if (bounds !== undefined) {
+      const instructions = decodeAuthenticationInstructions(template.core);
+      const sites = instructions.flatMap((instruction, index) =>
+        instruction.data !== undefined && equalBytes(instruction.data, selectivePrime) &&
+        instructions[index + 1]?.opcode === 0xa5 ? [index] : []);
+      assert(sites.length === bounds[0], `${template.name} prime range-check sites changed`);
+      const selected = new Set(sites.slice(0, bounds[1]));
+      // The arithmetic prefix defines the same P leaf before these range checks run.
+      const primeCall = decodeAuthenticationInstructions(concat(
+        pushVmNumber(arithmeticLeafId), Uint8Array.of(OP.INVOKE),
+      ));
+      const transformed = encodeAuthenticationInstructions(instructions.flatMap((instruction, index) =>
+        selected.has(index) ? primeCall : [instruction]));
+      assert(template.core.length - transformed.length === 47 * bounds[1],
+        `${template.name} prime range-check replacement length changed`);
+      template.core = transformed;
+    }
+  }
+  if (terminalPrimePool === 'on' && template.name === 'Terminal') {
+    const instructions = decodeAuthenticationInstructions(template.core);
+    const sites = instructions.flatMap((instruction, index) =>
+      instruction.data !== undefined && equalBytes(instruction.data, selectivePrime) ? [index] : []);
+    assert(sites.length === 1 && instructions[sites[0] + 1]?.data?.length === 1 &&
+      instructions[sites[0] + 1].data[0] === 22 &&
+      instructions[sites[0] + 2]?.opcode === OpcodesBCH.OP_PICK,
+      'terminal remaining prime site changed');
+    // The exact arithmetic prefix installs -1 before this main-body constant use.
+    const primeCall = decodeAuthenticationInstructions(Uint8Array.of(0x4f, OP.INVOKE));
+    const transformed = encodeAuthenticationInstructions(instructions.flatMap((instruction, index) =>
+      index === sites[0] ? primeCall : [instruction]));
+    assert(template.core.length - transformed.length === 47,
+      'terminal prime replacement length changed');
+    template.core = transformed;
+  }
+  if(FUSE_REGULAR_PAIR && ['AdditionMiddle','Terminal'].includes(template.name)){
+    const before=template.core,original=decodeAuthenticationInstructions(before),mapped=[],ledger=[];
+    const activeHops=template.members.map(i=>(i===20?20:i+1)-physicalBlock(i));
+    const previousHops=template.members.map(i=>i-physicalBlock(i-1));
+    const skip=template.members.map(i=>frameOrdinal(i-1));
+    assert(new Set(activeHops).size===1&&new Set(previousHops).size===1&&new Set(skip).size===1,'late context must share one map');
+    const shift=(amount,subtract)=>amount===0?[]:amount===1?[{opcode:subtract?0x8c:0x8b}]:[...decodeAuthenticationInstructions(pushVmNumber(amount)),{opcode:subtract?OP.SUB:OpcodesBCH.OP_ADD}];
+    let activeSites=0,previousSites=0;
+    for(let i=0;i<original.length;i++){
+      const instruction=original[i],previous=instruction.opcode===OpcodesBCH.OP_INPUTBYTECODE&&original[i-1]?.opcode!==OpcodesBCH.OP_0;
+      const active=instruction.opcode===OpcodesBCH.OP_INPUTINDEX;
+      const prefix=previous?shift(previousHops[0],true):[],suffix=active?shift(activeHops[0],false):previous?Array.from({length:skip[0]},()=>decodeAuthenticationInstructions(skipFirstFrameBytes)).flat():[];
+      activeSites+=Number(active);previousSites+=Number(previous);ledger.push({prefix,suffix});mapped.push(...prefix,instruction,...suffix);
+    }
+    assert(activeSites===1&&previousSites===2,'late-template context sites changed');
+    const restored=[];let cursor=0;
+    for(const{prefix,suffix}of ledger){
+      assert(equalBytes(encodeAuthenticationInstructions(mapped.slice(cursor,cursor+prefix.length)),encodeAuthenticationInstructions(prefix)),'context prefix inverse');cursor+=prefix.length;restored.push(mapped[cursor++]);
+      assert(equalBytes(encodeAuthenticationInstructions(mapped.slice(cursor,cursor+suffix.length)),encodeAuthenticationInstructions(suffix)),'context suffix inverse');cursor+=suffix.length;
+    }
+    assert(cursor===mapped.length&&equalBytes(encodeAuthenticationInstructions(restored),before),'context map inverse');template.core=encodeAuthenticationInstructions(mapped);
+  }
+  if(FUSE_CARRIER_PAIR&&template.name==='AdditionTail'){
+    const group=regularGroups.find(group=>group.first===2);
+    assert(group?.members.length===2&&group.last===3&&template.members.every(block=>block<group.first||block===group.last+1),'carrier AdditionTail domain');
+    const previousLogicalInput=group.last+1,nextPhysicalInput=physicalBlock(group.last+1);
+    const firstTailShift=frameOrdinal(1),previousHop=previousLogicalInput-physicalBlock(group.last);
+    assert(firstTailShift===(FUSE_FIRST_TAIL_PAIR?1:0)&&previousHop===1+firstTailShift,'First/Tail carrier context domain');
+    const before=template.core,original=decodeAuthenticationInstructions(before),mapped=[],ledger=[];let active=0,previous=0;
+    for(let i=0;i<original.length;i++){
+      const instruction=original[i],isActive=instruction.opcode===OpcodesBCH.OP_INPUTINDEX,isPrevious=instruction.opcode===OpcodesBCH.OP_INPUTBYTECODE&&original[i-1]?.opcode!==OpcodesBCH.OP_0;
+      const prefix=isPrevious?decodeAuthenticationInstructions(concat(Uint8Array.of(OpcodesBCH.OP_DUP),pushVmNumber(previousLogicalInput),Uint8Array.of(OpcodesBCH.OP_NUMEQUAL,OpcodesBCH.OP_IF),previousHop===1?Uint8Array.of(OpcodesBCH.OP_1SUB):concat(pushVmNumber(previousHop),Uint8Array.of(OP.SUB)))):[];
+      const suffix=isActive?decodeAuthenticationInstructions(FUSE_COORDINATOR_HEAD?concat(Uint8Array.of(OpcodesBCH.OP_DUP,OpcodesBCH.OP_0,OpcodesBCH.OP_NUMEQUAL,OpcodesBCH.OP_IF,OP.DROP),pushVmNumber(5),Uint8Array.of(OpcodesBCH.OP_ELSE,OpcodesBCH.OP_1ADD,OpcodesBCH.OP_ENDIF)):concat(firstTailShift?Uint8Array.of(OpcodesBCH.OP_1ADD):new Uint8Array(),Uint8Array.of(OpcodesBCH.OP_DUP),pushVmNumber(nextPhysicalInput+firstTailShift),Uint8Array.of(OpcodesBCH.OP_GREATERTHANOREQUAL,OpcodesBCH.OP_IF,OpcodesBCH.OP_1ADD,OpcodesBCH.OP_ENDIF))):isPrevious?[...decodeAuthenticationInstructions(skipFirstFrameBytes),...decodeAuthenticationInstructions(Uint8Array.of(OpcodesBCH.OP_ELSE,OpcodesBCH.OP_INPUTBYTECODE,OpcodesBCH.OP_ENDIF))]:[];
+      active+=Number(isActive);previous+=Number(isPrevious);ledger.push({prefix,suffix});mapped.push(...prefix,instruction,...suffix);
+    }
+    assert(active===1&&previous===2,'AdditionTail1/4 context sites');
+    const restored=[];let cursor=0;for(const{prefix,suffix}of ledger){assert(equalBytes(encodeAuthenticationInstructions(mapped.slice(cursor,cursor+prefix.length)),encodeAuthenticationInstructions(prefix)),'early context prefix inverse');cursor+=prefix.length;restored.push(mapped[cursor++]);assert(equalBytes(encodeAuthenticationInstructions(mapped.slice(cursor,cursor+suffix.length)),encodeAuthenticationInstructions(suffix)),'early context suffix inverse');cursor+=suffix.length;}
+    assert(cursor===mapped.length&&equalBytes(encodeAuthenticationInstructions(restored),before),'AdditionTail context inverse');
+    const after=encodeAuthenticationInstructions(mapped);assert(equalBytes(after.slice(0,templateArithmeticLength),before.slice(0,templateArithmeticLength)),'arithmetic prefix unchanged');template.core=after;
+  }
+  // Preserve the qualified compiler's parsing boundaries; replace only the final
+  // input-count operand after all exact shared fragments have been extracted.
+  if(FUSE_REGULAR_PAIRS){
+    const instructions=decodeAuthenticationInstructions(template.core);let sites=0;
+    const mapped=instructions.flatMap((instruction,index)=>{
+      if(instructions[index-1]?.opcode!==OpcodesBCH.OP_TXINPUTCOUNT)return[instruction];
+      assert(equalBytes(encodeAuthenticationInstructions([instruction]),pushVmNumber(20)),'template original input count');sites++;
+      return decodeAuthenticationInstructions(pushVmNumber(TEMPLATE_TOTAL_INPUTS));
+    });assert(sites===1,'one template input count');template.core=encodeAuthenticationInstructions(mapped);
+  }
+  template.digest = sha256(template.core);
   template.arithmeticRemainder = template.core.slice(templateArithmeticLength);
+  if(coordinatorPrefixCache)template.arithmeticRemainder=coordinatorPrefixCache.rewrite(template.arithmeticRemainder,{First:0,AdditionTail:1,AdditionMiddle:1,Regular:2,Terminal:3}[template.name]);
 });
 const templateForBlock = (index) => templateClasses.find(({ members }) => members.includes(index));
-const templateConfig = (record, index) => concat(
+const templateFunctionId=index=>(FUSE_FIRST_TAIL_PAIR&&index===1)||(FUSE_FINAL_PAIR&&index===20)||(FUSE_MIDDLE_PAIR&&index===15)?fusedPrivateNamespace.core:TEMPLATE_FUNCTION_ID;
+// Return the exact preceding logical payload/evaluation; canonical framing is
+// independently enforced for every logical leaf by the committing coordinator.
+const loadPredecessor = previousBlock => concat(
+  pushVmNumber(physicalBlock(previousBlock)),Uint8Array.of(OP.INPUTBYTECODE),
+  ...(FUSE_COORDINATOR_HEAD&&previousBlock===4?[pushVmNumber(coordinatorArgumentBytes),Uint8Array.of(OP.SPLIT,OP.NIP)]:[]),
+  ...Array.from({length:frameOrdinal(previousBlock)},()=>skipFirstFrameBytes),
+  Uint8Array.from(Buffer.from('76537f75517f7701007e8153937f7c537f777c517f7701307f75','hex')),
+);
+const templateConfig = (record,index,forward=false) => FUSE_REGULAR_PAIR && templateForBlock(index).name==='Regular' ? concat(
+  ...(groupContinuations.has(index) ? [Uint8Array.of(OP.FROMALTSTACK,OP.FROMALTSTACK)] : [loadPredecessor(index-1)]),
+  ...(forward?[Uint8Array.of(OpcodesBCH.OP_2OVER,OP.TOALTSTACK,OP.TOALTSTACK)]:[]),
+  pushVmNumber(index),encodeDataPush(record.fixedCommitment),pushVmNumber(TEMPLATE_FUNCTION_ID),Uint8Array.of(OP.INVOKE),
+) : concat(
   pushVmNumber(index),
   pushVmNumber(index === 0 ? 0 : blockRecords[index - 1].payload.length),
   encodeDataPush(record.fixedCommitment),
   ...(index === 20 ? [Uint8Array.of(OP.FROMALTSTACK)] : []),
-  pushVmNumber(TEMPLATE_FUNCTION_ID),
+  pushVmNumber(templateFunctionId(index)),
   Uint8Array.of(OP.INVOKE),
 );
-const templateCommonBodyPush = encodeDataPush(templateCommonBody);
-const templateCommonStart = templateCommonBodyPush.length - templateCommonBody.length;
-const templateCommonEnd = templateCommonStart + templateCommonBody.length;
+const templateCommonPrimePool = process.env.RPA_TEMPLATE_COMMON_PRIME_POOL ?? 'off';
+assert(['off', 'on'].includes(templateCommonPrimePool),
+  'RPA_TEMPLATE_COMMON_PRIME_POOL must be off or on');
+let templateCommonProgram = templateCommonBody;
+if (templateCommonPrimePool === 'on') {
+  assert(scheduledCompilerEntry && arithmeticLeafId === -1,
+    'shared parser prime pooling requires the scheduled minus1 arithmetic profile');
+  // Keep the raw parser extraction, identity and context-free guards above exact.
+  // Each consumer installs the unchanged arithmetic library before invoking this
+  // derived parser; its -1 leaf maps A to A || [P] and preserves the alternate stack.
+  const instructions = decodeAuthenticationInstructions(templateCommonBody);
+  const sites = instructions.flatMap((instruction, index) =>
+    instruction.data !== undefined && equalBytes(instruction.data, selectivePrime) ? [index] : []);
+  assert(sites.length === 1, 'shared parser prime literal changed');
+  const primeCall = decodeAuthenticationInstructions(concat(
+    Uint8Array.of(0x4f, OP.INVOKE),
+  ));
+  templateCommonProgram = encodeAuthenticationInstructions(instructions.flatMap((instruction, index) =>
+    index === sites[0] ? primeCall : [instruction]));
+  assert(templateCommonBody.length - templateCommonProgram.length === 47,
+    'shared parser prime pooling length changed');
+  const restored = encodeAuthenticationInstructions(instructions.flatMap((instruction) => [instruction]));
+  assert(equalBytes(restored, templateCommonBody), 'shared parser instruction round-trip changed');
+}
+if(coordinatorPrefixCache)templateCommonProgram=coordinatorPrefixCache.rewrite(templateCommonProgram,2);
+const templateCommonBodyPush = encodeDataPush(templateCommonProgram);
+const templateCommonStart = templateCommonBodyPush.length - templateCommonProgram.length;
+const templateCommonEnd = templateCommonStart + templateCommonProgram.length;
 const templateExtraBodyPush = encodeDataPush(templateExtraBody);
 const templateExtraStart = templateExtraBodyPush.length - templateExtraBody.length;
 const templateExtraEnd = templateExtraStart + templateExtraBody.length;
@@ -2551,50 +3297,151 @@ for (let payloadLength = 0;
 assert(templateTerminalDensityPadding.length === templateTerminalDensityPaddingBytes,
   'Terminal template density padding cannot be encoded');
 const loadTemplateBody = (carrier, carrierRedeemLength, start, end, functionId) => concat(
-  pushVmNumber(carrier.representative + 1),
+  pushVmNumber(physicalBlock(carrier.representative)),
   Uint8Array.of(OP.INPUTBYTECODE, OP.SIZE),
   pushVmNumber(carrierRedeemLength),
   Uint8Array.of(OP.SUB, OP.SPLIT, OP.NIP),
   sliceTopBytes(start, end),
-  pushVmNumber(functionId),
+  encodeDataPush(bigIntToVmNumber(BigInt(functionId))),
   Uint8Array.of(OP.DEFINE),
 );
+const regularGroupTails=new Map(regularGroups.filter(group=>group.kind===undefined).map(group=>[group.first,concat(
+  Uint8Array.of(OP.VERIFY),
+  ...group.members.slice(1).map((block,index,remaining)=>{
+    const forward=index<remaining.length-1;
+    return concat(...(forward?[Uint8Array.of(OpcodesBCH.OP_2SWAP)]:[]),
+      templateConfig(blockRecords[block],block,forward),...(forward?[Uint8Array.of(OP.VERIFY)]:[]));
+  }),
+)]));
+const regularCarrierSuffix=regularGroupTails.get(2)??new Uint8Array();
+const arithmeticCarrier=templateClasses.find(template=>template.name===templateArithmeticCarrier);
+assert(!ARITHMETIC_REGULAR_CARRIER||arithmeticLeafId===-1,'Regular arithmetic carrier requires minus1 arithmetic');
 let templateCarrierLengths = new Map([
   [templateCommonCarrier.name, 4_000],
   [templateExtraCarrier.name, 4_000],
+  ...(ARITHMETIC_REGULAR_CARRIER?[[arithmeticCarrier.name,4_000]]:[]),
 ]);
 let templateCarrierLengthsStable = false;
 // First now imports the arithmetic prefix too; lay out its authenticated carrier first.
 const templateLayoutOrder = [
+  ...(ARITHMETIC_REGULAR_CARRIER?[arithmeticCarrier]:[]),
   templateCommonCarrier,
-  ...templateClasses.filter((template) => template !== templateCommonCarrier),
+  ...templateClasses.filter(template=>template!==templateCommonCarrier&&(!ARITHMETIC_REGULAR_CARRIER||template!==arithmeticCarrier)),
 ];
+// Regular installs the shared arithmetic once. Final-total continuations use
+// only shared calls; other profiles remap their private helper and pin the inverse.
+const remapFusedPrivate = (bytecode, inverse = false) => {
+  const from = inverse ? FUSED_TERMINAL_HELPER_ID : 13;
+  const to = inverse ? 13 : FUSED_TERMINAL_HELPER_ID;
+  const raw = value => hex(bigIntToVmNumber(BigInt(value)));
+  const remap = bytes => {
+    const instructions = decodeAuthenticationInstructions(bytes);
+    for (let index = 0; index < instructions.length; index += 1) {
+      const instruction = instructions[index];
+      if (instruction.opcode !== OP.DEFINE && instruction.opcode !== OP.INVOKE) continue;
+      if (instruction.opcode === OP.DEFINE) {
+        assert(index >= 2 && instructions[index - 2].data !== undefined,
+          'Terminal literal helper definition');
+        instructions[index - 2] = decodeAuthenticationInstructions(encodeDataPush(
+          remap(instructions[index - 2].data),
+        ))[0];
+      }
+      if (arithmeticFunctionKey(instructions[index - 1]) === raw(from)) {
+        instructions[index - 1] = decodeAuthenticationInstructions(pushVmNumber(to))[0];
+      }
+    }
+    return encodeAuthenticationInstructions(instructions);
+  };
+  return remap(bytecode);
+};
+const assertRegularInitializerNamespace = (bytecode) => {
+  const instructions = decodeAuthenticationInstructions(bytecode);
+  assert(instructions.every(instruction => !instruction.malformed), 'Regular initializer instructions');
+  for (let index = 0; index < instructions.length; index += 1) {
+    const instruction = instructions[index];
+    if (instruction.opcode !== OP.DEFINE && instruction.opcode !== OP.INVOKE) continue;
+    const key = arithmeticFunctionKey(instructions[index - 1]);
+    assert(key !== undefined && key !== '0f', 'Regular cache identifier must be unused by existing definitions and calls');
+    if (instruction.opcode === OP.DEFINE) {
+      assert(instructions[index - 2]?.data !== undefined, 'Regular initializer literal definition');
+      assertRegularInitializerNamespace(instructions[index - 2].data);
+    }
+  }
+};
 for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration += 1) {
   templateLayoutOrder.forEach((template) => {
     const record = blockRecords[template.representative];
-    if (templateArithmeticImports.has(template.name)) {
-      assert(Number.isInteger(templateCommonCarrier.coreStart),
+    if ((FUSE_FINAL_PAIR && template.name === 'Terminal') || (FUSE_MIDDLE_PAIR && template.name === 'AdditionMiddle')) {
+      const instructions = decodeAuthenticationInstructions(template.arithmeticRemainder);
+      if(FINAL_RELATION_TOTAL){
+        assert(Array.isArray(template.sourceFunctions)&&template.sourceFunctions.every(fn=>fn.id<13),
+          'final-total mixed template has no private source declarations');
+        assert(instructions.every(instruction=>!instruction.malformed&&instruction.opcode!==OP.DEFINE),
+          'final-total mixed template has no private bytecode definitions');
+        const sharedKeys=new Set(candidateArithmeticInstructions.filter((_,index)=>index%3===1).map(arithmeticFunctionKey));
+        sharedKeys.add(functionKey(templateCommonFunctionId(template)));
+        sharedKeys.add(functionKey(TEMPLATE_EXTRA_FUNCTION_ID));
+        if(coordinatorPrefixCache)for(const key of coordinatorPrefixCache.functionKeys)sharedKeys.add(key);
+        for(let index=0;index<instructions.length;index++)if(instructions[index].opcode===OP.INVOKE)
+          assert(index>0&&sharedKeys.has(arithmeticFunctionKey(instructions[index-1])),
+            'final-total mixed template calls only its shared owners');
+      }else{
+      assert((FUSE_RELATIONS ? hex(instructions[0].data??new Uint8Array())==='537a78008a7b72528a' : instructions[0].data?.length===12) && instructions[1].opcode === 0x5d &&
+        instructions[2].opcode === OP.DEFINE && instructions[5]?.opcode !== OP.DEFINE,
+      'mixed continuation sole private helper13 ABI');
+      }
+      template.core = remapFusedPrivate(template.arithmeticRemainder);
+      if(FINAL_RELATION_TOTAL)assert(equalBytes(template.core,template.arithmeticRemainder),'empty private namespace remap must be identity');
+      assert(equalBytes(remapFusedPrivate(template.core, true), template.arithmeticRemainder),
+        'Terminal private namespace inverse');
+      template.digest = sha256(template.core);
+    } else if(FUSE_COORDINATOR_HEAD&&template.name==='AdditionTail'){
+      template.core=template.arithmeticRemainder;
+    } else if (templateArithmeticImports.has(template.name)) {
+      const libraryStart=ARITHMETIC_REGULAR_CARRIER?arithmeticCarrier.regularInitializerStart:arithmeticCarrier.coreStart;
+      assert(Number.isInteger(libraryStart),
         'arithmetic library carrier must be laid out before its consumers');
       template.core = concat(
         loadTemplateBody(
-          templateCommonCarrier,
-          templateCarrierLengths.get(templateCommonCarrier.name),
-          templateCommonCarrier.coreStart,
-          templateCommonCarrier.coreStart + templateArithmeticLength,
-          TEMPLATE_ARITHMETIC_FUNCTION_ID,
+          arithmeticCarrier,
+          templateCarrierLengths.get(arithmeticCarrier.name)+(ARITHMETIC_REGULAR_CARRIER?regularCarrierSuffix.length:0),
+          libraryStart,
+          libraryStart + templateArithmeticLength,
+          templateArithmeticFunctionId(template),
         ),
-        pushVmNumber(TEMPLATE_ARITHMETIC_FUNCTION_ID),
+        pushVmNumber(templateArithmeticFunctionId(template)),
         Uint8Array.of(OP.INVOKE),
         template.arithmeticRemainder,
       );
-      template.digest = sha256(template.core);
+    } else if(ARITHMETIC_REGULAR_CARRIER&&template===arithmeticCarrier){
+      template.core=concat(templateArithmeticBody,template.arithmeticRemainder);
     }
+    if(FUSE_REGULAR_PAIR && template.name==='Regular'){
+      const remainder=decodeAuthenticationInstructions(template.arithmeticRemainder);let end=0;
+      while(end+2<remainder.length && remainder[end+2].opcode===OP.DEFINE){assert(remainder[end].data!==undefined,'literal Regular initializer');end+=3;}
+      const main=encodeAuthenticationInstructions(remainder.slice(end));
+      template.regularInitializer=template.core.slice(0,template.core.length-main.length);
+      template.core=main;
+      if(BUNDLE_REGULAR_MAIN){
+        assertRegularInitializerNamespace(template.regularInitializer);
+        assertRegularInitializerNamespace(main);
+        const mainPush=encodeDataPush(main);
+        template.bundledMainOffset=template.regularInitializer.length+mainPush.length-main.length;
+        template.regularInitializer=concat(template.regularInitializer,mainPush,pushVmNumber(TEMPLATE_FUNCTION_ID),Uint8Array.of(OP.DEFINE));
+      }
+    }
+    template.digest=sha256(template.core);
     const definitions = [];
+    if(FUSE_REGULAR_PAIR && template.name==='Regular'){
+      const bodyPush=encodeDataPush(template.regularInitializer),key=encodeDataPush(bigIntToVmNumber(REGULAR_INITIALIZER_ID));
+      template.regularInitializerStart=bodyPush.length-template.regularInitializer.length;
+      template.regularInitializerEnd=bodyPush.length;
+      definitions.push(concat(bodyPush,key,Uint8Array.of(OP.DEFINE),key,Uint8Array.of(OP.INVOKE)));
+    }
     if (template === templateCommonCarrier) {
       definitions.push(concat(
         templateCommonBodyPush,
-        pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID),
-        Uint8Array.of(OP.DEFINE),
+        ...(FUSE_FIRST_TAIL_PAIR?[Uint8Array.of(OP.DROP)]:[pushVmNumber(templateCommonFunctionId(template)),Uint8Array.of(OP.DEFINE)]),
       ));
     }
     if (template === templateExtraCarrier) {
@@ -2610,7 +3457,7 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
         templateCarrierLengths.get(templateCommonCarrier.name),
         templateCommonStart,
         templateCommonEnd,
-        TEMPLATE_COMMON_FUNCTION_ID,
+        templateCommonFunctionId(template),
       ));
     }
     if (templateExtraOffsets.has(template.name) && template !== templateExtraCarrier) {
@@ -2631,37 +3478,44 @@ for (let iteration = 0;iteration < 4 && !templateCarrierLengthsStable;iteration 
           ? templateTerminalDensityPadding
           : new Uint8Array();
     const corePush = encodeDataPush(template.core);
-    template.coreStart = commonDefinition.length + factorDensityPadding.length +
-      corePush.length - template.core.length;
+    const regularMainBundled=BUNDLE_REGULAR_MAIN&&template.name==='Regular';
+    template.coreStart = regularMainBundled
+      ?template.regularInitializerStart+template.bundledMainOffset
+      :commonDefinition.length+factorDensityPadding.length+corePush.length-template.core.length;
+    if(regularMainBundled)assert(equalBytes(template.regularInitializer.slice(template.bundledMainOffset,template.bundledMainOffset+template.core.length),template.core),'bundled Regular main exact body');
     template.representativeRedeem = concat(
       commonDefinition,
       factorDensityPadding,
-      corePush,
-      pushVmNumber(TEMPLATE_FUNCTION_ID),
-      Uint8Array.of(OP.DEFINE),
+      ...(regularMainBundled?[]:[corePush]),
+      ...(FUSE_FIRST_TAIL_PAIR&&!FUSE_COORDINATOR_HEAD&&template.name==='AdditionTail'?[pushVmNumber(template.core.length-template.arithmeticRemainder.length),Uint8Array.of(OP.SPLIT,OP.NIP)]:[]),
+      ...(regularMainBundled?[]:[pushVmNumber(templateFunctionId(template.representative)),Uint8Array.of(OP.DEFINE)]),
       templateConfig(record, template.representative),
     );
   });
   const nextCarrierLengths = new Map([
     [templateCommonCarrier.name, templateCommonCarrier.representativeRedeem.length],
     [templateExtraCarrier.name, templateExtraCarrier.representativeRedeem.length],
+    ...(ARITHMETIC_REGULAR_CARRIER?[[arithmeticCarrier.name,arithmeticCarrier.representativeRedeem.length]]:[]),
   ]);
   templateCarrierLengthsStable = [...nextCarrierLengths].every(([name, length]) =>
     templateCarrierLengths.get(name) === length);
   templateCarrierLengths = nextCarrierLengths;
 }
 assert(templateCarrierLengthsStable, 'shared-template carrier lengths did not converge');
+if(ARITHMETIC_REGULAR_CARRIER){
+  assert(equalBytes(arithmeticCarrier.regularInitializer.slice(0,templateArithmeticLength),templateArithmeticBody),'Regular initializer raw535 prefix');
+}
 templateClasses.forEach((template) => {
   assert(template.representativeRedeem.length ===
     (templateCarrierLengths.get(template.name) ?? template.representativeRedeem.length),
   `${template.name} representative redeem length changed after convergence`);
 });
-const loadTemplateCommonBody = () => loadTemplateBody(
+const loadTemplateCommonBody = (template) => loadTemplateBody(
   templateCommonCarrier,
   templateCarrierLengths.get(templateCommonCarrier.name),
   templateCommonStart,
   templateCommonEnd,
-  TEMPLATE_COMMON_FUNCTION_ID,
+  templateCommonFunctionId(template),
 );
 const loadTemplateExtraBody = () => loadTemplateBody(
   templateExtraCarrier,
@@ -2678,10 +3532,17 @@ const templateBlockRedeems = blockRecords.map((record, index) => {
   const representativeRedeem = template.representativeRedeem;
   const coreStart = template.coreStart;
   const coreEnd = coreStart + template.core.length;
-  const redeem = concat(
-    ...(templateCommonOffsets.has(template.name) ? [loadTemplateCommonBody()] : []),
+  const redeem = FUSE_REGULAR_PAIR && template.name==='Regular' ? concat(
+    pushVmNumber(physicalBlock(template.representative)),Uint8Array.of(OP.INPUTBYTECODE,OP.SIZE),
+    pushVmNumber(representativeRedeem.length+regularCarrierSuffix.length),Uint8Array.of(OP.SUB,OP.SPLIT,OP.NIP,...(BUNDLE_REGULAR_MAIN?[]:[OP.DUP])),
+    sliceTopBytes(template.regularInitializerStart,template.regularInitializerEnd),
+    encodeDataPush(bigIntToVmNumber(REGULAR_INITIALIZER_ID)),Uint8Array.of(OP.DEFINE),encodeDataPush(bigIntToVmNumber(REGULAR_INITIALIZER_ID)),Uint8Array.of(OP.INVOKE),
+    ...(BUNDLE_REGULAR_MAIN?[]:[sliceTopBytes(coreStart,coreEnd),pushVmNumber(TEMPLATE_FUNCTION_ID),Uint8Array.of(OP.DEFINE)]),
+    templateConfig(record,index),
+  ) : concat(
+    ...(templateCommonOffsets.has(template.name) ? [loadTemplateCommonBody(template)] : []),
     ...(templateExtraOffsets.has(template.name) ? [loadTemplateExtraBody()] : []),
-    pushVmNumber(template.representative + 1),
+    pushVmNumber(physicalBlock(template.representative)),
     Uint8Array.of(OP.INPUTBYTECODE),
     Uint8Array.of(OP.SIZE),
     pushVmNumber(representativeRedeem.length),
@@ -2706,7 +3567,14 @@ const templateBlockRedeems = blockRecords.map((record, index) => {
 
 // Experimental compact-record layout padding. This is outside the frozen
 // resource profile; retain the old audited <=76-byte Regular option unchanged.
-const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_DENSITY_PADDING ?? '{"3":444,"5":432,"6":423,"7":431,"8":413,"9":421,"10":423,"11":431,"12":423,"13":431,"14":433,"16":419,"17":428,"18":430,"19":438}');
+const compactRegularDensityPadding = JSON.parse(process.env.RPA_COMPACT_REGULAR_DENSITY_PADDING ??
+  (arithmeticLeafId === -1
+    ? '{"3":370,"5":356,"6":311,"7":318,"8":301,"9":307,"10":309,"11":317,"12":312,"13":318,"14":320,"16":343,"17":315,"18":316,"19":324}'
+    : '{"3":436,"5":423,"6":377,"7":385,"8":369,"9":376,"10":377,"11":386,"12":377,"13":386,"14":388,"16":411,"17":383,"18":384,"19":393}'));
+if (FUSE_FINAL_PAIR) compactRegularDensityPadding['19'] = 0;
+if (FUSE_REGULAR_PAIR) {
+  regularGroups.forEach(group=>group.members.forEach(block=>{if(block!==2&&templateForBlock(block).name==='Regular')compactRegularDensityPadding[String(block)]=0;}));
+}
 Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   const index = Number(block);
   assert(Number.isInteger(index) && String(index) === block && index !== 2 &&
@@ -2714,21 +3582,156 @@ Object.entries(compactRegularDensityPadding).forEach(([block, byteCount]) => {
   assert(Number.isInteger(byteCount) && byteCount >= 0 && byteCount <= 1000,
     'compact Regular padding exceeds the bounded experiment');
   let padding = new Uint8Array();
-  while (padding.length < byteCount) {
-    const remaining = byteCount - padding.length;
-    assert(remaining >= 2, 'compact padding cannot encode a one-byte tail');
-    const chunk = Math.min(remaining === 77 ? 75 : 76, remaining);
-    padding = concat(padding, encodeDataPush(new Uint8Array(chunk - 2)), Uint8Array.of(OP.DROP));
+  if (arithmeticLeafId === -1 && byteCount >= 260) {
+    // One PUSHDATA2 and DROP retain the complete padding prefix length.
+    padding = concat(encodeDataPush(new Uint8Array(byteCount - 4)), Uint8Array.of(OP.DROP));
+  } else {
+    while (padding.length < byteCount) {
+      const remaining = byteCount - padding.length;
+      assert(remaining >= 2, 'compact padding cannot encode a one-byte tail');
+      const chunk = Math.min(remaining === 77 ? 75 : 76, remaining);
+      padding = concat(padding, encodeDataPush(new Uint8Array(chunk - 2)), Uint8Array.of(OP.DROP));
+    }
   }
   assert(padding.length === byteCount, 'compact padding byte count changed');
   templateBlockRedeems[index] = concat(padding, templateBlockRedeems[index]);
 });
 
+// Normalize only public input operands while applying exact historical q cuts.
+const mapQuotientInputs=(bytecode,fromInput,toInput,fromCount,toCount)=>{
+ const instructions=decodeAuthenticationInstructions(bytecode);let inputs=0,counts=0;
+ const mapped=instructions.flatMap((instruction,index)=>{
+  if(instructions[index+1]?.opcode===OP.INPUTBYTECODE&&equalBytes(encodeAuthenticationInstructions([instruction]),pushVmNumber(fromInput))){inputs++;return decodeAuthenticationInstructions(pushVmNumber(toInput));}
+  if(instructions[index-1]?.opcode===OpcodesBCH.OP_TXINPUTCOUNT&&equalBytes(encodeAuthenticationInstructions([instruction]),pushVmNumber(fromCount))){counts++;return decodeAuthenticationInstructions(pushVmNumber(toCount));}
+  return[instruction];
+ });assert(inputs===1&&counts===1,'quotient public input operands');return encodeAuthenticationInstructions(mapped);
+};
+if(FUSE_REGULAR_PAIRS){
+  const originalQuotient=fusedQuotientRedeem;
+  fusedQuotientRedeem=mapQuotientInputs(originalQuotient,physicalBlock(20),19,TEMPLATE_TOTAL_INPUTS,20);
+  assert(equalBytes(mapQuotientInputs(fusedQuotientRedeem,19,physicalBlock(20),20,TEMPLATE_TOTAL_INPUTS),originalQuotient),'quotient operand normalization inverse');
+}
+const quotientFinalInput = FUSE_REGULAR_PAIRS?19:FUSE_FINAL_PAIR?(FUSE_REGULAR_PAIR?19:20):21;
+const quotientInputCount = FUSE_REGULAR_PAIRS?20:TEMPLATE_TOTAL_INPUTS;
 const PIC_BLOCK4_INDEX = 4;
-const PIC_BLOCK4_INPUT = PIC_BLOCK4_INDEX + 1;
+const PIC_BLOCK4_INPUT = physicalBlock(PIC_BLOCK4_INDEX);
 const picBaseBlock4Redeem = templateBlockRedeems[PIC_BLOCK4_INDEX];
 const picAuthHelperPush = encodeDataPush(picAuthHelper);
 const picFixedBlobPush = encodeDataPush(picFixedBlob);
+if (arithmeticLeafId === -1) {
+  const restoreQuotientIdentity=bytecode=>{
+    const instructions=decodeAuthenticationInstructions(bytecode);let inputSites=0,countSites=0;
+    const restored=instructions.map((instruction,index)=>{
+      if(instructions[index+1]?.opcode===OP.INPUTBYTECODE && equalBytes(encodeAuthenticationInstructions([instruction]),pushVmNumber(quotientFinalInput))){
+        inputSites+=1; return decodeAuthenticationInstructions(pushVmNumber(21))[0];
+      }
+      if(instructions[index-1]?.opcode===OpcodesBCH.OP_TXINPUTCOUNT && equalBytes(encodeAuthenticationInstructions([instruction]),pushVmNumber(quotientInputCount))){
+        countSites+=1; return decodeAuthenticationInstructions(pushVmNumber(22))[0];
+      }
+      return instruction;
+    });
+    assert(inputSites===1&&countSites===1,'quotient logical-to-physical inverse sites');
+    return encodeAuthenticationInstructions(restored);
+  };
+  const fixedFinalEvaluation = concat(pushVmNumber(quotientFinalInput),Uint8Array.of(OP.INPUTBYTECODE),Uint8Array.from(Buffer.from('0244057f7701317f75517f7701307f7501007e81','hex')));
+  const offset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(fixedFinalEvaluation));
+  const boundaries = new Set([0]);
+  let instructionOffset = 0;
+  decodeAuthenticationInstructions(fusedQuotientRedeem).forEach((instruction) => {
+    instructionOffset += encodeAuthenticationInstructions([instruction]).length;
+    boundaries.add(instructionOffset);
+  });
+  assert(offset >= 0 &&
+    Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(fixedFinalEvaluation), offset + 1) < 0 &&
+    [offset, offset + 15, offset + 19, offset + fixedFinalEvaluation.length]
+      .every((position) => boundaries.has(position)),
+  'fused quotient fixed-width final evaluation changed');
+  // split(49)[0].split(1)[1] already leaves exactly 48 bytes.
+  // Keep both extraction bounds and the unsigned conversion unchanged.
+  fusedQuotientRedeem = concat(
+    fusedQuotientRedeem.slice(0, offset + 15), fusedQuotientRedeem.slice(offset + 19),
+  );
+  const loopSplit = Uint8Array.from(Buffer.from('7801307f75527901307f77537a757c6b7c6c', 'hex'));
+  const loopOffset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(loopSplit));
+  // These endpoints precede the final-evaluation cut, so the original boundaries apply.
+  assert(loopOffset >= 0 && loopOffset + loopSplit.length <= offset + 15 &&
+    Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(loopSplit), loopOffset + 1) < 0 &&
+    [loopOffset, loopOffset + loopSplit.length].every((position) => boundaries.has(position)),
+  'fused quotient loop split changed');
+  // S, remaining, index -> S, suffix, index, prefix48; preserve the alternate stack.
+  // Keep the split bound, unsigned conversion, coefficient range and loop arithmetic.
+  fusedQuotientRedeem = concat(
+    fusedQuotientRedeem.slice(0, loopOffset),
+    Uint8Array.from(Buffer.from('7c01307f7b7b', 'hex')),
+    fusedQuotientRedeem.slice(loopOffset + loopSplit.length),
+  );
+  const loopCleanup = Uint8Array.from(Buffer.from(
+    '7c6b7c6b7c6b7c6c6c6c52798b537a757c6b7c6c6d', 'hex',
+  ));
+  const cleanupOffset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(loopCleanup));
+  const cleanupBoundaries = new Set([0]);
+  let cleanupInstructionOffset = 0;
+  decodeAuthenticationInstructions(fusedQuotientRedeem).forEach((instruction) => {
+    cleanupInstructionOffset += encodeAuthenticationInstructions([instruction]).length;
+    cleanupBoundaries.add(cleanupInstructionOffset);
+  });
+  assert(fusedQuotientRedeem.length === 222 && hex(sha256(FUSE_FINAL_PAIR ? restoreQuotientIdentity(fusedQuotientRedeem) : fusedQuotientRedeem)) ===
+    'd8e36fa3293ecf497befcf51cb467248920382c30d5273fac7ff8f5c0ec93353' &&
+    cleanupOffset === 134 &&
+    Buffer.from(fusedQuotientRedeem).lastIndexOf(Buffer.from(loopCleanup)) === cleanupOffset &&
+    [cleanupOffset, cleanupOffset + loopCleanup.length].every((position) => cleanupBoundaries.has(position)),
+  'fused quotient loop cleanup changed');
+  // S,a,index,c,d,e -> S,e,a,index+1 with five entry items and unchanged ALT.
+  // Preserve 1ADD and all preceding unsigned conversion, range and arithmetic checks.
+  fusedQuotientRedeem = concat(
+    fusedQuotientRedeem.slice(0, cleanupOffset),
+    Uint8Array.from(Buffer.from('7b757c757b7b8b', 'hex')),
+    fusedQuotientRedeem.slice(cleanupOffset + loopCleanup.length),
+  );
+  const loopLifetime = Uint8Array.from(Buffer.from(
+    '7601007e817657799f6954795679957893577997557a757b757c757b7b8b', 'hex',
+  ));
+  const lifetimeOffset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(loopLifetime));
+  const lifetimeBoundaries = new Set([0]);
+  let lifetimeInstructionOffset = 0;
+  decodeAuthenticationInstructions(fusedQuotientRedeem).forEach((instruction) => {
+    lifetimeInstructionOffset += encodeAuthenticationInstructions([instruction]).length;
+    lifetimeBoundaries.add(lifetimeInstructionOffset);
+  });
+  assert(fusedQuotientRedeem.length === 208 && hex(sha256(FUSE_FINAL_PAIR ? restoreQuotientIdentity(fusedQuotientRedeem) : fusedQuotientRedeem)) ===
+    'd937ca47bdd7b2577404a1566b4770ce21cfd1833de6d15c971dfed1f5e954d2' &&
+    lifetimeOffset === 111 &&
+    Buffer.from(fusedQuotientRedeem).lastIndexOf(Buffer.from(loopLifetime)) === lifetimeOffset &&
+    [lifetimeOffset, lifetimeOffset + loopLifetime.length].every((position) => lifetimeBoundaries.has(position)),
+  'fused quotient coefficient lifetime changed');
+  // Consume coefficientBytes and coefficient once; keep unsigned conversion, range,
+  // MUL/ADD/MOD order and index increment. S,p,a,acc,suffix,i,prefix -> S,p,a,next,suffix,i+1.
+  fusedQuotientRedeem = concat(
+    fusedQuotientRedeem.slice(0, lifetimeOffset),
+    Uint8Array.from(Buffer.from('01007e817656799f69537955799593557997537a757b7b8b', 'hex')),
+    fusedQuotientRedeem.slice(lifetimeOffset + loopLifetime.length),
+  );
+}
+if (FUSE_FINAL_PAIR) {
+  const mixedFinalRead = concat(pushVmNumber(quotientFinalInput),Uint8Array.of(OP.INPUTBYTECODE),Uint8Array.from(Buffer.from('0244057f7701317f75517f7701007e81','hex')));
+  const offset = Buffer.from(fusedQuotientRedeem).indexOf(Buffer.from(mixedFinalRead));
+  assert(offset >= 0 &&
+    Buffer.from(fusedQuotientRedeem).lastIndexOf(Buffer.from(mixedFinalRead)) === offset,
+  'optimized final evaluation reader');
+  // Duplicate the input, decode its canonical uint16 payload length, add the
+  // three-byte first push and49-byte evaluation push, then retain frame two.
+  // The coordinator independently checks both canonical producer prefixes.
+  const skip = Uint8Array.from(Buffer.from('76537f75517f7701007e810134937f77', 'hex'));
+  const before = fusedQuotientRedeem;
+  fusedQuotientRedeem = concat(before.slice(0, offset + 3), skip, before.slice(offset + 3));
+  assert(equalBytes(concat(fusedQuotientRedeem.slice(0, offset + 3),
+    fusedQuotientRedeem.slice(offset + 3 + skip.length)), before), 'mixed reader inverse');
+}
+if(FUSE_REGULAR_PAIRS)fusedQuotientRedeem=mapQuotientInputs(fusedQuotientRedeem,19,physicalBlock(20),20,TEMPLATE_TOTAL_INPUTS);
+if(FUSE_CARRIER_PAIR){
+  const mapActive=(bytecode,from,to)=>{const instructions=decodeAuthenticationInstructions(bytecode);let sites=0;const mapped=instructions.map((instruction,index)=>{if(instructions[index-1]?.opcode!==OpcodesBCH.OP_INPUTINDEX)return instruction;assert(equalBytes(encodeAuthenticationInstructions([instruction]),pushVmNumber(from)),'quotient original active input');sites++;return decodeAuthenticationInstructions(pushVmNumber(to))[0];});assert(sites===1,'quotient one active input');return encodeAuthenticationInstructions(mapped);};
+  const before=fusedQuotientRedeem;fusedQuotientRedeem=mapActive(before,FUSED_QUOTIENT_INPUT_INDEX,physicalInput(FUSED_QUOTIENT_INPUT_INDEX));assert(equalBytes(mapActive(fusedQuotientRedeem,physicalInput(FUSED_QUOTIENT_INPUT_INDEX),FUSED_QUOTIENT_INPUT_INDEX),before),'quotient active input inverse');
+}
 const fusedQuotientOpcodes = decodeAuthenticationInstructions(fusedQuotientRedeem)
   .map((instruction) => OpcodesBCH[instruction.opcode]);
 assert(!fusedQuotientOpcodes.some((opcode) => [
@@ -2746,8 +3749,9 @@ const fusedQuotientTailStart = encodeDataPush(
   fusedQuotientTailPayload.length);
 const fusedQuotientTailEnd = fusedQuotientTailStart + fusedQuotientTailPayload.length;
 const fusedQuotientTailLoader = concat(
-  pushVmNumber(FUSED_QUOTIENT_TAIL_INPUT_INDEX),
+  pushVmNumber(physicalInput(FUSED_QUOTIENT_TAIL_INPUT_INDEX)),
   Uint8Array.of(OP.INPUTBYTECODE),
+  ...Array.from({length:frameOrdinal(FUSED_QUOTIENT_TAIL_BLOCK_INDEX)},()=>skipFirstFrameBytes),
   sliceTopBytes(fusedQuotientTailStart, fusedQuotientTailEnd),
 );
 const fusedQuotientTailLengthGuard = concat(
@@ -2786,30 +3790,37 @@ const picHelperEnd = picHelperStart + picAuthHelper.length;
 const picFixedStart = picAuthHelperPush.length + 1 +
   (picFixedBlobPush.length - picFixedBlob.length);
 const picFixedEnd = picFixedStart + picFixedBlob.length;
-const picCarrierRedeemLoader = concat(
+const picCarrierRedeemLoader = FUSE_COORDINATOR_HEAD?rootRedeemLoader(rootArgumentBytes):concat(
   pushVmNumber(PIC_BLOCK4_INPUT),
   Uint8Array.of(OP.INPUTBYTECODE, OP.SIZE),
   pushVmNumber(picBlock4Redeem.length),
   Uint8Array.of(OP.SUB, OP.SPLIT, OP.NIP),
 );
-const picAuthLoader = concat(
+// Regular's representative defines its PIC helper before the shared core.
+// Move that helper to 17 so the profile -1 core can own short key 15.
+const picAuthFunctionId = (firstWindow) => FUSE_MIDDLE_PAIR&&firstWindow===picAuthBatches[4].firstWindow?fusedPrivateNamespace.auth:FUSE_FINAL_PAIR && firstWindow === picAuthBatches[5].firstWindow ? FUSED_TERMINAL_AUTH_ID : arithmeticLeafId === -1 &&
+  firstWindow === picAuthBatches[3].firstWindow ? 17 : PIC_AUTH_FUNCTION_ID;
+const picAuthLoader = (functionId) => concat(
   picCarrierRedeemLoader,
   sliceTopBytes(picHelperStart, picHelperEnd),
-  pushVmNumber(PIC_AUTH_FUNCTION_ID),
+  pushVmNumber(functionId),
   Uint8Array.of(OP.DEFINE),
 );
-const picAuthWrapper = (firstWindow, windowCount, retainCarrierRedeem = false) => concat(
-  ...(retainCarrierRedeem ? [picCarrierRedeemLoader, Uint8Array.of(OP.DUP)] : [picAuthLoader]),
-  ...(retainCarrierRedeem ? [
-    sliceTopBytes(picHelperStart, picHelperEnd),
-    pushVmNumber(PIC_AUTH_FUNCTION_ID),
-    Uint8Array.of(OP.DEFINE),
-  ] : []),
-  pushVmNumber(windowCount),
-  pushVmNumber(firstWindow),
-  pushVmNumber(PIC_AUTH_FUNCTION_ID),
-  Uint8Array.of(OP.INVOKE, OP.ONE, OP.EQUALVERIFY),
-);
+const picAuthWrapper = (firstWindow, windowCount, retainCarrierRedeem = false) => {
+  const functionId = picAuthFunctionId(firstWindow);
+  return concat(
+    ...(FUSE_FIRST_TAIL_PAIR&&firstWindow===picAuthBatches[2].firstWindow?[]:retainCarrierRedeem ? [picCarrierRedeemLoader, Uint8Array.of(OP.DUP)] : [picAuthLoader(functionId)]),
+    ...(retainCarrierRedeem ? [
+      sliceTopBytes(picHelperStart, picHelperEnd),
+      pushVmNumber(functionId),
+      Uint8Array.of(OP.DEFINE),
+    ] : []),
+    pushVmNumber(windowCount),
+    pushVmNumber(firstWindow),
+    pushVmNumber(functionId),
+    Uint8Array.of(OP.INVOKE, OP.ONE, OP.EQUALVERIFY),
+  );
+};
 const picBlock0AuthWrapper = picAuthWrapper(
   picAuthBatches[1].firstWindow,
   picAuthBatches[1].windowCount,
@@ -2888,20 +3899,80 @@ templateBlockRedeems[15] = concat(
   Uint8Array.of(OP.VERIFY),
   templateBlockRedeems[15],
 );
-const templateSiblingLockings = templateBlockRedeems.map(
-  (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)),
-);
+// OP_2SWAP exposes Regular19's arguments; its verified result is consumed
+// before Terminal20 runs with the arithmetic definitions already installed.
+const mixedRedeem = FUSE_FINAL_PAIR ? concat(
+  Uint8Array.of(0x72), templateBlockRedeems[19],
+  Uint8Array.of(OP.VERIFY), templateBlockRedeems[20],
+) : null;
+if (FUSE_FINAL_PAIR) templateBlockRedeems[19] = mixedRedeem;
+const groupedRegularRedeems=new Map();
+for(const group of regularGroups){
+  const groupFundingBytes=group.funding;let groupFunding=new Uint8Array();
+  if(groupFundingBytes>=260)groupFunding=concat(encodeDataPush(new Uint8Array(groupFundingBytes-4)),Uint8Array.of(OP.DROP));
+  while(groupFunding.length<groupFundingBytes){const remaining=groupFundingBytes-groupFunding.length;assert(remaining>=2,'one-byte group funding tail');const n=Math.min(remaining===77?75:76,remaining);groupFunding=concat(groupFunding,encodeDataPush(new Uint8Array(n-2)),Uint8Array.of(OP.DROP));}
+  assert(groupFunding.length===groupFundingBytes,'group funding byte count');
+  const redeem=group.kind==='first-tail'?concat(groupFunding,Uint8Array.of(OpcodesBCH.OP_2SWAP),templateBlockRedeems[group.first],Uint8Array.of(OP.VERIFY),templateBlockRedeems[group.last]):group.kind==='middle'?concat(groupFunding,Uint8Array.of(OP.TOALTSTACK,OpcodesBCH.OP_2SWAP),templateBlockRedeems[group.first],Uint8Array.of(OP.VERIFY,OP.FROMALTSTACK),templateBlockRedeems[group.last]):concat(groupFunding,
+    Uint8Array.of(group.members.length===2?OpcodesBCH.OP_2SWAP:OpcodesBCH.OP_2ROT,OpcodesBCH.OP_2DUP,OP.TOALTSTACK,OP.TOALTSTACK),
+    templateBlockRedeems[group.first],regularGroupTails.get(group.first));
+  if(group.first===2)assert(equalBytes(redeem.slice(-regularCarrierSuffix.length),regularCarrierSuffix),'carrier raw suffix owner');
+  groupedRegularRedeems.set(group.first,redeem);templateBlockRedeems[group.first]=redeem;
+}
+const templateWorkerBlocks = templateBlockRedeems.flatMap((_, index) =>
+  !groupContinuations.has(index) && (!FUSE_FINAL_PAIR || index!==20) && (!FUSE_COORDINATOR_HEAD||index!==4) ? [index] : []);
+const templateSiblingLockings = templateWorkerBlocks.map(index =>
+  encodeLockingBytecodeP2sh32(hash256(templateBlockRedeems[index])));
 const templateSiblingLockingDigest = sha256(concat(...templateSiblingLockings));
-const templateCoordinatorCore = compileNamed(
-  coordinatorSource(
-    templateSiblingLockingDigest,
-    true,
-    TEMPLATE_TOTAL_INPUTS,
-    true,
-  ),
+const templateCoordinatorSource = coordinatorSource(
+  templateSiblingLockingDigest,
+  true,
+  TEMPLATE_TOTAL_INPUTS,
+  true,
+  !FUSE_COORDINATOR_HEAD,
+);
+let templateCoordinatorCore = compileNamed(
+  templateCoordinatorSource,
   'template coordinator',
   { optimizeFor: 'size' },
 );
+if (SCHEDULE_COORDINATOR) {
+  // This core owns its arithmetic helpers; only their private identifiers need
+  // the same declaration/ABI mapping used by the scheduled template mains.
+  templateCoordinatorCore = compileScheduledSource(
+    templateCoordinatorSource, templateCoordinatorCore, {optimizeFor: 'size'},
+  ).renamed;
+}
+if (arithmeticLeafId === -1) {
+  let primeSites = 0;
+  const poolCoordinatorPrime = (instructions) => instructions.map((instruction, index) => {
+    if (instruction.data !== undefined && instructions[index + 2]?.opcode === OP.DEFINE) {
+      return decodeAuthenticationInstructions(encodeDataPush(encodeAuthenticationInstructions(
+        poolCoordinatorPrime(decodeAuthenticationInstructions(instruction.data)).flat(),
+      )))[0];
+    }
+    if (instruction.opcode === OP.INVOKE) {
+      assert(instructions[index - 1]?.opcode !== 0x4f,
+        'coordinator prime key is already owned');
+    }
+    if (instruction.data !== undefined && equalBytes(instruction.data, selectivePrime)) {
+      primeSites += 1;
+      return decodeAuthenticationInstructions(concat(
+        pushVmNumber(arithmeticLeafId), Uint8Array.of(OP.INVOKE),
+      ));
+    }
+    return instruction;
+  });
+  // A constant leaf replaces identical P pushes, including those in private helpers.
+  const pooled = encodeAuthenticationInstructions(poolCoordinatorPrime(
+    decodeAuthenticationInstructions(templateCoordinatorCore),
+  ).flat());
+  assert(primeSites === 4, 'coordinator field-prime sites changed');
+  templateCoordinatorCore = concat(
+    encodeAuthenticationInstructions(arithmeticLeafDefinition), pooled,
+  );
+}
+let coordinatorArithmeticRemapping;
+if(FUSE_COORDINATOR_HEAD){const mapped=mapCoordinatorArithmetic(templateCoordinatorCore);templateCoordinatorCore=mapped.bytecode;coordinatorArithmeticRemapping=mapped.info;}
 const templateCoordinatorCoreRedeem = concat(
   picAuthWrapper(
     picAuthBatches[0].firstWindow,
@@ -2925,10 +3996,27 @@ for (let payloadLength = 0;
 assert(COORDINATOR_DENSITY_PADDING === 0 ||
   coordinatorDensityPadding.length === COORDINATOR_DENSITY_PADDING,
 'coordinator density padding cannot be encoded at the requested length');
-const templateCoordinatorRedeem = concat(
+let templateCoordinatorRedeem = concat(
   coordinatorDensityPadding,
   templateCoordinatorCoreRedeem,
 );
+const finalTemplateRedeems = templateBlockRedeems.slice();
+let coordinatorTailCarrier,coordinatorHeadFusion;
+if(FUSE_COORDINATOR_HEAD){
+  const head=concat(fusedQuotientTailLoader,fusedQuotientRedeem,Uint8Array.of(OP.VERIFY),picBlock4DensityPadding,picBaseBlock4Redeem);
+  const libraryLoad=concat(loadTemplateBody(arithmeticCarrier,templateCarrierLengths.get(arithmeticCarrier.name)+regularCarrierSuffix.length,arithmeticCarrier.regularInitializerStart,arithmeticCarrier.regularInitializerStart+templateArithmeticLength,17),pushVmNumber(17),Uint8Array.of(OP.INVOKE));
+  const fused=fuseCoordinatorHead({argumentBytes:rootArgumentBytes,prefix:concat(picAuthHelperPush,Uint8Array.of(OP.DROP),picFixedBlobPush,Uint8Array.of(OP.DROP)),head,delegated:templateCoordinatorCoreRedeem,libraryLoad,workerPrelude:coordinatorPrefixCache?.initializer,workers:templateWorkerBlocks.map(block=>({block,input:physicalBlock(block),redeem:templateBlockRedeems[block]})),compileBinding:digest=>{const source=`pragma cashscript ^0.14.0;\ncontract CoordinatorWorkerBinding() { function spend() {\n${workerBindingSource(digest,TEMPLATE_TOTAL_INPUTS).join('\n')}\n} }`;const artifact=scheduledCompiler.compileString(source,{rescheduleStacks:true,renumberFunctionIds:false,optimizeFor:'size'});return Uint8Array.from(Buffer.from(artifact.debug.bytecode,'hex'));}});
+  templateCoordinatorRedeem=fused.coordinator;for(const[block,redeem]of fused.workers)finalTemplateRedeems[block]=redeem;
+  coordinatorHeadFusion={...fused.info,arithmetic:coordinatorArithmeticRemapping,...(coordinatorPrefixCache?{prefixCache:{functionKey:coordinatorPrefixCache.functionKey,bytes:coordinatorPrefixCache.prefixBytes,initializerBytes:coordinatorPrefixCache.initializer.length,...(COORDINATOR_PREFIX_MODE==='fields'?{splitFields:true,functionKeys:coordinatorPrefixCache.functionKeys}:{})}}:{})};
+}
+if(COORDINATOR_TAIL_BYTES){
+  const carried=carryCoordinatorTail(templateCoordinatorRedeem,templateWorkerBlocks.map(block=>({
+    block,input:physicalBlock(block),redeem:templateBlockRedeems[block],
+  })),COORDINATOR_TAIL_BYTES);
+  templateCoordinatorRedeem=carried.coordinator;
+  for(const[block,redeem]of carried.workers)finalTemplateRedeems[block]=redeem;
+  coordinatorTailCarrier=carried.info;
+}
 const siblingLockings = [...blockRedeems, ...quotientRedeems].map(
   (redeem) => encodeLockingBytecodeP2sh32(hash256(redeem)),
 );
@@ -2983,40 +4071,53 @@ const makeTemplateBlockUnlocking = (payload, evaluation, quotientChunk, redeem) 
   ...(quotientChunk === null ? [] : [encodeDataPush(quotientChunk)]),
   encodeDataPush(redeem),
 );
-const makeTemplateInputs = () => [{
-  role: 'coordinator-template-classes',
-  payload: null,
-  evaluation: null,
-  redeem: templateCoordinatorRedeem,
-  locking: encodeLockingBytecodeP2sh32(hash256(templateCoordinatorRedeem)),
-  unlocking: concat(
-    encodeDataPush(transcriptHeader),
-    encodeDataPush(statementBytes),
-    encodeDataPush(templateCoordinatorRedeem),
-  ),
-}, ...blockPayloads.map((payload, index) => {
-  const evaluation = blockEvaluationPayloads[index];
-  const redeem = templateBlockRedeems[index];
-  const quotientChunk = index === FUSED_QUOTIENT_BLOCK_INDEX
-    ? fusedQuotientHeadPayload
-    : index === FUSED_QUOTIENT_TAIL_BLOCK_INDEX
-      ? fusedQuotientTailPayload
-      : null;
-  return {
-    role: `block-${index}-template-${templateForBlock(index).name}`,
-    payload,
-    evaluation,
-    quotientChunk,
-    quotientChunkRole: index === FUSED_QUOTIENT_BLOCK_INDEX
-      ? 'head'
+const makeTemplateInputs = () => {
+  const logicalInputs = [{
+    role: 'coordinator-template-classes',
+    payload: null,
+    evaluation: null,
+    redeem: templateCoordinatorRedeem,
+    locking: encodeLockingBytecodeP2sh32(hash256(templateCoordinatorRedeem)),
+    unlocking: concat(
+      encodeDataPush(transcriptHeader),
+      encodeDataPush(statementBytes),
+      ...(FUSE_COORDINATOR_HEAD?[encodeDataPush(blockPayloads[4]),encodeDataPush(blockEvaluationPayloads[4]),encodeDataPush(fusedQuotientHeadPayload)]:[]),
+      encodeDataPush(templateCoordinatorRedeem),
+    ),
+  }, ...blockPayloads.map((payload, index) => {
+    const evaluation = blockEvaluationPayloads[index];
+    const redeem = finalTemplateRedeems[index];
+    const quotientChunk = index === FUSED_QUOTIENT_BLOCK_INDEX
+      ? fusedQuotientHeadPayload
       : index === FUSED_QUOTIENT_TAIL_BLOCK_INDEX
-        ? 'tail'
-        : null,
-    redeem,
-    locking: encodeLockingBytecodeP2sh32(hash256(redeem)),
-    unlocking: makeTemplateBlockUnlocking(payload, evaluation, quotientChunk, redeem),
-  };
-})];
+        ? fusedQuotientTailPayload
+        : null;
+    return {
+      role: `block-${index}-template-${templateForBlock(index).name}`,
+      payload,
+      evaluation,
+      quotientChunk,
+      quotientChunkRole: index === FUSED_QUOTIENT_BLOCK_INDEX
+        ? 'head'
+        : index === FUSED_QUOTIENT_TAIL_BLOCK_INDEX
+          ? 'tail'
+          : null,
+      redeem,
+      locking: encodeLockingBytecodeP2sh32(hash256(redeem)),
+      unlocking: makeTemplateBlockUnlocking(payload, evaluation, quotientChunk, redeem),
+    };
+  })];
+  for(const group of regularGroups){
+    logicalInputs[group.first+1].unlocking=concat(...group.members.flatMap(block=>[encodeDataPush(blockPayloads[block]),encodeDataPush(blockEvaluationPayloads[block]),...(logicalInputs[block+1].quotientChunk===null?[]:[encodeDataPush(logicalInputs[block+1].quotientChunk)])]),encodeDataPush(finalTemplateRedeems[group.first]));
+  }
+  if (!FUSE_FINAL_PAIR) return logicalInputs;
+  logicalInputs[20].unlocking = concat(
+    encodeDataPush(blockPayloads[19]), encodeDataPush(blockEvaluationPayloads[19]),
+    encodeDataPush(blockPayloads[20]), encodeDataPush(blockEvaluationPayloads[20]),
+    encodeDataPush(finalTemplateRedeems[19]),
+  );
+  return logicalInputs.slice(0, 21).filter((_, index) => !groupContinuations.has(index-1)&&(!FUSE_COORDINATOR_HEAD||index!==5));
+};
 
 const verificationData = (inputs) => {
   const transaction = {
@@ -3058,6 +4159,152 @@ const evaluateInput = (inputs, inputIndex, vm) => {
 
 // The compact construction is the actual 22-input template graph. Apply the
 // preliminary strict input/whole-transaction gates to that same constructor.
+if (FUSE_FINAL_PAIR) {
+  const inputs = makeTemplateInputs();
+  const finalInput = inputs.length - 1;
+  const grade = (changed, target, vm) => {
+    const own = evaluateInput(changed, target, vm);
+    return {accepted:own.accepted,error:own.error,
+      wholeAccepted:vm.verify(verificationData(changed))===true};
+  };
+  const outcomes = {};
+  for (const [mode,vm] of [['consensus',consensusVm],['standard',standardVm]]) {
+    outcomes[mode]=inputs.map((_,index)=>{
+      const result=evaluateInput(inputs,index,vm);
+      return {index,accepted:result.accepted,error:result.error,
+        cost:result.accepted?Number(result.operationCost):null,
+        definedBodyBytes:Object.values(result.functionTable??{}).reduce((n,body)=>n+body.length,0),
+        unlockingBytes:inputs[index].unlocking.length};
+    });
+    assert(outcomes[mode].every(result=>result.accepted),
+      `${mode} fused graph input failure: ${JSON.stringify(outcomes[mode].filter(row=>!row.accepted))}`);
+    assert(vm.verify(verificationData(inputs))===true,`${mode} whole fused graph rejected`);
+  }
+  const pushData = instruction => instruction.data!==undefined?instruction.data:
+    instruction.opcode===0?new Uint8Array():undefined;
+  const mutatePush = (inputIndex,pushIndex,offset) => {
+    const changed=inputs.map(input=>({...input}));
+    const instructions=decodeAuthenticationInstructions(changed[inputIndex].unlocking);
+    const bytes=Uint8Array.from(pushData(instructions[pushIndex]));bytes[offset]^=1;
+    instructions[pushIndex]=decodeAuthenticationInstructions(encodeDataPush(bytes))[0];
+    changed[inputIndex].unlocking=encodeAuthenticationInstructions(instructions);
+    return changed;
+  };
+  const controls=[], rejectionPatches=[];
+  const reject = (label,changed,target) => {
+    if (FUSE_REGULAR_PAIR && process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1') {
+      rejectionPatches.push({label,target,inputs:changed.flatMap((input,index)=>
+        equalBytes(input.locking,inputs[index].locking) && equalBytes(input.unlocking,inputs[index].unlocking)
+          ? [] : [{index,locking:hex(input.locking),unlocking:hex(input.unlocking)}])});
+    }
+    for(const [mode,vm] of [['consensus',consensusVm],['standard',standardVm]]){
+      const result=grade(changed,target,vm);
+      assert(!result.accepted&&!result.wholeAccepted,`${mode} accepted fused control ${label}`);
+      controls.push({label,mode,target,ownRejected:!result.accepted,wholeRejected:!result.wholeAccepted,error:result.error});
+    }
+  };
+  for(let stage=0;stage<2;stage++){
+    for(const [label,slot,offset] of [['output',stage*2,0],['runtime-slope',stage*2,481],['fixed-line',stage*2,769],['evaluation',stage*2+1,0]]){
+      reject(`stage-${stage}/${label}`,mutatePush(finalInput,slot,offset),finalInput);
+    }
+  }
+  const first=decodeAuthenticationInstructions(inputs[finalInput].unlocking);
+  reject('PIC record',mutatePush(finalInput,0,pushData(first[0]).length-1),finalInput);
+  const swapped=inputs.map(input=>({...input}));
+  swapped[finalInput].unlocking=encodeAuthenticationInstructions([first[2],first[3],first[0],first[1],first[4]]);
+  reject('swapped logical stages',swapped,finalInput);
+  const truncated=inputs.map(input=>({...input}));
+  truncated[finalInput].unlocking=concat(encodeDataPush(pushData(first[0])),encodeDataPush(pushData(first[1])),encodeDataPush(pushData(first[2]).slice(0,-1)),encodeDataPush(pushData(first[3])),encodeDataPush(pushData(first[4])));
+  reject('truncated second frame',truncated,0);
+  const nonminimal=inputs.map(input=>({...input}));
+  nonminimal[finalInput].unlocking=concat(Uint8Array.of(0x4e),u32(pushData(first[0]).length),pushData(first[0]),...first.slice(1).map(instruction=>encodeAuthenticationInstructions([instruction])));
+  reject('nonminimal first frame',nonminimal,0);
+  reject('public input',mutatePush(0,1,193),0);
+  reject('commitment root',mutatePush(0,0,0),0);
+  const quotientInput=physicalInput(FUSED_QUOTIENT_INPUT_INDEX);
+  reject('quotient head',mutatePush(quotientInput,FUSE_COORDINATOR_HEAD?4:2,0),quotientInput);
+  if(FUSE_COORDINATOR_HEAD)for(const[label,slot,offset]of[['payload',2,0],['runtime-slope',2,481],['fixed-line',2,769],['evaluation',3,0]])reject('coordinator-head/'+label,mutatePush(0,slot,offset),0);
+  const quotientTailInput=physicalInput(FUSED_QUOTIENT_TAIL_INPUT_INDEX);
+  const quotientTailSlot=2+2*frameOrdinal(FUSED_QUOTIENT_TAIL_BLOCK_INDEX);
+  reject('quotient tail',mutatePush(quotientTailInput,quotientTailSlot,0),quotientInput);
+  if(FUSE_MIDDLE_PAIR){
+    const truncated=inputs.map(input=>({...input}));
+    const instructions=decodeAuthenticationInstructions(truncated[quotientTailInput].unlocking);
+    instructions[quotientTailSlot]=decodeAuthenticationInstructions(encodeDataPush(pushData(instructions[quotientTailSlot]).slice(0,-1)))[0];
+    truncated[quotientTailInput].unlocking=encodeAuthenticationInstructions(instructions);
+    reject('middle-pair-14-15/truncated quotient tail',truncated,quotientTailInput);
+  }
+  if(FUSE_CARRIER_PAIR){
+    reject('carrier-pair/AdditionTail1 predecessor payload',mutatePush(physicalBlock(0),0,0),physicalBlock(1));
+    reject('carrier-pair/AdditionTail1 predecessor evaluation',mutatePush(physicalBlock(0),1,0),physicalBlock(1));
+  }
+  const changedLocking=inputs.map(input=>({...input}));
+  changedLocking[finalInput].locking=Uint8Array.from(changedLocking[finalInput].locking);changedLocking[finalInput].locking[2]^=1;
+  reject('sibling locking',changedLocking,0);
+  for (const group of regularGroups) {
+    const {first:GROUP_FIRST,last:GROUP_SECOND,members}=group;
+    const groupLabel = group.kind==='first-tail' ? `first-tail-pair-${members.join('-')}` : group.kind==='middle' ? `middle-pair-${members.join('-')}` : FUSE_CARRIER_PAIR&&members.length===2 ? `regular-pair-${members.join('-')}` : FUSE_REGULAR_TRIPLES ? `regular-triple-${members.join('-')}` : FUSE_REGULAR_PAIRS ? `regular-pair-${GROUP_FIRST}-${GROUP_SECOND}` : 'regular-pair';
+    const groupInput = physicalBlock(GROUP_FIRST), nextInput = physicalBlock(GROUP_SECOND + 1);
+    for(let stage=0;stage<members.length;stage++){
+      for(const [label,slot,offset] of [['output',stage*2,0],['runtime-slope',stage*2,481],['fixed-line',stage*2,769],['evaluation',stage*2+1,0]]){
+        const field=templateForBlock(members[stage]).name!=='Regular'&&slot%2===0&&offset!==0?`payload-byte-${offset}`:label;
+        reject(`${groupLabel}/stage-${stage}/${field}`,mutatePush(groupInput,slot,offset),groupInput);
+      }
+    }
+    const first=decodeAuthenticationInstructions(inputs[groupInput].unlocking);
+    for (let stage=0;stage<members.length;stage++) {
+      if(templateForBlock(members[stage]).name!=='Regular')continue;
+      const carrier=regularPicCarrierBlocks.indexOf(members[stage]);
+      assert(carrier>=0, 'grouped PIC record has no window carrier');
+      const window=carrier*2+1;
+      const batch=picAuthBatches.find(batch=>window>=batch.firstWindow && window<batch.firstWindow+batch.windowCount);
+      assert(batch && (batch.host==='coordinator' || /^block-\d+$/.test(batch.host)),
+        'grouped PIC record has no authentication owner');
+      const owner=batch.host==='coordinator'?0:physicalBlock(Number(batch.host.slice(6)));
+      reject(`${groupLabel}/stage-${stage}/PIC record`,
+        mutatePush(groupInput,stage*2,pushData(first[stage*2]).length-1),owner);
+    }
+    for(let stage=0;stage<members.length-1;stage++){
+      const swapped=inputs.map(input=>({...input})),instructions=first.slice();
+      instructions.splice(stage*2,4,...first.slice(stage*2+2,stage*2+4),...first.slice(stage*2,stage*2+2));
+      swapped[groupInput].unlocking=encodeAuthenticationInstructions(instructions);
+      reject(members.length===2?`${groupLabel}/swapped logical stages`:`${groupLabel}/swapped stages-${stage}-${stage+1}`,swapped,groupInput);
+    }
+    for(const stage of members.length===2?[1]:[0,1,2]){
+      const truncated=inputs.map(input=>({...input})),instructions=first.slice();
+      instructions[stage*2]=decodeAuthenticationInstructions(encodeDataPush(pushData(first[stage*2]).slice(0,-1)))[0];
+      truncated[groupInput].unlocking=encodeAuthenticationInstructions(instructions);
+      reject(members.length===2?`${groupLabel}/truncated second frame`:`${groupLabel}/truncated frame-${stage}`,truncated,0);
+    }
+    for(let stage=0;stage<members.length;stage++){
+      const nonminimal=inputs.map(input=>({...input}));
+      nonminimal[groupInput].unlocking=concat(...first.slice(0,stage*2).map(instruction=>encodeAuthenticationInstructions([instruction])),Uint8Array.of(0x4e),u32(pushData(first[stage*2]).length),pushData(first[stage*2]),...first.slice(stage*2+1).map(instruction=>encodeAuthenticationInstructions([instruction])));
+      reject(members.length===2?`${groupLabel}/nonminimal ${stage===0?'first':'second'} frame`:`${groupLabel}/nonminimal frame-${stage}`,nonminimal,0);
+    }
+    const lastSlot=(members.length-1)*2;
+    reject(`${groupLabel}/next-worker predecessor payload`,mutatePush(groupInput,lastSlot,0),nextInput);
+    reject(`${groupLabel}/next-worker predecessor evaluation`,mutatePush(groupInput,lastSlot+1,0),nextInput);
+    const sibling=inputs.map(input=>({...input}));
+    sibling[groupInput].locking=Uint8Array.from(sibling[groupInput].locking);sibling[groupInput].locking[2]^=1;
+    reject(`${groupLabel}/sibling locking`,sibling,0);
+  }
+  const data=verificationData(inputs),wire=encodeTransactionBch(data.transaction).length;
+  const report={construction:FUSE_FIRST_TAIL_PAIR?'native-regular-initializer-first-tail-and-existing-groups':ARITHMETIC_REGULAR_CARRIER?'native-regular-initializer-and-existing-groups':FUSE_MIDDLE_PAIR?'native-fused-middle-carrier-pairs-regular-triples-and-final-pair':FUSE_CARRIER_PAIR?'native-fused-carrier-pair-regular-triples-and-final-pair':FUSE_REGULAR_TRIPLES?'native-fused-regular-triples-and-final-pair':FUSE_REGULAR_PAIRS?'native-fused-multiple-regular-and-final-pairs':FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
+    coordinatorScheduled:SCHEDULE_COORDINATOR,
+    ...(PIC_ZERO_MASK?{picZeroWindowMask:true}:{}),
+    ...(coordinatorTailCarrier?{coordinatorTailCarrier}:{}),
+    ...(coordinatorHeadFusion?{coordinatorHeadFusion}:{}),
+      ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
+    ...(FUSE_REGULAR_PAIR ? {...(FUSE_REGULAR_TRIPLES ? {regularTriplesFused:true,...(FUSE_CARRIER_PAIR?{carrierPairFused:true}:{}),...(FUSE_MIDDLE_PAIR?{middlePairFused:true}:{}),...(ARITHMETIC_REGULAR_CARRIER?{arithmeticRegularCarrier:true}:{}),...(BUNDLE_REGULAR_MAIN?{regularMainBundled:true,regularInitializerId:Number(REGULAR_INITIALIZER_ID)}:{}),...(LAZY_PAIR_PRODUCT?{lazyPairProduct:true}:{}),...(FUSE_RELATIONS?{relationsFused:true}:{}),...(FINAL_RELATION_TOTAL?{finalRelationTotal:true}:{}),...(EVAL6_PAIRED?{eval6Paired:true}:{}),...(FUSE_FIRST_TAIL_PAIR?{firstTailPairFused:true}:{}),regularGroups} : FUSE_REGULAR_PAIRS ? {regularPairsFused:true,...(PACK_REGULAR_PAIR_MAPS?{packedRegularMaps:true}:{}),regularGroups:regularGroups.map(({first,last,funding})=>({first,second:last,funding}))} : {regularPairFused:true,groupFundingBytes:regularGroups[0].funding}),regularPaddingMap:compactRegularDensityPadding,rejectionPatches:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?rejectionPatches:undefined,physicalMap:blockRecords.map((_,index)=>({logicalBlock:index,input:physicalBlock(index),frame:frameOrdinal(index)}))} : {}),
+    inputCount:inputs.length,logicalStages:blockRecords.length,wireBytes:wire,score:wire+35*inputs.length,
+    maximumUnlockingBytes:Math.max(...inputs.map(input=>input.unlocking.length)),
+    wholeConsensus:true,wholeStandard:true,outcomes,controls,
+    resource:process.env.RPA_EXPORT_RESOURCE_BYTECODES==='1'?inputs.map(input=>({role:input.role,locking:hex(input.locking),unlocking:hex(input.unlocking)})):undefined,
+    securityModel:'Fiat-Shamir PIT; exact G2; pairing-equivalent G1; same fixed proof/public/root/quotient/auxiliary values',
+  };
+  writeFileSync(1,JSON.stringify(report,null,2)+'\n');process.exit(0);
+}
+
 const inputs = makeTemplateInputs();
 const consensusOutcomes = inputs.map((_, index) => evaluateInput(inputs, index, consensusVm));
 const standardOutcomes = inputs.map((_, index) => evaluateInput(inputs, index, standardVm));
@@ -3065,6 +4312,36 @@ const validData = verificationData(inputs);
 const wireBytes = encodeTransactionBch(validData.transaction).length;
 const wholeConsensusVerified = consensusVm.verify(validData) === true;
 const wholeStandardVerified = standardVm.verify(validData) === true;
+
+// Diagnostic-only path: capture complete relaxed costs and the density frame
+// before the unchanged strict assertions below. This never changes a strict
+// result and is enabled only for a separately labelled cost diagnostic.
+if (process.env.RPA_DIAGNOSTIC_RELAXED_COST_ONLY === '1') {
+  const diagnosticConsensus = inputs.map((_, index) =>
+    evaluateInput(inputs, index, measurementConsensusVm));
+  const diagnosticStandard = inputs.map((_, index) =>
+    evaluateInput(inputs, index, measurementStandardVm));
+  const diagnosticRows = inputs.map((input, index) => ({
+    index,
+    role: input.role,
+    lockingBytes: input.locking.length,
+    unlockingBytes: input.unlocking.length,
+    consensusOperationCost: diagnosticConsensus[index].operationCost,
+    standardOperationCost: diagnosticStandard[index].operationCost,
+    consensusAcceptedRelaxed: diagnosticConsensus[index].accepted,
+    standardAcceptedRelaxed: diagnosticStandard[index].accepted,
+    densityControlLength: diagnosticConsensus[index].metrics.densityControlLength,
+    consensusMetrics: diagnosticConsensus[index].metrics,
+    standardMetrics: diagnosticStandard[index].metrics,
+  }));
+  writeFileSync(process.env.RPA_DIAGNOSTIC_RESULT, `${JSON.stringify({
+    label: 'DIAGNOSTIC_RELAXED_COST_ONLY',
+    strictGateRemainsBelow: true,
+    inputCount: inputs.length,
+    rows: diagnosticRows,
+    formula: 'actualDensityBudget = densityControlLength * 800; relaxedMargin = actualDensityBudget - operationCost',
+  }, null, 2)}\n`);
+}
 
 assert(inputs.every((input) => input.locking.length <= 10_000), 'locking bytecode exceeds 10,000 bytes');
 assert(inputs.every((input) => input.unlocking.length <= 10_000), 'unlocking bytecode exceeds 10,000 bytes');
@@ -3514,7 +4791,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
   );
   const extraCarrierPrefix = changedExtraCarrierRedeem.length -
     templateExtraCarrier.representativeRedeem.length;
-  const extraBodyOffset = extraCarrierPrefix + loadTemplateCommonBody().length +
+  const extraBodyOffset = extraCarrierPrefix + loadTemplateCommonBody(templateExtraCarrier).length +
     templateExtraStart;
   assert(extraCarrierPrefix >= 0 && changedExtraCarrierRedeem[extraBodyOffset] !== 0x6a,
     'extra shared template helper mutation is invalid');
@@ -3599,7 +4876,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     templateCommonCarrier,
     templateCommonStart,
     templateCommonEnd,
-    TEMPLATE_COMMON_FUNCTION_ID,
+    templateCommonFunctionId(firstArithmeticMutationTemplate),
   );
   const extraLoaderLayout = templateLoaderLayout(
     templateExtraCarrier,
@@ -3611,13 +4888,19 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     templateCommonCarrier,
     templateCommonCarrier.coreStart,
     templateCommonCarrier.coreStart + templateArithmeticLength,
-    TEMPLATE_ARITHMETIC_FUNCTION_ID,
+    templateArithmeticFunctionId(arithmeticMutationTemplate),
+  );
+  const firstArithmeticLoaderLayout = templateLoaderLayout(
+    templateCommonCarrier,
+    templateCommonCarrier.coreStart,
+    templateCommonCarrier.coreStart + templateArithmeticLength,
+    templateArithmeticFunctionId(firstArithmeticMutationTemplate),
   );
   const firstPicLoaderLayout = templateLoaderLayout(
     { name: 'PIC authentication', representative: PIC_BLOCK4_INDEX },
     picHelperStart, picHelperEnd, PIC_AUTH_FUNCTION_ID, picBlock4Redeem.length,
   );
-  assert(equalBytes(firstPicLoaderLayout.loader, picAuthLoader),
+  assert(equalBytes(firstPicLoaderLayout.loader, picAuthLoader(PIC_AUTH_FUNCTION_ID)),
     'First PIC loader layout differs from authenticated wrapper');
   const arithmeticLoaderOffset = templateInputs[arithmeticMutationTarget].redeem.length -
     arithmeticMutationTemplate.representativeRedeem.length + arithmeticMutationTemplate.coreStart;
@@ -3625,7 +4908,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     firstArithmeticMutationTemplate.representativeRedeem.length +
     firstArithmeticMutationTemplate.coreStart;
   const commonDefinitionBytes = templateCommonBodyPush.length +
-    pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID).length + 1;
+    pushVmNumber(templateCommonFunctionId(templateCommonCarrier)).length + 1;
   const extraLoaderOffset = templateInputs[extraMutationTarget].redeem.length -
     templateCommonCarrier.representativeRedeem.length + commonDefinitionBytes;
   [
@@ -3690,7 +4973,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       loaderOffset: arithmeticLoaderOffset,
       mutationOffset: arithmeticLoaderLayout.functionIdOffset,
       before: arithmeticLoaderLayout.functionIdPush,
-      after: pushVmNumber(TEMPLATE_ARITHMETIC_FUNCTION_ID + 1),
+      after: pushVmNumber(templateArithmeticFunctionId(arithmeticMutationTemplate) + 1),
     },
     {
       name: 'changed-template-arithmetic-loader-source-input',
@@ -3726,7 +5009,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       loaderOffset: firstCommonLoaderOffset,
       mutationOffset: commonLoaderLayout.functionIdOffset,
       before: commonLoaderLayout.functionIdPush,
-      after: pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID + 1),
+      after: pushVmNumber(templateCommonFunctionId(firstArithmeticMutationTemplate) + 1),
     },
     {
       name: 'changed-template-common-loader-source-input',
@@ -3778,6 +5061,14 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     {
       ...fixture,
       name: fixture.name.replace('template-arithmetic-', 'template-first-arithmetic-'),
+      layout: firstArithmeticLoaderLayout,
+      mutationOffset: fixture.mutationOffset === arithmeticLoaderLayout.functionIdOffset
+        ? firstArithmeticLoaderLayout.functionIdOffset : fixture.mutationOffset,
+      before: fixture.mutationOffset === arithmeticLoaderLayout.functionIdOffset
+        ? firstArithmeticLoaderLayout.functionIdPush : fixture.before,
+      after: fixture.mutationOffset === arithmeticLoaderLayout.functionIdOffset
+        ? pushVmNumber(templateArithmeticFunctionId(firstArithmeticMutationTemplate) + 1)
+        : fixture.after,
       targetInput: firstArithmeticMutationTarget,
       loaderOffset: firstArithmeticLoaderOffset,
     },
@@ -4324,6 +5615,8 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
   };
   writeFileSync(1, `${JSON.stringify({
     construction: 'atomic-validation-hoist-plus-five-exact-unrolled-classes',
+    coordinatorScheduled: SCHEDULE_COORDINATOR,
+    ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
     fixture: activeFixtureName,
     cacheFixture: activeFixture.cacheName,
     publicInputs: activePublicInputs.map(String),
@@ -4526,6 +5819,7 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
       wrapperBytes: picAuthBatches.map((batch) => ({
         ...batch,
         bytes: picAuthWrapper(batch.firstWindow, batch.windowCount).length,
+        ...(arithmeticLeafId === -1 ? { functionId: picAuthFunctionId(batch.firstWindow) } : {}),
       })),
       batches: picAuthBatches,
       fixtureGate: picAuthFixtureRows,
@@ -4546,7 +5840,9 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
     templateFactoring: {
       functions: [
         {
-          functionId: TEMPLATE_COMMON_FUNCTION_ID,
+          functionIdsByTemplate: Object.fromEntries(templateClasses
+            .filter(({ name }) => templateCommonOffsets.has(name))
+            .map((template) => [template.name, templateCommonFunctionId(template)])),
           bodyBytes: templateCommonBody.length,
           bodySha256: hex(sha256(templateCommonBody)),
           instructionCount: templateCommonOpcodes.length,
@@ -4572,17 +5868,27 @@ if (process.env.RPA_TEMPLATE_RUN === '1') {
           originalOffsets: Object.fromEntries(templateExtraOffsets),
         },
       ],
-      replacementBytesPerInvocation: pushVmNumber(TEMPLATE_COMMON_FUNCTION_ID).length + 1,
+      replacementBytesPerInvocationByTemplate: Object.fromEntries(templateClasses
+        .filter(({ name }) => templateCommonOffsets.has(name))
+        .map((template) => [template.name,
+          pushVmNumber(templateCommonFunctionId(template)).length + 1])),
       carrierLengthsConverged: templateCarrierLengthsStable,
       carrierRedeemLengths: Object.fromEntries(templateCarrierLengths),
       additionTailDensityPaddingBytes: templateTailDensityPadding.length,
       additionMiddleDensityPaddingBytes: templateFactorDensityPaddingBytes,
       terminalDensityPaddingBytes: templateTerminalDensityPaddingBytes,
       arithmeticLibrary: {
-        functionId: TEMPLATE_ARITHMETIC_FUNCTION_ID,
+        profileKey: arithmeticProfile.key,
+        leafId: arithmeticProfile.leafId,
+        namespaceMap: Object.fromEntries(arithmeticProfile.namespaceMap),
+        ...(arithmeticLeafId === -1 ? {
+          functionIdsByTemplate: Object.fromEntries(templateClasses
+            .filter((template) => templateArithmeticImports.has(template.name))
+            .map((template) => [template.name, templateArithmeticFunctionId(template)])),
+        } : { functionId: DEFAULT_TEMPLATE_ARITHMETIC_FUNCTION_ID }),
         bodyBytes: templateArithmeticLength,
         bodySha256: hex(sha256(templateArithmeticBody)),
-        definitions: 13,
+        definitions: candidateArithmeticInstructions.length / 3,
         carrierTemplate: templateCommonCarrier.name,
         carrierBlockIndex: templateCommonCarrier.representative,
         carrierCoreStart: templateCommonCarrier.coreStart,

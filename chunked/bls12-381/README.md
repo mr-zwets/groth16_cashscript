@@ -37,6 +37,116 @@ also feed the linked layouts assembled by the sibling `intratx/` and `grouped/` 
 - `bch-groth16-bls12381-intratx-residue-large`: 3 inputs / 164,426 script B / 164,579 score B /
   164,474 wire B / 149,814,405 op-cost on the proposed 100 kB-script VM; non-standard by total size.
 
+## Nine-input Fiat-Shamir candidate
+
+`RPA_FUSE_COORDINATOR_HEAD=1 RPA_CACHE_COORDINATOR_PREFIX=1 RPA_PIC_ZERO_MASK=1`
+selects the minimum-byte nine-input layout. The pinned scheduled compiler is
+`efc6ab80d9cbbea06c3c364b8fd5e915b9da84b4`. Set the cache mode to `fields`
+for the lower-cost alternative:
+
+| Cache mode | Total bytes | Native consensus primary | Native standard primary |
+| --- | ---: | ---: | ---: |
+| Combined prefix (`1`) | **60,285** | 37,816,994 | 37,986,594 |
+| Separate fields (`fields`) | 60,308 | **37,719,760** | **37,889,360** |
+
+Script/overhead splits are 59,878/407 and 59,901/407 bytes;
+spend transactions are 59,970 and 59,993 bytes. Separate
+fields spend 23 bytes for 97,234 fewer primary native units in either mode.
+The ten- and eleven-input profiles remain reproducible with their existing flags.
+
+The quotient head shares root input 0 with the coordinator. The root checks the
+ordered eight-worker locking commitment inline before loading complete
+coordinator code from four existing funding carriers and a literal First/Tail
+overflow push. Imported code excludes the expected worker hash, avoiding a hash
+fixed point. The root reuses the existing guarded arithmetic ABI. All 21 logical
+stages and all 46 archived proof argument pushes keep their values and encodings.
+
+Each input caches only bounded encoded root data. Mode `1` installs one literal
+870-byte prefix data function under raw key `0x67`. Mode `fields` installs literal
+130-byte header and 740-byte statement data functions under unused raw keys
+`0x67`/`0x68`. Witness bytes never execute. Only exact bounded header/statement
+reads are rewritten; full-root, quotient and predecessor reads stay unchanged.
+The inline framing check and final sibling commitment protect imported code.
+
+`RPA_PIC_ZERO_MASK` defaults off and requires coordinator-head fusion. After the
+existing canonical scalar range checks, the coordinator forms the bitwise OR
+of the two fixed-width 32-byte public scalars and appends a zero sign byte before
+conversion to an integer. For each unsigned byte pair, their sum is zero exactly
+when their OR is zero. The mask replaces repeated two-scalar extraction only in
+zero-window record-length decisions. Authenticated PIC digits, payloads, roots,
+challenges and all raw proof arguments remain unchanged. Coordinator code shrinks
+from 4,196 to 3,855 bytes, reducing First/Tail overflow by 341 bytes. Both profiles
+save 341 total bytes and 38,690/39,330 primary consensus/standard native units.
+Disabling the mask reproduces the previous 60,626/60,649-byte normal primary
+exports exactly. Cache bodies, function keys and shared arithmetic are unchanged.
+
+Each profile passes ten archived source fixtures and 3,520 owning/whole rejection
+checks. Actual native replay covers 1,090 contexts per profile: 20 accepted and
+1,070 rejected, with all 180 positive input prices reconciled. Every matched
+archived fixture improves on its previous same-profile native cost. All 173 old
+invalid transactions remain represented with every direct and nested origin;
+current source and all five code-carrier trust boundaries retain their controls.
+Maximum sampled native consensus/standard costs are
+49,462,972/49,811,132 for combined prefix and
+49,365,738/49,713,898 for separate fields.
+Minimum sampled per-input margins are
+54,639/48,751 and
+75,479/69,591, respectively.
+Maximum sampled scores are 80,445 and 80,468 bytes.
+These are finite corpus results, not arbitrary-proof resource bounds, a universal
+soundness theorem, or a live-relay result. Existing FS-PIT, G2/G1 validation grades
+and campaign limitations remain unchanged. Nine physical inputs remain required
+by these layouts; no eight-input admission is claimed.
+
+Run from this directory with the compiler above. Grouped regular inputs ignore
+the legacy compact-padding map below; the grouped coordinator carriers contain
+authenticated code bytes.
+
+```sh
+RPA_COORDINATOR_DENSITY_PADDING='0' \
+RPA_EXPORT_RESOURCE_BYTECODES='1' \
+RPA_INVERSES='off' \
+RPA_PIC32='1' \
+RPA_PIC_BLOCK2_DENSITY_PADDING='0' \
+RPA_PIC_BLOCK4_DENSITY_PADDING='0' \
+RPA_PIC_LAYOUT='regular' \
+RPA_Q_TAIL_COEFFICIENTS='22' \
+RPA_REGULAR_DENSITY_PADDING='{}' \
+RPA_SKIP_GAMMA='1' \
+RPA_TEMPLATE_FACTOR_DENSITY_PADDING='0' \
+RPA_TEMPLATE_RUN='1' \
+RPA_TEMPLATE_TAIL_DENSITY_PADDING='0' \
+RPA_TEMPLATE_TERMINAL_DENSITY_PADDING='0' \
+RPA_COMPACT_ARITHMETIC_PRIME_KEY='-1' \
+RESCHEDULE='on' \
+RPA_COMPACT_REGULAR_DENSITY_PADDING='{"3": 288, "5": 281, "6": 229, "7": 0, "8": 0, "9": 225, "10": 226, "11": 234, "12": 229, "13": 236, "14": 252, "16": 262, "17": 232, "18": 236, "19": 0}' \
+RPA_TEMPLATE_COMMON_PRIME_POOL='on' \
+RPA_PROOF_FIXTURE='committed' \
+RPA_TEMPLATE_TERMINAL_PRIME_POOL='on' \
+RPA_FUSE_FINAL_PAIR='1' \
+RPA_SCHEDULE_COORDINATOR='1' \
+RPA_GROUP_DENSITY_PADDING='0' \
+RPA_FUSE_REGULAR_PAIR='1' \
+RPA_SCHEDULE_PIC_AUTH='1' \
+RPA_FUSE_REGULAR_PAIRS='1' \
+RPA_FUSE_REGULAR_TRIPLES='1' \
+RPA_FUSE_CARRIER_PAIR='1' \
+RPA_FUSE_MIDDLE_PAIR='1' \
+RPA_ARITHMETIC_REGULAR_CARRIER='1' \
+RPA_FUSE_FIRST_TAIL_PAIR='1' \
+RPA_BUNDLE_REGULAR_MAIN='1' \
+RPA_LAZY_PAIR_PRODUCT='1' \
+RPA_FUSE_RELATIONS='1' \
+RPA_FINAL_RELATION_TOTAL='1' \
+RPA_EVAL6_PAIRED='1' \
+RPA_COORDINATOR_TAIL_BYTES='0' \
+RPA_FUSE_COORDINATOR_HEAD='1' \
+RPA_CACHE_COORDINATOR_PREFIX='1' \
+RPA_PIC_ZERO_MASK='1' \
+RPA_TEMPLATE_CASHC='/path/to/zk-language/packages/cashc/dist/compiler.js' \
+node measure_d3_two_chart_binary.mjs
+```
+
 ## Optimizations (prepared batched Miller + lazy reduction)
 
 The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B op to
