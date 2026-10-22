@@ -17,26 +17,42 @@ Here:
 ## Current shared-prime profiles and resource limits
 
 The registered shared-prime options use the scheduled compiler, constant hoisting,
-packed digit reads, packed GLV components and `SLIM_COMMUTATIVE_MUL=1`.
-The minimum-byte option is 33,560 total bytes; `MSM_GLV_PAIRS=1` adds a lower-cost
-33,565-byte option. Both use `GENESIS_PAD=10`, `STAGE_PADS=0,0,0,0`, full pins
-and split37/cuts27,36,47,55. Their primary native consensus/standard costs are
-24,901,292/24,966,188 and 24,881,548/24,946,444, respectively.
+packed digit reads, packed GLV components, `SLIM_COMMUTATIVE_MUL=1` and
+`MSM_SIGNED_RR=1`. The minimum-byte option is 33,548 total bytes;
+`MSM_GLV_PAIRS=1` adds a lower-cost 33,553-byte option. Both use
+`GENESIS_PAD=0`, `STAGE_PADS=0,0,0,0`, full pins and split37/cuts27,36,47,55.
+Primary native consensus/standard costs are 24,870,745/24,935,641 and
+24,851,001/24,915,897, respectively. The empty unused genesis argument remains
+an `OP_0`; there is no nonempty zero-padding payload.
 
-`SLIM_COMMUTATIVE_MUL` defaults off and requires the shared-prime profile. It
-removes one `OP_SWAP` directly before the shared scalar multiply/remainder call
-in the fingerprinted `sharedSequence3` body. Integer multiplication commutes;
-the following signed remainder, two-number requirement and lower main/ALT
-frames remain. The primitive multiplication, field-constant and complete caller
-bodies are checked before the transform. No other arithmetic rule is applied.
-The builder derives fragment lengths, readers, redeems and locking commitments.
-Setting the flag to `0` reproduces the previous 33,561/33,566-byte programs.
+`MSM_SIGNED_RR` defaults off and requires `MSM_SIGNED_RESIDUE=madd-ny`.
+It removes the two-byte `OVER ADD` bias from the fingerprinted MADD helper:
+`rr=s2+P-aY` becomes `rr=s2-aY`. For canonical field inputs, the values differ
+by P. Their squares are congruent, and `rr^2+3P-hhh-2vv` is at least 3, so
+both paths produce the same canonical nx. The raw ny dividends then differ by
+`P*(vv-nx+P)`; the existing signed remainder and negative-remainder correction
+produce the same canonical ny. h, nz and the `u2!=aX` guard stay unchanged.
+The retained P remains in the same stack slot. The canonical-input premise
+comes from the unchanged initial point, pinned tables, field helpers and exact
+XYZ handoffs; this is not an equivalence claim for arbitrary noncanonical
+standalone helper inputs.
 
-Each registered option saves one byte and 8,439 native units on every matched
-fixture in the 36-proof fixed archive, in either mode. The minimum observed
-standard native margins remain 87 and 67 cost units: this transform does not
-change the limiting genesis input. These finite fixture results do not establish
-arbitrary-proof resource admissibility.
+The helper shrinks 145 to 143 bytes. Native qualification of all 36 archived
+proofs permits removing the ten-byte genesis funding payload as well: the
+registered profiles save 12 total bytes and 30,547 primary native units against
+the previous 33,560/33,565-byte options. Every matched archive context is cheaper
+by 3,561 to 33,796 native units. Standalone component cost is operand-dependent
+and can increase; no uniform per-call saving is claimed. Minimum observed native
+consensus/standard margins become 17,240/5,080 and 17,220/5,060. These remain
+finite corpus evidence, not arbitrary-proof resource admissibility. Disabling
+`MSM_SIGNED_RR` and restoring `GENESIS_PAD=10` reproduces the previous options.
+
+`SLIM_COMMUTATIVE_MUL` also defaults off and requires the shared-prime profile.
+It removes one `OP_SWAP` before the unchanged shared scalar multiply/remainder
+call in the fingerprinted `sharedSequence3` body. Both paths still require two
+numeric operands and preserve lower main/ALT frames. The builder derives
+fragment lengths, readers, redeems and locking commitments. Disabling this flag
+as well reproduces the earlier 33,561/33,566-byte options with the same funding.
 
 **The earlier 33,641-byte signed-residue configuration is not admissible for
 arbitrary valid proofs.** With `MSM_SIGNED_RESIDUE=madd-ny`, `GENESIS_PAD=23`

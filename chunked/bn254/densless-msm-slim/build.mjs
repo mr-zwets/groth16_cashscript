@@ -7,6 +7,7 @@ import {cachePrimeLiterals, cacheProfile} from './prime-cache.mjs';
 import {compactInverseCopy} from './terminal-copies.mjs';
 import {compactExecutorCleanup} from './executor-cleanup.mjs';
 import {compactCommutativeMul} from './commutative-mul.mjs';
+import {compactSignedRr} from './signed-rr.mjs';
 import {compressOrbitTables} from './table-orbits.mjs';
 import {STATE_BYTES, EXEC_STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
 import {sliceGenesis} from './genesis-slice.mjs';
@@ -94,6 +95,8 @@ assert(!commutativeMul || sharedPrimeEnabled, 'commutative multiplication requir
 export const MSM_SIGNED_RESIDUE = process.env.MSM_SIGNED_RESIDUE ?? 'off';
 assert(['off', 'madd-ny'].includes(MSM_SIGNED_RESIDUE), 'unknown signed-residue profile');
 assert(MSM_SIGNED_RESIDUE === 'off' || sharedPrimeEnabled, 'signed-residue requires shared prime');
+const signedRr = process.env.MSM_SIGNED_RR === '1';
+assert(!signedRr || MSM_SIGNED_RESIDUE === 'madd-ny', 'signed rr requires signed ny normalization');
 // Opt-in WIP compiler profile: the current cached/signed helper library stays exact.
 const msmCompilerEntry = process.env.MSM_CASHC;
 const msmConstantHoisting = process.env.MSM_CONSTANT_HOISTING ?? 'off';
@@ -401,7 +404,7 @@ function normalizeMixedAddNy(bytecode) {
     const inverse = Buffer.concat([candidate.subarray(0, 121), body.subarray(121, 187), candidate.subarray(121, 131), candidate.subarray(138)]);
     assert(inverse.equals(body), 'MADD inverse changed');
     changed += 1;
-    return decodeAuthenticationInstructions(encodeDataPush(candidate))[0];
+    return decodeAuthenticationInstructions(encodeDataPush(signedRr ? compactSignedRr(candidate) : candidate))[0];
   });
   assert.equal(changed, 1, 'expected one MADD definition');
   return Buffer.from(encodeAuthenticationInstructions(next));
