@@ -78,6 +78,8 @@ const FUSE_RELATIONS=process.env.RPA_FUSE_RELATIONS==='1';
 const FINAL_RELATION_TOTAL=process.env.RPA_FINAL_RELATION_TOTAL==='1';
 const EVAL6_PAIRED=process.env.RPA_EVAL6_PAIRED==='1';
 const FUSE_COORDINATOR_HEAD=process.env.RPA_FUSE_COORDINATOR_HEAD==='1';
+const PIC_ZERO_MASK=process.env.RPA_PIC_ZERO_MASK==='1';
+if(PIC_ZERO_MASK&&!FUSE_COORDINATOR_HEAD)throw new Error('PIC zero-window mask requires coordinator-head fusion');
 const COORDINATOR_PREFIX_MODE=process.env.RPA_CACHE_COORDINATOR_PREFIX;
 const CACHE_COORDINATOR_PREFIX=COORDINATOR_PREFIX_MODE==='1'||COORDINATOR_PREFIX_MODE==='fields';
 if(CACHE_COORDINATOR_PREFIX&&!FUSE_COORDINATOR_HEAD)throw new Error('coordinator prefix cache requires the fused root profile');
@@ -2148,6 +2150,8 @@ const coordinatorSource = (
     );
   });
   if(bindWorkers)lines.push(...workerBindingSource(siblingLockingDigest, totalInputs));
+  // Only zero-window detection consumes the union; authenticated digits stay unchanged.
+  if(PIC_ZERO_MASK)lines.push('        int picDigits=int((toPaddedBytes(public0,32)|toPaddedBytes(public1,32))+0x00);');
   const commitmentSpecs = [{
     expression: 'statementBlob',
     payloadLength: statementBytes.length,
@@ -2161,7 +2165,8 @@ const coordinatorSource = (
       lines.push(`        int ${length}=1345;`);
       for (let slot = 0; slot < 2; slot += 1) {
         const shift = (carrier * 2 + slot) * 8;
-        lines.push(`        if (((public0>>${shift})%256)+((public1>>${shift})%256)==0) { ${length}=${length}+32; } else { ${length}=${length}+704; }`);
+        const zero=PIC_ZERO_MASK?`((picDigits>>${shift})%256)==0`:`((public0>>${shift})%256)+((public1>>${shift})%256)==0`;
+        lines.push(`        if (${zero}) { ${length}=${length}+32; } else { ${length}=${length}+704; }`);
       }
     }
     lines.push(groupContinuations.has(index)
@@ -4286,6 +4291,7 @@ if (FUSE_FINAL_PAIR) {
   const data=verificationData(inputs),wire=encodeTransactionBch(data.transaction).length;
   const report={construction:FUSE_FIRST_TAIL_PAIR?'native-regular-initializer-first-tail-and-existing-groups':ARITHMETIC_REGULAR_CARRIER?'native-regular-initializer-and-existing-groups':FUSE_MIDDLE_PAIR?'native-fused-middle-carrier-pairs-regular-triples-and-final-pair':FUSE_CARRIER_PAIR?'native-fused-carrier-pair-regular-triples-and-final-pair':FUSE_REGULAR_TRIPLES?'native-fused-regular-triples-and-final-pair':FUSE_REGULAR_PAIRS?'native-fused-multiple-regular-and-final-pairs':FUSE_REGULAR_PAIR?'native-fused-regular-and-final-pairs':'native-fused-final-pair',fixture:activeFixtureName,
     coordinatorScheduled:SCHEDULE_COORDINATOR,
+    ...(PIC_ZERO_MASK?{picZeroWindowMask:true}:{}),
     ...(coordinatorTailCarrier?{coordinatorTailCarrier}:{}),
     ...(coordinatorHeadFusion?{coordinatorHeadFusion}:{}),
       ...(SCHEDULE_PIC_AUTH ? {picAuthScheduled: true} : {}),
