@@ -17,12 +17,26 @@ Here:
 ## Current shared-prime profiles and resource limits
 
 The registered shared-prime options use the scheduled compiler, constant hoisting,
-packed digit reads and packed GLV components. The minimum-byte option is 33,561
-total bytes; `MSM_GLV_PAIRS=1` adds a lower-cost 33,566-byte option. Both use
-`GENESIS_PAD=10`, `STAGE_PADS=0,0,0,0`, full pins and split37/cuts27,36,47,55.
-Their minimum observed standard native margins are 87 and 67 cost units,
-respectively. These finite fixture results do not establish arbitrary-proof
-resource admissibility.
+packed digit reads, packed GLV components and `SLIM_COMMUTATIVE_MUL=1`.
+The minimum-byte option is 33,560 total bytes; `MSM_GLV_PAIRS=1` adds a lower-cost
+33,565-byte option. Both use `GENESIS_PAD=10`, `STAGE_PADS=0,0,0,0`, full pins
+and split37/cuts27,36,47,55. Their primary native consensus/standard costs are
+24,901,292/24,966,188 and 24,881,548/24,946,444, respectively.
+
+`SLIM_COMMUTATIVE_MUL` defaults off and requires the shared-prime profile. It
+removes one `OP_SWAP` directly before the shared scalar multiply/remainder call
+in the fingerprinted `sharedSequence3` body. Integer multiplication commutes;
+the following signed remainder, two-number requirement and lower main/ALT
+frames remain. The primitive multiplication, field-constant and complete caller
+bodies are checked before the transform. No other arithmetic rule is applied.
+The builder derives fragment lengths, readers, redeems and locking commitments.
+Setting the flag to `0` reproduces the previous 33,561/33,566-byte programs.
+
+Each registered option saves one byte and 8,439 native units on every matched
+fixture in the 36-proof fixed archive, in either mode. The minimum observed
+standard native margins remain 87 and 67 cost units: this transform does not
+change the limiting genesis input. These finite fixture results do not establish
+arbitrary-proof resource admissibility.
 
 **The earlier 33,641-byte signed-residue configuration is not admissible for
 arbitrary valid proofs.** With `MSM_SIGNED_RESIDUE=madd-ny`, `GENESIS_PAD=23`

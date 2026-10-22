@@ -6,6 +6,7 @@ import {sourceA, compile as compileCash} from '../pairfold5-msm/vkx-msm.mjs';
 import {cachePrimeLiterals, cacheProfile} from './prime-cache.mjs';
 import {compactInverseCopy} from './terminal-copies.mjs';
 import {compactExecutorCleanup} from './executor-cleanup.mjs';
+import {compactCommutativeMul} from './commutative-mul.mjs';
 import {compressOrbitTables} from './table-orbits.mjs';
 import {STATE_BYTES, EXEC_STATE_BYTES, sourceExec, sourceFinal} from './vkx-stages.mjs';
 import {sliceGenesis} from './genesis-slice.mjs';
@@ -88,6 +89,8 @@ const redeemPushBytes = (length) => length + (length < 76 ? 1 : length < 256 ? 2
 export const SHARED_PRIME_PROFILE = process.env.SHARED_PRIME_PROFILE ?? 'off';
 assert(['off', 'orbit-retained'].includes(SHARED_PRIME_PROFILE), 'unknown shared-prime profile');
 const sharedPrimeEnabled = SHARED_PRIME_PROFILE === 'orbit-retained';
+const commutativeMul = process.env.SLIM_COMMUTATIVE_MUL === '1';
+assert(!commutativeMul || sharedPrimeEnabled, 'commutative multiplication requires the shared-prime profile');
 export const MSM_SIGNED_RESIDUE = process.env.MSM_SIGNED_RESIDUE ?? 'off';
 assert(['off', 'madd-ny'].includes(MSM_SIGNED_RESIDUE), 'unknown signed-residue profile');
 assert(MSM_SIGNED_RESIDUE === 'off' || sharedPrimeEnabled, 'signed-residue requires shared prime');
@@ -171,7 +174,7 @@ const rotateHelperBodies = (source, expected) => {
   assert.equal(remaining.size, 0, 'missing rotation helper');
   return {...source, functions};
 };
-const sharedSource = primeSourceForProfile(rotateHelperBodies(shared, {
+const sharedSource = primeSourceForProfile(rotateHelperBodies(commutativeMul ? compactCommutativeMul(shared) : shared, {
   millerEvent: [16, '60fd4eddbe305d33a07a5275d0e6e348fd67ff06372b3e386e8ba08548788cff', 3],
   sharedSequence10: [19, '8ced1f9b3d18ec16e2ae94e6ded7e4934bb7dab6963ff903db6de5c31d23ab1a', 2],
   sharedSequence11: [0, '10d38744632c996cd081cc046b2b5a2f299148ee5ec4f5a8ebdf1efc076d3eae', 1],
