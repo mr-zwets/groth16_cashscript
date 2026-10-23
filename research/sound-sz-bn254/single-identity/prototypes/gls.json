@@ -1,0 +1,23 @@
+{
+ "glsEventLoop65": {
+  "opCost": 1403639,
+  "perEvent": 21594,
+  "bytesPerEventUnrolled": 82,
+  "note": "two 4-bit table lookups per sign per event, lazy double product, binding Horner"
+ },
+ "glsTable": {
+  "opCost": 48546,
+  "bytes": 111,
+  "builds": 4
+ },
+ "repEval": {
+  "opCost": 15782,
+  "bytes": 46,
+  "uses": "8 factor evals (R_k0,R_k1 at z and eta z, k=0,1) + S_c at z, eta z + 33 states (in state kernel)"
+ },
+ "glsSignsTBandBinding": {
+  "opCost": 18288,
+  "bytes": 154,
+  "note": "one group; x2"
+ }
+}

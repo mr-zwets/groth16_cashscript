@@ -1,0 +1,200 @@
+{
+ "B proj dbl + line + F^2 accum (hand)": {
+  "opCost": 142079,
+  "bytes": 424,
+  "naiveSim": 144508,
+  "breakdown": {
+   "copy": 20778,
+   "move": 10462,
+   "mul": 52124,
+   "mod": 47216,
+   "addsub": 9672,
+   "const": 606,
+   "nMul": 43,
+   "nMod": 20,
+   "nAdd": 50,
+   "nCopy": 98,
+   "nMove": 72
+  }
+ },
+ "proj dbl + line, no square (delta tail)": {
+  "opCost": 134691,
+  "bytes": 417,
+  "naiveSim": 137248,
+  "breakdown": {
+   "copy": 20778,
+   "move": 9998,
+   "mul": 47448,
+   "mod": 45232,
+   "addsub": 9672,
+   "const": 606,
+   "nMul": 41,
+   "nMod": 20,
+   "nAdd": 50,
+   "nCopy": 98,
+   "nMove": 66
+  }
+ },
+ "B proj mixed add + line + accum (hand)": {
+  "opCost": 178376,
+  "bytes": 568,
+  "naiveSim": 181411,
+  "breakdown": {
+   "copy": 29482,
+   "move": 14894,
+   "mul": 66110,
+   "mod": 54080,
+   "addsub": 13282,
+   "const": 0,
+   "nMul": 51,
+   "nMod": 24,
+   "nAdd": 65,
+   "nCopy": 136,
+   "nMove": 99
+  }
+ },
+ "B proj mixed add + line + accum + c-mul (hand)": {
+  "opCost": 184514,
+  "bytes": 562,
+  "naiveSim": 188737,
+  "breakdown": {
+   "copy": 29948,
+   "move": 13906,
+   "mul": 70786,
+   "mod": 56064,
+   "addsub": 13282,
+   "const": 0,
+   "nMul": 53,
+   "nMod": 24,
+   "nAdd": 65,
+   "nCopy": 138,
+   "nMove": 92
+  }
+ },
+ "B affine dbl, witness slope (hand) [+2 VERIFY ~400]": {
+  "opCost": 83514,
+  "bytes": 238,
+  "naiveSim": 84552,
+  "breakdown": {
+   "copy": 12341,
+   "move": 6005,
+   "mul": 34962,
+   "mod": 22756,
+   "addsub": 6260,
+   "const": 202,
+   "nMul": 26,
+   "nMod": 9,
+   "nAdd": 30,
+   "nCopy": 56,
+   "nMove": 41
+  }
+ },
+ "B affine add + c-mul, witness slope (hand) [+2 VERIFY]": {
+  "opCost": 79357,
+  "bytes": 237,
+  "naiveSim": 80461,
+  "breakdown": {
+   "copy": 13071,
+   "move": 5306,
+   "mul": 31872,
+   "mod": 22724,
+   "addsub": 6252,
+   "const": 0,
+   "nMul": 22,
+   "nMod": 9,
+   "nAdd": 30,
+   "nCopy": 60,
+   "nMove": 34
+  }
+ },
+ "delta step, baked lambda, dbl (hand)": {
+  "opCost": 46390,
+  "bytes": 157,
+  "naiveSim": 47099,
+  "breakdown": {
+   "copy": 7947,
+   "move": 4843,
+   "mul": 13772,
+   "mod": 15484,
+   "addsub": 4212,
+   "const": 0,
+   "nMul": 11,
+   "nMod": 7,
+   "nAdd": 21,
+   "nCopy": 36,
+   "nMove": 26
+  }
+ },
+ "delta step, baked lambda, add (hand)": {
+  "opCost": 46420,
+  "bytes": 158,
+  "naiveSim": 47026,
+  "breakdown": {
+   "copy": 7947,
+   "move": 4946,
+   "mul": 13767,
+   "mod": 15420,
+   "addsub": 4208,
+   "const": 0,
+   "nMul": 11,
+   "nMod": 7,
+   "nAdd": 21,
+   "nCopy": 36,
+   "nMove": 27
+  }
+ },
+ "delta line, 4 baked words (hand)": {
+  "opCost": 18757,
+  "bytes": 46,
+  "naiveSim": 19533,
+  "breakdown": {
+   "copy": 2229,
+   "move": 1372,
+   "mul": 7508,
+   "mod": 6636,
+   "addsub": 1012,
+   "const": 0,
+   "nMul": 6,
+   "nMod": 3,
+   "nAdd": 5,
+   "nCopy": 10,
+   "nMove": 11
+  }
+ },
+ "state eval + residual + rho fold (hand)": {
+  "opCost": 24147,
+  "bytes": 69,
+  "naiveSim": 24718,
+  "breakdown": {
+   "copy": 2857,
+   "move": 2720,
+   "mul": 10014,
+   "mod": 6634,
+   "addsub": 1922,
+   "const": 0,
+   "nMul": 8,
+   "nMod": 3,
+   "nAdd": 9,
+   "nCopy": 14,
+   "nMove": 19
+  }
+ },
+ "Horner x4 words (hand)": {
+  "opCost": 10368,
+  "bytes": 29,
+  "naiveSim": 10911,
+  "breakdown": {
+   "copy": 1165,
+   "move": 1073,
+   "mul": 5006,
+   "mod": 2212,
+   "addsub": 912,
+   "const": 0,
+   "nMul": 4,
+   "nMod": 1,
+   "nAdd": 4,
+   "nCopy": 5,
+   "nMove": 8
+  }
+ }
+}

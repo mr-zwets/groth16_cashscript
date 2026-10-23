@@ -1,0 +1,45 @@
+{
+ "absorbStates": {
+  "opCost": 70158,
+  "perState": 2126,
+  "bytes": 379
+ },
+ "parseState": {
+  "opCost": 3437,
+  "bytes": 31
+ },
+ "quotient_W4": {
+  "opCost": 370005,
+  "words": 104,
+  "perWord": 3558,
+  "blobs": 26,
+  "pushOverheadBytes": 52
+ },
+ "quotient_W8": {
+  "opCost": 365922,
+  "words": 104,
+  "perWord": 3518,
+  "blobs": 13,
+  "pushOverheadBytes": 39
+ },
+ "quotient_W52": {
+  "opCost": 430109,
+  "words": 104,
+  "perWord": 4136,
+  "blobs": 2,
+  "pushOverheadBytes": 6
+ },
+ "challenge": {
+  "opCost": 2481,
+  "bytes": 14
+ },
+ "frobSc": {
+  "opCost": 56458,
+  "bytes": 129,
+  "uses": 2
+ },
+ "fp2Const": {
+  "opCost": 12248,
+  "bytes": 29
+ }
+}
