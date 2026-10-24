@@ -4,15 +4,20 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {resolve,join} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {cofactorPoints} from './cofactor-points.mjs';
 import {buildProfile, candidateIdentifiers, inlinedFunctions as defaultInlinedFunctions, outlinedFunction, outlinedOccurrences, outlinedSequence,
   outlinedExtraFunction, outlinedExtraOccurrences,
   outlinedThirdFunction, outlinedThirdOccurrences, outlinedThirdSequence,
   outlinedFourthFunction, outlinedFourthOccurrences, outlinedFourthSequence} from './compact.mjs';
 
 const benchmarkArg = process.argv[2];
-assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark [bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61|extended52-55-57-59-61|extended52-55-57-59-61-62|extended52-55-57-59-61-62-63]');
-const profile = process.argv[3] ?? 'bytes';
-const {program, identifiers, inlinedFunctions, outlinedStackSequences} = buildProfile(profile);
+assert(benchmarkArg, 'usage: node export.mjs /absolute/candidate-benchmark [checked|bytes|balanced|cost|combined|expanded|aggressive|extended|extended55|extended57|extended55-57|extended52-55-57|extended52-55-57-61|extended52-55-57-59-61|extended52-55-57-59-61-62|extended52-55-57-59-61-62-63]');
+const profile = process.argv[3] ?? 'checked';
+const checkedProgram = profile === 'checked' ? cofactorPoints() : undefined;
+const {program, identifiers, inlinedFunctions, outlinedStackSequences} = checkedProgram
+  ? {program: checkedProgram, identifiers: checkedProgram.identifiers,
+    inlinedFunctions: defaultInlinedFunctions, outlinedStackSequences: []}
+  : buildProfile(profile);
 const retained = new Set(program.declarations.map(f => f.name));
 const benchmark = resolve(benchmarkArg);
 const source = fileURLToPath(new URL('../../../', import.meta.url));
@@ -42,9 +47,20 @@ assert(['44d79298047a012b2a1d132949f55c1bbd1c803d28197b2e63366eb54614e4c1', 'b98
 const committed = inputs[1].data.proofs.filter(p => p.committed);
 assert.equal(committed.length, 1);
 assert.equal(committed[0].unlocking, inputs[0].data.unlocking);
-const sourceFiles = Object.fromEntries(['program.mjs', 'field.mjs', 'build.mjs', 'compact.mjs', 'export.mjs']
+const sourceFiles = Object.fromEntries(['program.mjs', 'field.mjs', 'build.mjs', 'compact.mjs', 'export.mjs',
+  ...(checkedProgram ? ['cofactor-points.mjs', 'point-checks.mjs', 'complete-points.mjs', 'subgroup.mjs'] : [])]
   .map(name => [name, createHash('sha256').update(readFileSync(new URL(name, import.meta.url))).digest('hex')]));
-const provenance = {
+const provenance = checkedProgram ? {
+  source: 'singleton/bls12-381/leader-recovered/cofactor-points.mjs', sourceRevision, sourceFiles,
+  recoveredProgramSource: true, originalCompilerAndSearchPipelineRecovered: false,
+  change: 'canonical finite compressed-point checks, complete G2 square-root chart, complete group operations and r-component-preserving G1/G2 projections before Miller evaluation',
+  witnessPolicy: 'all supplied witness/public-input data retained byte-for-byte from the pinned accepted baseline',
+  lockingSha256: createHash('sha256').update(program.bytecode).digest('hex'),
+  functionCount: program.declarations.length,
+  profile,
+  proofDomain: 'fixed-VK cofactor-equivalent G1 and G2; original G2 subgroup membership is not enforced',
+  nativeResourceStatus: 'HOLD; arithmetic-oracle acceptance does not establish native admission',
+} : {
   source: 'singleton/bls12-381/leader-recovered/program.mjs', sourceRevision, sourceFiles,
   recoveredProgramSource: true, originalCompilerAndSearchPipelineRecovered: false,
   change: 'function identifiers fieldPrime 1 to 0, fp6Add 17 to 1, fp6Mul 18 to -1; main prefixed with the public-input range check 0 <= n0, n1 < r; SZ-a1 inlines stackSequence33, negFp, inverseFp, fp2Sqr; SM-a2 outlines six two-roll stack sequences into stackSequence52; SV-a2 swaps stackSequence52 and decompressG2 IDs; TB-a3 outlines 41 OP_MUL/CALL fieldPrime/OP_MOD sequences as mulFp and swaps mulFp with fp6Add (1 to 18); TJ-a2 outlines ten OP_7/OP_ROLL/OP_7/OP_ROLL sequences as stackSequence53=-1 and moves fp6Mul to 19; TR-a2 outlines nine OP_6/OP_ROLL/OP_7/OP_ROLL sequences as stackSequence54=14 and moves fp2Scale to 31; TW-a1 through TW-a4 apply four measured static outlines and their scoped ID packing; UE-a1 adds stackSequence59 for four 0x37 two-roll sites; UE-a2 adds stackSequence60 for two guarded g1Add stack sequences; UE-a3 adds stackSequence61 for three fp2Mul/swap/fp2Add sequences; UR-a1 adds stackSequence62=57 at two decompressG2 sites and stackSequence63=58 at two main sites, producing the historical 3,308-byte candidate with depth 12; VO-a1 replaces only the 50-byte powFp body with a 37-byte posttest remaining-exponent loop, producing 3,295 bytes (compact.mjs)',
@@ -75,7 +91,10 @@ const provenance = {
   } : {}),
   stackOutlines: outlinedStackSequences,
 };
-if (profile === 'bytes') assert.equal(provenance.lockingSha256, 'c5b4cf41459b7ec2f4c84fef0eb8cba5dfffee09ad03da909c9d31378a9d5ece');
+if (checkedProgram) {
+  assert.equal(program.bytecode.length, 5675);
+  assert.equal(provenance.lockingSha256, '6b36b9febaa033b366672c7a6a9d01dd604402d77cf7aced0a001a173292ad3f');
+} else if (profile === 'bytes') assert.equal(provenance.lockingSha256, 'c5b4cf41459b7ec2f4c84fef0eb8cba5dfffee09ad03da909c9d31378a9d5ece');
 else {
   provenance.profile = profile;
   const names = inlinedFunctions.slice(defaultInlinedFunctions.length);
@@ -85,7 +104,9 @@ else {
   provenance.change += `; ${profile} profile inlines ${names.join(' and ')} and restores ${restored}, producing ${program.bytecode.length} bytes`;
 }
 const outputs = inputs.map(input => {
-  const data = {...input.data, contract: 'leader-recovered/program.mjs (full genpow, compact function IDs, range-checked public inputs, SZ-a1 inlining, SM/TB/TJ/TR/TW/UE/UR static outlines and ID packing)',
+  const data = {...input.data, contract: checkedProgram
+    ? 'leader-recovered/cofactor-points.mjs (checked full genpow, cofactor-equivalent G1/G2, native-resource HOLD)'
+    : 'leader-recovered/program.mjs (full genpow, compact function IDs, range-checked public inputs, SZ-a1 inlining, SM/TB/TJ/TR/TW/UE/UR static outlines and ID packing)',
     lockingOK: Buffer.from(program.bytecode).toString('hex'),
     provenance: {...provenance, baselineVectorSha256: input.originalSha256}};
   if (input.data.proofs) assert.deepEqual(data.proofs, input.data.proofs);

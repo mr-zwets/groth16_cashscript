@@ -1,5 +1,23 @@
 # Recovered BLS singleton program
 
+The default `export.mjs` profile is now `checked`, selecting `cofactorPoints()`
+from `cofactor-points.mjs`. It emits 5,675 bytes with SHA256
+`6b36b9febaa033b366672c7a6a9d01dd604402d77cf7aced0a001a173292ad3f`.
+It checks canonical finite compressed coordinates and curve equations, completes
+the G2 square-root chart, and projects both pairing operands into their r-order
+components using complete group operations. This preserves the fixed-VK
+cofactor-equivalent equation for G1 and G2; it does not enforce subgroup
+membership of the original G2 input. The original ten-push proof/public-input
+interface is unchanged. Native-resource status remains **HOLD**: four original
+positive proofs passed the arithmetic oracle with resource ceilings lifted,
+which does not establish current BCH or relay admission.
+
+The explicit compact profiles and their measurements below describe historical
+unchecked controls. `compact.mjs` remains their source owner; shared raw kernels
+and independently reviewed FS/native entries are unchanged. Exporting the
+default checked profile updates only the two genpow vector locking/provenance
+records and preserves all supplied witness and public-input fields.
+
 `program.mjs` is symbolic assembly recovered from the exact 3,425-byte genpow leader. It declares all 51 functions by name and gives the complete main program. Calls reference names rather than historical numeric identifiers. `field.mjs` records the deterministic negative-seed field and full-exponent derivation. `build.mjs` compiles this source directly and rejects a baseline that differs from SHA256 `44d79298047a012b2a1d132949f55c1bbd1c803d28197b2e63366eb54614e4c1`.
 
 Run `node singleton/bls12-381/leader-recovered/build.mjs /absolute/output.json` with the pinned Libauth dependency. This build reads no benchmark artifact, frozen hex, recovery inventory or historical compiler output. Data literals in the assembly retain their exact wire encodings; function declarations and calls are emitted from symbolic references.
