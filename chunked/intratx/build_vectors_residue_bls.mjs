@@ -169,6 +169,7 @@ function specsVkxGlv(inst) {
       outLimbs: [vkxAff.x, vkxAff.y], extras: [vkxGlvZinv(k10, k20, k11, k21), GLV_TABLE_BYTES], role: 'cross',
       cmp: { cmpExpr: 'outBlob', nextFullInLen: MILLER_IN_LIMBS * W, skip: VKX_LIMB_OFFSET * W, cmpLen: 2 * W },
       label: 'GLV vk_x final -> assemble vk_x', checkpoint: 'vk_x',
+      enforceExactInputLength: QUOTIENT_TORUS,
     };
     return { file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs: [...vkxGlvStateAt(k10, k20, k11, k21, ch.hi), ...scal], extras: [], role: 'within', label: `GLV vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined };
   });
@@ -202,6 +203,7 @@ function specsMillerResidue(inst, c, cInv, u = null, bad = {}) {
         return {
           file: join(GEN, `millerres_${String(ch.idx).padStart(2, '0')}.cash`),
           inLimbs, outLimbs: [], extras: [], role: 'terminal',
+          enforceExactInputLength: true,
           label: `miller ops[${ch.opLo},${ch.opHi}) + quotient verdict`, checkpoint: 'verify',
         };
       }
@@ -255,14 +257,14 @@ const specKey = (s) => {
   let forward = null;
   if (s.role === 'within') { const outLen = s.outLimbs.length * W; forward = { cmpExpr: null, nextFullInLen: outLen, skip: 0, cmpLen: outLen }; }
   else if (s.role === 'cross') forward = s.cmp;
-  return { key: `${s.file}|${s.role}|${JSON.stringify(forward)}`, forward };
+  return { key: `${s.file}|${s.role}|exact=${s.enforceExactInputLength === true}|${JSON.stringify(forward)}`, forward, enforceExactInputLength: s.enforceExactInputLength };
 };
 function compileSpec(s) {
-  const { key, forward } = specKey(s);
+  const { key, forward, enforceExactInputLength } = specKey(s);
   let v = compileCache.get(key);
   if (!v) {
     // compile from a file (probe in generated/) so the chunk's relative library import resolves
-    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward }).src);
+    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward, enforceExactInputLength }).src);
     const resched = compileFileBytecode(PROBE);
     const raw = RESCHED ? compileFileBytecodeRaw(PROBE) : resched;
     v = { resched: Uint8Array.from([OP_DROP, ...resched]) }; // [OP_DROP, contract] — OP_DROP discards the pad
