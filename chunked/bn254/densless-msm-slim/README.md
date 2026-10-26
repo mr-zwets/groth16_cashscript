@@ -1,5 +1,15 @@
 # BN254 PairFold-5 densless with a sound vk_x: slim MSM state
 
+> **Withdrawn (2026-10-26).** The densless author has withdrawn the full-verifier soundness
+> claims for the submitted densless constructions ([#28 reply](https://github.com/mr-zwets/groth16_cashscript/issues/28), [#32](https://github.com/mr-zwets/groth16_cashscript/issues/32) F6,
+> [zk-verifier-bench#49](https://github.com/mr-zwets/zk-verifier-bench/issues/49)): the shared `millerEvent` consumes slopes without the
+> tangent/chord equations, the terminal's carried-R predicate compares a value with itself
+> instead of checking the B endpoint, and line/root values are not bound to the committed state.
+> No end-to-end false acceptance is claimed. Do not treat this verifier as sound. For a sound
+> BN254 design see [`../sound-si-gls`](../sound-si-gls/README.md).
+
+> The "soundness argument" below covers the vk_x MSM only, not the densless pairing part.
+
 This is a variant of [`../densless-msm`](../densless-msm), with the merged upstream compiler update retained. This variant keeps the same pairing programs and the same GLV Straus vk_x MSM. It only changes where the MSM state lives. Bench entry id: `bch-groth16-intratx-pairfold5-densless-msm-slim`.
 
 In `../densless-msm`, every stage ends with a 224-byte state push (X, Y, Z, n0, n1, w). n0, n1 and w are copied through all four stages, so 128 bytes are paid four times.

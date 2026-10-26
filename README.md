@@ -6,19 +6,23 @@ BCH 2026 VM:
 
 - **BN254** (a.k.a. BN256 / alt_bn128, the curve behind Ethereum's pairing precompiles)
   — the full singleton, op-optimized singletons, and the BCH-limit-viable chunked
-  verifiers. The best deployable one, `bch-groth16-intratx-pairfold5-densless-msm-slim`,
-  is **5 inputs in one standard transaction, 35,143 bytes**
-  ([`chunked/bn254/densless-msm-slim`](chunked/bn254/densless-msm-slim/README.md)).
+  verifiers. The best non-withdrawn deployable one, `bch-groth16-intratx-crown8-rawchain`,
+  is **8 inputs in one standard transaction, 77,193 bytes**. On the proposed `bch-spec` VM,
+  [`chunked/bn254/sound-si-gls`](chunked/bn254/sound-si-gls/README.md) verifies in **one
+  input at 21,915 bytes**. The 35,143-byte densless-msm-slim entry previously listed here is
+  withdrawn: its author withdrew the densless soundness claims ([#28](https://github.com/mr-zwets/groth16_cashscript/issues/28), [#32](https://github.com/mr-zwets/groth16_cashscript/issues/32) F6).
 - **BLS12-381** — the singleton verifier (baseline and op-optimized), on the **same
   curve as the nChain reference** so the benchmark gets a true apples-to-apples
   comparison (7,347 B vs nChain's 522,564 B, ~71× smaller), **plus** current-BCH
   linked and grouped-residue chunked constructions (the grouped quotient-residue
   verifier is 26 inputs in 3 standard transactions; the Fiat-Shamir intra-tx build fits
-  one standard transaction at 69,947 B).
+  one standard transaction; the smallest non-withdrawn one,
+  `bch-groth16-bls12381-intratx-fs-fused-coordinator-head`, is 60,285 B in 9 inputs).
 
 This has grown into a whole family of verifiers across two curves, two forms, and
 baseline/op-optimized variants — **[verifiers.md](verifiers.md) is the map** of which is
-which and where each deployable frontier sits.
+which and where each deployable frontier sits, and which entries are withdrawn
+([#32](https://github.com/mr-zwets/groth16_cashscript/issues/32), [bench#49](https://github.com/mr-zwets/zk-verifier-bench/issues/49)).
 
 The deterministic BN254 and BLS12-381 verifier.cash fixtures are equation-execution
 benchmarks, not circuit-generated proofs: their setup scalars are published so the harness
