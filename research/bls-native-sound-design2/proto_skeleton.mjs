@@ -14,7 +14,7 @@ import {createVirtualMachineBch2026, encodeDataPush, hash256, sha256 as SHA} fro
 import {Asm, Kernel, OP, pushNum, pushData} from './asm.mjs';
 import {p, r, mod, ETA, GAMMA1, PSI, X_ABS, XPOW, F2} from './blsmath.mjs';
 import {randProof, VKC, le, rdle} from './protocol.mjs';
-import {buildSplit, TAG, W} from './split.mjs';
+import {buildSplit, TAG, W, BC_NAMES} from './split.mjs';
 import * as K from './kernels.mjs';
 
 const OPX = {INPUTINDEX: 0xc0, TXINPUTCOUNT: 0xc3, UTXOBYTECODE: 0xc7, INPUTBYTECODE: 0xca};
@@ -39,25 +39,49 @@ export function buildMain(s, layout, role, {terminal = false, stop} = {}) {
     q.pick('v').invoke('P', ['p']).op(OP.LESSTHAN, 2, 'ok').op(OP.VERIFY, 1).roll('rest'); });
   a.defLocal('EV', 12, 2, (q) => q.kernel(K.kEval(), ['vp', 'vm'], {iters: ITERS}));
   a.defLocal('TM', 4, 16, (q) => q.kernel(K.kTable(), Array.from({length: 16}, (_, i) => 'T' + (15 - i)), {iters: ITERS}));
-  const RDn = (blob, names) => { for (const n of names) a.invoke('RD', [n, blob]); };
+  // decode words from a blob; long blobs are first cut into 8-word pieces, so a word split never re-pushes the whole tail
+  const RDn = (blob, names, onWord) => {
+    if (names.length <= 12) { for (const n of names) { a.invoke('RD', [n, blob]); if (onWord) onWord(n); } return; }
+    for (let i = 0; i < names.length; i += 8) {
+      const piece = names.slice(i, i + 8); const last = i + 8 >= names.length;
+      if (!last) a.roll(blob).push(8 * W).op(OP.SPLIT, 2, 'pc', blob).roll('pc'); else a.roll(blob).rename(blob, 'pc');
+      for (const n of piece) { a.invoke('RD', [n, 'pc']); if (onWord) onWord(n); }
+      a.drop('pc');
+    }
+    a.push(0, blob); // the (empty) blob stays named for the caller's drop
+  };
   const cut = (src, off, len, as) => { a.pick(src, as + '#s'); if (off) a.push(off).op(OP.SPLIT, 2, as + '#l', as).drop(as + '#l'); else a.rename(as + '#s', as); if (len !== undefined) a.push(len).op(OP.SPLIT, 2, as, as + '#r').drop(as + '#r'); };
   // 1. layout pin
   mark('pin'); a.emit(OP.DEPTH, ...pushNum(1), OP.NUMEQUALVERIFY);
   a.pick('W').emit(OP.SIZE); a.st.push('sz'); a.push(s.sizes[j]).op(OP.NUMEQUALVERIFY, 2).drop();
-  // 2. transcript over all inputs (introspection; the same bytes for every input)
-  mark('transcript'); a.pushBytes(TAG, 'h'); let haveQS = false; const keep = new Set([0]);
-  for (let i = 0; i < N; i++) {
-    a.push(i).op(OPX.INPUTBYTECODE, 1, 'u').push(3 + P1len[i]).op(OP.SPLIT, 2, 'hd', 'tl');
-    if (qlen[i]) { a.roll('tl').push(qlen[i]).op(OP.SPLIT, 2, 'qi', 'rest').drop('rest'); if (haveQS) a.roll('QS').roll('qi').op(OP.CAT, 2, 'QS'); else a.rename('qi', 'QS'); haveQS = true; } else a.drop('tl');
-    if (keep.has(i)) a.pick('hd', 'H' + i);
-    if (i === j - 1) a.pick('hd', 'Hprev');
-    a.roll('h').roll('hd').op(OP.CAT, 2, 'hh').op(OP.SHA256, 1, 'h');
+  const bcast = !!layout.bcast, hub = !bcast || j === 0; // hub: derives the challenges (every input in the base layout)
+  if (hub) {
+    // 2. transcript over all inputs (introspection; the same bytes for every input)
+    mark('transcript'); a.pushBytes(TAG, 'h'); let haveQS = false; const keep = new Set([0]);
+    for (let i = 0; i < N; i++) {
+      a.push(i).op(OPX.INPUTBYTECODE, 1, 'u').push(3 + P1len[i]).op(OP.SPLIT, 2, 'hd', 'tl');
+      if (qlen[i]) { a.roll('tl').push(qlen[i]).op(OP.SPLIT, 2, 'qi', 'rest').drop('rest'); if (haveQS) a.roll('QS').roll('qi').op(OP.CAT, 2, 'QS'); else a.rename('qi', 'QS'); haveQS = true; } else a.drop('tl');
+      if (keep.has(i)) a.pick('hd', 'H' + i);
+      if (i === j - 1) a.pick('hd', 'Hprev');
+      a.roll('h').roll('hd').op(OP.CAT, 2, 'hh').op(OP.SHA256, 1, 'h');
+    }
+    a.pick('h').pushBytes(Buffer.from('rho')).op(OP.CAT, 2, 'hr').op(OP.SHA256, 1, 'rhoRaw');
+    if (terminal) a.pick('QS', 'QS2'); else a.rename('QS', 'QS2');
+    a.roll('h').pick('rhoRaw').op(OP.CAT, 2, 'hz').roll('QS2').op(OP.CAT, 2, 'hzq').op(OP.SHA256, 1, 'zRaw');
+    U('zRaw'); a.rename('zRaw', 'z'); a.pick('z').op(OP.ZERONOTEQUAL, 1, 'nz').op(OP.VERIFY, 1);
+    a.roll('rhoRaw'); U('rhoRaw'); a.rename('rhoRaw', 'rho'); a.invoke('P', ['p']);
+  } else {
+    // consumer (bcast): input 0's statement slice and the broadcast area, the predecessor's slice, [the quotient] by introspection
+    mark('transcript');
+    a.push(0).op(OPX.INPUTBYTECODE, 1, 'u0').push(3 + P1len[0]).op(OP.SPLIT, 2, 'H0', 'u0r');
+    a.roll('u0r').push(at[0].BC - P1len[0]).op(OP.SPLIT, 2, 'x', 'BCb').drop('x').roll('BCb').push(BC_NAMES.length * W).op(OP.SPLIT, 2, 'BCb', 'y').drop('y');
+    mark('bcast-decode'); RDn('BCb', BC_NAMES); a.drop('BCb');
+    if (j - 1 === 0) a.pick('H0', 'Hprev'); else a.push(j - 1).op(OPX.INPUTBYTECODE, 1, 'uq').push(3 + P1len[j - 1]).op(OP.SPLIT, 2, 'Hprev', 'uqr').drop('uqr');
+    if (terminal) { let have = false; for (let i = 0; i < N; i++) if (qlen[i]) {
+      a.push(i).op(OPX.INPUTBYTECODE, 1, 'u').push(3 + at[i].Q).op(OP.SPLIT, 2, 'x', 'u').drop('x').push(qlen[i]).op(OP.SPLIT, 2, 'qi', 'y').drop('y');
+      if (have) a.roll('QS').roll('qi').op(OP.CAT, 2, 'QS'); else a.rename('qi', 'QS'); have = true; } }
+    a.invoke('P', ['p']);
   }
-  a.pick('h').pushBytes(Buffer.from('rho')).op(OP.CAT, 2, 'hr').op(OP.SHA256, 1, 'rhoRaw');
-  if (terminal) a.pick('QS', 'QS2'); else a.rename('QS', 'QS2');
-  a.roll('h').pick('rhoRaw').op(OP.CAT, 2, 'hz').roll('QS2').op(OP.CAT, 2, 'hzq').op(OP.SHA256, 1, 'zRaw');
-  U('zRaw'); a.rename('zRaw', 'z'); a.pick('z').op(OP.ZERONOTEQUAL, 1, 'nz').op(OP.VERIFY, 1);
-  a.roll('rhoRaw'); U('rhoRaw'); a.rename('rhoRaw', 'rho'); a.invoke('P', ['p']);
   // 3. this role's constant blob (delta lines) against its pinned hash
   mark('consts'); cut('W', at[j].K, s.K[j].length, 'Kj'); a.pick('Kj').op(OP.SHA256, 1, 'kh').pushBytes(s.Khash[j]).op(OP.EQUALVERIFY, 2); a.drop('Kj');
   // 4. statement, s^c (from input 0's slice)
@@ -79,6 +103,7 @@ export function buildMain(s, layout, role, {terminal = false, stop} = {}) {
     a.pick('NIB', 'Nc'); a.pushBytes(Buffer.alloc(128, 0x0f)).op(OP.AND, 2, 'Nm').pick('NIB').op(OP.EQUALVERIFY, 2);
   } else { a.drop('NN'); a.drop('NIB'); }
   // 5. loop environment: z powers, the eta z powers, point/env products
+  if (hub) {
   mark('env'); for (const n of ['xA', 'yA', 'xC', 'yC']) a.pick(n, n + 'k'); for (const n of ['xA', 'yA', 'xC', 'yC']) a.rename(n + 'k', n) && 0;
   // (kPowers consumes xA yA xC yC: the copies just made carry those names, the originals are renamed out of the way)
   a.kernel(K.kPowers(), ['z2', 'z3', 'z4', 'z5', 'z6', 't', 'xz2', 'xz2t', 'xz23', 'xz23t', 'yz3', 'yz3t', 'cz2', 'cz2t', 'ycz3'], {iters: ITERS});
@@ -95,6 +120,14 @@ export function buildMain(s, layout, role, {terminal = false, stop} = {}) {
   }
   // 7. c^-1 at +-z and the start state
   mark('start'); for (let jj = 0; jj < 6; jj++) a.pick('sc' + jj, 'in' + jj); for (let i = 0; i < 6; i++) a.pick(ZP[i], 'in' + (6 + i)); a.invoke('EV', ['Scp', 'Scm']);
+  if (bcast) { // the hub checks the claimed broadcast area against what it computed (exact, canonical words)
+    mark('bcast-check'); cut('W', at[0].BC, BC_NAMES.length * W, 'BCb');
+    // (computed - claimed) mod p == 0: computed values may be unreduced or negative; claimed words are canonical (RD)
+    RDn('BCb', BC_NAMES.map((n) => 'c#' + n), (cn) => { const n = cn.slice(2); a.roll(cn).pick(n === 'cp' ? 'Scm' : n === 'cm' ? 'Scp' : n).op(OP.SUB, 2, 'df').pick('p').op(OP.MOD, 2, 'dm').op(OP.NOT, 1, 'eq').op(OP.VERIFY, 1); });
+    a.drop('BCb');
+  }
+  }
+  mark('start2');
   if (j === 0) { a.pick('Scm', 'Fp').pick('Scp', 'Fm'); }
   else { a.roll('Hprev').push(3 + P1len[j - 1] - 6 * W).op(OP.SPLIT, 2, 'hl', 'Sst').drop('hl'); RDn('Sst', ['in0', 'in1', 'in2', 'in3', 'in4', 'in5']); a.drop('Sst');
     for (let i = 0; i < 6; i++) a.pick(ZP[i], 'in' + (6 + i)); a.invoke('EV', ['Fp', 'Fm']); }
@@ -179,6 +212,20 @@ export function buildMain(s, layout, role, {terminal = false, stop} = {}) {
 // ---------------- assemble the transaction and run one role ----------------
 const vms = {cons: createVirtualMachineBch2026(false), std: createVirtualMachineBch2026(true)};
 const p2sh32 = (redeem) => Uint8Array.from([0xaa, 0x20, ...hash256(redeem), 0x87]);
+// transaction builder for rejection tests: the honest 5-input transaction for `role`'s blob, plus an evaluator
+export function prepare(layout, seed, role, opts = {}) {
+  const BLOB_SLOT = opts.blobSlot ?? 6800; const lay = (n) => ({...layout, pad: layout.pad.map((x, j) => (j === layout.cbHost ? x + BLOB_SLOT - n : x))});
+  let blobLen = 3000, built, s;
+  for (let it = 0; it < 4; it++) { s = buildSplit(randProof(seed), lay(blobLen), {blob: Buffer.alloc(blobLen, 0x61)}); built = buildMain(s, lay(blobLen), role, opts); if (built.blob.length === blobLen) break; blobLen = built.blob.length; }
+  s = buildSplit(randProof(seed), lay(blobLen), {blob: Buffer.from(built.blob)}); const blob = built.blob;
+  const R = buildRedeem(layout.N, layout.cbHost, 3 + s.offsets[layout.cbHost].CB, blob.length, SHA.hash(blob)); const lock = p2sh32(R);
+  const unlOf = (Wj, red = R) => Wj.map((x) => Uint8Array.from([...encodeDataPush(x), ...encodeDataPush(red)]));
+  const txOf = (unl) => ({version: 2, locktime: 0, inputs: unl.map((u, i) => ({outpointIndex: i, outpointTransactionHash: new Uint8Array(32).fill(i + 1), sequenceNumber: 0, unlockingBytecode: u})), outputs: [{lockingBytecode: Uint8Array.of(0x6a), valueSatoshis: 0n}]});
+  const srcOf = (n, lk = lock) => Array.from({length: n}, () => ({lockingBytecode: lk, valueSatoshis: 1000n}));
+  const evalInput = (i, tx, src, mode = 'std') => { const st = vms[mode].evaluate({inputIndex: i, sourceOutputs: src, transaction: tx}); return st.error ?? 'accepted'; };
+  return {s, blob, R, lock, Wj: s.Wj.map((x) => Buffer.from(x)), unlOf, txOf, srcOf, evalInput};
+}
+
 export function runRole(layout, seed, role, opts = {}) {
   // fixed point: the blob's size enters the holder's witness size (a pushed constant in the blob)
   // the holder's padding absorbs the blob length so every witness size (and so the transcript) is independent of it
@@ -221,7 +268,7 @@ export function runRole(layout, seed, role, opts = {}) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const L = JSON.parse(readFileSync(process.argv[2] ?? 'layout-e5.json'));
-  const layout = {N: L.ins.length, chunks: L.ins.map((x) => x.chunks), q: L.ins.map((x) => x.q / W), cbHost: L.ins.findIndex((x) => x.cb), pad: L.ins.map((x) => x.pad)};
+  const layout = {N: L.ins.length, bcast: L.variant === 'bcast', chunks: L.ins.map((x) => x.chunks), q: L.ins.map((x) => x.q / W), cbHost: L.ins.findIndex((x) => x.cb), pad: L.ins.map((x) => x.pad)};
   const seed = Number(process.argv[3] ?? 3); const res = [];
   for (let role = 0; role < layout.N; role++) {
     const terminal = role === layout.N - 1; const o = runRole(layout, seed, role, {terminal}); res.push(o);

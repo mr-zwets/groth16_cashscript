@@ -13,7 +13,7 @@
    "events": 14,
    "op": {
     "std": 6961728,
-    "cons": 6916728
+    "cons": 6917728
    },
    "mandatory": 5952,
    "q": 0,
@@ -25,7 +25,7 @@
    "unlocking": 9629,
    "budget": 7736000,
    "marginStd": 0.10008686659772492,
-   "marginCons": 0.1059038262668045
+   "marginCons": 0.10577456049638057
   },
   {
    "j": 1,
@@ -35,20 +35,20 @@
    ],
    "events": 14,
    "op": {
-    "std": 6637512,
-    "cons": 6591512
+    "std": 6638512,
+    "cons": 6592512
    },
    "mandatory": 5232,
    "q": 3840,
    "cb": 0,
-   "need": 9106,
+   "need": 9108,
    "content": 9072,
-   "pad": 34,
-   "wit": 9106,
-   "unlocking": 9178,
-   "budget": 7375200,
-   "marginStd": 0.10002277904328016,
-   "marginCons": 0.10625989803666336
+   "pad": 36,
+   "wit": 9108,
+   "unlocking": 9180,
+   "budget": 7376800,
+   "marginStd": 0.1000824205617612,
+   "marginCons": 0.10631818674764126
   },
   {
    "j": 2,
@@ -58,20 +58,20 @@
    ],
    "events": 16,
    "op": {
-    "std": 6973071,
-    "cons": 6927071
+    "std": 6974071,
+    "cons": 6928071
    },
    "mandatory": 5712,
    "q": 0,
    "cb": 0,
-   "need": 9572,
+   "need": 9574,
    "content": 5712,
-   "pad": 3860,
-   "wit": 9572,
-   "unlocking": 9644,
-   "budget": 7748000,
-   "marginStd": 0.10001664945792466,
-   "marginCons": 0.10595366546205476
+   "pad": 3862,
+   "wit": 9574,
+   "unlocking": 9646,
+   "budget": 7749600,
+   "marginStd": 0.10007342314442036,
+   "marginCons": 0.10600921337875502
   },
   {
    "j": 3,
@@ -81,20 +81,20 @@
    ],
    "events": 14,
    "op": {
-    "std": 6637141,
-    "cons": 6591141
+    "std": 6638141,
+    "cons": 6592141
    },
    "mandatory": 5232,
    "q": 2496,
    "cb": 0,
-   "need": 9106,
+   "need": 9107,
    "content": 7728,
-   "pad": 1378,
-   "wit": 9106,
-   "unlocking": 9178,
-   "budget": 7375200,
-   "marginStd": 0.10007308276385729,
-   "marginCons": 0.10631020175724049
+   "pad": 1379,
+   "wit": 9107,
+   "unlocking": 9179,
+   "budget": 7376000,
+   "marginStd": 0.10003511388286335,
+   "marginCons": 0.10627155639913233
   },
   {
    "j": 4,
@@ -104,25 +104,25 @@
    ],
    "events": 6,
    "op": {
-    "std": 5158895,
-    "cons": 5112895
+    "std": 5194895,
+    "cons": 5148895
    },
    "mandatory": 2352,
    "q": 0,
    "cb": 7000,
-   "need": 7053,
+   "need": 7103,
    "content": 9352,
    "pad": 0,
    "wit": 9352,
    "unlocking": 9424,
    "budget": 7572000,
-   "marginStd": 0.3186879292128896,
-   "marginCons": 0.32476294241944004
+   "marginStd": 0.3139335710512414,
+   "marginCons": 0.3200085842577919
   }
  ],
- "bytes": 47053,
- "score": 47463,
- "pad": 8877,
+ "bytes": 47058,
+ "score": 47468,
+ "pad": 8882,
  "cuts": [
   0,
   7,

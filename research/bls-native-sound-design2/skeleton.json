@@ -1,15 +1,29 @@
 {
- "_source": "proto_skeleton.mjs, 5-input BCH 2026 transaction, proofs seed 3 and 11 (max taken); blob size is an estimate for the all-roles blob (role blobs measured 2,823 B event / 4,628 B terminal)",
- "setup": {"std": 1335000, "cons": 1289000},
- "firstInputSaving": {"std": 97000, "cons": 96000},
+ "_source": "proto_skeleton.mjs in a 5-input BCH 2026 transaction (layouts layout-e5.json = base, layout-bcast-n5.json = bcast), proofs seed 3 and 11, max taken and rounded up; terminal = terminal + quotient Horner + GLS binding + curve/range/nibble checks; blob = estimate for the all-roles blob (measured role blobs: base event 2,823 B, base terminal 4,628 B, bcast hub 3,910 B, bcast consumer 1,097 B, bcast terminal 2,914 B; broadcast decoded/checked in 8-word pieces)",
+ "base": {
+  "first": {
+   "std": 1238000,
+   "cons": 1194000
+  },
+  "other": {
+   "std": 1336000,
+   "cons": 1290000
+  }
+ },
+ "bcast": {
+  "first": {
+   "std": 1630000,
+   "cons": 1582000
+  },
+  "other": {
+   "std": 590000,
+   "cons": 580000
+  },
+  "bcastWords": 83
+ },
+ "terminalExtraSetup": 35000,
  "terminal": 1710000,
  "loopPerEvent": 6000,
  "blob": 7000,
- "redeem": 68,
- "tablesOp": 632000,
- "consumerBase": {"std": 308000, "cons": 283000},
- "sharedDecodeFixed": 25000,
- "sharedDecodePerWord": 1600,
- "sharedCheckPerWord": 1900,
- "bcastWords": 87
+ "redeem": 68
 }

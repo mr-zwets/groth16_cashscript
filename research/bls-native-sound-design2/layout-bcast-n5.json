@@ -12,66 +12,66 @@
    ],
    "events": 12,
    "op": {
-    "std": 6421875,
-    "cons": 6376875
+    "std": 6648575,
+    "cons": 6600575
    },
-   "mandatory": 9456,
+   "mandatory": 9264,
    "q": 0,
    "cb": 0,
-   "need": 9331,
-   "content": 9456,
-   "pad": 0,
-   "wit": 9456,
-   "unlocking": 9528,
-   "budget": 7655200,
-   "marginStd": 0.16110944194795696,
-   "marginCons": 0.16698779914306616
+   "need": 9665,
+   "content": 9264,
+   "pad": 401,
+   "wit": 9665,
+   "unlocking": 9737,
+   "budget": 7822400,
+   "marginStd": 0.15005944467171206,
+   "marginCons": 0.15619566884843528
   },
   {
    "j": 1,
    "chunks": [
     6,
-    13
+    14
    ],
-   "events": 14,
+   "events": 16,
    "op": {
-    "std": 5775237,
-    "cons": 5750237
+    "std": 6597665,
+    "cons": 6587665
    },
-   "mandatory": 5232,
-   "q": 2832,
+   "mandatory": 5904,
+   "q": 3648,
    "cb": 0,
-   "need": 8380,
-   "content": 8064,
-   "pad": 316,
-   "wit": 8380,
-   "unlocking": 8452,
-   "budget": 6794400,
-   "marginStd": 0.15000044154009184,
-   "marginCons": 0.15367994230542803
+   "need": 9590,
+   "content": 9552,
+   "pad": 38,
+   "wit": 9590,
+   "unlocking": 9662,
+   "budget": 7762400,
+   "marginStd": 0.1500483098010924,
+   "marginCons": 0.1513365711635577
   },
   {
    "j": 2,
    "chunks": [
-    13,
+    14,
     22
    ],
-   "events": 18,
+   "events": 16,
    "op": {
-    "std": 6814899,
-    "cons": 6789899
+    "std": 6228071,
+    "cons": 6218071
    },
-   "mandatory": 6384,
-   "q": 3504,
+   "mandatory": 5712,
+   "q": 2688,
    "cb": 0,
-   "need": 9909,
-   "content": 9888,
-   "pad": 21,
-   "wit": 9909,
-   "unlocking": 9981,
-   "budget": 8017600,
-   "marginStd": 0.15000760826182402,
-   "marginCons": 0.15312574835362203
+   "need": 9046,
+   "content": 8400,
+   "pad": 646,
+   "wit": 9046,
+   "unlocking": 9118,
+   "budget": 7327200,
+   "marginStd": 0.15000668741128942,
+   "marginCons": 0.1513714652254613
   },
   {
    "j": 3,
@@ -81,20 +81,20 @@
    ],
    "events": 14,
    "op": {
-    "std": 5774341,
-    "cons": 5749341
+    "std": 5892141,
+    "cons": 5882141
    },
    "mandatory": 5232,
    "q": 0,
    "cb": 0,
-   "need": 8379,
+   "need": 8552,
    "content": 5232,
-   "pad": 3147,
-   "wit": 8379,
-   "unlocking": 8451,
-   "budget": 6793600,
-   "marginStd": 0.15003223622232686,
-   "marginCons": 0.15371217027790862
+   "pad": 3320,
+   "wit": 8552,
+   "unlocking": 8624,
+   "budget": 6932000,
+   "marginStd": 0.15000851125216386,
+   "marginCons": 0.15145109636468557
   },
   {
    "j": 4,
@@ -104,29 +104,29 @@
    ],
    "events": 6,
    "op": {
-    "std": 4296095,
-    "cons": 4271095
+    "std": 4448895,
+    "cons": 4438895
    },
    "mandatory": 2352,
    "q": 0,
    "cb": 7000,
-   "need": 6205,
+   "need": 6430,
    "content": 9352,
    "pad": 0,
    "wit": 9352,
    "unlocking": 9424,
    "budget": 7572000,
-   "marginStd": 0.4326340464870576,
-   "marginCons": 0.43593568409931327
+   "marginStd": 0.4124544374009509,
+   "marginCons": 0.4137750924458531
   }
  ],
- "bytes": 45836,
- "score": 46246,
- "pad": 3484,
+ "bytes": 46565,
+ "score": 46975,
+ "pad": 4405,
  "cuts": [
   0,
   6,
-  13,
+  14,
   22,
   29
  ]

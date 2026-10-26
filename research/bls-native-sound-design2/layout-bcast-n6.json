@@ -8,70 +8,70 @@
    "j": 0,
    "chunks": [
     0,
-    6
+    4
    ],
-   "events": 12,
+   "events": 8,
    "op": {
-    "std": 6421875,
-    "cons": 6376875
+    "std": 5239181,
+    "cons": 5191181
    },
-   "mandatory": 9456,
+   "mandatory": 7920,
    "q": 0,
    "cb": 0,
-   "need": 9922,
-   "content": 9456,
-   "pad": 466,
-   "wit": 9922,
-   "unlocking": 9994,
-   "budget": 8028000,
-   "marginStd": 0.2000653961136024,
-   "marginCons": 0.20567077727952165
+   "need": 8074,
+   "content": 7920,
+   "pad": 154,
+   "wit": 8074,
+   "unlocking": 8146,
+   "budget": 6549600,
+   "marginStd": 0.20007618785880055,
+   "marginCons": 0.20740487968730914
   },
   {
    "j": 1,
    "chunks": [
-    6,
-    11
+    4,
+    9
    ],
    "events": 10,
    "op": {
-    "std": 4366079,
-    "cons": 4341079
+    "std": 4483620,
+    "cons": 4473620
    },
    "mandatory": 3888,
    "q": 0,
    "cb": 0,
-   "need": 6709,
+   "need": 6893,
    "content": 3888,
-   "pad": 2821,
-   "wit": 6709,
-   "unlocking": 6781,
-   "budget": 5457600,
-   "marginStd": 0.2000001832307241,
-   "marginCons": 0.20458095133391963
+   "pad": 3005,
+   "wit": 6893,
+   "unlocking": 6965,
+   "budget": 5604800,
+   "marginStd": 0.20003925206965456,
+   "marginCons": 0.20182343705395378
   },
   {
    "j": 2,
    "chunks": [
-    11,
+    9,
     17
    ],
-   "events": 12,
+   "events": 16,
    "op": {
-    "std": 4700076,
-    "cons": 4675076
+    "std": 6227529,
+    "cons": 6217529
    },
-   "mandatory": 4368,
-   "q": 288,
+   "mandatory": 5712,
+   "q": 3888,
    "cb": 0,
-   "need": 7231,
-   "content": 4656,
-   "pad": 2575,
-   "wit": 7231,
-   "unlocking": 7303,
-   "budget": 5875200,
-   "marginStd": 0.20001429738562093,
-   "marginCons": 0.20426947167755993
+   "need": 9618,
+   "content": 9600,
+   "pad": 18,
+   "wit": 9618,
+   "unlocking": 9690,
+   "budget": 7784800,
+   "marginStd": 0.2000399496454629,
+   "marginCons": 0.20132450416195669
   },
   {
    "j": 3,
@@ -81,20 +81,20 @@
    ],
    "events": 12,
    "op": {
-    "std": 4700678,
-    "cons": 4675678
+    "std": 4818478,
+    "cons": 4808478
    },
    "mandatory": 4368,
-   "q": 2832,
+   "q": 0,
    "cb": 0,
-   "need": 7232,
-   "content": 7200,
-   "pad": 32,
-   "wit": 7232,
-   "unlocking": 7304,
-   "budget": 5876000,
-   "marginStd": 0.20002076242341726,
-   "marginCons": 0.2042753573859769
+   "need": 7416,
+   "content": 4368,
+   "pad": 3048,
+   "wit": 7416,
+   "unlocking": 7488,
+   "budget": 6023200,
+   "marginStd": 0.200013614025767,
+   "marginCons": 0.20167386107052732
   },
   {
    "j": 4,
@@ -104,20 +104,20 @@
    ],
    "events": 12,
    "op": {
-    "std": 5069844,
-    "cons": 5044844
+    "std": 5187644,
+    "cons": 5177644
    },
    "mandatory": 4560,
-   "q": 3216,
+   "q": 2448,
    "cb": 0,
-   "need": 7809,
-   "content": 7776,
-   "pad": 33,
-   "wit": 7809,
-   "unlocking": 7881,
-   "budget": 6337600,
-   "marginStd": 0.2000372380711941,
-   "marginCons": 0.2039819490027771
+   "need": 7993,
+   "content": 7008,
+   "pad": 985,
+   "wit": 7993,
+   "unlocking": 8065,
+   "budget": 6484800,
+   "marginStd": 0.20003022452504315,
+   "marginCons": 0.20157229212928696
   },
   {
    "j": 5,
@@ -127,29 +127,29 @@
    ],
    "events": 6,
    "op": {
-    "std": 4296095,
-    "cons": 4271095
+    "std": 4448895,
+    "cons": 4438895
    },
    "mandatory": 2352,
    "q": 0,
    "cb": 7000,
-   "need": 6600,
+   "need": 6839,
    "content": 9352,
    "pad": 0,
    "wit": 9352,
    "unlocking": 9424,
    "budget": 7572000,
-   "marginStd": 0.4326340464870576,
-   "marginCons": 0.43593568409931327
+   "marginStd": 0.4124544374009509,
+   "marginCons": 0.4137750924458531
   }
  ],
- "bytes": 48687,
- "score": 49175,
- "pad": 5927,
+ "bytes": 49778,
+ "score": 50266,
+ "pad": 7210,
  "cuts": [
   0,
-  6,
-  11,
+  4,
+  9,
   17,
   23,
   29

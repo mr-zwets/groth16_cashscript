@@ -9,6 +9,10 @@ import {prove, quotient, VKC, glsFactorPoly, uniformBounds, nqMax, le, rdle, sha
 
 export const TAG = Buffer.from('BLS-SIGLS-MI/1');
 export const W = 48;
+// broadcast area (bcast layout), in decode order: challenges, z powers, loop environment, c^-1 at +-z, then the four
+// GT-GLS tables, each from entry 15 down to entry 0 so that entry n ends at depth d0 + n
+export const BC_NAMES = ['z', 'rho', 'z2', 'z3', 'z4', 'z5', 'z6', 't', 'xz2', 'xz2t', 'xz23', 'xz23t', 'yz3', 'yz3t', 'cz2', 'cz2t', 'ycz3', 'cp', 'cm',
+  ...['TP0', 'TM0', 'TP1', 'TM1'].flatMap((T) => Array.from({length: 16}, (_, i) => `${T}_${15 - i}`))];
 // layout: {N, chunks: [[c0, c1] per input] (event inputs = all N; the last one runs the terminal), q: [words per input], cbHost, pad: [bytes]}
 export function buildSplit(pf, layout, {blob = Buffer.alloc(layout.cbBytes ?? 6800, 0x61), bounds = uniformBounds(2)} = {}) {
   const pr = prove(pf, {bounds}); const {st, Sc, states, N: nib, ns} = pr; const NI = layout.N;
@@ -22,7 +26,8 @@ export function buildSplit(pf, layout, {blob = Buffer.alloc(layout.cbBytes ?? 68
   const K = layout.chunks.map(([c0, c1]) => { const e0 = c0 ? bounds[c0 - 1] : 0, e1 = bounds[c1 - 1];
     return Buffer.concat(VKC.lines.filter((l) => l.e >= e0 && l.e < e1).flatMap((l) => [w(l.c.c0), w(l.c.c1), w(l.lam.c0), w(l.lam.c1)])); });
   // witness sizes are fixed by the layout; the push header of W_j is PUSHDATA2 (3 bytes) for 256 <= |W_j| <= 65535
-  const sizes = layout.chunks.map((_, j) => P1[j].length + layout.q[j] * W + K[j].length + (j ? 7 * W : 0) + (j === layout.cbHost ? blob.length : 0) + layout.pad[j]);
+  const BCW = layout.bcast ? BC_NAMES.length : 0;
+  const sizes = layout.chunks.map((_, j) => P1[j].length + layout.q[j] * W + K[j].length + (j ? 7 * W : 0) + (j === 0 ? BCW * W : 0) + (j === layout.cbHost ? blob.length : 0) + layout.pad[j]);
   const hdr = (n) => Buffer.from(encodeDataPush(new Uint8Array(n)).subarray(0, 3));
   // transcript phase 1: h = SHA256(TAG | U_0[0, 3+|P1_0|]); h = SHA256(h | U_j[0, 3+|P1_j|])
   let h = sha(TAG, hdr(sizes[0]), P1[0]); for (let j = 1; j < NI; j++) h = sha(h, hdr(sizes[j]), P1[j]);
@@ -61,8 +66,16 @@ export function buildSplit(pf, layout, {blob = Buffer.alloc(layout.cbBytes ?? 68
     }
   }
   const final = trace.at(-1).final; if (process.env.DBG) console.error(final); assert.ok(process.env.NOASSERT || final.ok && final.endpoint && final.bind && final.curves, 'multi-input conjunction must accept the honest proof');
-  const Wj = layout.chunks.map((_, j) => Buffer.concat([P1[j], Qseg[j], K[j], ...(j ? [IN[j]] : []), ...(j === layout.cbHost ? [blob] : []), Buffer.alloc(layout.pad[j])]));
+  // broadcast values (bcast layout): exactly what input 0 computes from the challenges and the statement
+  const bcVals = (() => { const z2 = mod(z * z), z3 = mod(z2 * z), z4 = mod(z2 * z2), z5 = mod(z4 * z), z6 = mod(z3 * z3), t = mod(z6 - 1n);
+    const xz2 = mod(st.xA * z2), yz3 = mod(st.yA * z3), cz2 = mod(st.xC * z2), xz23 = mod(3n * xz2);
+    const v = {z, rho, z2, z3, z4, z5, z6, t, xz2, xz2t: mod(xz2 * t), xz23, xz23t: mod(xz23 * t), yz3, yz3t: mod(yz3 * t), cz2, cz2t: mod(cz2 * t), ycz3: mod(st.yC * z3), cp, cm};
+    for (const k of [0, 1]) { const vp = [0, 1, 2, 3].map((i) => peval(glsFactorPoly(k, i), z)), vmm = [0, 1, 2, 3].map((i) => peval(glsFactorPoly(k, i), zm));
+      for (const [nm, vv] of [[`TP${k}`, vp], [`TM${k}`, vmm]]) for (let n = 0; n < 16; n++) { let a = 1n; for (let b = 0; b < 4; b++) if ((n >> b) & 1) a = mod(a * vv[b]); v[`${nm}_${n}`] = a; } }
+    return BC_NAMES.map((n) => { assert.ok(v[n] !== undefined, n); return v[n]; }); })();
+  const BC = layout.bcast ? Buffer.concat(bcVals.map(w)) : Buffer.alloc(0);
+  const Wj = layout.chunks.map((_, j) => Buffer.concat([P1[j], Qseg[j], K[j], ...(j ? [IN[j]] : []), ...(j === 0 ? [BC] : []), ...(j === layout.cbHost ? [blob] : []), Buffer.alloc(layout.pad[j])]));
   Wj.forEach((x, j) => assert.equal(x.length, sizes[j]));
-  const offsets = layout.chunks.map((_, j) => { let o = 0; const at = {}; at.P1 = o; o += P1[j].length; at.Q = o; o += Qseg[j].length; at.K = o; o += K[j].length; if (j) { at.IN = o; o += 7 * W; } if (j === layout.cbHost) { at.CB = o; o += blob.length; } at.PAD = o; return at; });
-  return {pr, P1, K, Qseg, WQ, IN, Wj, sizes, offsets, h0, rhoRaw, rho, zRaw, z, trace, final, STMT, NIB, SC, Khash: K.map((k) => sha(k))};
+  const offsets = layout.chunks.map((_, j) => { let o = 0; const at = {}; at.P1 = o; o += P1[j].length; at.Q = o; o += Qseg[j].length; at.K = o; o += K[j].length; if (j) { at.IN = o; o += 7 * W; } if (j === 0) { at.BC = o; o += BC.length; } if (j === layout.cbHost) { at.CB = o; o += blob.length; } at.PAD = o; return at; });
+  return {pr, P1, K, Qseg, WQ, IN, BC, bcVals, Wj, sizes, offsets, h0, rhoRaw, rho, zRaw, z, trace, final, STMT, NIB, SC, Khash: K.map((k) => sha(k))};
 }
