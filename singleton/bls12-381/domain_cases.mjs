@@ -2,7 +2,8 @@
 // domain_checks_test.mjs and the vector builders (which ship them to the bench as extra
 // rejection runs). Every case reuses the committed instance (bls_instance.mjs) and changes
 // only the proof points; each must be REJECTED by the domain checks:
-//   - coordinates outside [0, p) (the same point under a non-canonical encoding);
+//   - coordinates outside [0, p) (the same point under a non-canonical encoding): +p on
+//     Ax, Cx, Cy and each of B's four Fp coordinates, -p on Ay;
 //   - A, C off E(Fp): y^2 = x^3 + 4, and B off the twist E'(Fp2): y^2 = x^3 + 4(1+u), including
 //     (0,0), which is how a point at infinity would have to be encoded;
 //   - B on the twist but outside G2: B + T13 and T13 itself (T13 of exact order 13, 13^2 | h2,
@@ -85,7 +86,13 @@ export function domainRejectCases() {
     ['B on twist, not in G2: T13 (walk collapses)', withB(T13)],
     ['B on twist, not in G2: B + [r]Q (cofactor)', withB(BplusCof)],
     ['Ax + p (same point, non-canonical)', { ...honest, Ax: honest.Ax + P }],
+    ['Cx + p (same point, non-canonical)', { ...honest, Cx: honest.Cx + P }],
     ['Cy + p (same point, non-canonical)', { ...honest, Cy: honest.Cy + P }],
+    // B's twist equation is evaluated mod p, so for B the range check is the ONLY guard
+    // against a second encoding of the same point: one case per coordinate
+    ['Bxa + p (same point, non-canonical)', { ...honest, Bxa: honest.Bxa + P }],
+    ['Bxb + p (same point, non-canonical)', { ...honest, Bxb: honest.Bxb + P }],
+    ['Bya + p (same point, non-canonical)', { ...honest, Bya: honest.Bya + P }],
     ['Byb + p (same point, non-canonical)', { ...honest, Byb: honest.Byb + P }],
     ['Ay - p (negative, same residue)', { ...honest, Ay: honest.Ay - P }],
   ].map(([label, w]) => ({ label, args: toArgs(w) }));

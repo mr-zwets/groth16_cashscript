@@ -8,6 +8,9 @@
 //      -> dissect + probe arities + recompile every subroutine + main -> outline
 //   B. rescheduled compile (size objective + rescheduleStacks) -> outline
 // so the entry can never come out worse than the outlined compiler output.
+// Candidate A is skipped (not guessed) when a subroutine's arity cannot be probed with
+// random inputs: since the domain checks, g1Check (range + y^2 = x^3 + 4, no outputs)
+// fails its require for every random input count, and probeArity throws for it.
 //
 // Run:  node singleton/bls12-381/build_vectors_optimized.mjs
 import { readFileSync, writeFileSync } from 'node:fs';
@@ -19,7 +22,7 @@ import {
 } from '@bitauth/libauth';
 import { compileFile } from 'cashc';
 import {
-  dissect, probeArity, recompileAll, recompileMain, rebuild, evalFull, setTestInputRange,
+  dissect, probeArity, ArityProbeError, recompileAll, recompileMain, rebuild, evalFull, setTestInputRange,
 } from '../bn254/recompiler/recompiler.mjs';
 import { outlineArtifact } from '../bn254/recompiler/outline.mjs';
 import { proof, PUBLIC_INPUTS } from './bls_instance.mjs';
@@ -49,26 +52,35 @@ const outline = (bytes) => outlineArtifact(bytes, { verify: acceptsRejects, log:
 
 // candidate A: golf pipeline (custom decompile -> reschedule -> recompile), then outline
 console.log('candidate A: golf recompile ...');
-const baseline = hexToBin(compileFile(join(here, 'groth16.cash'), { optimizeFor: 'size', disableDefSinking: true }).debug.bytecode);
-const d = dissect(baseline);
-console.log(`  dissected ${d.order.length} subroutines; probing arities ...`);
-const arity = probeArity(d);
-console.log('  recompiling subroutines (min of cashc / topo / greedy, diff-tested) ...');
-const { override, origBytes, newBytes } = recompileAll(d, arity);
-console.log(`  subroutine bytes ${origBytes} -> ${newBytes}`);
-let bestMain = null, bestMainLen = Infinity;
-for (const strat of ['topo', 'greedy']) {
-  let m; try { m = recompileMain(d, arity, MAIN_INARITY, strat); } catch (e) { console.log(`  main (${strat}) failed: ${e.message}`); continue; }
-  const spliced = rebuild(d, override, m);
-  const ok = acceptsRejects(spliced);
-  if (ok && m.length < bestMainLen) { bestMain = m; bestMainLen = m.length; }
-  console.log(`  main (${strat}): ${m.length} B  ok=${ok}`);
+function buildCandidateA() {
+  const baseline = hexToBin(compileFile(join(here, 'groth16.cash'), { optimizeFor: 'size', disableDefSinking: true }).debug.bytecode);
+  const d = dissect(baseline);
+  console.log(`  dissected ${d.order.length} subroutines; probing arities ...`);
+  const arity = probeArity(d);
+  console.log('  recompiling subroutines (min of cashc / topo / greedy, diff-tested) ...');
+  const { override, origBytes, newBytes } = recompileAll(d, arity);
+  console.log(`  subroutine bytes ${origBytes} -> ${newBytes}`);
+  let bestMain = null, bestMainLen = Infinity;
+  for (const strat of ['topo', 'greedy']) {
+    let m; try { m = recompileMain(d, arity, MAIN_INARITY, strat); } catch (e) { console.log(`  main (${strat}) failed: ${e.message}`); continue; }
+    const spliced = rebuild(d, override, m);
+    const ok = acceptsRejects(spliced);
+    if (ok && m.length < bestMainLen) { bestMain = m; bestMainLen = m.length; }
+    console.log(`  main (${strat}): ${m.length} B  ok=${ok}`);
+  }
+  const golfed = bestMain ? rebuild(d, override, bestMain) : rebuild(d, override);
+  if (!acceptsRejects(golfed)) throw new Error('golfed candidate failed the accept/reject check before outlining');
+  console.log(`  golfed ${baseline.length} -> ${golfed.length} B; outlining ...`);
+  return outline(golfed);
 }
-const golfed = bestMain ? rebuild(d, override, bestMain) : rebuild(d, override);
-if (!acceptsRejects(golfed)) throw new Error('golfed candidate failed the accept/reject check before outlining');
-console.log(`  golfed ${baseline.length} -> ${golfed.length} B; outlining ...`);
-const candA = outline(golfed);
-console.log(`candidate A: ${candA.length} B`);
+let candA = null;
+try {
+  candA = buildCandidateA();
+  console.log(`candidate A: ${candA.length} B`);
+} catch (e) {
+  if (!(e instanceof ArityProbeError)) throw e;
+  console.log(`candidate A: skipped (${e.message})`);
+}
 
 // candidate B: rescheduled compile, then outline
 console.log('candidate B: rescheduled compile ...');
@@ -77,8 +89,9 @@ console.log(`  compiled ${rescheduled.length} B; outlining ...`);
 const candB = outline(rescheduled);
 console.log(`candidate B: ${candB.length} B`);
 
-const optimized = candA.length <= candB.length ? candA : candB;
-const which = candA.length <= candB.length ? 'A (golf recompile)' : 'B (rescheduled compile)';
+const useA = candA !== null && candA.length <= candB.length;
+const optimized = useA ? candA : candB;
+const which = useA ? 'A (golf recompile)' : 'B (rescheduled compile)';
 console.log(`kept candidate ${which}: ${optimized.length} B`);
 
 // full battery on the winner
