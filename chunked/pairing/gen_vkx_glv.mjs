@@ -228,7 +228,9 @@ function select16(int idx${sharedTable ? ', bytes table' : ''}) returns (int, in
     return aX, aY;
 }`;
 
-const groupedPrologue = (sharedTable) => `function jacDouble(int x, int y, int z) returns (int, int, int) {
+const groupedPrologue = (sharedTable) => `function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
+function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
+function jacDouble(int x, int y, int z) returns (int, int, int) {
     int a = (x * x) % ${Pstr}; int b = (y * y) % ${Pstr}; int c = (b * b) % ${Pstr};
     int d = (4 * x * b) % ${Pstr};
     int e = (a * 3) % ${Pstr}; int f = (e * e) % ${Pstr};
@@ -243,13 +245,17 @@ function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int,
         int z1z1 = (aZ * aZ) % ${Pstr};
         int u2 = (bX * z1z1) % ${Pstr};
         int s2 = (z1z1 * aZ * bY) % ${Pstr};
-        int h = (u2 + ${Pstr} - aX) % ${Pstr}; int hh = (h * h) % ${Pstr}; int hhh = (h * hh) % ${Pstr};
-        int rr = (s2 + ${Pstr} - aY) % ${Pstr}; int vv = (hh * aX) % ${Pstr};
-        int anx = (rr * rr + ${P3str} - hhh - 2 * vv) % ${Pstr};
-        int ayhhh = (aY * hhh) % ${Pstr};
-        int any = ((vv - anx + ${Pstr}) * rr + ${Pstr} - ayhhh) % ${Pstr};
-        int anz = (aZ * h) % ${Pstr};
-        rx = anx; ry = any; rz = anz;
+        if (aX == u2 && aY == s2) {
+            (rx, ry, rz) = jacDouble(aX, aY, aZ);
+        } else {
+            int h = (u2 + ${Pstr} - aX) % ${Pstr}; int hh = (h * h) % ${Pstr}; int hhh = (h * hh) % ${Pstr};
+            int rr = (s2 + ${Pstr} - aY) % ${Pstr}; int vv = (hh * aX) % ${Pstr};
+            int anx = (rr * rr + ${P3str} - hhh - 2 * vv) % ${Pstr};
+            int ayhhh = (aY * hhh) % ${Pstr};
+            int any = ((vv - anx + ${Pstr}) * rr + ${Pstr} - ayhhh) % ${Pstr};
+            int anz = (aZ * h) % ${Pstr};
+            rx = anx; ry = any; rz = anz;
+        }
     }
     return rx, ry, rz;
 }`;
@@ -318,16 +324,14 @@ export function genCash(
   } else {
     L.push(`            (int aX, int aY) = select16(idx${sharedTable !== null ? ', glvTable' : ''});`);
   }
-  L.push(grouped
-    ? '            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); if (ay == 0) { (ax, ay, az) = jacDouble(rX, rY, rZ); } rX = ax; rY = ay; rZ = az; }'
-    : '            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
+  L.push('            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }');
   if (grouped) {
     for (let group = 1; group < SPLIT_GROUPS; group++) {
       const shift = group * SPLIT_WIDTH;
       L.push(`            int idx${shift} = (k10 >> (i + ${shift})) % 2 + 2 * ((k20 >> (i + ${shift})) % 2) + 4 * ((k11 >> (i + ${shift})) % 2) + 8 * ((k21 >> (i + ${shift})) % 2);`);
       L.push(`            int aX${shift} = 0; int aY${shift} = 0;`);
       L.push(`            if (idx${shift} != 0) { bytes ent${shift} = glvTable${shift}.split((idx${shift} - 1) * 64)[1].split(64)[0]; aX${shift} = int(ent${shift}.split(32)[0]); aY${shift} = int(ent${shift}.split(32)[1]); }`);
-      L.push(`            if (aX${shift} != 0) { (int ax${shift}, int ay${shift}, int az${shift}) = jacAddAffine(rX, rY, rZ, aX${shift}, aY${shift}); if (ay${shift} == 0) { (ax${shift}, ay${shift}, az${shift}) = jacDouble(rX, rY, rZ); } rX = ax${shift}; rY = ay${shift}; rZ = az${shift}; }`);
+      L.push(`            if (aX${shift} != 0) { (int ax${shift}, int ay${shift}, int az${shift}) = jacAddAffine(rX, rY, rZ, aX${shift}, aY${shift}); rX = ax${shift}; rY = ay${shift}; rZ = az${shift}; }`);
     }
   }
   L.push('        }');
