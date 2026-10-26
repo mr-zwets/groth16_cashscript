@@ -20,11 +20,13 @@ const R = JSON.parse(readFileSync(new URL('./ranges.json', import.meta.url)));
 const CUTS = []; for (let e = 0; e <= 64; e += 2) CUTS.push(e); CUTS.push(65); // chunk c = events [CUTS[c], CUTS[c+1])
 const NCH = CUTS.length - 1;                                                   // 33 chunks
 const addsIn = (c) => DIGITS.slice(CUTS[c], CUTS[c + 1]).filter((d) => d).length;
+const jAt = (e) => e + DIGITS.slice(0, e).filter((d) => d).length; // delta steps before event e
 
 // ---- fixed op costs (standard mode) ----
 export const OP = {
-  setupPerInput: 800_000,  // library load+hash 50k, delta blob 45k, graph 2k, transcript 110k, decode 20k, powers 119k, GLS tables 358k, env 46k, handover 30k
-  ownerChecks: 30_000,     // range checks of the statement words, curve checks of A and C, twist check of B, nibble mask
+  setupPerInput: 870_000,  // MEASURED setup2.mjs (real 3-input bch-2026 tx): library load, layout pin, graph, digest list + challenges, own
+                           //   delta slice, decode, handover: 0.32-0.36M; + SI-GLS in situ: powers 0.119M, GLS tables 0.358M, loop env 0.046M
+  ownerChecks: 20_000,     // range checks of the statement words, curve checks of A and C, twist check of B, nibble mask
   terminalAffine: 540_000, // SI terminal 0.707M with the two B additions affine (2 x 95k instead of 2 x 180k)
   terminalProj: 707_000,   // SI terminal (measured): psi(B) adds, delta Frobenius lines, endpoint, Rconst, S_c(eta z), Frob W
   binding: 130_000,        // acc_k from the nibble strings (65 x 2 doubling-adds + TB lookups), mod-r check
@@ -33,16 +35,17 @@ export const OP = {
 };
 // ---- bytes ----
 export const BY = {
-  codeAffine: 4000,  // SI code 4,057 - 440 (affine loop kernels) + ~380 (graph check, library loader, transcript gather, handover)
-  codeHybrid: 5030,  // both kernel sets (SI projective BADD 590 + inline kBDbl ~440)
-  consts: 1460 + 32, // SI field constants 1,386 + other data 74 + hash of the delta blob
+  codeAffine: 4900,  // SI code 4,057 - 440 (affine loop kernels) + setup by introspection (setup.mjs ~1.1k for the owner role) + handover
+  codeHybrid: 5930,  // both kernel sets (SI projective BADD 590 + inline kBDbl ~440)
+  consts: 1460 + 96, // SI field constants 1,386 + other data 74 + the three delta-slice digests
   deltaStartPerInput: 128, // (x_j, c_{j-1}) of the delta recursion at each later input's first step (VK constants)
-  deltaSlopes: 88 * 64,
-  redeem: 55, locking: 35, txPerInput: 43, txFixed: 22,
-  stmt: 320 + 130 + 192, state: 192, slope: 64, handoverAffine: 160, handoverProj: 224, pushHdr: 3,
+  deltaSlope: 64, digestList: 96,
+  redeem: 57, locking: 35, txPerInput: 43, txFixed: 22,
+  stmt: 320 + 130 + 192, state: 192, slope: 64, handoverAffine: 224, handoverProj: 288, pushHdr: 3, // handover: T (4 or 6 words), F+-, R
 };
 const nq = Number(process.env.NQ ?? 114);
 const NQ_MAX = 132;
+export const CAP = Number(process.env.CAP ?? 9800); // per-input unlocking bytes at the scored witness (leaves room for a filler up to 10,000)
 export const MARGIN = Number(process.env.MARGIN ?? 0.02); // required op margin of every input at the scored witness (filler included)
 
 export function evaluate({n, m, cuts, amode = 'affine'}) {
@@ -58,47 +61,58 @@ export function evaluate({n, m, cuts, amode = 'affine'}) {
       states += 1;
     }
     bytes += states * BY.state + slopes;
-    if (i > 0) bytes += CUTS[cuts[i]] < m ? BY.handoverAffine : BY.handoverProj;
-    ins.push({i, events: [CUTS[cuts[i]], CUTS[cuts[i + 1]]], op, bytes, data: []});
+    const hand = i > 0 ? (CUTS[cuts[i]] < m ? BY.handoverAffine : BY.handoverProj) : 0; bytes += hand;
+    const B = {redeemAndHeaders: BY.redeem + 1 + BY.pushHdr * 4, states: states * BY.state, bWitness: slopes, handover: hand};
+    const O = {setup: OP.setupPerInput, loop: op - OP.setupPerInput};
+    ins.push({i, events: [CUTS[cuts[i]], CUTS[cuts[i + 1]]], op, bytes, data: [], B, O});
   }
   const last = ins[n - 1];
   last.op += (m >= NE ? OP.terminalAffine + 2 * 0 : OP.terminalProj) + OP.binding + OP.qPerWord * nq + OP.final;
-  if (m >= NE) last.bytes += 2 * wAdd; // the two terminal B additions
-  ins[0].op += OP.ownerChecks; ins[0].bytes += BY.stmt;
-  // shared blobs, placed greedily into the inputs with the largest budget deficit
+  Object.assign(last.O, {terminal: m >= NE ? OP.terminalAffine : OP.terminalProj, binding: OP.binding, quotient: OP.qPerWord * nq, final: OP.final});
+  if (m >= NE) { last.bytes += 2 * wAdd; last.B.bWitness += 2 * wAdd; } // the two terminal B additions
+  ins[0].op += OP.ownerChecks; ins[0].bytes += BY.stmt + BY.digestList; ins[0].O.ownerChecks = OP.ownerChecks; ins[0].B.statementAndDigests = BY.stmt + BY.digestList;
+  // movable blobs: the library, WQ, and each input's delta slice (authenticated by its own digest; read by
+  // introspection when it is not local: +25k op for its user); every placement is tried
   const blobs = [
-    {name: 'library', bytes: (m > 0 && m < NE ? BY.codeHybrid : BY.codeAffine) + BY.consts + BY.deltaStartPerInput * (n - 1)},
-    {name: 'delta-slopes', bytes: BY.deltaSlopes},
-    {name: 'WQ', bytes: 32 * nq},
+    ...(process.env.SPLITLIB ? [{name: 'code', bytes: (m > 0 && m < NE ? BY.codeHybrid : BY.codeAffine) + 32}, {name: 'consts', bytes: BY.consts + BY.deltaStartPerInput * (n - 1)}]
+      : [{name: 'library', bytes: (m > 0 && m < NE ? BY.codeHybrid : BY.codeAffine) + BY.consts + BY.deltaStartPerInput * (n - 1)}]),
+    {name: 'WQ', bytes: 32 * nq, reserve: 32 * (NQ_MAX - nq)},
+    ...ins.map((x, i) => { const j0 = jAt(x.events[0]), j1 = jAt(x.events[1]) + (i === n - 1 ? 2 : 0); return {name: 'DS' + i, bytes: BY.deltaSlope * (j1 - j0), user: i}; }),
   ];
-  for (const b of blobs.sort((x, y) => y.bytes - x.bytes)) {
-    const cand = ins.filter((x) => x.bytes + b.bytes + (b.name === 'WQ' ? 32 * (NQ_MAX - nq) : 0) <= 10_000).sort((x, y) => (y.op / 800 - 41 - y.bytes) - (x.op / 800 - 41 - x.bytes));
-    if (!cand.length) return null;
-    cand[0].bytes += b.bytes; cand[0].data.push(b.name);
-  }
-  // liveness at the quotient cap: the WQ holder carries 32 NQ_MAX bytes, the last input runs NQ_MAX Horner steps
-  for (const x of ins) {
-    const extraBytes = x.data.includes('WQ') ? 32 * (NQ_MAX - nq) : 0, extraOp = x === last ? OP.qPerWord * (NQ_MAX - nq) : 0;
-    const need = Math.ceil((x.op + extraOp) / (800 * (1 - MARGIN))) - 41 - (x.bytes + extraBytes);
-    if (x.bytes + extraBytes + Math.max(0, need) > 10_000) return null;
-  }
-  // zero filler where an input's op exceeds (1 - MARGIN) of its budget (counts as bytes)
-  let fill = 0;
-  for (const x of ins) { const need = Math.ceil(x.op / (800 * (1 - MARGIN))) - 41 - x.bytes; x.fill = Math.max(0, need); x.bytes += x.fill; fill += x.fill; if (x.bytes > 10_000) return null; x.budget = 800 * (41 + x.bytes); x.margin = 1 - x.op / x.budget; }
+  let best = null;
+  const place = (k, at) => {
+    if (k < blobs.length) { for (let h = 0; h < n; h++) place(k + 1, [...at, h]); return; }
+    const X = ins.map((x) => ({...x, data: [...x.data], B: {...x.B}, O: {...x.O}}));
+    blobs.forEach((bl, k2) => { const h = at[k2]; X[h].bytes += bl.bytes; X[h].data.push(bl.name); X[h].B[bl.name] = bl.bytes;
+      if (bl.user !== undefined && bl.user !== h) { X[bl.user].op += 25_000; X[bl.user].O.remoteReads = (X[bl.user].O.remoteReads ?? 0) + 25_000; }
+      if (bl.name === 'WQ' && h !== 0) X.forEach((x) => { x.op += 20_000; x.O.remoteReads = (x.O.remoteReads ?? 0) + 20_000; }); });
+    for (const x of X) { // liveness at the quotient cap
+      const extraBytes = x.data.includes('WQ') ? 32 * (NQ_MAX - nq) : 0, extraOp = x.i === n - 1 ? OP.qPerWord * (NQ_MAX - nq) : 0;
+      const need = Math.ceil((x.op + extraOp) / (800 * (1 - MARGIN))) - 41 - (x.bytes + extraBytes);
+      if (x.bytes + extraBytes + Math.max(0, need) > 10_000) return;
+    }
+    let fill = 0;
+    for (const x of X) { const need = Math.ceil(x.op / (800 * (1 - MARGIN))) - 41 - x.bytes; x.fill = Math.max(0, need); x.bytes += x.fill; fill += x.fill; x.B.filler = x.fill; if (x.bytes > CAP) return; x.budget = 800 * (41 + x.bytes); x.margin = 1 - x.op / x.budget; }
+    const content = X.reduce((s2, x) => s2 + x.bytes, 0);
+    if (!best || content < best.content) best = {X, fill, content};
+  };
+  place(0, []);
+  if (!best) return null;
+  ins.splice(0, ins.length, ...best.X); const fill = best.fill;
   const content = ins.reduce((s, x) => s + x.bytes, 0);
   const score = content + n * (BY.locking + BY.txPerInput) + BY.txFixed;
   return {n, m, amode, cuts, ins, fill, content, op: ins.reduce((s, x) => s + x.op, 0), score};
 }
 
 // search: n in {3, 4}, m over chunk boundaries (0 = all projective, 65 = all affine), input cuts by brute force
-export function search({ns = [3, 4], ms, amodes = ['affine', 'affineAN', 'affineN']} = {}) {
+export function search({ns = [3, 4], ms, amodes = ['affine', 'affineAN', 'affineN'], stride = 1} = {}) {
   ms ??= [...CUTS];
   const best = [];
   for (const amode of amodes) for (const n of ns) for (const m of ms) {
     let top = null;
     const rec = (cuts) => {
       if (cuts.length === n) { const r = evaluate({n, m, cuts: [...cuts, NCH], amode}); if (r && (!top || r.score < top.score)) top = r; return; }
-      for (let c = cuts.at(-1) + 1; c <= NCH - (n - cuts.length); c++) rec([...cuts, c]);
+      for (let c = cuts.at(-1) + 1; c <= NCH - (n - cuts.length); c++) if (c % stride === 0) rec([...cuts, c]);
     };
     rec([0]);
     if (top) best.push(top);
@@ -107,10 +121,18 @@ export function search({ns = [3, 4], ms, amodes = ['affine', 'affineAN', 'affine
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const res = search();
   const show = (r) => `${r.amode.padEnd(8)} n=${r.n} m=${String(r.m).padStart(2)} score=${r.score} content=${r.content} fill=${r.fill} op=${(r.op / 1e6).toFixed(2)}M | ` +
     r.ins.map((x) => `[${x.events}] ${x.bytes}B ${(x.op / 1e6).toFixed(2)}M ${(100 * x.margin).toFixed(1)}% ${x.data.join('+')}`).join(' | ');
-  console.log('best 8:'); for (const r of res.slice(0, 8)) console.log(show(r));
-  for (const amode of ['affine', 'affineAN', 'affineN']) for (const m of [0, 65]) for (const n of [3, 4]) { const r = res.find((x) => x.m === m && x.n === n && x.amode === amode); if (r) console.log(`${m ? 'all-affine' : 'all-proj'}: ${show(r)}`); }
-  if (process.env.OUT) (await import('node:fs')).writeFileSync(process.env.OUT, JSON.stringify(res.slice(0, 20), null, 1));
+  const runs = [
+    ['all-affine inverse-norm, 3 inputs (DESIGN)', {ns: [3], ms: [65], amodes: ['affineN']}],
+    ['all-affine inverse-norm, 4 inputs', {ns: [4], ms: [65], amodes: ['affineN'], stride: 2}],
+    ['all-affine slope witnesses, 3 inputs', {ns: [3], ms: [65], amodes: ['affine']}],
+    ['all-affine adds inv-norm, dbls slope, 3 inputs', {ns: [3], ms: [65], amodes: ['affineAN']}],
+    ['hybrid affine-slope prefix + SI projective', {ns: [3], ms: [36, 40, 44, 48], amodes: ['affine', 'affineAN']}],
+    ['hybrid affine-inv-norm prefix + SI projective', {ns: [3], ms: [48, 54, 60], amodes: ['affineN']}],
+    ['all SI projective, 4 inputs', {ns: [4], ms: [0], amodes: ['affine'], stride: 2}],
+  ];
+  const out = {};
+  for (const [label, opt] of runs) { const r = search(opt)[0]; out[label] = r ?? null; console.log(label.padEnd(48), r ? show(r) : 'infeasible'); }
+  if (process.env.OUT) (await import('node:fs')).writeFileSync(process.env.OUT, JSON.stringify(out, null, 1));
 }

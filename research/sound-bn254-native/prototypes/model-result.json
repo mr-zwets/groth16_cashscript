@@ -1,0 +1,419 @@
+{
+ "all-affine inverse-norm, 3 inputs (DESIGN)": {
+  "n": 3,
+  "m": 65,
+  "amode": "affineN",
+  "cuts": [
+   0,
+   9,
+   23,
+   33
+  ],
+  "ins": [
+   {
+    "i": 0,
+    "events": [
+     0,
+     18
+    ],
+    "op": 5649927,
+    "bytes": 7166,
+    "data": [
+     "WQ"
+    ],
+    "fill": 182,
+    "budget": 5765600,
+    "margin": 0.020062612737616226
+   },
+   {
+    "i": 1,
+    "events": [
+     18,
+     46
+    ],
+    "op": 7813643,
+    "bytes": 9926,
+    "data": [
+     "DS0",
+     "DS1",
+     "DS2"
+    ],
+    "fill": 160,
+    "budget": 7973600,
+    "margin": 0.020060825724892095
+   },
+   {
+    "i": 2,
+    "events": [
+     46,
+     65
+    ],
+    "op": 7163203,
+    "bytes": 9790,
+    "data": [
+     "library"
+    ],
+    "fill": 0,
+    "budget": 7864800,
+    "margin": 0.08920722713864304
+   }
+  ],
+  "fill": 342,
+  "content": 26882,
+  "op": 20626773,
+  "score": 27138
+ },
+ "all-affine inverse-norm, 4 inputs": {
+  "n": 4,
+  "m": 65,
+  "amode": "affineN",
+  "cuts": [
+   0,
+   10,
+   18,
+   24,
+   33
+  ],
+  "ins": [
+   {
+    "i": 0,
+    "events": [
+     0,
+     20
+    ],
+    "op": 6063908,
+    "bytes": 7694,
+    "data": [
+     "WQ"
+    ],
+    "fill": 454,
+    "budget": 6188000,
+    "margin": 0.020053652230122787
+   },
+   {
+    "i": 1,
+    "events": [
+     20,
+     36
+    ],
+    "op": 4892758,
+    "bytes": 6200,
+    "data": [
+     "DS0",
+     "DS1"
+    ],
+    "fill": 626,
+    "budget": 4992800,
+    "margin": 0.02003725364524911
+   },
+   {
+    "i": 2,
+    "events": [
+     36,
+     48
+    ],
+    "op": 3936847,
+    "bytes": 4981,
+    "data": [
+     "DS2",
+     "DS3"
+    ],
+    "fill": 463,
+    "budget": 4017600,
+    "margin": 0.020099810832337694
+   },
+   {
+    "i": 3,
+    "events": [
+     48,
+     65
+    ],
+    "op": 6603260,
+    "bytes": 9630,
+    "data": [
+     "library"
+    ],
+    "fill": 0,
+    "budget": 7736800,
+    "margin": 0.1465127701375245
+   }
+  ],
+  "fill": 1543,
+  "content": 28505,
+  "op": 21496773,
+  "score": 28839
+ },
+ "all-affine slope witnesses, 3 inputs": null,
+ "all-affine adds inv-norm, dbls slope, 3 inputs": {
+  "n": 3,
+  "m": 65,
+  "amode": "affineAN",
+  "cuts": [
+   0,
+   13,
+   21,
+   33
+  ],
+  "ins": [
+   {
+    "i": 0,
+    "events": [
+     0,
+     26
+    ],
+    "op": 6973050,
+    "bytes": 8872,
+    "data": [
+     "WQ"
+    ],
+    "fill": 0,
+    "budget": 7130400,
+    "margin": 0.022067485695052125
+   },
+   {
+    "i": 1,
+    "events": [
+     26,
+     42
+    ],
+    "op": 4778847,
+    "bytes": 9758,
+    "data": [
+     "library"
+    ],
+    "fill": 0,
+    "budget": 7839200,
+    "margin": 0.3903909837738545
+   },
+   {
+    "i": 2,
+    "events": [
+     42,
+     65
+    ],
+    "op": 7694884,
+    "bytes": 9990,
+    "data": [
+     "DS0",
+     "DS1",
+     "DS2"
+    ],
+    "fill": 0,
+    "budget": 8024800,
+    "margin": 0.041112052636825824
+   }
+  ],
+  "fill": 0,
+  "content": 28620,
+  "op": 19446781,
+  "score": 28876
+ },
+ "hybrid affine-slope prefix + SI projective": {
+  "n": 3,
+  "m": 36,
+  "amode": "affineAN",
+  "cuts": [
+   0,
+   13,
+   24,
+   33
+  ],
+  "ins": [
+   {
+    "i": 0,
+    "events": [
+     0,
+     26
+    ],
+    "op": 6973050,
+    "bytes": 8872,
+    "data": [
+     "WQ"
+    ],
+    "fill": 0,
+    "budget": 7130400,
+    "margin": 0.022067485695052125
+   },
+   {
+    "i": 1,
+    "events": [
+     26,
+     48
+    ],
+    "op": 7046067,
+    "bytes": 8947,
+    "data": [
+     "DS0",
+     "DS1",
+     "DS2"
+    ],
+    "fill": 141,
+    "budget": 7190400,
+    "margin": 0.02007301401869155
+   },
+   {
+    "i": 2,
+    "events": [
+     48,
+     65
+    ],
+    "op": 7627769,
+    "bytes": 9828,
+    "data": [
+     "library"
+    ],
+    "fill": 0,
+    "budget": 7895200,
+    "margin": 0.03387260614043974
+   }
+  ],
+  "fill": 141,
+  "content": 27647,
+  "op": 21646886,
+  "score": 27903
+ },
+ "hybrid affine-inv-norm prefix + SI projective": {
+  "n": 3,
+  "m": 48,
+  "amode": "affineN",
+  "cuts": [
+   0,
+   11,
+   24,
+   33
+  ],
+  "ins": [
+   {
+    "i": 0,
+    "events": [
+     0,
+     22
+    ],
+    "op": 6612475,
+    "bytes": 8394,
+    "data": [
+     "DS0",
+     "DS1"
+    ],
+    "fill": 418,
+    "budget": 6748000,
+    "margin": 0.02008372851215179
+   },
+   {
+    "i": 1,
+    "events": [
+     22,
+     48
+    ],
+    "op": 7451038,
+    "bytes": 9463,
+    "data": [
+     "WQ",
+     "DS2"
+    ],
+    "fill": 401,
+    "budget": 7603200,
+    "margin": 0.020012889309764303
+   },
+   {
+    "i": 2,
+    "events": [
+     48,
+     65
+    ],
+    "op": 7647769,
+    "bytes": 9828,
+    "data": [
+     "library"
+    ],
+    "fill": 0,
+    "budget": 7895200,
+    "margin": 0.03133942142060997
+   }
+  ],
+  "fill": 819,
+  "content": 27685,
+  "op": 21711282,
+  "score": 27941
+ },
+ "all SI projective, 4 inputs": {
+  "n": 4,
+  "m": 0,
+  "amode": "affine",
+  "cuts": [
+   0,
+   8,
+   14,
+   24,
+   33
+  ],
+  "ins": [
+   {
+    "i": 0,
+    "events": [
+     0,
+     16
+    ],
+    "op": 5986125,
+    "bytes": 7595,
+    "data": [
+     "WQ",
+     "DS0"
+    ],
+    "fill": 195,
+    "budget": 6108800,
+    "margin": 0.02008168543740174
+   },
+   {
+    "i": 1,
+    "events": [
+     16,
+     28
+    ],
+    "op": 4343634,
+    "bytes": 5500,
+    "data": [
+     "DS1",
+     "DS3"
+    ],
+    "fill": 1494,
+    "budget": 4432800,
+    "margin": 0.020115051434759113
+   },
+   {
+    "i": 2,
+    "events": [
+     28,
+     48
+    ],
+    "op": 7135639,
+    "bytes": 9061,
+    "data": [
+     "DS2"
+    ],
+    "fill": 5055,
+    "budget": 7281600,
+    "margin": 0.020045182377499415
+   },
+   {
+    "i": 3,
+    "events": [
+     48,
+     65
+    ],
+    "op": 7627769,
+    "bytes": 9689,
+    "data": [
+     "library"
+    ],
+    "fill": 763,
+    "budget": 7784000,
+    "margin": 0.020070786228160276
+   }
+  ],
+  "fill": 7507,
+  "content": 31845,
+  "op": 25093167,
+  "score": 32179
+ }
+}

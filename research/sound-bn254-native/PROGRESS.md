@@ -12,10 +12,14 @@ groth16_cashscript/research/sound-bn254-native/ (README + prototypes/).
 - prototypes/ranges.json (per-chunk op, all modes) + model.mjs (3/4-input layouts, data placement, 2% margin,
   n_q cap liveness, zero filler): best = all-affine inverse-norm, 3 inputs, score ~26.1k (fill 524).
 
+- setup.mjs (v1, everyone hashes everything): 0.41-0.44M/input; setup2.mjs (v2 design: digest list in input 0,
+  own delta slices with per-role digests): 0.32-0.36M/input, all 3 inputs VALID in a real bch-2026 3-input tx.
+- facts.mjs: no exceptional affine step for B in G2 along the schedule; p = 3 mod 4 (norm anisotropic).
+- model.mjs (SPLITLIB=1 CAP=9800): DESIGN = all-affine inverse-norm, 3 inputs, ~26.8k B (bytes-bound, margins >= 2.5%).
+  Alternatives: 4 inputs ~28.8k; slope witnesses infeasible/28.9k; hybrids ~27.9k; SI projective 4 inputs ~32.2k.
+
 ## Next
-- Prototype the per-input setup (library load via OP_INPUTBYTECODE + hash + OP_DEFINE, transcript gather,
-  handover) in a real 3-input bch-2026 tx to replace the 0.80M/input estimate.
-- Write README: protocol, soundness argument, layout table, risks.
+- Write README (protocol, soundness argument, layout table, risks); final commit + push.
 
 ## Commands
 node research/sound-bn254-native/prototypes/kernels.mjs

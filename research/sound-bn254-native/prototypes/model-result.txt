@@ -1,0 +1,6 @@
+all-affine inverse-norm, 3 inputs (DESIGN)       affineN  n=3 m=65 score=26828 content=26572 fill=0 op=20.69M | [0,24] 9068B 7.05M 3.2% code | [24,48] 9082B 7.04M 3.6% consts+WQ | [48,65] 8422B 6.60M 2.5% DS0+DS1+DS2
+all-affine inverse-norm, 4 inputs                affineN  n=4 m=65 score=27661 content=27327 fill=333 op=21.55M | [0,16] 6446B 5.09M 2.0% consts+DS0 | [16,40] 8742B 6.89M 2.0% code | [40,52] 4998B 3.95M 2.0% DS1+DS2 | [52,65] 7141B 5.63M 2.0% WQ+DS3
+all-affine slope witnesses, 3 inputs             infeasible
+all-affine adds inv-norm, dbls slope, 3 inputs   affineAN n=3 m=65 score=28908 content=28652 fill=0 op=19.45M | [0,18] 9372B 5.32M 29.3% consts+WQ | [18,44] 9610B 6.81M 11.8% code | [44,65] 9670B 7.32M 5.8% DS0+DS1+DS2
+hybrid affine-slope prefix + SI projective       affineAN n=3 m=36 score=27867 content=27611 fill=73 op=21.62M | [0,26] 8872B 6.97M 2.2% WQ | [26,48] 9082B 7.05M 3.5% consts+DS0+DS1 | [48,65] 9657B 7.60M 2.0% code+DS2
+hybrid affine-inv-norm prefix + SI projective    affineN  n=3 m=60 score=27728 content=27472 fill=126 op=21.04M | [0,26] 9788B 7.44M 5.4% consts+DS0+DS2 | [26,50] 9318B 7.01M 6.4% WQ+DS1 | [50,65] 8366B 6.59M 2.0% code
