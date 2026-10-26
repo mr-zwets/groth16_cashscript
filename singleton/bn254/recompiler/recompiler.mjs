@@ -93,14 +93,30 @@ export function setTestInputRange(p) { testInputRange = BigInt(p); }
 const rnd = (s) => { let x = BigInt(s + 7); for (let i = 0; i < 6; i++) x = (x * 6364136223846793005n + 1442695040888963407n) % testInputRange; return x; };
 
 // Determine (inputs -> outputs) arity of every subroutine by probing input counts.
+// in = 1 + the largest input count that errors (stack underflow); out = in + net stack
+// growth on the first successful run above it. A body that errors for EVERY probed
+// count (k = 0..PROBE_MAX) has no measurable arity: typically a require-only function
+// whose require fails on random in-range inputs (e.g. an on-curve check). Returning a
+// guess (formerly in = out = 31) would hand the scheduler a wrong signature, so throw
+// instead; callers decide whether to skip that candidate (the BLS12-381 builder falls
+// back to the rescheduled compile) or fail the build.
+const PROBE_MAX = 30;
+export class ArityProbeError extends Error {
+  constructor(id, error) {
+    super(`probeArity: subroutine ${id} errored for every input count 0..${PROBE_MAX} `
+      + `(last error: ${String(error).slice(0, 120)}); its arity cannot be probed with random inputs`);
+    this.name = 'ArityProbeError'; this.subroutine = id;
+  }
+}
 export function probeArity(d) {
   const table = {};
   for (const id of d.order) {
-    let maxErr = -1, netBig = 0;
-    for (let k = 0; k <= 30; k++) {
+    let maxErr = -1, netBig = 0, lastErr;
+    for (let k = 0; k <= PROBE_MAX; k++) {
       const r = runSubroutine(d, id, Array.from({ length: k }, (_, i) => rnd(i * 31 + id)));
-      if (r.error) maxErr = k; else netBig = r.stack.length - k;
+      if (r.error) { maxErr = k; lastErr = r.error; } else netBig = r.stack.length - k;
     }
+    if (maxErr === PROBE_MAX) throw new ArityProbeError(id, lastErr);
     table[id] = { in: maxErr + 1, out: maxErr + 1 + netBig };
   }
   return table;

@@ -7,8 +7,10 @@
 > [Proof-point validation](#proof-point-validation)): every coordinate is range-checked
 > (`0 <= v < p`), A and C must satisfy `y^2 = x^3 + 4`, B must satisfy the twist equation
 > `y^2 = x^3 + 4(1+u)`, and B must pass the G2 subgroup check `psi(B) == [-x]B`, fused into B's
-> Miller walk with a `Z != 0` guard. Both entries are rebuilt with their original pipelines and
-> are back as unreviewed (not independently reviewed). `bch-groth16-bls12381-singleton-minop`
+> Miller walk with a `Z != 0` guard. Both entries are rebuilt with their original pipelines.
+> An independent review (2026-10-26) found no soundness gaps; its minor follow-ups (more
+> non-canonical-encoding tests, the cofactor-malleability note below) are done, and both entries
+> are marked reviewed. `bch-groth16-bls12381-singleton-minop`
 > (`groth16_minop.cash`) is a separate source and is not affected.
 
 The complete Groth16 verifier on **BLS12-381** — the same curve as the nChain
@@ -88,15 +90,28 @@ prints unused-variable warnings for them).
 **No G1 subgroup check on A, C.** Both are paired only with order-r G2 points (B is checked,
 gamma and delta are fixed), so a G1 cofactor component pairs to 1, as in `groth16_minop.cash`.
 
-**Tests.** `domain_checks_test.mjs` runs the honest instance, the bench multiproof set, and 13
+**Cofactor malleability (not a soundness issue).** Because of this, `A + T` and `C + T` also verify
+for any point `T` of order dividing the G1 cofactor `h1` (`gcd(h1, r) = 1`; for example `(0, 2)`,
+of order 3): the pairing values are unchanged. These variants are the same proof up
+to a cofactor component. Projecting with `[h1 * (h1^-1 mod r)]` recovers the honest `A` and `C`,
+which can be done efficiently, so a verifying `(A, B, C)` still proves knowledge exactly as a
+standard Groth16 proof does. This is malleability only. It matters only if an application uses
+the proof bytes themselves as an identifier or nullifier. Such an application should bind the
+public inputs instead, as it must for Groth16 anyway, since Groth16 proofs are re-randomizable.
+(B has no such variants: it must be in G2.)
+
+**Tests.** `domain_checks_test.mjs` runs the honest instance, the bench multiproof set, and 17
 out-of-domain cases from `domain_cases.mjs`: off-curve A and C, off-twist B, `(0,0)` for A, B and
 C, B on the twist but outside G2 (`B + T13` with `T13` of order 13, `T13` alone, and `B + [r]Q`),
-and non-canonical coordinates (`Ax + p`, `Cy + p`, `Byb + p`, `Ay - p`). All are rejected. The
+and non-canonical coordinates (`Ax + p`, `Cx + p`, `Cy + p`, `Bxa + p`, `Bxb + p`, `Bya + p`,
+`Byb + p`, `Ay - p`). For B the range check is the only guard against a second encoding (the
+twist equation is evaluated mod p), so each of its four coordinates has its own case. All are
+rejected. The
 op-cost at rejection shows where each one fails: about 20k-190k for the range and curve checks,
 about 0.1-0.19B for the subgroup check (after vk_x and B's Miller loop), and about 1B for a
-pairing mismatch. Before this change the four non-canonical encodings were **accepted** (the
-same point under a second encoding); the off-curve and off-subgroup cases with the honest A/C
-happened to fail the pairing equation. The vector builders ship the 13 cases to the bench as
+pairing mismatch. Before this change the non-canonical encodings tested at the time (`Ax + p`,
+`Cy + p`, `Byb + p`, `Ay - p`) were **accepted** (the same point under a second encoding); the off-curve and off-subgroup cases with the honest A/C
+happened to fail the pairing equation. The vector builders ship the 17 cases to the bench as
 extra invalid runs and fail the build if any is accepted.
 
 | entry | locking before → after | bench score before → after | op-cost before → after |
@@ -140,7 +155,7 @@ node singleton/bls12-381/finalexp.mjs     # cp#3 final exponentiation (slow)
 node singleton/bls12-381/vkx.mjs          # vk_x G1 checkpoint
 node singleton/bls12-381/verify.mjs       # pairing verdict (very slow)
 node singleton/bls12-381/groth16.mjs      # full verifier (very slow)
-node singleton/bls12-381/domain_checks_test.mjs  # proof-point validation: 13 out-of-domain cases (slow)
+node singleton/bls12-381/domain_checks_test.mjs  # proof-point validation: 17 out-of-domain cases (slow)
 
 node singleton/bls12-381/build_vectors.mjs          # -> pairing-bls12381-singleton-vectors.json
 node singleton/bls12-381/build_vectors_groth16.mjs  # -> groth16-bls12381-singleton-vectors.json

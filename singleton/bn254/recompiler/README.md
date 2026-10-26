@@ -72,6 +72,13 @@ validated end to end. Two guards cover that:
   as `rangeInvalid`) against the optimized artifact and fails if any is accepted.
   `node singleton/bn254/range_checks_test.mjs <vectors.json>` runs them standalone.
 
+The converse case, a require-only body whose require fails on random inputs (an on-curve
+check such as the BLS12-381 `g1Check`), has no measurable arity: it errors for every probed
+input count. `probeArity` throws `ArityProbeError` for such a body instead of returning a
+made-up 31 -> 31 signature. The BLS12-381 opt builder catches it and skips its golf
+candidate. The rescheduled compile (candidate B) already won there, so the artifact is
+unchanged.
+
 ## Scope / floor
 
 After this pass, ~54% of the remaining bytes are `ROLL`/`PICK` addressing (the depth-arg
