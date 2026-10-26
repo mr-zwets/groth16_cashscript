@@ -1,0 +1,279 @@
+{
+ "a2": {
+  "layout": [
+   1,
+   2,
+   1,
+   2,
+   1,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2
+  ],
+  "eaff": 14,
+  "NQ_MAX": 118,
+  "primary": {
+   "score": 27347,
+   "unlocking": 27249,
+   "redeem": 13176,
+   "ws": 11712,
+   "wq": 2352,
+   "opStandard": 28167488,
+   "opConsensus": 28139328,
+   "budget": 29799200,
+   "pct": 94.52,
+   "bytes": {
+    "statement": 448,
+    "glsNibbles": 128,
+    "residueRoot": 288,
+    "states": 9216,
+    "bSlopes": 1632,
+    "wsPush": 3,
+    "quotient": 2355,
+    "redeemPush": 3,
+    "deltaPile": 6570,
+    "fieldConstants": 1862,
+    "otherData": 93,
+    "code": 4651
+   },
+   "opsM": {
+    "bDblProj": 12.118,
+    "bDblAff": 2.13,
+    "bAddProj": 0.697,
+    "bAddAff": 0.498,
+    "delta": 5.674,
+    "eventGlue": 0.299,
+    "gls": 2.381,
+    "states": 2.15,
+    "quotient": 0.398,
+    "transcript": 0.066,
+    "parseChecks": 0.263,
+    "powers": 0.231,
+    "glsTables": 0.677,
+    "terminal": 0.43,
+    "misc": 0.156
+   }
+  },
+  "liveness": {
+   "witness": "zero statement (all digits 0, smallest quotient)",
+   "nq": 46,
+   "op": 28143783,
+   "budget": 29684000,
+   "pct": 94.81,
+   "marginOp": 1540217
+  },
+  "cap": {
+   "nq": 118,
+   "score": 30659,
+   "pct": 88.48,
+   "unlocking": 30561
+  },
+  "fixtures": {
+   "committed": {
+    "nq": 49,
+    "score": 27347,
+    "opM": 28.167,
+    "budgetM": 29.799,
+    "pct": 94.52
+   },
+   "proof1": {
+    "nq": 55,
+    "score": 27635,
+    "opM": 28.215,
+    "budgetM": 30.03,
+    "pct": 93.96
+   },
+   "dense": {
+    "nq": 89,
+    "score": 29267,
+    "opM": 28.482,
+    "budgetM": 31.335,
+    "pct": 90.89
+   },
+   "zero": {
+    "nq": 46,
+    "score": 27203,
+    "opM": 28.144,
+    "budgetM": 29.684,
+    "pct": 94.81
+   },
+   "max": {
+    "nq": 76,
+    "score": 28643,
+    "opM": 28.379,
+    "budgetM": 30.836,
+    "pct": 92.03
+   },
+   "msm-identity": {
+    "nq": 82,
+    "score": 28931,
+    "opM": 28.427,
+    "budgetM": 31.066,
+    "pct": 91.5
+   }
+  }
+ },
+ "u2": {
+  "layout": [
+   1,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2
+  ],
+  "eaff": 14,
+  "NQ_MAX": 127,
+  "primary": {
+   "score": 27347,
+   "unlocking": 27249,
+   "redeem": 13176,
+   "ws": 11424,
+   "wq": 2640,
+   "opStandard": 28146544,
+   "opConsensus": 28118384,
+   "budget": 29799200,
+   "pct": 94.45,
+   "bytes": {
+    "statement": 448,
+    "glsNibbles": 128,
+    "residueRoot": 288,
+    "states": 8928,
+    "bSlopes": 1632,
+    "wsPush": 3,
+    "quotient": 2643,
+    "redeemPush": 3,
+    "deltaPile": 6570,
+    "fieldConstants": 1862,
+    "otherData": 93,
+    "code": 4651
+   },
+   "opsM": {
+    "bDblProj": 12.118,
+    "bDblAff": 2.13,
+    "bAddProj": 0.697,
+    "bAddAff": 0.498,
+    "delta": 5.674,
+    "eventGlue": 0.299,
+    "gls": 2.381,
+    "states": 2.083,
+    "quotient": 0.444,
+    "transcript": 0.066,
+    "parseChecks": 0.263,
+    "powers": 0.231,
+    "glsTables": 0.677,
+    "terminal": 0.43,
+    "misc": 0.156
+   }
+  },
+  "liveness": {
+   "witness": "zero statement (all digits 0, smallest quotient)",
+   "nq": 55,
+   "op": 28146544,
+   "budget": 29799200,
+   "pct": 94.45,
+   "marginOp": 1652656
+  },
+  "cap": {
+   "nq": 127,
+   "score": 30803,
+   "pct": 88.17,
+   "unlocking": 30705
+  },
+  "fixtures": {
+   "committed": {
+    "nq": 55,
+    "score": 27347,
+    "opM": 28.147,
+    "budgetM": 29.799,
+    "pct": 94.45
+   },
+   "proof1": {
+    "nq": 55,
+    "score": 27347,
+    "opM": 28.147,
+    "budgetM": 29.799,
+    "pct": 94.45
+   },
+   "dense": {
+    "nq": 89,
+    "score": 28979,
+    "opM": 28.413,
+    "budgetM": 31.105,
+    "pct": 91.35
+   },
+   "zero": {
+    "nq": 55,
+    "score": 27347,
+    "opM": 28.147,
+    "budgetM": 29.799,
+    "pct": 94.45
+   },
+   "max": {
+    "nq": 79,
+    "score": 28499,
+    "opM": 28.335,
+    "budgetM": 30.721,
+    "pct": 92.23
+   },
+   "msm-identity": {
+    "nq": 82,
+    "score": 28643,
+    "opM": 28.359,
+    "budgetM": 30.836,
+    "pct": 91.97
+   }
+  }
+ }
+}
