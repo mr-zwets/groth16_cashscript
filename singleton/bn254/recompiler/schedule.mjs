@@ -72,6 +72,7 @@ export function emitBlockV2(block, arity, strategy = 'topo') {
   const visited = new Set(); const order = [];
   const visitRef = (r) => { if (r.k === 'out') visitNode(r.node); };
   function visitNode(node) { if (visited.has(node.id)) return; visited.add(node.id); for (const r of node.ins) visitRef(r); order.push(node); }
+  for (const nd of block.effects ?? []) visitNode(nd); // side-effect-only calls are roots
   for (const r of exit) visitRef(r);
   for (const r of exitAlt) visitRef(r);
 
