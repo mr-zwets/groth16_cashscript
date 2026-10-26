@@ -14,7 +14,7 @@ import {p, r, mod, F2, F12, Fr, f2, AX, AXPOW, BITS, NE, ADD_EVENTS, LAMBDA, N6R
 
 export const sha = (...parts) => createHash('sha256').update(Buffer.concat(parts)).digest();
 // ---------------- fixed layout ----------------
-export const E_A = Number(process.env.SIGLS_EA ?? 15);    // affine B events (build knob, see README)
+export const E_A = Number(process.env.SIGLS_EA ?? 10);    // affine B events (build knob, see README: smallest E_A with a >= 6% worst-case standard margin)
 assert.ok(E_A >= 1 && E_A <= NE);
 export const TAG = Buffer.concat([Buffer.from('SIGLS-BLS/1'), sha(VK_ENCODING)]); // 43 B, fixed width
 assert.equal(TAG.length, 43);
@@ -27,10 +27,10 @@ export const NSTATES = BOUNDS.length, K_IDS = NSTATES + 1;
 assert.equal(NSTATES, 32);
 export const isBoundary = (e) => BOUNDS.includes(e);
 export const isAdd = (e) => BITS[e] === 1;
-export const NSLOPES = E_A + ADD_EVENTS.filter((e) => e < E_A).length; // 19 at E_A = 15
+export const NSLOPES = E_A + ADD_EVENTS.filter((e) => e < E_A).length; // 13 at E_A = 10
 export const W = 48;                                        // field word (LE)
 export const WS_LAYOUT = {stmt: 0, n0: 384, n1: 416, N0: 448, N1: 512, sc: 576, states: 864, slopes: 864 + 288 * NSTATES};
-export const WS_SIZE = WS_LAYOUT.slopes + 96 * NSLOPES;      // 11,904 at E_A = 15
+export const WS_SIZE = WS_LAYOUT.slopes + 96 * NSLOPES;      // 11,328 at E_A = 10
 // ---------------- degree bookkeeping (structural, adversarial: up to 8 GLS bits per event) ----------------
 // B line: affine 8, projective 9; delta line 8; c factor 6; GLS factor 6 per set bit. Start: c^-1 (6), Rconst' (6), GLS nibble 0.
 export const lineDegB = (e) => (e < E_A ? 8 : 9);

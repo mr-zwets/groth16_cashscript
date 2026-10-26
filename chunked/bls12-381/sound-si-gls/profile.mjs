@@ -9,7 +9,9 @@ const {redeem: rd, info} = buildRedeem(); const redeem = Buffer.from(rd), lockin
 const ins = decodeAuthenticationInstructions(redeem); const offs = []; { let o = 0; for (const i of ins) { offs.push(o); o += encodeAuthenticationInstruction(i).length; } }
 const NEXT = {'end:init': 'transcript', 'end:transcript': 'parse+checks', 'end:parse+checks': 'powers', 'end:powers': 'gls-tables', 'end:gls-tables': 'loop-setup', 'end:loop-setup': 'loop', 'end:loop': 'terminal', 'end:terminal': 'quotient', 'end:final': 'cleanup'};
 const marks = info.marks.slice().sort((a, b) => a.off - b.off).map((m) => ({...m, name: NEXT[m.name] ?? 'loop:' + m.name}));
-const w = prove(FIXTURES[process.env.FIX ?? 'committed']); const u = unlockingFor(w.WS, w.WQ, redeem);
+let fx = FIXTURES[process.env.FIX ?? 'committed'];
+if (process.env.WORSTNQ) { const {maxSlots, statementFor} = await import('./worst.mjs'); const {mint} = await import('./math.mjs'); fx = mint(statementFor(maxSlots(Number(process.env.WORSTNQ))).ns); }
+const w = prove(fx); const u = unlockingFor(w.WS, w.WQ, redeem);
 const vm = process.env.UNLIMITED ? VM_UNLIMITED : VMS[process.env.MODE ?? 'standard'];
 const tr = vm.debug(programOf(locking, u));
 const by = new Map(); let prev = 0, cur = 'p2sh';

@@ -52,19 +52,19 @@ export function kProjDbl() {
   const [X0, X1, Y0, Y1, Z0, Z1] = ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1'].map((n) => I(n));
   const B0 = m(mul(add(Y0, Y1), sub(Y0, Y1))), B1 = m(k.small(mul(Y0, Y1), 2));
   const C0 = m(mul(add(Z0, Z1), sub(Z0, Z1))), C1 = m(k.small(mul(Z0, Z1), 2));
-  const E0 = m(k.small(sub(C0, C1), 12)), E1 = m(k.small(add(C0, C1), 12));
+  const E0 = k.small(sub(C0, C1), 12), E1 = k.small(add(C0, C1), 12); // 3b' C, left unreduced (|E| < 24p)
   const F0 = k.small(E0, 3), F1 = k.small(E1, 3);
   const [xy0, xy1] = kar(k, X0, X1, Y0, Y1); const XY0 = m(xy0), XY1 = m(xy1);
   const D0 = k.small(sub(B0, F0), 2), D1 = k.small(sub(B1, F1), 2);
-  const [x30, x31] = sch(k, XY0, XY1, D0, D1);
+  const [x30, x31] = kar(k, XY0, XY1, D0, D1);
   const G0 = add(B0, F0), G1 = add(B1, F1);
   const Y30 = m(sub(mul(add(G0, G1), sub(G0, G1)), k.small(mul(add(E0, E1), sub(E0, E1)), 12)));
   const Y31 = m(sub(k.small(mul(G0, G1), 2), k.small(mul(E0, E1), 24)));
   const S0 = add(Y0, Z0), S1 = add(Y1, Z1);
   const H0 = m(sub(sub(mul(add(S0, S1), sub(S0, S1)), B0), C0)), H1 = m(sub(sub(k.small(mul(S0, S1), 2), B1), C1));
-  const [z30, z31] = sch(k, k.small(B0, 4), k.small(B1, 4), H0, H1);
+  const [z30, z31] = kar(k, k.small(B0, 4), k.small(B1, 4), H0, H1);
   const X20 = mul(add(X0, X1), sub(X0, X1)), X21 = k.small(mul(X0, X1), 2);
-  const e = m(k.sum(sub(B0, E0), mul(E('t'), sub(B1, E1)), k.neg(k.small(m(k.sum(mul(E('xz2'), X20), mul(E('xz2t'), X21))), 3))));
+  const e = m(k.sum(sub(B0, E0), mul(E('t'), sub(B1, E1)), k.neg(k.small(k.sum(mul(E('xz2'), X20), mul(E('xz2t'), X21)), 3))));
   const o = m(add(mul(E('oP'), H0), mul(E('oPt'), H1)));
   const Fp = I('Fp'), Fm = I('Fm');
   k.output(I('SL', 0n), m(x30), m(x31), Y30, Y31, m(z30), m(z31), m(mul(mul(Fp, Fp), add(e, o))), m(mul(mul(Fm, Fm), sub(e, o))));
