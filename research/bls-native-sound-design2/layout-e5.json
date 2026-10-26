@@ -1,0 +1,132 @@
+{
+ "E": 5,
+ "margin": 0.1,
+ "ok": true,
+ "ins": [
+  {
+   "j": 0,
+   "chunks": [
+    0,
+    5
+   ],
+   "events": 10,
+   "op": {
+    "std": 5629389,
+    "cons": 5574733
+   },
+   "mandatory": 4608,
+   "q": 0,
+   "cb": 0,
+   "need": 7702,
+   "content": 4608,
+   "pad": 3094,
+   "wit": 7702,
+   "unlocking": 7778,
+   "budget": 6255200,
+   "marginStd": 0.10004652129428315,
+   "marginCons": 0.10878421153600204
+  },
+  {
+   "j": 1,
+   "chunks": [
+    5,
+    13
+   ],
+   "events": 16,
+   "op": {
+    "std": 7175191,
+    "cons": 7120535
+   },
+   "mandatory": 5904,
+   "q": 3936,
+   "cb": 0,
+   "need": 9849,
+   "content": 9840,
+   "pad": 9,
+   "wit": 9849,
+   "unlocking": 9925,
+   "budget": 7972800,
+   "marginStd": 0.10004126530202684,
+   "marginCons": 0.10689657334938796
+  },
+  {
+   "j": 2,
+   "chunks": [
+    13,
+    21
+   ],
+   "events": 16,
+   "op": {
+    "std": 6805368,
+    "cons": 6750712
+   },
+   "mandatory": 5712,
+   "q": 0,
+   "cb": 0,
+   "need": 9335,
+   "content": 5712,
+   "pad": 3623,
+   "wit": 9335,
+   "unlocking": 9411,
+   "budget": 7561600,
+   "marginStd": 0.1000095217943292,
+   "marginCons": 0.10723762166737194
+  },
+  {
+   "j": 3,
+   "chunks": [
+    21,
+    28
+   ],
+   "events": 14,
+   "op": {
+    "std": 6475941,
+    "cons": 6421285
+   },
+   "mandatory": 5232,
+   "q": 2400,
+   "cb": 0,
+   "need": 8878,
+   "content": 7632,
+   "pad": 1246,
+   "wit": 8878,
+   "unlocking": 8954,
+   "budget": 7196000,
+   "marginStd": 0.10006378543635353,
+   "marginCons": 0.10765911617565316
+  },
+  {
+   "j": 4,
+   "chunks": [
+    28,
+    32
+   ],
+   "events": 8,
+   "op": {
+    "std": 5359878,
+    "cons": 5305222
+   },
+   "mandatory": 3024,
+   "q": 0,
+   "cb": 6800,
+   "need": 7328,
+   "content": 9824,
+   "pad": 0,
+   "wit": 9824,
+   "unlocking": 9900,
+   "budget": 7952800,
+   "marginStd": 0.3260388793883915,
+   "marginCons": 0.3329114274217886
+  }
+ ],
+ "bytes": 45968,
+ "score": 46378,
+ "pad": 7972,
+ "cuts": [
+  0,
+  5,
+  13,
+  21,
+  28
+ ]
+}
