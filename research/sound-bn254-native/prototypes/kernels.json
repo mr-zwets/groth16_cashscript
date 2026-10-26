@@ -1,0 +1,86 @@
+[
+ {
+  "name": "affine dbl",
+  "est": 81249,
+  "vm": 80800,
+  "bytes": 256
+ },
+ {
+  "name": "affine dbl (karatsuba)",
+  "est": 81017,
+  "vm": 80203,
+  "bytes": 271
+ },
+ {
+  "name": "affine add",
+  "est": 76251,
+  "vm": 80410,
+  "bytes": 278
+ },
+ {
+  "name": "affine add (karatsuba)",
+  "est": 77017,
+  "vm": 80195,
+  "bytes": 299
+ },
+ {
+  "name": "SI projective dbl (kBDbl)",
+  "est": 131334,
+  "vm": 123198,
+  "bytes": 434
+ },
+ {
+  "name": "SI projective add (kBAdd)",
+  "est": 176848,
+  "vm": 154194,
+  "bytes": 584
+ },
+ {
+  "name": "SI delta step (kDStep)",
+  "est": 43858,
+  "vm": 37753,
+  "bytes": 152
+ },
+ {
+  "name": "affine dbl + delta (merged)",
+  "est": 124374,
+  "vm": 119872,
+  "bytes": 465
+ },
+ {
+  "name": "affine add + delta (merged)",
+  "est": 121497,
+  "vm": 121509,
+  "bytes": 512
+ },
+ {
+  "name": "SI projective dbl + delta (merged)",
+  "est": 177795,
+  "vm": 163433,
+  "bytes": 626
+ },
+ {
+  "name": "projective + witnessed-slope add",
+  "est": 117705,
+  "vm": 113259,
+  "bytes": 387
+ },
+ {
+  "name": "projective + witnessed-slope add (karatsuba)",
+  "est": 116908,
+  "vm": 112540,
+  "bytes": 421
+ },
+ {
+  "name": "affine dbl, inverse-norm witness",
+  "est": 104139,
+  "vm": 101096,
+  "bytes": 269
+ },
+ {
+  "name": "affine add, inverse-norm witness",
+  "est": 84280,
+  "vm": 92803,
+  "bytes": 276
+ }
+]

@@ -1,0 +1,4 @@
+redeem 57 B, library body 2133 B (role code 1091 / 636 / 382 B)
+input 0: unlocking 6886 B, setup op 438199 (7.9% of 5541600), error: none
+input 1: unlocking 9699 B, setup op 422226 (5.4% of 7792000), error: none
+input 2: unlocking 8811 B, setup op 411327 (5.8% of 7081600), error: none

@@ -1,0 +1,89 @@
+{
+ "n": 4,
+ "safety": 0.05,
+ "cuts": [
+  0,
+  18,
+  38,
+  54,
+  65
+ ],
+ "minMarginPct": 4.64,
+ "sumUnlocking": 36691,
+ "lockings": 140,
+ "txOverhead": 192,
+ "score": 37023,
+ "opTotal": 28113569,
+ "budgetTotal": 29484000,
+ "delta": 174,
+ "inputs": [
+  {
+   "i": 0,
+   "role": "head",
+   "events": [
+    0,
+    18
+   ],
+   "slopes": 25,
+   "op": 7416982,
+   "K": 5902,
+   "fixedU": 6307,
+   "data": 3372,
+   "U": 9682,
+   "budget": 7778400,
+   "margin": 361418,
+   "marginPct": 4.65
+  },
+  {
+   "i": 1,
+   "role": "worker",
+   "events": [
+    18,
+    38
+   ],
+   "slopes": 25,
+   "op": 7439579,
+   "K": 5821,
+   "fixedU": 6226,
+   "data": 3483,
+   "U": 9712,
+   "budget": 7802400,
+   "margin": 362821,
+   "marginPct": 4.65
+  },
+  {
+   "i": 2,
+   "role": "worker",
+   "events": [
+    38,
+    54
+   ],
+   "slopes": 21,
+   "op": 6409669,
+   "K": 5562,
+   "fixedU": 5967,
+   "data": 2392,
+   "U": 8362,
+   "budget": 6722400,
+   "margin": 312731,
+   "marginPct": 4.65
+  },
+  {
+   "i": 3,
+   "role": "last",
+   "events": [
+    54,
+    65
+   ],
+   "slopes": 17,
+   "op": 6847339,
+   "K": 6797,
+   "fixedU": 6977,
+   "data": 1955,
+   "U": 8935,
+   "budget": 7180800,
+   "margin": 333461,
+   "marginPct": 4.64
+  }
+ ]
+}
