@@ -152,8 +152,22 @@ export function commitBytes(w) {
     Buffer.from(N[0]), Buffer.from(N[1]), ...Sc.slice(0, 6).map((x) => le(x)), ...states.flatMap((s) => s.slice(0, 6).map((x) => le(x))),
     ...slopes.flatMap((l) => [le(l.c0), le(l.c1)])]);
 }
-export function finish(w, affOf = () => true) {
-  const WS = commitBytes(w); const h0 = sha(TAG, WS), rhoRaw = sha(h0, Buffer.from('rho')); const rho = toFp(rhoRaw);
+// multi-input commit regions: input 0 (head) holds the statement, nibbles and s^c; every input holds the states that
+// end its chunks (not the terminal one) and the B slopes of its affine events. owners[i] = [j0, j1) chunk range of input i.
+export const stmtBytes = (w) => { const {st, ns, N, Sc} = w; return Buffer.concat([...[st.xA, st.yA, st.xB.c0, st.xB.c1, st.yB.c0, st.yB.c1, st.xC, st.yC].map((x) => le(x)), ...ns.map((n) => le(n, 32)), Buffer.from(N[0]), Buffer.from(N[1]), ...Sc.slice(0, 6).map((x) => le(x))]); };
+export function regionsFor(w, owners, affOf = () => true) {
+  // slope index at each event
+  const slopeStart = {}; let si = 0; for (let e = 1; e <= NEV; e++) { slopeStart[e] = si; if (affOf(e)) si += isAdd(e) ? 2 : 1; }
+  return owners.map(([j0, j1], i) => {
+    const parts = i === 0 ? [stmtBytes(w)] : [];
+    for (let j = j0; j < Math.min(j1, NCHUNK - 1); j++) parts.push(...w.states[j].slice(0, 6).map((x) => le(x)));
+    for (let j = j0; j < j1; j++) for (const e of chunkEvents(j)) if (affOf(e)) { const n = isAdd(e) ? 2 : 1; for (let q = 0; q < n; q++) { const l = w.slopes[slopeStart[e] + q]; parts.push(le(l.c0), le(l.c1)); } }
+    return Buffer.concat(parts);
+  });
+}
+export const h0Of = (regions) => sha(TAG, ...regions.map((g) => sha(g))); // fixed-arity tree of fixed-size regions
+export function finish(w, affOf = () => true, owners = null) {
+  const WS = commitBytes(w); const h0 = owners ? h0Of(regionsFor(w, owners, affOf)) : sha(TAG, WS), rhoRaw = sha(h0, Buffer.from('rho')); const rho = toFp(rhoRaw);
   const bitsOf = (g) => [0, 1].reduce((s, k) => s + [0, 1, 2, 3].filter((i) => (w.N[k][g] >> i) & 1).length, 0);
   const nq = nqOf(bitsOf, affOf);
   const Qagg = Array(2 * nq).fill(0n);
@@ -161,7 +175,7 @@ export function finish(w, affOf = () => true) {
   const qOdd = Qagg.filter((_, i) => i % 2 === 1); while (qOdd.length > 1 && qOdd.at(-1) === 0n) qOdd.pop();
   const WQ = Buffer.concat(qOdd.slice().reverse().map((x) => le(x)));
   const z = toFp(sha(h0, rhoRaw, WQ)); assert.notEqual(z, 0n);
-  return {WS, WQ, nq: qOdd.length, nqBound: nq, rho, z, h0};
+  return {WS, WQ, nq: qOdd.length, nqBound: nq, rho, z, h0, rhoRaw, regions: owners ? regionsFor(w, owners, affOf) : null};
 }
 
 // ---------------- value-level reference verifier, split by input ranges of chunks ----------------

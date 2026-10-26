@@ -26,6 +26,15 @@ Prototype dir: research/sound-sz-bls12381-native/prototypes/
   program blob loaded by OP_INPUTBYTECODE+SHA256+OP_DEFINE, nested OP_DEFINE + loops OK, every input pins count/order/
   P2SH32(<K><j>LOADER) (no fixed point); reorder and tampered blob rejected. Glue ~33-80k op per input.
 
+- head.mjs: VM prototype of the head (transcript tree over regions + WQ, claims, statement ranges/nibble mask, curve and
+  twist checks, binding loop, Horner, final identity over worker partial sums): accepts honest witness. fixture0 op 1.17M
+  (transcript 67k, statement 33k, curves 91k, binding 319k, Horner 8k/word, final 98k).
+- nq-dist.mjs: random statements n_q 78..124 (median 96); fixture0 / small inputs 70; artificial min 55; max 127.
+  -> canonical WQ minimum length N_MIN = 70 (zero-left-pad only below 70).
+- layout.mjs: cost model (measured components + EST glue) + exhaustive partition search + data relocation.
+  BEST n=4: score 32,786 B, owners [[0,3],[3,14],[14,24],[24,32]], projective from event 48, blob carrier in3,
+  margins >= 1.5% std at nq 70 and 127. n=5: 33,663.
+
 ## Next
 - kernels.mjs + measure.mjs: measure BLS kernels in libauth VM (B dbl/add, delta step, EV, tables, affine-slope variants).
 - cost model + input layout (layout.mjs), README design record.
