@@ -1,12 +1,15 @@
 // Build (locking, unlocking) vectors for the FULL single-tx Groth16 VERIFIER
-// (Groth16Verify, singleton/pairing/groth16.cash) -- vk_x computed on-chain +
+// (Groth16Verify, singleton/bn254/groth16.cash) -- vk_x computed on-chain +
 // the pairing -- and measure op-cost + size on the real & loosened BCH 2026 VMs.
-// Writes src/bch/groth16-singleton-vectors.json for the bch-groth16-singleton
+// Writes $BENCH_DIR/src/bch/groth16-singleton-vectors.json for the bch-groth16-singleton
 // benchmark entry (head-to-head with nchain / scrypt full verifiers).
 //
 // Runtime: proof (A,B,C) + public inputs (in0,in1). VK hardcoded. The contract
 // computes vk_x = IC0 + in0*IC1 + in1*IC2 on-chain and require()s the pairing
-// product == 1. ~1.26B op-cost, ~21.7 KB -> does NOT fit one BCH input.
+// product == 1. ~771M op-cost, ~7.8 KB locking -> does NOT fit one BCH input
+// (needs ~97 inputs' worth of op-cost budget).
+// (The 'contract' label written into the JSON keeps its historical path string
+// so the committed vectors stay byte-identical.)
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';

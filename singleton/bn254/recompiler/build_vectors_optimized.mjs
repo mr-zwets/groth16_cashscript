@@ -3,7 +3,8 @@
 //   2. dissect + probe arities + recompile every subroutine     -> optimized locking bytecode
 //   2c. outline repeated instruction sequences (outline.mjs)    -> outlined locking bytecode
 //   3. reuse the committed proof witnesses (interface-identical) -> validate + measure
-//   4. write verifier/src/bch/groth16-singleton-opcode-optimized{,-multiproof}-vectors.json
+//   4. write $BENCH_DIR/src/bch/groth16-singleton-opcode-optimized{,-multiproof}-vectors.json
+//      (BENCH_DIR defaults to the sibling zk-verifier-bench checkout)
 //
 // Run:  node singleton/bn254/recompiler/build_vectors_optimized.mjs
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
