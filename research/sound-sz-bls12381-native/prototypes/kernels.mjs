@@ -134,3 +134,29 @@ export function kBound() {
   const k = new Kernel(); const R = k.in('R');
   return k.output(k.in('Sp'), k.in('Sm'), k.mod(k.sub(k.add(k.mul(R, k.env('rho')), k.mul(k.in('Fp'), k.in('Sm'))), k.mul(k.in('Fm'), k.in('Sp')))));
 }
+
+// ---- lazy-reduction variants (same outputs mod p) ----
+// ADbl2: cc = lam x - y is not reduced (used only in a sum and in one product with t)
+export function kADbl2() {
+  const k = new Kernel(); const {I, E, m, mul, add, sub, sq2, km} = ops(k);
+  const [x0, x1, y0, y1, l0, l1] = ['x0', 'x1', 'y0', 'y1', 'l0', 'l1'].map(I);
+  const [xx0, xx1] = sq2(x0, x1); const [yl0, yl1] = km(y0, y1, l0, l1);
+  const r0 = m(sub(k.small(yl0, 2), k.small(xx0, 3))), r1 = m(sub(k.small(yl1, 2), k.small(xx1, 3)));
+  const [ll0, ll1] = sq2(l0, l1); const nx0 = m(sub(ll0, k.small(x0, 2))), nx1 = m(sub(ll1, k.small(x1, 2)));
+  const [lx0, lx1] = km(l0, l1, x0, x1); const cc0 = sub(lx0, y0), cc1 = sub(lx1, y1);
+  const [ln0, ln1] = km(l0, l1, nx0, nx1); const ny0 = m(sub(cc0, ln0)), ny1 = m(sub(cc1, ln1));
+  const e = m(k.sum(cc0, mul(cc1, E('t')), k.neg(add(mul(l0, E('xz2')), mul(l1, E('xz2t'))))));
+  const Fp = I('Fp'), Fm = I('Fm');
+  k.output(r0, r1, nx0, nx1, ny0, ny1, m(mul(mul(Fp, Fp), add(e, E('nyz3')))), m(mul(mul(Fm, Fm), sub(e, E('nyz3')))));
+  return k;
+}
+// DStep2: c_j kept unreduced across steps (bounded: |c| < 2^770)
+export function kDStep2() {
+  const k = new Kernel(); const {I, E, m, mul, add, sub, km} = ops(k);
+  const [x0, x1, c0, c1, l0, l1, n0, n1, s0, s1] = ['dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'n0', 'n1', 's0', 's1'].map(I);
+  const [u0, u1] = km(add(l0, n0), add(l1, n1), x0, x1); const nc0 = sub(u0, c0), nc1 = sub(u1, c1);
+  const e = m(k.sum(nc0, mul(nc1, E('t')), k.neg(add(mul(n0, E('cz2')), mul(n1, E('cz2t'))))));
+  const nx0 = m(sub(sub(mul(add(n0, n1), sub(n0, n1)), x0), s0)), nx1 = m(sub(sub(mul(add(n0, n0), n1), x1), s1));
+  k.output(nx0, nx1, nc0, nc1, n0, n1, m(mul(I('Fp'), add(e, E('cy3')))), m(mul(I('Fm'), sub(e, E('cy3')))));
+  return k;
+}

@@ -19,10 +19,20 @@
   "bytes": 282,
   "desc": "AAdd (affine add, witnessed slope, checks)"
  },
+ "ADbl2": {
+  "op": 144392,
+  "bytes": 268,
+  "desc": "ADbl2 (affine dbl, lazy cc)"
+ },
  "DStep": {
   "op": 78448,
   "bytes": 147,
   "desc": "DStep (delta line, slope-only bake, recursion)"
+ },
+ "DStep2": {
+  "op": 73524,
+  "bytes": 141,
+  "desc": "DStep2 (delta step, c unreduced)"
  },
  "DLine": {
   "op": 32752,

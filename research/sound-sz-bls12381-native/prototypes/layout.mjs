@@ -8,10 +8,10 @@ import {chunkEvents, isAdd, NCHUNK} from './protocol.mjs';
 
 // ---------------- measured op costs (consensus) ----------------
 export const OPC = {
-  dblAff: 152_800, dblProj: 232_500, dstep: 80_600, gls: 17_000, loopGlue: 4_000 /* EST: loop/schedule control per event */,
+  dblAff: 152_800, dblProj: 232_500, dstep: 80_600, gls: 34_200 /* worst case: dense nibbles (worst.mjs) */, loopGlue: Number(process.env.GLUE ?? 4_000) /* EST: loop/schedule control per event */,
   bound: 57_000, addAff: 154_300, addProj: 332_000,
   setup: 117_000 + 630_500 + 30_600 + 35_400, // env, GLS tables, S_c(+-z), start EV
-  terminal: 176_400, endpointAff: 44_900, endpointProj: 62_000 /* EST */, projToAff: 50_000 /* EST: witnessed affine T check */,
+  terminal: 176_400, endpointAff: 44_900, endpointProj: 98_100 /* measured: worker.mjs 23 32 55 */, projToAff: 50_000 /* EST: witnessed affine T check */,
   head: {transcript: 66_500, statement: 32_500, curves: 91_300, binding: 319_100, hornerPerWord: 8_000, hornerFixed: 20_000, final: 97_700},
   pinPerInput: 3_000, loaderFixed: 2_000, claimCheck: 600, decodeWord: 1_300, cleanup: 3_000,
 };
@@ -19,7 +19,7 @@ const SHA_ITER = (len) => Math.ceil((len + 9) / 64);
 const STD_SURCHARGE = 128; // standard - consensus cost per digest iteration
 // ---------------- bytes ----------------
 export const BYTES = {
-  blobMixed: 5_700, blobAffOnly: 5_300 /* EST: shared program incl. R/eta/p/r constants */, redeem: 54, locking: 35, txPerInput: 43, txFixed: 20,
+  blobMixed: Number(process.env.BLOB ?? 5_700), blobAffOnly: Number(process.env.BLOB ?? 5_700) - 400 /* EST: shared program incl. R/eta/p/r constants */, redeem: 54, locking: 35, txPerInput: 43, txFixed: 20,
   stmt: 864, claimsHead: 96, Rt: 48, Tt: 192, Tproj: 288, state: 288, slope: 96, dslope: 96, termConsts: 960, constHash: 32,
 };
 const RELOCATE = process.env.RELOCATE !== '0';
@@ -45,31 +45,36 @@ function inputCost(i, n, [j0, j1], E_p, nq, U, blobBytes, carrier) {
   if (miller) { pushes.push(R.dsteps * BYTES.dslope + (R.terminal ? BYTES.termConsts : 0)); if (!R.terminal) pushes.push(BYTES.Rt + BYTES.Tt + (R.nProj && !R.terminal ? 0 : 0)); else pushes.push(BYTES.Rt); }
   if (i === carrier) pushes.push(blobBytes);
   const u = pushes.reduce((s, x) => s + push(x), 0) + BYTES.redeem;
+  const bb = {redeem: BYTES.redeem};
+  if (head) { bb.WQ = push(48 * nq); bb.claimsZRho = push(BYTES.claimsHead); bb.statement = BYTES.stmt; }
+  if (miller) { bb.states = R.states * BYTES.state; bb.Bslopes = R.slopes * BYTES.slope; bb.deltaConsts = R.dsteps * BYTES.dslope; if (R.terminal) bb.termConsts = BYTES.termConsts; bb.Rt = BYTES.Rt; if (!R.terminal) bb.Tt = BYTES.Tt; }
+  if (i === carrier) bb.blob = blobBytes;
+  bb.headers = u - Object.values(bb).reduce((a2, b2) => a2 + b2, 0);
   // ---- op ----
-  let op = 0, it = 0;
+  let op = 0, it = 0; const ob = {}; const add = (k2, v2) => { ob[k2] = (ob[k2] ?? 0) + v2; op += v2; };
   // loader: read the carrier's unlocking, 2 splits, hash the blob, define/invoke
-  op += 3 * U[carrier] + blobBytes + OPC.loaderFixed; it += SHA_ITER(blobBytes);
-  op += n * OPC.pinPerInput; it += 2 * n; // HASH256 of each ~100-byte redeem template: 2 x 2 iterations
-  op += OPC.cleanup;
+  add('loader', 3 * U[carrier] + blobBytes + OPC.loaderFixed); it += SHA_ITER(blobBytes);
+  add('pins', n * OPC.pinPerInput); it += 2 * n; // HASH256 of each ~100-byte redeem template
+  add('cleanup', OPC.cleanup);
   if (miller) {
-    if (!head) op += 3 * U[0] + 25 * OPC.decodeWord;                       // statement, z, rho, s^c, nibbles from the head
-    if (j0 > 0) op += 3 * U[i - 1] + 10 * OPC.decodeWord;                  // start state + T from the predecessor
-    op += BYTES.dslope * R.dsteps + 2000; it += SHA_ITER(R.dsteps * BYTES.dslope + (R.terminal ? BYTES.termConsts : 0)); // own constants hash check
-    op += OPC.setup + R.nAff * OPC.dblAff + R.nProj * OPC.dblProj + R.dsteps * OPC.dstep + R.nEv * (OPC.gls + OPC.loopGlue) + R.chunks * OPC.bound
-      + R.addsAff * (OPC.addAff - OPC.dblAff * 0) + R.addsProj * OPC.addProj - R.chunks * 0;
-    // boundary count: chunks that end in a state (the terminal chunk ends in the terminal instead)
-    op -= (R.terminal ? 1 : 0) * OPC.bound;
-    if (R.terminal) op += OPC.terminal + (R.nProj ? OPC.endpointProj : OPC.endpointAff);
-    else { op += 2 * OPC.claimCheck; if (R.nProj) op += OPC.projToAff; }
-    op += OPC.claimCheck; // R~
+    if (!head) add('readHead', 3 * U[0] + 25 * OPC.decodeWord);              // statement, z, rho, s^c, nibbles from the head
+    if (j0 > 0) add('readPred', 3 * U[i - 1] + 10 * OPC.decodeWord);         // start state + T from the predecessor
+    add('constCheck', BYTES.dslope * R.dsteps + 2000); it += SHA_ITER(R.dsteps * BYTES.dslope + (R.terminal ? BYTES.termConsts : 0));
+    add('setup', OPC.setup);
+    add('Bdbl', R.nAff * OPC.dblAff + R.nProj * OPC.dblProj); add('Badd', R.addsAff * OPC.addAff + R.addsProj * OPC.addProj);
+    add('delta', R.dsteps * OPC.dstep); add('gls', R.nEv * OPC.gls); add('loopGlue', R.nEv * OPC.loopGlue);
+    add('boundaries', (R.chunks - (R.terminal ? 1 : 0)) * OPC.bound);
+    if (R.terminal) add('terminal', OPC.terminal + (R.nProj ? OPC.endpointProj : OPC.endpointAff));
+    else { add('claims', 2 * OPC.claimCheck); if (R.nProj) add('projToAff', OPC.projToAff); }
+    add('claims', OPC.claimCheck);
   }
   if (head) {
-    // reads every other input's unlocking once (commit regions + partial sums), hashes the regions and WQ
-    for (let j = 1; j < n; j++) op += 3 * U[j];
+    let rd = 0; for (let j = 1; j < n; j++) rd += 3 * U[j]; add('headReads', rd);
     const regionBytes = BYTES.stmt + 31 * BYTES.state + 0; it += 40 + SHA_ITER(48 * nq) + Math.ceil(regionBytes / 64);
-    const H = OPC.head; op += H.transcript + H.statement + H.curves + H.binding + H.hornerFixed + H.hornerPerWord * nq + H.final;
+    const H = OPC.head; add('headTranscript', H.transcript); add('headStatement', H.statement + H.curves); add('headBinding', H.binding); add('headHorner', H.hornerFixed + H.hornerPerWord * nq); add('headFinal', H.final);
   }
-  return {u, opCons: op, opStd: op + STD_SURCHARGE * it, iters: it, R};
+  ob.hashSurchargeStd = STD_SURCHARGE * it;
+  return {u, opCons: op, opStd: op + STD_SURCHARGE * it, iters: it, R, bytes: bb, ops: ob};
 }
 export const NQ_MIN = Number(process.env.NQ_MIN ?? 70), MARGIN = Number(process.env.MARGIN ?? 0.015);
 export function evaluate(n, owners, E_p, {nq = 70, carrier = null, blobBytes = null, nqWorst = [NQ_MIN, 127]} = {}) {
@@ -92,7 +97,7 @@ export function evaluate(n, owners, E_p, {nq = 70, carrier = null, blobBytes = n
       for (let d = 0; d < n; d++) { if (def[d] <= 0) continue;
         for (let s = 0; s < n && def[d] > 0; s++) { if (s === d) continue; const spare = -Math.max(...cases0.map((cs) => need(cs, s) - moved[s] + extraOp[s] / 800 + (moved[s] < 0 ? 0 : 0))) - 40;
           const capD = 10_000 - Math.max(...cases0.map((cs) => cs[d].u + moved[d])) - 3;
-          const amt = Math.floor(Math.min(def[d], spare, capD, ownData(cases0[0][s], s, nq) + Math.min(0, moved[s]))); if (amt <= 0) continue;
+          const amt = Math.floor(Math.min(def[d], spare, capD, ownData(cases0[0][s], s, nq) - (s === c ? push(blobBytes) : 0) + Math.min(0, moved[s]))); if (amt <= 0) continue;
           moved[d] += amt; moved[s] -= amt; extraOp[s] += 3 * 10_000 / 3 + 3 * (cases0[0][d].u + moved[d]); def[d] -= amt; } }
     }
     const cases = cases0.map((cs) => cs.map((x, i) => ({...x, u: x.u + moved[i], opStd: x.opStd + extraOp[i], opCons: x.opCons + extraOp[i]})));
@@ -112,7 +117,7 @@ function* partitions(n, lo = 0, hi = NCHUNK) {
 }
 if (import.meta.url === `file://${process.argv[1]}`) {
   const results = {};
-  for (const n of [4, 5]) {
+  for (const n of (process.env.NS ?? '4,5').split(',').map(Number)) {
     let best = null;
     for (const owners of partitions(n)) {
       if (owners.slice(1).some(([a, b]) => b <= a)) continue; // every worker owns at least one chunk
@@ -121,6 +126,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       }
     }
     results[n] = best;
+    if (process.env.DETAIL) for (const [i, x] of best.inputs.entries()) console.log('  in' + i, JSON.stringify(x.bytes), JSON.stringify(x.ops));
     console.log(`n=${n}: score ${best.score}  owners ${JSON.stringify(best.owners)}  projective from event ${best.E_p}  carrier ${best.carrier}`);
     for (const [i, x] of best.inputs.entries()) {
       const bud = 800 * (41 + x.u);

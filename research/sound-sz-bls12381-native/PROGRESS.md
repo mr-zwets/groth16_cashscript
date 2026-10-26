@@ -35,6 +35,11 @@ Prototype dir: research/sound-sz-bls12381-native/prototypes/
   BEST n=4: score 32,786 B, owners [[0,3],[3,14],[14,24],[24,32]], projective from event 48, blob carrier in3,
   margins >= 1.5% std at nq 70 and 127. n=5: 33,663.
 
+- worst.mjs: GLS worst case 34.2k/event (dense nibbles; fixture0 ~10k). Mixed terminal worker validated (proj endpoint 98k).
+- lazy-reduction kernels (ADbl2 -2.6%, DStep2 -6%; ~0.57M op total) measured, NOT in the headline.
+- FINAL layout (n=4): mixed (proj from event 56) 33,551 B @ >=1.5% margin; all-affine 33,919 B @ >=4.8% margin (recommended).
+  Sensitivity: blob +-1 kB -> 34,167 / 32,918; loop glue 8k/event -> 33,781. Files: layout-n4-*.txt
+
 ## Next
 - kernels.mjs + measure.mjs: measure BLS kernels in libauth VM (B dbl/add, delta step, EV, tables, affine-slope variants).
 - cost model + input layout (layout.mjs), README design record.

@@ -59,10 +59,16 @@ const lamA = F2.div(F2.sub(Ba.y, T.y), F2.sub(Ba.x, T.x));
 results.push(measure('AAdd (affine add, witnessed slope, checks)', K.kAAdd, ['t', 'xz2', 'xz2t', 'nyz3'], ['x0', 'x1', 'y0', 'y1', 'l0', 'l1', 'xq0', 'xq1', 'yq0', 'yq1', 'Fp', 'Fm', 'cp', 'cm'],
   {...env, x0: T.x.c0, x1: T.x.c1, y0: T.y.c0, y1: T.y.c1, l0: lamA.c0, l1: lamA.c1, xq0: Ba.x.c0, xq1: Ba.x.c1, yq0: Ba.y.c0, yq1: Ba.y.c1, Fp: Fp_, Fm: Fm_, cp, cm},
   (o) => { assert.equal(o[0], 0n); assert.equal(o[1], 0n); const s = Bp.multiply(6n).toAffine(); assert.ok(F2.eql({c0: o[4], c1: o[5]}, s.x) && F2.eql({c0: o[6], c1: o[7]}, s.y), 'affine add = T + B'); }));
+results.push(measure('ADbl2 (affine dbl, lazy cc)', K.kADbl2, ['t', 'xz2', 'xz2t', 'nyz3'], ['x0', 'x1', 'y0', 'y1', 'l0', 'l1', 'Fp', 'Fm'],
+  {...env, x0: T.x.c0, x1: T.x.c1, y0: T.y.c0, y1: T.y.c1, l0: lamD.c0, l1: lamD.c1, Fp: Fp_, Fm: Fm_},
+  (o) => { assert.equal(o[0], 0n); assert.equal(o[1], 0n); const r = affDbl([T.x, T.y], lamD); assert.equal(o[6], mod(Fp_ * Fp_ * lineAt(A.x, mod(-A.y), r.line, 1n))); assert.equal(o[7], mod(Fm_ * Fm_ * lineAt(A.x, mod(-A.y), r.line, -1n))); }));
 // delta step (recursion) and baked-line variant
 const nl = f2r(), dl = f2r(), dx = f2r(), dc = f2r();
 results.push(measure('DStep (delta line, slope-only bake, recursion)', K.kDStep, ['t', 'cz2', 'cz2t', 'cy3'], ['dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'n0', 'n1', 's0', 's1', 'Fp', 'Fm'],
   {...env, dx0: dx.c0, dx1: dx.c1, dc0: dc.c0, dc1: dc.c1, dl0: dl.c0, dl1: dl.c1, n0: nl.c0, n1: nl.c1, s0: dx.c0, s1: dx.c1, Fp: Fp_, Fm: Fm_}));
+{ const big = {c0: dc.c0 * p + 12345n, c1: dc.c1 * p - 999n}; // an unreduced carried c (|c| < 2^770)
+results.push(measure('DStep2 (delta step, c unreduced)', K.kDStep2, ['t', 'cz2', 'cz2t', 'cy3'], ['dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'n0', 'n1', 's0', 's1', 'Fp', 'Fm'],
+  {...env, dx0: dx.c0, dx1: dx.c1, dc0: big.c0, dc1: big.c1, dl0: dl.c0, dl1: dl.c1, n0: nl.c0, n1: nl.c1, s0: dx.c0, s1: dx.c1, Fp: Fp_, Fm: Fm_})); }
 results.push(measure('DLine (delta line fully baked)', K.kDLine, ['t', 'cz2', 'cz2t', 'cy3'], ['n0', 'n1', 'cc0', 'cc1', 'Fp', 'Fm'],
   {...env, n0: nl.c0, n1: nl.c1, cc0: dc.c0, cc1: dc.c1, Fp: Fp_, Fm: Fm_}));
 // evaluation, tables, boundary
