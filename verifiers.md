@@ -29,26 +29,39 @@ Numbers are the benchmark's `results.json` as of 2026-10-17 (zk-verifier-bench `
 score = total on-chain bytes, op = small-proof op-cost summed over all inputs. "Inputs" are
 the verifier's steps; "tx" is how many transactions carry them.
 
+**Withdrawals (2026-10-26).** Entries marked **withdrawn** have had their correctness claims
+withdrawn by their author ([#32], [bench#49]) or are held as withdrawn because a listed
+finding applies to the code they ship. Their rows stay here as history. The current best
+non-withdrawn BN254 entries are `bch-groth16-intratx-crown8-rawchain` (77,193 B, current-BCH
+deployable) and `bch-groth16-sound-si-gls-single` (21,915 B, proposed `bch-spec` VM, one input).
+The densless family (`-densless-msm`, `-densless-msm-slim`, `-densless-msm-spec`) is
+withdrawn under F6: the Miller slopes are not constrained by the tangent/chord equations and
+the terminal compares a value with itself instead of checking the B endpoint ([#28], [#32]);
+at the #22 / bench#42 head (`-densless-msm-slim`) line/root values are also not bound to the
+committed state. The plain `-pairfold5-densless` baseline is excluded from the author's
+withdrawal and is held as withdrawn on our reading (see below).
+
 | entry | form / variant | headline | notes |
 |---|---|---|---|
-| `bch-groth16-intratx-pairfold5-densless-msm-slim` | chunked, intra-tx PairFold-5 densless + slim vk_x MSM | **5 inputs / 1 standard tx / 35,143 B / 24.9M op** | **current best deployable verifier**; the densless-msm construction with claimed inputs as terminal pushes and witness bytes moved out of the carried state; see `chunked/bn254/densless-msm-slim` |
-| `bch-groth16-intratx-pairfold5-densless-msm` | chunked, intra-tx PairFold-5 densless + sound vk_x MSM | **5 inputs / 1 standard tx / 35,861 B / 24.3M op** | densless base (`chunked/bn254/densless-recovered`) with its dead vk_x predicate sliced out, plus a GLV Straus MSM that binds vk_x to the claimed public inputs; see `chunked/bn254/densless-msm` |
-| `bch-groth16-intratx-crown8-rawchain` | chunked, intra-tx, raw Miller-chain records | **8 inputs / 1 standard tx / 77,193 B / 58.3M op** | sibling-bytecode-bound Miller chain |
+| `bch-groth16-intratx-pairfold5-densless-msm-slim` | chunked, intra-tx PairFold-5 densless + slim vk_x MSM | **5 inputs / 1 standard tx / 35,143 B / 24.9M op** | **withdrawn** ([#32] F6); formerly listed as the current best deployable verifier; the densless-msm construction with claimed inputs as terminal pushes and witness bytes moved out of the carried state; see `chunked/bn254/densless-msm-slim` |
+| `bch-groth16-intratx-pairfold5-densless-msm` | chunked, intra-tx PairFold-5 densless + sound vk_x MSM | **5 inputs / 1 standard tx / 35,861 B / 24.3M op** | **withdrawn** ([#32] F6: the densless pairing part); densless base (`chunked/bn254/densless-recovered`) with its dead vk_x predicate sliced out, plus a GLV Straus MSM that binds vk_x to the claimed public inputs; see `chunked/bn254/densless-msm` |
+| `bch-groth16-intratx-crown8-rawchain` | chunked, intra-tx, raw Miller-chain records | **8 inputs / 1 standard tx / 77,193 B / 58.3M op** | **current best deployable BN254 verifier** (no open finding, not independently reviewed); sibling-bytecode-bound Miller chain |
 | `bch-groth16-intratx-direct-state-public` | chunked, intra-tx, fixed-deployment profile | **10 inputs / 1 standard tx / 83,294 B / 60.3M op** | binds the complete source-role topology |
 | `bch-groth16-intratx-residue` | chunked, intra-tx + quotient-torus residue | **11 inputs / 1 standard tx / 86,950 B / 68.5M op** | two GLV vk_x inputs feeding nine affine Miller inputs |
 | `bch-groth16-chunked-covenant-residue` | chunked, quotient-torus covenant chain | **12 tx / 93,802 B / 69.9M op** | standard-relayable; token-bound state thread |
 | `bch-groth16-intratx-general` | chunked, intra-tx | **13 inputs / 1 standard tx / 95,201 B / 58.1M op** | general layout of the intra-tx verifier |
-| `bch-groth16-grouped-residue` | chunked, grouped + residue | **26 inputs / 3 standard tx / 225,877 B / 179.4M op** | |
-| `bch-groth16-intratx` | chunked, intra-tx linked | **31 inputs / 1 tx / 234,022 B / 183.0M op** | whole verifier in one non-standard tx |
-| `bch-groth16-grouped` | chunked, grouped | **31 inputs / 4 standard tx / 234,301 B / 183.0M op** | |
+| `bch-groth16-grouped-residue` | chunked, grouped + residue | **26 inputs / 3 standard tx / 225,877 B / 179.4M op** | **withdrawn** ([#32] F1: grouped26 frame ownership) |
+| `bch-groth16-intratx` | chunked, intra-tx linked | **31 inputs / 1 tx / 234,022 B / 183.0M op** | **withdrawn** ([#32] F1: BN42 public-scalar tail); whole verifier in one non-standard tx |
+| `bch-groth16-grouped` | chunked, grouped | **31 inputs / 4 standard tx / 234,301 B / 183.0M op** | **withdrawn** ([#32] F1: grouped42 public-scalar tail) |
 | `bch-groth16-chunked` | chunked, covenant chain | **32 tx / 239,773 B / 183.2M op** | NFT-commitment chain |
-| `bch-groth16-intratx-authenticated-p2s` | chunked, intra-tx, bare P2S dispatchers | **42 inputs / 1 tx / 330,742 B / 261.8M op** | P2S variant of the older 42-input intra-tx layout |
+| `bch-groth16-intratx-authenticated-p2s` | chunked, intra-tx, bare P2S dispatchers | **42 inputs / 1 tx / 330,742 B / 261.8M op** | **withdrawn** ([#32] F1); P2S variant of the older 42-input intra-tx layout |
 | `bch-groth16-chunked-covenant` | chunked, covenant chain with transcript thread | **49 tx / 473,475 B / 305.7M op** | non-standard (chain depth) |
-| `bch-groth16-intratx-pairfold5-densless-msm-spec` | as densless-msm, **`bch-spec`** | **5 inputs / 33,875 B / 24.0M op** | proposed-VM-only — see [Target VM](#target-vm-bch-spec) |
+| `bch-groth16-intratx-pairfold5-densless-msm-spec` | as densless-msm, **`bch-spec`** | **5 inputs / 33,875 B / 24.0M op** | **withdrawn** ([#32] F6); proposed-VM-only — see [Target VM](#target-vm-bch-spec) |
 | `bch-groth16-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **4 inputs / 58,460 B / 67.3M op** | proposed-VM-only; passes its standard-policy model |
-| `bch-groth16-singleton-genpow` | singleton, symbolic assembly | **4,619 B / 5.5B op** | smallest BN254 bytes; built from `singleton/bn254/genpow-reconstructed`, not cashc; oracle only |
-| `bch-groth16-singleton-opcode-optimized` | singleton, baseline + rescheduled/outlined | **6,179 B / 800M op** | oracle |
-| `bch-groth16-singleton` | singleton, baseline | **8,145 B / 771M op** | correctness oracle; over per-input limits |
+| `bch-groth16-sound-si-gls-single` | one input, SI-GLS batched torus identity, **`bch-spec`** | **1 input / 21,915 B / 23.3M op** | **best BN254 `bch-spec` entry**; independently reviewed; every accept-relevant value is computed, baked, hash-committed before its challenge or exactly checked; see `chunked/bn254/sound-si-gls` (added after the 2026-10-17 snapshot) |
+| `bch-groth16-singleton-genpow` | singleton, symbolic assembly | **4,619 B / 5.5B op** | **withdrawn** ([#32] F4: helper32 identity operand; a fix is proposed in groth16_cashscript#30 / bench#47); formerly the smallest BN254 bytes; built from `singleton/bn254/genpow-reconstructed`, not cashc; oracle only |
+| `bch-groth16-singleton-opcode-optimized` | singleton, baseline + rescheduled/outlined | **6,237 B / 800M op** | the F4 mechanism in `lib/G1.cash` `jacAddG1` (a zero public input dropped IC0), found by maintainer review, is **fixed** (+19 B, zero-input proofs added as tests); coordinate range checks added; **independently reviewed** (2026-10-26); oracle |
+| `bch-groth16-singleton` | singleton, baseline | **8,206 B / 771M op** | the F4 mechanism in `lib/G1.cash` `jacAddG1`, found by maintainer review, is **fixed** (+19 B, zero-input proofs added as tests); coordinate range checks added; **independently reviewed** (2026-10-26); correctness oracle; over per-input limits |
 | `bch-groth16-singleton-minop` | singleton, op-optimized | **58,073 B / 64.8M op** | quotient-torus residue + affine GLV; still single-input (oracle) |
 | `bch-pairing-intratx` | chunked pairing-only, intra-tx | **12 inputs / 107,243 B / 84.4M op** | Miller-boundary milestone |
 | `bch-pairing-chunked` | chunked pairing-only, covenant | **12 tx / 109,305 B / 84.3M op** | Miller-boundary milestone |
@@ -58,8 +71,15 @@ the verifier's steps; "tx" is how many transactions carry them.
 **Failing PairFold entries.** `bch-groth16-intratx-pairfold5` (44,968 B), `-pairfold5-densless`
 (33,179 B), `-pairfold5-pevalfuse` (36,836 B) and `-pairfold7` (54,483 B) are still registered
 but currently **fail** the benchmark: the maintainer red-team accepts a forged public input
-(`n0 + 2` with the true vk_x kept), because their vk_x is not bound to the claimed inputs. The
-`-densless-msm` entries above are the repaired successors.
+(`n0 + 2` with the true vk_x kept), because their vk_x is not bound to the claimed inputs.
+All four are also **withdrawn**: pevalfuse under [#32] F9; pairfold5 because its genesis is
+byte-identical to pevalfuse's, so F9 applies to it as well; pairfold5-densless **withdrawn**
+(held: same `millerEvent`/terminal bytes as F6; the author's withdrawal excludes the
+plain-densless baseline); pairfold7 **withdrawn** (held: the same public-statement-binding
+class as F9, from the failing red-team verdict, found by maintainer review; not withdrawn by
+the author). The
+`-densless-msm` entries above were the successors that repaired the vk_x binding, but they
+keep the densless pairing part and are withdrawn under F6.
 
 ## BLS12-381 verifiers
 
@@ -67,26 +87,31 @@ Same curve as the nChain reference (522,564 B), so these give a true apples-to-a
 comparison. Per-layer status and build commands are in
 [singleton/bls12-381/README.md](singleton/bls12-381/README.md).
 
+**Withdrawals (2026-10-26).** As above, **withdrawn** rows stay as history. The current best
+non-withdrawn BLS12-381 deployable entry is `bch-groth16-bls12381-intratx-fs-fused-coordinator-head`
+(60,285 B, 9 inputs in one standard transaction, Fiat-Shamir PIT model).
+
 | entry | form / variant | headline | notes |
 |---|---|---|---|
-| `bch-groth16-bls12381-intratx-fs-compact` | chunked, compact transcript + **Fiat-Shamir PIT** | **22 inputs / 1 standard tx / 69,947 B / 42.7M op** | best BLS12-381 deployable; finite candidate (10 fixtures / 220 source pairs), no universal resource theorem; separate security model — see [Fiat-Shamir model](#security-model-fiat-shamir-pit) |
+| `bch-groth16-bls12381-intratx-fs-fused-coordinator-head` | chunked, Fiat-Shamir PIT, fused coordinator/quotient head | **9 inputs / 1 standard tx / 60,285 B** | **current best BLS12-381 deployable** (no open finding, not independently reviewed); finite ten-fixture coverage, no universal resource certificate; separate security model (added after the 2026-10-17 snapshot; one of the bench#43 fs-fused variants, see the benchmark for the others) |
+| `bch-groth16-bls12381-intratx-fs-compact` | chunked, compact transcript + **Fiat-Shamir PIT** | **22 inputs / 1 standard tx / 69,947 B / 42.7M op** | formerly listed as the best BLS12-381 deployable (superseded by the fs-fused variants; registry score now 65,696 B); finite candidate (10 fixtures / 220 source pairs), no universal resource theorem; separate security model — see [Fiat-Shamir model](#security-model-fiat-shamir-pit) |
 | `bch-groth16-bls12381-intratx-fs` | chunked, intra-tx + residue + **Fiat-Shamir PIT** | **22 inputs / 1 standard tx / 79,948 B / 53.1M op** | first single-standard-tx full BLS verifier; separate security model |
-| `bch-groth16-bls12381-intratx-residue` | chunked, intra-tx + quotient-torus residue | **24 inputs / 1 tx / 193,309 B / 151.4M op** | current-consensus-valid; non-standard only by total size |
+| `bch-groth16-bls12381-intratx-residue` | chunked, intra-tx + quotient-torus residue | **24 inputs / 1 tx / 193,309 B / 151.4M op** | **withdrawn** ([#32] F1: BLS24 frame ownership); current-consensus-valid; non-standard only by total size |
 | `bch-groth16-bls12381-grouped-residue` | chunked, grouped + quotient-torus residue | **26 inputs / 3 standard tx / 202,594 B / 158.3M op** | best unconditional (non-FS) standard BLS verifier |
 | `bch-groth16-bls12381-chunked-covenant-residue` | chunked, covenant chain + residue | **27 tx / 211,163 B / 157.0M op** | standard-relayable |
 | `bch-groth16-bls12381-intratx` | chunked, intra-tx linked | **43 inputs / 1 tx / 345,471 B / 270.6M op** | non-standard |
 | `bch-groth16-bls12381-grouped` | chunked, grouped | **43 inputs / 5 standard tx / 345,791 B / 270.6M op** | |
 | `bch-groth16-bls12381-chunked` | chunked, covenant chain | **43 tx / 357,241 B / 270.5M op** | |
 | `bch-groth16-bls12381-chunked-covenant` | chunked, covenant chain with transcript thread | **69 tx / 635,295 B / 420.5M op** | non-standard (chain depth) |
-| `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **3 inputs / 161,660 B / 146.6M op** | proposed-VM-only; non-standard by total transaction size — see [Target VM](#target-vm-bch-spec) |
-| `bch-groth16-bls12381-singleton-genpow` | singleton, symbolic assembly | **3,722 B / 20.7B op** | smallest entry overall (~140× smaller than nChain); built from `singleton/bls12-381/leader-recovered`, not cashc; oracle only |
-| `bch-groth16-bls12381-singleton-opcode-optimized` | singleton, baseline + rescheduled/outlined | **5,828 B / 1.0B op** | oracle |
-| `bch-groth16-bls12381-singleton` | singleton, baseline | **7,347 B / 979M op** | **~71× smaller bytecode than the nChain reference** |
+| `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **3 inputs / 161,660 B / 146.6M op** | **withdrawn** (held: same F1 generator pattern, no exact-length gate; not confirmed by the author); proposed-VM-only; non-standard by total transaction size — see [Target VM](#target-vm-bch-spec) |
+| `bch-groth16-bls12381-singleton-genpow` | singleton, symbolic assembly | **3,722 B / 20.7B op** | **withdrawn** ([#32] F5: compact decoder curve/cofactor domain; a fix is proposed in groth16_cashscript#31 / bench#48); formerly the smallest entry overall (~140× smaller than nChain); built from `singleton/bls12-381/leader-recovered`, not cashc; oracle only |
+| `bch-groth16-bls12381-singleton-opcode-optimized` | singleton, baseline + rescheduled/outlined | **5,999 B / 1.0B op** | unreviewed: domain checks added (range, curve, G2 subgroup; see [singleton/bls12-381](singleton/bls12-381/README.md#proof-point-validation)) after a maintainer hold; same source as `-singleton`; oracle |
+| `bch-groth16-bls12381-singleton` | singleton, baseline | **7,510 B / 995M op** | unreviewed: domain checks added (range, curve, G2 subgroup) after a maintainer hold |
 | `bch-groth16-bls12381-singleton-minop` | singleton, op-optimized | **58,841 B / 145.6M op** | quotient torus (`λ=p+|x|`, 6-limb root u) + GLV; fused G2 ψ-check; A/C on-curve (G1 subgroup checks omitted) |
 | `bch-groth16-bls12381-singleton-fs` | singleton, **Fiat-Shamir PIT** | **124,238 B / 58.7M op** | single-script qsplit tail-22 (`chunked/bls12-381/measure_fs_singleton.mjs`); separate security model |
 | `bch-pairing-bls12381-singleton` | singleton, pairing-only | **6,652 B / 968M op** | the pairing verdict milestone (`verify.cash`) |
 | `bch-pairing-bls12381-intratx` / `-chunked` | chunked pairing-only | **38 inputs / 335,614 B** (intra-tx) · **38 tx / 342,331 B** (covenant) | Miller-boundary milestones |
-| `bch-vkx-bls12381-chunked-covenant` | chunked `vk_x`-only | **11 tx / 23,700 B / 6.8M op** | |
+| `bch-vkx-bls12381-chunked-covenant` | chunked `vk_x`-only | **11 tx / 23,700 B / 6.8M op** | **withdrawn** (held: successor locking not pinned, found by maintainer review) |
 
 The BLS chunked pairing/Miller/final-exp families also exist in
 [chunked/bls12-381/](chunked/bls12-381/) (plain and residue generators); the
@@ -126,7 +151,7 @@ the transaction's own payloads. The G2 walk, slope checks, ψ terminal relation,
 
 Most entries target **current BCH** (libauth `createVirtualMachineBch2026`, 10 kB scripts). Three —
 `bch-groth16-intratx-residue-large`, `bch-groth16-bls12381-intratx-residue-large` and
-`bch-groth16-intratx-pairfold5-densless-msm-spec` — instead target
+`bch-groth16-intratx-pairfold5-densless-msm-spec` (now withdrawn, [#32] F6) — instead target
 the **proposed `bch-spec` upgrade** (`createVirtualMachineBchSpec`). The harness marks them
 `vm: 'bch-spec'` and files them in their own leaderboard category, separate from the
 current-BCH frontier. `bch-spec` = `{ ...ConsensusBch2026, ...overrides }`; the
@@ -145,12 +170,12 @@ Extra considerations for spec-targeting verifiers (full detail in
   also uses a different scalar schedule and flatter verifier layout; that result is a construction
   win in the separate spec category, not a claim that larger scripts make operations cheaper. The
   densless-msm spec build saves under 2 kB over its current-BCH twin, since that construction
-  already needs no pad.
+  already needs no pad (both densless-msm builds are now withdrawn, [#32] F6).
 - **Intra-tx introspection is ~free.** Reading a sibling's unlocking costs the reader 1 op/byte while
   those bytes grant the sibling 800 op of budget (800 : 1); pad is serialized once, so it is not
   double-counted in the score.
 - **Standardness is measured per entry.** Both BN254 spec transactions (58,460 B and 33,875 B
-  score) pass the proposed VM's standard-policy checks; the BLS12-381 one does not. A build that actually approaches a 100 kB input can still
+  score; the 33,875 B one is now withdrawn) pass the proposed VM's standard-policy checks; the BLS12-381 one does not. A build that actually approaches a 100 kB input can still
   exceed the 100 kB transaction limit and require direct mining.
 
 ## The forms in one paragraph each
@@ -174,7 +199,7 @@ Extra considerations for spec-targeting verifiers (full detail in
 | method | how state crosses | deployability | folder |
 |---|---|---|---|
 | **covenant chain** | NFT `hash256` commitment, one chunk per tx | 12 tx for the BN254 quotient-torus build; larger layouts approach or exceed the 50-deep mempool edge | `chunked/pairing`, `chunked/bls12-381` |
-| **intra-tx linked** | next input's unlocking bytecode (`OP_INPUTBYTECODE` forward-check), one tx | one tx; 35,143 B and standard for the BN254 frontier (5 inputs), larger builds can be non-standard | `chunked/intratx`, `chunked/bn254` |
+| **intra-tx linked** | next input's unlocking bytecode (`OP_INPUTBYTECODE` forward-check), one tx | one tx; 77,193 B and standard for the current BN254 frontier (crown8-rawchain, 8 inputs; the withdrawn 5-input densless-msm-slim was 35,143 B), larger builds can be non-standard | `chunked/intratx`, `chunked/bn254` |
 | **grouped** | intra-tx *within* a tx + NFT hand-off *across* txs | **standard-relayable, a handful of <100 KB txs, under the 50-tx limit** | `chunked/grouped` |
 
 The BN254 frontier and the BLS12-381 Fiat-Shamir builds are standard-relayable as one transaction.
@@ -200,8 +225,8 @@ comparison: [`chunked/twoloop/`](chunked/twoloop/) (simple, 16 chunks) and
   math packed into a deployable chunk graph. The hard-part final exponentiation
   (dozens of chunks in the plain build) collapses to a short witnessed-residue tail.
   BN254 additionally evaluates the Miller accumulator in `Fp12*/Fp6*`, reducing the
-  graph to a standard 11-input transaction (the PairFold-5 densless-msm builds take
-  this to 5 inputs); grouped packing remains available for
+  graph to a standard 11-input transaction (the PairFold-5 densless-msm builds took
+  this to 5 inputs but are withdrawn, [#32] F6); grouped packing remains available for
   constructions whose complete graph exceeds standard transaction policy.
 
 The op-cost win that these share at the *codegen* level — the `rescheduleStacks` compile
@@ -226,3 +251,7 @@ commands.
 - [rescheduling-stacks.md](rescheduling-stacks.md) — the codegen op-cost lever.
 - [The CashScript Compiler Fork](cashscript-compiler-fork.md) — the compiler these are
   built with.
+
+[#28]: https://github.com/mr-zwets/groth16_cashscript/issues/28
+[#32]: https://github.com/mr-zwets/groth16_cashscript/issues/32
+[bench#49]: https://github.com/mr-zwets/zk-verifier-bench/issues/49

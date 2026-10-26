@@ -185,7 +185,7 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
       : encodeProof(vectors);
     const exported = {...encoded, lockingOK,
       contract: 'genpow-reconstructed/verifier.asm (BN254 genpow, G1 parity compression)',
-      description: 'Fixed proof and public-input integers with A/C y represented by parity. The verifier reconstructs and checks each exact canonical G1 point before unchanged later arithmetic. Relaxed VM research; native compatibility requires independent qualification.',
+      description: 'Fixed proof/public-input bytes retain the G1 x/parity interface. Canonical coordinate and scalar guards, complete identity addition, and neutral pairing branches bind the fixed-key equation. Finite parity0/1 bytes are unchanged; parity2 with x=0 denotes neutral G1. Mathematical correctness and native resource admission are separate qualifications.',
       witnessEncoding: 'g1-a-c-x-parity-v1',
     };
     writeFileSync(resolve(output, name), JSON.stringify(exported, null, 2) + '\n');

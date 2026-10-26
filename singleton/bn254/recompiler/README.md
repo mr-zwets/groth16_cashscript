@@ -4,10 +4,14 @@ A post-pass over the cashc-compiled `../groth16.cash` that re-emits the bytecode
 better stack schedule, then outlines repeated instruction sequences into `OP_DEFINE`
 bodies. Semantics are unchanged — scheduling only changes *how operands are moved on the
 stack*, outlining is byte-exact factoring — and together they cut the locking bytecode
-**14,131 → 6,314 B (−55%)** (scheduling 14,131 → 8,385, outlining 8,385 → 6,314), far
-under BCH's 10,000-byte standard script-size cap. Op-cost (~750M → ~796M) grows slightly
-from the outline call overhead; the win is purely byte size, which is what this entry is
-scored on.
+**7,953 → 5,878 B (−26%)** (scheduling 7,953 → 7,539, outlining 7,539 → 5,878), far
+under BCH's 10,000-byte standard script-size cap. Numbers are for cashc
+compiler-optimizations-8 with the coordinate range checks (2026-10-26); the 7,953 B input
+is the `disableDefSinking` compile (the plain `bch-groth16-singleton` entry ships the
+`rescheduleStacks` compile, 7,847 B). Against an older cashc the same pass took
+14,131 → 6,314 B; cashc has since absorbed much of the scheduling gain. Op-cost
+(771.3M plain → 800.2M optimized, committed proof) grows slightly from the outline call
+overhead; the win is purely byte size, which is what this entry is scored on.
 
 ## Why there's room
 
@@ -39,18 +43,34 @@ Compiles `../groth16.cash`, recompiles it, re-validates against the committed pr
 witnesses (the runtime interface is identical, so the same unlocking witnesses apply), and
 writes:
 
-- `verifier/src/bch/groth16-singleton-opcode-optimized-vectors.json`
-- `verifier/src/bch/groth16-singleton-opcode-optimized-multiproof-vectors.json`
+- `zk-verifier-bench/src/bch/groth16-singleton-opcode-optimized-vectors.json`
+- `zk-verifier-bench/src/bch/groth16-singleton-opcode-optimized-multiproof-vectors.json`
+
+(`zk-verifier-bench` is the sibling checkout by default; override with `BENCH_DIR`.) Run
+`../build_vectors_groth16.mjs` and the bench's `pnpm gen:multiproof` first: this build reads
+the plain entry's unlocking witnesses and `rangeInvalid` cases from
+`groth16-singleton-vectors.json`.
 
 Benchmark entry: `bch-groth16-singleton-opcode-optimized`
-(`verifier/src/implementations/bch-groth16-singleton-opcode-optimized.ts`).
+(`zk-verifier-bench/src/implementations/bch-groth16-singleton-opcode-optimized.ts`).
 
 ## Correctness
 
 Every rewritten subroutine is differential-tested against the cashc original on random
 inputs (`recompiler.mjs` `bodyEquiv`), and the full contract is checked accept-valid /
-reject-tampered plus all distinct multiproofs before any vectors are written. The
-`asm.mjs` parser/serializer round-trips the original bytecode byte-for-byte.
+reject-tampered plus all distinct multiproofs and zero-input proofs before any vectors are
+written. The `asm.mjs` parser/serializer round-trips the original bytecode byte-for-byte.
+
+Random in-range inputs never make a `require()` fail, so the differential test cannot see
+a dropped check, and the main routine (which holds the input-validation requires) is only
+validated end to end. Two guards cover that:
+
+- `decompile.mjs` records calls to zero-output bodies (functions that only `require()`)
+  as block roots (`block.effects`), so the scheduler keeps them. Before this fix they had
+  no consumers and were silently dropped, which removed `fpRange(v)` from the main routine.
+- the build re-runs the 18 non-canonical coordinate cases (`../range_cases.mjs`, shipped
+  as `rangeInvalid`) against the optimized artifact and fails if any is accepted.
+  `node singleton/bn254/range_checks_test.mjs <vectors.json>` runs them standalone.
 
 ## Scope / floor
 
