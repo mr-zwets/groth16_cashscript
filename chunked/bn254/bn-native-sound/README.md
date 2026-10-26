@@ -3,7 +3,7 @@
 A full Groth16 verifier for the fixed BN254 VK of the densless fixtures (`../densless-recovered/public-fixtures.json`,
 public inputs `n0, n1`) that runs on **current BCH** (libauth `BCH_2026`): one standard transaction with three
 P2SH32 inputs, each unlocking at most 10,000 B, each with the per-input op-cost budget `(41 + unlocking length) × 800`.
-Bench entry id: `bch-groth16-bn254-sound-native` (status `unreviewed`).
+Bench entry id: `bch-groth16-bn254-sound-native` (status `reviewed`, independent review 2026-10-26).
 
 The mathematics is the reviewed single-input SI-GLS verifier (`../sound-si-gls/README.md`): one batched torus
 identity at ±z, GT-GLS folding of `e(vk_x, γ)`, a torus residue root, 33 committed monic states. This build changes

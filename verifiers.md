@@ -32,8 +32,10 @@ the verifier's steps; "tx" is how many transactions carry them.
 **Withdrawals (2026-10-26).** Entries marked **withdrawn** have had their correctness claims
 withdrawn by their author ([#32], [bench#49]) or are held as withdrawn because a listed
 finding applies to the code they ship. Their rows stay here as history. The current best
-non-withdrawn BN254 entries are `bch-groth16-intratx-crown8-rawchain` (77,193 B, current-BCH
-deployable) and `bch-groth16-sound-si-gls-single` (21,915 B, proposed `bch-spec` VM, one input).
+non-withdrawn BN254 entries are `bch-groth16-bn254-sound-native` (27,624 B, current-BCH
+deployable: 3 inputs in one standard transaction, independently reviewed) and
+`bch-groth16-sound-si-gls-single` (21,915 B, proposed `bch-spec` VM, one input, independently
+reviewed); the smallest BN254 singleton (oracle) is `bch-groth16-singleton-opcode-optimized` (6,237 B, reviewed).
 The densless family (`-densless-msm`, `-densless-msm-slim`, `-densless-msm-spec`) is
 withdrawn under F6: the Miller slopes are not constrained by the tangent/chord equations and
 the terminal compares a value with itself instead of checking the B endpoint ([#28], [#32]);
@@ -43,9 +45,10 @@ withdrawal and is held as withdrawn on our reading (see below).
 
 | entry | form / variant | headline | notes |
 |---|---|---|---|
+| `bch-groth16-bn254-sound-native` | chunked, intra-tx SI-MX3 (SI-GLS batched torus identity, affine B walk, 3 roles) | **3 inputs / 1 standard tx / 27,624 B / 20.6M op** | **current best deployable BN254 verifier**; **independently reviewed** (2026-10-26); sound by construction: every accept-relevant value is computed, baked, hash-committed before its challenge or exactly checked; inputs, order and sibling code pinned by introspection, state handed over byte-exactly; worst-case liveness margin 6.0% per input; see `chunked/bn254/bn-native-sound` (added 2026-10-27) |
 | `bch-groth16-intratx-pairfold5-densless-msm-slim` | chunked, intra-tx PairFold-5 densless + slim vk_x MSM | **5 inputs / 1 standard tx / 35,143 B / 24.9M op** | **withdrawn** ([#32] F6); formerly listed as the current best deployable verifier; the densless-msm construction with claimed inputs as terminal pushes and witness bytes moved out of the carried state; see `chunked/bn254/densless-msm-slim` |
 | `bch-groth16-intratx-pairfold5-densless-msm` | chunked, intra-tx PairFold-5 densless + sound vk_x MSM | **5 inputs / 1 standard tx / 35,861 B / 24.3M op** | **withdrawn** ([#32] F6: the densless pairing part); densless base (`chunked/bn254/densless-recovered`) with its dead vk_x predicate sliced out, plus a GLV Straus MSM that binds vk_x to the claimed public inputs; see `chunked/bn254/densless-msm` |
-| `bch-groth16-intratx-crown8-rawchain` | chunked, intra-tx, raw Miller-chain records | **8 inputs / 1 standard tx / 77,193 B / 58.3M op** | **current best deployable BN254 verifier** (no open finding, not independently reviewed); sibling-bytecode-bound Miller chain |
+| `bch-groth16-intratx-crown8-rawchain` | chunked, intra-tx, raw Miller-chain records | **8 inputs / 1 standard tx / 77,193 B / 58.3M op** | formerly listed as the current best deployable BN254 verifier (superseded by `bch-groth16-bn254-sound-native`); no open finding, not independently reviewed; sibling-bytecode-bound Miller chain |
 | `bch-groth16-intratx-direct-state-public` | chunked, intra-tx, fixed-deployment profile | **10 inputs / 1 standard tx / 83,294 B / 60.3M op** | binds the complete source-role topology |
 | `bch-groth16-intratx-residue` | chunked, intra-tx + quotient-torus residue | **11 inputs / 1 standard tx / 86,950 B / 68.5M op** | two GLV vk_x inputs feeding nine affine Miller inputs |
 | `bch-groth16-chunked-covenant-residue` | chunked, quotient-torus covenant chain | **12 tx / 93,802 B / 69.9M op** | standard-relayable; token-bound state thread |
@@ -58,7 +61,7 @@ withdrawal and is held as withdrawn on our reading (see below).
 | `bch-groth16-chunked-covenant` | chunked, covenant chain with transcript thread | **49 tx / 473,475 B / 305.7M op** | non-standard (chain depth) |
 | `bch-groth16-intratx-pairfold5-densless-msm-spec` | as densless-msm, **`bch-spec`** | **5 inputs / 33,875 B / 24.0M op** | **withdrawn** ([#32] F6); proposed-VM-only — see [Target VM](#target-vm-bch-spec) |
 | `bch-groth16-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **4 inputs / 58,460 B / 67.3M op** | proposed-VM-only; passes its standard-policy model |
-| `bch-groth16-sound-si-gls-single` | one input, SI-GLS batched torus identity, **`bch-spec`** | **1 input / 21,915 B / 23.3M op** | **best BN254 `bch-spec` entry**; independently reviewed; every accept-relevant value is computed, baked, hash-committed before its challenge or exactly checked; see `chunked/bn254/sound-si-gls` (added after the 2026-10-17 snapshot) |
+| `bch-groth16-sound-si-gls-single` | one input, SI-GLS batched torus identity, **`bch-spec`** | **1 input / 21,915 B / 23.3M op** | **best BN254 `bch-spec` entry** (and the smallest reviewed full verifier on either curve outside the singleton oracles); independently reviewed; every accept-relevant value is computed, baked, hash-committed before its challenge or exactly checked; see `chunked/bn254/sound-si-gls` (added after the 2026-10-17 snapshot) |
 | `bch-groth16-singleton-genpow` | singleton, symbolic assembly | **4,619 B / 5.5B op** | **withdrawn** ([#32] F4: helper32 identity operand; a fix is proposed in groth16_cashscript#30 / bench#47); formerly the smallest BN254 bytes; built from `singleton/bn254/genpow-reconstructed`, not cashc; oracle only |
 | `bch-groth16-singleton-opcode-optimized` | singleton, baseline + rescheduled/outlined | **6,237 B / 800M op** | the F4 mechanism in `lib/G1.cash` `jacAddG1` (a zero public input dropped IC0), found by maintainer review, is **fixed** (+19 B, zero-input proofs added as tests); coordinate range checks added; **independently reviewed** (2026-10-26); oracle |
 | `bch-groth16-singleton` | singleton, baseline | **8,206 B / 771M op** | the F4 mechanism in `lib/G1.cash` `jacAddG1`, found by maintainer review, is **fixed** (+19 B, zero-input proofs added as tests); coordinate range checks added; **independently reviewed** (2026-10-26); correctness oracle; over per-input limits |
@@ -88,12 +91,16 @@ comparison. Per-layer status and build commands are in
 [singleton/bls12-381/README.md](singleton/bls12-381/README.md).
 
 **Withdrawals (2026-10-26).** As above, **withdrawn** rows stay as history. The current best
-non-withdrawn BLS12-381 deployable entry is `bch-groth16-bls12381-intratx-fs-fused-coordinator-head`
-(60,285 B, 9 inputs in one standard transaction, Fiat-Shamir PIT model).
+non-withdrawn BLS12-381 deployable entry is `bch-groth16-bls12381-sound-native` (34,229 B, 4 inputs
+in one standard transaction, independently reviewed). The best BLS12-381 `bch-spec` entry is
+`bch-groth16-bls12381-sound-si-gls-single` (26,484 B, one input, independently reviewed), and the
+smallest BLS12-381 singleton (oracle) is `bch-groth16-bls12381-singleton-opcode-optimized` (5,999 B, reviewed).
 
 | entry | form / variant | headline | notes |
 |---|---|---|---|
-| `bch-groth16-bls12381-intratx-fs-fused-coordinator-head` | chunked, Fiat-Shamir PIT, fused coordinator/quotient head | **9 inputs / 1 standard tx / 60,285 B** | **current best BLS12-381 deployable** (no open finding, not independently reviewed); finite ten-fixture coverage, no universal resource certificate; separate security model (added after the 2026-10-17 snapshot; one of the bench#43 fs-fused variants, see the benchmark for the others) |
+| `bch-groth16-bls12381-sound-native` | chunked, intra-tx SI-GLS (batched torus identity, GT-GLS fold), 4 inputs sharing one 81 B redeem | **4 inputs / 1 standard tx / 34,229 B / 24.0M op** | **current best BLS12-381 deployable**; **independently reviewed** (2026-10-26); sound by construction (unconditional apart from the hash-committed SI-GLS challenge, ε ≈ 2^−248); worst-case liveness sample minimum 6.18% standard / 6.42% consensus; see `chunked/bls12-381/bls-native-sound` (added 2026-10-27) |
+| `bch-groth16-bls12381-sound-si-gls-single` | one input, SI-GLS batched torus identity, **`bch-spec`** | **1 input / 26,484 B / 26.1M op** | **best BLS12-381 `bch-spec` entry**; **independently reviewed** (2026-10-26); BLS12-381 port of the BN254 `sound-si-gls`; worst forced liveness margin 6.14%; see `chunked/bls12-381/sound-si-gls` (added 2026-10-27) |
+| `bch-groth16-bls12381-intratx-fs-fused-coordinator-head` | chunked, Fiat-Shamir PIT, fused coordinator/quotient head | **9 inputs / 1 standard tx / 60,285 B** | formerly listed as the current best BLS12-381 deployable (superseded by `bch-groth16-bls12381-sound-native`); no open finding, not independently reviewed; finite ten-fixture coverage, no universal resource certificate; separate security model (added after the 2026-10-17 snapshot; one of the bench#43 fs-fused variants, see the benchmark for the others) |
 | `bch-groth16-bls12381-intratx-fs-compact` | chunked, compact transcript + **Fiat-Shamir PIT** | **22 inputs / 1 standard tx / 69,947 B / 42.7M op** | formerly listed as the best BLS12-381 deployable (superseded by the fs-fused variants; registry score now 65,696 B); finite candidate (10 fixtures / 220 source pairs), no universal resource theorem; separate security model — see [Fiat-Shamir model](#security-model-fiat-shamir-pit) |
 | `bch-groth16-bls12381-intratx-fs` | chunked, intra-tx + residue + **Fiat-Shamir PIT** | **22 inputs / 1 standard tx / 79,948 B / 53.1M op** | first single-standard-tx full BLS verifier; separate security model |
 | `bch-groth16-bls12381-intratx-residue` | chunked, intra-tx + quotient-torus residue | **24 inputs / 1 tx / 193,309 B / 151.4M op** | **withdrawn** ([#32] F1: BLS24 frame ownership); current-consensus-valid; non-standard only by total size |
@@ -154,7 +161,9 @@ Most entries target **current BCH** (libauth `createVirtualMachineBch2026`, 10 k
 `bch-groth16-intratx-pairfold5-densless-msm-spec` (now withdrawn, [#32] F6) — instead target
 the **proposed `bch-spec` upgrade** (`createVirtualMachineBchSpec`). The harness marks them
 `vm: 'bch-spec'` and files them in their own leaderboard category, separate from the
-current-BCH frontier. `bch-spec` = `{ ...ConsensusBch2026, ...overrides }`; the
+current-BCH frontier. Two reviewed one-input builds also target it: `bch-groth16-sound-si-gls-single`
+(BN254, 21,915 B) and `bch-groth16-bls12381-sound-si-gls-single` (BLS12-381, 26,484 B).
+`bch-spec` = `{ ...ConsensusBch2026, ...overrides }`; the
 overrides raise the script / stack-item / big-int size caps 10 kB → 100 kB, raise the density-control
 base 41 → 10,000, and add two opcodes (`OP_EVAL`, `OP_POW`, unused so far).
 

@@ -5,7 +5,7 @@ A full Groth16 verifier for the fixed BLS12-381 VK of the bench fixtures (`math.
 per-input op-cost budget (41 + unlocking length) × 800, standard transaction ≤ 100,000 B. The transaction has 4 P2SH32
 inputs that all lock to the same redeem R; together they run one SI-GLS check ("single batched torus identity at ±z,
 GT-GLS folding of e(vk_x, γ)"), the same mathematics as the reviewed BN254 `chunked/bn254/sound-si-gls` and the BLS
-bch-spec build. Bench entry id: `bch-groth16-bls12381-sound-native` (review status: unreviewed).
+bch-spec build. Bench entry id: `bch-groth16-bls12381-sound-native` (review status: **reviewed**, independent review 2026-10-26).
 
 Design record: `research/sound-sz-bls12381-native` (design 1, the base) and `research/bls-native-sound-design2`
 (merged items), judged in `verifier.cash/work/bls-native-sound-DESIGN.md`. Deviations from that design are listed below.

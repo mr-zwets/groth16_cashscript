@@ -3,7 +3,7 @@
 A full Groth16 verifier for the fixed BLS12-381 VK of the bench's BLS12-381 fixtures (α = 3·G1, β = 5·G2, γ = 7·G2,
 δ = 11·G2, IC = (2, 4, 6)·G1; `singleton/bls12-381/bls_instance.mjs`) with public inputs `n0, n1`, in ONE P2SH32 input
 on the proposed bch-spec VM (100,000-byte scripts, per-input op-cost budget `(10,000 + unlocking length) * 800`).
-Bench entry id: `bch-groth16-bls12381-sound-si-gls-single`. Review status: **unreviewed** (awaiting the owner review).
+Bench entry id: `bch-groth16-bls12381-sound-si-gls-single`. Review status: **reviewed** (independent review 2026-10-26).
 
 This is the BLS12-381 port of the reviewed BN254 SI-GLS verifier (`../../bn254/sound-si-gls`). It follows the
 chosen design (`work/bls-si-gls-spec-DESIGN.md`: design 1 of `research/sound-sz-bls12381/si-gls-spec`, with four items
