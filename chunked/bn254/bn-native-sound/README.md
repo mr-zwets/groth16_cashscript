@@ -39,7 +39,7 @@ For comparison (bench, same VK): crown8-rawchain 77,193 B (8 inputs, unreviewed)
 
 Gates: valid accepted; 24/24 invalid vectors rejected; 4/4 proofs runtime-general; cross-stage staple: 2/2 seams
 bound; public inputs bound (9/9 mutated claims rejected); layout gate: 3 pads, none malleable; worst-case proof
-accepted; BCH-compatible (consensus) and standard; P2SH32 packaging; maintainer red-team file: all runs rejected (see
+(the forced op-cost worst case: every GT-GLS nibble 15, n_q 132) accepted; BCH-compatible (consensus) and standard; P2SH32 packaging; maintainer red-team file: all runs rejected (see
 Verification).
 
 Op cost profile (fixture 0, standard, `node profile.mjs`):
@@ -95,7 +95,10 @@ Notation: as in SI-GLS:
   canonical residues.
 - `WQ`: the odd quotient coefficients, highest first (`32·n_q` B, 1 ≤ n_q ≤ 132, leading word ≠ 0). This is SI-GLS's rule.
 - `FILL_i`: 0 ≤ L_i zero bytes. It buys op budget. No computation reads it, except that `FILL_2` is inside the z-tail
-  hash.
+  hash. Its content is pinned (all zero), its length only by `≤ 10,000` (and the raw-size pin uses the actual length).
+  So a third party can grow `FILL_0` or `FILL_1` (zero bytes, within the cap) and the transaction still verifies with
+  a different txid (no soundness impact; see Open risks, owner decisions). `FILL_2`'s length changes `z`, so it cannot
+  be changed without recomputing the handovers and `WQ`.
 - `DS_i` (2,048 / 2,048 / 1,536 B): role i's slice of the 88 baked δ slopes. It is a VK constant, authenticated by
   `SHA256(DS_i) == K_DS[i]`.
 - `C_0, C_1`: the two pieces of the code blob.
@@ -212,12 +215,12 @@ costs 100.
 | code identity | R hashes exactly the item it defines: `C_0 ‖ C_1`, at fixed ranges, `OP_DUP OP_SHA256 <K_code> OP_EQUALVERIFY <1> OP_DEFINE`, and nothing is re-pushed in between. Function ids are asserted distinct (`build.mjs`). Nested `OP_DEFINE` inside function 1 runs on libauth `BCH_2026` (3.1.0-next.8). |
 | framing | Every role pins its own layout (`DEPTH`, every size, raw unlocking size) and checks the push header at every remote offset. `ZT` runs from a fixed offset to `len − |push(R)|`. Minimal pushes and push-only unlockings are consensus rules. |
 | decoding | Every word is decoded unsigned (`BIN2NUM(w ‖ 0x00)`) and required `< p`; `n_k < r` and the nibble mask hold in every role (local decoding). `t < p`. The handover is canonical and compared byte-exactly. |
-| filler | All zero (byte-exact), ≤ 10,000, and read by nothing except the `ZT` hash (`FILL_2`). |
+| filler | All zero (byte-exact), ≤ 10,000, and read by nothing except the `ZT` hash (`FILL_2`). The lengths of `FILL_0` and `FILL_1` are not committed (txid malleability only; owner decision). |
 | challenges | `z ≠ 0`; every input derives ρ and z itself. |
-| graph | `TXINPUTCOUNT == 3` and every `UTXOBYTECODE(j)` equals the own one. Outputs are unconstrained: applications that release funds add output rules in role 2. |
+| graph | `TXINPUTCOUNT == 3` and every `UTXOBYTECODE(j)` equals the own one. Outputs are unconstrained: applications that release funds add output rules in role 2. No funding or fee input with another locking can be added: fees and any released value come from these three `P2SH32(R)` UTXOs. |
 | margins | Fillers are prover-sized to a ≥ 6% standard-mode margin per input (fixture 0: 6.00/6.00/6.00% standard, 6.46/6.46/6.47% consensus). Cap rule: the forced worst case per input is ≤ 0.94 × 8,032,800 (see Liveness). |
 | reduced values before guards | Every equality or ≠0 guard tests a value reduced mod p (or mod r): the inverse-norm equations, curve checks, endpoint, binding, final identity. `z` is tested in [0, p). |
-| nonzero line factors | Every B line has ℓ0 = 1 (affine), so its polynomial is nonzero. δ lines have ℓ0 = 1. Every other factor is monic. |
+| nonzero line factors | The X^0 coefficient of every B line polynomial is `y_P = −y_A`, and of every δ line `y_C`. Both are ≠ 0: A and C are on `y² = x³ + 3`, which has no 2-torsion point (G1 has odd prime order), so no curve point has y = 0. Each line factor is therefore a nonzero polynomial of degree < 12, hence nonzero mod M. Every other factor is monic. |
 
 ## Soundness argument (constructive: an owner for every value)
 
@@ -253,7 +256,7 @@ satisfies Groth16 for the baked VK, except with probability `≤ q_H·2^−245` 
 | inverse norms `t` | the exact equation `t·N(den) ≡ 1` with `t < p`. The solution is unique and forces `den ≠ 0` (anisotropic norm). They are also committed (harmless). |
 | the B trajectory, λ, lines, ±z evaluations, tables, F±, R, acc_k | computed on-chain |
 | `HAND_i` | byte equality with the canonical encoding of the values that role i−1 computed (top byte checked: never a negative value), and decoded `< p` by role i |
-| `FILL_i` | outside every computation; all zero; only in `ZT` (harmless) |
+| `FILL_i` | outside every computation; all zero; only in `ZT` (each `FILL_2` length is one more z query, counted in `q_H`); `FILL_0`/`FILL_1` lengths are free (txid only) |
 
 4. **Handover induction.**
    - Role i's computation is deterministic from the constants, the committed data, the challenges and `HAND_i`.
@@ -282,9 +285,14 @@ satisfies Groth16 for the baked VK, except with probability `≤ q_H·2^−245` 
      - `D ≡ 0 mod M` gives `[P_k] = [S_{k+1}]`;
      - `[f'] = [c]^λ` gives `FE(f') = 1`;
      - the mod-r binding of the hashed, range-checked nibbles gives the Groth16 product `e(vk_x, γ)`.
+   - Every line factor is nonzero mod M: its constant coefficient is `y_P = −y_A` (B lines) or `y_C` (δ lines),
+     nonzero because the curve checks put A and C on `y² = x³ + 3`, which has no point with y = 0; with degree < 12
+     the factor is nonzero mod M. (The affine `ℓ0 = 1` alone does not imply this.)
 
 **Soundness error** per random-oracle query: `ε ≤ 1.134·(33 + 275)/p ≈ 2^−245.15`, as in SI-GLS, plus a SHA256
-collision term for the extra digest layer.
+collision term for the extra digest layer. `z`'s preimage contains `push(FILL_2)`, whose length the prover chooses, so
+each filler length (up to ≈ 10,000 per fixed `(h0, WQ)`) is a separate z query and is counted in `q_H`. Fixing `WQ`
+at 132 words with no filler (the owner-decision alternative) removes this degree of freedom.
 
 ### Code-as-witness checklist (design merge item 7)
 
@@ -355,11 +363,16 @@ collision term for the extra digest layer.
 ```sh
 # in this directory, with the repository's dependencies (@noble/curves 2.2.0, @bitauth/libauth 3.1.0-next.8)
 node build.mjs                                             # code 7,310 B sha256 75c780ae…78d7; R 65 B; writes build.json
-node export.mjs vectors.json                               # bench vectors (fixtures 0-4, 24 invalid runs)
+node export.mjs vectors.json                               # bench vectors (fixtures 0-3, worst case = every nibble 15, 24 invalid runs)
 node redteam.mjs vectors.json redteam.json redteam-report.json   # every run rejected; bench red-team file
 SWEEP_N=400 node sweep.mjs sweep.json                      # liveness, both modes, cap rule (SWEEP_SHARD=k/n to split)
 node profile.mjs                                           # op cost by section / function (FIX=, MODE=)
 ```
+
+`export.mjs` and `sweep.mjs` mint proofs through `../sound-si-gls/mint.mjs`, which reads the pairing-vector trapdoor
+from a zk-verifier-bench checkout: by default the sibling `../../../../zk-verifier-bench` (relative to this directory's
+parent), otherwise set `VERIFIER_DIR=<path to zk-verifier-bench>`. Without it they fail with ENOENT on
+`src/checkpoints/pairing-vectors.json`.
 
 In zk-verifier-bench:
 - copy `vectors.json` to `src/bch/groth16-bn254-sound-native-vectors.json`;
@@ -386,7 +399,11 @@ In zk-verifier-bench:
     - whole-input staples from a second valid proof;
     - layout (extra, missing or swapped pushes; a nonzero or 0x80 filler; an oversize unlocking; redeem, code and
       δ-slice bytes; non-minimal pushes that shift remote offsets; a non-push opcode; swapped inputs);
-    - graph (2 or 4 inputs, a foreign P2SH32 input, run locally only).
+    - B on the twist but outside G2, with its inverse norms, `DG`, the challenges and the handovers recomputed
+      (inputs 0 and 1 accept; the run asserts that role 2's endpoint guard `T == −ψ³(B)` is what rejects);
+    - graph (2 or 4 inputs, a foreign P2SH32 input; run locally only), including a foreign P2SH32 input at each index
+      j that carries input j's honest pushes: the run asserts that the sibling-locking check `UTXOBYTECODE(j) == own`
+      (GRAPH instruction 8 / 12 / 16) fires in both siblings, and the input-count check for a 4th input.
   - **Positive controls:** fixture 0, and a valid lattice-shifted GT-GLS witness.
 - **Liveness** (`sweep.json`, 424 cases, 4 shards):
   - every case is accepted in both modes; n_q ranges over 60–132;
@@ -410,7 +427,11 @@ In zk-verifier-bench:
   There is no formal equivalence proof of the generated bytecode.
 - **Owner decisions** (as listed in the design):
   - **Prover-sized zero filler.** If it is rejected, fix `WQ` at 132 words. That is about +576 B at fixture 0;
-    injectivity holds by the fixed width, and the degree argument holds with leading zeros.
+    injectivity holds by the fixed width, and the degree argument holds with leading zeros. Note: the lengths of
+    `FILL_0` and `FILL_1` are committed nowhere, so a third party can grow them (zero bytes, ≤ 10,000 B per input) and
+    the transaction still verifies under a new txid. No soundness impact (and an unsigned spend with unconstrained
+    outputs is re-creatable anyway); if txid stability matters to an application, bind the filler lengths (e.g.
+    `|FILL_0|, |FILL_1|` in a committed item) or adopt the fixed-width alternative.
   - **Code read from inputs 0 and 1's unlocking bytes** and authenticated by `R ∋ K_code`. This pattern is new to
     the bench and needs the owner's OK to count as verifier code.
   - **Public inputs bind through the GT-GLS fold and the mod-r check,** as already accepted for SI-GLS.
@@ -418,3 +439,10 @@ In zk-verifier-bench:
   10,000-byte cap leaves 12.1%. Any later change that adds op cost must re-run `sweep.mjs`.
 - **Outputs are unconstrained** (as for SI-GLS). An application that releases value must add output rules (for
   example in role 2), or anyone holding a valid proof can redirect the spend.
+- **Inputs are fixed** (application note). GRAPH requires exactly 3 inputs, all spending `P2SH32(R)`. No funding or
+  fee input with another locking can be added, so fees and any released value must come from these three UTXOs.
+- **Trust boundary of the GT-GLS factor constants.** The `R_{k,i}` (24 pushes) and `Rconst` (6 pushes) equal
+  `math.mjs`'s values. The independent review confirmed that `math.mjs`'s `mIC` is noble's Miller value `m(IC_k, γ)`
+  and that `R_{k,0}` lies in its class, but did not recompute them all from noble. Their end-to-end correctness is shown
+  by the final identity on the 5 fixtures, the extra proofs and every swept proof, and by the binding rejections. A
+  future review could recompute `Rconst` (the class of `m(α,β)·m(IC0,γ)·corr`) from noble.

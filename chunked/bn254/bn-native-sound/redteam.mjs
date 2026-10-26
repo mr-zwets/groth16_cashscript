@@ -15,8 +15,9 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {encodeDataPush, decodeAuthenticationInstructions, encodeAuthenticationInstruction} from '@bitauth/libauth';
-import {FIXTURES, p, r, PI, GLS_OFFSET, LATTICE, mod} from '../sound-si-gls/math.mjs';
-import {proveCore, runRange, startState, encodeHand, zOf, zTail, sha, le32, rdle, STMT_LAYOUT, CUTS, ROLES, NQ_MAX, TAG, toFp} from './protocol.mjs';
+import {bn254} from '@noble/curves/bn254.js';
+import {FIXTURES, p, r, PI, GLS_OFFSET, LATTICE, mod, F2, f2, Fp} from '../sound-si-gls/math.mjs';
+import {BOUNDS, proveCore, factorSchedule, runRange, startState, encodeHand, zOf, zTail, sha, le32, rdle, STMT_LAYOUT, CUTS, ROLES, NQ_MAX, TAG, toFp} from './protocol.mjs';
 import {buildProgram} from './script.mjs';
 import {transactionFor, unlockingsFor} from './transaction.mjs';
 import {encodeUnlocking, spendAll, programOf, VMS, p2sh32} from './vm.mjs';
@@ -36,7 +37,8 @@ const PUSH = {S0: [0, 0], DS0: [0, 1], C0: [0, 2], F0: [0, 3], R0: [0, 4], S1: [
   DG: [2, 0], STMT: [2, 1], S2: [2, 2], H2: [2, 3], DS2: [2, 4], F2: [2, 5], WQ: [2, 6], R2: [2, 7]};
 
 const runs = [];
-const add = (label, kind, unlockings, {locks = LOCKS, bench = true} = {}) => runs.push({label, kind, unlockings: unlockings.map((u) => Buffer.from(u)), locks, bench});
+// expect (optional): the exact first rejecting guard per input, as guardOf reports it ('accept' = that input must accept)
+const add = (label, kind, unlockings, {locks = LOCKS, bench = true, expect = null} = {}) => runs.push({label, kind, unlockings: unlockings.map((u) => Buffer.from(u)), locks, bench, expect});
 const clonePushes = (T) => T.pushes.map((ps) => ps.map((b) => Buffer.from(b)));
 const enc = (P) => P.map((ps) => Buffer.from(encodeUnlocking(ps)));
 const setWord = (b, off, v) => { const c = Buffer.from(b); le32(v).copy(c, off); return c; };
@@ -45,8 +47,8 @@ const raw = (label, kind, f, T = T0) => { const P = clonePushes(T); f(P); add(la
 const at = (P, k) => P[PUSH[k][0]][PUSH[k][1]];
 const put = (P, k, v) => { P[PUSH[k][0]][PUSH[k][1]] = Buffer.from(v); };
 // recommitted: change committed items (STMT, S, WQ), recompute DG, rho, z and the handovers the honest roles compute
-function recommitted(label, kind, {STMT, S, WQ, fill2} = {}, base = T0) {
-  const c = {...base.core, STMT: STMT ?? base.core.STMT, S: S ?? base.core.S, WQ: WQ ?? base.core.WQ};
+function recommitted(label, kind, {STMT, S, WQ, fill2, core, expect} = {}, base = T0) {
+  const c = {...(core ?? base.core), STMT: STMT ?? base.core.STMT, S: S ?? base.core.S, WQ: WQ ?? base.core.WQ};
   c.D = Buffer.concat([sha(c.S[0]), sha(c.S[1]), sha(c.STMT, c.S[2])]);
   c.h0 = sha(TAG, c.D); c.rhoRaw = sha(c.h0, Buffer.from('rho')); c.rho = toFp(c.rhoRaw);
   const f = [...fills]; if (fill2 !== undefined) f[2] = fill2;
@@ -54,7 +56,7 @@ function recommitted(label, kind, {STMT, S, WQ, fill2} = {}, base = T0) {
   for (let i = 0; i < 2; i++) { s = runRange(c, z, CUTS[i], CUTS[i + 1], s); H.push(encodeHand(s)); }
   const P = clonePushes(base); put(P, 'DG', c.D); put(P, 'STMT', c.STMT); put(P, 'S0', c.S[0]); put(P, 'S1', c.S[1]); put(P, 'S2', c.S[2]); put(P, 'WQ', c.WQ);
   put(P, 'H1', H[1]); put(P, 'H2', H[2]); put(P, 'F2', Buffer.alloc(f[2]));
-  add(label, kind, enc(P));
+  add(label, kind, enc(P), {expect});
 }
 const W = T0.core; const word = (b, o) => rdle(b, o);
 const stmtWith = (off, v) => setWord(W.STMT, off, v);
@@ -86,6 +88,24 @@ const stmtWith = (off, v) => setWord(W.STMT, off, v);
   recommitted('-B (y negated, on the twist)', 'invalid-proof-point', {STMT: setWord(stmtWith(128, mod(-word(W.STMT, 128))), 160, mod(-word(W.STMT, 160)))});
   recommitted('A from proof 1', 'invalid-proof-point', {STMT: Buffer.concat([T1.core.STMT.subarray(0, 64), W.STMT.subarray(64)])});
   recommitted('B from proof 1 (in G2; the inverse-norm witnesses no longer match)', 'invalid-proof-point', {STMT: Buffer.concat([W.STMT.subarray(0, 64), T1.core.STMT.subarray(64, 192), W.STMT.subarray(192)])});
+}
+// ---------------- 2b. B on the twist but outside G2 (the endpoint guard) ----------------
+// B' = the first twist point with x = (k, 1), k = 1, 2, ... (a square right-hand side) that noble's G2 validity check
+// rejects; deterministic, no search over verifier outcomes. The inverse-norm witnesses t of the B' walk, DG, rho, z
+// and the handovers are recomputed (states, residue root and quotient stay the honest ones), so every guard before
+// the end of the walk passes on inputs 0 and 1 and the endpoint check T == -psi^3(B) in role 2 is the first to fire.
+{ const bT = F2.div(f2(3n, 0n), f2(9n, 1n)); let Bq = null;
+  for (let k = 1n; !Bq; k++) { const x = f2(k, 1n); let y; try { y = F2.sqrt(F2.add(F2.mul(F2.sqr(x), x), bT)); } catch { continue; } if (!y) continue;
+    let inG2 = true; try { bn254.G2.Point.fromAffine({x, y}).assertValidity(); } catch { inG2 = false; } if (!inG2) Bq = {x, y}; }
+  const st2 = {...W.st, xB: Bq.x, yB: Bq.y}; const sched2 = factorSchedule(st2);
+  assert.ok(!sched2.endpoint, 'non-G2 B: the walk must not end at -psi^3(B)');
+  const S2 = ROLES.map(({chunks, i}) => { const out = [];
+    for (const k of chunks) { for (let e = (k ? BOUNDS[k - 1] : 0); e < BOUNDS[k]; e++) out.push(...sched2.events[e].ts.map((t) => le32(mod(t)))); out.push(...W.states[k].slice(0, 6).map((v) => le32(mod(v)))); }
+    if (i === ROLES.length - 1) out.push(...sched2.tts.map((t) => le32(mod(t))));
+    const b = Buffer.concat(out); assert.equal(b.length, ROLES[i].streamSize); return b; });
+  const STMT2 = [Bq.x.c0, Bq.x.c1, Bq.y.c0, Bq.y.c1].reduce((b, v, j) => setWord(b, 64 + 32 * j, v), W.STMT);
+  recommitted('B on the twist but outside G2 (t, DG, rho, z, handovers recomputed; states, quotient honest)', 'g2-subgroup',
+    {STMT: STMT2, S: S2, core: {...W, st: st2, sched: sched2}, expect: ['accept', 'accept', 'r2:t:endpoint']});
 }
 // ---------------- 3. statement: GT-GLS nibbles, residue root ----------------
 { const L = STMT_LAYOUT;
@@ -196,6 +216,18 @@ for (const [label, mix] of [['input 0 from proof 1', [1, 0, 0]], ['input 1 from 
   add('input 2 replaced by a foreign P2SH32(OP_TRUE) input', 'graph', [T0.unlockings[0], T0.unlockings[1], Buffer.from(encodeUnlocking([Uint8Array.of(0x51)]))], {locks: [lock, lock, foreign], bench: false});
   add('a foreign P2SH32(OP_TRUE) input appended', 'graph', [...T0.unlockings, Buffer.from(encodeUnlocking([Uint8Array.of(0x51)]))], {locks: [lock, lock, lock, foreign], bench: false});
   add('input 0 replaced by a foreign P2SH32(OP_TRUE) input', 'graph', [Buffer.from(encodeUnlocking([Uint8Array.of(0x51)])), T0.unlockings[1], T0.unlockings[2]], {locks: [foreign, lock, lock], bench: false});
+  // a foreign P2SH32 input at index j that carries input j's honest pushes (only the redeem differs: it drops every item
+  // and leaves TRUE), so the code pieces and every remote range sit where the sibling readers expect them: the
+  // sibling-locking check UTXOBYTECODE(j) == own (GRAPH instruction 8 / 12 / 16 for j = 0 / 1 / 2) must fire in both
+  // siblings, and the input-count check (GRAPH instruction 2) for an appended 4th input with the same locking
+  for (const j of [0, 1, 2]) {
+    const n = T0.pushes[j].length - 1; const fr = Uint8Array.from([...Array(n >> 1).fill(0x6d), ...(n & 1 ? [0x75] : []), 0x51]);
+    const U = T0.unlockings.slice(); U[j] = Buffer.from(encodeUnlocking([...T0.pushes[j].slice(0, -1), fr]));
+    const locks = LOCKS.slice(); locks[j] = Buffer.from(p2sh32(fr));
+    add(`foreign P2SH32 input at index ${j} carrying the honest pushes`, 'graph', U, {locks, bench: false,
+      expect: [0, 1, 2].map((i) => (i === j ? 'foreign' : `r${i}:graph > GRAPH@${[8, 12, 16][j]}`))});
+  }
+  runs.find((x) => x.label === '4 inputs (input 2 duplicated)').expect = ['r0:graph > GRAPH@2', 'r1:graph > GRAPH@2', 'r2:graph > GRAPH@2', 'unlocking/redeem'];  // input 3: no role 3 (dispatch fails before GRAPH)
 }
 
 // ---------------- locate the first rejecting guard ----------------
@@ -206,7 +238,7 @@ const guardOf = (locks, unl, input) => {
   const tr = VMS.consensus.debug(programOf(locks, unl, input)); let sec = 'unlocking/redeem', fn = '';
   for (const s of tr) { const ri = roleIns.findIndex((x) => x.n === s.instructions?.length);
     if (ri >= 0) { fn = ''; let n = 'r' + ri + ':start'; for (const m of marks) if (m.role === ri && m.roff <= roleIns[ri].offs[Math.max(0, s.ip - 1)]) n = m.name; sec = n; }
-    else if (fnOf.has(s.instructions?.length)) fn = fnOf.get(s.instructions.length);
+    else if (fnOf.has(s.instructions?.length)) fn = fnOf.get(s.instructions.length) + '@' + (s.ip - 1); // index of the instruction just run
     if (s.error) break; }
   return sec + (fn ? ' > ' + fn : ''); };
 // ---------------- evaluate ----------------
@@ -216,7 +248,11 @@ for (const x of runs) {
   const accC = c.every((y) => y.accepted), accS = s.every((y) => y.accepted);
   const first = c.findIndex((y) => !y.accepted);
   const rejecting = c.map((y, i) => (y.accepted ? null : i)).filter((i) => i !== null);
-  report.push({label: x.label, kind: x.kind, consensus: accC, standard: accS, rejectingInputs: rejecting,
+  if (x.expect) { const got = x.locks.map((l, i) => (!l.equals(lock) ? 'foreign' : c[i].accepted ? 'accept' : guardOf(x.locks, x.unlockings, i)));
+    const gotS = x.locks.map((l, i) => (!l.equals(lock) ? 'foreign' : s[i].accepted ? 'accept' : 'rejected'));
+    assert.deepEqual(got, x.expect, 'unexpected guard: ' + x.label);
+    assert.deepEqual(gotS, x.expect.map((e) => (e === 'accept' || e === 'foreign' ? e : 'rejected')), 'standard mode differs: ' + x.label); }
+  report.push({label: x.label, kind: x.kind, consensus: accC, standard: accS, rejectingInputs: rejecting, expect: x.expect ?? undefined,
     reason: first >= 0 ? String(c[first].error).replace(/^.*?: /, '').slice(0, 100) : null, at: first >= 0 && x.locks[first].equals(lock) ? `input ${first}: ${guardOf(x.locks, x.unlockings, first)}` : first >= 0 ? `input ${first} (foreign)` : null, bench: x.bench});
   if (accC || accS) { acceptedAny++; console.log('ACCEPTED:', x.label); }
 }

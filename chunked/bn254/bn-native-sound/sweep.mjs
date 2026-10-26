@@ -6,7 +6,11 @@
 // nibbles at the 5 addition-first events and nibble 4 elsewhere, n_q 66); the lowest-n_q statements of a search;
 // a lattice-shifted (non-Babai) valid witness; random proofs minted under the fixture VK.
 // The first 5 forced cases also give the per-input op profile (merge item 5 of the design).
-// Usage: [SWEEP_N=400] [SWEEP_SPARSE=8] [SWEEP_SEED=bn-native-sound-v1] [SWEEP_SHARD=k/n] node sweep.mjs [out.json]
+// The CAP RULE is applied AT THE CAP: every case is also run with all three unlockings padded (zero filler) to exactly
+// 10,000 B, the most an honest prover can use (longer remote reads, z-tail hash and filler check cost more op than at
+// the prover-sized fill). Acceptance is required in both runs; capRule and capMargin are taken from the cap run.
+// SWEEP_DENSE extra every-nibble-15 proofs (the heaviest class) are added from a separate seed.
+// Usage: [SWEEP_N=400] [SWEEP_SPARSE=8] [SWEEP_DENSE=16] [SWEEP_SEED=bn-native-sound-v1] [SWEEP_SHARD=k/n] node sweep.mjs [out.json]
 import assert from 'node:assert/strict';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -14,10 +18,10 @@ import {FIXTURES, r, PI, glsDecompose, GLS_OFFSET, LATTICE, DIGITS, NE} from '..
 import {mint, rng, denseStatement, thinDenseStatement, zeroStatement} from '../sound-si-gls/mint.mjs';
 import {NQ_MAX, nqFor, BOUNDS} from './protocol.mjs';
 import {buildProgram} from './script.mjs';
-import {transactionFor} from './transaction.mjs';
+import {transactionFor, unlockingsFor, UNLOCK_CAP} from './transaction.mjs';
 import {spendAll, budgetOf} from './vm.mjs';
 
-const N = Number(process.env.SWEEP_N ?? 400), SPARSE = Number(process.env.SWEEP_SPARSE ?? 8);
+const N = Number(process.env.SWEEP_N ?? 400), SPARSE = Number(process.env.SWEEP_SPARSE ?? 8), DENSE = Number(process.env.SWEEP_DENSE ?? 16);
 const seed = process.env.SWEEP_SEED ?? 'bn-native-sound-v1';
 const [shard, shards] = (process.env.SWEEP_SHARD ?? '0/1').split('/').map(Number);
 const CAP_BUDGET = budgetOf(new Uint8Array(10000)), CAP_RULE = Math.floor(0.94 * CAP_BUDGET);
@@ -49,6 +53,9 @@ for (const [label, ns] of [['n = (0, 0)', [0n, 0n]], ['n = (1, 0)', [1n, 0n]], [
 { const es = FIXTURES.fixtures[0].publicInputs.map((n) => glsDecompose(BigInt(n))); let done = false;
   for (const v of LATTICE) for (const sg of [1n, -1n]) { const e2 = es[0].map((x, i) => x + sg * v[i]); if (!done && e2.every((x) => x >= -GLS_OFFSET && x < GLS_OFFSET)) { done = true; cases.push({label: 'fixture 0, lattice-shifted GLS witness', fx: FIXTURES.fixtures[0], opts: {es: [e2, es[1]]}}); } } }
 for (let i = 0; i < N; i++) cases.push({label: `random #${i}`, fx: mint(rnd(), rnd(), rnd)});
+{ const rd = rng(seed + ':dense'); for (let i = 0; i < DENSE; i++) { const d = denseStatement(); cases.push({label: `dense (every nibble 15) #${i}`, fx: mint(...d.n, rd), opts: {es: d.es}}); } }
+// fillers that pad every unlocking to exactly UNLOCK_CAP bytes (the filler push header is 3 bytes at these sizes)
+const capFills = (core) => unlockingsFor(core, prog, [0, 0, 0]).unlockings.map((u) => { const f = UNLOCK_CAP - u.length + 1 - 3; assert.ok(f >= 256); return f; });
 
 const results = [];
 for (const [k, c] of cases.entries()) {
@@ -59,16 +66,20 @@ for (const [k, c] of cases.entries()) {
     const xs = spendAll(t.unlockings.map(() => t.locking), t.unlockings, mode);
     row[mode] = {accepted: xs.every((x) => x.accepted), inputs: xs.map((x) => ({op: x.opCost, budget: x.budget, margin: +(1 - x.opCost / x.budget).toFixed(5), capMargin: +(1 - x.opCost / CAP_BUDGET).toFixed(5), error: x.error}))};
   }
-  row.capRule = row.standard.inputs.every((x) => x.op <= CAP_RULE) && row.consensus.inputs.every((x) => x.op <= CAP_RULE);
+  { const {unlockings} = unlockingsFor(t.core, prog, capFills(t.core)); assert.ok(unlockings.every((u) => u.length === UNLOCK_CAP), 'cap padding');
+    row.cap = {}; for (const mode of ['consensus', 'standard']) { const xs = spendAll(unlockings.map(() => t.locking), unlockings, mode);
+      row.cap[mode] = {accepted: xs.every((x) => x.accepted), inputs: xs.map((x) => ({op: x.opCost, capMargin: +(1 - x.opCost / CAP_BUDGET).toFixed(5), error: x.error}))}; } }
+  row.capRule = ['consensus', 'standard'].every((m) => row.cap[m].accepted && row.cap[m].inputs.every((x) => x.op <= CAP_RULE));
   results.push(row);
   const f = (m) => row[m].inputs.map((x) => `${(x.op / 1e6).toFixed(3)}M ${(100 * x.margin).toFixed(2)}%`).join(' | ');
-  console.log(`${c.label.slice(0, 60).padEnd(60)} nq=${String(row.nq).padStart(3)} U=${row.unlocking.join('/')} cons ${row.consensus.accepted} [${f('consensus')}] std ${row.standard.accepted} [${f('standard')}] cap ${row.capRule}`);
+  console.log(`${c.label.slice(0, 60).padEnd(60)} nq=${String(row.nq).padStart(3)} U=${row.unlocking.join('/')} cons ${row.consensus.accepted} [${f('consensus')}] std ${row.standard.accepted} [${f('standard')}] at-cap std ${row.cap.standard.inputs.map((x) => (x.op / 1e6).toFixed(3) + 'M').join('/')} cap ${row.capRule}`);
   if (process.argv[2]) writeFileSync(process.argv[2], JSON.stringify({seed, shard: `${shard}/${shards}`, capBudget: CAP_BUDGET, capRule: CAP_RULE, results}, null, 1) + '\n');
 }
 const failed = results.filter((x) => !x.consensus.accepted || !x.standard.accepted || !x.capRule);
 console.log(`cases ${results.length}, failed ${failed.length}`);
 for (const mode of ['consensus', 'standard']) for (let i = 0; i < 3; i++) {
   const m = results.reduce((a, x) => (x[mode].inputs[i].margin < a[mode].inputs[i].margin ? x : a)); const M = results.reduce((a, x) => (x[mode].inputs[i].op > a[mode].inputs[i].op ? x : a));
-  console.log(`${mode} input ${i}: min margin ${(100 * m[mode].inputs[i].margin).toFixed(2)}% at ${m.label}; max op ${M[mode].inputs[i].op} (cap margin ${(100 * M[mode].inputs[i].capMargin).toFixed(2)}%) at ${M.label}`);
+  const K = results.reduce((a, x) => (x.cap[mode].inputs[i].op > a.cap[mode].inputs[i].op ? x : a));
+  console.log(`${mode} input ${i}: min margin ${(100 * m[mode].inputs[i].margin).toFixed(2)}% at ${m.label}; max op (prover fill) ${M[mode].inputs[i].op} at ${M.label}; max op AT THE CAP ${K.cap[mode].inputs[i].op} (cap margin ${(100 * K.cap[mode].inputs[i].capMargin).toFixed(2)}%) at ${K.label}`);
 }
 assert.equal(failed.length, 0, `failed: ${failed.map((x) => x.label).join(', ')}`);

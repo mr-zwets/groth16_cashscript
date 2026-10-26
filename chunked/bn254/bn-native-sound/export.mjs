@@ -1,11 +1,14 @@
 // Bench vectors (one bch-2026 transaction, 3 P2SH32 inputs): valid = fixture 0, extraValidProofs = fixtures 1-3,
-// worstCaseProof = fixture 4 (dense near-r inputs); invalid = one tamper per push class (each run is the full
+// worstCaseProof = the forced op-cost worst case (every GT-GLS nibble 15, n_q 132: a proof minted under the fixture VK
+// for denseStatement(), the same case as sweep.mjs's first forced case, seed bn-native-sound-v1); invalid = one tamper per push class (each run is the full
 // 3-input transaction, and must be rejected). Fillers are prover-sized (6% standard margin per input).
 //   node export.mjs vectors.json
 import assert from 'node:assert/strict';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {FIXTURES} from '../sound-si-gls/math.mjs';
+import {mint, rng, denseStatement} from '../sound-si-gls/mint.mjs';
+import {NQ_MAX} from './protocol.mjs';
 import {STMT_LAYOUT} from './protocol.mjs';
 import {buildProgram} from './script.mjs';
 import {transactionFor} from './transaction.mjs';
@@ -18,8 +21,9 @@ assert.equal(createHash('sha256').update(prog.code).digest('hex'), built.codeSha
 export const LABELS = ['input 0: events 0-24', 'input 1: events 24-48', 'input 2: events 48-65, terminal, binding, quotient'];
 export const CHECKPOINTS = ['miller-events-24', 'miller-events-48', 'pairing-close'];
 const stepsOf = (unlockings, locking) => unlockings.map((u, i) => ({label: LABELS[i], locking: locking.toString('hex'), unlocking: Buffer.from(u).toString('hex'), checkpoint: CHECKPOINTS[i]}));
-const run = (fx) => { const t = transactionFor(fx, prog); const r = spendAll(t.unlockings.map(() => t.locking), t.unlockings, 'standard'); assert.ok(r.every((x) => x.accepted), 'valid run rejected'); return stepsOf(t.unlockings, t.locking); };
+const run = (fx, opts = {}, check = () => {}) => { const t = transactionFor(fx, prog, opts); check(t); const r = spendAll(t.unlockings.map(() => t.locking), t.unlockings, 'standard'); assert.ok(r.every((x) => x.accepted), 'valid run rejected'); return stepsOf(t.unlockings, t.locking); };
 const [primary, ...rest] = FIXTURES.fixtures;
+const worst = (() => { const d = denseStatement(); return run(mint(...d.n, rng('bn-native-sound-v1')), {es: d.es}, (t) => assert.equal(t.core.nq, NQ_MAX, 'worst case: n_q')); })();
 const T = transactionFor(primary, prog); const lock = T.locking;
 // one tamper per push class: [label, input, push index, byte offset within the push]
 const P = T.pushes;
@@ -37,5 +41,5 @@ const invalid = classes.map(([label, i, k, off]) => {
   const r = spendAll(unl.map(() => lock), unl, 'consensus'); assert.ok(!r.every((x) => x.accepted), label + ' accepted');
   return stepsOf(unl, lock).map((s, j) => ({...s, label: (j === i ? 'TAMPERED ' : '') + s.label + ': ' + label}));
 });
-writeFileSync(process.argv[2], JSON.stringify({steps: run(primary), invalid, extraValidProofs: rest.slice(0, 3).map(run), worstCaseProof: run(rest[3])}, null, 1) + '\n');
+writeFileSync(process.argv[2], JSON.stringify({steps: run(primary), invalid, extraValidProofs: rest.slice(0, 3).map((f) => run(f)), worstCaseProof: worst}, null, 1) + '\n');
 console.log('wrote', process.argv[2], 'invalid classes', invalid.length);

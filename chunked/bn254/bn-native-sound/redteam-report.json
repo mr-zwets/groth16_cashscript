@@ -83,7 +83,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > STMT",
+   "at": "input 0: r0:statement > STMT@28",
    "bench": true
   },
   {
@@ -97,7 +97,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > STMT",
+   "at": "input 0: r0:statement > STMT@40",
    "bench": true
   },
   {
@@ -111,7 +111,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > STMT",
+   "at": "input 0: r0:statement > STMT@28",
    "bench": true
   },
   {
@@ -125,7 +125,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > STMT",
+   "at": "input 0: r0:statement > STMT@28",
    "bench": true
   },
   {
@@ -151,7 +151,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > G1C",
+   "at": "input 0: r0:statement > G1C@17",
    "bench": true
   },
   {
@@ -165,7 +165,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > G1C",
+   "at": "input 0: r0:statement > G1C@17",
    "bench": true
   },
   {
@@ -207,7 +207,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > G1C",
+   "at": "input 0: r0:statement > G1C@17",
    "bench": true
   },
   {
@@ -221,7 +221,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > G1C",
+   "at": "input 0: r0:statement > G1C@17",
    "bench": true
   },
   {
@@ -235,7 +235,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > RD|FILL",
+   "at": "input 0: r0:statement > RD|FILL@10",
    "bench": true
   },
   {
@@ -249,7 +249,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > RD|FILL",
+   "at": "input 0: r0:statement > RD|FILL@10",
    "bench": true
   },
   {
@@ -263,7 +263,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > RD|FILL",
+   "at": "input 0: r0:statement > RD|FILL@10",
    "bench": true
   },
   {
@@ -277,7 +277,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > RD|FILL",
+   "at": "input 0: r0:statement > RD|FILL@10",
    "bench": true
   },
   {
@@ -291,7 +291,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > RD|FILL",
+   "at": "input 0: r0:statement > RD|FILL@10",
    "bench": true
   },
   {
@@ -305,7 +305,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > RD|FILL",
+   "at": "input 0: r0:statement > RD|FILL@10",
    "bench": true
   },
   {
@@ -319,7 +319,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > G1C",
+   "at": "input 0: r0:statement > G1C@17",
    "bench": true
   },
   {
@@ -333,7 +333,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > G1C",
+   "at": "input 0: r0:statement > G1C@17",
    "bench": true
   },
   {
@@ -417,7 +417,24 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:loop > BDBL",
+   "at": "input 0: r0:loop > BDBL@275",
+   "bench": true
+  },
+  {
+   "label": "B on the twist but outside G2 (t, DG, rho, z, handovers recomputed; states, quotient honest)",
+   "kind": "g2-subgroup",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "expect": [
+    "accept",
+    "accept",
+    "r2:t:endpoint"
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:t:endpoint",
    "bench": true
   },
   {
@@ -431,7 +448,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > STMT",
+   "at": "input 0: r0:statement > STMT@63",
    "bench": true
   },
   {
@@ -445,7 +462,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > STMT",
+   "at": "input 0: r0:statement > STMT@63",
    "bench": true
   },
   {
@@ -459,7 +476,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > STMT",
+   "at": "input 0: r0:statement > STMT@63",
    "bench": true
   },
   {
@@ -540,7 +557,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:statement > RD|FILL",
+   "at": "input 0: r0:statement > RD|FILL@10",
    "bench": true
   },
   {
@@ -643,7 +660,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 1: r1:loop > RD|FILL",
+   "at": "input 1: r1:loop > RD|FILL@10",
    "bench": true
   },
   {
@@ -655,7 +672,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 2: r2:loop > RD|FILL",
+   "at": "input 2: r2:loop > RD|FILL@10",
    "bench": true
   },
   {
@@ -681,7 +698,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:loop > RD|FILL",
+   "at": "input 0: r0:loop > RD|FILL@10",
    "bench": true
   },
   {
@@ -694,7 +711,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:loop > BDBL",
+   "at": "input 0: r0:loop > BDBL@275",
    "bench": true
   },
   {
@@ -707,7 +724,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:loop > BDBL",
+   "at": "input 0: r0:loop > BDBL@275",
    "bench": true
   },
   {
@@ -720,7 +737,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 1: r1:loop > RD|FILL",
+   "at": "input 1: r1:loop > RD|FILL@10",
    "bench": true
   },
   {
@@ -733,7 +750,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 1: r1:loop > BDBL",
+   "at": "input 1: r1:loop > BDBL@275",
    "bench": true
   },
   {
@@ -746,7 +763,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 1: r1:loop > BDBL",
+   "at": "input 1: r1:loop > BDBL@275",
    "bench": true
   },
   {
@@ -759,7 +776,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:loop > RD|FILL",
+   "at": "input 0: r0:loop > RD|FILL@10",
    "bench": true
   },
   {
@@ -772,7 +789,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:loop > BADD",
+   "at": "input 0: r0:loop > BADD@262",
    "bench": true
   },
   {
@@ -785,7 +802,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:loop > BADD",
+   "at": "input 0: r0:loop > BADD@262",
    "bench": true
   },
   {
@@ -797,7 +814,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 2: r2:t:badd1 > RD|FILL",
+   "at": "input 2: r2:t:badd1 > RD|FILL@10",
    "bench": true
   },
   {
@@ -809,7 +826,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 2: r2:t:badd1 > BADD",
+   "at": "input 2: r2:t:badd1 > BADD@262",
    "bench": true
   },
   {
@@ -821,7 +838,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 2: r2:t:badd1 > BADD",
+   "at": "input 2: r2:t:badd1 > BADD@262",
    "bench": true
   },
   {
@@ -833,7 +850,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 2: r2:t:badd2 > RD|FILL",
+   "at": "input 2: r2:t:badd2 > RD|FILL@10",
    "bench": true
   },
   {
@@ -845,7 +862,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 2: r2:t:badd2 > BADD",
+   "at": "input 2: r2:t:badd2 > BADD@262",
    "bench": true
   },
   {
@@ -857,7 +874,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 2: r2:t:badd2 > BADD",
+   "at": "input 2: r2:t:badd2 > BADD@262",
    "bench": true
   },
   {
@@ -870,7 +887,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:loop > BDBL",
+   "at": "input 0: r0:loop > BDBL@275",
    "bench": true
   },
   {
@@ -883,7 +900,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 1: r1:loop > BDBL",
+   "at": "input 1: r1:loop > BDBL@275",
    "bench": true
   },
   {
@@ -895,7 +912,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 2: r2:loop > BDBL",
+   "at": "input 2: r2:loop > BDBL@275",
    "bench": true
   },
   {
@@ -979,7 +996,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 2: r2:quotient > RD|FILL",
+   "at": "input 2: r2:quotient > RD|FILL@10",
    "bench": true
   },
   {
@@ -991,7 +1008,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 2: r2:quotient > RD|FILL",
+   "at": "input 2: r2:quotient > RD|FILL@10",
    "bench": true
   },
   {
@@ -1502,7 +1519,7 @@
     0
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:layout > RD|FILL",
+   "at": "input 0: r0:layout > RD|FILL@9",
    "bench": true
   },
   {
@@ -1514,7 +1531,7 @@
     0
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:layout > RD|FILL",
+   "at": "input 0: r0:layout > RD|FILL@9",
    "bench": true
   },
   {
@@ -1577,7 +1594,7 @@
     1
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 1: r1:layout > RD|FILL",
+   "at": "input 1: r1:layout > RD|FILL@9",
    "bench": true
   },
   {
@@ -1589,7 +1606,7 @@
     1
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 1: r1:layout > RD|FILL",
+   "at": "input 1: r1:layout > RD|FILL@9",
    "bench": true
   },
   {
@@ -1860,7 +1877,7 @@
     1
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:graph > GRAPH",
+   "at": "input 0: r0:graph > GRAPH@2",
    "bench": false
   },
   {
@@ -1874,8 +1891,14 @@
     2,
     3
    ],
+   "expect": [
+    "r0:graph > GRAPH@2",
+    "r1:graph > GRAPH@2",
+    "r2:graph > GRAPH@2",
+    "unlocking/redeem"
+   ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:graph > GRAPH",
+   "at": "input 0: r0:graph > GRAPH@2",
    "bench": false
   },
   {
@@ -1888,7 +1911,7 @@
     1
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:graph > GRAPH",
+   "at": "input 0: r0:graph > GRAPH@16",
    "bench": false
   },
   {
@@ -1902,7 +1925,7 @@
     2
    ],
    "reason": "Program failed an OP_VERIFY operation.",
-   "at": "input 0: r0:graph > GRAPH",
+   "at": "input 0: r0:graph > GRAPH@2",
    "bench": false
   },
   {
@@ -1916,6 +1939,60 @@
    ],
    "reason": "2; requested split index: 5385.",
    "at": "input 1: unlocking/redeem",
+   "bench": false
+  },
+  {
+   "label": "foreign P2SH32 input at index 0 carrying the honest pushes",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "expect": [
+    "foreign",
+    "r1:graph > GRAPH@8",
+    "r2:graph > GRAPH@8"
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:graph > GRAPH@8",
+   "bench": false
+  },
+  {
+   "label": "foreign P2SH32 input at index 1 carrying the honest pushes",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "expect": [
+    "r0:graph > GRAPH@12",
+    "foreign",
+    "r2:graph > GRAPH@12"
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:graph > GRAPH@12",
+   "bench": false
+  },
+  {
+   "label": "foreign P2SH32 input at index 2 carrying the honest pushes",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "expect": [
+    "r0:graph > GRAPH@16",
+    "r1:graph > GRAPH@16",
+    "foreign"
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:graph > GRAPH@16",
    "bench": false
   }
  ],
