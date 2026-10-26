@@ -18,6 +18,14 @@ Prototype dir: research/sound-sz-bls12381-native/prototypes/
   chunks, terminal merged), transcript, aggregated odd quotient, value-level verifier split over input chunk ranges.
   fixture0 nq 70 (3,360 B), NQ_MAX 127 (affine) / 130 (projective); WS 16,320 (all-affine) / 9,792 (projective).
 
+- worker.mjs: VM prototype of a Miller input (chunks [j0,j1)), partial sum R_i checked == reference. Measured (fixture 0, std):
+  per event: affine dbl+slope decode 152.8k, projective dbl 232.5k, delta step 80.6k, GLS 10.4k (zero nibbles) / 17k (full);
+  boundary 57k per chunk; adds affine 154k, projective 332k (+ a delta step); setup: env 117k, tables 630k, S_c 31k, start 35k;
+  terminal 176k + endpoint 45k.  (node worker.mjs 4 12 aff ; 24 32 aff ; 0 4 proj)
+- glue.mjs: real bch-2026 multi-input tx (standard+consensus valid): loader 19 B, redeem 53 B (<K> <i> LOADER), shared
+  program blob loaded by OP_INPUTBYTECODE+SHA256+OP_DEFINE, nested OP_DEFINE + loops OK, every input pins count/order/
+  P2SH32(<K><j>LOADER) (no fixed point); reorder and tampered blob rejected. Glue ~33-80k op per input.
+
 ## Next
 - kernels.mjs + measure.mjs: measure BLS kernels in libauth VM (B dbl/add, delta step, EV, tables, affine-slope variants).
 - cost model + input layout (layout.mjs), README design record.
