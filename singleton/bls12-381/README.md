@@ -1,14 +1,15 @@
 # singleton/bls12-381/ — BLS12-381 Groth16 verifier (singleton oracle)
 
-> **Withdrawn (held, 2026-10-26).** The bench entries built from `groth16.cash`,
-> `bch-groth16-bls12381-singleton` (7,347 B) and `bch-groth16-bls12381-singleton-opcode-optimized`
-> (5,828 B), are held as withdrawn on maintainer review; this is not an author withdrawal.
-> `groth16.cash` range-checks only the public inputs: the proof coordinates (A, B, C) get no
-> `< p` range checks, A, C and B get no curve-equation checks, and B gets no G2 subgroup
-> check. `lib/G2Check.cash` (the ψ check) exists but is not imported by `groth16.cash`. The
-> vk_x MSM handles identity and zero inputs correctly (F4 does not apply). Do not treat these
-> two entries as sound verifiers. `bch-groth16-bls12381-singleton-minop` (`groth16_minop.cash`)
-> is a separate source and is not covered by this note.
+> **Domain checks added (2026-10-26).** The bench entries built from `groth16.cash`,
+> `bch-groth16-bls12381-singleton` and `bch-groth16-bls12381-singleton-opcode-optimized`, were
+> held as withdrawn on maintainer review because `groth16.cash` range-checked only the public
+> inputs. It now validates the proof points before any pairing work (see
+> [Proof-point validation](#proof-point-validation)): every coordinate is range-checked
+> (`0 <= v < p`), A and C must satisfy `y^2 = x^3 + 4`, B must satisfy the twist equation
+> `y^2 = x^3 + 4(1+u)`, and B must pass the G2 subgroup check `psi(B) == [-x]B`, fused into B's
+> Miller walk with a `Z != 0` guard. Both entries are rebuilt with their original pipelines and
+> are back as unreviewed (not independently reviewed). `bch-groth16-bls12381-singleton-minop`
+> (`groth16_minop.cash`) is a separate source and is not affected.
 
 The complete Groth16 verifier on **BLS12-381** — the same curve as the nChain
 reference, so the benchmark can compare on the same curve. On-chain `vk_x`
@@ -50,11 +51,68 @@ squaring are identical; the tower/G1 layers are near-mechanical re-parameterizat
 | **FinalExp** | **`finalexp.cash`** | **`finalexp.mjs`** | **== noble; valid→1, invalid→≠1** | ✅ **cp#3** (~365M, 9.4 KB) |
 | G1 (vk_x) | `vkx.cash` | `vkx.mjs` | IC0 + in0·IC1 + in1·IC2 (Jacobian, 255-bit loop) | ✅ PASS (3.9 KB) |
 | **Verdict** | **`verify.cash`** | **`verify.mjs`** | **4 pairs → product → conj → finalExp → require==1** | ✅ **full pairing** (~1.38B, 19.8 KB) |
-| **Verifier** | **`groth16.cash`** | **`groth16.mjs`** | **proof+inputs → vk_x on-chain → pairing → ==1** | ✅ **COMPLETE & SOUND** (~1.48B, 24.2 KB) |
+| **Verifier** | **`groth16.cash`** | **`groth16.mjs`** | **proof+inputs → vk_x on-chain → pairing → ==1** | ✅ **COMPLETE** (~1.48B, 24.2 KB; pre-rescheduler numbers) |
 
 `verify.cash` ties the pairing into the single intrinsic verdict
 `e(−A,B)·e(α,β)·e(vk_x,γ)·e(C,δ)==1`; `groth16.cash` folds in the on-chain `vk_x`
 (also standalone in `vkx.cash`) for the complete verifier.
+
+## Proof-point validation
+
+`spend()` checks the proof points before vk_x and the Miller loops:
+
+| check | how |
+|---|---|
+| public inputs `0 <= in < r` | `within` (unchanged) |
+| coordinates `0 <= v < p` | `within(v, 0, P)` on Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy |
+| A, C on `E(Fp)`: `y^2 = x^3 + 4` | `g1Check(x, y)` (range + curve), one body called twice |
+| B on `E'(Fp2)`: `y^2 = x^3 + 4(1+u)` | two `fp2Sqr` and one `fp2Mul` |
+| B in G2: `psi(B) == [-x]B` | fused into B's Miller walk (below), no separate `[\|x\|]B` walk |
+
+**Points at infinity.** The affine encoding has no point at infinity, and `(0,0)` is off both
+curves, so A = O, B = O and C = O are all rejected by the curve checks. The honest fixtures never
+use them (`B = 1*G2`, A and C nonzero multiples of the G1 generator).
+
+**G2 subgroup check.** The `(-A, B)` Miller loop now runs through `millerSingleR`
+(`lib/Miller.cash`), which also returns its homogeneous accumulator `R = (X:Y:Z)`. The NAF walk
+starts at `R = B` and ends at `[|x|]B` whenever every step is a regular double/add. Every
+exceptional step (`R = ±B` in `pointAdd`, `R` of order 2 in `pointDouble`) produces `Z = 0`, and
+`Z = 0` is absorbing under both formulas, so `require(Rza + Rzb != 0)` leaves only faithful walks;
+then `X == psi(B).x * Z` and `Y == -psi(B).y * Z` check `psi(B) == -[|x|]B = [x]B`, which holds
+exactly for B in G2. `psi` is `g2psi` from `lib/G2Check.cash`. This is the same fused check (and
+guard) as `groth16_minop.cash`; see [psi-subgroup-degeneracy.md](../../psi-subgroup-degeneracy.md)
+for the order-13 collapse that the guard closes. The other three pairs also call
+`millerSingleR`, so the bytecode keeps one Miller body, and drop the extra outputs (cashc
+prints unused-variable warnings for them).
+
+**No G1 subgroup check on A, C.** Both are paired only with order-r G2 points (B is checked,
+gamma and delta are fixed), so a G1 cofactor component pairs to 1, as in `groth16_minop.cash`.
+
+**Tests.** `domain_checks_test.mjs` runs the honest instance, the bench multiproof set, and 13
+out-of-domain cases from `domain_cases.mjs`: off-curve A and C, off-twist B, `(0,0)` for A, B and
+C, B on the twist but outside G2 (`B + T13` with `T13` of order 13, `T13` alone, and `B + [r]Q`),
+and non-canonical coordinates (`Ax + p`, `Cy + p`, `Byb + p`, `Ay - p`). All are rejected. The
+op-cost at rejection shows where each one fails: about 20k-190k for the range and curve checks,
+about 0.1-0.19B for the subgroup check (after vk_x and B's Miller loop), and about 1B for a
+pairing mismatch. Before this change the four non-canonical encodings were **accepted** (the
+same point under a second encoding); the off-curve and off-subgroup cases with the honest A/C
+happened to fail the pairing equation. The vector builders ship the 13 cases to the bench as
+extra invalid runs and fail the build if any is accepted.
+
+| entry | before | after |
+|---|---|---|
+| `bch-groth16-bls12381-singleton` (locking) | 6,863 B / 978,824,303 op | 7,026 B / 994,589,979 op |
+| `bch-groth16-bls12381-singleton-opcode-optimized` (locking) | 5,344 B / 1,002,455,753 op | 5,515 B / 1,003,512,299 op |
+
+The checks themselves cost about 0.1M op-cost on the valid path; most of the plain entry's
++15.8M op-cost comes from the rescheduler laying out the larger program differently (a build
+that kept `g2psi`/the curve checks inline in `spend()` measured 7,296 B / 979.2M, so the
+committed source trades +15M op-cost for -270 B, the scored quantity).
+
+```
+node singleton/bls12-381/domain_checks_test.mjs                 # compile groth16.cash and run all cases
+node singleton/bls12-381/domain_checks_test.mjs <vectors.json>  # same, against a built lockingOK
+```
 
 ## How it's built
 
@@ -79,6 +137,7 @@ node singleton/bls12-381/finalexp.mjs     # cp#3 final exponentiation (slow)
 node singleton/bls12-381/vkx.mjs          # vk_x G1 checkpoint
 node singleton/bls12-381/verify.mjs       # pairing verdict (very slow)
 node singleton/bls12-381/groth16.mjs      # full verifier (very slow)
+node singleton/bls12-381/domain_checks_test.mjs  # proof-point validation: 13 out-of-domain cases (slow)
 
 node singleton/bls12-381/build_vectors.mjs          # -> pairing-bls12381-singleton-vectors.json
 node singleton/bls12-381/build_vectors_groth16.mjs  # -> groth16-bls12381-singleton-vectors.json
@@ -120,13 +179,12 @@ node singleton/bls12-381/gen_multiproof_minop.mjs        # -> ...-minop-multipro
 Entries on the **same curve as nChain** (so a true apples-to-apples size
 comparison, unlike the BN254 entries):
 
-- `bch-groth16-bls12381-singleton` — **withdrawn (held, see the note at the top)**: plain compiler output
-  (size objective + rescheduleStacks, no post-passes); 6,863-byte locking, ~966M
-  op-cost (~121 BCH inputs). Smaller bytecode than the nChain reference, but it skips
-  input validation, so it is not a like-for-like comparison.
-- `bch-groth16-bls12381-singleton-opcode-optimized` — **withdrawn (held)**: the byte-optimized build of the
+- `bch-groth16-bls12381-singleton` — plain compiler output (size objective +
+  rescheduleStacks, no post-passes); 7,026-byte locking, ~995M op-cost (~124 BCH inputs),
+  with the proof-point validation above (range, curve, G2 subgroup).
+- `bch-groth16-bls12381-singleton-opcode-optimized` — the byte-optimized build of the
   same source (`build_vectors_optimized.mjs`: golf recompile A/B'd vs the rescheduled
-  compile, then auto-outlining); 5,344-byte locking, ~1.004B op-cost. The pair shows the
+  compile, then auto-outlining); 5,515-byte locking, ~1.004B op-cost. The pair shows the
   bytesize-vs-opcost tradeoff, mirroring the BN254 plain/optimized split.
 - `bch-groth16-bls12381-singleton-minop` — the op-optimized COMPLETE verifier
   (`groth16_minop.cash`); 67,163 total bytes, **~256.6M op-cost (~32 inputs)** vs the baseline's
