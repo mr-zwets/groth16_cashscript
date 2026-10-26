@@ -71,7 +71,9 @@ export const PLACE = (() => {
   const pl = process.env.NATIVE_PLACE ? JSON.parse(process.env.NATIVE_PLACE) : process.env.NATIVE_CUTS ? dflt : structuredClone(LAYOUT_FILE.place);
   if (!pl.K) pl.K = dflt.K;
   pl.K = pl.K.map((pcs, i) => { const tot = pcs.reduce((s, [, l]) => s + l, 0); const fixed = pcs.map(([h, l]) => [h, l]);
-    if (tot !== ROLES[i].kSize) { const lastLen = fixed.at(-1)[1] + ROLES[i].kSize - tot; assert.ok(lastLen >= 48, 'K piece'); fixed.at(-1)[1] = lastLen; } return fixed; });
+    // a placement given for layout search may be off by the K-block sizes of other cuts: the last piece absorbs the
+    // difference; the checked-in layout.json must state the exact piece lengths
+    if (tot !== ROLES[i].kSize) { assert.ok(process.env.NATIVE_PLACE || process.env.NATIVE_CUTS, `layout.json: K${i} pieces sum to ${tot}, not ${ROLES[i].kSize}`); const lastLen = fixed.at(-1)[1] + ROLES[i].kSize - tot; assert.ok(lastLen >= 48, 'K piece'); fixed.at(-1)[1] = lastLen; } return fixed; });
   if (!Array.isArray(pl.blob)) pl.blob = [pl.blob]; pl.blobLens = pl.blobLens ?? [];
   assert.equal(pl.blobLens.length, pl.blob.length - 1); assert.equal(new Set(pl.blob).size, pl.blob.length);
   pl.blob.forEach((c) => assert.ok(c > 0 && c < NIN, 'a carrier is not input 0 (its WQ has a variable length)'));

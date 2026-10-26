@@ -12,11 +12,12 @@ for (let it = 0; it < 6; it++) {
   const out = execFileSync('node', ['--input-type=module', '-e', `
     const {buildAll} = await import('./script.mjs'); const {txPushes} = await import('./protocol.mjs'); const {witnessFor} = await import('./measure.mjs');
     const {p2sh32, txOf, unlockingsFor, evalTxUnlimited} = await import('./vm.mjs');
-    const b = buildAll(); const res = [];
+    const {PLACE} = await import('./protocol.mjs'); const b = buildAll(); const res = [];
     for (const spec of process.env.WIT.split(',')) { const w = await witnessFor(spec); const un = unlockingsFor(txPushes(w, b.blob), b.R); const ctx = txOf(un, un.map(() => p2sh32(b.R)));
       const rs = evalTxUnlimited(ctx, 'standard'); res.push({spec, nq: w.nq, rs: rs.map((x) => ({ok: x.ok, op: x.op, U: x.bytes}))}); }
-    console.log(JSON.stringify({blob: b.blob.length, res}));`], {env, cwd: new URL('.', import.meta.url).pathname, maxBuffer: 1 << 26}).toString();
+    console.log(JSON.stringify({blob: b.blob.length, K: PLACE.K, res}));`], {env, cwd: new URL('.', import.meta.url).pathname, maxBuffer: 1 << 26}).toString();
   const m = JSON.parse(out.trim().split('\n').at(-1));
+  L.place.K = m.K;                                     // the normalized piece lengths (they sum to each kSize)
   if (m.res.some((x) => x.rs.some((y) => !y.ok))) throw new Error('a witness is rejected: ' + JSON.stringify(m.res.map((x) => [x.spec, x.rs.map((y) => y.ok)])));
   // slack per input: own bytes beyond what its worst witness needs at the margin (negative: bytes missing)
   const slack = [0, 1, 2, 3].map((i) => Math.min(...m.res.map((x) => { const r = x.rs[i]; return r.U - (Math.ceil(r.op / (800 * (1 - MARGIN))) - 41); })));
