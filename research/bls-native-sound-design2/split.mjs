@@ -15,6 +15,8 @@ export const BC_NAMES = ['z', 'rho', 'z2', 'z3', 'z4', 'z5', 'z6', 't', 'xz2', '
   ...['TP0', 'TM0', 'TP1', 'TM1'].flatMap((T) => Array.from({length: 16}, (_, i) => `${T}_${15 - i}`))];
 // layout: {N, chunks: [[c0, c1] per input] (event inputs = all N; the last one runs the terminal), q: [words per input], cbHost, pad: [bytes]}
 export function buildSplit(pf, layout, {blob = Buffer.alloc(layout.cbBytes ?? 6800, 0x61), bounds = uniformBounds(2)} = {}) {
+  const parts = layout.cbParts ?? [{host: layout.cbHost, len: blob.length}]; assert.equal(parts.reduce((a, x) => a + x.len, 0), blob.length, 'blob parts');
+  const partOf = (j) => { let o = 0; for (const x of parts) { if (x.host === j) return blob.subarray(o, o + x.len); o += x.len; } return Buffer.alloc(0); };
   const pr = prove(pf, {bounds}); const {st, Sc, states, N: nib, ns} = pr; const NI = layout.N;
   const NQ = nqMax(bounds); assert.equal(layout.q.reduce((a, b) => a + b, 0), NQ, 'quotient words must sum to NQ');
   const w = (x) => le(mod(x), W);
@@ -27,7 +29,7 @@ export function buildSplit(pf, layout, {blob = Buffer.alloc(layout.cbBytes ?? 68
     return Buffer.concat(VKC.lines.filter((l) => l.e >= e0 && l.e < e1).flatMap((l) => [w(l.c.c0), w(l.c.c1), w(l.lam.c0), w(l.lam.c1)])); });
   // witness sizes are fixed by the layout; the push header of W_j is PUSHDATA2 (3 bytes) for 256 <= |W_j| <= 65535
   const BCW = layout.bcast ? BC_NAMES.length : 0;
-  const sizes = layout.chunks.map((_, j) => P1[j].length + layout.q[j] * W + K[j].length + (j ? 7 * W : 0) + (j === 0 ? BCW * W : 0) + (j === layout.cbHost ? blob.length : 0) + layout.pad[j]);
+  const sizes = layout.chunks.map((_, j) => P1[j].length + layout.q[j] * W + K[j].length + (j ? 7 * W : 0) + (j === 0 ? BCW * W : 0) + partOf(j).length + layout.pad[j]);
   const hdr = (n) => Buffer.from(encodeDataPush(new Uint8Array(n)).subarray(0, 3));
   // transcript phase 1: h = SHA256(TAG | U_0[0, 3+|P1_0|]); h = SHA256(h | U_j[0, 3+|P1_j|])
   let h = sha(TAG, hdr(sizes[0]), P1[0]); for (let j = 1; j < NI; j++) h = sha(h, hdr(sizes[j]), P1[j]);
@@ -74,8 +76,8 @@ export function buildSplit(pf, layout, {blob = Buffer.alloc(layout.cbBytes ?? 68
       for (const [nm, vv] of [[`TP${k}`, vp], [`TM${k}`, vmm]]) for (let n = 0; n < 16; n++) { let a = 1n; for (let b = 0; b < 4; b++) if ((n >> b) & 1) a = mod(a * vv[b]); v[`${nm}_${n}`] = a; } }
     return BC_NAMES.map((n) => { assert.ok(v[n] !== undefined, n); return v[n]; }); })();
   const BC = layout.bcast ? Buffer.concat(bcVals.map(w)) : Buffer.alloc(0);
-  const Wj = layout.chunks.map((_, j) => Buffer.concat([P1[j], Qseg[j], K[j], ...(j ? [IN[j]] : []), ...(j === 0 ? [BC] : []), ...(j === layout.cbHost ? [blob] : []), Buffer.alloc(layout.pad[j])]));
+  const Wj = layout.chunks.map((_, j) => Buffer.concat([P1[j], Qseg[j], K[j], ...(j ? [IN[j]] : []), ...(j === 0 ? [BC] : []), partOf(j), Buffer.alloc(layout.pad[j])]));
   Wj.forEach((x, j) => assert.equal(x.length, sizes[j]));
-  const offsets = layout.chunks.map((_, j) => { let o = 0; const at = {}; at.P1 = o; o += P1[j].length; at.Q = o; o += Qseg[j].length; at.K = o; o += K[j].length; if (j) { at.IN = o; o += 7 * W; } if (j === 0) { at.BC = o; o += BC.length; } if (j === layout.cbHost) { at.CB = o; o += blob.length; } at.PAD = o; return at; });
+  const offsets = layout.chunks.map((_, j) => { let o = 0; const at = {}; at.P1 = o; o += P1[j].length; at.Q = o; o += Qseg[j].length; at.K = o; o += K[j].length; if (j) { at.IN = o; o += 7 * W; } if (j === 0) { at.BC = o; o += BC.length; } if (partOf(j).length) { at.CB = o; o += partOf(j).length; } at.PAD = o; return at; });
   return {pr, P1, K, Qseg, WQ, IN, BC, bcVals, Wj, sizes, offsets, h0, rhoRaw, rho, zRaw, z, trace, final, STMT, NIB, SC, Khash: K.map((k) => sha(k))};
 }

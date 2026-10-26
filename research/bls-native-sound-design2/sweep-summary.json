@@ -1,0 +1,57 @@
+[
+ {
+  "layout": "layout-rec.json",
+  "score": 47014,
+  "proofs": 48,
+  "worstMarginStd": 20.48,
+  "worstMarginCons": 20.62,
+  "worstProof": "random 9",
+  "meanMarginStd": 20.77,
+  "loopMin": 21930266,
+  "loopMax": 23445248
+ },
+ {
+  "layout": "layout-rec15.json",
+  "score": 44261,
+  "proofs": 48,
+  "worstMarginStd": 15.56,
+  "worstMarginCons": 15.69,
+  "worstProof": "random 9",
+  "meanMarginStd": 15.86,
+  "loopMin": 21930266,
+  "loopMax": 23445248
+ },
+ {
+  "layout": "layout-n6-25.json",
+  "score": 51205,
+  "proofs": 48,
+  "worstMarginStd": 25.46,
+  "worstMarginCons": 25.59,
+  "worstProof": "random 9",
+  "meanMarginStd": 25.67,
+  "loopMin": 21930266,
+  "loopMax": 23445248
+ },
+ {
+  "layout": "layout-base-n5.json",
+  "score": 45434,
+  "proofs": 48,
+  "worstMarginStd": 10.44,
+  "worstMarginCons": 11.13,
+  "worstProof": "random 9",
+  "meanMarginStd": 10.72,
+  "loopMin": 21930266,
+  "loopMax": 23445248
+ },
+ {
+  "layout": "layout-base-n6.json",
+  "score": 50140,
+  "proofs": 48,
+  "worstMarginStd": 15.46,
+  "worstMarginCons": 16.05,
+  "worstProof": "random 9",
+  "meanMarginStd": 15.73,
+  "loopMin": 21930266,
+  "loopMax": 23445248
+ }
+]

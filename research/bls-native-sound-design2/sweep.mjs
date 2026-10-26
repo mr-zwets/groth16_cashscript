@@ -39,7 +39,7 @@ if (mode === 'measure') {
     const L = JSON.parse(readFileSync(f)); const N = L.ins.length; const hub = L.hub ?? 0; const parts = L.parts ?? 1;
     const per = rows.map((rw) => L.ins.map((x) => { const [c0, c1] = x.chunks; const ev = 2 * (c1 - c0);
       const loop = rw.chunks.slice(c0, c1).reduce((a, b) => a + b, 0) + SK.loopPerEvent * ev; const term = x.j === N - 1 ? SK.terminal : 0;
-      const su = (m) => SK[L.variant][x.j === hub ? 'first' : 'other'][m] + (x.j === N - 1 ? SK.terminalExtraSetup : 0) + 15000 * (parts - 1);
+      const su = (m) => SK[L.variant][x.j === hub ? 'first' : 'other'][m] + (x.j === N - 1 ? SK.terminalExtraSetup : 0) + 30000 * (parts - 1);
       return {std: 1 - (su('std') + loop + term) / x.budget, cons: 1 - (su('cons') + loop + term) / x.budget}; }));
     const minStd = per.map((p) => Math.min(...p.map((q) => q.std))), minCons = per.map((p) => Math.min(...p.map((q) => q.cons)));
     const w = minStd.indexOf(Math.min(...minStd));

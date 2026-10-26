@@ -2,6 +2,7 @@
  "N": 5,
  "margin": 0.1,
  "variant": "base",
+ "parts": 2,
  "ok": true,
  "ins": [
   {
@@ -12,20 +13,20 @@
    ],
    "events": 14,
    "op": {
-    "std": 6961728,
-    "cons": 6917728
+    "std": 6993239,
+    "cons": 6949239
    },
    "mandatory": 5952,
-   "q": 0,
+   "q": 2496,
    "cb": 0,
-   "need": 9557,
-   "content": 5952,
-   "pad": 3605,
-   "wit": 9557,
-   "unlocking": 9629,
-   "budget": 7736000,
-   "marginStd": 0.10008686659772492,
-   "marginCons": 0.10577456049638057
+   "need": 9555,
+   "content": 8448,
+   "pad": 1107,
+   "wit": 9555,
+   "unlocking": 9672,
+   "budget": 7770400,
+   "marginStd": 0.10001557191392974,
+   "marginCons": 0.10567808607021523
   },
   {
    "j": 1,
@@ -35,20 +36,20 @@
    ],
    "events": 14,
    "op": {
-    "std": 6638512,
-    "cons": 6592512
+    "std": 6669858,
+    "cons": 6623858
    },
    "mandatory": 5232,
-   "q": 3840,
-   "cb": 0,
-   "need": 9108,
-   "content": 9072,
-   "pad": 36,
-   "wit": 9108,
-   "unlocking": 9180,
-   "budget": 7376800,
-   "marginStd": 0.1000824205617612,
-   "marginCons": 0.10631818674764126
+   "q": 0,
+   "cb": 3500,
+   "need": 9106,
+   "content": 8732,
+   "pad": 374,
+   "wit": 9106,
+   "unlocking": 9223,
+   "budget": 7411200,
+   "marginStd": 0.1000299546632124,
+   "marginCons": 0.10623677677029364
   },
   {
    "j": 2,
@@ -58,76 +59,77 @@
    ],
    "events": 16,
    "op": {
-    "std": 6974071,
-    "cons": 6928071
+    "std": 7005223,
+    "cons": 6959223
    },
    "mandatory": 5712,
-   "q": 0,
+   "q": 3840,
    "cb": 0,
-   "need": 9574,
-   "content": 5712,
-   "pad": 3862,
-   "wit": 9574,
-   "unlocking": 9646,
-   "budget": 7749600,
-   "marginStd": 0.10007342314442036,
-   "marginCons": 0.10600921337875502
+   "need": 9572,
+   "content": 9552,
+   "pad": 20,
+   "wit": 9572,
+   "unlocking": 9689,
+   "budget": 7784000,
+   "marginStd": 0.10004843268242547,
+   "marginCons": 0.10595799075025691
   },
   {
    "j": 3,
    "chunks": [
     22,
-    29
+    28
    ],
-   "events": 14,
+   "events": 12,
    "op": {
-    "std": 6638141,
-    "cons": 6592141
+    "std": 5965184,
+    "cons": 5919184
    },
-   "mandatory": 5232,
-   "q": 2496,
+   "mandatory": 4560,
+   "q": 0,
    "cb": 0,
-   "need": 9107,
-   "content": 7728,
-   "pad": 1379,
-   "wit": 9107,
-   "unlocking": 9179,
-   "budget": 7376000,
-   "marginStd": 0.10003511388286335,
-   "marginCons": 0.10627155639913233
+   "need": 8127,
+   "content": 4560,
+   "pad": 3567,
+   "wit": 8127,
+   "unlocking": 8244,
+   "budget": 6628000,
+   "marginStd": 0.10000241400120702,
+   "marginCons": 0.10694266747133374
   },
   {
    "j": 4,
    "chunks": [
-    29,
+    28,
     32
    ],
-   "events": 6,
+   "events": 8,
    "op": {
-    "std": 5194895,
-    "cons": 5148895
+    "std": 5930370,
+    "cons": 5884370
    },
-   "mandatory": 2352,
+   "mandatory": 3024,
    "q": 0,
-   "cb": 7000,
-   "need": 7103,
-   "content": 9352,
-   "pad": 0,
-   "wit": 9352,
-   "unlocking": 9424,
-   "budget": 7572000,
-   "marginStd": 0.3139335710512414,
-   "marginCons": 0.3200085842577919
+   "cb": 3500,
+   "need": 8079,
+   "content": 6524,
+   "pad": 1555,
+   "wit": 8079,
+   "unlocking": 8196,
+   "budget": 6589600,
+   "marginStd": 0.10004097365545706,
+   "marginCons": 0.10702167051110845
   }
  ],
- "bytes": 47058,
- "score": 47468,
- "pad": 8882,
+ "bytes": 45024,
+ "score": 45434,
+ "pad": 6623,
  "cuts": [
   0,
   7,
   14,
   22,
-  29
- ]
+  28
+ ],
+ "hub": 0
 }

@@ -2,156 +2,158 @@
  "N": 6,
  "margin": 0.15,
  "variant": "base",
+ "parts": 2,
  "ok": true,
  "ins": [
   {
    "j": 0,
    "chunks": [
     0,
-    6
+    4
    ],
-   "events": 12,
+   "events": 8,
    "op": {
-    "std": 6256575,
-    "cons": 6211575
+    "std": 4878200,
+    "cons": 4834200
    },
-   "mandatory": 5280,
+   "mandatory": 3936,
    "q": 0,
    "cb": 0,
-   "need": 9088,
-   "content": 5280,
-   "pad": 3808,
-   "wit": 9088,
-   "unlocking": 9160,
-   "budget": 7360800,
-   "marginStd": 0.15001426475383106,
-   "marginCons": 0.1561277306814477
+   "need": 7016,
+   "content": 3936,
+   "pad": 3080,
+   "wit": 7016,
+   "unlocking": 7133,
+   "budget": 5739200,
+   "marginStd": 0.15002090883746866,
+   "marginCons": 0.15768748257596876
   },
   {
    "j": 1,
    "chunks": [
-    6,
-    12
+    4,
+    10
    ],
    "events": 12,
    "op": {
-    "std": 5933637,
-    "cons": 5887637
+    "std": 5965424,
+    "cons": 5919424
    },
    "mandatory": 4560,
-   "q": 1920,
+   "q": 4032,
    "cb": 0,
-   "need": 8613,
-   "content": 6480,
-   "pad": 2133,
-   "wit": 8613,
-   "unlocking": 8685,
-   "budget": 6980800,
-   "marginStd": 0.1500061597524639,
-   "marginCons": 0.15659566238826494
+   "need": 8615,
+   "content": 8592,
+   "pad": 23,
+   "wit": 8615,
+   "unlocking": 8732,
+   "budget": 7018400,
+   "marginStd": 0.15003077624529804,
+   "marginCons": 0.15658497663285076
   },
   {
    "j": 2,
    "chunks": [
-    12,
-    16
+    10,
+    15
    ],
-   "events": 8,
+   "events": 10,
    "op": {
-    "std": 4153348,
-    "cons": 4107348
+    "std": 4890556,
+    "cons": 4844556
    },
-   "mandatory": 3024,
+   "mandatory": 3696,
    "q": 0,
    "cb": 0,
-   "need": 5995,
-   "content": 3024,
-   "pad": 2971,
-   "wit": 5995,
-   "unlocking": 6067,
-   "budget": 4886400,
-   "marginStd": 0.15001882776686315,
-   "marginCons": 0.15943271119842828
+   "need": 7034,
+   "content": 3696,
+   "pad": 3338,
+   "wit": 7034,
+   "unlocking": 7151,
+   "budget": 5753600,
+   "marginStd": 0.15000069521690762,
+   "marginCons": 0.1579956896551724
   },
   {
    "j": 3,
    "chunks": [
-    16,
+    15,
     22
    ],
-   "events": 12,
+   "events": 14,
    "op": {
-    "std": 5563751,
-    "cons": 5517751
+    "std": 6300140,
+    "cons": 6254140
    },
-   "mandatory": 4368,
+   "mandatory": 5040,
    "q": 0,
-   "cb": 0,
-   "need": 8069,
-   "content": 4368,
-   "pad": 3701,
-   "wit": 8069,
-   "unlocking": 8141,
-   "budget": 6545600,
-   "marginStd": 0.1500013749694451,
-   "marginCons": 0.15702899657785385
+   "cb": 3500,
+   "need": 9107,
+   "content": 8540,
+   "pad": 567,
+   "wit": 9107,
+   "unlocking": 9224,
+   "budget": 7412000,
+   "marginStd": 0.15000809498111167,
+   "marginCons": 0.15621424716675658
   },
   {
    "j": 4,
    "chunks": [
     22,
-    29
+    27
    ],
-   "events": 14,
+   "events": 10,
    "op": {
-    "std": 6637141,
-    "cons": 6591141
+    "std": 5260331,
+    "cons": 5214331
    },
-   "mandatory": 5232,
-   "q": 4416,
+   "mandatory": 3888,
+   "q": 2304,
    "cb": 0,
-   "need": 9648,
-   "content": 9648,
-   "pad": 0,
-   "wit": 9648,
-   "unlocking": 9720,
-   "budget": 7808800,
-   "marginStd": 0.1500434125601885,
-   "marginCons": 0.15593420243827472
+   "need": 7578,
+   "content": 6192,
+   "pad": 1386,
+   "wit": 7578,
+   "unlocking": 7695,
+   "budget": 6188800,
+   "marginStd": 0.15002407574974141,
+   "marginCons": 0.15745685754912098
   },
   {
    "j": 5,
    "chunks": [
-    29,
+    27,
     32
    ],
-   "events": 6,
+   "events": 10,
    "op": {
-    "std": 5158895,
-    "cons": 5112895
+    "std": 6635223,
+    "cons": 6589223
    },
-   "mandatory": 2352,
+   "mandatory": 3696,
    "q": 0,
-   "cb": 7000,
-   "need": 7474,
-   "content": 9352,
-   "pad": 0,
-   "wit": 9352,
-   "unlocking": 9424,
-   "budget": 7572000,
-   "marginStd": 0.3186879292128896,
-   "marginCons": 0.32476294241944004
+   "cb": 3500,
+   "need": 9600,
+   "content": 7196,
+   "pad": 2404,
+   "wit": 9600,
+   "unlocking": 9717,
+   "budget": 7806400,
+   "marginStd": 0.15002779770444763,
+   "marginCons": 0.1559203986472638
   }
  ],
- "bytes": 51197,
- "score": 51685,
- "pad": 12613,
+ "bytes": 49652,
+ "score": 50140,
+ "pad": 10798,
  "cuts": [
   0,
-  6,
-  12,
-  16,
+  4,
+  10,
+  15,
   22,
-  29
- ]
+  27
+ ],
+ "hub": 0
 }

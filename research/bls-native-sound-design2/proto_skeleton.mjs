@@ -7,7 +7,7 @@
 // the curve / range / nibble checks. The event loop itself is measured by proto_worker.mjs; here the terminal role
 // takes the post-loop values (T, F+-, R) from the value-level split as constants (marked), so the final identity is
 // really checked in the VM. Writes skeleton.json with the measured setup and terminal costs.
-//   node proto_skeleton.mjs [layout.json=layout-e5.json] [seed=3]
+//   node proto_skeleton.mjs [layout.json=layout-rec.json] [seed=3]
 import assert from 'node:assert/strict';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createVirtualMachineBch2026, encodeDataPush, hash256, sha256 as SHA} from '@bitauth/libauth';
@@ -21,13 +21,24 @@ const OPX = {INPUTINDEX: 0xc0, TXINPUTCOUNT: 0xc3, UTXOBYTECODE: 0xc7, INPUTBYTE
 const ITERS = Number(process.env.SCHED_ITERS ?? 2000);
 const ZP = ['z', 'z2', 'z3', 'z4', 'z5', 'z6'], EZP = ['ez', 'ez2', 'ez3', 'ez4', 'ez5', 'z6'];
 
+// model layout -> split layout (hub = 0 in the prototypes; cb slots from the model's blob placement)
+export const layoutFromModel = (L) => { assert.ok((L.hub ?? 0) === 0, 'prototype assumes hub = input 0');
+  return {N: L.ins.length, bcast: L.variant === 'bcast', chunks: L.ins.map((x) => x.chunks), q: L.ins.map((x) => x.q / W), pad: L.ins.map((x) => x.pad),
+    cbSlots: L.ins.filter((x) => x.cb).map((x) => ({host: x.j, slot: x.cb}))}; };
 // ---------------- uniform redeem (loader) ----------------
-export function buildRedeem(N, holder, cbOffset, cbLen, cbHash) {
+// parts: [{host, off (byte offset in the host's unlocking bytecode), len}] in blob order; the parts are concatenated,
+// hashed once (SHA-256) and defined as function 0
+export function buildRedeem(N, parts, cbHash) {
+  const load = parts.flatMap(({host, off, len}, k) => [...pushNum(host), OPX.INPUTBYTECODE, ...pushNum(off), OP.SPLIT, OP.NIP, ...pushNum(len), OP.SPLIT, OP.DROP, ...(k ? [OP.CAT] : [])]);
   return Uint8Array.from([OPX.TXINPUTCOUNT, ...pushNum(N), OP.NUMEQUALVERIFY,
     OP[0], OP.BEGIN, OP.DUP, OPX.UTXOBYTECODE, OPX.INPUTINDEX, OPX.UTXOBYTECODE, OP.EQUALVERIFY, OP.ADD1, OP.DUP, ...pushNum(N), OP.NUMEQUAL, OP.UNTIL, OP.DROP,
-    ...pushNum(holder), OPX.INPUTBYTECODE, ...pushNum(cbOffset), OP.SPLIT, OP.NIP, ...pushNum(cbLen), OP.SPLIT, OP.DROP,
-    OP.DUP, OP.SHA256, ...pushData(cbHash), OP.EQUALVERIFY, OP[0], OP.DEFINE, OP[0], OP.INVOKE]);
+    ...load, OP.DUP, OP.SHA256, ...pushData(cbHash), OP.EQUALVERIFY, OP[0], OP.DEFINE, OP[0], OP.INVOKE]);
 }
+// blob parts: fixed slots per host (the hosts' padding absorbs any unused slot bytes, so witness sizes never depend on the blob)
+const slotsOf = (layout, opts) => layout.cbSlots ?? [{host: layout.cbHost, slot: opts.blobSlot ?? 6800}];
+const layWith = (layout, slots, n) => { const parts = []; let left = n; for (const {host, slot} of slots) { const len = Math.min(slot, left); parts.push({host, len}); left -= len; }
+  assert.equal(left, 0, 'blob exceeds its slots'); return {...layout, cbParts: parts, pad: layout.pad.map((x, j) => x + slots.filter((q) => q.host === j).reduce((a, q) => a + q.slot, 0) - parts.filter((q) => q.host === j).reduce((a, q) => a + q.len, 0))}; };
+const redeemFor = (layout, s, blob) => buildRedeem(layout.N, s.layoutUsed.cbParts.filter((x) => x.len > 0).map(({host, len}) => ({host, off: 3 + s.offsets[host].CB, len})), SHA.hash(blob));
 
 // ---------------- the role program (blob = prologue + code) ----------------
 export function buildMain(s, layout, role, {terminal = false, stop} = {}) {
@@ -144,7 +155,8 @@ export function buildMain(s, layout, role, {terminal = false, stop} = {}) {
   mark('out');
   if (j + 1 < N) {
     a.push(j + 1).op(OPX.INPUTBYTECODE, 1, 'u').push(3 + at[j + 1].IN).op(OP.SPLIT, 2, 'ul', 'u').drop('ul').push(7 * W).op(OP.SPLIT, 2, 'nx', 'ur').drop('ur');
-    for (const n of ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'R']) { a.invoke('RD', ['v', 'nx']); a.roll('v').roll(n).op(OP.NUMEQUALVERIFY, 2); }
+    // (computed - claimed) mod p == 0: the loop's values may be unreduced or negative; the successor's words are canonical (RD)
+    for (const n of ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'R']) { a.invoke('RD', ['v', 'nx']); a.roll('v').roll(n).op(OP.SUB, 2, 'df').pick('p').op(OP.MOD, 2, 'dm').op(OP.NOT, 1, 'eq').op(OP.VERIFY, 1); }
     a.drop('nx');
   }
   if (terminal) {
@@ -214,11 +226,11 @@ const vms = {cons: createVirtualMachineBch2026(false), std: createVirtualMachine
 const p2sh32 = (redeem) => Uint8Array.from([0xaa, 0x20, ...hash256(redeem), 0x87]);
 // transaction builder for rejection tests: the honest 5-input transaction for `role`'s blob, plus an evaluator
 export function prepare(layout, seed, role, opts = {}) {
-  const BLOB_SLOT = opts.blobSlot ?? 6800; const lay = (n) => ({...layout, pad: layout.pad.map((x, j) => (j === layout.cbHost ? x + BLOB_SLOT - n : x))});
+  const slots = slotsOf(layout, opts); const lay = (n) => layWith(layout, slots, n);
   let blobLen = 3000, built, s;
   for (let it = 0; it < 4; it++) { s = buildSplit(randProof(seed), lay(blobLen), {blob: Buffer.alloc(blobLen, 0x61)}); built = buildMain(s, lay(blobLen), role, opts); if (built.blob.length === blobLen) break; blobLen = built.blob.length; }
-  s = buildSplit(randProof(seed), lay(blobLen), {blob: Buffer.from(built.blob)}); const blob = built.blob;
-  const R = buildRedeem(layout.N, layout.cbHost, 3 + s.offsets[layout.cbHost].CB, blob.length, SHA.hash(blob)); const lock = p2sh32(R);
+  s = buildSplit(randProof(seed), lay(blobLen), {blob: Buffer.from(built.blob)}); s.layoutUsed = lay(blobLen); const blob = built.blob;
+  const R = redeemFor(layout, s, blob); const lock = p2sh32(R);
   const unlOf = (Wj, red = R) => Wj.map((x) => Uint8Array.from([...encodeDataPush(x), ...encodeDataPush(red)]));
   const txOf = (unl) => ({version: 2, locktime: 0, inputs: unl.map((u, i) => ({outpointIndex: i, outpointTransactionHash: new Uint8Array(32).fill(i + 1), sequenceNumber: 0, unlockingBytecode: u})), outputs: [{lockingBytecode: Uint8Array.of(0x6a), valueSatoshis: 0n}]});
   const srcOf = (n, lk = lock) => Array.from({length: n}, () => ({lockingBytecode: lk, valueSatoshis: 1000n}));
@@ -229,17 +241,15 @@ export function prepare(layout, seed, role, opts = {}) {
 export function runRole(layout, seed, role, opts = {}) {
   // fixed point: the blob's size enters the holder's witness size (a pushed constant in the blob)
   // the holder's padding absorbs the blob length so every witness size (and so the transcript) is independent of it
-  const BLOB_SLOT = opts.blobSlot ?? 6800; const lay = (n) => ({...layout, pad: layout.pad.map((x, j) => (j === layout.cbHost ? x + BLOB_SLOT - n : x))});
+  const slots = slotsOf(layout, opts); const lay = (n) => layWith(layout, slots, n);
   let blobLen = 3000, built, s;
   for (let it = 0; it < 4; it++) {
     s = buildSplit(randProof(seed), lay(blobLen), {blob: Buffer.alloc(blobLen, 0x61)});
     built = buildMain(s, lay(blobLen), role, opts); if (built.blob.length === blobLen) break; blobLen = built.blob.length;
   }
-  assert.ok(blobLen <= BLOB_SLOT, 'blob exceeds its slot');
-  s = buildSplit(randProof(seed), lay(blobLen), {blob: Buffer.from(built.blob)}); const built2 = buildMain(s, lay(blobLen), role, opts);
+  s = buildSplit(randProof(seed), lay(blobLen), {blob: Buffer.from(built.blob)}); s.layoutUsed = lay(blobLen); const built2 = buildMain(s, lay(blobLen), role, opts);
   assert.deepEqual(built2.blob, built.blob, 'blob fixed point'); const blob = built.blob;
-  const cbOff = 3 + s.offsets[layout.cbHost].CB;
-  const R = buildRedeem(layout.N, layout.cbHost, cbOff, blob.length, SHA.hash(blob));
+  const R = redeemFor(layout, s, blob);
   const lock = p2sh32(R);
   const unl = s.Wj.map((x) => Uint8Array.from([...encodeDataPush(x), ...encodeDataPush(R)]));
   unl.forEach((u, j) => assert.equal(u[0], 0x4d, 'PUSHDATA2 header for W_' + j));
@@ -267,8 +277,8 @@ export function runRole(layout, seed, role, opts = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const L = JSON.parse(readFileSync(process.argv[2] ?? 'layout-e5.json'));
-  const layout = {N: L.ins.length, bcast: L.variant === 'bcast', chunks: L.ins.map((x) => x.chunks), q: L.ins.map((x) => x.q / W), cbHost: L.ins.findIndex((x) => x.cb), pad: L.ins.map((x) => x.pad)};
+  const L = JSON.parse(readFileSync(process.argv[2] ?? 'layout-rec.json'));
+  const layout = layoutFromModel(L);
   const seed = Number(process.argv[3] ?? 3); const res = [];
   for (let role = 0; role < layout.N; role++) {
     const terminal = role === layout.N - 1; const o = runRole(layout, seed, role, {terminal}); res.push(o);

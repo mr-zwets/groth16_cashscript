@@ -13,20 +13,20 @@
    ],
    "events": 10,
    "op": {
-    "std": 5958905,
-    "cons": 5910905
+    "std": 5960109,
+    "cons": 5913109
    },
    "mandatory": 8592,
    "q": 0,
    "cb": 0,
-   "need": 9153,
+   "need": 9155,
    "content": 8592,
-   "pad": 561,
-   "wit": 9153,
-   "unlocking": 9270,
-   "budget": 7448800,
-   "marginStd": 0.2000181237246268,
-   "marginCons": 0.20646211470303943
+   "pad": 563,
+   "wit": 9155,
+   "unlocking": 9272,
+   "budget": 7450400,
+   "marginStd": 0.20002832062708042,
+   "marginCons": 0.20633670675399973
   },
   {
    "j": 1,
@@ -36,20 +36,20 @@
    ],
    "events": 14,
    "op": {
-    "std": 5908307,
-    "cons": 5898307
+    "std": 5924258,
+    "cons": 5914258
    },
    "mandatory": 5232,
    "q": 3840,
    "cb": 0,
-   "need": 9074,
+   "need": 9099,
    "content": 9072,
-   "pad": 2,
-   "wit": 9074,
-   "unlocking": 9191,
-   "budget": 7385600,
-   "marginStd": 0.2000234239601386,
-   "marginCons": 0.20137741009532062
+   "pad": 27,
+   "wit": 9099,
+   "unlocking": 9216,
+   "budget": 7405600,
+   "marginStd": 0.2000299773144647,
+   "marginCons": 0.20138030679485797
   },
   {
    "j": 2,
@@ -59,20 +59,20 @@
    ],
    "events": 16,
    "op": {
-    "std": 6242351,
-    "cons": 6232351
+    "std": 6258947,
+    "cons": 6248947
    },
    "mandatory": 5712,
    "q": 0,
    "cb": 3500,
-   "need": 9596,
+   "need": 9622,
    "content": 9212,
-   "pad": 384,
-   "wit": 9596,
-   "unlocking": 9713,
-   "budget": 7803200,
-   "marginStd": 0.200026783883535,
-   "marginCons": 0.20130830941152345
+   "pad": 410,
+   "wit": 9622,
+   "unlocking": 9739,
+   "budget": 7824000,
+   "marginStd": 0.20003233640081797,
+   "marginCons": 0.20131045501022493
   },
   {
    "j": 3,
@@ -82,20 +82,20 @@
    ],
    "events": 14,
    "op": {
-    "std": 5907537,
-    "cons": 5897537
+    "std": 5924337,
+    "cons": 5914337
    },
    "mandatory": 5232,
    "q": 2496,
    "cb": 0,
-   "need": 9073,
+   "need": 9099,
    "content": 7728,
-   "pad": 1345,
-   "wit": 9073,
-   "unlocking": 9190,
-   "budget": 7384800,
-   "marginStd": 0.20004103022424435,
-   "marginCons": 0.20139516303759075
+   "pad": 1371,
+   "wit": 9099,
+   "unlocking": 9216,
+   "budget": 7405600,
+   "marginStd": 0.20001930971156967,
+   "marginCons": 0.20136963919196282
   },
   {
    "j": 4,
@@ -105,25 +105,25 @@
    ],
    "events": 10,
    "op": {
-    "std": 5873247,
-    "cons": 5863247
+    "std": 5889223,
+    "cons": 5879223
    },
    "mandatory": 3696,
    "q": 0,
    "cb": 3500,
-   "need": 9019,
+   "need": 9044,
    "content": 7196,
-   "pad": 1823,
-   "wit": 9019,
-   "unlocking": 9136,
-   "budget": 7341600,
-   "marginStd": 0.20000449493298467,
-   "marginCons": 0.20136659583741967
+   "pad": 1848,
+   "wit": 9044,
+   "unlocking": 9161,
+   "budget": 7361600,
+   "marginStd": 0.2000077428819822,
+   "marginCons": 0.20136614322973267
   }
  ],
- "bytes": 46500,
- "score": 46910,
- "pad": 4115,
+ "bytes": 46604,
+ "score": 47014,
+ "pad": 4219,
  "cuts": [
   0,
   5,

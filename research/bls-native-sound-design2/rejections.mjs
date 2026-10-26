@@ -1,15 +1,15 @@
 // Ordinary rejection tests on the VM skeleton (bcast layout): each mutation of the honest 5-input transaction must make
 // the input whose check owns it fail (standard and consensus). The positive control must be accepted.
-//   node rejections.mjs [layout=layout-bcast-n5.json] [seed=3]
+//   node rejections.mjs [layout=layout-rec.json] [seed=3]
 import assert from 'node:assert/strict';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {encodeDataPush} from '@bitauth/libauth';
 import {p} from './blsmath.mjs';
 import {le, rdle} from './protocol.mjs';
-import {prepare} from './proto_skeleton.mjs';
+import {prepare, layoutFromModel} from './proto_skeleton.mjs';
 import {W, BC_NAMES} from './split.mjs';
-const L = JSON.parse(readFileSync(process.argv[2] ?? 'layout-bcast-n5.json')); const seed = Number(process.argv[3] ?? 3);
-const layout = {N: L.ins.length, bcast: L.variant === 'bcast', chunks: L.ins.map((x) => x.chunks), q: L.ins.map((x) => x.q / W), cbHost: L.ins.findIndex((x) => x.cb), pad: L.ins.map((x) => x.pad)};
+const L = JSON.parse(readFileSync(process.argv[2] ?? 'layout-rec.json')); const seed = Number(process.argv[3] ?? 3);
+const layout = layoutFromModel(L);
 const N = layout.N, T = N - 1; const preps = new Map(); const P = (role) => { if (!preps.has(role)) preps.set(role, prepare(layout, seed, role, {terminal: role === T})); return preps.get(role); };
 const results = []; let failures = 0;
 const run = (name, role, mutate, {expect = 'reject'} = {}) => {
@@ -37,7 +37,7 @@ run('a sibling with a foreign locking', 0, (c) => c.foreignLock(2));
 run('inputs 1 and 2 swapped', 1, (c) => c.swap(1, 2));
 run('witness one byte longer', 2, (c) => { c.Wj[2] = Buffer.concat([c.Wj[2], Buffer.of(0)]); });
 run('an extra push before the witness', 3, (c) => { c.extraPush = true; });
-run('code blob tampered (one byte)', 0, (c) => { const h = layout.cbHost; c.Wj[h][P(0).s.offsets[h].CB + 10] ^= 1; });
+for (const {host} of layout.cbSlots) run(`code blob part in input ${host} tampered (one byte)`, 0, (c) => { c.Wj[host][P(0).s.offsets[host].CB + 10] ^= 1; });
 // constants
 run('delta constant tampered (input 2)', 2, (c) => { c.Wj[2][at(2).K + 5] ^= 1; });
 // transcript (the hub derives z from every input's phase-1 slice and the quotient; the broadcast then mismatches)

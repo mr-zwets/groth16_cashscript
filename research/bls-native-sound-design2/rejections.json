@@ -70,7 +70,14 @@
   "ok": true
  },
  {
-  "name": "code blob tampered (one byte)",
+  "name": "code blob part in input 2 tampered (one byte)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "code blob part in input 4 tampered (one byte)",
   "role": 0,
   "std": "Program failed an OP_VERIFY operation.",
   "cons": "Program failed an OP_VERIFY operation.",

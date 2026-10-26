@@ -24,7 +24,7 @@ const SHARED_WORDS = {base: 0, bcast: SK.bcast.bcastWords};
 const overhead = (n) => 20 + 43 * n + 35 * n; // tx framing + spent P2SH32 lockings (scored)
 // per-input setup op by variant and role (VM-measured in proto_skeleton.mjs)
 let HUB = 0; // the input that derives the challenges (bcast); searched below
-const setup = (j, mode) => SK[VARIANT][j === HUB ? 'first' : 'other'][mode] + (j === N - 1 ? SK.terminalExtraSetup : 0) + 15000 * (PARTS - 1);
+const setup = (j, mode) => SK[VARIANT][j === HUB ? 'first' : 'other'][mode] + (j === N - 1 ? SK.terminalExtraSetup : 0) + 30000 * (PARTS - 1);
 function evaluate(cuts) {
   const ins = [];
   for (let j = 0; j < N; j++) {
