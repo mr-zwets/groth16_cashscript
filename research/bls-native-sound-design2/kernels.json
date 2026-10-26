@@ -1,0 +1,54 @@
+{
+ "BDbl": {
+  "op": 245796,
+  "bytes": 423
+ },
+ "BAdd": {
+  "op": 329136,
+  "bytes": 571
+ },
+ "DStep": {
+  "op": 79483,
+  "bytes": 155
+ },
+ "DBaked": {
+  "op": 33042,
+  "bytes": 47
+ },
+ "Eval": {
+  "op": 28260,
+  "bytes": 46
+ },
+ "Table16": {
+  "op": 92580,
+  "bytes": 111
+ },
+ "Boundary": {
+  "op": 15273,
+  "bytes": 24
+ },
+ "GlsMul": {
+  "op": 15048,
+  "bytes": 7
+ },
+ "Horner4": {
+  "op": 18700,
+  "bytes": 29
+ },
+ "Powers": {
+  "op": 110255,
+  "bytes": 138
+ },
+ "G1Check": {
+  "op": 19013,
+  "bytes": 15
+ },
+ "G2Check": {
+  "op": 49836,
+  "bytes": 84
+ },
+ "RD48": {
+  "op": 1493,
+  "bytes": 14
+ }
+}

@@ -1,0 +1,205 @@
+[
+ {
+  "name": "honest transaction",
+  "role": 0,
+  "std": "accepted",
+  "cons": "accepted",
+  "ok": true
+ },
+ {
+  "name": "honest transaction",
+  "role": 1,
+  "std": "accepted",
+  "cons": "accepted",
+  "ok": true
+ },
+ {
+  "name": "honest transaction",
+  "role": 2,
+  "std": "accepted",
+  "cons": "accepted",
+  "ok": true
+ },
+ {
+  "name": "honest transaction",
+  "role": 3,
+  "std": "accepted",
+  "cons": "accepted",
+  "ok": true
+ },
+ {
+  "name": "honest transaction",
+  "role": 4,
+  "std": "accepted",
+  "cons": "accepted",
+  "ok": true
+ },
+ {
+  "name": "extra (6th) input",
+  "role": 1,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "a sibling with a foreign locking",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "inputs 1 and 2 swapped",
+  "role": 1,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "witness one byte longer",
+  "role": 2,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "an extra push before the witness",
+  "role": 3,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "code blob part in input 2 tampered (one byte)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "code blob part in input 4 tampered (one byte)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "delta constant tampered (input 2)",
+  "role": 2,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "state word tampered (input 3 phase-1 slice)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "statement word tampered (x_A)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "quotient word tampered",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "GLS nibble tampered",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "broadcast word z changed (+1)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "broadcast word rho changed (+1)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "broadcast word cp changed (+1)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "broadcast word TP0_7 changed (+1)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "broadcast word TM1_0 changed (+1)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "broadcast word z aliased (+p, non-canonical)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "handoff T word changed in input 2 (producer 1 checks)",
+  "role": 1,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "handoff R changed in input 3 (producer 2 checks)",
+  "role": 2,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "handoff word aliased +p (consumer 2 decodes)",
+  "role": 2,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "s^c tampered: transcript changes (hub)",
+  "role": 0,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "public input n0 + 1 (terminal: binding)",
+  "role": 4,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ },
+ {
+  "name": "quotient word changed (terminal: final identity)",
+  "role": 4,
+  "std": "Program failed an OP_VERIFY operation.",
+  "cons": "Program failed an OP_VERIFY operation.",
+  "ok": true
+ }
+]
