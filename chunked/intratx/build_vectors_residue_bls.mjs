@@ -235,6 +235,10 @@ function specsResidueTail(fF, c, cInv, w) {
   }
   return [{
     file: join(GEN, 'finalexpres_00.cash'), inLimbs: commit36, outLimbs: [], extras: wl, role: 'terminal',
+    // The Fp6 residue tail owns the complete Miller boundary. The predecessor
+    // comparison authenticates only its declared prefix; reject a trailing
+    // state suffix before the terminal BIN2NUM reads the boundary.
+    enforceExactInputLength: true,
     label: 'residue Fp6 verdict', checkpoint: 'verify',
   }];
 }
