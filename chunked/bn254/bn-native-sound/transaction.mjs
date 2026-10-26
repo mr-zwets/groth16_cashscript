@@ -1,7 +1,7 @@
 // Unlocking construction for the 3-input transaction, with prover-sized zero fillers.
-//   input 0: [DG] [STMT] [S_0] [DS_0] [C_0] [FILL_0] [R]
+//   input 0: [S_0] [DS_0] [C_0] [FILL_0] [R]
 //   input 1: [S_1] [HAND_1] [DS_1] [C_1] [FILL_1] [R]
-//   input 2: [S_2] [HAND_2] [DS_2] [FILL_2] [WQ] [R]
+//   input 2: [DG] [STMT] [S_2] [HAND_2] [DS_2] [FILL_2] [WQ] [R]
 // The fillers only buy op budget: each is all zero, read by nothing except (FILL_2) the z-tail hash. The honest
 // prover sizes each filler so that the input's STANDARD op cost is at most (1 - MARGIN) of its budget, capped at the
 // 10,000-byte unlocking limit.
@@ -21,9 +21,9 @@ export function unlockingsFor(core, prog, fills) {
   const z = zOf(core, zTail(fills[2], core.WQ)); const {H} = handovers(core, z);
   const F = fills.map((n) => Buffer.alloc(n));
   const pushes = [
-    [core.D, core.STMT, core.S[0], DS[0], prog.pieces[0], F[0], prog.R],
+    [core.S[0], DS[0], prog.pieces[0], F[0], prog.R],
     [core.S[1], H[1], DS[1], prog.pieces[1], F[1], prog.R],
-    [core.S[2], H[2], DS[2], F[2], core.WQ, prog.R],
+    [core.D, core.STMT, core.S[2], H[2], DS[2], F[2], core.WQ, prog.R],
   ];
   return {pushes, unlockings: pushes.map((ps) => Buffer.from(encodeUnlocking(ps))), z, H};
 }

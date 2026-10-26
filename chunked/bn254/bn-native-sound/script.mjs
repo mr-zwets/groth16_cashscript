@@ -13,16 +13,16 @@ const ITERS = Number(process.env.SCHED_ITERS ?? 4000);
 const D_PIECE = 8; // delta slopes per pile piece (512 B)
 
 // ---------------- layout ----------------
-// input 0: [DG 96] [STMT 642] [S_0] [DS_0] [C_0] [FILL_0] [R]
+// input 0: [S_0] [DS_0] [C_0] [FILL_0] [R]
 // input 1: [S_1] [HAND_1 224] [DS_1] [C_1] [FILL_1] [R]
-// input 2: [S_2] [HAND_2 224] [DS_2] [FILL_2] [WQ] [R]
+// input 2: [DG 96] [STMT 642] [S_2] [HAND_2 224] [DS_2] [FILL_2] [WQ] [R]
 // Every byte range another input reads (DG, STMT, HAND_i, C_i, the z-tail ZT) starts before any variable-length push.
 export const CODE_HOSTS = [0, 1];
 export function layoutFor(codeLens, rLen) {
   const fixed = [
-    [['DG', D_SIZE], ['STMT', STMT_SIZE], ['S', ROLES[0].streamSize], ['DS', DS[0].length], ['C', codeLens[0]]],
+    [['S', ROLES[0].streamSize], ['DS', DS[0].length], ['C', codeLens[0]]],
     [['S', ROLES[1].streamSize], ['HAND', HAND_SIZE], ['DS', DS[1].length], ['C', codeLens[1]]],
-    [['S', ROLES[2].streamSize], ['HAND', HAND_SIZE], ['DS', DS[2].length]],
+    [['DG', D_SIZE], ['STMT', STMT_SIZE], ['S', ROLES[2].streamSize], ['HAND', HAND_SIZE], ['DS', DS[2].length]],
   ];
   const pushR = pushLen(rLen);
   const off = fixed.map((items) => { let o = 0; const m = {}; for (const [n, sz] of items) { m[n] = {data: o + pushLen(sz) - sz, size: sz, hdr: hdrOf(sz)}; o += pushLen(sz); } m.end = o; return m; });
@@ -40,7 +40,7 @@ export function redeemFor(lay, Kcode) {
 const TABLES = [0, 1].flatMap((k) => ['TP', 'TM'].flatMap((T) => Array.from({length: 16}, (_, n) => `${T}${k}_${15 - n}`)));
 const ENV = ['z', 'z2', 'z4', 'z5', 'z6', 'ez', 'ez2', 'ez3', 'ez4', 'ez5'];
 const HOT = ['xd0', 'xd1', 'xB0', 'xB1', 'yB0', 'yB1', 'nyB0', 'nyB1', 'Scp', 'Scm', 'yC', 'cz', 'czt', 'z3t', 'yP', 'xz', 'xzt', 'z3', 'p'];
-const STATE0 = ['X0', 'X1', 'Y0', 'Y1', 'W', 'D', 'dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'Fp', 'Fm'];
+const STATE0 = ['R', 'SCH', 'N0', 'N1', 'BND', 'd', 'X0', 'X1', 'Y0', 'Y1', 'W', 'D', 'dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'Fp', 'Fm'];
 const SETUP_OUT = [...TABLES, ...ENV, ...HOT];
 const STMT_OUT = ['xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC', 'n0', 'n1', 'r', 'G', 'sc0', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5'];
 const ZP = ['z', 'z2', 'z3', 'z4', 'z5', 'z6'], EZP = ['ez', 'ez2', 'ez3', 'ez4', 'ez5', 'z6'];
@@ -143,18 +143,31 @@ function defineFunctions(a, WIN) {
     s.op(OP.BIN2NUM, 1, 'n1').roll('w0').op(OP.BIN2NUM, 1, 'n0'); // baked slopes (authenticated by K_DS): < p < 2^254, nonnegative LE numbers
     s.kernel(kDStep(), ['dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'Fp', 'Fm'], {iters: ITERS});
   });
+  // ADDSTEP: the addition of Q = d_e B (d_e from the altstack) with its line, the residue-root factor and the delta step;
+  // BNDSTEP: a chunk boundary (read the state, R <- R rho + F+ S'(-z) - F- S'(z), F+- <- S'(+-z), take the next record).
+  // Both are functions so that an event without them skips 2 instructions instead of the whole body.
+  a.defBound('ADDSTEP', (t) => {
+    t.pick('d', 'dt').push(0).op(OP.LESSTHAN, 2, 'neg').ifElse(
+      (u) => { u.pick('xB0', 'xq0').pick('xB1', 'xq1').pick('nyB0', 'yq0').pick('nyB1', 'yq1').pick('Scp', 'cp').pick('Scm', 'cm'); },
+      (u) => { u.pick('xB0', 'xq0').pick('xB1', 'xq1').pick('yB0', 'yq0').pick('yB1', 'yq1').pick('Scm', 'cp').pick('Scp', 'cm'); });
+    t.invoke('BADD'); for (const n of ['yq1', 'yq0', 'xq1', 'xq0']) t.drop(n);
+    t.pick('xd0', 's0').pick('xd1', 's1'); callBound(t, 'DSTEP');
+  });
+  a.defBound('BNDSTEP', (t) => {
+    t.roll('W');
+    for (let j = 0; j < 6; j++) t.invoke('RD', ['s' + j, 'W']);
+    t.op(OP.SIZE, 1, 'W', 'ws').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1).drop('W'); // the record ends with the state
+    for (const n of ZP) t.pick(n); t.invoke('EV', ['Sp', 'Sm']);
+    const k = new Kernel(); const R = k.in('R');
+    k.output(k.in('Sp'), k.in('Sm'), k.mod(k.sub(k.add(k.mul(R, k.env('rho')), k.mul(k.in('Fp'), k.in('Sm'))), k.mul(k.in('Fm'), k.in('Sp')))));
+    t.kernel(k, ['Fp', 'Fm', 'R'], {iters: 500});
+    t.altPileTake('W'); // the next chunk record (the role's last boundary takes the final piece)
+  });
   // LOOP: events of the role's range, driven by the role's baked schedule (alt: SCH digits, BND boundary flags)
   a.defBound('LOOP', (s0) => s0.loop((s) => {
     s.invoke('BDBL');
     s.pick('dx0', 's0').pick('dx1', 's1').invoke('DSTEP');
-    s.peekAlt('dt').ifElse((t) => {
-      t.peekAlt('dt').push(0).op(OP.LESSTHAN, 2, 'neg').ifElse(
-        (u) => { u.pick('xB0', 'xq0').pick('xB1', 'xq1').pick('nyB0', 'yq0').pick('nyB1', 'yq1').pick('Scp', 'cp').pick('Scm', 'cm'); },
-        (u) => { u.pick('xB0', 'xq0').pick('xB1', 'xq1').pick('yB0', 'yq0').pick('yB1', 'yq1').pick('Scm', 'cp').pick('Scp', 'cm'); });
-      t.invoke('BADD'); for (const n of ['yq1', 'yq0', 'xq1', 'xq0']) t.drop(n);
-      t.pick('xd0', 's0').pick('xd1', 's1').invoke('DSTEP');
-    });
-    for (const n of ['d', 'BND', 'N1', 'N0', 'SCH']) s.fromAlt(n);
+    s.pick('d', 'dt').ifElse((t) => t.invoke('ADDSTEP'));
     s.drop('d').roll('SCH').push(1).op(OP.SPLIT, 2, 'db', 'SCH').roll('db').op(OP.BIN2NUM, 1, 'd');
     s.roll('N0').push(1).op(OP.SPLIT, 2, 'b0', 'N0').roll('b0').op(OP.BIN2NUM, 1, 'i0');
     s.roll('N1').push(1).op(OP.SPLIT, 2, 'b1', 'N1').roll('b1').op(OP.BIN2NUM, 1, 'i1');
@@ -164,19 +177,8 @@ function defineFunctions(a, WIN) {
     }
     s.drop('i0').drop('i1');
     s.roll('BND').push(1).op(OP.SPLIT, 2, 'fb', 'BND').roll('fb').op(OP.BIN2NUM, 1, 'bnd');
-    s.ifElse((t) => {
-      t.fromAlt('R').roll('W');
-      for (let j = 0; j < 6; j++) t.invoke('RD', ['s' + j, 'W']);
-      t.op(OP.SIZE, 1, 'W', 'ws').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1).drop('W'); // the record ends with the state
-      for (const n of ZP) t.pick(n); t.invoke('EV', ['Sp', 'Sm']);
-      const k = new Kernel(); const R = k.in('R');
-      k.output(k.in('Sp'), k.in('Sm'), k.mod(k.sub(k.add(k.mul(R, k.env('rho')), k.mul(k.in('Fp'), k.in('Sm'))), k.mul(k.in('Fm'), k.in('Sp')))));
-      t.kernel(k, ['Fp', 'Fm', 'R'], {iters: 500});
-      t.altPileTake('W'); t.toAlt('R'); // the next chunk record (the role's last boundary takes the final piece)
-    });
+    s.ifElse((t) => t.invoke('BNDSTEP'));
     s.pick('SCH', 'SCHc').op(OP.SIZE, 1, 'SCHc', 'm').op(OP.NIP, 2, 'm').op(OP.NOT, 1, 'last');
-    for (const n of ['SCH', 'N0', 'N1', 'BND', 'd']) s.toAlt(n);
-    s.roll('last');
   }, {onExit: (nat) => { const w = nat.slice(nat.length - WIN.length); if (w.join() !== WIN.join()) throw {retryWIN: w}; }}));
 }
 
@@ -207,8 +209,8 @@ const cleanup = (a) => { assert.equal(a.alt.length, 0); assert.equal(a.piles.siz
 
 function roleProgram(i, ctx, lay, WIN) {
   const RL = ROLES[i], SC = SCHEDULE[i], last = i === NROLES - 1;
-  const items = [['DG', 'STMT', 'S', 'DS', 'C', 'FILL'], ['S', 'HAND', 'DS', 'C', 'FILL'], ['S', 'HAND', 'DS', 'FILL', 'WQ']][i];
-  const a = new Asm(items, ctx);
+  const items = [['S', 'DS', 'C', 'FILL'], ['S', 'HAND', 'DS', 'C', 'FILL'], ['DG', 'STMT', 'S', 'HAND', 'DS', 'FILL', 'WQ']][i];
+  const a = new Asm(items, ctx); a.mark('layout');
   // ---- 1. own layout: item count, every size, filler all-zero, quotient length rules, raw unlocking size ----
   a.emit(OP.DEPTH, ...pushNum(items.length), OP.NUMEQUALVERIFY);
   if (last) {
@@ -223,25 +225,27 @@ function roleProgram(i, ctx, lay, WIN) {
   sizeIs(a, 'DS', DS[i].length); a.pick('DS', 'c').op(OP.SHA256, 1, 'h').pushBytes(sha(DS[i])).op(OP.EQUALVERIFY, 2); // K_DS[i]
   if (i > 0) sizeIs(a, 'HAND', HAND_SIZE);
   sizeIs(a, 'S', RL.streamSize);
-  if (i === 0) { sizeIs(a, 'STMT', STMT_SIZE); sizeIs(a, 'DG', D_SIZE); }
+  if (last) { sizeIs(a, 'STMT', STMT_SIZE); sizeIs(a, 'DG', D_SIZE); }
   a.emit(IX.INPUTINDEX); a.st.push('ix'); a.op(IX.INPUTBYTECODE, 1, 'U').op(OP.SIZE, 1, 'U', 'us');
   a.push(lay.rawFixed[i], 'ex').roll('fl').op(OP.ADD, 2, 'ex'); if (last) a.roll('ql').op(OP.ADD, 2, 'ex');
   a.op(OP.NUMEQUALVERIFY, 2);
   if (last) a.op(OP.SIZE, 1, 'U', 'us').push(lay.pushR).op(OP.SUB, 2, 'e').op(OP.SPLIT, 2, 'U', 'rp').drop('rp').push(lay.zt).op(OP.SPLIT, 2, 'j', 'U').op(OP.NIP, 2, 'ZT');
   else a.drop('U');
   // ---- 2. graph ----
-  a.invoke('GRAPH', []);
+  a.mark('graph').invoke('GRAPH', []);
   // ---- 3. remote reads ----
-  const o0 = lay.off[0], dgst = [{name: 'DG', ...o0.DG}, {name: 'STMT', ...o0.STMT}];
-  if (i === 0) { remote(a, lay, 1, [{name: 'Hn', ...lay.off[1].HAND}]); remote(a, lay, 2, [], true); }
-  if (i === 1) { remote(a, lay, 0, dgst); remote(a, lay, 2, [{name: 'Hn', ...lay.off[2].HAND}], true); }
-  if (i === 2) remote(a, lay, 0, dgst);
+  a.mark('remote');
+  const o2 = lay.off[2], dgst = [{name: 'DG', ...o2.DG}, {name: 'STMT', ...o2.STMT}];
+  if (i === 0) { remote(a, lay, 1, [{name: 'Hn', ...lay.off[1].HAND}]); remote(a, lay, 2, dgst, true); }
+  if (i === 1) remote(a, lay, 2, [...dgst, {name: 'Hn', ...o2.HAND}], true);
   // ---- 4. transcript: own digest d_i, then h0, rho, z ----
-  if (i === 0) a.pick('STMT', 'c').pick('S', 'c2').op(OP.CAT, 2, 'c').op(OP.SHA256, 1, 'd'); else a.pick('S', 'c').op(OP.SHA256, 1, 'd');
+  a.mark('transcript');
+  if (last) a.pick('STMT', 'c').pick('S', 'c2').op(OP.CAT, 2, 'c').op(OP.SHA256, 1, 'd'); else a.pick('S', 'c').op(OP.SHA256, 1, 'd');
   a.pick('DG', 'c'); if (i) a.push(32 * i).op(OP.SPLIT, 2, 'x', 'c').op(OP.NIP, 2, 'c'); if (!last) a.push(32).op(OP.SPLIT, 2, 'c', 'x').drop('x');
   a.op(OP.EQUALVERIFY, 2);
   a.arrange(['DG', 'ZT']).invoke('TRANS', ['rho', 'z']);
   // ---- 5. statement (decoded and range-checked by every role) ----
+  a.mark('statement');
   a.roll('STMT').invoke('STMT', STMT_OUT);
   if (!last) for (const n of ['n0', 'n1', 'r']) a.drop(n);
   if (i === 0) { // owner checks: A, C on y^2 = x^3 + 3; B on the twist y^2 = x^3 + b'
@@ -258,6 +262,7 @@ function roleProgram(i, ctx, lay, WIN) {
     a.kernel(k, ['px0', 'px1', 'py0', 'py1'], {iters: 300});
   }
   // ---- 6. the role's nibble slices, stream records, schedule ----
+  a.mark('slices');
   { const A = RL.a, B = RL.b; (last ? a.pick.bind(a) : a.roll.bind(a))('G', 'g');
     if (A) a.push(A).op(OP.SPLIT, 2, 'x', 'g').op(OP.NIP, 2, 'g');
     a.push(B - A).op(OP.SPLIT, 2, 'N0', 'g').push(65 + A - B).op(OP.SPLIT, 2, 'x', 'g').op(OP.NIP, 2, 'g').push(B - A).op(OP.SPLIT, 2, 'N1', 'g').drop('g'); }
@@ -266,13 +271,12 @@ function roleProgram(i, ctx, lay, WIN) {
     for (let k = n - 1; k >= 1; k--) a.push(RL.records.slice(0, k).reduce((x, y) => x + y, 0)).op(OP.SPLIT, 2, 'S', 'rec').toAlt('rec');
     a.rename('S', 'W'); a.alt.splice(-n, n); a.pushAltPile('WSp', n); }
   if (i === 0) a.push(0, 'R'); else a.roll('HAND').invoke('HDEC', ['X0', 'X1', 'Y0', 'Y1', 'Fp', 'Fm', 'R']);
-  a.toAlt('R');
-  a.pushBytes(SC.sch, 'SCH').toAlt('SCH').toAlt('N0').toAlt('N1').pushBytes(SC.bnd, 'BND').toAlt('BND').push(SC.d0, 'd').toAlt('d');
+  a.pushBytes(SC.sch, 'SCH').pushBytes(SC.bnd, 'BND').push(SC.d0, 'd');
   // ---- 7. the delta pile (first piece on top), setup, start state ----
+  a.mark('setup');
   { const nP = DS[i].length / (64 * D_PIECE); assert.ok(Number.isInteger(nP));
     a.roll('DS'); for (let k = nP - 1; k >= 1; k--) a.push(64 * D_PIECE * k).op(OP.SPLIT, 2, 'DS', 'pk' + k).roll('DS');
     a.st.splice(-nP, nP); a.st.push('Dp'); a.piles.set('Dp', nP); }
-  if (process.env.DEBUG_ST) console.error('pre-setup', i, a.st.join(','));
   const keep = last ? ['sc0', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5'] : [];
   for (const n of ['sc0', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5', 'z', 'xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC']) (keep.includes(n) ? a.pick(n) : a.roll(n));
   a.invoke('P', ['p']).invoke('SETUP', SETUP_OUT);
@@ -281,19 +285,20 @@ function roleProgram(i, ctx, lay, WIN) {
   a.arrangeAbove('Dp', WIN);
   a.piles.set('Dp', null); a.piles.set('WSp', null);
   // ---- 8. the event loop ----
-  a.invoke('LOOP');
+  a.mark('loop').invoke('LOOP'); a.mark('post');
   // after the loop every delta piece and every stream record has been taken (fixed by the schedule)
   a.piles.set('Dp', 0); a.piles.set('WSp', 0);
   if (!last) {
     a.roll('D').op(OP.SIZE, 1, 'D', 'ds').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1).drop('D'); a.pileDone('Dp');
     a.roll('W').op(OP.SIZE, 1, 'W', 'ws').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1).drop('W');
-    for (const n of ['d', 'BND', 'N1', 'N0', 'SCH']) a.fromAlt(n).drop(n);
-    a.fromAlt('R'); a.pileDone('WSp');
+    for (const n of ['d', 'BND', 'N1', 'N0', 'SCH']) a.drop(n);
+    a.pileDone('WSp');
     // ---- 9. outgoing handover: canonical encoding of (T, F+, F-, R) == HAND_{i+1} of input i+1 ----
     a.arrange(['X0', 'X1', 'Y0', 'Y1', 'Fp', 'Fm', 'R', 'p']).invoke('HENC', ['HO']).roll('Hn').op(OP.EQUALVERIFY, 2);
-    a.push(1, 'result'); cleanup(a); return a;
+    a.push(1, 'result'); a.mark('cleanup'); cleanup(a); return a;
   }
   // ---- 9'. terminal (last role) ----
+  a.mark('terminal');
   const piles0 = () => { a.piles.set('Dp', 0); a.piles.set('WSp', 0); };
   a.pick('px0', 'xq0').pick('px1', 'xq1').pick('py0', 'yq0').pick('py1', 'yq1').push(1, 'cp').push(1, 'cm'); callBound(a, 'BADD'); piles0();
   for (const n of ['yq1', 'yq0', 'xq1', 'xq0']) a.drop(n);
@@ -308,8 +313,8 @@ function roleProgram(i, ctx, lay, WIN) {
   { const k = new Kernel(); const [X0, X1, Y0, Y1, px0, px1, py0, py1] = ['X0', 'X1', 'Y0', 'Y1', 'px0', 'px1', 'py0', 'py1'].map((n) => k.in(n));
     k.output(k.mod(k.sub(X0, k.mul(k.c(OMEGA), px0))), k.mod(k.sub(X1, k.mul(k.c(OMEGA), px1))), k.mod(k.sub(Y0, py0)), k.mod(k.sub(Y1, py1)));
     a.kernel(k, ['ex0', 'ex1', 'ey0', 'ey1'], {iters: 500}); for (let j = 0; j < 4; j++) a.op(OP.NOT, 1, 'q').op(OP.VERIFY, 1); }
-  for (const n of ['d', 'BND', 'N1', 'N0', 'SCH']) a.fromAlt(n).drop(n);
-  a.fromAlt('R'); a.pileDone('WSp');
+  for (const n of ['d', 'BND', 'N1', 'N0', 'SCH']) a.drop(n);
+  a.pileDone('WSp');
   // F *= Rconst(+-z) * S_c(+-eta z)
   for (let j = 0; j < 6; j++) a.push(VKC.Rconst[j]); for (const n of ZP) a.pick(n); a.invoke('EV', ['rp', 'rm']);
   for (let j = 0; j < 6; j++) a.pick('sc' + j); for (const n of EZP) a.pick(n); a.invoke('EV', ['ep', 'em']);
@@ -326,6 +331,7 @@ function roleProgram(i, ctx, lay, WIN) {
     const [a1, a2] = fr(ZP), [b1, b2] = fr(EZP);
     k.output(m(k.sub(k.add(mul(I('R'), E('rho')), mul(I('Fp'), m(mul(a2, b2)))), mul(I('Fm'), m(mul(a1, b1))))));
     a.kernel(k, ['R'], {iters: 1500}); }
+  a.mark('binding');
   // ---- GT-GLS binding (exact integers): acc_k = sum_e 2^(64-e) TB[N_k[e]] = sum_i u_{k,i} pi_i;  (acc_k - 2^64 sum pi_i - n_k) mod r == 0 ----
   a.push(1, 'pi0').pick('p').pick('r').op(OP.SUB, 2, 'pi1').pick('pi1').pick('pi1').op(OP.MUL, 2, 'q').pick('r').op(OP.MOD, 2, 'pi2')
     .pick('pi1').pick('pi2').op(OP.MUL, 2, 'q').pick('r').op(OP.MOD, 2, 'pi3').invoke('TA', Array.from({length: 16}, (_, n) => `TB_${15 - n}`));
@@ -338,6 +344,7 @@ function roleProgram(i, ctx, lay, WIN) {
   a.push(PI_SUM_OFFSET, 'pso');
   for (const k of [0, 1]) a.roll('acc' + k).roll('n' + k).op(OP.SUB, 2, 'dn').pick('pso').op(OP.SUB, 2, 'dn2').pick('r').op(OP.MOD, 2, 'dr').op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1);
   a.drop('pso').drop('r');
+  a.mark('quotient');
   // ---- quotient: Q(z) = z q(z^2), Horner over WQ (highest first), 4 words per step, each word < p ----
   a.push(0).push(96).op(OP.NUM2BIN, 2, 'zeros').push(128).pick('WQ').op(OP.SIZE, 1, 'WQ_', 'qs').op(OP.NIP, 2, 'qs').push(128).op(OP.MOD, 2, 'qr').op(OP.SUB, 2, 'pad')
     .push(128).op(OP.MOD, 2, 'pad').op(OP.SPLIT, 2, 'zp', 'zr').drop('zr').roll('WQ').op(OP.CAT, 2, 'WQ');
@@ -356,23 +363,29 @@ function roleProgram(i, ctx, lay, WIN) {
     const Mz = k.add(k.sub(k.mul(z6, z6), k.mul(k.c(18n), z6)), k.c(82n));
     k.output(k.mod(k.sub(k.in('R'), k.mul(k.mod(k.mul(k.env('z'), k.in('acc'))), k.mod(Mz))))); a.kernel(k, ['fin'], {iters: 300}); }
   a.op(OP.NOT, 1, 'result');
-  cleanup(a); return a;
+  a.mark('cleanup'); cleanup(a); return a;
 }
 
 // ---------------- the program ----------------
-// body = definitions of every function (ids 2..N), then OP_INPUTINDEX dispatch into the role programs
+// body = definitions of every function (ids 2..N) and of the role programs (ids ROLE_ID + i), then
+// OP_INPUTINDEX <ROLE_ID> OP_ADD OP_INVOKE: each input runs only its own role (an unexecuted branch would still
+// cost 100 per skipped instruction); an input index without a role program fails (undefined function)
 function genBody(lay, WIN) {
   const ctx = {funcs: new Map(), nextId: 2, defs: []};
   const a0 = new Asm([], ctx); defineFunctions(a0, WIN);
   const roles = [0, 1, 2].map((i) => roleProgram(i, ctx, lay, WIN));
   const pro = []; for (const f of [...ctx.defs].sort((x, y) => x.id - y.id)) pro.push(...pushData(f.code), ...pushNum(f.id), OP.DEFINE);
-  const code = Uint8Array.from([...pro, IX.INPUTINDEX, OP.DUP, OP.NOT, OP.IF, OP.DROP, ...roles[0].code, OP.ELSE, ...pushNum(1), OP.NUMEQUAL,
-    OP.IF, ...roles[1].code, OP.ELSE, ...roles[2].code, OP.ENDIF, OP.ENDIF]);
-  return {code, roles: roles.map((x) => x.code.length), prologue: pro.length, funcs: Object.fromEntries([...ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [n, {id: f.id, bytes: f.code.length}]))};
+  const ROLE_ID = ctx.nextId; const offs = [];
+  roles.forEach((x, i) => { const pd = pushData(x.code); offs.push(pro.length + pd.length - x.code.length); pro.push(...pd, ...pushNum(ROLE_ID + i), OP.DEFINE); });
+  const code = Uint8Array.from([...pro, IX.INPUTINDEX, ...pushNum(ROLE_ID), OP.ADD, OP.INVOKE]);
+  const marks = roles.flatMap((x, i) => x.marks.map((m) => ({name: `r${i}:${m.name}`, off: offs[i] + m.off, role: i, roff: m.off})));
+  const funcCodes = Object.fromEntries([...ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [n, Uint8Array.from(f.code)]));
+  roles.forEach((x, i) => { funcCodes['role' + i] = Uint8Array.from(x.code); });
+  return {code, marks, roles: roles.map((x) => x.code.length), roleId: ROLE_ID, prologue: pro.length, funcs: Object.fromEntries([...ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [n, {id: f.id, bytes: f.code.length}])), funcCodes};
 }
 // code piece split: input 0 and input 1 host the code; by default balance their unlocking content
 const SPLIT0 = process.env.CODE_SPLIT0 ? Number(process.env.CODE_SPLIT0) : null;
-const splitLens = (total) => { const c0 = ROLES[0].streamSize + DS[0].length + D_SIZE + STMT_SIZE, c1 = ROLES[1].streamSize + DS[1].length + HAND_SIZE;
+const splitLens = (total) => { const c0 = ROLES[0].streamSize + DS[0].length, c1 = ROLES[1].streamSize + DS[1].length + HAND_SIZE;
   const L0 = SPLIT0 ?? Math.max(256, Math.min(total - 256, Math.round((total + c1 - c0) / 2))); return [L0, total - L0]; };
 export function buildProgram() {
   let WIN = [...SETUP_OUT, 'rho', ...STATE0];
@@ -385,7 +398,7 @@ export function buildProgram() {
     if (nl[0] === lens[0] && nl[1] === lens[1]) {
       const Kcode = sha(body.code); const R = redeemFor(lay, Kcode); assert.equal(R.length, rLen0);
       const pieces = [body.code.subarray(0, lens[0]), body.code.subarray(lens[0])];
-      return {code: body.code, pieces, R, Kcode, lay, info: {roles: body.roles, prologue: body.prologue, funcs: body.funcs, WIN}};
+      return {code: body.code, pieces, R, Kcode, lay, marks: body.marks, funcCodes: body.funcCodes, info: {roles: body.roles, prologue: body.prologue, funcs: body.funcs, WIN}};
     }
     lens = nl;
   }

@@ -156,7 +156,7 @@ export function proveCore({proof, publicInputs}, {es: esOverride} = {}) {
     if (i === NROLES - 1) out.push(...sched.tts.map(W));
     const buf = Buffer.concat(out); assert.equal(buf.length, ROLES[i].streamSize); return buf;
   });
-  const D = Buffer.concat([sha(STMT, S[0]), sha(S[1]), sha(S[2])]);
+  const D = Buffer.concat([sha(S[0]), sha(S[1]), sha(STMT, S[2])]); // d_i covers the committed items hosted in input i
   const h0 = sha(TAG, D), rhoRaw = sha(h0, Buffer.from('rho')), rho = toFp(rhoRaw);
   const bitsOf = (e) => [0, 1].reduce((s, k) => s + [0, 1, 2, 3].filter((i) => (N[k][e] >> i) & 1).length, 0);
   const nq = nqFor(bitsOf);
