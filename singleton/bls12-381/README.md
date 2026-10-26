@@ -120,12 +120,13 @@ node singleton/bls12-381/gen_multiproof_minop.mjs        # -> ...-minop-multipro
 Entries on the **same curve as nChain** (so a true apples-to-apples size
 comparison, unlike the BN254 entries):
 
-- `bch-groth16-bls12381-singleton` — the COMPLETE verifier, plain compiler output
-  (size objective + rescheduleStacks, no post-passes); 7,698-byte locking, ~966M
-  op-cost (~121 BCH inputs). **Far smaller bytecode than the nChain reference.**
-- `bch-groth16-bls12381-singleton-opcode-optimized` — the byte-optimized COMPLETE
-  verifier (`build_vectors_optimized.mjs`: golf recompile A/B'd vs the rescheduled
-  compile, then auto-outlining); **5,789-byte locking**, ~1.004B op-cost. The pair shows the
+- `bch-groth16-bls12381-singleton` — **withdrawn (held, see the note at the top)**: plain compiler output
+  (size objective + rescheduleStacks, no post-passes); 6,863-byte locking, ~966M
+  op-cost (~121 BCH inputs). Smaller bytecode than the nChain reference, but it skips
+  input validation, so it is not a like-for-like comparison.
+- `bch-groth16-bls12381-singleton-opcode-optimized` — **withdrawn (held)**: the byte-optimized build of the
+  same source (`build_vectors_optimized.mjs`: golf recompile A/B'd vs the rescheduled
+  compile, then auto-outlining); 5,344-byte locking, ~1.004B op-cost. The pair shows the
   bytesize-vs-opcost tradeoff, mirroring the BN254 plain/optimized split.
 - `bch-groth16-bls12381-singleton-minop` — the op-optimized COMPLETE verifier
   (`groth16_minop.cash`); 67,163 total bytes, **~256.6M op-cost (~32 inputs)** vs the baseline's
