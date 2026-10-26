@@ -4,7 +4,7 @@
 //   [MARGIN=0.062] [WIT=forced:44,forced:44:0,all15:0,...] node tune.mjs '{"cuts":[...],"place":{...}}'
 import {writeFileSync, readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
-const MARGIN = Number(process.env.MARGIN ?? 0.062), WIT = process.env.WIT ?? 'forced:44,forced:44:0,forced:44:1,forced:44:2,forced:44:3,forced:45,forced:46,forced:47,all15,all15:0,all15:1,all15:2,all15:3,dense,random:1,random:2,random:3';
+const MARGIN = Number(process.env.MARGIN ?? 0.062), WIT = process.env.WIT ?? 'forced:44,forced:44:0,forced:44:1,forced:44:2,forced:44:3,forced:44d3,forced:44d3:0,forced:44d3:1,forced:44d3:2,forced:44d3:3,forced:44d3:4,forced:44d3:5,forced:45,forced:46,forced:47,all15,all15:0,all15:1,all15:2,all15:3,dense,random:1,random:2,random:3';
 const L = JSON.parse(process.argv[2] ?? readFileSync(new URL('./layout.json', import.meta.url), 'utf8'));
 L.place.fill = L.place.fill ?? [0, 0, 0, 0];
 for (let it = 0; it < 6; it++) {

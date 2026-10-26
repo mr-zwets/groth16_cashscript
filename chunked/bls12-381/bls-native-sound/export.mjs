@@ -1,8 +1,9 @@
 // Bench vectors (4 P2SH32 inputs, one bch-2026 transaction): valid = fixture `committed`, extraValidProofs = proof1, dense,
-// zero, max, msm-identity and the forced floor witness `forced n_q<=44, random B and C #28` (the smallest input-0
-// margin of the sweep, 6.18% standard); worstCaseProof = `ALL15, random B and C #32` (every nibble 15 on bytes 8..63,
-// n_q = NQ_MAX = 116: the largest total op cost, the heaviest input and the largest transaction of the liveness sweep,
-// and the smallest margin of inputs 1-3, 6.19%; its overall minimum margin is within 0.02% of the sweep minimum).
+// zero, max, msm-identity and the forced floor witness `forced n_q<=44, digit 3 first, random B and C #55` (the smallest
+// input-0 margin of the sweep, 6.18% standard); worstCaseProof = `ALL15, random B and C #32` (every nibble 15 on bytes 8..63,
+// n_q = NQ_MAX = 116: 26.01M consensus op, within 0.2% of the sweep's largest total (random proof #312, 26.04M), the
+// heaviest input and the largest transaction of the liveness sweep, and the smallest margin of input 1, 6.19%; its
+// overall minimum margin is within 0.02% of the sweep minimum).
 // invalid = ordinary rejection vectors (one mutation per push class, each input).
 //   node export.mjs vectors.json
 import assert from 'node:assert/strict';
@@ -30,7 +31,7 @@ for (const [label, h, k, at] of classes) {
 }
 { const ps = pushes.map((x) => x.slice()); const unl = unlockingsOf(ps); unl[1] = encodeWith(ps[1], flip(R, R.length >> 1)); assert.notEqual(verifyTx(ctxOf(unl), 'consensus'), true); invalid.push(steps(unl).map((s, i) => ({...s, label: s.label + (i === 1 ? ' [tampered: redeem byte]' : '')}))); }
 const SW = sweepCases(); const sweepCase = (label) => SW.find((c) => c.label === label).fx;
-const extra = [...['proof1', 'dense', 'zero', 'max', 'msm-identity'].map((n) => runOf(FIXTURES[n])), runOf(sweepCase('forced n_q<=44, random B and C #28'))];
+const extra = [...['proof1', 'dense', 'zero', 'max', 'msm-identity'].map((n) => runOf(FIXTURES[n])), runOf(sweepCase('forced n_q<=44, digit 3 first, random B and C #55'))];
 const worst = runOf(sweepCase('ALL15, random B and C #32'));
 writeFileSync(process.argv[2], JSON.stringify({steps: runOf(FIXTURES.committed), invalid, extraValidProofs: extra, worstCaseProof: worst}, null, 1) + '\n');
 console.log('wrote', process.argv[2], 'invalid', invalid.length, 'extra', extra.length);

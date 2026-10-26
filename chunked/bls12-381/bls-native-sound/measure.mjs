@@ -8,7 +8,7 @@ import {buildAll} from './script.mjs';
 import {createHash} from 'node:crypto';
 import {FIXTURES, mint, r, synthetic} from './math.mjs';
 import {prove, txPushes, ROLES, CUTS} from './protocol.mjs';
-import {statementFor, maxSlots, ALL15} from './worst.mjs';
+import {statementFor, maxSlots, ALL15, D3FIRST} from './worst.mjs';
 import {p2sh32, txOf, unlockingsFor, VM_UNLIMITED} from './vm.mjs';
 
 export function witnessFor(spec) {
@@ -17,7 +17,8 @@ export function witnessFor(spec) {
   // with an index i, random B and C (the op cost moves by ~2k op with B and C)
   const bcOf = (tag) => { const h = (x) => BigInt('0x' + createHash('sha256').update('measure-bc:' + tag + x).digest('hex')) % r; return [1n + h(0) % (r - 1n), 1n + h(1) % (r - 1n)]; };
   const withBC = (ns, i) => (i === undefined ? mint(ns) : synthetic(ns, ...bcOf(spec)));
-  if (spec.startsWith('forced:')) { const [, nq, i] = spec.split(':'); return prove(withBC(statementFor(maxSlots(Number(nq))).ns, i)); }
+  // forced:<nq>d3[:<i>]: the same slots with the bits in digit 3 first (worst.mjs D3FIRST; input 0's extreme)
+  if (spec.startsWith('forced:')) { const [, nqs, i] = spec.split(':'); const d3 = nqs.endsWith('d3'); return prove(withBC(statementFor(maxSlots(parseInt(nqs, 10)), d3 ? D3FIRST : undefined).ns, i)); }
   if (spec.startsWith('all15')) { const [, i] = spec.split(':'); return prove(withBC([ALL15, ALL15], i)); }
   if (spec.startsWith('sweep:')) return import('./sweep.mjs').then(({sweepCases}) => prove(sweepCases().find((c) => c.label === spec.slice(6)).fx));
   if (spec.startsWith('random:')) { const h = (x) => BigInt('0x' + createHash('sha256').update('measure:' + spec + x).digest('hex')) % r;

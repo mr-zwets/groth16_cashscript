@@ -1,6 +1,6 @@
 {
  "generator": "redteam.mjs",
- "locking": "aa20086d926aa93971b58e437d11671c57f4dec90736cfd160be9195957b3d8215ae87",
+ "locking": "aa20a60c700e916cd629e18346efbc43055ca5b003f74f072fe1decd5b3fff1958ff87",
  "results": [
   {
    "name": "honest transaction (fixture committed)",

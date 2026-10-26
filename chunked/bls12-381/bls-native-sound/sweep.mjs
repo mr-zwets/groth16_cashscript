@@ -4,17 +4,18 @@
 // set bit, ~2k op (sd) from B and C; only input 0's budget grows with n_q (48 B per WQ word). So the extremes are
 //  * inputs 1-3: the every-nibble-15 statement ALL15 (n_q = NQ_MAX = 116, also the cap-size regression case for
 //    input 0's unlocking), swept with random B and C;
-//  * input 0: the forced witnesses at the floor n_q = N_MIN (most op at the smallest n_q), swept with random B and C.
+//  * input 0: the forced witnesses at the floor n_q = N_MIN (most op at the smallest n_q), swept with random B and C,
+//    both with the `j mod 4` digit placement and with the bits in digit 3 first (the longest binding-loop TB lookups).
 // Random proofs land between (their inputs 1-3 are within ~0.2% of ALL15) and are sampled widely.
 // Cases: the 6 fixtures, forced n_q targets, every nibble nonzero, ALL15, the zero statement, special public inputs,
-// SWEEP_W x (ALL15, forced N_MIN, forced N_MIN + 1) with random B and C, SWEEP_W random B and C, SWEEP_N random proofs.
+// SWEEP_W x (ALL15, forced N_MIN, forced N_MIN + 1) and 2 SWEEP_W x forced N_MIN digit 3 first, with random B and C, SWEEP_W random B and C, SWEEP_N random proofs.
 //   [SWEEP_N=400] [SWEEP_W=40] [SWEEP_SEED=bls-native-sound-v2] [SWEEP_SHARD=k/n] node sweep.mjs [sweep.json]
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {FIXTURES, FIXTURE_NAMES, r, mint, synthetic} from './math.mjs';
 import {N_MIN, NQ_MAX} from './protocol.mjs';
-import {forcedCases, maxSlots, statementFor, ALL15} from './worst.mjs';
+import {forcedCases, maxSlots, statementFor, ALL15, D3FIRST} from './worst.mjs';
 import {pushesFor, unlockingsOf, ctxOf} from './transaction.mjs';
 import {evalTx, verifyTx, txSize} from './vm.mjs';
 
@@ -29,9 +30,10 @@ export function sweepCases() {
   for (const [label, ns] of [['n = (0, 0)', [0n, 0n]], ['n = (1, 0)', [1n, 0n]], ['n = (r-1, r-1)', [r - 1n, r - 1n]], ['n = (r-1, 0)', [r - 1n, 0n]], ['n = (2^64, 2^128)', [1n << 64n, 1n << 128n]], ['n = (r/2, r/3)', [r / 2n, r / 3n]]])
     cases.push({label, fx: mint(ns)});
   const sc = () => 1n + rnd() % (r - 1n);
-  const f0 = statementFor(maxSlots(N_MIN)).ns, f1 = statementFor(maxSlots(N_MIN + 1)).ns;
+  const f0 = statementFor(maxSlots(N_MIN)).ns, f0d3 = statementFor(maxSlots(N_MIN), D3FIRST).ns, f1 = statementFor(maxSlots(N_MIN + 1)).ns;
   for (let i = 0; i < NW; i++) cases.push({label: `ALL15, random B and C #${i}`, fx: synthetic([ALL15, ALL15], sc(), sc())});
   for (let i = 0; i < NW; i++) cases.push({label: `forced n_q<=${N_MIN}, random B and C #${i}`, fx: synthetic(f0, sc(), sc())});
+  for (let i = 0; i < 2 * NW; i++) cases.push({label: `forced n_q<=${N_MIN}, digit 3 first, random B and C #${i}`, fx: synthetic(f0d3, sc(), sc())});
   for (let i = 0; i < NW; i++) cases.push({label: `forced n_q<=${N_MIN + 1}, random B and C #${i}`, fx: synthetic(f1, sc(), sc())});
   for (let i = 0; i < NW; i++) { const ns = [rnd(), rnd()]; cases.push({label: `random B and C #${i}`, fx: synthetic(ns, 1n + rnd() % (r - 1n), 1n + rnd() % (r - 1n))}); }
   for (let i = 0; i < N; i++) cases.push({label: `random proof #${i}`, fx: mint([rnd(), rnd()])});

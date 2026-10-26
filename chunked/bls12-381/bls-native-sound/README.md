@@ -17,22 +17,22 @@ before the challenge it meets, or fixed by an exact field or integer equation. N
 
 | | |
 |---|---|
-| **score** (scripts + tx overhead) | **34,226** = 34,034 (4 × 35 locking + 33,894 unlocking) + 192 |
-| unlocking per input | 6,394 / 9,755 / 9,720 / 8,025 (each ≤ 10,000; standard) |
+| **score** (scripts + tx overhead) | **34,229** = 34,037 (4 × 35 locking + 33,897 unlocking) + 192 |
+| unlocking per input | 6,397 / 9,755 / 9,720 / 8,025 (each ≤ 10,000; standard) |
 | R (the redeem of every input) | 81 B |
 | program (shared, loaded by R from two carriers) | 6,465 B (role bodies 1,521 / 195 / 183 / 789; SETUP 1,606 incl. 1,152 B of GLS factor constants) |
 | op-cost, standard (consensus) | 4.70M (4.65M) / 6.85M (6.83M) / 6.84M (6.82M) / 5.76M (5.75M) = 24.15M (24.04M) |
 | margins at the fixture, standard | 8.7% / 12.7% / 12.4% / 10.7% |
-| liveness sweep (586 proofs, both modes) | all valid and standard; **minimum margin 6.18% standard, 6.42% consensus** (forced worst cases with random B, C) |
-| zero filler (budget only, content pinned) | 308 B in 4 pushes (bench `padBytes` 314) |
+| liveness sweep (667 proofs, both modes) | all valid and standard; **sample minimum margin 6.18% standard, 6.42% consensus** (forced worst cases with random B, C) |
+| zero filler (budget only, content pinned) | 311 B in 4 pushes (bench `padBytes` 317) |
 
 Gates (`tools/bench-one.mts bch-groth16-bls12381-sound-native`): valid accepted, 41/41 invalid vectors rejected,
 cross-stage stapling 0/3 unbound seams, red team 57/57 rejected, public inputs 9/9 mutations rejected, layout not
 malleable, 7/7 proofs runtime-general, standard (relayable), P2SH32 packaging.
 The bench `worstCaseProof` is `ALL15, random B and C #32` (`export.mjs`): every nibble 15 on bytes 8..63, n_q = 116,
-the largest total op cost (26.0M consensus), the heaviest input and the largest transaction of the sweep, and the
-smallest margin of inputs 1–3; the smallest input-0 margin (forced n_q = 44, random B and C #28) ships as an extra valid
-proof.
+26.01M consensus op (within 0.2% of the sweep's largest total, 26.04M at random proof #312), the heaviest input and the
+largest transaction of the sweep, and the smallest margin of input 1; the smallest input-0 margin of the sweep (forced
+n_q = 44, digit 3 first, random B and C #55) ships as an extra valid proof.
 
 ## Protocol
 
@@ -93,7 +93,10 @@ last field of z's preimage, so every preimage parses one way.
 **Miller part of input i** (shared code, `WORK` / `SETUP` / `LOOP`): reads z̃, ρ̃, the statement and s^c from input 0
 (every word decoded unsigned and range-checked again); for i > 0 the predecessor's last state S_{c0} (< p) and its claims
 R̃_{i−1} ‖ T̃_{i−1} (< p); its own states and slopes; its δ block. Setup: z-powers, the line environment, S_c(±z), the
-GLS tables TP_k / TM_k at ±z (16 entries each, R_{k,0/1} baked, R_{k,2/3}(X) = R_{k,0/1}(ηX)). Start: F± = S_{c0}(±z)
+GLS tables TP_k / TM_k at ±z (16 entries each). Two monic reps per group are baked, R_{k,0} = rep[m_k] and
+R_{k,1} = rep[Frob(m_k)]; the digit factors are factor_{k,0}(X) = R_{k,0}(X), factor_{k,1}(X) = R_{k,1}(−X) (the
+conjugated Frobenius rep), factor_{k,2}(X) = R_{k,0}(ηX) and factor_{k,3}(X) = R_{k,1}(−ηX) (`glsFactorPoly`; `math.mjs`
+asserts each factor's class, FE(factor_{k,i}) = FE(m_k)^(|x|^i)). Start: F± = S_{c0}(±z)
 (input 0: S_c(∓z)·Rconst′(±z)·TP/TM[N[0]]), R = R̃_{i−1} (input 0: 0). Per event e:
 - B doubling with the witnessed slope l (< p): residue 2y·l − 3x² ≡ 0 (reduced, both Fp2 coordinates); x₃ = l² − 2x,
   y₃ = (lx − y) − l·x₃; F± ← F±²·L_B(±z);
@@ -118,7 +121,7 @@ x·γ₁² = conj(x_B), y·γ₁³ = −conj(y_B) (exact, reduced), and R̃₃ b
 | 6. pins | R: input count 4, every input's locking equals this input's own, SHA256(program) = H_blob; K_HASH[i] in the program; role = OP_INPUTINDEX by computed OP_INVOKE. |
 | 7. no IF ladders | role dispatch by computed OP_INVOKE; the addition and the chunk end are function calls inside one-instruction IF bodies (a skipped branch costs two instructions). |
 | 8. build-time assertions | `math.mjs` (every constant, class equality with noble's Miller loop, λ facts, ψ, gcd(p − x, h₂) = 1, odd #E(Fp), GLS factor reps, Rconst′), `protocol.mjs` (degree bound, n_q cap/floor, δ trajectory and K blocks), `build.mjs` (deterministic double build, smoke spend). |
-| 9. liveness gate | ≥ 6% standard at the forced worst cases, ≥ 5% measured in both modes on the built artifact: fillers fitted to 6.2% on the forced worst witnesses (`tune.mjs`), measured **6.18%** standard / 6.42% consensus minimum over 586 proofs (`sweep.mjs`); every unlocking ≤ 10,000 B (largest 9,802 B, input 0 at n_q = 116), tx ≤ 100,000 B. |
+| 9. liveness gate | ≥ 6% standard at the forced worst cases, ≥ 5% measured in both modes on the built artifact: fillers fitted to 6.2% on the forced worst witnesses (`tune.mjs`), measured **≈ 6.18%** standard / 6.42% consensus sample minimum over 667 proofs (`sweep.mjs`; 6.175% over 3,600 more proofs of the review families); every unlocking ≤ 10,000 B (largest 9,805 B, input 0 at n_q = 116), tx ≤ 100,000 B. |
 | 10. rejection suite | `redteam.mjs`: 61 rejection cases + 2 positive controls (below). |
 
 ## Soundness argument
@@ -187,7 +190,7 @@ x·γ₁² = conj(x_B), y·γ₁³ = −conj(y_B) (exact, reduced), and R̃₃ b
 
 **Not claimed.** Witness uniqueness (the residue root is unique up to r-torsion; the digits up to the binding; neither
 lets a false statement through). Formal bytecode equivalence: tested (exact divisibility of every honest identity,
-value-level split verifier = VM claims, 586 accepted proofs, 61 rejections), not proven. Totality of the class
+value-level split verifier = VM claims, 667 accepted proofs, 61 rejections), not proven. Totality of the class
 encoding: G = Fp12*/Fp6* has p⁶ + 1 classes but there are only p⁶ monic degree-6 representatives; the order-2 class [w]
 has none (an odd polynomial has no X⁶ term). An honest state or residue root in [w] would make the prover throw
 ("singular"); this happens with probability about 33/p⁶ per proof, is liveness-only and does not affect soundness.
@@ -209,7 +212,7 @@ has none (an odd polynomial has no X⁶ term). An honest state or residue root i
   constants.
 - **Two program parts** (design 2's merge item): no single input can carry the 6.5 kB program and its own data within
   10,000 B at the required budget. R is 81 B (design estimate 65–81).
-- **Zero fillers (308 B).** At the 6.2% tuning target the worst witnesses need more op budget than the natural bytes buy;
+- **Zero fillers (311 B).** At the 6.2% tuning target the worst witnesses need more op budget than the natural bytes buy;
   `tune.mjs` moves constant/program bytes along the available edges first and adds all-zero filler pushes only for the
   remainder. Each filler's content is checked to be zero (no malleability).
 
@@ -226,19 +229,24 @@ has none (an odd polynomial has no X⁶ term). An honest state or residue root i
   successor-read last state, x_A, s^c, n₀ + r, a nibble 0x10: only the range checks can reject these); malformed proof
   points with an honest prover (A, C off the curve, −A, B off the twist, B on the twist outside G2, a foreign B); stapled
   inputs from two valid proofs at every seam. 57 of them are the bench red-team file (unlocking patches only).
-- **Liveness** (`sweep.mjs`, 586 proofs, all valid in both modes, every unlocking ≤ 10,000 B). Op cost model (measured,
+- **Liveness** (`sweep.mjs`, 667 proofs, all valid in both modes, every unlocking ≤ 10,000 B). Op cost model (measured,
   `worst.mjs`): ~24k op per nonzero GLS nibble, ~0.2k op per extra set bit of a nibble, ~2k op (sd) from B and C; only
-  input 0's budget grows with n_q. So the extremes are, for inputs 1–3, the every-nibble-15 statement ALL15
-  (n₀ = n₁ = (2⁵⁶ − 1)·Σ_{i<4}|x|^i, n_q = NQ_MAX = 116) and, for input 0, the forced witnesses at the floor n_q = 44
-  (`maxSlots`: per chunk, the set bits per byte that maximize 24k·(nonzero nibbles) + 0.2k·(set bits) within the degree
-  bound). Cases: the 6 fixtures; forced witnesses at n_q ≤ 44, 45, 46, 47, 48, 50, 52, 54, 56, 60, 64; every nibble
-  nonzero; ALL15; the zero statement; special public inputs (0, 1, r − 1, 2⁶⁴/2¹²⁸, r/2, r/3); 40 × each of ALL15,
-  forced 44 and forced 45 with random B and C; 40 random statements with random B and C; 400 random proofs. n_q 44–116;
-  total op 24.0M–26.2M standard; minimum margins standard 6.18% / 6.19% / 6.21% / 6.20% (inputs 0–3; input 0 at forced
-  44, inputs 1–3 at ALL15), consensus 7.24% / 6.42% / 6.44% / 6.46%; largest input-0 unlocking 9,802 B (ALL15, n_q =
-  116, the cap-size regression case); largest tx 37,494 B. Random proofs stay above ALL15 on inputs 1–3 (their minimum 0.04–0.13% higher, their mean ~0.5% higher). An
-  independent re-run of the review families (m15, mval, all1, rand 400, f44/f44s/f44x 590, f45–f47) on this build:
-  minimum 6.18% standard, all valid.
+  input 0's budget grows with n_q; input 0 also pays for the GT-GLS binding loop, whose TB[N_k[g]] lookups are 1–25 B
+  (TB[1] = 1 is 1 B, TB[8] = |x|³ is 24 B), so the same set bits cost input 0 more in the high digits. So the extremes
+  are, for inputs 1–3, the every-nibble-15 statement ALL15 (n₀ = n₁ = (2⁵⁶ − 1)·Σ_{i<4}|x|^i, n_q = NQ_MAX = 116) and,
+  for input 0, the forced witnesses at the floor n_q = 44 (`maxSlots`: per chunk, the set bits per byte that maximize
+  24k·(nonzero nibbles) + 0.2k·(set bits) within the degree bound), with the bits placed both at digit j mod 4
+  (`statementFor`) and in digit 3 first (`statementFor(slots, D3FIRST)`, still canonical: asserted against `glsDigits`).
+  Cases: the 6 fixtures; forced witnesses at n_q ≤ 44, 45, 46, 47, 48, 50, 52, 54, 56, 60, 64 and n_q ≤ 44 digit 3
+  first; every nibble nonzero; ALL15; the zero statement; special public inputs (0, 1, r − 1, 2⁶⁴/2¹²⁸, r/2, r/3);
+  40 × each of ALL15, forced 44 and forced 45 and 80 × forced 44 digit 3 first, with random B and C; 40 random
+  statements with random B and C; 400 random proofs. n_q 44–116 (random statements 77–113); total op 24.0M–26.2M
+  standard; sample minimum margins standard 6.18% / 6.19% / 6.21% / 6.20% (inputs 0–3; input 0 at forced 44 digit 3
+  first, inputs 1–3 at ALL15), consensus 7.24% / 6.42% / 6.44% / 6.46%; largest input-0 unlocking 9,805 B (ALL15,
+  n_q = 116, the cap-size regression case); largest tx 37,497 B. Random proofs stay above ALL15 on inputs 1–3. These
+  are minima over a sample, not bounds: B and C spread input 0's margin at forced 44 by ~0.05%. An independent re-run
+  of the review families (seed review-r1: f44d3 900, f44s 600, f44 600, f44d2 300, m15 900, rand 300; 3,600 proofs) on
+  this build: all valid, minimum standard 6.175% / 6.181% / 6.187% / 6.180% (input 0 at f44d3, inputs 1–3 at m15).
 - **Build**: double build byte-identical; `test-protocol.mjs` (prover and value-level verifier on all fixtures,
   divisibility of every identity, split claims equal to the reference; the accepted relation FE(f′) = e(A,B)/(e(α,β)e(vk_x,γ)e(C,δ)) on
   random non-valid (A, B, C, n)).
@@ -261,12 +269,15 @@ node test-protocol.mjs                                  # prover + value-level v
 node build.mjs                                          # R 81 B, program 6,465 B; redeem.hex, program.hex, build.json
 node export.mjs vectors.json                            # bench vectors (41 invalid)
 node redteam.mjs redteam.json redteam-report.json       # 63/63 as expected
-for k in 0 1 2 3 4 5 6 7; do SWEEP_SHARD=$k/8 node sweep.mjs sweep/sweep-$k.json & done; wait   # 586 proofs
-# layout (only after a program change): measure, search, tune
-NATIVE_CUTS=0,5,15,25,33 NATIVE_PLACE='<a cap-feasible placement>' WIT=committed,dense,forced:44,random:1,random:2,random:3 node measure.mjs meas.json
-MARGIN=0.06 node layout.mjs meas.json 3                # measure.json is the measurement behind layout.json
-node tune.mjs '<the chosen {"cuts", "place"}>'          # fits placement and fillers on the VM (MARGIN 0.062 on forced
-                                                        # 44-47 and ALL15 with random B, C); writes layout.json
+for k in 0 1 2 3 4 5 6 7; do SWEEP_SHARD=$k/8 node sweep.mjs sweep/sweep-$k.json & done; wait   # 667 proofs
+node tune.mjs                                           # the reproducible layout step: reads layout.json, re-fits
+                                                        # placement and fillers on the VM (MARGIN 0.062; forced 44
+                                                        # (both placements), 45-47, ALL15, random B, C); layout.json
+                                                        # is its fixed point (re-running leaves it unchanged)
+# layout search (only after a program change; a heuristic seed, not unique: different seeds tune to different fixed points)
+WIT=committed,dense,forced:44,forced:44d3,random:1,random:2,random:3 node measure.mjs measure.json   # per-event op of the current layout
+MARGIN=0.06 node layout.mjs measure.json 3              # candidate {cuts, place}
+node tune.mjs '<a candidate {"cuts", "place"}>'         # fits it on the VM; writes layout.json
 ```
 
 In zk-verifier-bench: copy `vectors.json` to `src/bch/groth16-bls12381-sound-native-vectors.json` and `redteam.json` to
@@ -274,24 +285,25 @@ In zk-verifier-bench: copy `vectors.json` to `src/bch/groth16-bls12381-sound-nat
 
 ## Open risks
 
-1. **Thin liveness margins.** 6.18% standard at the worst measured witnesses (586 proofs; fillers fitted to 6.2% on the
-   forced worst cases). The forced cases (ALL15 for inputs 1–3, forced n_q = 44 for input 0) are the extremes of the
-   measured op model; B and C move the op cost by ~2k op (sd ≈ 0.03% of a budget), so a margin below 6.0% would need a
-   ~7σ outlier. Any change to the program moves the byte balance: re-run `measure.mjs`, `layout.mjs`, `tune.mjs` and the
+1. **Thin liveness margins.** ≈ 6.17–6.18% standard at the worst measured witnesses (sample minima: 6.18% over the
+   667-proof sweep, 6.175% over 3,600 review-family proofs; fillers fitted to 6.2% on the forced worst cases). The
+   forced cases (ALL15 for inputs 1–3, forced n_q = 44 with the bits in digit 3 first for input 0) are the extremes of
+   the measured op model; B and C move the op cost by ~2k op (sd ≈ 0.03% of a budget), so a margin below 6.0% would
+   need a ~6σ outlier. Any change to the program moves the byte balance: re-run `measure.mjs`, `layout.mjs`, `tune.mjs` and the
    sweep.
 2. **Correctness is tested, not proven**: the kernels (affine doubling/addition, δ step, evaluations, tables), the
    handoffs and the terminal are checked by exact divisibility of every honest identity, the split reference claims and
    the VM runs, not by a formal equivalence proof (same status as SI-GLS BN254).
 3. **The quotient floor N_MIN = 44** is an encoding-uniqueness rule (not a soundness rule) and is new relative to the
    reviewed BN rule; the floor makes input 0's minimum budget deterministic.
-4. **Input 0's cap at the structural maximum.** The cap check uses NQ_MAX = 116: input 0 is 6,346 B at n_q = 44, so
-   9,802 B at n_q = 116 (198 B under the 10,000 B cap). This is a real honest case: the canonical statement ALL15 reaches
+4. **Input 0's cap at the structural maximum.** The cap check uses NQ_MAX = 116: input 0 is 6,349 B at n_q = 44, so
+   9,805 B at n_q = 116 (195 B under the 10,000 B cap). This is a real honest case: the canonical statement ALL15 reaches
    n_q = 116 and verifies in both modes (kept in the sweep as the cap-size regression test). Random statements have
-   n_q 80–113.
+   n_q 77–113 (the sweep's random proofs and random-B, C statements).
 5. **Public-input binding through GT-GLS** (exact integer equation on hashed nibbles) rather than an on-chain vk_x MSM;
    the owner accepted this mechanism for SI-GLS BN254.
 6. **G1 cofactor malleability** of A and C (curve checks only): statement-preserving, as documented for the reviewed
    BLS singleton.
 7. **The fixture understates typical proofs**: random statements have n_q ≈ 77–113 (≈ +1.5–3.3 kB of WQ in input 0,
    which also raises its budget); the score is measured on fixture `committed` like every other entry.
-8. **Zero fillers (308 B)** are budget-only bytes; they are pinned to zero and reported by the bench as padding.
+8. **Zero fillers (311 B)** are budget-only bytes; they are pinned to zero and reported by the bench as padding.
