@@ -99,10 +99,13 @@ same point under a second encoding); the off-curve and off-subgroup cases with t
 happened to fail the pairing equation. The vector builders ship the 13 cases to the bench as
 extra invalid runs and fail the build if any is accepted.
 
-| entry | before | after |
-|---|---|---|
-| `bch-groth16-bls12381-singleton` (locking) | 6,863 B / 978,824,303 op | 7,026 B / 994,589,979 op |
-| `bch-groth16-bls12381-singleton-opcode-optimized` (locking) | 5,344 B / 1,002,455,753 op | 5,515 B / 1,003,512,299 op |
+| entry | locking before → after | bench score before → after | op-cost before → after |
+|---|---|---|---|
+| `bch-groth16-bls12381-singleton` | 6,863 → 7,026 B | 7,347 → 7,510 B | 978,824,303 → 994,589,979 |
+| `bch-groth16-bls12381-singleton-opcode-optimized` | 5,344 → 5,515 B | 5,828 → 5,999 B | 1,002,455,753 → 1,003,512,299 |
+
+(Bench score = locking + unlocking + transaction overhead; the "before" scores are the committed
+`results.json` values.)
 
 The checks themselves cost about 0.1M op-cost on the valid path; most of the plain entry's
 +15.8M op-cost comes from the rescheduler laying out the larger program differently (a build
