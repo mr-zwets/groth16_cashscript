@@ -1,0 +1,77 @@
+{
+ "iters": 1500,
+ "blsBDbl": {
+  "op": 245080,
+  "bytes": 468
+ },
+ "blsBAdd": {
+  "op": 332455,
+  "bytes": 588
+ },
+ "blsDStep": {
+  "op": 76821,
+  "bytes": 156
+ },
+ "blsEval": {
+  "op": 28262,
+  "bytes": 48
+ },
+ "blsTableMul": {
+  "op": 92180,
+  "bytes": 121
+ },
+ "blsFold": {
+  "op": 14454,
+  "bytes": 25
+ },
+ "blsHorner4": {
+  "op": 18704,
+  "bytes": 30
+ },
+ "blsGlsMul": {
+  "op": 30400,
+  "bytes": 19
+ },
+ "bnEval": {
+  "op": 15788,
+  "bytes": 48
+ },
+ "bnTableMul": {
+  "op": 48478,
+  "bytes": 121
+ },
+ "bnFold": {
+  "op": 8429,
+  "bytes": 25
+ },
+ "bnHorner4": {
+  "op": 10335,
+  "bytes": 30
+ },
+ "bnGlsMul": {
+  "op": 14756,
+  "bytes": 19
+ },
+ "bnBDbl": {
+  "op": 143351,
+  "bytes": 441
+ },
+ "bnBAdd": {
+  "op": 186975,
+  "bytes": 596
+ },
+ "bnDStep": {
+  "op": 46732,
+  "bytes": 160
+ },
+ "ratios": {
+  "BDbl": 1.71,
+  "BAdd": 1.778,
+  "DStep": 1.644,
+  "Eval": 1.79,
+  "TableMul": 1.901,
+  "Fold": 1.715,
+  "Horner4": 1.81,
+  "GlsMul": 2.06
+ }
+}
