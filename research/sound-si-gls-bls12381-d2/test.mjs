@@ -1,11 +1,11 @@
 // protocol self-test: honest proofs accepted by the value-level verifier; tampering rejected.
 import assert from 'node:assert/strict';
 import {mintProof, groth16Holds, r} from './math.mjs';
-import {layoutFor, prove, verifyValues, nqMax} from './protocol.mjs';
-const BOUNDS = (process.env.BOUNDS ?? Array.from({length: 31}, (_, i) => 2 * i + 1).join(',')).split(',').map(Number);
+import {layoutFor, prove, verifyValues, nqMax, DEFAULT_BOUNDS} from './protocol.mjs';
+const BOUNDS = DEFAULT_BOUNDS;
 const L = layoutFor(BOUNDS);
 console.log('states', L.NSTATES, 'WS', L.WS_SIZE, 'NQ_MAX', nqMax(L));
-const cases = [[123n, 456n], [0n, 0n], [r - 1n, 1n], [2n ** 200n + 12345n, r - 2n]];
+const T = 0xd201000000010000n; const cases = [[123n, 456n], [0n, 0n], [r - 1n, 1n], [2n ** 200n + 12345n, r - 2n], [(T - 1n) * (1n + T + T * T), (T - 1n) * (1n + T + T * T) + 7n], [r - 1n, r - 1n]];
 for (const ns of cases) {
   const pr = mintProof(ns, {b: 1n + ns[0] % 97n, c: 13n + ns[1] % 89n}); assert.ok(groth16Holds(pr));
   const t0 = Date.now(); const w = prove(pr, L); const v = verifyValues(w.WS, w.WQ, L);

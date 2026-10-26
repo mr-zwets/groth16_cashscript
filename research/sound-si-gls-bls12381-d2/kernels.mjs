@@ -115,6 +115,24 @@ export function kHorner4() { const k = new Kernel(); const I = (n) => k.in(n), E
 // GLS per event, value part only: F+ <- F+ TP0 TP1 mod p, F- likewise
 export function kGlsMul() { const k = new Kernel(); k.output(k.mod(k.mul(k.mul(k.in('u0'), k.in('u1')), k.in('Fp'))), k.mod(k.mul(k.mul(k.in('v0'), k.in('v1')), k.in('Fm')))); return k; }
 
+// OPTION (not in the baseline): affine doubling with a witnessed slope lam (exact check 2 y lam = 3 x^2), line (lam x - y, -lam, 1)
+export function kBDblAffBLS() {
+  const k = new Kernel(); const I = (n) => k.in(n), E = (n) => k.env(n), m = (x) => k.mod(x), mul = (a, b) => k.mul(a, b), add = (a, b) => k.add(a, b), sub = (a, b) => k.sub(a, b);
+  const [x0, x1, y0, y1, l0, l1] = ['x0', 'x1', 'y0', 'y1', 'l0', 'l1'].map(I);
+  const fs = (a0, a1, b0, b1) => [sub(mul(a0, b0), mul(a1, b1)), add(mul(a0, b1), mul(a1, b0))];
+  const xx0 = mul(add(x0, x1), sub(x0, x1)), xx1 = k.small(mul(x0, x1), 2);
+  const [yl0, yl1] = fs(y0, y1, l0, l1);
+  const ck0 = m(sub(k.small(yl0, 2), k.small(xx0, 3))), ck1 = m(sub(k.small(yl1, 2), k.small(xx1, 3)));
+  const ll0 = mul(add(l0, l1), sub(l0, l1)), ll1 = k.small(mul(l0, l1), 2);
+  const nx0 = m(sub(ll0, k.small(x0, 2))), nx1 = m(sub(ll1, k.small(x1, 2)));
+  const [a0, a1] = fs(l0, l1, sub(x0, nx0), sub(x1, nx1)); const ny0 = m(sub(a0, y0)), ny1 = m(sub(a1, y1));
+  const [c0, c1] = fs(l0, l1, x0, x1); const cc0 = m(sub(c0, y0)), cc1 = m(sub(c1, y1));
+  const e = m(sub(add(cc0, mul(E('t'), cc1)), add(mul(E('xz2'), l0), mul(E('xz2t'), l1)))); const o = E('yz3');
+  const Fp = I('Fp'), Fm = I('Fm');
+  k.output(ck0, ck1, nx0, nx1, ny0, ny1, m(mul(mul(Fp, Fp), add(e, o))), m(mul(mul(Fm, Fm), sub(e, o))));
+  return k;
+}
+
 // ---------------- measurements ----------------
 const out = {};
 const R = (P) => rnd(P);
@@ -155,6 +173,27 @@ const R = (P) => rnd(P);
   const nx = F2.sub(F2.sub(F2.sqr(lams[j]), x), sv);
   assert.deepEqual(r3.got.map((v) => mod(v)), [nx.c0, nx.c1, cj.c0, cj.c1, lams[j].c0, lams[j].c1, mod(Fp0 * peval(L3, z)), mod(Fm0 * peval(L3, mod(-z)))], 'BLS delta step');
   out.blsDStep = {op: r3.op, bytes: r3.bytes};
+}
+{ // option: affine doubling with a witnessed slope (checked)
+  const Bp = G2P.BASE.multiply(99991n).toAffine(), A = G1P.BASE.multiply(777n).toAffine(); const z = R(1n << 256n), t = mod(z ** 6n - 1n), yP = mod(-A.y);
+  const lam = F2.div(F2.mul(f2(3n, 0n), F2.sqr(Bp.x)), F2.add(Bp.y, Bp.y)); const Fp0 = R(p), Fm0 = R(p);
+  const env = {t, xz2: mod(A.x * z * z), xz2t: mod(A.x * z * z * t), yz3: mod(yP * z ** 3n)};
+  const ra = measure(kBDblAffBLS(), {P: p, env, ins: {x0: Bp.x.c0, x1: Bp.x.c1, y0: Bp.y.c0, y1: Bp.y.c1, l0: lam.c0, l1: lam.c1, Fp: Fp0, Fm: Fm0}, outs: ['ck0', 'ck1', 'x0', 'x1', 'y0', 'y1', 'Fp', 'Fm'], extraDepth: 30});
+  const D = G2P.fromAffine(Bp).double().toAffine(); const L = linePoly(A.x, yP, F2.sub(F2.mul(lam, Bp.x), Bp.y), F2.neg(lam), F2.ONE);
+  assert.deepEqual(ra.got.map((v) => mod(v)), [0n, 0n, D.x.c0, D.x.c1, D.y.c0, D.y.c1, mod(Fp0 * Fp0 * peval(L, z)), mod(Fm0 * Fm0 * peval(L, mod(-z)))], 'affine doubling option');
+  out.optBDblAffine = {op: ra.op + 2 * 200, bytes: ra.bytes + 4}; // + the two NOT VERIFY on the check values
+}
+// RD: split a word, BIN2NUM(w || 0x00), require < p (BN 32-byte words, BLS 48-byte words)
+for (const [tag, P, W] of [['bls', p, 48], ['bn', PBN, 32]]) {
+  setPrime(P); const a = new Asm(['p', 'blob']);
+  a.defLocal('RD', 1, 2, (s) => { s.push(W).op(OP.SPLIT, 2, 'w', 'rest').roll('w').pushBytes([0]).op(OP.CAT, 2, 'w0').op(OP.BIN2NUM, 1, 'v'); s.pick('v').push(P, 'pp').op(OP.LESSTHAN, 2, 'ok').op(OP.VERIFY, 1).roll('rest'); });
+  for (let i = 0; i < 6; i++) a.invoke('RD', ['v' + i, 'blob']);
+  const code = [...a.prologue(), ...a.code]; const words = Array.from({length: 6}, () => R(P));
+  const blob = Buffer.concat(words.map((v) => { const b = Buffer.alloc(W); let x = v; for (let i = 0; i < W; i++) { b[i] = Number(x & 255n); x >>= 8n; } return b; }));
+  const run = bare(code, [vmNum(P), [...blob]]); const base = bare([OP.NOP], [vmNum(P), [...blob]]);
+  const prol = bare([...a.prologue()], [vmNum(P), [...blob]]);
+  assert.deepEqual(run.stack.slice(1, 7).map(num), words, 'RD');
+  out[tag + 'RD6'] = {op: run.opCost - prol.opCost, bytes: a.code.length};
 }
 // generic kernels at both primes
 for (const [tag, P] of [['bls', p], ['bn', PBN]]) {

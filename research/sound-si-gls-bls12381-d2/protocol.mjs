@@ -14,7 +14,8 @@ import {p, r, mod, F2, F12, f2, T, BITS, NE, NADD, LAMBDA, N6R, TPOW, glsDigits,
 // BOUNDS: events after which a state is committed; the last chunk (ending at event 62) is closed by the
 // terminal identity against W = Frob(S_c) instead of a committed state. Default: pairs, with the addition
 // events placed second in their chunk where possible (chosen by search.mjs).
-export const DEFAULT_BOUNDS = (process.env.BOUNDS ?? '').length ? process.env.BOUNDS.split(',').map(Number) : null;
+export const DEFAULT_BOUNDS = (process.env.BOUNDS ?? '').length ? process.env.BOUNDS.split(',').map(Number)
+  : [0, 2, 3, 5, 6, ...Array.from({length: 27}, (_, i) => 8 + 2 * i)]; // 32 states; chunks [-1,0] [1,2] [3] [4,5] [6] [7,8] .. [61,62]
 export function layoutFor(BOUNDS) {
   assert.ok(BOUNDS.every((b, i) => b >= -1 && b < NE - 1 && (i === 0 || b > BOUNDS[i - 1])));
   const NSTATES = BOUNDS.length;
@@ -110,10 +111,11 @@ export function prove(proof, L, {forge = false} = {}) {
   const nq = nqFor(L, bitsOf);
   const Qagg = Array(2 * nq).fill(0n);
   ids.forEach((id, k) => { const wgt = mod(rho ** BigInt(L.K_IDS - 1 - k)); id.Q.forEach((x, i) => { if (x) { assert.ok(i < 2 * nq, 'Q exceeds structural bound'); Qagg[i] = mod(Qagg[i] + wgt * x); } }); });
-  const qOdd = Qagg.filter((_, i) => i % 2 === 1);
-  while (qOdd.length > 1 && qOdd.at(-1) === 0n) qOdd.pop();
-  const WQ = Buffer.concat(qOdd.slice().reverse().map(W48)); // highest coefficient first
-  return {WS, WQ, nq: qOdd.length, nqBound: nq, ds, ns, Sc, states, c, debug: {sched, ids, rho, bitsOf}};
+  const qOdd = Qagg.filter((_, i) => i % 2 === 1); const NQ = nqMax(L); assert.ok(qOdd.length <= NQ);
+  const nqUsed = (() => { let n = qOdd.length; while (n > 1 && qOdd[n - 1] === 0n) n--; return n; })();
+  while (qOdd.length < NQ) qOdd.push(0n); // fixed width: the top words are zero for most statements
+  const WQ = Buffer.concat(qOdd.slice().reverse().map(W48)); // highest coefficient first, exactly NQ_MAX words
+  return {WS, WQ, nq: nqUsed, nqBound: nq, ds, ns, Sc, states, c, debug: {sched, ids, rho, bitsOf}};
 }
 
 // ---------------- value-level reference verifier (mirrors the intended script) ----------------
@@ -121,7 +123,7 @@ export function verifyValues(WS, WQ, L) {
   const fail = (why) => ({ok: false, why});
   const NQ_MAX = nqMax(L);
   if (WS.length !== L.WS_SIZE) return fail('WS size');
-  if (WQ.length % 48 || WQ.length === 0 || WQ.length > 48 * NQ_MAX) return fail('WQ size');
+  if (WQ.length !== 48 * NQ_MAX) return fail('WQ size');
   const word = (o) => { const v = rdle(WS, o); return v < p ? v : null; };
   const st = Array.from({length: 8}, (_, i) => word(48 * i)); if (st.some((v) => v === null)) return fail('coordinate not canonical');
   const ns = [rdle(WS, 384, 32), rdle(WS, 416, 32)]; if (ns.some((v) => v >= r)) return fail('public input not canonical');
@@ -133,7 +135,6 @@ export function verifyValues(WS, WQ, L) {
   const sc = words(576, 6), stts = Array.from({length: L.NSTATES}, (_, k) => words(864 + 288 * k, 6));
   if ([...sc, ...stts.flat()].some((v) => v === null)) return fail('state word not canonical');
   const qw = Array.from({length: WQ.length / 48}, (_, i) => rdle(WQ, 48 * i)); if (qw.some((v) => v >= p)) return fail('Q word not canonical');
-  if (qw[0] === 0n) return fail('Q leading word zero');
   const h0 = sha(TAG, WS), rhoRaw = sha(h0, Buffer.from('rho')), rho = toCh(rhoRaw), z = toCh(sha(h0, rhoRaw, WQ));
   if (z === 0n) return fail('z = 0');
   // GLS binding (exact integers): acc_k = sum_bits 2^(63-e1) TB[N_k[e1]], TB[n] = sum_{i in n} T^i; acc_k == n_k
