@@ -1,0 +1,89 @@
+{
+ "iters": 4000,
+ "blsBDbl": {
+  "op": 245080,
+  "bytes": 468
+ },
+ "blsBAdd": {
+  "op": 331127,
+  "bytes": 575
+ },
+ "blsDStep": {
+  "op": 76821,
+  "bytes": 156
+ },
+ "optBDblAffine": {
+  "op": 152868,
+  "bytes": 260
+ },
+ "blsRD6": {
+  "op": 9990,
+  "bytes": 12
+ },
+ "bnRD6": {
+  "op": 9270,
+  "bytes": 12
+ },
+ "blsEval": {
+  "op": 28266,
+  "bytes": 48
+ },
+ "blsTableMul": {
+  "op": 92427,
+  "bytes": 121
+ },
+ "blsFold": {
+  "op": 14506,
+  "bytes": 25
+ },
+ "blsHorner4": {
+  "op": 18649,
+  "bytes": 30
+ },
+ "blsGlsMul": {
+  "op": 30204,
+  "bytes": 19
+ },
+ "bnEval": {
+  "op": 15753,
+  "bytes": 48
+ },
+ "bnTableMul": {
+  "op": 48580,
+  "bytes": 121
+ },
+ "bnFold": {
+  "op": 8460,
+  "bytes": 25
+ },
+ "bnHorner4": {
+  "op": 10368,
+  "bytes": 30
+ },
+ "bnGlsMul": {
+  "op": 14790,
+  "bytes": 19
+ },
+ "bnBDbl": {
+  "op": 143186,
+  "bytes": 440
+ },
+ "bnBAdd": {
+  "op": 185733,
+  "bytes": 583
+ },
+ "bnDStep": {
+  "op": 46624,
+  "bytes": 160
+ },
+ "ratios": {
+  "BDbl": 1.712,
+  "BAdd": 1.783,
+  "DStep": 1.648,
+  "Eval": 1.794,
+  "TableMul": 1.903,
+  "Fold": 1.715,
+  "Horner4": 1.799,
+  "GlsMul": 2.042
+ }
+}
