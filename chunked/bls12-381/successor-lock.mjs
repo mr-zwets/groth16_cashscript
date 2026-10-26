@@ -24,4 +24,3 @@ export function buildSuccessorLockings(bareLockings) {
   }
   return bound;
 }
-
