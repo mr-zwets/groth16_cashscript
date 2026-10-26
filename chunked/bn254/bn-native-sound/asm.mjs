@@ -37,6 +37,7 @@ export const pushData = (b) => [...encodeDataPush(Uint8Array.from(b))];
 export const numLen = (n) => numBytes(n).length;
 
 let uid = 0;
+const LAZY = process.env.LAZY === '1'; // off by default: the static cost model is not accurate enough for it
 export class Asm {
   constructor(stack = [], ctx = undefined) {
     this.st = [...stack];
@@ -194,9 +195,9 @@ export class Asm {
   // ---- kernels ----
   // K: Kernel; ins: names consumed (may be anywhere in the stack); env: other referenced names (read-only);
   // outs: names given to the outputs, which end on top in order.
-  kernel(K, outs, {iters = 3000, seed = 1} = {}) {
+  kernel(K, outs, {iters = 3000, seed = 1, lazy = LAZY} = {}) {
     assert.equal(outs.length, K.outs.length);
-    const res = scheduleKernel(this, K, iters, seed);
+    const res = scheduleKernel(this, K, iters, seed, lazy);
     if (process.env.DEBUG_K) console.error('kernel', outs.join(',').slice(0, 40), 'est op', res.cost, 'bytes', res.code.length);
     this.emit(...res.code); this.st = res.st; // outputs on top with internal ids
     for (let i = 0; i < outs.length; i++) this.st[this.st.length - outs.length + i] = outs[i];
@@ -235,11 +236,14 @@ export class Kernel {
 
 const COMM = new Set(['add', 'mul']);
 const OPC = {add: OP.ADD, sub: OP.SUB, mul: OP.MUL};
-function scheduleKernel(asm, K, iters, seed) {
+function scheduleKernel(asm, K, iters, seed, lazy) {
   const N = K.nodes; const P = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
   // sample lengths: refs are 32-byte unless a sample is given
   let ctr = 7n; const sampleOf = (n) => (n.sample !== undefined ? n.sample : (ctr = (ctr * 6364136223846793005n + 1442695040888963407n) % (1n << 64n), (P - 1n) - ctr * 12345n));
-  const vals = K.simulate(sampleOf, P); const lens = vals.map((x) => numLen(x)); lens.p = 32;
+  const samples = new Map(); for (const n of N) if (n.op === 'ref') samples.set(n.id, sampleOf(n)); // (same sequence as before)
+  const sv = (n) => samples.get(n.id);
+  const plan = (iters, final) => {
+  const vals = K.simulate(sv, P); const lens = vals.map((x) => numLen(x)); lens.p = 32;
   // live nodes in topological order
   const live = new Set(); const stk = [...K.outs];
   while (stk.length) { const x = stk.pop(); if (live.has(x)) continue; live.add(x); stk.push(...N[x].args); }
@@ -316,7 +320,28 @@ function scheduleKernel(asm, K, iters, seed) {
     const cand = order.slice(); cand.splice(i, 1); cand.splice(j, 0, id);
     const c = run(cand, false).cost; if (c <= best) { best = c; order = cand; }
   }
-  const out = run(order, true);
+  return final ? {out: run(order, true), hasMod} : best;
+  };
+  // lazy reduction (extension (4) vs the SI-GLS copy): greedily bypass an interior MOD node when the scheduled cost
+  // (short schedule) decreases. Never an output, and every path to an output must still pass through a MOD, so all
+  // outputs stay reduced; values are unchanged mod p.
+  let orig = null;
+  if (lazy) {
+    orig = N.map((n) => n.args.slice());
+    const LI = 300; let base = plan(LI, false); const outSet = new Set(K.outs);
+    const usersOf = (id) => N.filter((u) => u.args.includes(id));
+    const reachesRaw = (id, seen = new Set()) => { if (seen.has(id)) return false; seen.add(id); return usersOf(id).some((u) => u.op !== 'mod' && (outSet.has(u.id) || reachesRaw(u.id, seen))); };
+    for (const n of N) {
+      if (n.op !== 'mod' || outSet.has(n.id)) continue; const users = usersOf(n.id); if (!users.length || reachesRaw(n.id)) continue;
+      const saved = users.map((u) => u.args.slice()); users.forEach((u) => { u.args = u.args.map((x) => (x === n.id ? n.args[0] : x)); });
+      const c = plan(LI, false); if (c < base) base = c; else users.forEach((u, i) => { u.args = saved[i]; });
+    }
+  }
+  // keep the lazy DAG only if its full schedule is cheaper than the original's
+  if (lazy) { const cl = plan(iters, false); const mod = N.map((n) => n.args.slice()); N.forEach((n, i) => { n.args = orig[i]; }); const co = plan(iters, false);
+    if (process.env.DEBUG_LAZY) console.error('lazy', co, '->', cl);
+    if (cl < co) N.forEach((n, i) => { n.args = mod[i]; }); }
+  const {out, hasMod} = plan(iters, true);
   // resolve the P-invoke placeholder
   const code = []; for (const b of out.code) { if (b === 'PINV') { const f = asm.ctx.funcs.get('P'); if (f.id === null) { f.id = asm.ctx.nextId++; f.code = asm.compileLocal(f); asm.ctx.defs.push(f); } code.push(...pushNum(f.id), OP.INVOKE); } else code.push(b); }
   // the symbolic stack: replace numeric keys of outputs; everything else must be gone

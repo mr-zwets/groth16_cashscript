@@ -30,7 +30,7 @@ const prog = b1;
 assert.deepEqual(Buffer.concat(prog.pieces.map((x) => Buffer.from(x))), Buffer.from(prog.code));
 assert.equal(sha(prog.code), Buffer.from(prog.Kcode).toString('hex'));
 { const ids = Object.values(prog.info.funcs).map((f) => f.id); assert.equal(new Set(ids).size, ids.length, 'function ids distinct'); assert.ok(!ids.includes(1), 'id 1 is the body');
-  const roleIds = [0, 1, 2].map((i) => prog.info.roleId + i); assert.ok(roleIds.every((x) => !ids.includes(x)), 'role ids distinct'); }
+  assert.ok(Number.isInteger(prog.info.roleId)); const roleIds = [0, 1, 2].map((i) => prog.info.roleId + i); assert.ok(roleIds.every((x) => !ids.includes(x) && x !== 1), 'role ids distinct'); }
 // ---- schedule / chain facts (protocol.mjs asserts the per-role schedules at load) ----
 assert.deepEqual(CUTS, [0, 24, 48, 65]); assert.equal(ROLES.reduce((s, r) => s + r.nStates, 0), NSTATES);
 assert.equal(DS.reduce((s, d) => s + d.length, 0), 88 * 64);

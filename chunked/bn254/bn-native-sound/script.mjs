@@ -100,9 +100,10 @@ function defineFunctions(a, WIN) {
   });
   // HDEC: [HAND 224] -> x_T.c0, x_T.c1, y_T.c0, y_T.c1, F+, F-, R (each < p)
   a.defLocal('HDEC', 1, 7, (s) => { s.rename('in0', 'H'); for (const n of ['X0', 'X1', 'Y0', 'Y1', 'Fp', 'Fm', 'R']) s.invoke('RD', [n, 'H']); s.drop('H'); });
-  // HENC: [7 values, p] -> 224-byte canonical encoding ((v mod p) as 32-byte LE)
+  // HENC: [7 values, p] -> 224-byte canonical encoding: w = (v + p) mod p as a 33-byte VM number whose top byte must be
+  // 0x00 (so w is in [0, p): a negative w, possible only if v <= -p, is rejected, never encoded), then its 32-byte LE
   a.defLocal('HENC', 8, 1, (s) => {
-    for (let k = 0; k < 7; k++) { s.roll('in' + k).pick('in7').op(OP.ADD, 2, 'v').pick('in7').op(OP.MOD, 2, 'v').push(33).op(OP.NUM2BIN, 2, 'b').push(32).op(OP.SPLIT, 2, 'b', 'x').drop('x'); if (k) s.op(OP.CAT, 2, 'o'); else s.rename('o'); }
+    for (let k = 0; k < 7; k++) { s.roll('in' + k).pick('in7').op(OP.ADD, 2, 'v').pick('in7').op(OP.MOD, 2, 'v').push(33).op(OP.NUM2BIN, 2, 'b').push(32).op(OP.SPLIT, 2, 'b', 'x').pushBytes([0]).op(OP.EQUALVERIFY, 2); if (k) s.op(OP.CAT, 2, 'o'); else s.rename('o'); }
     s.drop('in7');
   });
   // SETUP: [sc0..sc5, z, xA, yA, xB0, xB1, yB0, yB1, xC, yC, p] -> TABLES, ENV, HOT (see the window above)
@@ -204,6 +205,8 @@ function callBound(a, name) {
   const f = a.ctx.funcs.get(name); assert.ok(f.id !== null, name + ' not compiled yet');
   a.arrangeAbove('Dp', f.entry.slice(f.entry.lastIndexOf('Dp') + 1)); a.invoke(name);
 }
+// clean stack: park the result on the altstack, drop every other item (2DROP pairs: cheaper in op than a DEPTH loop,
+// and every input is op-bound, not byte-bound), take the result back
 const cleanup = (a) => { assert.equal(a.alt.length, 0); assert.equal(a.piles.size, 0);
   a.toAlt('result'); while (a.st.length >= 2) { a.emit(OP.TWODROP); a.st.length -= 2; } if (a.st.length) a.drop(); a.fromAlt('result'); assert.deepEqual(a.st, ['result']); };
 
@@ -300,30 +303,34 @@ function roleProgram(i, ctx, lay, WIN) {
   // ---- 9'. terminal (last role) ----
   a.mark('terminal');
   const piles0 = () => { a.piles.set('Dp', 0); a.piles.set('WSp', 0); };
-  a.pick('px0', 'xq0').pick('px1', 'xq1').pick('py0', 'yq0').pick('py1', 'yq1').push(1, 'cp').push(1, 'cm'); callBound(a, 'BADD'); piles0();
+  a.mark('t:badd1'); a.pick('px0', 'xq0').pick('px1', 'xq1').pick('py0', 'yq0').pick('py1', 'yq1').push(1, 'cp').push(1, 'cm'); callBound(a, 'BADD'); piles0();
   for (const n of ['yq1', 'yq0', 'xq1', 'xq0']) a.drop(n);
-  a.push(VKC.deltaPsi.x.c0, 's0').push(VKC.deltaPsi.x.c1, 's1'); callBound(a, 'DSTEP'); piles0();
-  { const k = new Kernel(); k.output(k.mod(k.mul(k.env('xB0'), k.c(OMEGA))), k.mod(k.mul(k.env('xB1'), k.c(OMEGA)))); a.kernel(k, ['xq0', 'xq1'], {iters: 50}); }
+  a.mark('t:dstep1'); a.push(VKC.deltaPsi.x.c0, 's0').push(VKC.deltaPsi.x.c1, 's1'); callBound(a, 'DSTEP'); piles0();
+  a.mark('t:badd2'); { const k = new Kernel(); k.output(k.mod(k.mul(k.env('xB0'), k.c(OMEGA))), k.mod(k.mul(k.env('xB1'), k.c(OMEGA)))); a.kernel(k, ['xq0', 'xq1'], {iters: 50}); }
   a.pick('yB0', 'yq0').pick('yB1', 'yq1').push(1, 'cp').push(1, 'cm'); callBound(a, 'BADD'); piles0();
   for (const n of ['yq1', 'yq0', 'xq1', 'xq0']) a.drop(n);
-  a.pick('dx0', 's0').pick('dx1', 's1'); callBound(a, 'DSTEP'); piles0(); // s is irrelevant for the last delta line
+  a.mark('t:dstep2'); a.pick('dx0', 's0').pick('dx1', 's1'); callBound(a, 'DSTEP'); piles0(); // s is irrelevant for the last delta line
   a.roll('D').op(OP.SIZE, 1, 'D', 'ds').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1).drop('D'); a.pileDone('Dp'); // all 88 delta slopes consumed
   a.roll('W').op(OP.SIZE, 1, 'W', 'ws').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1).drop('W');                   // every witness consumed
+  a.mark('t:endpoint');
   // endpoint: T == -psi^3(B) = (omega px, py), exactly (affine, reduced): lambda(psi)(B) = O, so B is in G2
   { const k = new Kernel(); const [X0, X1, Y0, Y1, px0, px1, py0, py1] = ['X0', 'X1', 'Y0', 'Y1', 'px0', 'px1', 'py0', 'py1'].map((n) => k.in(n));
     k.output(k.mod(k.sub(X0, k.mul(k.c(OMEGA), px0))), k.mod(k.sub(X1, k.mul(k.c(OMEGA), px1))), k.mod(k.sub(Y0, py0)), k.mod(k.sub(Y1, py1)));
     a.kernel(k, ['ex0', 'ex1', 'ey0', 'ey1'], {iters: 500}); for (let j = 0; j < 4; j++) a.op(OP.NOT, 1, 'q').op(OP.VERIFY, 1); }
   for (const n of ['d', 'BND', 'N1', 'N0', 'SCH']) a.drop(n);
   a.pileDone('WSp');
+  a.mark('t:rconst');
   // F *= Rconst(+-z) * S_c(+-eta z)
   for (let j = 0; j < 6; j++) a.push(VKC.Rconst[j]); for (const n of ZP) a.pick(n); a.invoke('EV', ['rp', 'rm']);
   for (let j = 0; j < 6; j++) a.pick('sc' + j); for (const n of EZP) a.pick(n); a.invoke('EV', ['ep', 'em']);
   { const k = new Kernel(); k.output(k.mod(k.mul(k.mul(k.in('Fp'), k.in('rp')), k.in('ep'))), k.mod(k.mul(k.mul(k.in('Fm'), k.in('rm')), k.in('em')))); a.kernel(k, ['Fp', 'Fm'], {iters: 200}); }
+  a.mark('t:cj');
   // c_j = Phi(gamma1^j)(z) = g0 + g1 (z^6 - 9), j = 1..5 (Frob(X^j) = Phi(gamma1^j) X^j)
   { const k = new Kernel(); const m = (x) => k.mod(x), mul = (x, y) => k.mul(x, y); const t = k.sub(k.env('z6'), k.c(9n)); const g = [[k.c(GAMMA1.c0), k.c(GAMMA1.c1)]];
     const fm = (a0, a1, b0, b1) => [m(k.sub(mul(a0, b0), mul(a1, b1))), m(k.add(mul(a0, b1), mul(a1, b0)))];
     for (let j = 2; j <= 5; j++) g.push(fm(...g[j - 2], ...g[0]));
     k.output(...g.map(([g0, g1]) => m(k.add(g0, mul(g1, t))))); a.kernel(k, ['c1', 'c2', 'c3', 'c4', 'c5'], {iters: 800}); }
+  a.mark('t:W');
   // W(+-z) = Frob(S_c)(+-z) Frob(S_c)(+-eta z);  R <- R rho + F+ W(-z) - F- W(+z)
   { const k = new Kernel(); const I = (n) => k.in(n), E = (n) => k.env(n), m = (x) => k.mod(x), mul = (x, y) => k.mul(x, y);
     const sc = [0, 1, 2, 3, 4, 5].map((j) => I('sc' + j)); const sj = [null, ...[1, 2, 3, 4, 5].map((j) => m(mul(sc[j], I('c' + j))))];
@@ -398,7 +405,7 @@ export function buildProgram() {
     if (nl[0] === lens[0] && nl[1] === lens[1]) {
       const Kcode = sha(body.code); const R = redeemFor(lay, Kcode); assert.equal(R.length, rLen0);
       const pieces = [body.code.subarray(0, lens[0]), body.code.subarray(lens[0])];
-      return {code: body.code, pieces, R, Kcode, lay, marks: body.marks, funcCodes: body.funcCodes, info: {roles: body.roles, prologue: body.prologue, funcs: body.funcs, WIN}};
+      return {code: body.code, pieces, R, Kcode, lay, marks: body.marks, funcCodes: body.funcCodes, info: {roles: body.roles, roleId: body.roleId, prologue: body.prologue, funcs: body.funcs, WIN}};
     }
     lens = nl;
   }

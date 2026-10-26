@@ -28,7 +28,7 @@ export function unlockingsFor(core, prog, fills) {
   return {pushes, unlockings: pushes.map((ps) => Buffer.from(encodeUnlocking(ps))), z, H};
 }
 // prover-sized fillers: iterate until every input meets the margin (standard mode) or hits the cap
-export function sizeFills(core, prog, {margin = MARGIN, fills0 = [0, 0, 0], maxIter = 8} = {}) {
+export function sizeFills(core, prog, {margin = MARGIN, fills0 = [0, 0, 0], maxIter = 40} = {}) {
   const lock = lockingOf(prog); let fills = fills0.slice();
   for (let it = 0; it < maxIter; it++) {
     const {unlockings} = unlockingsFor(core, prog, fills);
@@ -38,8 +38,10 @@ export function sizeFills(core, prog, {margin = MARGIN, fills0 = [0, 0, 0], maxI
       // the push header grows with the filler: re-add it
       f = Math.max(0, need - (base - 1) - (f >= 256 ? 3 : f >= 76 ? 2 : 1));
       return Math.min(f, Math.max(0, UNLOCK_CAP - base - 2)); });
-    if (next.every((f, i) => f <= fills[i]) && runs.every((x) => x.opCost <= (1 - margin) * x.budget || x.length >= UNLOCK_CAP - 3)) return {fills, runs};
-    fills = next.map((f, i) => Math.max(f, fills[i]));
+    const ok = runs.map((x) => x.opCost <= (1 - margin) * x.budget || x.length >= UNLOCK_CAP - 3);
+    if (ok.every(Boolean)) return {fills, runs};
+    // an input that misses the margin grows its filler (at least 1 B, so the iteration always progresses)
+    fills = next.map((f, i) => (ok[i] ? fills[i] : Math.max(f, fills[i] + 1)));
   }
   throw new Error('filler sizing did not converge');
 }
