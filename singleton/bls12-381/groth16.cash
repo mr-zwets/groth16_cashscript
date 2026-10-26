@@ -78,6 +78,13 @@ function computeVkx(int in0, int in1) returns (int, int) {
     return mulFp(vx, zInv2), mulFp(vy, zInv3);
 }
 
+// (psi(B).x, -psi(B).y) for the G2 subgroup check in spend(); see the comment there.
+function psiNegY(int xa, int xb, int ya, int yb) returns (int, int, int, int) {
+    int c = 4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437;
+    int a = 2973677408986561043442465346520108879172042883009249989176415018091420807192182638567116318576472649347015917690530;
+    return mulFp(c, xb), mulFp(c, xa), mulFp(a, subFp(yb, ya)), mulFp(a, addFp(ya, yb));
+}
+
 contract Groth16Verify() {
     function spend(
         int Ax, int Ay,
@@ -89,6 +96,25 @@ contract Groth16Verify() {
         // vk_x, so one proof would verify for two different claimed integers.
         require(within(in0, 0, 52435875175126190479447740508185965837690552500527637822603658699938581184513));
         require(within(in1, 0, 52435875175126190479447740508185965837690552500527637822603658699938581184513));
+        // ---- proof-point domain checks ----
+        // Coordinates must be canonical field elements, 0 <= v < p: the field ops reduce mod p,
+        // so without this v and v + p would be the same point under two encodings.
+        require(within(Ax, 0, P)); require(within(Ay, 0, P));
+        require(within(Bxa, 0, P)); require(within(Bxb, 0, P));
+        require(within(Bya, 0, P)); require(within(Byb, 0, P));
+        require(within(Cx, 0, P)); require(within(Cy, 0, P));
+        // A, C on E(Fp): y^2 = x^3 + 4. The affine encoding has no point at infinity, and (0,0) is
+        // off-curve, so A = O and C = O are rejected here. No G1 subgroup check: A and C are
+        // paired only with order-r G2 points (B is checked below, gamma/delta are fixed), so a
+        // G1 cofactor component pairs to 1 (as in groth16_minop.cash).
+        require(sqrFp(Ay) == addFp(mulFp(sqrFp(Ax), Ax), 4));
+        require(sqrFp(Cy) == addFp(mulFp(sqrFp(Cx), Cx), 4));
+        // B on the M-twist E'(Fp2): y^2 = x^3 + 4(1+u). B = O has no encoding and (0,0) is off-curve.
+        (int bx2a, int bx2b) = fp2Sqr(Bxa, Bxb);
+        (int bx3a, int bx3b) = fp2Mul(bx2a, bx2b, Bxa, Bxb);
+        (int by2a, int by2b) = fp2Sqr(Bya, Byb);
+        require(by2a == addFp(bx3a, 4)); require(by2b == addFp(bx3b, 4));
+
         // vk_x = IC0 + in0*IC1 + in1*IC2 in one shared-doubling Shamir pass.
         (int affX, int affY) = computeVkx(in0, in1);
 
@@ -103,14 +129,32 @@ contract Groth16Verify() {
         int deltaYa = 3530302418949228934091667310294175693003022032414424968762352951695783200280895198385592038318823552301823495139379; int deltaYb = 3641837813198967662575394539948599175533608045000606654724943255491235392098335065445605489678881045687449867006307;
 
         int nAy = negFp(Ay);
-        (int a0,int a1,int a2,int a3,int a4,int a5,int a6,int a7,int a8,int a9,int a10,int a11) =
-            millerSingle(Bxa,Bxb,Bya,Byb, Ax, nAy);
-        (int b0,int b1,int b2,int b3,int b4,int b5,int b6,int b7,int b8,int b9,int b10,int b11) =
-            millerSingle(betaXa,betaXb,betaYa,betaYb, alphaX, alphaY);
-        (int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11) =
-            millerSingle(gammaXa,gammaXb,gammaYa,gammaYb, affX, affY);
-        (int d0,int d1,int d2,int d3,int d4,int d5,int d6,int d7,int d8,int d9,int d10,int d11) =
-            millerSingle(deltaXa,deltaXb,deltaYa,deltaYb, Cx, Cy);
+        (int a0,int a1,int a2,int a3,int a4,int a5,int a6,int a7,int a8,int a9,int a10,int a11,
+         int Rxa,int Rxb,int Rya,int Ryb,int Rza,int Rzb) =
+            millerSingleR(Bxa,Bxb,Bya,Byb, Ax, nAy);
+        // ---- G2 subgroup check on B, fused into its Miller walk ----
+        // The walk ends at R = (X:Y:Z) = [|x|]B unless some step was exceptional (R = +-B in
+        // pointAdd, R of order 2 in pointDouble), which leaves Z = 0, and Z = 0 is absorbing; an
+        // order-13 B, for one, collapses at the NAF prefix 13. Require Z != 0 (Rza, Rzb are
+        // canonical, so the sum is 0 only when both are), then check psi(B) == [-x]B = -[|x|]B
+        // projectively: X == psi(B).x * Z and Y == -psi(B).y * Z. psi(B) == [x]B holds exactly
+        // for B in G2 (x the BLS12-381 seed; see psi-subgroup-degeneracy.md).
+        // psi is lib/G2Check.cash's g2psi, psi(x,y) = (PSI_X*conj(x), PSI_Y*conj(y)), expanded:
+        // PSI_X = c*u and PSI_Y = a*(1-u) (its second limb is p - a), so
+        //   psi(B).x  = (c*Bxb, c*Bxa)
+        //   -psi(B).y = (a*(Byb - Bya), a*(Bya + Byb)).
+        require(Rza + Rzb != 0);
+        (int pxa,int pxb,int nya,int nyb) = psiNegY(Bxa, Bxb, Bya, Byb);
+        (int gxa,int gxb) = fp2Mul(pxa, pxb, Rza, Rzb);
+        require(Rxa == gxa); require(Rxb == gxb);
+        (int gya,int gyb) = fp2Mul(nya, nyb, Rza, Rzb);
+        require(Rya == gya); require(Ryb == gyb);
+        (int b0,int b1,int b2,int b3,int b4,int b5,int b6,int b7,int b8,int b9,int b10,int b11, int bR0,int bR1,int bR2,int bR3,int bR4,int bR5) =
+            millerSingleR(betaXa,betaXb,betaYa,betaYb, alphaX, alphaY);
+        (int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11, int cR0,int cR1,int cR2,int cR3,int cR4,int cR5) =
+            millerSingleR(gammaXa,gammaXb,gammaYa,gammaYb, affX, affY);
+        (int d0,int d1,int d2,int d3,int d4,int d5,int d6,int d7,int d8,int d9,int d10,int d11, int dR0,int dR1,int dR2,int dR3,int dR4,int dR5) =
+            millerSingleR(deltaXa,deltaXb,deltaYa,deltaYb, Cx, Cy);
         (int ab0,int ab1,int ab2,int ab3,int ab4,int ab5,int ab6,int ab7,int ab8,int ab9,int ab10,int ab11) =
             fp12Mul(a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11, b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11);
         (int abc0,int abc1,int abc2,int abc3,int abc4,int abc5,int abc6,int abc7,int abc8,int abc9,int abc10,int abc11) =

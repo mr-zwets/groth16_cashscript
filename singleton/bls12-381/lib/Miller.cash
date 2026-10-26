@@ -104,3 +104,37 @@ function millerSingle(int Qxa,int Qxb,int Qya,int Qyb, int Px, int Py)
         }
         return F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11;
     }
+
+// millerSingle that also returns the final homogeneous-projective accumulator R = (X:Y:Z),
+// for callers that fuse the G2 subgroup check into the walk (groth16.cash). The NAF walk
+// starts at R = Q and ends at R = [|x|]Q whenever every step was a regular double/add.
+// Every exceptional step (R = +-Q in pointAdd, R of order 2 in pointDouble) yields Z = 0, and
+// Z = 0 is absorbing under both formulas, so a caller that requires Z != 0 gets the true
+// [|x|]Q. Kept separate from millerSingle so its other consumers keep their bytes.
+function millerSingleR(int Qxa,int Qxb,int Qya,int Qyb, int Px, int Py)
+        returns (int,int,int,int,int,int,int,int,int,int,int,int, int,int,int,int,int,int) {
+        int F0=1; int F1=0; int F2=0; int F3=0; int F4=0; int F5=0;
+        int F6=0; int F7=0; int F8=0; int F9=0; int F10=0; int F11=0;
+        int Rxa=Qxa; int Rxb=Qxb; int Rya=Qya; int Ryb=Qyb; int Rza=1; int Rzb=0;
+
+        for (int k = 0; k < 64; k = k + 1) {
+            (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
+                fp12Sqr(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11);
+            (int dc0,int dc1,int dc2,int dc3,int dc4,int dc5, Rxa,Rxb,Rya,Ryb,Rza,Rzb) =
+                pointDouble(Rxa,Rxb,Rya,Ryb,Rza,Rzb);
+            (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
+                line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, dc0,dc1,dc2,dc3,dc4,dc5, Px, Py);
+            int nz = (140737488388170 >> k) % 2;
+            if (nz == 1) {
+                int neg = (2 >> k) % 2;
+                int uya = Qya;
+                int uyb = Qyb;
+                if (neg == 1) { (uya,uyb) = fp2Neg(Qya, Qyb);}
+                (int ac0,int ac1,int ac2,int ac3,int ac4,int ac5, Rxa,Rxb,Rya,Ryb,Rza,Rzb) =
+                    pointAdd(Rxa,Rxb,Rya,Ryb,Rza,Rzb, Qxa,Qxb,uya,uyb);
+                (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) =
+                    line(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, ac0,ac1,ac2,ac3,ac4,ac5, Px, Py);
+            }
+        }
+        return F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, Rxa,Rxb,Rya,Ryb,Rza,Rzb;
+    }
