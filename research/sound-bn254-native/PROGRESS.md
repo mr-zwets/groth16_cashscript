@@ -18,11 +18,15 @@ groth16_cashscript/research/sound-bn254-native/ (README + prototypes/).
 - model.mjs (SPLITLIB=1 CAP=9800): DESIGN = all-affine inverse-norm, 3 inputs, ~26.8k B (bytes-bound, margins >= 2.5%).
   Alternatives: 4 inputs ~28.8k; slope witnesses infeasible/28.9k; hybrids ~27.9k; SI projective 4 inputs ~32.2k.
 
-## Next
-- Write README (protocol, soundness argument, layout table, risks); final commit + push.
+- Calibrated model (chunk sums corrected to direct range measurements, within 0.2%): DESIGN 26,884 B, op 20.97M,
+  3 inputs [0,24) 9,087 B / [24,48) 9,037 B / [48,65) 8,504 B, margins 2.0%.
+- README.md written (protocol, soundness argument, layout table, sources of every number, alternatives, liveness, risks).
+
+## Next (if continued)
+- Optional: optimize setup2 further; build phase = port SI-GLS build/export/redteam/sweep to 3 inputs.
 
 ## Commands
 node research/sound-bn254-native/prototypes/kernels.mjs
 node research/sound-bn254-native/prototypes/loop.mjs affineN 0 65
-node research/sound-bn254-native/prototypes/ranges.mjs > research/sound-bn254-native/prototypes/ranges.json
-node research/sound-bn254-native/prototypes/model.mjs
+node research/sound-bn254-native/prototypes/setup2.mjs
+SPLITLIB=1 CAP=9800 node research/sound-bn254-native/prototypes/model.mjs

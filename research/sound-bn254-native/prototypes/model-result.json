@@ -5,8 +5,262 @@
   "amode": "affineN",
   "cuts": [
    0,
+   12,
+   24,
+   33
+  ],
+  "ins": [
+   {
+    "i": 0,
+    "events": [
+     0,
+     24
+    ],
+    "op": 7156017,
+    "bytes": 9087,
+    "data": [
+     "code"
+    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 2304,
+     "bWitness": 1024,
+     "handover": 0,
+     "statementAndDigests": 738,
+     "code": 4932,
+     "filler": 19
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 6221017,
+     "ownerChecks": 20000,
+     "remoteReads": 45000
+    },
+    "fill": 19,
+    "budget": 7302400,
+    "margin": 0.02004587532865909
+   },
+   {
+    "i": 1,
+    "events": [
+     24,
+     48
+    ],
+    "op": 7116540,
+    "bytes": 9037,
+    "data": [
+     "consts",
+     "DS1",
+     "DS2"
+    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 2304,
+     "bWitness": 1024,
+     "handover": 224,
+     "consts": 1812,
+     "DS1": 2048,
+     "DS2": 1536,
+     "filler": 19
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 6226540,
+     "remoteReads": 20000
+    },
+    "fill": 19,
+    "budget": 7262400,
+    "margin": 0.020084269662921317
+   },
+   {
+    "i": 2,
+    "events": [
+     48,
+     65
+    ],
+    "op": 6699276,
+    "bytes": 8504,
+    "data": [
+     "WQ",
+     "DS0"
+    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 1728,
+     "bWitness": 768,
+     "handover": 224,
+     "WQ": 3648,
+     "DS0": 2048,
+     "filler": 18
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 4316696,
+     "terminal": 540000,
+     "binding": 130000,
+     "quotient": 737580,
+     "final": 60000,
+     "remoteReads": 45000
+    },
+    "fill": 18,
+    "budget": 6836000,
+    "margin": 0.020000585137507354
+   }
+  ],
+  "fill": 56,
+  "content": 26628,
+  "op": 20971833,
+  "score": 26884
+ },
+ "all-affine inverse-norm, 4 inputs": {
+  "n": 4,
+  "m": 65,
+  "amode": "affineN",
+  "cuts": [
+   0,
+   12,
+   20,
+   26,
+   33
+  ],
+  "ins": [
+   {
+    "i": 0,
+    "events": [
+     0,
+     24
+    ],
+    "op": 7136017,
+    "bytes": 9062,
+    "data": [
+     "WQ",
+     "DS3"
+    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 2304,
+     "bWitness": 1024,
+     "handover": 0,
+     "statementAndDigests": 738,
+     "WQ": 3648,
+     "DS3": 1216,
+     "filler": 62
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 6221017,
+     "ownerChecks": 20000,
+     "remoteReads": 25000
+    },
+    "fill": 62,
+    "budget": 7282400,
+    "margin": 0.020100928265406992
+   },
+   {
+    "i": 1,
+    "events": [
+     24,
+     40
+    ],
+    "op": 4965656,
+    "bytes": 6293,
+    "data": [
+     "consts",
+     "DS1"
+    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 1536,
+     "bWitness": 672,
+     "handover": 224,
+     "consts": 1940,
+     "DS1": 1344,
+     "filler": 507
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 4095656
+    },
+    "fill": 507,
+    "budget": 5067200,
+    "margin": 0.02003946952952318
+   },
+   {
+    "i": 2,
+    "events": [
+     40,
+     52
+    ],
+    "op": 3978012,
+    "bytes": 5033,
+    "data": [
+     "DS0",
+     "DS2"
+    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 1152,
+     "bWitness": 512,
+     "handover": 224,
+     "DS0": 2048,
+     "DS2": 1024,
+     "filler": 3
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 3108012
+    },
+    "fill": 3,
+    "budget": 4059200,
+    "margin": 0.020000985415845496
+   },
+   {
+    "i": 3,
+    "events": [
+     52,
+     65
+    ],
+    "op": 5692646,
+    "bytes": 7221,
+    "data": [
+     "code"
+    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 1344,
+     "bWitness": 608,
+     "handover": 224,
+     "code": 4932,
+     "filler": 43
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 3330066,
+     "terminal": 540000,
+     "binding": 130000,
+     "quotient": 737580,
+     "final": 60000,
+     "remoteReads": 25000
+    },
+    "fill": 43,
+    "budget": 5809600,
+    "margin": 0.02013116221426603
+   }
+  ],
+  "fill": 615,
+  "content": 27609,
+  "op": 21772331,
+  "score": 27943
+ },
+ "all-affine slope witnesses, 3 inputs": null,
+ "all-affine adds inv-norm, dbls slope, 3 inputs": {
+  "n": 3,
+  "m": 65,
+  "amode": "affineAN",
+  "cuts": [
+   0,
    9,
-   23,
+   22,
    33
   ],
   "ins": [
@@ -16,206 +270,222 @@
      0,
      18
     ],
-    "op": 5649927,
-    "bytes": 7166,
+    "op": 5399184,
+    "bytes": 9372,
     "data": [
+     "consts",
      "WQ"
     ],
-    "fill": 182,
-    "budget": 5765600,
-    "margin": 0.020062612737616226
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 1728,
+     "bWitness": 1376,
+     "handover": 0,
+     "statementAndDigests": 738,
+     "consts": 1812,
+     "WQ": 3648,
+     "filler": 0
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 4484184,
+     "ownerChecks": 20000,
+     "remoteReads": 25000
+    },
+    "fill": 0,
+    "budget": 7530400,
+    "margin": 0.283014979283969
    },
    {
     "i": 1,
     "events": [
      18,
-     46
+     44
     ],
-    "op": 7813643,
-    "bytes": 9926,
+    "op": 6921139,
+    "bytes": 9610,
+    "data": [
+     "code"
+    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 2496,
+     "bWitness": 1888,
+     "handover": 224,
+     "code": 4932,
+     "filler": 0
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 6026139,
+     "remoteReads": 25000
+    },
+    "fill": 0,
+    "budget": 7720800,
+    "margin": 0.10357229820743963
+   },
+   {
+    "i": 2,
+    "events": [
+     44,
+     65
+    ],
+    "op": 7413018,
+    "bytes": 9670,
     "data": [
      "DS0",
      "DS1",
      "DS2"
     ],
-    "fill": 160,
-    "budget": 7973600,
-    "margin": 0.020060825724892095
-   },
-   {
-    "i": 2,
-    "events": [
-     46,
-     65
-    ],
-    "op": 7163203,
-    "bytes": 9790,
-    "data": [
-     "library"
-    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 2112,
+     "bWitness": 1632,
+     "handover": 224,
+     "DS0": 1600,
+     "DS1": 2112,
+     "DS2": 1920,
+     "filler": 0
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 5075438,
+     "terminal": 540000,
+     "binding": 130000,
+     "quotient": 737580,
+     "final": 60000
+    },
     "fill": 0,
-    "budget": 7864800,
-    "margin": 0.08920722713864304
-   }
-  ],
-  "fill": 342,
-  "content": 26882,
-  "op": 20626773,
-  "score": 27138
- },
- "all-affine inverse-norm, 4 inputs": {
-  "n": 4,
-  "m": 65,
-  "amode": "affineN",
-  "cuts": [
-   0,
-   10,
-   18,
-   24,
-   33
-  ],
-  "ins": [
-   {
-    "i": 0,
-    "events": [
-     0,
-     20
-    ],
-    "op": 6063908,
-    "bytes": 7694,
-    "data": [
-     "WQ"
-    ],
-    "fill": 454,
-    "budget": 6188000,
-    "margin": 0.020053652230122787
-   },
-   {
-    "i": 1,
-    "events": [
-     20,
-     36
-    ],
-    "op": 4892758,
-    "bytes": 6200,
-    "data": [
-     "DS0",
-     "DS1"
-    ],
-    "fill": 626,
-    "budget": 4992800,
-    "margin": 0.02003725364524911
-   },
-   {
-    "i": 2,
-    "events": [
-     36,
-     48
-    ],
-    "op": 3936847,
-    "bytes": 4981,
-    "data": [
-     "DS2",
-     "DS3"
-    ],
-    "fill": 463,
-    "budget": 4017600,
-    "margin": 0.020099810832337694
-   },
-   {
-    "i": 3,
-    "events": [
-     48,
-     65
-    ],
-    "op": 6603260,
-    "bytes": 9630,
-    "data": [
-     "library"
-    ],
-    "fill": 0,
-    "budget": 7736800,
-    "margin": 0.1465127701375245
-   }
-  ],
-  "fill": 1543,
-  "content": 28505,
-  "op": 21496773,
-  "score": 28839
- },
- "all-affine slope witnesses, 3 inputs": null,
- "all-affine adds inv-norm, dbls slope, 3 inputs": {
-  "n": 3,
-  "m": 65,
-  "amode": "affineAN",
-  "cuts": [
-   0,
-   13,
-   21,
-   33
-  ],
-  "ins": [
-   {
-    "i": 0,
-    "events": [
-     0,
-     26
-    ],
-    "op": 6973050,
-    "bytes": 8872,
-    "data": [
-     "WQ"
-    ],
-    "fill": 0,
-    "budget": 7130400,
-    "margin": 0.022067485695052125
-   },
-   {
-    "i": 1,
-    "events": [
-     26,
-     42
-    ],
-    "op": 4778847,
-    "bytes": 9758,
-    "data": [
-     "library"
-    ],
-    "fill": 0,
-    "budget": 7839200,
-    "margin": 0.3903909837738545
-   },
-   {
-    "i": 2,
-    "events": [
-     42,
-     65
-    ],
-    "op": 7694884,
-    "bytes": 9990,
-    "data": [
-     "DS0",
-     "DS1",
-     "DS2"
-    ],
-    "fill": 0,
-    "budget": 8024800,
-    "margin": 0.041112052636825824
+    "budget": 7768800,
+    "margin": 0.04579626197096076
    }
   ],
   "fill": 0,
-  "content": 28620,
-  "op": 19446781,
-  "score": 28876
+  "content": 28652,
+  "op": 19733341,
+  "score": 28908
  },
  "hybrid affine-slope prefix + SI projective": {
   "n": 3,
-  "m": 36,
+  "m": 40,
   "amode": "affineAN",
   "cuts": [
    0,
+   14,
+   25,
+   33
+  ],
+  "ins": [
+   {
+    "i": 0,
+    "events": [
+     0,
+     28
+    ],
+    "op": 7609516,
+    "bytes": 9756,
+    "data": [
+     "consts",
+     "DS0"
+    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 2688,
+     "bWitness": 2080,
+     "handover": 0,
+     "statementAndDigests": 738,
+     "consts": 1812,
+     "DS0": 2368,
+     "filler": 0
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 6699516,
+     "ownerChecks": 20000,
+     "remoteReads": 20000
+    },
+    "fill": 0,
+    "budget": 7837600,
+    "margin": 0.029101255486373434
+   },
+   {
+    "i": 1,
+    "events": [
+     28,
+     50
+    ],
+    "op": 6910966,
+    "bytes": 8806,
+    "data": [
+     "WQ",
+     "DS1"
+    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 2112,
+     "bWitness": 896,
+     "handover": 224,
+     "WQ": 3648,
+     "DS1": 1856,
+     "filler": 0
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 6020966,
+     "remoteReads": 20000
+    },
+    "fill": 0,
+    "budget": 7077600,
+    "margin": 0.023543856674578922
+   },
+   {
+    "i": 2,
+    "events": [
+     50,
+     65
+    ],
+    "op": 7325172,
+    "bytes": 9303,
+    "data": [
+     "code",
+     "DS2"
+    ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 1536,
+     "bWitness": 0,
+     "handover": 288,
+     "code": 5962,
+     "DS2": 1408,
+     "filler": 39
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 4800592,
+     "terminal": 707000,
+     "binding": 130000,
+     "quotient": 737580,
+     "final": 60000,
+     "remoteReads": 20000
+    },
+    "fill": 39,
+    "budget": 7475200,
+    "margin": 0.020070098458904062
+   }
+  ],
+  "fill": 39,
+  "content": 27865,
+  "op": 21845654,
+  "score": 28121
+ },
+ "hybrid affine-inv-norm prefix + SI projective": {
+  "n": 3,
+  "m": 60,
+  "amode": "affineN",
+  "cuts": [
+   0,
    13,
-   24,
+   25,
    33
   ],
   "ins": [
@@ -225,116 +495,101 @@
      0,
      26
     ],
-    "op": 6973050,
-    "bytes": 8872,
+    "op": 7554532,
+    "bytes": 9788,
     "data": [
-     "WQ"
+     "consts",
+     "DS0",
+     "DS2"
     ],
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 2496,
+     "bWitness": 1088,
+     "handover": 0,
+     "statementAndDigests": 738,
+     "consts": 1812,
+     "DS0": 2176,
+     "DS2": 1408,
+     "filler": 0
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 6644532,
+     "ownerChecks": 20000,
+     "remoteReads": 20000
+    },
     "fill": 0,
-    "budget": 7130400,
-    "margin": 0.022067485695052125
+    "budget": 7863200,
+    "margin": 0.039254756333299445
    },
    {
     "i": 1,
     "events": [
      26,
-     48
+     50
     ],
-    "op": 7046067,
-    "bytes": 8947,
-    "data": [
-     "DS0",
-     "DS1",
-     "DS2"
-    ],
-    "fill": 141,
-    "budget": 7190400,
-    "margin": 0.02007301401869155
-   },
-   {
-    "i": 2,
-    "events": [
-     48,
-     65
-    ],
-    "op": 7627769,
-    "bytes": 9828,
-    "data": [
-     "library"
-    ],
-    "fill": 0,
-    "budget": 7895200,
-    "margin": 0.03387260614043974
-   }
-  ],
-  "fill": 141,
-  "content": 27647,
-  "op": 21646886,
-  "score": 27903
- },
- "hybrid affine-inv-norm prefix + SI projective": {
-  "n": 3,
-  "m": 48,
-  "amode": "affineN",
-  "cuts": [
-   0,
-   11,
-   24,
-   33
-  ],
-  "ins": [
-   {
-    "i": 0,
-    "events": [
-     0,
-     22
-    ],
-    "op": 6612475,
-    "bytes": 8394,
-    "data": [
-     "DS0",
-     "DS1"
-    ],
-    "fill": 418,
-    "budget": 6748000,
-    "margin": 0.02008372851215179
-   },
-   {
-    "i": 1,
-    "events": [
-     22,
-     48
-    ],
-    "op": 7451038,
-    "bytes": 9463,
+    "op": 7110240,
+    "bytes": 9318,
     "data": [
      "WQ",
-     "DS2"
+     "DS1"
     ],
-    "fill": 401,
-    "budget": 7603200,
-    "margin": 0.020012889309764303
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 2304,
+     "bWitness": 1024,
+     "handover": 224,
+     "WQ": 3648,
+     "DS1": 2048,
+     "filler": 0
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 6220240,
+     "remoteReads": 20000
+    },
+    "fill": 0,
+    "budget": 7487200,
+    "margin": 0.05034725932257722
    },
    {
     "i": 2,
     "events": [
-     48,
+     50,
      65
     ],
-    "op": 7647769,
-    "bytes": 9828,
+    "op": 6698240,
+    "bytes": 8503,
     "data": [
-     "library"
+     "code"
     ],
-    "fill": 0,
-    "budget": 7895200,
-    "margin": 0.03133942142060997
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 1536,
+     "bWitness": 448,
+     "handover": 224,
+     "code": 5962,
+     "filler": 263
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 4148660,
+     "terminal": 707000,
+     "binding": 130000,
+     "quotient": 737580,
+     "final": 60000,
+     "remoteReads": 45000
+    },
+    "fill": 263,
+    "budget": 6835200,
+    "margin": 0.02003745318352057
    }
   ],
-  "fill": 819,
-  "content": 27685,
-  "op": 21711282,
-  "score": 27941
+  "fill": 263,
+  "content": 27609,
+  "op": 21363012,
+  "score": 27865
  },
  "all SI projective, 4 inputs": {
   "n": 4,
@@ -343,8 +598,8 @@
   "cuts": [
    0,
    8,
-   14,
-   24,
+   16,
+   26,
    33
   ],
   "ins": [
@@ -354,66 +609,124 @@
      0,
      16
     ],
-    "op": 5986125,
-    "bytes": 7595,
+    "op": 6148294,
+    "bytes": 7802,
     "data": [
      "WQ",
      "DS0"
     ],
-    "fill": 195,
-    "budget": 6108800,
-    "margin": 0.02008168543740174
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 1536,
+     "bWitness": 0,
+     "handover": 0,
+     "statementAndDigests": 738,
+     "WQ": 3648,
+     "DS0": 1408,
+     "filler": 402
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 5258294,
+     "ownerChecks": 20000
+    },
+    "fill": 402,
+    "budget": 6274400,
+    "margin": 0.02009849547367082
    },
    {
     "i": 1,
     "events": [
      16,
-     28
+     32
     ],
-    "op": 4343634,
-    "bytes": 5500,
+    "op": 5898474,
+    "bytes": 7483,
     "data": [
-     "DS1",
-     "DS3"
+     "consts",
+     "DS1"
     ],
-    "fill": 1494,
-    "budget": 4432800,
-    "margin": 0.020115051434759113
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 1536,
+     "bWitness": 0,
+     "handover": 288,
+     "consts": 1940,
+     "DS1": 1344,
+     "filler": 2305
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 5028474
+    },
+    "fill": 2305,
+    "budget": 6019200,
+    "margin": 0.020056818181818148
    },
    {
     "i": 2,
     "events": [
-     28,
-     48
+     32,
+     52
     ],
-    "op": 7135639,
-    "bytes": 9061,
+    "op": 7106917,
+    "bytes": 9024,
     "data": [
+     "code",
      "DS2"
     ],
-    "fill": 5055,
-    "budget": 7281600,
-    "margin": 0.020045182377499415
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 1920,
+     "bWitness": 0,
+     "handover": 288,
+     "code": 4932,
+     "DS2": 1664,
+     "filler": 150
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 6236917
+    },
+    "fill": 150,
+    "budget": 7252000,
+    "margin": 0.020005929398786537
    },
    {
     "i": 3,
     "events": [
-     48,
+     52,
      65
     ],
-    "op": 7627769,
-    "bytes": 9689,
+    "op": 6586325,
+    "bytes": 8360,
     "data": [
-     "library"
+     "DS3"
     ],
-    "fill": 763,
-    "budget": 7784000,
-    "margin": 0.020070786228160276
+    "B": {
+     "redeemAndHeaders": 70,
+     "states": 1344,
+     "bWitness": 0,
+     "handover": 288,
+     "DS3": 1216,
+     "filler": 5442
+    },
+    "O": {
+     "setup": 870000,
+     "loop": 4081745,
+     "terminal": 707000,
+     "binding": 130000,
+     "quotient": 737580,
+     "final": 60000
+    },
+    "fill": 5442,
+    "budget": 6720800,
+    "margin": 0.020008778716819386
    }
   ],
-  "fill": 7507,
-  "content": 31845,
-  "op": 25093167,
-  "score": 32179
+  "fill": 8299,
+  "content": 32669,
+  "op": 25740010,
+  "score": 33003
  }
 }

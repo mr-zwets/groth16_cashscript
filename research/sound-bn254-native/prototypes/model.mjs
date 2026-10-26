@@ -57,6 +57,7 @@ export function evaluate({n, m, cuts, amode = 'affine'}) {
     for (let c = cuts[i]; c < cuts[i + 1]; c++) {
       const aff = CUTS[c + 1] <= m;
       op += aff ? R.chunks[amode][c] : R.chunks.proj[c];
+      if (c > cuts[i]) op -= aff ? R[amode + 'PerRangeConst'] : R.projPerRangeConst; // chunks measured alone vs inside one loop (calibrated on the whole loop)
       if (aff) slopes += (CUTS[c + 1] - CUTS[c]) * wDbl + addsIn(c) * wAdd;
       states += 1;
     }
