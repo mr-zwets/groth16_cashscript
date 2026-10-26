@@ -1,0 +1,313 @@
+{
+  "schema": "verifier.cash/authenticated42-exact-code-repair/v1",
+  "inputFixtureSha256": "34bb01c525668364b30c04232a912af5485318c8cde8f3a9267b2705ead31074",
+  "inputBenchmarkRevision": "86820022643b8832c4818967666c8cdaaaaa3b6e",
+  "historicalBenchmarkRevision": "d1004f640e9ef7de1a3d64da9027c4dd54888cb2",
+  "originalProgramSha256": [
+    "df8927336ed59a65835ea036da437c5e7ecaed89503e74f1c97be7825d35cf14",
+    "947e078f24ae4cc0681064bde72f48a762d5854ca4a21672df5cf06dabc7efbb",
+    "7c3113d6645249fa7909141d57ce065142f0b4db90af6420b216f638cc91013d",
+    "7207d31b31cabe193c7f42c04b1b79b049c9e70bbb8334f881704c3cd9c4dc3e",
+    "014c93dcf599f885f756dff137430c76ebc98567088cb56650b8c3d0e92a50f2",
+    "da0fceca27c3e20a347a713fd2ff1505a126250c4b27a73109ded80dfcf9728b",
+    "79858bfa9c88df702fc20b3fa04c9be93df5b2504cb2bf84eeb58b2aa5136745",
+    "a4452d1a216f95f354a5f4653a01edeea1fe3e9aa590dcb674f21f68fa46870c",
+    "bfd7a4ea1021ebd2920aedcb046c391e413598a5eb10c776b686e6d7b9b158ac",
+    "50a43f84cdfa2e792b5ea64193a3848b0754ce05837224d1f92dedb1d0bf4a78",
+    "9d5551953d0d735d05fa919845d6a852c809cfde136248792a75765088b1f447",
+    "ab2674df05b3892f49e0fdc76af53cbab70ce65a32f288c7ab89d10d363fb36e",
+    "92b7556bc3c5d31f040310049a8847b39d75ba51b51cb59fc96716d52f3b26dc",
+    "7d3aa6497aa198f2efba8ef890fa9a42b9fabb40613d27fc32b8a182879cf46f",
+    "d02f73c3ff6475025d210356ae444a65f860e06cb38f195a0fa73d93848d40a1",
+    "e51eed6c5995aa8e0ba23f0a899dd006bd67bedf2823aaf1ff01619234396cf3",
+    "62530048967f8afdf2e7648743df05df9057038ac1b19328b75cbe0785e3b0ff",
+    "4d01b1f8504f58252ae249dee7789cfcf261af0237fa6fb8680de7181c2cc3c7",
+    "6f94f46e3e6d3d1d64e38cd06a412b12954ac50d8cd0ea5f205266f61eb43f61",
+    "cf4450c0eb9ded4419f040f36e0f87084c3f6f09925e1bcce0c5468434b3aab2",
+    "120ba502f21973496dfef639cb1aaaa4c35efd666c07586609593593c9710c95",
+    "701a042cdbbe6d1bf3ec28b315aa39bda827c67f51dfafdbd7a403c6ad265a8f",
+    "5507d53dac6378364080f1e5a5eddc5c9f7bf6c0ffe4ff45d5838475c90b9282",
+    "e093d024bca93efca2a8a773ccd328c86324cf569bb368e7c62c8feeb97e9a8f",
+    "21b08a03b0251812813daaa83bfc5f9f0b156ec8726bf8d45aaa37d644d2ead9",
+    "4dad26c72ba9e59310eac2487d027b17781f56792e511eda5fc0b16af0edbbf9",
+    "264d2c950c16693a6fcfc781ebce36d4b5a92e59994a62916f78a25d431c5dee",
+    "f0072c02e8bc248b7b8f9f34cfc237f17b6e4e31680774f78aaa6784d79215dd",
+    "6a6d2d913a7ba452bc604e822108af24da204587ee88496976448068e165b1b6",
+    "4e8f28a17d32fab417deae85c6a109e55bde75a9f5b7a0a4a381392381a66f1f",
+    "58abf76880da3566d18728b99413b6392597d44998a10d4531675191fd549bbd",
+    "f10213f23135736b1910eddae835183f704e2f88f6d7a16b69b98457fe47efdf",
+    "f466b8376d9524929b93eb352ba0914c91fd411c8ea7acce9d9a232fe8e83213",
+    "ae7c5f3514475aa34946d29611cb8462f2fbfff68a8779d1532b434851f90eef",
+    "ff824fac553f003165471481b556db1194d8d98b652a6ebed3c46c50e467958e",
+    "83f9041bf3f25f2c63ae6ff91356ca257e237b670151ab094aee256715e40bac",
+    "647d65b86749a7f247dd07187992e41c02b4c57762ca20d48363d26bd1de4b0e",
+    "6f3f9b9801fcc9f974220d68e31840c9d5058d7561e82b547d51a58df1025ba5",
+    "c120215b8b446c62c4b9caf89f0eee35f2dc55dabd65f45a59aab981c5ae35f0",
+    "fdfcb8060cd27c6ee6e3533310f9465f7b98c95decd45abc382e21611f28a37e",
+    "ab8a00e7a2e1a4004f5fd524dca94f3e8ed728c6effa77de3d173722c6407a0c",
+    "9b6e734fba5e476fc2e64ba505c9b154dbb93f2de3c17dbf39b6a94ef11f04be"
+  ],
+  "selectedProgramSha256": [
+    "df8927336ed59a65835ea036da437c5e7ecaed89503e74f1c97be7825d35cf14",
+    "947e078f24ae4cc0681064bde72f48a762d5854ca4a21672df5cf06dabc7efbb",
+    "7c3113d6645249fa7909141d57ce065142f0b4db90af6420b216f638cc91013d",
+    "7207d31b31cabe193c7f42c04b1b79b049c9e70bbb8334f881704c3cd9c4dc3e",
+    "014c93dcf599f885f756dff137430c76ebc98567088cb56650b8c3d0e92a50f2",
+    "da0fceca27c3e20a347a713fd2ff1505a126250c4b27a73109ded80dfcf9728b",
+    "79858bfa9c88df702fc20b3fa04c9be93df5b2504cb2bf84eeb58b2aa5136745",
+    "a4452d1a216f95f354a5f4653a01edeea1fe3e9aa590dcb674f21f68fa46870c",
+    "0b1f591ad8786c3fbba42e1e5d466bb345a244c7a9e5dc85c810b9da901509fe",
+    "7e385db7afc5fe7308e2f1ab13040f8636c239c096f74121d516bbf30336df2a",
+    "9d5551953d0d735d05fa919845d6a852c809cfde136248792a75765088b1f447",
+    "ab2674df05b3892f49e0fdc76af53cbab70ce65a32f288c7ab89d10d363fb36e",
+    "92b7556bc3c5d31f040310049a8847b39d75ba51b51cb59fc96716d52f3b26dc",
+    "7d3aa6497aa198f2efba8ef890fa9a42b9fabb40613d27fc32b8a182879cf46f",
+    "d02f73c3ff6475025d210356ae444a65f860e06cb38f195a0fa73d93848d40a1",
+    "e51eed6c5995aa8e0ba23f0a899dd006bd67bedf2823aaf1ff01619234396cf3",
+    "62530048967f8afdf2e7648743df05df9057038ac1b19328b75cbe0785e3b0ff",
+    "4d01b1f8504f58252ae249dee7789cfcf261af0237fa6fb8680de7181c2cc3c7",
+    "6f94f46e3e6d3d1d64e38cd06a412b12954ac50d8cd0ea5f205266f61eb43f61",
+    "cf4450c0eb9ded4419f040f36e0f87084c3f6f09925e1bcce0c5468434b3aab2",
+    "120ba502f21973496dfef639cb1aaaa4c35efd666c07586609593593c9710c95",
+    "701a042cdbbe6d1bf3ec28b315aa39bda827c67f51dfafdbd7a403c6ad265a8f",
+    "5507d53dac6378364080f1e5a5eddc5c9f7bf6c0ffe4ff45d5838475c90b9282",
+    "e093d024bca93efca2a8a773ccd328c86324cf569bb368e7c62c8feeb97e9a8f",
+    "21b08a03b0251812813daaa83bfc5f9f0b156ec8726bf8d45aaa37d644d2ead9",
+    "4dad26c72ba9e59310eac2487d027b17781f56792e511eda5fc0b16af0edbbf9",
+    "264d2c950c16693a6fcfc781ebce36d4b5a92e59994a62916f78a25d431c5dee",
+    "f0072c02e8bc248b7b8f9f34cfc237f17b6e4e31680774f78aaa6784d79215dd",
+    "ca36765044a7a50dd94da08589f7c8161bb6619dae9e244edcb46bb9c910da59",
+    "9b9da37f5c3280bd742c2f3f9f5722b67853900686048afce511b85ceda90953",
+    "ab10b5924aee956a80c867ecc4b76fa5e66d192ad912bc44a155cd2781821f31",
+    "072dea209047f0e6de707a269d783a6f019539c31ec036f7f13b717e77a3c946",
+    "9fcfad62fb9fb9e8c4b47e88404132550ec9c3b2230ff09ccfa12e4310c19c01",
+    "bba4c4f07582886a85502104783b7c4abf969ae60df78286ef56ca716c75a03f",
+    "25d77da72d3b67f6c98fde325d5d01490eb270af84c52ec7514fec31972d89e4",
+    "be6dc562c387aea76ea97c556412fc3ac4c2ffbc1f4f547b95723702a525be0e",
+    "2faf4157e80e2f157544e9aec73edd8882f8ef7bcdd576a29e7e8860b7eec964",
+    "c5c84ea99dd11d9de18b69a0ebaca7d319b7d702494b9e99f1b45204b4dead65",
+    "e642dd0339e0783d383f9986be9527acc85d74a066adbb36f00c1ebf797df874",
+    "2be8178f625d7d6e100a4383e9f44276b1653298fc318c7552acdad667a8d16d",
+    "26cc3afb3af51f2039bb22a99502a9a6488e21d33420ef33896df57eb7e2000e",
+    "abef143cc84a72d00eb0702d6ad9cc3725cb54810b51b06d46ccff4c66dab455"
+  ],
+  "repairs": [
+    {
+      "input": 8,
+      "originalProgramSha256": "bfd7a4ea1021ebd2920aedcb046c391e413598a5eb10c776b686e6d7b9b158ac",
+      "programSha256": "0b1f591ad8786c3fbba42e1e5d466bb345a244c7a9e5dc85c810b9da901509fe",
+      "requiredLength": 160,
+      "gateHex": "7c76827702a0009d7c",
+      "gateOffset": 783,
+      "argumentDepth": 1
+    },
+    {
+      "input": 9,
+      "originalProgramSha256": "50a43f84cdfa2e792b5ea64193a3848b0754ce05837224d1f92dedb1d0bf4a78",
+      "programSha256": "7e385db7afc5fe7308e2f1ab13040f8636c239c096f74121d516bbf30336df2a",
+      "requiredLength": 320,
+      "gateHex": "7682770240019d",
+      "gateOffset": 1449,
+      "argumentDepth": 0
+    },
+    {
+      "input": 28,
+      "originalProgramSha256": "6a6d2d913a7ba452bc604e822108af24da204587ee88496976448068e165b1b6",
+      "programSha256": "ca36765044a7a50dd94da08589f7c8161bb6619dae9e244edcb46bb9c910da59",
+      "requiredLength": 896,
+      "gateHex": "7682770280039d",
+      "gateOffset": 1549,
+      "argumentDepth": 0
+    },
+    {
+      "input": 29,
+      "originalProgramSha256": "4e8f28a17d32fab417deae85c6a109e55bde75a9f5b7a0a4a381392381a66f1f",
+      "programSha256": "9b9da37f5c3280bd742c2f3f9f5722b67853900686048afce511b85ceda90953",
+      "requiredLength": 384,
+      "gateHex": "7682770280019d",
+      "gateOffset": 1891,
+      "argumentDepth": 0
+    },
+    {
+      "input": 30,
+      "originalProgramSha256": "58abf76880da3566d18728b99413b6392597d44998a10d4531675191fd549bbd",
+      "programSha256": "ab10b5924aee956a80c867ecc4b76fa5e66d192ad912bc44a155cd2781821f31",
+      "requiredLength": 768,
+      "gateHex": "7682770200039d",
+      "gateOffset": 969,
+      "argumentDepth": 0
+    },
+    {
+      "input": 31,
+      "originalProgramSha256": "f10213f23135736b1910eddae835183f704e2f88f6d7a16b69b98457fe47efdf",
+      "programSha256": "072dea209047f0e6de707a269d783a6f019539c31ec036f7f13b717e77a3c946",
+      "requiredLength": 768,
+      "gateHex": "7682770200039d",
+      "gateOffset": 969,
+      "argumentDepth": 0
+    },
+    {
+      "input": 32,
+      "originalProgramSha256": "f466b8376d9524929b93eb352ba0914c91fd411c8ea7acce9d9a232fe8e83213",
+      "programSha256": "9fcfad62fb9fb9e8c4b47e88404132550ec9c3b2230ff09ccfa12e4310c19c01",
+      "requiredLength": 768,
+      "gateHex": "7682770200039d",
+      "gateOffset": 969,
+      "argumentDepth": 0
+    },
+    {
+      "input": 33,
+      "originalProgramSha256": "ae7c5f3514475aa34946d29611cb8462f2fbfff68a8779d1532b434851f90eef",
+      "programSha256": "bba4c4f07582886a85502104783b7c4abf969ae60df78286ef56ca716c75a03f",
+      "requiredLength": 768,
+      "gateHex": "7682770200039d",
+      "gateOffset": 1022,
+      "argumentDepth": 0
+    },
+    {
+      "input": 34,
+      "originalProgramSha256": "ff824fac553f003165471481b556db1194d8d98b652a6ebed3c46c50e467958e",
+      "programSha256": "25d77da72d3b67f6c98fde325d5d01490eb270af84c52ec7514fec31972d89e4",
+      "requiredLength": 1536,
+      "gateHex": "7682770200069d",
+      "gateOffset": 969,
+      "argumentDepth": 0
+    },
+    {
+      "input": 35,
+      "originalProgramSha256": "83f9041bf3f25f2c63ae6ff91356ca257e237b670151ab094aee256715e40bac",
+      "programSha256": "be6dc562c387aea76ea97c556412fc3ac4c2ffbc1f4f547b95723702a525be0e",
+      "requiredLength": 1536,
+      "gateHex": "7682770200069d",
+      "gateOffset": 969,
+      "argumentDepth": 0
+    },
+    {
+      "input": 36,
+      "originalProgramSha256": "647d65b86749a7f247dd07187992e41c02b4c57762ca20d48363d26bd1de4b0e",
+      "programSha256": "2faf4157e80e2f157544e9aec73edd8882f8ef7bcdd576a29e7e8860b7eec964",
+      "requiredLength": 1536,
+      "gateHex": "7682770200069d",
+      "gateOffset": 969,
+      "argumentDepth": 0
+    },
+    {
+      "input": 37,
+      "originalProgramSha256": "6f3f9b9801fcc9f974220d68e31840c9d5058d7561e82b547d51a58df1025ba5",
+      "programSha256": "c5c84ea99dd11d9de18b69a0ebaca7d319b7d702494b9e99f1b45204b4dead65",
+      "requiredLength": 1536,
+      "gateHex": "7682770200069d",
+      "gateOffset": 1022,
+      "argumentDepth": 0
+    },
+    {
+      "input": 38,
+      "originalProgramSha256": "c120215b8b446c62c4b9caf89f0eee35f2dc55dabd65f45a59aab981c5ae35f0",
+      "programSha256": "e642dd0339e0783d383f9986be9527acc85d74a066adbb36f00c1ebf797df874",
+      "requiredLength": 2304,
+      "gateHex": "7682770200099d",
+      "gateOffset": 969,
+      "argumentDepth": 0
+    },
+    {
+      "input": 39,
+      "originalProgramSha256": "fdfcb8060cd27c6ee6e3533310f9465f7b98c95decd45abc382e21611f28a37e",
+      "programSha256": "2be8178f625d7d6e100a4383e9f44276b1653298fc318c7552acdad667a8d16d",
+      "requiredLength": 2304,
+      "gateHex": "7682770200099d",
+      "gateOffset": 969,
+      "argumentDepth": 0
+    },
+    {
+      "input": 40,
+      "originalProgramSha256": "ab8a00e7a2e1a4004f5fd524dca94f3e8ed728c6effa77de3d173722c6407a0c",
+      "programSha256": "26cc3afb3af51f2039bb22a99502a9a6488e21d33420ef33896df57eb7e2000e",
+      "requiredLength": 2304,
+      "gateHex": "7682770200099d",
+      "gateOffset": 969,
+      "argumentDepth": 0
+    },
+    {
+      "input": 41,
+      "originalProgramSha256": "9b6e734fba5e476fc2e64ba505c9b154dbb93f2de3c17dbf39b6a94ef11f04be",
+      "programSha256": "abef143cc84a72d00eb0702d6ad9cc3725cb54810b51b06d46ccff4c66dab455",
+      "requiredLength": 2304,
+      "gateHex": "7682770200099d",
+      "gateOffset": 2119,
+      "argumentDepth": 0
+    }
+  ],
+  "typedGuards": [
+    {
+      "length": 160,
+      "gateHex": "76827702a0009d",
+      "sourceSha256": "7f4fd4804963cba22a3823c3e08888f94332d227a03fbdd62da9ef1defa2b80c",
+      "source": "pragma cashscript ^0.14.0;\ncontract StateOwnerWitness() {\n    function spend(bytes inBlob) {\n        require(inBlob.length == 160);\n        require(hash256(inBlob) == 0x0000000000000000000000000000000000000000000000000000000000000000);\n    }\n}\n"
+    },
+    {
+      "length": 320,
+      "gateHex": "7682770240019d",
+      "sourceSha256": "68e884a43b4af332e0ee936e2fc6054bf07d39bae4875f6de17daa4d5e3f861c",
+      "source": "pragma cashscript ^0.14.0;\ncontract StateOwnerWitness() {\n    function spend(bytes inBlob) {\n        require(inBlob.length == 320);\n        require(hash256(inBlob) == 0x0000000000000000000000000000000000000000000000000000000000000000);\n    }\n}\n"
+    },
+    {
+      "length": 384,
+      "gateHex": "7682770280019d",
+      "sourceSha256": "a396d452d6560ab2d97d466f02272cc9bf6d459f1161b591b75b632b0b1ccddd",
+      "source": "pragma cashscript ^0.14.0;\ncontract StateOwnerWitness() {\n    function spend(bytes inBlob) {\n        require(inBlob.length == 384);\n        require(hash256(inBlob) == 0x0000000000000000000000000000000000000000000000000000000000000000);\n    }\n}\n"
+    },
+    {
+      "length": 768,
+      "gateHex": "7682770200039d",
+      "sourceSha256": "8aa76cca2e3c72aba00dee8380faa3175d05334939ae44c1dbd42a966aa464b8",
+      "source": "pragma cashscript ^0.14.0;\ncontract StateOwnerWitness() {\n    function spend(bytes inBlob) {\n        require(inBlob.length == 768);\n        require(hash256(inBlob) == 0x0000000000000000000000000000000000000000000000000000000000000000);\n    }\n}\n"
+    },
+    {
+      "length": 896,
+      "gateHex": "7682770280039d",
+      "sourceSha256": "387a763b21cc3570bc6cbbb7c2a932eca46cd48834a6e72c1b2baf6881728060",
+      "source": "pragma cashscript ^0.14.0;\ncontract StateOwnerWitness() {\n    function spend(bytes inBlob) {\n        require(inBlob.length == 896);\n        require(hash256(inBlob) == 0x0000000000000000000000000000000000000000000000000000000000000000);\n    }\n}\n"
+    },
+    {
+      "length": 1536,
+      "gateHex": "7682770200069d",
+      "sourceSha256": "f60b744fbb5e8db1876299730c19a4d4a5ee66c6d20f34d33af62658d615a513",
+      "source": "pragma cashscript ^0.14.0;\ncontract StateOwnerWitness() {\n    function spend(bytes inBlob) {\n        require(inBlob.length == 1536);\n        require(hash256(inBlob) == 0x0000000000000000000000000000000000000000000000000000000000000000);\n    }\n}\n"
+    },
+    {
+      "length": 2304,
+      "gateHex": "7682770200099d",
+      "sourceSha256": "659425d07788293d5d678b41245eafe3dd892721dba494c8968fd3a924b5ac90",
+      "source": "pragma cashscript ^0.14.0;\ncontract StateOwnerWitness() {\n    function spend(bytes inBlob) {\n        require(inBlob.length == 2304);\n        require(hash256(inBlob) == 0x0000000000000000000000000000000000000000000000000000000000000000);\n    }\n}\n"
+    }
+  ],
+  "provenance": {
+    "compiler": {
+      "revision": "1c707c1dbf87396b30ba5e0704b1db44475ce893",
+      "entry": "packages/cashc/dist/index.js"
+    },
+    "typedGuardCertificateSha256": "7332d84f4a53fe65c57ff992b6b9f7cf8d94df4b52d4c5d33913c04cd84f91ba",
+    "innerOwnerCertificateSha256": "acd6fee6b40188610a19134d37f1936e12a355434663a6ae3a95d11c25c05e26",
+    "innerEquationCertificateSha256": "8e71c647af3b04ce1850be638e3493707a6961629e26e2396a13208e1db54f0d",
+    "dispatcherCertificateSha256": "307bbec2c063f3f4ba5ca29514c3627c144df6ab53f879101ef29104a6a1672f",
+    "completeAuthenticatedCertificateSha256": "9fa9d517edc89ca8e2f4ed20da257bafc0bd9ae1f7af80a7d18ced0d643c2051",
+    "scope": "Typed compiled exact-length predicates are inserted at certified main-entry boundaries. The only non-top argument guard is index8: SWAP, compiled guard, SWAP. Complete original namespace, main and callees are retained byte-for-byte. This is an exact archived-program repair, not current31 producer regeneration."
+  },
+  "statement": "Every accepting complete selected42-program graph satisfies e(-A,B)*e(alpha,beta)*e(IC0+u0*IC1+u1*IC2,gamma)*e(C,delta)=1.",
+  "premises": [
+    "Pinned BCH2026 ScriptNum, DEFINE/INVOKE, minimal pushes, introspection, P2SH32/cleanstack and valid ledger semantics.",
+    "Standard BN254 prime fields, irreducible tower, group orders and reduced optimal-Ate pairing theorem on the established finite nonexceptional domain.",
+    "Hash256 collision resistance and externally anchored complete ordered native/grouped execution with valid zero-FT mutable-NFT lineage.",
+    "Identification of canonical runtime proof and public scalar owners with the public statement; individual scripts do not enforce arbitrary global graph topology."
+  ],
+  "nativeAdmission": "HOLD",
+  "standardAdmission": "HOLD",
+  "existingQualification": {
+    "consensusAccepted": 126,
+    "consensusEvaluations": 126,
+    "standardAccepted": 42,
+    "standardEvaluations": 126,
+    "standardDensityRejections": 84,
+    "qualification": "Historical selected code-only replay with unchanged original argument/padding prefixes; not a new current execution."
+  }
+}

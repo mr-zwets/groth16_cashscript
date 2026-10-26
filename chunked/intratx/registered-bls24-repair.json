@@ -1,0 +1,136 @@
+{
+  "schema": "verifier.cash/registered-bls24-exact-code-repair/v1",
+  "inputFixtureSha256": "a185441ac9de32395165c4fad247d65cc34608824d9b3a7e5fba7b6479472a26",
+  "inputBenchmarkRevision": "86820022643b8832c4818967666c8cdaaaaa3b6e",
+  "inputSourceRevision": "5aa48d80caec4ba0ab4c06df5cde70853b938659",
+  "originalProgramSha256": [
+    "6ccff130ece7bced4431962d9ef1f6e49afa1616d8be9ba3e538a35f1f198755",
+    "9a0040f4807dafed85e19a8e69a2d60f66436819a1cca490f03964b0fda4845b",
+    "2b2ba4acb63b67cf91077f783504fdcb908d1ce718e268216e728e158c877486",
+    "3659913bab2a376e4f062ff6ad78969973f1a45cee3b80534b9d882ca70caacf",
+    "343db251947b9927d1612482ef03d46a1be0ca7bb45dc869dee8334e55e476be",
+    "d7994a8e1277530dc84489f667825523fe23d1dd41589cb0bb8275908c882180",
+    "8efeda63ed9f05dfbac3d12c1670faa2a15a8539f50ace8573f684b8005900dc",
+    "77bbfc8e2f7a869017aad202bd8c39aae12028e9754f5d3d03b82cd1a6fca875",
+    "d817832c610c8c3407407aaf39f7dfd32771fd21d083589f4dc4f2c6eda08394",
+    "7635e05c8d4364ee999238d8626b6b1e6aa06c1f2229c495da7057c7936c75df",
+    "1d353aab22a41e0a6cc6f2ebd0d6c1d75d2fe7b4f41d2bfca46dbd3f80544736",
+    "f4b9f19fb782e2bc4e3f7e515bc34953b3c20f16fffcedf5e38c409af31bf486",
+    "cce1527c8f78712be3b2d3abe782fd55a2acbc1e3347d8ea9a39523d0046b8d1",
+    "a06a8efad03960e0498ee533bf67732dc1d4f32a3a69ec80f3502899f7166f92",
+    "debba0bd4a0bd3aeab11bb00e6d34129f04a70eac8cf3c68adfe513cdf32c223",
+    "143c0fb2680f8665a336ea2851788806e4714cddeeaa5bae6c4b7afe22ea2f04",
+    "bc2a938a1b90dc40651a3b8b99b084ff2dc25cc3c5d480dcacca5d6ccd6c1f90",
+    "213bfd9a92fc8a755ace4e1df1f5e0fead43c88107ce5ad7fc1fe804e6b3632b",
+    "fbd0335909f9f8dff5db3e350116a1302cc1e7cb41822713a196ac2a98ebca11",
+    "91097948cb5ff30dc14b41287a18aa5eb89406c0c11b7f4d5aaaf64baf761227",
+    "774de570e0094dc8b8ce3ef7535e2d35f0a17d4023b1f619bd411f3824343a58",
+    "a1d790493d792b230e9d2d538293f0ed6408301b806e86a627d1861f18542191",
+    "23ba28794537df7907ead3de0ae00761cbc8e4e7c56c0579f074bd70ee62ab47",
+    "15f5fed96d672179b388b2e05c138d82f87bbed4343709599d3902fb1fa31ff7"
+  ],
+  "selectedProgramSha256": [
+    "6ccff130ece7bced4431962d9ef1f6e49afa1616d8be9ba3e538a35f1f198755",
+    "9a0040f4807dafed85e19a8e69a2d60f66436819a1cca490f03964b0fda4845b",
+    "2b2ba4acb63b67cf91077f783504fdcb908d1ce718e268216e728e158c877486",
+    "3659913bab2a376e4f062ff6ad78969973f1a45cee3b80534b9d882ca70caacf",
+    "947ee29a72a98c6a25c7b9fdeb6a7cf4ef1521b46ade4e72c0d4d99ac79ea8bf",
+    "d7994a8e1277530dc84489f667825523fe23d1dd41589cb0bb8275908c882180",
+    "8efeda63ed9f05dfbac3d12c1670faa2a15a8539f50ace8573f684b8005900dc",
+    "77bbfc8e2f7a869017aad202bd8c39aae12028e9754f5d3d03b82cd1a6fca875",
+    "d817832c610c8c3407407aaf39f7dfd32771fd21d083589f4dc4f2c6eda08394",
+    "7635e05c8d4364ee999238d8626b6b1e6aa06c1f2229c495da7057c7936c75df",
+    "1d353aab22a41e0a6cc6f2ebd0d6c1d75d2fe7b4f41d2bfca46dbd3f80544736",
+    "f4b9f19fb782e2bc4e3f7e515bc34953b3c20f16fffcedf5e38c409af31bf486",
+    "cce1527c8f78712be3b2d3abe782fd55a2acbc1e3347d8ea9a39523d0046b8d1",
+    "a06a8efad03960e0498ee533bf67732dc1d4f32a3a69ec80f3502899f7166f92",
+    "debba0bd4a0bd3aeab11bb00e6d34129f04a70eac8cf3c68adfe513cdf32c223",
+    "143c0fb2680f8665a336ea2851788806e4714cddeeaa5bae6c4b7afe22ea2f04",
+    "bc2a938a1b90dc40651a3b8b99b084ff2dc25cc3c5d480dcacca5d6ccd6c1f90",
+    "213bfd9a92fc8a755ace4e1df1f5e0fead43c88107ce5ad7fc1fe804e6b3632b",
+    "fbd0335909f9f8dff5db3e350116a1302cc1e7cb41822713a196ac2a98ebca11",
+    "91097948cb5ff30dc14b41287a18aa5eb89406c0c11b7f4d5aaaf64baf761227",
+    "774de570e0094dc8b8ce3ef7535e2d35f0a17d4023b1f619bd411f3824343a58",
+    "a1d790493d792b230e9d2d538293f0ed6408301b806e86a627d1861f18542191",
+    "23ba28794537df7907ead3de0ae00761cbc8e4e7c56c0579f074bd70ee62ab47",
+    "152e48900771de69d2365f54de2b40334821275d07822a580acf5d4bc14100af"
+  ],
+  "repairs": [
+    {
+      "input": 4,
+      "originalProgramSha256": "343db251947b9927d1612482ef03d46a1be0ca7bb45dc869dee8334e55e476be",
+      "programSha256": "947ee29a72a98c6a25c7b9fdeb6a7cf4ef1521b46ade4e72c0d4d99ac79ea8bf",
+      "requiredLength": 432,
+      "gateHex": "5279827702b0019d",
+      "gateOffset": 668,
+      "argumentDepth": 2,
+      "registryPrefixSha256": "4b30a1391c99408056c200f7f03b8106900e2003b4770891b5e23e0872bf8012"
+    },
+    {
+      "input": 23,
+      "originalProgramSha256": "15f5fed96d672179b388b2e05c138d82f87bbed4343709599d3902fb1fa31ff7",
+      "programSha256": "152e48900771de69d2365f54de2b40334821275d07822a580acf5d4bc14100af",
+      "requiredLength": 1632,
+      "gateHex": "7682770260069d",
+      "gateOffset": 1823,
+      "argumentDepth": 0,
+      "registryPrefixSha256": "3eb57dcea1eac9047bc2989be28c1c90a4eca34cf6521c26b32a6c7cfb86eb28"
+    }
+  ],
+  "typedGuards": [
+    {
+      "length": 432,
+      "gateHex": "76827702b0019d",
+      "source": "pragma cashscript ^0.14.0;\ncontract StateOwnerWitness() {\n    function spend(bytes inBlob) {\n        require(inBlob.length == 432);\n        require(hash256(inBlob) == 0x0000000000000000000000000000000000000000000000000000000000000000);\n    }\n}\n",
+      "sourceSha256": "b93fd18be851ffc9f07964dc1edd92c3b6422928f6a0e5987d8766cb91d78f26",
+      "compiledHex": "76827702b0019daa20000000000000000000000000000000000000000000000000000000000000000087",
+      "compiledSha256": "5e90ad152e8a089446088182618b17edfd725910bfc44dbc20d3d871bbfc027d"
+    },
+    {
+      "length": 1632,
+      "gateHex": "7682770260069d",
+      "source": "pragma cashscript ^0.14.0;\ncontract StateOwnerWitness() {\n    function spend(bytes inBlob) {\n        require(inBlob.length == 1632);\n        require(hash256(inBlob) == 0x0000000000000000000000000000000000000000000000000000000000000000);\n    }\n}\n",
+      "sourceSha256": "ef9e90625f428b4b99aef4fb109fce5902914227bb44881f60f04dfcece0a39f",
+      "compiledHex": "7682770260069daa20000000000000000000000000000000000000000000000000000000000000000087",
+      "compiledSha256": "8d98d4035c06ef492d83b9bae9c0c0582a91840cab42202bef9d645bf916a81c"
+    }
+  ],
+  "provenance": {
+    "compilerRevision": "1c707c1dbf87396b30ba5e0704b1db44475ce893",
+    "typedGuardCertificateSha256": "70ff7a4be1ca4281f75d64e74fd9e2247d8051491b0971c34437759bba7312cb",
+    "currentArithmeticAndRawCallerCertificateSha256": "7c6e70bcfa0296564e8bbc9342dc4a4f0116231af5b841cff55179fd91370531",
+    "carrierSourceCorrespondenceSha256": "a07d8c732d2a4f264c6000b7985e1922255986a48b1d5a1eb18a720e21d2da6c",
+    "terminalRawOwnerSha256": "254db8cd391b7041ab980a1fe855b0049e6cb4d754c8e10962491f0b4630593d",
+    "physicalInterfaceCertificateSha256": "0fb7a74c603d367d4b8e7e1217dc17c347b7246c43783ba856e51d92cfcc5da1",
+    "sourceOwnerCertificateSha256": "a08747b3ec2ac748e4798f23bdd7eee49d324d4b49b1dac031e999ca9ced303c",
+    "physicalArityCertificateSha256": "371564fd0884cca8345ed30b4cea6c011142b827666beaf2a7aaf53818ac39df"
+  },
+  "statement": "Every accepting complete ordered selected24 graph satisfies the pinned finite-domain Groth16 pairing equation, under the explicit mathematical, VM, hash-binding and external graph-anchor premises. The added exact432 and1632 predicates enforce the two local byte-owner premises of the original-current theorem.",
+  "necessaryEquation": "e(-A,B) * e(alpha,beta) * e(IC0+n0*IC1+n1*IC2,gamma) * e(C,delta) = 1",
+  "acceptedDomain": {
+    "publicInputs": "Two canonical scalars0<=ni<r",
+    "A": "finite canonical on-curve G1 representative",
+    "B": "finite nonzero strict r-subgroup twist point",
+    "C": "finite canonical on-curve G1 representative",
+    "vk_x": "IC0+n0IC1+n1IC2 must be finite",
+    "root": "six canonical Fp limbs of finiteFp6 torusclass[1+uW]",
+    "neutralDomainComplete": false
+  },
+  "premises": [
+    "The complete ordered24-input native graph is externally anchored to the exactprogramhashes inthisresult. Source13 doesnotpin that graph from a single input0locking;this theorem mustnot be advertised as single-root enforcement.",
+    "Execution uses the pinned unmodified libauth3.1.0-next.8 BCH2026 evaluator and exact signed-integer/MOD/byte semantics with ordinary initialization. Applicable consensus and policy/resource checks must separately succeed; this mathematical theorem is not an admission certificate.",
+    "The fixedtable HASH256/P2SH bindings satisfy theirstandard bindingpremise. Allactualstatic callee namespaces equal thecaptured exactcompiled registries.",
+    "The explicit BLS12-381 prime/curve/twistorders,transportedFrobenius polynomial andr-eigenvalue,irreducibletower andstandardoptimal-Ate/reducedpairing theorem hold as in thepinneduniversal parameter/domain certificates. No circuit-knowledge or trustedsetup claim is made."
+  ],
+  "nativeAdmission": "HOLD",
+  "standardAdmission": "HOLD",
+  "sourceQualification": "The public frozen-artifact tool reproduces these exact selected24 programs. The separate builder patch routes the same two role-specific exact predicates through its actual cache and transform option. This does not claim byte reproduction of all24 programs by the current producer or execute that producer.",
+  "provedPhysicalInterface": [
+    "Push-only is unconditional before unlocking evaluation. Starting empty control state means every push is active; inherited pushOperation unconditionally rejects nonminimal pushes in both standard and nonstandard modes. OP_RESERVED cannot yield a successful unlocking. Therefore each accepted unlocking is exactly a sequence of minimal data/numeric pushes.",
+    "P2SH32 takes the final pushed item as redeem bytecode and begins redeem evaluation with the preceding stack in original push order and fresh alternate/control/function state. CLEANSTACK forces the actual CFG arity:4 slots at carrier4,2 everywhere else, including the leading discarded pad.",
+    "After pad DROP and literal neutral immutable DEFINE prefix, carrier depth2 is the first pushed blob, depth1 is the second pushed table, and depth0 is zInv. The complete proved current carrier main assigns these exact meanings and hash-binds the1440-byte fixed table. No external typedorder premise remains.",
+    "The mandatory432 guard plus minimal PUSHDATA2 headers puts the blob at offset3 and the exact hash-bound table at3+432+3=438. This is precisely the fixed1440-byte slice used by the other GLV mains. No caller prefix or oversized blob can alter that identity on success.",
+    "Terminal23 has only the first blob below its discarded pad. Mandatory1632 makes the final int-decoded tail own[1584:L] exactly the48 bytes own[1584:1632] bound by predecessor22. No local fixed-width assumption remains."
+  ],
+  "sourceMode": "BLS_QUOTIENT_TORUS=1; the legacy mode receives neither new predicate."
+}
