@@ -14,7 +14,7 @@ const ACC_PER_EVENT = 2500;             // GLS accumulator work removed from the
 const T_DATA = 6978 + 4224;             // WS + fixed-width WQ (132 words)
 const H = 224, DELTA = 6 + 3 + n * 4 + 1 + 3 + 32 * n + 2 + 9 + 6;   // dispatcher bytes (proto: 174 at n=4, 210 at n=5)
 // ---- fixed op cost per role (standard mode) ----
-const GLUE = {head: 255000, worker: 275000, last: 257000};          // measured, proto-tx.mjs (n=4, realistic sizes)
+const GLUE = n === 5 ? {head: 282526, worker: 302220, last: 284372} : {head: 255000 + 27000 * (n - 4), worker: 275000 + 27000 * (n - 4), last: 257000 + 27000 * (n - 4)}; // measured, proto-tx.mjs (n=4 and n=5, ~9 kB inputs, standard mode)
 const FIX = {
   head: 3500 + 238000 + 100000 + 340000 + 46000 + 50000,             // prologue, parse+curve checks, powers (no gamma), tables (no TB), setup, cleanup
   worker: 3500 + 140000 + 100000 + 340000 + 46000 + 70000 + 50000,   // + F init from the first state
