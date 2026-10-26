@@ -40,9 +40,15 @@ Prototype dir: research/sound-sz-bls12381-native/prototypes/
 - FINAL layout (n=4): mixed (proj from event 56) 33,551 B @ >=1.5% margin; all-affine 33,919 B @ >=4.8% margin (recommended).
   Sensitivity: blob +-1 kB -> 34,167 / 32,918; loop glue 8k/event -> 33,781. Files: layout-n4-*.txt
 
-## Next
-- kernels.mjs + measure.mjs: measure BLS kernels in libauth VM (B dbl/add, delta step, EV, tables, affine-slope variants).
-- cost model + input layout (layout.mjs), README design record.
+- README.md (research/sound-sz-bls12381-native/README.md): full design record (protocol, soundness/owner table, liveness,
+  per-input layout, measured kernels, alternatives with exchange rates, open risks, reproduce).
+
+## Status: DESIGN DONE (designer 1). Recommended: all-affine SI-GLS, 4 inputs, ~33,919 B (>=4.8% std margin);
+   byte-optimal mixed variant ~33,551 B (>=1.5%).
+
+## Next (for a build)
+- compile the shared program as one blob (loop + bound functions), re-measure its size and loop glue;
+- WQ canonical rule with N_MIN = 70 in the head; relocation block placement; full sweep (dense nibbles @ nq 70, all-15, random B).
 
 ## Commands
-- node research/sound-sz-bls12381-native/prototypes/math.mjs   (asserts)
+- see README.md "Reproduce" (prototypes dir); layout: NS=4 MARGIN=0.05 DETAIL=1 node layout.mjs
