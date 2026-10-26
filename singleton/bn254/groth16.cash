@@ -7,6 +7,12 @@ import "./lib/Miller.cash";
 import "./lib/FinalExp.cash";
 import "./lib/G1.cash";
 
+// proof coordinates must be canonical Fp elements (0 <= x < P): congruent values encode the
+// same point, so without this every proof has many byte encodings (encoding malleability).
+function fpRange(int x) {
+    require(within(x, 0, P));
+}
+
 contract Groth16Verify() {
     function spend(
         int Ax, int Ay, int Bxa, int Bxb, int Bya, int Byb, int Cx, int Cy,
@@ -17,6 +23,15 @@ contract Groth16Verify() {
         // input-aliasing bug behind nullifier double-spends). ----
         require(within(in0, 0, 21888242871839275222246405745257275088548364400416034343698204186575808495617));
         require(within(in1, 0, 21888242871839275222246405745257275088548364400416034343698204186575808495617));
+        // ---- proof coordinates canonical: 0 <= v < P (see fpRange) ----
+        fpRange(Ax);
+        fpRange(Ay);
+        fpRange(Bxa);
+        fpRange(Bxb);
+        fpRange(Bya);
+        fpRange(Byb);
+        fpRange(Cx);
+        fpRange(Cy);
         // ---- validate spender-supplied proof points (EIP-197 rigor) ----
         require(mulFp(Ay, Ay) == addFp(mulFp(mulFp(Ax, Ax), Ax), 3)); // A on G1
         require(mulFp(Cy, Cy) == addFp(mulFp(mulFp(Cx, Cx), Cx), 3)); // C on G1

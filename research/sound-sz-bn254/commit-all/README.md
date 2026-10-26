@@ -11,7 +11,8 @@ the ~0.4–0.6 kB of padding or rebalancing needed for a liveness margin, plan f
 required changes plus the residue-completeness rewrite). 3 major and 4 minor issues; two of the
 major ones concern statement binding.
 
-This is the densless polynomial folding with the #28 gap closed: every intermediate state is
+This is the densless polynomial folding with the #28 gap closed (the densless author has
+since withdrawn the densless soundness claims for these gaps; see #28 and #32 F6): every intermediate state is
 committed in full (not as a fingerprint), every line value is computed on-chain, states are
 classes mod `Fp6*`, all chunk identities are batched with ρ into one odd quotient, and
 `e(vk_x, γ)` is moved into GT factors.

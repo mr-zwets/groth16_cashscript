@@ -8,7 +8,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { proof, PUBLIC_INPUTS } from './bls_instance.mjs';
-import { outlineArtifact } from '../bn254/recompiler/outline.mjs';
+import { domainRejectCases } from './domain_cases.mjs';
 
 import {
   hexToBin, binToHex, bigIntToVmNumber, encodeDataPush,
@@ -17,6 +17,8 @@ import {
 } from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
+// bench repo vector dir: $BENCH_VDIR, else the sibling zk-verifier-bench checkout
+const VDIR = (process.env.BENCH_VDIR ?? join(here, '../../../zk-verifier-bench/src/bch')) + '/';
 const STANDARD_BUDGET = (41 + 10_000) * 800;
 
 const HUGE = Number.MAX_SAFE_INTEGER;
@@ -61,11 +63,22 @@ const opCost = looseAccept.operationCost;
 
 // the benchmark entry replays the multiproof unlockings against THIS locking; make the
 // build fail loudly if the artifact ever breaks one of them
-const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-singleton-multiproof-vectors.json', 'utf8'));
+const mp = JSON.parse(readFileSync(VDIR + 'groth16-bls12381-singleton-multiproof-vectors.json', 'utf8'));
 for (const p of mp.proofs) {
   if (!evalPair(looseVm, template, hexToBin(p.unlocking)).accepted) throw new Error('artifact failed a multiproof accept');
+  if (evalPair(looseVm, template, hexToBin(p.invalidUnlocking)).accepted) throw new Error('artifact failed a multiproof reject');
 }
-console.log(`multiproof ${mp.proofs.length}/${mp.proofs.length} accept OK`);
+console.log(`multiproof ${mp.proofs.length}/${mp.proofs.length} accept+reject OK`);
+// out-of-domain proof points (range / curve / G2 subgroup, domain_cases.mjs): each must reject;
+// shipped to the bench as extra invalid runs
+const domainInvalid = domainRejectCases().map(({ label, args }) => {
+  const u = unlockingFor(args);
+  const r = evalPair(looseVm, template, u);
+  if (r.accepted) throw new Error(`artifact accepted out-of-domain case: ${label}`);
+  console.log(`  reject ${label} (op-cost ${r.operationCost.toLocaleString()})`);
+  return { label, unlocking: binToHex(u) };
+});
+console.log(`domain cases ${domainInvalid.length}/${domainInvalid.length} rejected`);
 
 console.log('=== Groth16Verify BLS12-381 singleton (vk_x on-chain + pairing, single-tx) ===');
 console.log(`locking ${template.length}B  unlocking ${unlocking.length}B`);
@@ -88,6 +101,10 @@ const out = {
   inputsNeeded: Math.ceil(opCost / STANDARD_BUDGET),
   looseAccept: looseAccept.accepted,
   rejectInvalid: !looseRejectInvalid.accepted,
+  domainInvalid,
 };
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-singleton-vectors.json', JSON.stringify(out, null, 2));
-console.log('wrote src/bch/groth16-bls12381-singleton-vectors.json');
+writeFileSync(VDIR + 'groth16-bls12381-singleton-vectors.json', JSON.stringify(out, null, 2));
+// the multiproof set keeps its proofs; only the locking it was checked against changes
+writeFileSync(VDIR + 'groth16-bls12381-singleton-multiproof-vectors.json',
+  JSON.stringify({ ...mp, lockingOK: binToHex(template), lockingBytes: template.length }, null, 2));
+console.log('wrote src/bch/groth16-bls12381-singleton-vectors.json (+ multiproof locking)');

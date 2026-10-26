@@ -43,7 +43,7 @@ Fp.cash        base field Fp (6 fns: add/sub/mul/sqr/neg/inverse)
  └─ Fp2.cash   Fp2 = Fp[u]/(u^2+1)         imports Fp   (11 fns)
      └─ Fp6.cash   Fp6 = Fp2[v]/(v^3-xi)   imports Fp2  (12 fns: + sparse mul01/mul1, frobenius, inverse)
          └─ Fp12.cash   Fp12 = Fp6[w]/(w^2-v)  imports Fp6  (8 fns: mul/sqr/conj/inv/frob1-3 + mul014)
-             ├─ Miller.cash    pointDouble/pointAdd, line, millerSingle   (4 fns)
+             ├─ Miller.cash    pointDouble/pointAdd, line, millerSingle, millerSingleR   (5 fns)
              └─ FinalExp.cash  fp4Square, cycSqr, cycExpX, powMinusX, finalExp  (5 fns)
 ```
 
@@ -63,7 +63,7 @@ inlines any function where that is cheaper by byte accounting than OP_DEFINE/OP_
 | `miller`, `miller4` | `Miller` | value-equivalent |
 | `finalexp` | `FinalExp` | value-equivalent |
 | `verify` | `Miller`, `FinalExp` | value-equivalent |
-| `groth16` (full verifier) | `Miller`, `FinalExp` | value-equivalent (smaller: 19699 B vs 19852 B) |
+| `groth16` (full verifier) | `Miller`, `FinalExp`, `G2Check` (`g2psi` only) | value-equivalent (smaller: 19699 B vs 19852 B) |
 | `vkx` | `Fp` (G1 inlined) | value-equivalent |
 
 "Value-equivalent" means the bytecode differs from the old inline version (the libraries consolidate

@@ -581,6 +581,32 @@ call fp2_mul
 end
 
 function outline_40 40
+# Input Py,Px,Qyi,Qyr,Qxi,Qxr. Either canonical neutral point pairs to one.
+OP_5
+OP_PICK
+OP_5
+OP_PICK
+OP_BOOLOR
+OP_NOT
+OP_4
+OP_PICK
+OP_4
+OP_PICK
+OP_BOOLOR
+OP_3
+OP_PICK
+OP_BOOLOR
+OP_2
+OP_PICK
+OP_BOOLOR
+OP_NOT
+OP_BOOLOR
+OP_IF
+OP_2DROP
+OP_2DROP
+OP_2DROP
+call outline_62
+OP_ELSE
 call outline_62
 OP_12
 OP_PICK
@@ -911,6 +937,7 @@ OP_12
 OP_ROLL
 OP_DROP
 call outline_21
+OP_ENDIF
 end
 
 function outline_41 41
@@ -981,6 +1008,25 @@ call outline_9
 end
 
 function outline_32 32
+# A scalar-zero result is a valid identity operand on either side.
+# Input: reversed Q XYZ, reversed P XYZ. Return canonical P if Q.Z=0.
+OP_5
+OP_PICK
+OP_0
+OP_NUMEQUAL
+OP_IF
+OP_5
+OP_ROLL
+OP_DROP
+OP_4
+OP_ROLL
+OP_DROP
+OP_3
+OP_ROLL
+OP_DROP
+OP_SWAP
+OP_ROT
+OP_ELSE
 OP_3
 OP_PICK
 OP_5
@@ -1150,6 +1196,7 @@ OP_DROP
 OP_3
 OP_ROLL
 OP_DROP
+OP_ENDIF
 end
 
 function outline_42 42
@@ -1761,6 +1808,18 @@ OP_NIP
 end
 
 function g1_decompress 67
+# Neutral G1 encoding is parity2,x0; finite parity0/1 keeps its exact decoder.
+OP_OVER
+OP_2
+OP_NUMEQUAL
+OP_IF
+OP_DUP
+OP_0
+OP_NUMEQUALVERIFY
+OP_2DROP
+OP_0
+OP_0
+OP_ELSE
 # Input: parity, x. Output: exact canonical y selected by parity, original x.
 # x keeps the original verifier's integer domain. Root verification owns G1 membership.
 OP_DUP
@@ -1801,6 +1860,7 @@ OP_3
 OP_ROLL
 OP_NUMEQUALVERIFY
 OP_SWAP
+OP_ENDIF
 end
 
 # VE: share 10 exact straight-line sequences; static inverse qualified separately.
@@ -1846,7 +1906,68 @@ constant G2_SUBGROUP_SCALAR
 OP_SUB
 OP_LESSTHAN
 OP_VERIFY
-# Decode C, then A, restoring the original ten-item stack before G2 checks.
+# Canonical original field coordinates; public scalars retain their separate r guard.
+OP_6
+OP_PICK
+OP_0
+OP_GREATERTHANOREQUAL
+OP_VERIFY
+OP_6
+OP_PICK
+call prime
+OP_LESSTHAN
+OP_VERIFY
+OP_5
+OP_PICK
+OP_0
+OP_GREATERTHANOREQUAL
+OP_VERIFY
+OP_5
+OP_PICK
+call prime
+OP_LESSTHAN
+OP_VERIFY
+OP_4
+OP_PICK
+OP_0
+OP_GREATERTHANOREQUAL
+OP_VERIFY
+OP_4
+OP_PICK
+call prime
+OP_LESSTHAN
+OP_VERIFY
+OP_3
+OP_PICK
+OP_0
+OP_GREATERTHANOREQUAL
+OP_VERIFY
+OP_3
+OP_PICK
+call prime
+OP_LESSTHAN
+OP_VERIFY
+OP_2
+OP_PICK
+OP_0
+OP_GREATERTHANOREQUAL
+OP_VERIFY
+OP_2
+OP_PICK
+call prime
+OP_LESSTHAN
+OP_VERIFY
+OP_0
+OP_PICK
+OP_0
+OP_GREATERTHANOREQUAL
+OP_VERIFY
+OP_0
+OP_PICK
+call prime
+OP_LESSTHAN
+OP_VERIFY
+# Decode A, then C, restoring the original ten-item stack before G2 checks.
 call g1_decompress
 call outline_69
 call g1_decompress
@@ -1855,6 +1976,19 @@ OP_2ROT
 call outline_69
 OP_2ROT
 OP_2ROT
+# Canonical all-zero B is neutral; every nonzero B uses the exact finite checks.
+OP_5
+OP_PICK
+OP_5
+OP_PICK
+OP_BOOLOR
+OP_4
+OP_PICK
+OP_BOOLOR
+OP_3
+OP_PICK
+OP_BOOLOR
+OP_IF
 OP_2OVER
 call outline_5
 OP_5
@@ -2161,6 +2295,7 @@ OP_ROLL
 OP_ROT
 OP_NUMEQUALVERIFY
 OP_NUMEQUALVERIFY
+OP_ENDIF
 OP_SWAP
 OP_0
 call fp_sub_top_minus_next

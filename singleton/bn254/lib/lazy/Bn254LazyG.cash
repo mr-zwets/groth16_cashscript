@@ -99,24 +99,27 @@ function jacDoubleG1(int x, int y, int z) returns (int, int, int) {
 function jacAddG1(int aX, int aY, int aZ, int bX, int bY, int bZ) returns (int, int, int) {
     int rx = bX; int ry = bY; int rz = bZ;
     if (aZ != 0) {
-        int z1z1 = mSqr(aZ); int z2z2 = mSqr(bZ);
-        int u1 = mulFp(aX, z2z2); int u2 = mulFp(bX, z1z1);
-        int s1 = mulFp(mulFp(aY, bZ), z2z2); int s2 = mulFp(mulFp(bY, aZ), z1z1);
-        if (u1 == u2 && s1 == s2) {
-            int da = mSqr(aX); int db = mSqr(aY); int dc = mSqr(db);
-            int dd = mulFp(2, mSub(mSub(mSqr(mAdd(aX, db)), da), dc));
-            int de = mulFp(3, da); int df = mSqr(de);
-            int dnx = mSub(df, mulFp(2, dd));
-            int dny = mSub(mulFp(de, mSub(dd, dnx)), mulFp(8, dc));
-            int dnz = mulFp(2, mulFp(aY, aZ));
-            rx = dnx; ry = dny; rz = dnz;
-        } else {
-            int h = mSub(u2, u1); int i2 = mSqr(mulFp(2, h)); int jj = mulFp(h, i2);
-            int rr = mulFp(2, mSub(s2, s1)); int vv = mulFp(u1, i2);
-            int anx = mSub(mSub(mSqr(rr), jj), mulFp(2, vv));
-            int any = mSub(mulFp(rr, mSub(vv, anx)), mulFp(2, mulFp(s1, jj)));
-            int anz = mulFp(mSub(mSub(mSqr(mAdd(aZ, bZ)), z1z1), z2z2), h);
-            rx = anx; ry = any; rz = anz;
+        rx = aX; ry = aY; rz = aZ; // P + O = P (right operand at infinity), mirrors O + Q = Q
+        if (bZ != 0) {
+            int z1z1 = mSqr(aZ); int z2z2 = mSqr(bZ);
+            int u1 = mulFp(aX, z2z2); int u2 = mulFp(bX, z1z1);
+            int s1 = mulFp(mulFp(aY, bZ), z2z2); int s2 = mulFp(mulFp(bY, aZ), z1z1);
+            if (u1 == u2 && s1 == s2) {
+                int da = mSqr(aX); int db = mSqr(aY); int dc = mSqr(db);
+                int dd = mulFp(2, mSub(mSub(mSqr(mAdd(aX, db)), da), dc));
+                int de = mulFp(3, da); int df = mSqr(de);
+                int dnx = mSub(df, mulFp(2, dd));
+                int dny = mSub(mulFp(de, mSub(dd, dnx)), mulFp(8, dc));
+                int dnz = mulFp(2, mulFp(aY, aZ));
+                rx = dnx; ry = dny; rz = dnz;
+            } else {
+                int h = mSub(u2, u1); int i2 = mSqr(mulFp(2, h)); int jj = mulFp(h, i2);
+                int rr = mulFp(2, mSub(s2, s1)); int vv = mulFp(u1, i2);
+                int anx = mSub(mSub(mSqr(rr), jj), mulFp(2, vv));
+                int any = mSub(mulFp(rr, mSub(vv, anx)), mulFp(2, mulFp(s1, jj)));
+                int anz = mulFp(mSub(mSub(mSqr(mAdd(aZ, bZ)), z1z1), z2z2), h);
+                rx = anx; ry = any; rz = anz;
+            }
         }
     }
     return rx, ry, rz;

@@ -1,5 +1,17 @@
 # BN254 PairFold-5 densless with a sound vk_x
 
+> **Withdrawn (2026-10-26).** The densless author has withdrawn the full-verifier soundness
+> claims for the submitted densless constructions ([#28 reply](https://github.com/mr-zwets/groth16_cashscript/issues/28), [#32](https://github.com/mr-zwets/groth16_cashscript/issues/32) F6,
+> [zk-verifier-bench#49](https://github.com/mr-zwets/zk-verifier-bench/issues/49)): the shared `millerEvent` consumes slopes without the
+> tangent/chord equations, the terminal's carried-R predicate compares a value with itself
+> instead of checking the B endpoint. (The further finding that line/root values are not bound
+> to the committed state is confined to the #22 / bench#42 head, densless-msm-slim.)
+> No end-to-end false acceptance is claimed. Do not treat this verifier as sound. For a sound
+> BN254 design see [`../sound-si-gls`](../sound-si-gls/README.md).
+
+> The vk_x MSM added here fixes the public-input binding only; it does not repair the
+> densless pairing part, so the "sound vk_x" in the title does not make the verifier sound.
+
 The PairFold verifiers (pairfold5, pevalfuse, densless, pairfold7) check the public-input
 relation with a log-derivative identity on an auxiliary polynomial blob in the genesis
 input. That identity holds for arbitrary multiplicities, so it does not bind vk_x to the

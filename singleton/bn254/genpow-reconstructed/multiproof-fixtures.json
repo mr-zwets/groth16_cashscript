@@ -1,6 +1,6 @@
 {
   "contract": "genpow-reconstructed/verifier.asm (BN254 genpow, shared P)",
-  "description": "Source-assembled 4,228-byte BN254 genpow program, structurally equivalent to the official 4,292-byte leader. Public proof/input fixtures and all verification predicates are unchanged; generic final exponentiation and higher operation cost are retained.",
+  "description": "Archived public proof/input data only. This fixture file does not certify a program size, operation cost, or verifier equivalence. The current assembly and build manifest own program identity.",
   "numProofs": 4,
   "proofs": [
     {

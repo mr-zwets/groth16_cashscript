@@ -11,21 +11,43 @@ per-input op budget `(10,000 + unlockingLen) × 800`, benchmark score
 
 ## Why
 
-The current single-input BN254 draft (densless-msm-spec-single, 28,433 B; draft PRs
+The single-input BN254 draft (densless-msm-spec-single, 28,433 B; draft PRs
 groth16_cashscript#29 and zk-verifier-bench#46) inherits the densless polynomial folding. In
 densless, the prover supplies the fixed-table words and the per-checkpoint evaluations at the
 Fiat–Shamir point `z` *after* `z` is known, and only a linear fingerprint of each committed
-state is hashed. Whether a prover can exploit that freedom is
-**groth16_cashscript#28, an open question**. Nothing here claims densless is broken; the
-point of this work is to have designs whose soundness does not depend on how #28 resolves.
+state is hashed. When this design work started, whether that freedom is exploitable was open
+(groth16_cashscript#28).
+
+**Update (2026-10-26):** the densless author has since withdrawn the full-verifier soundness
+claims for the submitted densless constructions
+([#28 reply](https://github.com/mr-zwets/groth16_cashscript/issues/28),
+[#32 F6](https://github.com/mr-zwets/groth16_cashscript/issues/32),
+[zk-verifier-bench#49](https://github.com/mr-zwets/zk-verifier-bench/issues/49)). The reasons given are:
+
+- the shared `millerEvent` consumes prover-supplied slopes without the tangent/chord
+  equations, so the group-law recurrence for the B walk is not established;
+- the terminal's carried-R predicate compares a modular value with itself, so there is no
+  B endpoint equality;
+- supplied line values and root copies are not bound to their actual evaluations or to the
+  committed state. At the #22 head this covers interior line products, the initial fixed-pair
+  lines, final line operands and local/genesis root copies.
+
+The author reports this as missing constraints found by review. No end-to-end false
+acceptance was executed. The single-input draft shares the densless folding, so it has no
+soundness argument either. The designs below are built to close these gaps by construction
+(slopes and the B endpoint are checked by exact equations, every line value is computed
+on-chain, and every state is hash-committed before the challenge it meets). Only SI-GLS
+([`chunked/bn254/sound-si-gls`](../../chunked/bn254/sound-si-gls/README.md)) is built and
+independently reviewed; commit-all and hybrid-direct remain design records (see the review
+status table below).
 
 The sound reference points are:
 
 | Verifier | Inputs | Score | Soundness |
 |---|---|---|---|
-| densless-msm-spec-single (draft) | 1 | 28,433 B | open (#28) |
-| intratx-residue-large | 4 | 58,460 B | sound |
-| singleton-minop, moved to one bch-spec input | 1 | ~71–81 kB (estimate) | sound |
+| densless-msm-spec-single (draft) | 1 | 28,433 B | none: shares the withdrawn densless folding (#32 F6) |
+| intratx-residue-large | 4 | 58,460 B | exact arithmetic, no open finding (not independently reviewed) |
+| singleton-minop, moved to one bch-spec input | 1 | ~71–81 kB (estimate) | exact arithmetic, no open finding (not independently reviewed) |
 
 ## The soundness requirement
 
@@ -105,7 +127,9 @@ for like.
 **Build single-identity first.**
 
 - Its measured score is 22.7–23.0 kB (fixture 0 to fixture 4), about 5.4–5.7 kB under the
-  densless single-input draft at 28,433 B, whose soundness is open (#28).
+  densless single-input draft at 28,433 B, whose soundness claims were withdrawn (#28, #32 F6).
+  The built entry is `chunked/bn254/sound-si-gls` (21,915 B, bench id
+  `bch-groth16-sound-si-gls-single`).
 - It is byte-bound with 16% op headroom on the worst witness, so op under-estimates (glue,
   stack layout) do not move the score: with 10% or 15% glue the score stays 22,711 B (fixture 0)
   and the worst case reaches 88% / 92% of budget.
