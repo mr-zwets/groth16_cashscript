@@ -1,0 +1,98 @@
+{
+  "schema": "checked-legacy-bn-profiles/v1",
+  "benchmarkBase": "b140f64ca073c6d0466083fe14b5d9c83776d844",
+  "profiles": [
+    {
+      "id": "bch-groth16-intratx-pairfold5-equation-checked",
+      "originalId": "bch-groth16-intratx-pairfold5",
+      "file": "groth16-intratx-pairfold5-vectors.json",
+      "originalSha256": "db5101c11e19030bc647a43b5f81d27b2376bc6188595271318f1feca1384491",
+      "proofInput": 3,
+      "guardInput": 3,
+      "n0Push": 37,
+      "n1Push": 36,
+      "argumentCount": 38,
+      "declaredVm": "bch-2026",
+      "verificationKeyScope": "known fixed checker VK; original source lineage verified"
+    },
+    {
+      "id": "bch-groth16-intratx-pairfold5-pevalfuse-equation-checked",
+      "originalId": "bch-groth16-intratx-pairfold5-pevalfuse",
+      "file": "groth16-intratx-pairfold5-pevalfuse-vectors.json",
+      "originalSha256": "898a83fe59c33392651aa09b83346486841ae3e0c5713982d2b4f5798ac87e12",
+      "proofInput": 3,
+      "guardInput": 3,
+      "n0Push": 37,
+      "n1Push": 36,
+      "argumentCount": 38,
+      "declaredVm": "bch-2026",
+      "verificationKeyScope": "known fixed checker VK; original source lineage verified"
+    },
+    {
+      "id": "bch-groth16-intratx-pairfold5-densless-equation-checked",
+      "originalId": "bch-groth16-intratx-pairfold5-densless",
+      "file": "groth16-intratx-pairfold5-densless-vectors.json",
+      "originalSha256": "b9d418090d217f0e4eb34cf28fc52b502db80decab73af88b9193c77ce633858",
+      "proofInput": 3,
+      "guardInput": 3,
+      "n0Push": 39,
+      "n1Push": 38,
+      "argumentCount": 40,
+      "declaredVm": "bch-2026",
+      "verificationKeyScope": "known fixed checker VK; original source lineage verified"
+    },
+    {
+      "id": "bch-groth16-intratx-pairfold5-densless-msm-equation-checked",
+      "originalId": "bch-groth16-intratx-pairfold5-densless-msm",
+      "file": "groth16-intratx-pairfold5-densless-msm-vectors.json",
+      "originalSha256": "28da876167a5da5a88583c7ea35b6284341345072372a6d80223e7e4f940df7a",
+      "proofInput": 3,
+      "guardInput": 3,
+      "n0Push": 22,
+      "n1Push": 21,
+      "argumentCount": 23,
+      "declaredVm": "bch-2026",
+      "verificationKeyScope": "known fixed checker VK; original source lineage verified"
+    },
+    {
+      "id": "bch-groth16-intratx-pairfold5-densless-msm-slim-equation-checked",
+      "originalId": "bch-groth16-intratx-pairfold5-densless-msm-slim",
+      "guardPlacement": "locking",
+      "file": "groth16-intratx-pairfold5-densless-msm-slim-vectors.json",
+      "originalSha256": "62be105735030471e69c3b07eecce9704199052849d7d199b45a1487f2c21885",
+      "proofInput": 3,
+      "guardInput": 4,
+      "n0Push": 53,
+      "n1Push": 52,
+      "argumentCount": 56,
+      "declaredVm": "bch-2026",
+      "verificationKeyScope": "known fixed checker VK; original source lineage verified"
+    },
+    {
+      "id": "bch-groth16-intratx-pairfold5-densless-msm-spec-equation-checked",
+      "originalId": "bch-groth16-intratx-pairfold5-densless-msm-spec",
+      "file": "groth16-intratx-pairfold5-densless-msm-spec-vectors.json",
+      "originalSha256": "47a43f19f0edbb9bf5e78349959599267f1d94d23abc80020c56e8d166a7a191",
+      "proofInput": 3,
+      "guardInput": 3,
+      "n0Push": 23,
+      "n1Push": 22,
+      "argumentCount": 24,
+      "declaredVm": "bch-spec",
+      "verificationKeyScope": "known fixed checker VK; original source lineage verified"
+    },
+    {
+      "id": "bch-groth16-intratx-pairfold7-equation-checked",
+      "originalId": "bch-groth16-intratx-pairfold7",
+      "file": "groth16-intratx-pairfold7-vectors.json",
+      "originalSha256": "4cb3ca8745a404d50ca7543858f6d01e6fbf68a7a8240ac96f7c8597b57233ac",
+      "proofInput": 5,
+      "guardInput": 5,
+      "n0Push": 36,
+      "n1Push": 35,
+      "argumentCount": 37,
+      "declaredVm": "bch-2026",
+      "verificationKeyScope": "known fixed checker VK; original PairFold-7 VK intent is not established"
+    }
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "schema": "bn254-legacy-equation-checked-qualification/v1",
+  "status": "CONDITIONAL_FIXED_KEY_MATHEMATICAL_REFERENCE_NATIVE_HOLD",
+  "equationOwner": "../pairfold5-pevalfuse-deterministic/equation-guard.mjs",
+  "equationLoaderSha256": "0c295f59ae5440c097821589fd2068c1d1a42f8cda010a76b18d90036a258650",
+  "equationLoaderBytes": 5901,
+  "composition": [
+    "The copied checker is identical to the checked native5 function bank. It enforces canonical proof-coordinate/public-scalar bounds, curve/subgroup conditions, actual public MSM, and the complete fixed-key four-pair equation.",
+    "The mandatory bridge copies the declared n0,n1 slots and the original 448-byte proof tuple. Legacy -Ay is mapped to Ay by canonical modular negation. The checker invocation is immediately followed by VERIFY.",
+    "The guard restores the original argument frame before the old program. Legacy auxiliary predicates impose further acceptance restrictions and receive no independent soundness credit.",
+    "For six profiles the immutable terminal root is transferred to the selected guarded genesis locking. The slim reference uses a bare terminal locking so its original reverse-offset frame remains unchanged. Externally anchored graph root and successful execution of the complete ordered input graph remain premises."
+  ],
+  "existingPositiveObservations": {
+    "profiles": 7,
+    "graphs": 35,
+    "arithmeticOracleInputsAccepted": 185,
+    "arithmeticOracleInputsEvaluated": 185,
+    "completeDeclaredConsensusGraphsAccepted": 0,
+    "completeDeclaredStandardGraphsAccepted": 0
+  },
+  "verificationKeyScope": "The successor relation is against the copied checker fixed VK. Six legacy profiles have explicit leader/densless VK source lineage. Original PairFold-7 VK intent is unavailable in the current source tree: its successor is qualified only against the known checker VK; original-key equivalence is not asserted. A deployment tag is not treated as a verification-key hash.",
+  "livePremises": [
+    "Correctness of the referenced fixed-key checker theorem and field/pairing facts.",
+    "Pinned VM function-definition, signed-number and minimal-push semantics.",
+    "Collision resistance for code and graph commitments, fixed selected code, and externally anchored correct graph ancestry."
+  ],
+  "excludedClaims": [
+    "Universal completeness of legacy auxiliary restrictions",
+    "Arbitrary verification keys",
+    "Independent correctness of legacy PIT/table/slope equations",
+    "Native resource or whole-transaction admission",
+    "Relay or mainnet deployment"
+  ],
+  "fixturePolicy": "Only existing positive payloads are transported. Proof/public/auxiliary/state/table/padding instructions are byte-identical; only static executable code/redeem/locking transport changes. No new proof or negative suite is supplied."
+}
