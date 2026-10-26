@@ -29,7 +29,8 @@ const BLS_P = 400240955522166739341778982573590415655688281993900788533205813612
 setTestInputRange(BLS_P); // 381-bit random probe/diff-test inputs (BN254 default is 254-bit)
 
 const here = dirname(fileURLToPath(import.meta.url));
-const VDIR = join(here, '../../../verifier/src/bch') + '/';
+// bench repo vector dir: $BENCH_VDIR, else the sibling zk-verifier-bench checkout
+const VDIR = (process.env.BENCH_VDIR ?? join(here, '../../../zk-verifier-bench/src/bch')) + '/';
 const STANDARD_BUDGET = (41 + 10_000) * 800;
 const realVm = createVirtualMachineBch2026(false);
 

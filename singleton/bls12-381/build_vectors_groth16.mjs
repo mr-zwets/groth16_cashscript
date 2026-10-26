@@ -17,6 +17,8 @@ import {
 } from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
+// bench repo vector dir: $BENCH_VDIR, else the sibling zk-verifier-bench checkout
+const VDIR = (process.env.BENCH_VDIR ?? join(here, '../../../zk-verifier-bench/src/bch')) + '/';
 const STANDARD_BUDGET = (41 + 10_000) * 800;
 
 const HUGE = Number.MAX_SAFE_INTEGER;
@@ -61,7 +63,7 @@ const opCost = looseAccept.operationCost;
 
 // the benchmark entry replays the multiproof unlockings against THIS locking; make the
 // build fail loudly if the artifact ever breaks one of them
-const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-singleton-multiproof-vectors.json', 'utf8'));
+const mp = JSON.parse(readFileSync(VDIR + 'groth16-bls12381-singleton-multiproof-vectors.json', 'utf8'));
 for (const p of mp.proofs) {
   if (!evalPair(looseVm, template, hexToBin(p.unlocking)).accepted) throw new Error('artifact failed a multiproof accept');
 }
@@ -89,5 +91,5 @@ const out = {
   looseAccept: looseAccept.accepted,
   rejectInvalid: !looseRejectInvalid.accepted,
 };
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-bls12381-singleton-vectors.json', JSON.stringify(out, null, 2));
+writeFileSync(VDIR + 'groth16-bls12381-singleton-vectors.json', JSON.stringify(out, null, 2));
 console.log('wrote src/bch/groth16-bls12381-singleton-vectors.json');
