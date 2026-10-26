@@ -1,6 +1,6 @@
 {
  "generator": "redteam.mjs",
- "locking": "aa20359c94315e8d60d839be62561aef3a2a7b725f9680e17e41a20a9f064ecb2df687",
+ "locking": "aa202e5fe55a2f6f44f1e0087dcaecbb152c715d2f7d361cff260320654af0eb705387",
  "results": [
   {
    "name": "honest transaction (fixture committed)",
@@ -138,10 +138,10 @@
      3
     ],
     "errors": [
-     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
-     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
-     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
-     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286."
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
     ]
    },
    "standard": {
@@ -153,10 +153,10 @@
      3
     ],
     "errors": [
-     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
-     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
-     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
-     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286."
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
     ]
    },
    "ok": true
@@ -270,13 +270,12 @@
     "rejectingInputs": [
      0,
      1,
-     2,
      3
     ],
     "errors": [
      "Program failed an OP_VERIFY operation.",
      "Program failed an OP_VERIFY operation.",
-     "Program failed an OP_VERIFY operation.",
+     "ok",
      "Program failed an OP_VERIFY operation."
     ]
    },
@@ -285,13 +284,12 @@
     "rejectingInputs": [
      0,
      1,
-     2,
      3
     ],
     "errors": [
      "Program failed an OP_VERIFY operation.",
      "Program failed an OP_VERIFY operation.",
-     "Program failed an OP_VERIFY operation.",
+     "ok",
      "Program failed an OP_VERIFY operation."
     ]
    },
@@ -366,47 +364,17 @@
    "ownerRejects": true
   },
   {
-   "name": "relocated constant pieces swapped in input 1 (K0_1 <-> K1_0)",
+   "name": "constant pieces swapped in input 3 (K0_1 <-> K1_1)",
    "kind": "layout",
    "consensus": {
     "valid": false,
     "rejectingInputs": [
      0,
-     1
-    ],
-    "errors": [
-     "Program failed an OP_VERIFY operation.",
-     "Program failed an OP_VERIFY operation.",
-     "ok",
-     "ok"
-    ]
-   },
-   "standard": {
-    "valid": false,
-    "rejectingInputs": [
-     0,
-     1
-    ],
-    "errors": [
-     "Program failed an OP_VERIFY operation.",
-     "Program failed an OP_VERIFY operation.",
-     "ok",
-     "ok"
-    ]
-   },
-   "ok": true
-  },
-  {
-   "name": "relocated constant piece resized (48 B moved from K3_1 to K1_0 in input 1)",
-   "kind": "layout",
-   "consensus": {
-    "valid": false,
-    "rejectingInputs": [
      1,
      3
     ],
     "errors": [
-     "ok",
+     "Program failed an OP_VERIFY operation.",
      "Program failed an OP_VERIFY operation.",
      "ok",
      "Program failed an OP_VERIFY operation."
@@ -415,11 +383,12 @@
    "standard": {
     "valid": false,
     "rejectingInputs": [
+     0,
      1,
      3
     ],
     "errors": [
-     "ok",
+     "Program failed an OP_VERIFY operation.",
      "Program failed an OP_VERIFY operation.",
      "ok",
      "Program failed an OP_VERIFY operation."
@@ -428,29 +397,63 @@
    "ok": true
   },
   {
-   "name": "filler push not zero (input 2)",
+   "name": "relocated constant piece resized (48 B of K0_1 moved into K0_0)",
    "kind": "layout",
    "consensus": {
     "valid": false,
     "rejectingInputs": [
-     2
+     0,
+     1,
+     3
     ],
     "errors": [
-     "ok",
-     "ok",
      "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "filler push not zero (input 0)",
+   "kind": "layout",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
      "ok"
     ]
    },
    "standard": {
     "valid": false,
     "rejectingInputs": [
-     2
+     0
     ],
     "errors": [
-     "ok",
-     "ok",
      "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
      "ok"
     ]
    },
@@ -458,7 +461,7 @@
    "ownerRejects": true
   },
   {
-   "name": "program part 0 (input 3) tampered",
+   "name": "program part 0 (input 1) tampered",
    "kind": "program",
    "consensus": {
     "valid": false,
@@ -528,7 +531,7 @@
    "ok": true
   },
   {
-   "name": "delta constant block K2 tampered (wrong K_const)",
+   "name": "delta constant block K2 tampered (wrong K_const, push K2_0 in input 2)",
    "kind": "constants",
    "consensus": {
     "valid": false,
@@ -558,7 +561,7 @@
    "ownerRejects": true
   },
   {
-   "name": "delta constant piece K0_1 (hosted in input 1) tampered",
+   "name": "delta constant piece K0_1 (hosted in input 3) tampered",
    "kind": "constants",
    "consensus": {
     "valid": false,
@@ -580,6 +583,36 @@
     "errors": [
      "Program failed an OP_VERIFY operation.",
      "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "delta constant piece K1_1 (hosted in input 3) tampered",
+   "kind": "constants",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     1
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     1
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
      "ok",
      "ok"
     ]
@@ -1145,11 +1178,12 @@
    "consensus": {
     "valid": false,
     "rejectingInputs": [
-     0
+     0,
+     1
     ],
     "errors": [
      "Program failed an OP_VERIFY operation.",
-     "ok",
+     "Program failed an OP_VERIFY operation.",
      "ok",
      "ok"
     ]
@@ -1157,11 +1191,12 @@
    "standard": {
     "valid": false,
     "rejectingInputs": [
-     0
+     0,
+     1
     ],
     "errors": [
      "Program failed an OP_VERIFY operation.",
-     "ok",
+     "Program failed an OP_VERIFY operation.",
      "ok",
      "ok"
     ]
@@ -1175,26 +1210,26 @@
    "consensus": {
     "valid": false,
     "rejectingInputs": [
-     0,
-     1
+     1,
+     2
     ],
     "errors": [
-     "Program failed an OP_VERIFY operation.",
-     "Program failed an OP_VERIFY operation.",
      "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
      "ok"
     ]
    },
    "standard": {
     "valid": false,
     "rejectingInputs": [
-     0,
-     1
+     1,
+     2
     ],
     "errors": [
-     "Program failed an OP_VERIFY operation.",
-     "Program failed an OP_VERIFY operation.",
      "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
      "ok"
     ]
    },
@@ -1207,27 +1242,27 @@
    "consensus": {
     "valid": false,
     "rejectingInputs": [
-     0,
-     2
+     2,
+     3
     ],
     "errors": [
-     "Program failed an OP_VERIFY operation.",
+     "ok",
      "ok",
      "Program failed an OP_VERIFY operation.",
-     "ok"
+     "Program failed an OP_VERIFY operation."
     ]
    },
    "standard": {
     "valid": false,
     "rejectingInputs": [
-     0,
-     2
+     2,
+     3
     ],
     "errors": [
-     "Program failed an OP_VERIFY operation.",
+     "ok",
      "ok",
      "Program failed an OP_VERIFY operation.",
-     "ok"
+     "Program failed an OP_VERIFY operation."
     ]
    },
    "ok": true,
@@ -1271,27 +1306,27 @@
    "consensus": {
     "valid": false,
     "rejectingInputs": [
-     0,
-     2
+     2,
+     3
     ],
     "errors": [
-     "Program failed an OP_VERIFY operation.",
+     "ok",
      "ok",
      "Program failed an OP_VERIFY operation.",
-     "ok"
+     "Program failed an OP_VERIFY operation."
     ]
    },
    "standard": {
     "valid": false,
     "rejectingInputs": [
-     0,
-     2
+     2,
+     3
     ],
     "errors": [
-     "Program failed an OP_VERIFY operation.",
+     "ok",
      "ok",
      "Program failed an OP_VERIFY operation.",
-     "ok"
+     "Program failed an OP_VERIFY operation."
     ]
    },
    "ok": true,

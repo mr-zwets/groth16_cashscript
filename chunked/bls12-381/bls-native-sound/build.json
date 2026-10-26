@@ -2,26 +2,26 @@
  "inputs": 4,
  "R": {
   "bytes": 81,
-  "hex": "c3549d006576c7c0c7888b76549c667553ca02650e7f7702be107f7552ca02cd1d7f77023b087f757e76a82097af45d145d4afdee56376875b3acd148eeab2ec8fb2c85f7a1d79438832ce8a880089008a",
-  "sha256": "c60465a09e74b33501078aa1ee73637d35844fdcd705b9d3f5aebb0e0df49d20"
+  "hex": "c3549d006576c7c0c7888b76549c667551ca0223157f770285107f7552ca02cf1c7f7702ba087f757e76a820a826d28bafc55608e1bfb068c3443d4856331014bf791d723a924adb1729f598880089008a",
+  "sha256": "7cf08800d0bb5b81fba09484b8e9fc951c9166957e3a1d9f2aa7b82529dca275"
  },
  "locking": {
-  "hex": "aa20359c94315e8d60d839be62561aef3a2a7b725f9680e17e41a20a9f064ecb2df687",
-  "sha256": "e76546332def2841d7045559a1a14cbc0233db09edd364a16765ac5cfc7214bb"
+  "hex": "aa202e5fe55a2f6f44f1e0087dcaecbb152c715d2f7d361cff260320654af0eb705387",
+  "sha256": "d474a774a4f3b8721e3a9e46c3d769288359aecca7341e7f024858bcdfbc4276"
  },
  "program": {
-  "bytes": 6393,
-  "sha256": "97af45d145d4afdee56376875b3acd148eeab2ec8fb2c85f7a1d79438832ce8a",
+  "bytes": 6463,
+  "sha256": "a826d28bafc55608e1bfb068c3443d4856331014bf791d723a924adb1729f598",
   "parts": [
    {
-    "carrier": 3,
-    "off": 3685,
-    "len": 4286
+    "carrier": 1,
+    "off": 5411,
+    "len": 4229
    },
    {
     "carrier": 2,
-    "off": 7629,
-    "len": 2107
+    "off": 7375,
+    "len": 2234
    }
   ]
  },
@@ -36,27 +36,31 @@
   ],
   "place": {
    "blob": [
-    3,
+    1,
     2
    ],
    "blobLens": [
-    4286
+    4229
    ],
    "K": [
     [
      [
       0,
-      653
+      513
      ],
      [
-      1,
-      499
+      3,
+      447
      ]
     ],
     [
      [
       1,
-      2208
+      171
+     ],
+     [
+      3,
+      2037
      ]
     ],
     [
@@ -68,19 +72,15 @@
     [
      [
       3,
-      48
-     ],
-     [
-      1,
-      1680
+      1728
      ]
     ]
    ],
    "fill": [
-    29,
-    161,
-    271,
-    28
+    8,
+    92,
+    19,
+    93
    ]
   },
   "roles": [
@@ -97,7 +97,7 @@
     "slopes": 10,
     "region": 3264,
     "claims": 240,
-    "kBlock": 1152
+    "kBlock": 960
    },
    {
     "chunks": [
@@ -161,13 +161,13 @@
     },
     {
      "name": "K0_0",
-     "size": 653,
+     "size": 513,
      "role": 0,
      "piece": 0
     },
     {
      "name": "PAD",
-     "size": 29
+     "size": 8
     },
     {
      "name": "WQ",
@@ -184,26 +184,19 @@
      "size": 240
     },
     {
-     "name": "K0_1",
-     "size": 499,
-     "role": 0,
-     "piece": 1
-    },
-    {
      "name": "K1_0",
-     "size": 2208,
+     "size": 171,
      "role": 1,
      "piece": 0
     },
     {
-     "name": "K3_1",
-     "size": 1680,
-     "role": 3,
-     "piece": 1
+     "name": "PAD",
+     "size": 92
     },
     {
-     "name": "PAD",
-     "size": 161
+     "name": "BLOB",
+     "size": null,
+     "part": 0
     }
    ],
    [
@@ -223,7 +216,7 @@
     },
     {
      "name": "PAD",
-     "size": 271
+     "size": 19
     },
     {
      "name": "BLOB",
@@ -241,24 +234,31 @@
      "size": 48
     },
     {
+     "name": "K0_1",
+     "size": 447,
+     "role": 0,
+     "piece": 1
+    },
+    {
+     "name": "K1_1",
+     "size": 2037,
+     "role": 1,
+     "piece": 1
+    },
+    {
      "name": "K3_0",
-     "size": 48,
+     "size": 1728,
      "role": 3,
      "piece": 0
     },
     {
      "name": "PAD",
-     "size": 28
-    },
-    {
-     "name": "BLOB",
-     "size": null,
-     "part": 0
+     "size": 93
     }
    ]
   ],
   "kHash": [
-   "6fb0d5b2039d76e16d0cb4d8adad6419dbf9f637f887af5942ce567813736797",
+   "54bfcb923721165687b1acfef8e0422111a7835cdf061e16e8ce6bf274026df7",
    "82d8e0602ca0791c7dfac3d0d24025995d13c068f36bf86fbe28a9de265ff4c1",
    "b594b0ab5e22f373d32a472b2f9714a8bfaf891ad616043dfec0ba475a10ab52",
    "f0ee31461357885da7a736303d2ca55c8199b48c61e9cf2874199bf2ce83ffaa"
@@ -267,105 +267,107 @@
  "committed": {
   "nq": 45,
   "unlocking": [
-   6539,
-   9783,
-   9819,
-   8054
+   6378,
+   9723,
+   9692,
+   8003
   ],
-  "sumUnlocking": 34195,
-  "txBytes": 34387,
-  "score": 34527,
+  "sumUnlocking": 33796,
+  "txBytes": 33988,
+  "score": 34128,
   "consensus": [
    {
-    "op": 4773208,
-    "budget": 5264000,
-    "margin": 0.0932
+    "op": 4645888,
+    "budget": 5135200,
+    "margin": 0.0953
    },
    {
-    "op": 6838289,
-    "budget": 7859200,
-    "margin": 0.1299
+    "op": 6827098,
+    "budget": 7811200,
+    "margin": 0.126
    },
    {
-    "op": 6852226,
-    "budget": 7888000,
-    "margin": 0.1313
+    "op": 6818832,
+    "budget": 7786400,
+    "margin": 0.1243
    },
    {
-    "op": 5791292,
-    "budget": 6476000,
-    "margin": 0.1057
+    "op": 5746667,
+    "budget": 6435200,
+    "margin": 0.107
    }
   ],
   "standard": [
    {
-    "op": 4827480,
-    "budget": 5264000,
-    "margin": 0.0829
+    "op": 4699904,
+    "budget": 5135200,
+    "margin": 0.0848
    },
    {
-    "op": 6856081,
-    "budget": 7859200,
-    "margin": 0.1276
+    "op": 6845018,
+    "budget": 7811200,
+    "margin": 0.1237
    },
    {
-    "op": 6870018,
-    "budget": 7888000,
-    "margin": 0.1291
+    "op": 6836752,
+    "budget": 7786400,
+    "margin": 0.122
    },
    {
-    "op": 5808188,
-    "budget": 6476000,
-    "margin": 0.1031
+    "op": 5763691,
+    "budget": 6435200,
+    "margin": 0.1043
    }
   ]
  },
  "functions": {
-  "WORK": 186,
-  "READ0": 57,
-  "RD": 14,
+  "WORK": 279,
+  "READ0": 33,
+  "RD2": 27,
   "P": 49,
+  "RD6": 75,
+  "RD": 14,
   "SETUP": 1606,
   "EV": 46,
   "TBL": 175,
   "TM": 111,
-  "WSTART": 41,
-  "LOOP": 101,
-  "AFFDBL": 290,
+  "WSTART": 31,
+  "LOOP": 103,
+  "AFFDBL": 288,
   "DSTEP": 186,
-  "AFFADD": 334,
-  "BND": 68,
+  "AFFADD": 333,
+  "BND": 92,
   "FINW": 118,
   "C48": 11,
   "G1C": 18,
   "TA": 78
  },
  "roleBodies": [
-  1640,
-  192,
-  185,
-  793
+  1519,
+  195,
+  183,
+  789
  ],
  "sections": {
-  "1:pin+K": 134,
+  "1:pin+K": 137,
   "1:params": 53,
   "1:work": 2,
   "1:fin": 3,
-  "2:pin+K": 126,
+  "2:pin+K": 124,
   "2:params": 54,
   "2:work": 2,
   "2:fin": 3,
-  "3:pin+K": 135,
+  "3:pin+K": 131,
   "3:params": 49,
   "3:work": 2,
   "3:fin": 607,
-  "0:pin+K": 134,
-  "0:transcript": 191,
-  "0:statement": 366,
-  "0:binding": 135,
-  "0:quotient+final": 283,
-  "0:setup": 1016,
-  "0:start": 485,
+  "0:pin+K": 190,
+  "0:transcript": 177,
+  "0:statement": 231,
+  "0:binding": 98,
+  "0:quotient+final": 186,
+  "0:setup": 835,
+  "0:start": 489,
   "0:loop": 2,
   "0:fin": 3
  },

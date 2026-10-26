@@ -7,7 +7,7 @@ import {p2sh32, txOf, unlockingsFor, evalTx, verifyTx, txSize} from './vm.mjs';
 const b = buildAll(); console.log('blob', b.blob.length, 'R', b.R.length);
 let worst = 1;
 for (const spec of (process.env.WIT ?? 'committed,dense,forced:44').split(',')) {
-  const w = witnessFor(spec); const un = unlockingsFor(txPushes(w, b.blob), b.R); const ctx = txOf(un, un.map(() => p2sh32(b.R)));
+  const w = await witnessFor(spec); const un = unlockingsFor(txPushes(w, b.blob), b.R); const ctx = txOf(un, un.map(() => p2sh32(b.R)));
   for (const mode of ['standard', 'consensus']) {
     const rs = evalTx(ctx, mode); const v = verifyTx(ctx, mode);
     const m = rs.map((x) => 1 - x.op / x.budget); worst = Math.min(worst, ...m);

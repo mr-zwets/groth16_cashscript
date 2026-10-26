@@ -5,7 +5,8 @@
 import {writeFileSync} from 'node:fs';
 import {encodeAuthenticationInstructions} from '@bitauth/libauth';
 import {buildAll} from './script.mjs';
-import {FIXTURES, mint} from './math.mjs';
+import {createHash} from 'node:crypto';
+import {FIXTURES, mint, r, synthetic} from './math.mjs';
 import {prove, txPushes, ROLES, CUTS} from './protocol.mjs';
 import {statementFor, maxSlots} from './worst.mjs';
 import {p2sh32, txOf, unlockingsFor, VM_UNLIMITED} from './vm.mjs';
@@ -13,6 +14,9 @@ import {p2sh32, txOf, unlockingsFor, VM_UNLIMITED} from './vm.mjs';
 export function witnessFor(spec) {
   if (spec === 'dense') return prove(mint(statementFor(Array(64).fill(2)).ns));
   if (spec.startsWith('forced:')) return prove(mint(statementFor(maxSlots(Number(spec.slice(7)))).ns));
+  if (spec.startsWith('sweep:')) return import('./sweep.mjs').then(({sweepCases}) => prove(sweepCases().find((c) => c.label === spec.slice(6)).fx));
+  if (spec.startsWith('random:')) { const h = (x) => BigInt('0x' + createHash('sha256').update('measure:' + spec + x).digest('hex')) % r;
+    return prove(synthetic([h(0), h(1)], 1n + h(2) % (r - 1n), 1n + h(3) % (r - 1n))); }
   return prove(FIXTURES[spec]);
 }
 export function measure(b, w, mode = 'standard') {

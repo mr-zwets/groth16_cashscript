@@ -80,7 +80,7 @@ function kTable(mult) {
 export const FLAGS = Array.from({length: NE}, (_, e) => (isAdd(e) ? 1 : 0) | (isBoundary(e) ? 2 : 0));
 const ZP = ['z', 'z2', 'z3', 'z4', 'z5', 'z6'], EZP = ['ez', 'ez2', 'ez3', 'ez4', 'ez5', 'z6'];
 // canonical frame: every role re-creates exactly this main stack (alt empty) before SETUP
-const FRAME = ['CL', 'D', 'dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'z', 'rho', 'xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC',
+const FRAME = ['CL', 'Rp', 'D', 'dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'z', 'rho', 'xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC',
   'sc0', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5', 'N0', 'N1', 'X0', 'X1', 'Y0', 'Y1', 'SL', 'ST', 'SCH', 'f'];
 const HOT = ['xd0', 'xd1', 'xB0', 'xB1', 'yB0', 'yB1', 'Scp', 'Scm', 'oC', 'cz2', 'cz2t', 'oP', 'xz2', 'xz2t', 't', 'p'];
 const STATE = ['N0', 'N1', 'SCH', 'SL', 'X0', 'X1', 'Y0', 'Y1', 'D', 'dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'Fp', 'Fm', 'f'];
@@ -118,6 +118,14 @@ function gen(L0guess, BLOB_LENS) {
   // RD: [blob] -> [v, rest]: split one 48-byte LE word, decode unsigned (BIN2NUM(w || 0x00)), require v < p
   top.defLocal('RD', 1, 2, (s) => { s.push(48).op(OP.SPLIT, 2, 'w', 'rest').roll('w').pushBytes([0]).op(OP.CAT, 2, 'w0').op(OP.BIN2NUM, 1, 'v');
     s.pick('v').invoke('P', ['p']).op(OP.LESSTHAN, 2, 'ok').op(OP.VERIFY, 1).roll('rest'); });
+  // RDk: [blob] -> [v0 .. v_{k-1}, rest]: k words decoded unsigned (BIN2NUM(w || 0x00)), one range check max(v_j) < p
+  for (const k of [2, 6]) top.defLocal('RD' + k, 1, k + 1, (s) => {
+    for (let j = 0; j < k; j++) { s.push(48).op(OP.SPLIT, 2, 'w', 'rest').roll('w').pushBytes([0]).op(OP.CAT, 2, 'w0').op(OP.BIN2NUM, 1, 'v' + j).roll('rest'); }
+    s.pick('v0', 'm'); for (let j = 1; j < k; j++) s.pick('v' + j, 'x').op(OP.MAX, 2, 'm');
+    s.invoke('P', ['p']).op(OP.LESSTHAN, 2, 'ok').op(OP.VERIFY, 1);
+  });
+  // k words: RD6 / RD2 groups (one range check per group)
+  const rdk = (a, names, blob) => { for (let o = 0; o < names.length;) { const g = names.length - o >= 6 ? 6 : names.length - o >= 2 ? 2 : 1; a.invoke(g === 1 ? 'RD' : 'RD' + g, [...names.slice(o, o + g), blob]); o += g; } };
   top.defLocal('EV', 12, 2, (s) => s.kernel(kEval(), ['vp', 'vm'], {iters: ITERS}));
   top.defLocal('TM', 4, 16, (s) => s.kernel(kTable(true), Array.from({length: 16}, (_, i) => 'T' + (15 - i)), {iters: ITERS}));
   top.defLocal('TA', 4, 16, (s) => s.kernel(kTable(false), Array.from({length: 16}, (_, i) => 'T' + (15 - i)), {iters: ITERS}));
@@ -130,11 +138,11 @@ function gen(L0guess, BLOB_LENS) {
     const oZR = offsetOf(0, 'ZR'), oG = offsetOf(0, 'G');
     s.push(0).op(OP.INPUTBYTECODE, 1, 'u').push(oZR).op(OP.SPLIT, 2, 'x', 'u').drop('x').push(oG + STMT_SIZE - oZR).op(OP.SPLIT, 2, 'u', 'x').drop('x');
     // u = ZR (96) | G header | statement (864)
-    for (const n of ['z', 'rho']) s.invoke('RD', [n, 'u']);
+    rdk(s, ['z', 'rho'], 'u');
     s.push(oG - oZR - 96).op(OP.SPLIT, 2, 'x', 'u').drop('x');
-    for (const n of ['xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC']) s.invoke('RD', [n, 'u']);
+    rdk(s, ['xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC'], 'u');
     s.push(64).op(OP.SPLIT, 2, 'x', 'u').drop('x').push(128).op(OP.SPLIT, 2, 'NB', 'u');
-    for (let j = 0; j < 6; j++) s.invoke('RD', ['sc' + j, 'u']);
+    rdk(s, ['sc0', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5'], 'u');
     s.op(OP.SIZE, 1, 'u', 'n').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1).drop('u');
   });
 
@@ -178,7 +186,7 @@ function gen(L0guess, BLOB_LENS) {
   // WSTART (inputs 1..3): F+- = S_start(+-z), S_start = the first state of ST (the predecessor's last state)
   top.defBound('WSTART', (a) => {
     a.roll('ST').push(288).op(OP.SPLIT, 2, 'S', 'ST');
-    a.roll('S'); for (let j = 0; j < 6; j++) a.invoke('RD', ['s' + j, 'S']); a.drop('S');
+    a.roll('S'); rdk(a, ['s0', 's1', 's2', 's3', 's4', 's5'], 'S'); a.drop('S');
     for (const n of ZP) a.pick(n); a.invoke('EV', ['Fp', 'Fm']);
   });
   const lookup = (s, tbl, idx, out) => {
@@ -191,7 +199,7 @@ function gen(L0guess, BLOB_LENS) {
     s.op(OP.BIN2NUM, 1, 'n1').roll('w0').op(OP.BIN2NUM, 1, 'n0'); // baked slopes: < p < 2^381, so the LE word is a nonnegative number
     s.kernel(kDStep(), ['dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'Fp', 'Fm'], {iters: ITERS});
   });
-  const slope = (s) => { s.roll('SL').push(96).op(OP.SPLIT, 2, 'lw', 'SL').roll('lw'); s.invoke('RD', ['l0', 'lw']).invoke('RD', ['l1', 'lw']).drop('lw'); };
+  const slope = (s) => { s.roll('SL').push(96).op(OP.SPLIT, 2, 'lw', 'SL').roll('lw'); rdk(s, ['l0', 'l1'], 'lw'); s.drop('lw'); };
   top.defBound('AFFDBL', (t) => { slope(t); t.kernel(kvDblC(), ['X0', 'X1', 'Y0', 'Y1', 'Fp', 'Fm', 'd0', 'd1'], {iters: ITERS});
     t.op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1).op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1); });
   top.defBound('AFFADD', (u) => { slope(u); u.kernel(kvAddB(), ['X0', 'X1', 'Y0', 'Y1', 'Fp', 'Fm', 'd0', 'd1', 'ex0', 'ex1'], {iters: ITERS});
@@ -199,11 +207,14 @@ function gen(L0guess, BLOB_LENS) {
     u.pick('xd0', 's0').pick('xd1', 's1').invoke('DSTEP', undefined, {arrange: true}); });
   top.defBound('BND', (t) => {
     t.fromAlt('R').fromAlt('ST').push(288).op(OP.SPLIT, 2, 'S', 'ST').toAlt('ST');
-    for (let j = 0; j < 6; j++) t.invoke('RD', ['s' + j, 'S']);
-    t.drop('S'); for (const n of ZP) t.pick(n); t.invoke('EV', ['Sp', 'Sm']);
-    const k = new Kernel(); const R = k.in('R');
-    k.output(k.in('Sp'), k.in('Sm'), k.mod(k.sub(k.add(k.mul(R, k.env('rho')), k.mul(k.in('Fp'), k.in('Sm'))), k.mul(k.in('Fm'), k.in('Sp')))));
-    t.kernel(k, ['Fp', 'Fm', 'R'], {iters: 500}); t.toAlt('R');
+    rdk(t, ['s0', 's1', 's2', 's3', 's4', 's5'], 'S');
+    t.drop('S');
+    // S(+-z) inline (z powers and p from the loop environment), then R <- R rho + F+ S(-z) - F- S(z), F+- <- S(+-z)
+    const k = new Kernel(); const R = k.in('R'); const sv = [0, 1, 2, 3, 4, 5].map((j) => k.in('s' + j)); const zp = ZP.map((n) => k.env(n));
+    const ev = k.mod(k.sum(sv[0], k.mul(sv[2], zp[1]), k.mul(sv[4], zp[3]), zp[5])), od = k.mod(k.sum(k.mul(sv[1], zp[0]), k.mul(sv[3], zp[2]), k.mul(sv[5], zp[4])));
+    const Sp = k.add(ev, od), Sm = k.sub(ev, od);
+    k.output(Sp, Sm, k.mod(k.sub(k.add(k.mul(R, k.env('rho')), k.mul(k.in('Fp'), Sm)), k.mul(k.in('Fm'), Sp))));
+    t.kernel(k, ['Fp', 'Fm', 'R'], {iters: 1500}); t.toAlt('R');
   });
   top.defBound('LOOP', (a) => {
     const L0 = a.st.slice();
@@ -238,7 +249,7 @@ function gen(L0guess, BLOB_LENS) {
   // clean stack: every check is a VERIFY, so drop everything (2 items per instruction) and leave TRUE
   const clean = (a) => { assert.equal(a.alt.length, 0, 'altstack not empty'); const n = a.st.length; for (let k = 0; k + 1 < n; k += 2) a.emit(OP.TWODROP); if (n % 2) a.emit(OP.DROP); a.emit(OP.TRUE); a.st = ['ok']; };
   const toLoop = (a, L0g) => {
-    a.toAlt('ST').push(0, 'R').toAlt();
+    a.toAlt('ST').roll('Rp').rename('Rp', 'R').toAlt();   // R continues from the predecessor's claim (input 0: 0)
     const moved = new Set([...HOT, ...STATE]);
     a.arrangeAll(L0g ?? [...a.st.filter((x) => !moved.has(x)), ...HOT, ...STATE]);
   };
@@ -252,8 +263,8 @@ function gen(L0guess, BLOB_LENS) {
     a.drop('pE0').drop('pNE');
     // the predecessor: its last state (the start of this input's first identity) and its B-walk end point T~
     a.roll('pH').op(OP.INPUTBYTECODE, 1, 'u').roll('pOS').op(OP.SPLIT, 2, 'x', 'u').drop('x').push(288).op(OP.SPLIT, 2, 'S0', 'u')
-      .roll('pOT').op(OP.SPLIT, 2, 'x', 'u').drop('x').push(192).op(OP.SPLIT, 2, 'Tt', 'x').drop('x');
-    a.roll('Tt'); for (const n of ['X0', 'X1', 'Y0', 'Y1']) a.invoke('RD', [n, 'Tt']); a.drop('Tt');
+      .roll('pOT').op(OP.SPLIT, 2, 'x', 'u').drop('x').push(240).op(OP.SPLIT, 2, 'Tt', 'x').drop('x');
+    a.roll('Tt'); rdk(a, ['Rp', 'X0', 'X1', 'Y0', 'Y1'], 'Tt'); a.drop('Tt');   // the predecessor's claims R~ | T~
     // own region: states | slopes
     a.roll('G').roll('pNS').op(OP.SPLIT, 2, 'STo', 'SL');
     a.roll('S0').roll('STo').op(OP.CAT, 2, 'ST');
@@ -286,16 +297,22 @@ function gen(L0guess, BLOB_LENS) {
       a.rename(`K${i}_${j}`, 'K');
     });
     a.pick('K', 'Kc').op(OP.SHA256, 1, 'kh').pushBytes(K_HASH[i]).op(OP.EQUALVERIFY, 2);
-    // delta start: (x_j, y_j), resumed as (x, c, l) = (x_j, y_j, 0)
-    a.roll('K').push(192).op(OP.SPLIT, 2, 'ks', 'D').roll('ks');
-    for (const n of ['dx0', 'dx1', 'dc0', 'dc1']) { a.push(48).op(OP.SPLIT, 2, 'w', 'ks').roll('w'); U(a, n); a.roll('ks'); }
-    a.drop('ks').push(0, 'dl0').push(0, 'dl1');
+    // delta start: (x_j, y_j), resumed as (x, c, l) = (x_j, y_j, 0); input 0 starts at delta itself (x from SETUP, y baked)
+    if (i === 0) { a.rename('K', 'D').push(0, 'dx0').push(0, 'dx1').push(VKC.deltaAff.y.c0, 'dc0').push(VKC.deltaAff.y.c1, 'dc1'); }
+    else {
+      a.roll('K').push(192).op(OP.SPLIT, 2, 'ks', 'D').roll('ks');
+      for (const n of ['dx0', 'dx1', 'dc0', 'dc1']) { a.push(48).op(OP.SPLIT, 2, 'w', 'ks').roll('w'); U(a, n); a.roll('ks'); }
+      a.drop('ks');
+    }
+    a.push(0, 'dl0').push(0, 'dl1');
     sect('pin+K');
     if (i === 0) {
       head(a, U, lookup);
+      a.push(0, 'Rp');
       a.pushBytes(Buffer.from([...FLAGS.slice(ro.e0 + 1, ro.e1 + 1), 0].map((x) => x | 16)), 'SCH').push(FLAGS[ro.e0] | 16, 'f');
       a.arrangeAll(FRAME); assert.equal(a.alt.length, 0);
       a.invoke('SETUP');
+      a.drop('dx0').drop('dx1').pick('xd0', 'dx0').pick('xd1', 'dx1'); // input 0's delta walk starts at delta
       sect('setup');
       // initial value: F+ = S_c(-z) Rc'(z) TP0[N0[0]] TP1[N1[0]], F- = S_c(z) Rc'(-z) TM0[..] TM1[..]
       for (let j = 0; j < 6; j++) a.push(VKC.Rconst[j]); for (const n of ZP) a.pick(n); a.invoke('EV', ['rcp', 'rcm']);
@@ -312,7 +329,7 @@ function gen(L0guess, BLOB_LENS) {
       sect('loop');
     } else {
       // role parameters, then the shared worker body: reads, setup, start, the event loop
-      const h = i - 1, ph = ROLES[h]; const oS = offsetOf(h, 'G') + (h === 0 ? STMT_SIZE : 0) + 288 * (ph.states.length - 1), oT = offsetOf(h, 'CL') + 48;
+      const h = i - 1, ph = ROLES[h]; const oS = offsetOf(h, 'G') + (h === 0 ? STMT_SIZE : 0) + 288 * (ph.states.length - 1), oT = offsetOf(h, 'CL');
       assert.ok(oT > oS + 288);
       a.push(ro.e0 + 1, 'pE0').push(ro.e1 - ro.e0 + 1, 'pNE').push(h, 'pH').push(oS, 'pOS').push(oT - oS - 288, 'pOT').push(288 * ro.states.length, 'pNS');
       a.pushBytes(Buffer.from([...FLAGS.slice(ro.e0 + 1, ro.e1 + 1), 0].map((x) => x | 16)), 'SCH').push(FLAGS[ro.e0] | 16, 'f');
@@ -341,8 +358,9 @@ function gen(L0guess, BLOB_LENS) {
     // siblings: region G_i and the partial-sum claim R~_i, at their pinned offsets
     for (let h = 1; h < NIN; h++) {
       const oG = offsetOf(h, 'G'), oC = offsetOf(h, 'CL'), gs = ROLES[h].regionSize;
-      a.push(h).op(OP.INPUTBYTECODE, 1, 'u').push(oG).op(OP.SPLIT, 2, 'x', 'u').drop('x').push(gs).op(OP.SPLIT, 2, 'g', 'u')
-        .push(oC - oG - gs).op(OP.SPLIT, 2, 'x', 'u').drop('x').push(48).op(OP.SPLIT, 2, 'Rw' + h, 'x').drop('x');
+      a.push(h).op(OP.INPUTBYTECODE, 1, 'u').push(oG).op(OP.SPLIT, 2, 'x', 'u').drop('x').push(gs).op(OP.SPLIT, 2, 'g', 'u');
+      if (h === NIN - 1) a.push(oC - oG - gs).op(OP.SPLIT, 2, 'x', 'u').drop('x').push(48).op(OP.SPLIT, 2, 'Rw', 'x').drop('x'); // R~_3: the full batched sum
+      else a.drop('u');
       a.roll('g').op(OP.SHA256, 1, 'H' + h);
     }
     a.pick('G', 'gc').op(OP.SHA256, 1, 'H0');
@@ -357,13 +375,14 @@ function gen(L0guess, BLOB_LENS) {
     sect('transcript');
     // statement: coordinates, n_k < r, nibbles (each <= 0x0f), s^c; then states | slopes of input 0
     a.roll('G').push(STMT_SIZE).op(OP.SPLIT, 2, 'u', 'Gr');
-    a.roll('u'); for (const n of ['xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC']) a.invoke('RD', [n, 'u']);
+    a.roll('u'); rdk(a, ['xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC'], 'u');
     a.push(r, 'r');
     for (const n of ['n0', 'n1']) { a.roll('u').push(32).op(OP.SPLIT, 2, 'w', 'u').roll('w'); U(a, n); a.pick(n).pick('r').op(OP.LESSTHAN, 2, 'ok').op(OP.VERIFY, 1); }
     a.drop('r');
     a.roll('u').push(128).op(OP.SPLIT, 2, 'NB', 'u').roll('NB').pick('NB', 'NBc');
-    a.pushBytes(Buffer.alloc(128, 0x0f), 'mk').op(OP.AND, 2, 'NBm').pick('NB', 'NBc2').op(OP.EQUALVERIFY, 2);
-    a.roll('u'); for (let j = 0; j < 6; j++) a.invoke('RD', ['sc' + j, 'u']);
+    a.pushBytes(Buffer.alloc(8, 0x0f), 'mk'); for (let i = 0; i < 4; i++) a.op(OP.DUP, 1, 'mk', 'mk2').op(OP.CAT, 2, 'mk'); // 128 x 0x0f
+    a.op(OP.AND, 2, 'NBm').pick('NB', 'NBc2').op(OP.EQUALVERIFY, 2);
+    a.roll('u'); rdk(a, ['sc0', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5'], 'u');
     a.op(OP.SIZE, 1, 'u', 'n').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1).drop('u');
     a.roll('Gr').push(288 * ro.states.length).op(OP.SPLIT, 2, 'ST', 'SL');
     // curve checks: A, C on y^2 = x^3 + 4; B on y^2 = x^3 + 4(1 + u) (reduced residues)
@@ -375,7 +394,8 @@ function gen(L0guess, BLOB_LENS) {
       a.kernel(k, ['tw0', 'tw1'], {iters: 300}); a.op(OP.NOT, 1, 'ok1').op(OP.VERIFY, 1).op(OP.NOT, 1, 'ok0').op(OP.VERIFY, 1); }
     sect('statement');
     // GT-GLS binding over the integers: acc_k = sum_g 2^(63-g) TB[N_k[g]] == n_k, TB[m] = sum_{i in m} |x|^i
-    a.push(1, 'T0').push(AX, 'T1').push(AX * AX, 'T2').push(AX * AX * AX, 'T3').invoke('TA', Array.from({length: 16}, (_, n) => `TB_${15 - n}`));
+    a.push(1, 'T0').push(AX, 'T1').op(OP.DUP, 1, 'T1', 'T1c').op(OP.DUP, 1, 'T1c', 'T1d').op(OP.MUL, 2, 'T2').op(OP.DUP, 1, 'T2', 'T2c').pick('T1', 'T1e').op(OP.MUL, 2, 'T3')
+      .invoke('TA', Array.from({length: 16}, (_, n) => `TB_${15 - n}`));
     a.pick('NB', 'Nb').push(64).op(OP.SPLIT, 2, 'Na', 'Nb').push(0, 'acc0').push(0, 'acc1');
     a.loop((s) => {
       for (const [N, acc] of [['Nb', 'acc1'], ['Na', 'acc0']]) {
@@ -397,20 +417,17 @@ function gen(L0guess, BLOB_LENS) {
     a.push(0, 'acc');
     a.loop((s) => {
       s.roll('WQ').push(192).op(OP.SPLIT, 2, 'Q4', 'WQ').roll('Q4');
-      for (let j = 0; j < 4; j++) s.invoke('RD', ['q' + j, 'Q4']);
+      rdk(s, ['q0', 'q1', 'q2', 'q3'], 'Q4');
       s.drop('Q4');
       const k = new Kernel(); const I = (n) => k.in(n), E = (n) => k.env(n);
       k.output(k.mod(k.sum(k.mul(I('acc'), E('hz8')), k.mul(I('q0'), E('hz6')), k.mul(I('q1'), E('hz4')), k.mul(I('q2'), E('hz2')), I('q3')))); s.kernel(k, ['acc'], {iters: 300});
       s.roll('WQ').emit(OP.SIZE); s.st.push('qs'); s.op(OP.NOT, 1, 'done');
     });
     a.drop('WQ');
-    // final identity: sum_i rho^(K - c1_i) R~_i == z q(z^2) M(z) (mod p); R~_0 from this input's own claim
-    a.pick('CL', 'c0').push(48).op(OP.SPLIT, 2, 'Rw0', 'x').drop('x');
-    for (let h = 0; h < NIN; h++) { a.roll('Rw' + h); a.invoke('RD', ['Rt' + h, 'e']); a.op(OP.SIZE, 1, 'e', 'n').op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1).drop('e'); }
-    { const k = new Kernel(); const rho = k.env('rho'); const m = (x) => k.mod(x); const pw = new Map([[1, rho]]);
-      const pow = (n) => { if (pw.has(n)) return pw.get(n); const h = Math.floor(n / 2); const v = m(k.mul(pow(h), pow(n - h))); pw.set(n, v); return v; };
-      let lhs = k.in('Rt0'); for (let h = 1; h < NIN; h++) lhs = k.add(m(k.mul(lhs, pow(ROLES[h].c1 - ROLES[h - 1].c1))), k.in('Rt' + h));
-      k.output(m(k.sub(lhs, k.mul(m(k.mul(k.env('z'), k.in('acc'))), k.in('Mz'))))); a.kernel(k, ['fin'], {iters: 300}); }
+    // final identity: R~_3 (the chained partial sums of all 33 identities) == z q(z^2) M(z) (mod p)
+    a.roll('Rw'); a.invoke('RD', ['Rt', 'e']); a.op(OP.SIZE, 1, 'e', 'n').op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1).drop('e');
+    { const k = new Kernel(); const m = (x) => k.mod(x);
+      k.output(m(k.sub(k.in('Rt'), k.mul(m(k.mul(k.env('z'), k.in('acc'))), k.in('Mz'))))); a.kernel(k, ['fin'], {iters: 300}); }
     a.op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1);
     for (const n of ['hz2', 'hz4', 'hz6', 'hz8', 'p']) a.drop(n);
     sect('quotient+final');

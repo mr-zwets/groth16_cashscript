@@ -8,7 +8,8 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {FIXTURES, G1, G2, F2, f2, p, r, mod, randomTwistPoint, synthetic} from './math.mjs';
-import {prove, finishWitness, txPushes, pushesOf, ROLES, STMT, N_MIN, NQ_MAX, W, W48, rdle, leN, K_BLOCKS} from './protocol.mjs';
+import {prove, finishWitness, txPushes, pushesOf, ROLES, STMT, N_MIN, NQ_MAX, W, W48, rdle, leN, K_BLOCKS, PLACE} from './protocol.mjs';
+const PLACE_K = () => PLACE.K;
 import {R, blob, locking, LABELS, encodeWith} from './transaction.mjs';
 import {VMS, txOf, encodeUnlocking} from './vm.mjs';
 assert.equal(process.argv.length, 4, 'usage: node redteam.mjs redteam.json redteam-report.json');
@@ -70,15 +71,21 @@ run('input 1: region one byte longer', 'layout', (c) => { c.ps[1][0] = Buffer.co
 run('input 3: an extra push before the witness', 'layout', (c) => { c.ps[3] = [Buffer.from([1, 2, 3]), ...c.ps[3]]; }, {owner: 3});
 run('input 2: a non-push opcode in the unlocking', 'layout', (c) => { c.raw[2] = Buffer.concat([Buffer.of(0x61), Buffer.from(encodeWith(c.ps[2], R))]); });
 run('input 0: claims push one byte short', 'layout', (c) => { c.ps[0][idx(0, 'CL')] = c.ps[0][idx(0, 'CL')].subarray(1); }, {owner: 0});
-run('relocated constant pieces swapped in input 1 (K0_1 <-> K1_0)', 'layout', (c) => { const a = idx(1, 'K0_1'), b = idx(1, 'K1_0'); [c.ps[1][a], c.ps[1][b]] = [c.ps[1][b], c.ps[1][a]]; });
-run('relocated constant piece resized (48 B moved from K3_1 to K1_0 in input 1)', 'layout', (c) => { const a = idx(1, 'K1_0'), b = idx(1, 'K3_1'); c.ps[1][a] = Buffer.concat([c.ps[1][a], c.ps[1][b].subarray(0, 48)]); c.ps[1][b] = c.ps[1][b].subarray(48); });
-run('filler push not zero (input 2)', 'layout', (c) => { const k = idx(2, 'PAD'); c.ps[2][k] = Buffer.from(c.ps[2][k]); c.ps[2][k][5] = 1; }, {owner: 2});
+// layout-dependent cases are derived from the role table (pushesOf): relocated constant pieces, program parts, fillers
+const pushTable = [0, 1, 2, 3].flatMap((h) => pushesOf(h).map((x, k) => ({h, k, ...x})));
+const kPieces = pushTable.filter((x) => x.role !== undefined), relocated = kPieces.filter((x) => x.role !== x.h);
+{ const h2 = [0, 1, 2, 3].find((h) => kPieces.filter((x) => x.h === h).length >= 2);
+  if (h2 !== undefined) { const [x, y] = kPieces.filter((q) => q.h === h2); run(`constant pieces swapped in input ${h2} (${x.name} <-> ${y.name})`, 'layout', (c) => { [c.ps[h2][x.k], c.ps[h2][y.k]] = [c.ps[h2][y.k], c.ps[h2][x.k]]; }); }
+  const blk = PLACE_K().findIndex((pcs) => pcs.length >= 2);
+  if (blk >= 0) { const [a, b] = kPieces.filter((q) => q.role === blk); run(`relocated constant piece resized (48 B of ${b.name} moved into ${a.name})`, 'layout', (c) => { c.ps[a.h][a.k] = Buffer.concat([c.ps[a.h][a.k], c.ps[b.h][b.k].subarray(0, 48)]); c.ps[b.h][b.k] = c.ps[b.h][b.k].subarray(48); }, {owner: blk}); } }
+for (const x of pushTable.filter((q) => q.name === 'PAD').slice(0, 1)) run(`filler push not zero (input ${x.h})`, 'layout', (c) => { c.ps[x.h][x.k] = Buffer.from(c.ps[x.h][x.k]); c.ps[x.h][x.k][x.size >> 1] = 1; }, {owner: x.h});
 // ---- program and constants ----
-run('program part 0 (input 3) tampered', 'program', (c) => { const k = idx(3, 'BLOB'); c.ps[3][k] = Buffer.from(c.ps[3][k]); flip(c.ps[3][k], 100); });
-run('program part 1 (input 2) tampered', 'program', (c) => { const k = idx(2, 'BLOB'); c.ps[2][k] = Buffer.from(c.ps[2][k]); flip(c.ps[2][k], 10); });
-run('delta constant block K2 tampered (wrong K_const)', 'constants', (c) => { const k = idx(2, 'K2_0'); flip(c.ps[2][k], 500); }, {owner: 2});
-run('delta constant piece K0_1 (hosted in input 1) tampered', 'constants', (c) => { const k = idx(1, 'K0_1'); flip(c.ps[1][k], 7); }, {owner: 0});
-run('delta start point of K3 replaced by K2\'s', 'constants', (c) => { const k = idx(3, 'K3_0'); c.ps[3][k] = Buffer.from(K_BLOCKS[2].subarray(0, c.ps[3][k].length)); }, {owner: 3});
+for (const x of pushTable.filter((q) => q.name === 'BLOB')) run(`program part ${x.part} (input ${x.h}) tampered`, 'program', (c) => { c.ps[x.h][x.k] = Buffer.from(c.ps[x.h][x.k]); flip(c.ps[x.h][x.k], 100); });
+{ const x = kPieces.find((q) => q.role === 2 && q.h === 2) ?? kPieces.find((q) => q.role === 2);
+  run(`delta constant block K2 tampered (wrong K_const, push ${x.name} in input ${x.h})`, 'constants', (c) => { flip(c.ps[x.h][x.k], Math.min(500, x.size - 1)); }, {owner: 2}); }
+for (const x of relocated.slice(0, 2)) run(`delta constant piece ${x.name} (hosted in input ${x.h}) tampered`, 'constants', (c) => { flip(c.ps[x.h][x.k], 7); }, {owner: x.role});
+{ const x = kPieces.find((q) => q.role === 3 && q.piece === 0);
+  run('delta start point of K3 replaced by K2\'s', 'constants', (c) => { c.ps[x.h][x.k] = Buffer.from(K_BLOCKS[2].subarray(0, x.size)); }, {owner: 3}); }
 // ---- transcript: committed bytes changed after the challenges (claims no longer match) ----
 run('statement x_A changed', 'transcript', (c) => { flip(c.ps[0][idx(0, 'G')], STMT.xA + 3); }, {owner: 0});
 run('state word changed (region 2)', 'transcript', (c) => { flip(c.ps[2][0], oS(2) + 100); }, {owner: 0});

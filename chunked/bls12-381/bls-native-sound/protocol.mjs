@@ -58,7 +58,7 @@ export const ROLES = Array.from({length: NIN}, (_, i) => {
   return {i, c0, c1, e0, e1, events, states, nslopes, dstep0, last: i === NIN - 1,
     regionSize: (i === 0 ? STMT_SIZE : 0) + 288 * states.length + 96 * nslopes,
     claimSize: i === NIN - 1 ? W : W + 4 * W,
-    kSize: 192 + 96 * nslopes};                                // delta block: start point (x, y) + one slope per step
+    kSize: (i === 0 ? 0 : 192) + 96 * nslopes};                // delta block: start point (x, y) (input 0: delta itself, in the program) + one slope per step
 });
 
 // ---------------- placement of the movable bytes (constant blocks, program blob) ----------------
@@ -119,7 +119,7 @@ export const DELTA = (() => {
 // the start point (x_j, y_j) of role i's first delta step (y_j = c_{j-1} - l_{j-1} x_j); the script resumes the recursion
 // with l_{j-1} := 0 and c_{j-1} := y_j, which gives the same c_j = l_j x_j - y_j
 export const kBlock = (i) => { const ro = ROLES[i]; const s = DELTA.states[ro.dstep0]; const y = F2.sub(s.c, F2.mul(s.l, s.x));
-  const b = Buffer.concat([...[s.x.c0, s.x.c1, y.c0, y.c1].map(W48), ...VKC.lams.slice(ro.dstep0, ro.dstep0 + ro.nslopes).flatMap((l) => [W48(l.c0), W48(l.c1)])]);
+  const b = Buffer.concat([...(i === 0 ? [] : [s.x.c0, s.x.c1, y.c0, y.c1].map(W48)), ...VKC.lams.slice(ro.dstep0, ro.dstep0 + ro.nslopes).flatMap((l) => [W48(l.c0), W48(l.c1)])]);
   assert.equal(b.length, ro.kSize); return b; };
 export const K_BLOCKS = ROLES.map((_, i) => kBlock(i));
 export const K_HASH = K_BLOCKS.map((b) => sha(b));
@@ -240,7 +240,8 @@ export function transcript(regions) {
 
 // ---------------- value-level split computation (the reference of each input's work) ----------------
 // For input i: F+- start at S_{c0}(+-z) (input 0: S_c(-+z) Rconst'(+-z) G_0(+-z)); per event the factors; at each
-// chunk end R <- R rho + F+ S(-z) - F- S(z); the last input closes against W = Frob(S_c). Claims: R_i, T_i (B point).
+// chunk end R <- R rho + F+ S(-z) - F- S(z); the last input closes against W = Frob(S_c). R continues across the inputs:
+// input i > 0 starts from the predecessor's claim R_{i-1}, so R_3 = sum_k rho^(K-1-k) D_k(z). Claims: R_i, T_i (B point).
 export function splitClaims(w, st, sched) {
   const {z, rho} = w; const zm = mod(-z); const mono = (s) => [...s.slice(0, 6), 1n];
   const scP = mono(w.Sc); const ev2 = (f, F) => [mod(F[0] * peval(f, z)), mod(F[1] * peval(f, zm))];
@@ -249,7 +250,7 @@ export function splitClaims(w, st, sched) {
     let F;
     if (ro.i === 0) { F = [peval(pneg(scP), z), peval(pneg(scP), zm)]; for (const f of sched.start) F = ev2(f, F); }
     else { const S = mono(w.states[ro.c0 - 1]); F = [peval(S, z), peval(S, zm)]; }
-    let R = 0n;
+    let R = ro.i === 0 ? 0n : Rs[ro.i - 1];
     for (const e of ro.events) {
       const ev = sched.events[e];
       F = [mod(F[0] * F[0]), mod(F[1] * F[1])]; for (const f of ev.fs) F = ev2(f, F); if (ev.c) F = ev2(pneg(scP), F);
@@ -259,10 +260,9 @@ export function splitClaims(w, st, sched) {
     if (ro.last) { const Wp = frob1Monic(w.Sc.slice(0, 6)); R = mod(R * rho + F[0] * peval(Wp, zm) - F[1] * peval(Wp, z)); }
     Rs.push(R); Ts.push(sched.pts[ro.e1]);
   }
-  // the head's final identity: sum_i rho^(K - c1_i) R_i == z q(z^2) M(z)
+  // the head's final identity: R_3 == z q(z^2) M(z)
   let acc = 0n; const z2 = mod(z * z); for (let i = 0; i < w.WQ.length; i += 48) acc = mod(acc * z2 + rdle(w.WQ, i));
-  const lhs = ROLES.reduce((s, ro, i) => mod(s + Rs[i] * mod(rho ** BigInt(K_IDS - ro.c1))), 0n);
-  const fin = mod(lhs - z * acc * peval(M, z));
+  const fin = mod(Rs[NIN - 1] - z * acc * peval(M, z));
   return {R: Rs, T: Ts, final: fin, bytes: ROLES.map((ro, i) => Buffer.concat([W48(Rs[i]), ...(ro.last ? [] : [Ts[i].x.c0, Ts[i].x.c1, Ts[i].y.c0, Ts[i].y.c1].map(W48))]))};
 }
 

@@ -1,5 +1,59 @@
 {
- "note": "chunk ownership and placement of the movable bytes; produced by layout.mjs (MARGIN=0.06) from measure.mjs data, then checked on the VM (check.mjs, sweep.mjs)",
- "cuts": [0, 5, 15, 25, 33],
- "place": {"blob": [3, 2], "blobLens": [4286], "K": [[[0, 653], [1, 499]], [[1, 2208]], [[2, 2208]], [[3, 48], [1, 1680]]], "fill": [29, 161, 271, 28]}
+ "note": "chunk ownership and placement of the movable bytes; layout.mjs (MARGIN=0.06) then tune.mjs (fillers fitted on the VM to the worst measured witnesses)",
+ "cuts": [
+  0,
+  5,
+  15,
+  25,
+  33
+ ],
+ "place": {
+  "blob": [
+   1,
+   2
+  ],
+  "blobLens": [
+   4229
+  ],
+  "K": [
+   [
+    [
+     0,
+     513
+    ],
+    [
+     3,
+     639
+    ]
+   ],
+   [
+    [
+     1,
+     171
+    ],
+    [
+     3,
+     2037
+    ]
+   ],
+   [
+    [
+     2,
+     2208
+    ]
+   ],
+   [
+    [
+     3,
+     1728
+    ]
+   ]
+  ],
+  "fill": [
+   8,
+   92,
+   19,
+   93
+  ]
+ }
 }

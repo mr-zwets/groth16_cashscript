@@ -13,10 +13,13 @@ const isAddE = (e) => [0, 2, 5, 14, 46].includes(e);
 // per-event worst op: dense witness for every event (from whichever input ran it), forced witness inside input 0
 const evDense = [], evForced = [];
 const WD = process.env.LAYOUT_WIT ?? 'dense', WF = process.env.LAYOUT_WIT ?? Object.keys(meas.wit).find((k) => k.startsWith('forced'));
-for (const x of meas.wit[WD].inputs) for (const v of x.events) evDense[v.e] = v.op;
+// per event: the maximum over the dense witness and every random witness measured (random statements, random B and C)
+const WR = process.env.LAYOUT_WIT ? [] : Object.keys(meas.wit).filter((k) => k.startsWith('random'));
+for (const k of [WD, ...WR]) for (const x of meas.wit[k].inputs) for (const v of x.events) evDense[v.e] = Math.max(evDense[v.e] ?? 0, v.op);
 for (const x of meas.wit[WF].inputs) for (const v of x.events) evForced[v.e] = v.op;
 const d = meas.wit[WD].inputs, f = meas.wit[WF];
-const PRE_W = Math.max(d[1].prefix, d[2].prefix, d[3].prefix), SUF_W = d[1].suffix, SUF_T = d[3].suffix, PRE_H = f.inputs[0].prefix, NQ_H = f.nq;
+const allW = [WD, ...WR].map((k) => meas.wit[k].inputs);
+const PRE_W = Math.max(...allW.flatMap((xs) => [xs[1].prefix, xs[2].prefix, xs[3].prefix])), SUF_W = Math.max(...allW.map((xs) => xs[1].suffix)), SUF_T = Math.max(...allW.map((xs) => xs[3].suffix)), PRE_H = f.inputs[0].prefix, NQ_H = f.nq;
 const roleOf = (cuts, i) => { const c0 = cuts[i], c1 = cuts[i + 1]; const e0 = CHUNK_START[c0], e1 = CHUNK_END[c1 - 1]; const events = []; for (let e = e0; e <= e1; e++) events.push(e);
   const ns = []; for (let k = c0; k < c1; k++) if (k < NSTATES) ns.push(k); const nsl = events.reduce((s, e) => s + 1 + (isAddE(e) ? 1 : 0), 0);
   return {e0, e1, events, G: (i === 0 ? STMT_SIZE : 0) + 288 * ns.length + 96 * nsl, K: 192 + 96 * nsl, CL: i === 3 ? W : 5 * W}; };

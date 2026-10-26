@@ -17,15 +17,20 @@ import {evalTx, verifyTx, txSize} from './vm.mjs';
 
 const N = Number(process.env.SWEEP_N ?? 40), seed = process.env.SWEEP_SEED ?? 'bls-native-sound-v1';
 const [shard, shards] = (process.env.SWEEP_SHARD ?? '0/1').split('/').map(Number);
-let ctr = 0; const rnd = () => BigInt('0x' + createHash('sha256').update(`${seed}:${ctr++}`).digest('hex')) % r;
-const cases = [];
-for (const n of FIXTURE_NAMES) cases.push({label: `fixture ${n}`, fx: FIXTURES[n]});
-const targets = [N_MIN, N_MIN + 1, N_MIN + 2, N_MIN + 3, N_MIN + 4, N_MIN + 6, N_MIN + 8, N_MIN + 10, N_MIN + 12, N_MIN + 16, N_MIN + 20];
-for (const c of forcedCases(targets)) cases.push({label: c.label, fx: mint(c.ns)});
-for (const [label, ns] of [['n = (0, 0)', [0n, 0n]], ['n = (1, 0)', [1n, 0n]], ['n = (r-1, r-1)', [r - 1n, r - 1n]], ['n = (r-1, 0)', [r - 1n, 0n]], ['n = (2^64, 2^128)', [1n << 64n, 1n << 128n]], ['n = (r/2, r/3)', [r / 2n, r / 3n]]])
-  cases.push({label, fx: mint(ns)});
-for (let i = 0; i < 6; i++) { const ns = [rnd(), rnd()]; cases.push({label: `random B and C #${i}`, fx: synthetic(ns, 1n + rnd() % (r - 1n), 1n + rnd() % (r - 1n))}); }
-for (let i = 0; i < N; i++) cases.push({label: `random proof #${i}`, fx: mint([rnd(), rnd()])});
+export function sweepCases() {
+  let ctr = 0; const rnd = () => BigInt('0x' + createHash('sha256').update(`${seed}:${ctr++}`).digest('hex')) % r;
+  const cases = [];
+  for (const n of FIXTURE_NAMES) cases.push({label: `fixture ${n}`, fx: FIXTURES[n]});
+  const targets = [N_MIN, N_MIN + 1, N_MIN + 2, N_MIN + 3, N_MIN + 4, N_MIN + 6, N_MIN + 8, N_MIN + 10, N_MIN + 12, N_MIN + 16, N_MIN + 20];
+  for (const c of forcedCases(targets)) cases.push({label: c.label, fx: mint(c.ns)});
+  for (const [label, ns] of [['n = (0, 0)', [0n, 0n]], ['n = (1, 0)', [1n, 0n]], ['n = (r-1, r-1)', [r - 1n, r - 1n]], ['n = (r-1, 0)', [r - 1n, 0n]], ['n = (2^64, 2^128)', [1n << 64n, 1n << 128n]], ['n = (r/2, r/3)', [r / 2n, r / 3n]]])
+    cases.push({label, fx: mint(ns)});
+  for (let i = 0; i < 6; i++) { const ns = [rnd(), rnd()]; cases.push({label: `random B and C #${i}`, fx: synthetic(ns, 1n + rnd() % (r - 1n), 1n + rnd() % (r - 1n))}); }
+  for (let i = 0; i < N; i++) cases.push({label: `random proof #${i}`, fx: mint([rnd(), rnd()])});
+  return cases;
+}
+if (import.meta.url === `file://${process.argv[1]}`) {
+const cases = sweepCases();
 const results = [];
 for (const [k, c] of cases.entries()) {
   if (k % shards !== shard) continue;
@@ -47,3 +52,4 @@ for (const mode of ['consensus', 'standard']) for (let i = 0; i < 4; i++) {
   console.log(`min ${mode} margin input ${i}: ${m[mode].marginPct[i].toFixed(2)}% (${m[mode].margin[i]} op of ${m[mode].budget[i]}) at ${m.label}`);
 }
 assert.equal(failed.length, 0, `failed: ${failed.map((x) => x.label).join(', ')}`);
+}
