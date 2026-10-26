@@ -23,6 +23,7 @@ import {
 } from '../bn254/recompiler/recompiler.mjs';
 import { outlineArtifact } from '../bn254/recompiler/outline.mjs';
 import { proof, PUBLIC_INPUTS } from './bls_instance.mjs';
+import { domainRejectCases } from './domain_cases.mjs';
 
 const MAIN_INARITY = 10; // spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1)
 const BLS_P = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787n;
@@ -88,6 +89,14 @@ for (const p of mpBase.proofs) {
   if (!evalFull(optimized, hexToBin(p.unlocking)).accepted) throw new Error('optimized contract failed a multiproof accept');
   if (evalFull(optimized, hexToBin(p.invalidUnlocking)).accepted) throw new Error('optimized contract failed a multiproof reject');
 }
+// out-of-domain proof points (range / curve / G2 subgroup, domain_cases.mjs): each must reject
+const domainInvalid = domainRejectCases().map(({ label, args }) => {
+  const u = unlockingFor(args);
+  const r = evalFull(optimized, u);
+  if (r.accepted) throw new Error(`optimized contract accepted out-of-domain case: ${label}`);
+  return { label, unlocking: binToHex(u) };
+});
+console.log(`domain cases ${domainInvalid.length}/${domainInvalid.length} rejected`);
 const st = realVm.evaluate(createTestAuthenticationProgramBch({ lockingBytecode: optimized, unlockingBytecode: unlocking, valueSatoshis: 1000n }));
 const top = st.stack[st.stack.length - 1];
 const realAccepted = st.error === undefined && st.stack.length === 1 && top?.length === 1 && top[0] === 1;
@@ -112,6 +121,7 @@ const main = {
   inputsNeeded: Math.ceil(opCost / STANDARD_BUDGET),
   looseAccept: looseAccept.accepted,
   rejectInvalid: !looseReject.accepted,
+  domainInvalid,
 };
 writeFileSync(VDIR + 'groth16-bls12381-singleton-opcode-optimized-vectors.json', JSON.stringify(main, null, 2));
 

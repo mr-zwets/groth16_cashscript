@@ -3,6 +3,7 @@ pragma cashscript ^0.14.0;
 // BLS12-381 singleton harness `groth16` — arithmetic from the shared lib/ libraries (see lib/README.md).
 import "./lib/Miller.cash";
 import "./lib/FinalExp.cash";
+import "./lib/G2Check.cash";
 
 function jacDoubleG1(int x, int y, int z) returns (int, int, int) {
     int a = sqrFp(x); int b = sqrFp(y); int c = sqrFp(b);
@@ -78,11 +79,14 @@ function computeVkx(int in0, int in1) returns (int, int) {
     return mulFp(vx, zInv2), mulFp(vy, zInv3);
 }
 
-// (psi(B).x, -psi(B).y) for the G2 subgroup check in spend(); see the comment there.
-function psiNegY(int xa, int xb, int ya, int yb) returns (int, int, int, int) {
-    int c = 4002409555221667392624310435006688643935503118305586438271171395842971157480381377015405980053539358417135540939437;
-    int a = 2973677408986561043442465346520108879172042883009249989176415018091420807192182638567116318576472649347015917690530;
-    return mulFp(c, xb), mulFp(c, xa), mulFp(a, subFp(yb, ya)), mulFp(a, addFp(ya, yb));
+// A proof G1 point (A or C) must be canonical, 0 <= x, y < p, and on E(Fp): y^2 = x^3 + 4. The
+// affine encoding has no point at infinity and (0,0) is off-curve, so O is rejected. No G1
+// subgroup check: A and C are paired only with order-r G2 points (B is subgroup-checked in
+// spend(), gamma and delta are fixed), so a G1 cofactor component pairs to 1 (the same argument
+// as groth16_minop.cash; see psi-subgroup-degeneracy.md).
+function g1Check(int x, int y) {
+    require(within(x, 0, P)); require(within(y, 0, P));
+    require(sqrFp(y) == addFp(mulFp(sqrFp(x), x), 4));
 }
 
 contract Groth16Verify() {
@@ -99,16 +103,11 @@ contract Groth16Verify() {
         // ---- proof-point domain checks ----
         // Coordinates must be canonical field elements, 0 <= v < p: the field ops reduce mod p,
         // so without this v and v + p would be the same point under two encodings.
-        require(within(Ax, 0, P)); require(within(Ay, 0, P));
+        // A and C: range + curve equation in g1Check.
         require(within(Bxa, 0, P)); require(within(Bxb, 0, P));
         require(within(Bya, 0, P)); require(within(Byb, 0, P));
-        require(within(Cx, 0, P)); require(within(Cy, 0, P));
-        // A, C on E(Fp): y^2 = x^3 + 4. The affine encoding has no point at infinity, and (0,0) is
-        // off-curve, so A = O and C = O are rejected here. No G1 subgroup check: A and C are
-        // paired only with order-r G2 points (B is checked below, gamma/delta are fixed), so a
-        // G1 cofactor component pairs to 1 (as in groth16_minop.cash).
-        require(sqrFp(Ay) == addFp(mulFp(sqrFp(Ax), Ax), 4));
-        require(sqrFp(Cy) == addFp(mulFp(sqrFp(Cx), Cx), 4));
+        g1Check(Ax, Ay);
+        g1Check(Cx, Cy);
         // B on the M-twist E'(Fp2): y^2 = x^3 + 4(1+u). B = O has no encoding and (0,0) is off-curve.
         (int bx2a, int bx2b) = fp2Sqr(Bxa, Bxb);
         (int bx3a, int bx3b) = fp2Mul(bx2a, bx2b, Bxa, Bxb);
@@ -133,22 +132,20 @@ contract Groth16Verify() {
          int Rxa,int Rxb,int Rya,int Ryb,int Rza,int Rzb) =
             millerSingleR(Bxa,Bxb,Bya,Byb, Ax, nAy);
         // ---- G2 subgroup check on B, fused into its Miller walk ----
-        // The walk ends at R = (X:Y:Z) = [|x|]B unless some step was exceptional (R = +-B in
-        // pointAdd, R of order 2 in pointDouble), which leaves Z = 0, and Z = 0 is absorbing; an
-        // order-13 B, for one, collapses at the NAF prefix 13. Require Z != 0 (Rza, Rzb are
-        // canonical, so the sum is 0 only when both are), then check psi(B) == [-x]B = -[|x|]B
-        // projectively: X == psi(B).x * Z and Y == -psi(B).y * Z. psi(B) == [x]B holds exactly
-        // for B in G2 (x the BLS12-381 seed; see psi-subgroup-degeneracy.md).
-        // psi is lib/G2Check.cash's g2psi, psi(x,y) = (PSI_X*conj(x), PSI_Y*conj(y)), expanded:
-        // PSI_X = c*u and PSI_Y = a*(1-u) (its second limb is p - a), so
-        //   psi(B).x  = (c*Bxb, c*Bxa)
-        //   -psi(B).y = (a*(Byb - Bya), a*(Bya + Byb)).
+        // The walk ends at R = (X:Y:Z) = [|x|]B unless some step was exceptional, which leaves
+        // Z = 0 (absorbing); e.g. an order-13 B collapses at the NAF prefix 13. Require Z != 0
+        // (Rza, Rzb are canonical, so their sum is 0 only when both are), then check
+        // psi(B) == [-x]B = -[|x|]B projectively: X == psi(B).x * Z and Y == -psi(B).y * Z.
+        // psi(B) == [x]B holds exactly for B in G2 (x the BLS12-381 seed; see
+        // psi-subgroup-degeneracy.md). g2psi is lib/G2Check.cash's psi endomorphism.
         require(Rza + Rzb != 0);
-        (int pxa,int pxb,int nya,int nyb) = psiNegY(Bxa, Bxb, Bya, Byb);
-        (int gxa,int gxb) = fp2Mul(pxa, pxb, Rza, Rzb);
+        (int psxa,int psxb,int psya,int psyb) = g2psi(Bxa, Bxb, Bya, Byb);
+        (int gxa,int gxb) = fp2Mul(psxa, psxb, Rza, Rzb);
         require(Rxa == gxa); require(Rxb == gxb);
-        (int gya,int gyb) = fp2Mul(nya, nyb, Rza, Rzb);
-        require(Rya == gya); require(Ryb == gyb);
+        (int gya,int gyb) = fp2Mul(psya, psyb, Rza, Rzb);
+        require(addFp(Rya, gya) == 0); require(addFp(Ryb, gyb) == 0);
+        // The fixed pairs reuse millerSingleR (one Miller body in the bytecode) and drop its R
+        // outputs; cashc warns about the unused bR*/cR*/dR* variables.
         (int b0,int b1,int b2,int b3,int b4,int b5,int b6,int b7,int b8,int b9,int b10,int b11, int bR0,int bR1,int bR2,int bR3,int bR4,int bR5) =
             millerSingleR(betaXa,betaXb,betaYa,betaYb, alphaX, alphaY);
         (int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11, int cR0,int cR1,int cR2,int cR3,int cR4,int cR5) =
