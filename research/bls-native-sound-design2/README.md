@@ -427,6 +427,16 @@ Read from `chunked/bls12-381/README.md` and the bench entry's header only.
 - **Coordination with bls-si-gls-spec.** This design is the same BLS SI-GLS math. `blsmath.mjs` and `protocol.mjs`
   (identity chain checked against noble) can serve both tracks. The bch-spec single input is the same computation
   without the split, at about 10,000 + op/800 bytes.
+- **Cross-check with the bls-si-gls-spec track** (`work/bls-si-gls-spec`, M1 prototype): it makes the same
+  choices: λ = p + |x|, the base-|x| GT-GLS with an exact binding, ψ(B) = [x]B, and the same synthetic VK.
+  - Its single-input bch-spec build measures 26.23M op standard. The same computation here is
+    23.45M (loop) + about 1.3M (setup) + about 1.7M (terminal) ≈ 26.4M, an independent check of the cost basis.
+  - That track folds Rconst into the loop's initial value; adopting it saves the terminal's Rconst evaluation
+    (about 30k).
+  - **Build rule from that track:** skipped IF branches still cost 100 op per instruction. Role dispatch must
+    therefore be `OP_INPUTINDEX <base> OP_ADD OP_INVOKE` over role functions, never an IF ladder: an IF ladder
+    over a 7 kB blob would charge each input for the other roles' code. The addition branch of the event loop must
+    likewise be a function invocation. The measured prototypes here are straight-line and contain no IF.
 - **Build plan:**
   1. Assemble the all-roles blob with the sound-si-gls assembler (loop with a fixed-point layout, bound kernel
      functions, hierarchical blob splits).
