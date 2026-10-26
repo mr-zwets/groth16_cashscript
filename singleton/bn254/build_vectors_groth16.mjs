@@ -14,6 +14,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compileFile } from 'cashc';
+import { rangeRejectCases } from './range_cases.mjs';
 
 import {
   hexToBin, binToHex, bigIntToVmNumber, encodeDataPush,
@@ -69,6 +70,10 @@ const looseAccept = evalPair(looseVm, template, unlocking);
 const looseRejectInvalid = evalPair(looseVm, template, invalidUnlocking);
 const realAccept = evalPair(realVm, template, unlocking);
 const opCost = looseAccept.operationCost;
+// non-canonical proof coordinates (v + P / v - P, same point mod P): must be rejected
+const rangeInvalid = rangeRejectCases(BENCH).map((c) => ({ label: c.label, unlocking: binToHex(unlockingFor(c.args)) }));
+const rangeAccepted = rangeInvalid.filter((c) => evalPair(looseVm, template, hexToBin(c.unlocking)).accepted);
+if (rangeAccepted.length) throw new Error(`accepted non-canonical coordinates: ${rangeAccepted.map((c) => c.label).join(', ')}`);
 
 console.log('=== Groth16Verify singleton (full verifier: vk_x on-chain + pairing, single-tx) ===');
 console.log(`locking ${template.length}B  unlocking ${unlocking.length}B`);
@@ -76,6 +81,7 @@ console.log(`loosened: ACCEPT valid = ${looseAccept.accepted}  (op-cost ${opCost
 console.log(`loosened: REJECT invalid = ${!looseRejectInvalid.accepted}`);
 console.log(`real BCH 2026: accepted = ${realAccept.accepted}  err = ${realAccept.error ?? '(none)'}`);
 console.log(`inputsNeeded = ${Math.ceil(opCost / STANDARD_BUDGET)}`);
+console.log(`loosened: REJECT non-canonical coordinates = ${rangeInvalid.length}/${rangeInvalid.length}`);
 
 const out = {
   contract: 'Groth16Verify (singleton/pairing/groth16.cash)',
@@ -91,6 +97,8 @@ const out = {
   inputsNeeded: Math.ceil(opCost / STANDARD_BUDGET),
   looseAccept: looseAccept.accepted,
   rejectInvalid: !looseRejectInvalid.accepted,
+  // valid proofs with one coordinate replaced by v + P or v - P; each must be REJECTED (range_cases.mjs)
+  rangeInvalid,
 };
 writeFileSync(join(BENCH, 'src/bch/groth16-singleton-vectors.json'), JSON.stringify(out, null, 2));
 console.log('wrote src/bch/groth16-singleton-vectors.json');

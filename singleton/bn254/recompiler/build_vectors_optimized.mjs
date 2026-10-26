@@ -74,6 +74,13 @@ const looseReject = evalFull(optimized, hexToBin(base.invalidUnlocking));
 const realAccept = evalReal(base.unlocking);
 const opCost = looseAccept.operationCost;
 if (!looseAccept.accepted || looseReject.accepted) throw new Error('optimized contract failed the accept/reject check');
+// non-canonical proof coordinates (shipped by build_vectors_groth16.mjs): the range-check
+// requires live in the main routine, which is validated only end-to-end, so check them here
+const rangeInvalid = base.rangeInvalid ?? [];
+if (!rangeInvalid.length) throw new Error('groth16-singleton-vectors.json has no rangeInvalid cases; rebuild it first');
+for (const c of rangeInvalid) {
+  if (evalFull(optimized, hexToBin(c.unlocking)).accepted) throw new Error(`optimized contract accepted non-canonical ${c.label}`);
+}
 
 const main = {
   contract: 'Groth16Verify (opcode-optimized recompile of singleton/bn254/groth16.cash)',
@@ -92,6 +99,7 @@ const main = {
   inputsNeeded: Math.ceil(opCost / STANDARD_BUDGET),
   looseAccept: looseAccept.accepted,
   rejectInvalid: !looseReject.accepted,
+  rangeInvalid,
 };
 writeFileSync(VDIR + 'groth16-singleton-opcode-optimized-vectors.json', JSON.stringify(main, null, 2));
 
@@ -122,4 +130,5 @@ console.log(`\nlooseAccept ${looseAccept.accepted}  rejectInvalid ${!looseReject
 console.log(`realAccepted ${realAccept.accepted}  realError ${realAccept.error ?? '(none)'}`);
 console.log(`multiproof ${mpBase.proofs.length}/${mpBase.proofs.length} accept+reject OK`);
 console.log(`zero-input proofs ${zeroChecked} accept+reject OK`);
+console.log(`non-canonical coordinates ${rangeInvalid.length}/${rangeInvalid.length} rejected`);
 console.log('wrote groth16-singleton-opcode-optimized-vectors.json + -multiproof-vectors.json');
