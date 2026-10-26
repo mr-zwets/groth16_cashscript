@@ -253,7 +253,11 @@ function buildSpecs(inst) {
     // G2-final inBlob = R(6) || -A/B/C(8); Miller genesis starts with the same proof tuple.
     { targetSpecIndex: millerGenesisIndex, sourceOffset: 6 * W, targetOffset: 0, length: 8 * W },
   ];
-  return [...g2, ...vkx, ...miller];
+  // Every linked state blob is a complete physical frame. Cross-group NFT
+  // hashes and same-group readers must cover exactly the bytes parsed here.
+  const specs = [...g2, ...vkx, ...miller];
+  specs.forEach((spec) => { spec.enforceExactInputLength = true; });
+  return specs;
 }
 
 // ---- grouping: partition the ordered chunk list into transactions -------------------
@@ -267,6 +271,9 @@ function groupedCfg(specs, i, lo, hi, groupIdx, G) {
   const isFirst = i === lo, isLast = i === hi;
   const covInHash = isFirst && groupIdx > 0;
   const epilogueMode = isLast && groupIdx < G - 1 ? 'covout' : undefined;
+  // Cross-group hashes and same-group fixed-offset readers must authenticate
+  // the complete physical frame, not merely the parsed prefix.
+  const enforceExactInputLength = specs[i].enforceExactInputLength !== false;
   let forward = null;
   if (!epilogueMode && specs[i].role !== 'terminal') {
     if (specs[i].role === 'within') { const outLen = byteLengthOf(specs[i], 'out'); forward = { cmpExpr: null, nextFullInLen: outLen, skip: 0, cmpLen: outLen }; }
@@ -286,7 +293,7 @@ function groupedCfg(specs, i, lo, hi, groupIdx, G) {
       length: binding.length,
     };
   });
-  return { covInHash, epilogueMode, forward, externalBindings };
+  return { covInHash, epilogueMode, forward, externalBindings, enforceExactInputLength };
 }
 
 const RESCHED = process.env.RESCHEDULE !== 'off';
@@ -301,6 +308,7 @@ const cfgKey = (spec, cfg) => [
   cfg.covInHash ? 'ci' : '',
   cfg.epilogueMode ?? '',
   cfg.nextLockingHash ?? '',
+  cfg.enforceExactInputLength ? 'exact' : 'prefix',
   JSON.stringify(cfg.forward),
   JSON.stringify(cfg.externalBindings),
 ].join('|');
@@ -316,6 +324,7 @@ function compileChunk(spec, cfg) {
       covInHash: cfg.covInHash,
       epilogueMode: cfg.epilogueMode,
       nextLockingHash: cfg.nextLockingHash,
+      enforceExactInputLength: cfg.enforceExactInputLength,
       externalBindings: cfg.externalBindings,
     });
     let resched, raw;
