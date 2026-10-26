@@ -43,6 +43,10 @@ export class Asm {
     this.piles = new Map(); // pile item name -> physical item count (null: varies, items below are unreachable)
   }
   mark(name) { this.marks.push({name, off: this.code.length}); return this; }
+  // SWAP with a peephole: a SWAP opcode right after another SWAP opcode (nothing emitted in between, no mark between
+  // them) cancels it instead (SWAP SWAP is the identity). swapEnd = code length just after the last SWAP opcode.
+  swapCancels() { return this.swapEnd === this.code.length && !this.marks.some((m) => m.off === this.code.length); }
+  swap() { if (this.swapCancels()) { this.code.pop(); this.swapEnd = -1; } else { this.emit(OP.SWAP); this.swapEnd = this.code.length; } return this; }
   absorb(sub, base) { for (const m of sub.marks) this.marks.push({name: m.name, off: base + m.off}); }
   fresh(b = 't') { return `${b}#${uid++}`; }
   emit(...b) { for (const x of b) { assert.ok(Number.isInteger(x) && x >= 0 && x < 256, 'byte ' + x); this.code.push(x); } return this; }
@@ -56,7 +60,7 @@ export class Asm {
   // ---- piles (a run of physical items represented by one symbolic item; the top one is taken first) ----
   pushPile(name, pieces) { for (const b of pieces) this.emit(...pushData(b)); this.st.push(name); this.piles.set(name, pieces.length); return this; }
   pileTake(name, as) {
-    const d = this.depth(name); if (d === 1) this.emit(OP.SWAP); else if (d === 2) this.emit(OP.ROT); else if (d > 2) this.emit(...pushNum(d), OP.ROLL); else this.emit(OP.DUP, OP.DROP);
+    const d = this.depth(name); if (d === 1) this.swap(); else if (d === 2) this.emit(OP.ROT); else if (d > 2) this.emit(...pushNum(d), OP.ROLL); else this.emit(OP.DUP, OP.DROP);
     const c = this.piles.get(name); if (c !== null) { this.piles.set(name, c - 1); }
     this.st.push(as); return this;
   }
@@ -71,7 +75,7 @@ export class Asm {
   top(k = 0) { return this.st[this.st.length - 1 - k]; }
   // ---- stack moves ----
   pick(name, as) { const d = this.depth(name); if (d === 0) this.emit(OP.DUP); else if (d === 1) this.emit(OP.OVER); else this.emit(...pushNum(d), OP.PICK); this.st.push(as ?? name); return this; }
-  roll(name) { const d = this.depth(name); if (d === 1) this.emit(OP.SWAP); else if (d === 2) this.emit(OP.ROT); else if (d > 2) this.emit(...pushNum(d), OP.ROLL); this.st.splice(this.st.length - 1 - d, 1); this.st.push(name); return this; }
+  roll(name) { const d = this.depth(name); if (d === 1) this.swap(); else if (d === 2) this.emit(OP.ROT); else if (d > 2) this.emit(...pushNum(d), OP.ROLL); this.st.splice(this.st.length - 1 - d, 1); this.st.push(name); return this; }
   drop(name) { if (name !== undefined) { const d = this.depth(name); if (d === 1) { this.emit(OP.NIP); this.st.splice(this.st.length - 2, 1); return this; } if (d > 0) this.roll(name); } this.emit(OP.DROP); this.st.pop(); return this; }
   rename(name, as) { if (as === undefined) { this.st[this.st.length - 1] = name; return this; } this.st[this.idx(name)] = as; return this; }
   push(v, name) { this.emit(...pushNum(v)); this.st.push(name ?? this.fresh('c')); return this; }
@@ -167,7 +171,9 @@ export class Asm {
     assert.equal(outs.length, K.outs.length);
     const res = scheduleKernel(this, K, iters, seed);
     if (process.env.DEBUG_K) console.error('kernel', outs.join(',').slice(0, 40), 'est op', res.cost, 'bytes', res.code.length);
-    this.emit(...res.code); this.st = res.st; // outputs on top with internal ids
+    let kc = res.code; if (kc.length && kc[0] === OP.SWAP && this.swapCancels()) { this.code.pop(); kc = kc.slice(1); this.swapEnd = -1; } // kernel code starts with an opcode
+    this.emit(...kc); if (res.endsSwap && kc.length) this.swapEnd = this.code.length;
+    this.st = res.st; // outputs on top with internal ids
     for (let i = 0; i < outs.length; i++) this.st[this.st.length - outs.length + i] = outs[i];
     return res;
   }
@@ -218,7 +224,9 @@ function scheduleKernel(asm, K, iters, seed) {
   // emit/cost for an order
   const run = (order, want) => {
     const st = asm.st.slice(); const code = []; let cost = 0;
-    const em = (...b) => { if (want) code.push(...b); };
+    let lastSwap = false; // the last thing emitted is a SWAP opcode: a following SWAP cancels it (SWAP SWAP = identity)
+    const em = (...b) => { if (want) code.push(...b); lastSwap = false; };
+    const swap = () => { if (lastSwap) { if (want) code.pop(); lastSwap = false; cost -= 100; } else { em(OP.SWAP); lastSwap = true; cost += 100; } };
     const uses = new Map(); const bump = (x) => uses.set(x, (uses.get(x) ?? 0) + 1);
     order.forEach((id) => N[id].args.forEach(bump)); K.outs.forEach(bump);
     // stack entries are names (strings) for pre-existing items and numbers for node results
@@ -230,7 +238,7 @@ function scheduleKernel(asm, K, iters, seed) {
       const key = keyOf(id); const last = consumable(id) && uses.get(id) === 1; uses.set(id, uses.get(id) - 1);
       const d = depthOf(key); const L = lenOf(id);
       if (last) {
-        if (d === 0) return; if (d === 1) { em(OP.SWAP); cost += 100; } else if (d === 2) { em(OP.ROT); cost += 100; } else { em(...pushNum(d), OP.ROLL); cost += 200 + numLen(d) + L + d; }
+        if (d === 0) return; if (d === 1) swap(); else if (d === 2) { em(OP.ROT); cost += 100; } else { em(...pushNum(d), OP.ROLL); cost += 200 + numLen(d) + L + d; }
         st.splice(st.length - 1 - d, 1); st.push(key);
       } else {
         if (d === 0) em(OP.DUP); else if (d === 1) em(OP.OVER); else { em(...pushNum(d), OP.PICK); cost += 100 + numLen(d); }
@@ -257,7 +265,7 @@ function scheduleKernel(asm, K, iters, seed) {
       em(OPC[n.op]); cost += 100 + 2 * lens[id] + (n.op === 'mul' ? lenOf(a) * lenOf(b) : 0); st.pop(); st.pop(); st.push(id);
     }
     for (const o of K.outs) fetch(o);
-    return {code, cost, st};
+    return {code, cost, st, endsSwap: lastSwap};
     function pairCost(a, b) {
       const s2 = st.slice(); let c = 0;
       for (const [k, id] of [a, b].entries()) {
@@ -289,5 +297,5 @@ function scheduleKernel(asm, K, iters, seed) {
   const st = out.st.map((x) => (typeof x === 'number' ? `__k${x}` : x));
   const extra = st.length - asm.st.length + [...K.inputs].length - K.outs.length;
   if (extra !== 0) throw new Error('kernel left stray items: ' + extra);
-  return {code, st, cost: out.cost, hasMod};
+  return {code, st, cost: out.cost, hasMod, endsSwap: out.endsSwap};
 }

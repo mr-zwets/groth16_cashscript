@@ -1,8 +1,8 @@
 {
- "redeemBytes": 12853,
- "redeemSha256": "d8d5cf75af6e6a879d90025dc1127f50d86acb8e968c144d4b32dedcac5f6f74",
- "lockingHex": "aa203bd57c8775ad4877ae4621e548be5fa6ecf9ea3ed2894a7888ddfbf47548efa587",
- "lockingSha256": "7f9c1352d665279e3c195a885f7a0c854fceef2819f5e832c51466caab373865",
+ "redeemBytes": 12793,
+ "redeemSha256": "c93557ac85f8082011ffb4a582892396d17bbd58373d815e65d7cd5f255e8f74",
+ "lockingHex": "aa20ee10ce1f00643f7c48c659af8fb6f68ac7ea17fec743b59e1395e2851ce88f7a87",
+ "lockingSha256": "9e5ef200959b12c2f78b2c285184b02f1f623b782010cbb406dd03dc7cefd311",
  "tag": "5349474c532d424c532f314e94e7b81bd1f7356f4850f67579834f3b3ec212780f6032a21bda9af7ab126d",
  "E_A": 10,
  "witness": {
@@ -12,44 +12,44 @@
   "nq_committed": 47,
   "NQ_MAX": 118
  },
- "unlockingBytes_committed": 26446,
+ "unlockingBytes_committed": 26386,
  "committed": {
   "consensus": {
-   "opCost": 26113031,
-   "budget": 29156800
+   "opCost": 26070993,
+   "budget": 29108800
   },
   "standard": {
-   "opCost": 26166535,
-   "budget": 29156800
+   "opCost": 26124497,
+   "budget": 29108800
   }
  },
  "sections": {
   "init": 0,
   "transcript": 6702,
-  "parse+checks": 285,
-  "powers": 818,
+  "parse+checks": 277,
+  "powers": 811,
   "gls-tables": 1500,
   "loop-setup": 575,
   "loop": 173,
-  "terminal": 345,
-  "final": 148,
+  "terminal": 334,
+  "final": 145,
   "cleanup": 7
  },
  "functions": {
   "P": 49,
   "RD": 14,
-  "EV": 46,
+  "EV": 45,
   "TM": 111,
   "TA": 78,
-  "G1C": 18,
+  "G1C": 16,
   "DSTEP": 190,
-  "AFFDBL": 290,
-  "PROJDBL": 447,
-  "AFFADD": 301,
-  "PROJADD": 627,
-  "BND": 81
+  "AFFDBL": 284,
+  "PROJDBL": 445,
+  "AFFADD": 296,
+  "PROJADD": 614,
+  "BND": 79
  },
- "prologue": 2300,
+ "prologue": 2269,
  "schedule": {
   "events": 63,
   "bits": "101001000000001000000000000000000000000000000010000000000000000",

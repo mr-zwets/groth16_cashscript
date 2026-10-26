@@ -7,14 +7,16 @@ import {writeFileSync} from 'node:fs';
 import {FIXTURES, mint} from './math.mjs';
 import {WS_LAYOUT, NSTATES} from './protocol.mjs';
 import {redeem, locking, unlocking} from './transaction.mjs';
-import {encodeUnlocking, spend} from './vm.mjs';
-import {maxSlots, statementFor} from './worst.mjs';
+import {encodeUnlocking, spend, unlockingFor} from './vm.mjs';
+import {worstWitness} from './worst.mjs';
 assert.equal(process.argv.length, 3, 'usage: node export.mjs vectors.json');
-export const WORST_NQ = 53; // the forced witness with the smallest standard margin (sweep.json)
+export const WORST_NQ = 53; // the forced pattern with the smallest standard margin (worst.mjs, sweep.json)
+export const WORST_PROOFS = 40; // proof samples searched for that pattern (the one with the smallest standard margin is exported)
 const step = (u) => ({label: 'single', locking: locking.toString('hex'), unlocking: Buffer.from(u).toString('hex'), checkpoint: 'pairing-close'});
 const run = (fx) => { const {unlocking: u} = unlocking(fx); for (const m of ['consensus', 'standard']) assert.ok(spend(locking, u, m).accepted, m); return [step(u)]; };
 const extra = ['proof1', 'dense', 'zero', 'max', 'msm-identity'].map((n) => FIXTURES[n]);
-const worst = mint(statementFor(maxSlots(WORST_NQ)).ns);
+const ww = worstWitness(WORST_NQ, WORST_PROOFS, redeem, locking, spend, unlockingFor); const worst = ww.fx;
+console.log(`worst case: n_q ${ww.nq}, standard margin ${ww.m} (${(100 * ww.m / ww.rs[1].budget).toFixed(3)}%), consensus ${ww.mc}, proof ${ww.bc ? ww.bc.map((x) => x.toString(16)).join(' / ') : 'default'}`);
 const {w} = unlocking(FIXTURES.committed);
 const flip = (buf, at) => { const b = Buffer.from(buf); b[at] ^= 0x01; return b; };
 const S0 = WS_LAYOUT.states;

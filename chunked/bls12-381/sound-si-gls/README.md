@@ -47,6 +47,9 @@ T = |x| = 0xd201000000010000 (x < 0). The Miller loop runs over T in binary: the
 e = 0..62 handle bit 62 − e, with additions at events 0, 2, 5, 14, 46. Lines are scaled by w³:
 L(X) = Φ(ℓ0) + x_P X²Φ(ℓ2) + y_P X³Φ(ℓ3), with the affine line (λx_T − y_T, −λ, 1) (degree 8) and the projective lines
 (degree 9). The pairing ê := FE(f_{T,Q}(P)) = e(P, Q)^−1 is nondegenerate and bilinear, and every VK constant uses it.
+FE is the (p^12 − 1)/r power. noble's `finalExponentiate`, which every build-time assertion in `math.mjs` uses,
+computes the cube of that power. This makes no difference to any asserted relation: every one is an equality (or
+≠ 1 test) in μ_r, and cubing is a bijection on μ_r because gcd(3, r) = 1.
 λ = p + T = h1·r (h1 the G1 cofactor).
 
 **Witness** (unlocking `<WQ> <WS> <redeem>`, exactly two items besides the redeem):
@@ -122,10 +125,11 @@ S_k (S_0 = S_c(−X)·Rconst′·G_0) and events [a, b]:
   P_k(X) = S_k^{2^{b−a+1}} · Π_{e∈[a,b]} ( L_{B,e} · L_{δ,e} · [L′_{B,e} L′_{δ,e} S_c(−X) if e is an addition] · G_{e+1} )^{2^{b−e}}
 
 with G_j = Π_{k,i: bit i of N_k[j]} factor_{k,i}(X). D_k = P_k(X)S′(−X) − P_k(−X)S′(X), S′ = S_{k+1} (monic) or, for the
-last chunk, W = Frob(S_c). Since M is even, D_k ≡ 0 (mod M) ⟺ P_k·σ(S′) ∈ Fp6 ⟺ [P_k] = [S′] in G, provided P_k ≠ 0
-and S′ ≠ 0: Fp12 is a field; an affine line has X³ coefficient y_P ≠ 0 (E(Fp) has odd order); a projective line has
-X³ coefficient y_P·Φ(2YZ or λ′), nonzero because Z = 0 is absorbing and Z_T ≠ 0 is checked; δ lines have ℓ3 = 1; every
-other factor is monic; W = Frob(S_c) ≠ 0.
+last chunk, W = Frob(S_c) (not monic and of degree 11, see below). Since M is even, D_k ≡ 0 (mod M) ⟺ P_k·σ(S′) ∈ Fp6 ⟺ [P_k] = [S′] in G, provided P_k ≠ 0
+and S′ ≠ 0: Fp12 is a field; an affine line has X³ coefficient y_P ≠ 0 (E(Fp) has odd order); in a projective line
+Φ(ℓ3) splits the y_P term, with ℓ3 = 2YZ or λ′: the X³ and X^9 coefficients are y_P(ℓ3.c0 − ℓ3.c1) and y_P·ℓ3.c1,
+which are not both zero because y_P ≠ 0 and ℓ3 ≠ 0 (Z = 0 is absorbing and Z_T ≠ 0 is checked); δ lines have ℓ3 = 1;
+every other factor is monic; W = Frob(S_c) ≠ 0.
 
 **Chain and residue.** The 33 relations give [f′·c^{−T}] = [c^p], i.e. [f′] = [c]^λ, where
 f′ = Miller(−A,B)·Miller(C,δ)·Rconst′^{2^63}·Π_{k,i} factor_{k,i}^{a_{k,i}} up to Fp2 line scalings (which lie in Fp6).
@@ -145,8 +149,9 @@ The projective segment is exact because Z = 0 is absorbing and Z_T ≠ 0 is chec
 check gives ψ(B) = [x]B. N(ψ − x) = λ and gcd(λ, h2) = 1 (asserted), so B ∈ G2. This is the same check as the reviewed
 BLS singleton (`work/bls-singleton-review/REVIEW.md`, item 2).
 
-**G1 cofactor.** A and C get curve checks only. ê(·, Q) on E(Fp) is a power of the reduced Tate pairing, which kills the
-h1-torsion (gcd(h1, r) = 1; checked numerically in `math.mjs` on a point with components of every prime order dividing
+**G1 cofactor.** A and C get curve checks only. ê(·, Q) on E(Fp) is a power of the reduced Tate pairing (the
+Hess–Smart–Vercauteren relation for f_{x,Q} with x ≡ p (mod r), carried over to f_{T,Q} through f_T = 1/(f_x·v) with
+v a vertical line, which FE kills), so it kills the h1-torsion (gcd(h1, r) = 1; checked numerically in `math.mjs` on a point with components of every prime order dividing
 h1). Hence verdict(A, B, C) = verdict(A_r, B, C_r): an off-G1 point only re-encodes a valid proof (cofactor
 malleability, no forgery). Precedent: the reviewed BLS singleton (REVIEW.md item 3).
 
@@ -154,7 +159,10 @@ malleability, no forgery). Precedent: the reviewed BLS singleton (REVIEW.md item
 before ρ. If some D_k mod M ≠ 0, Σρ^{32−k}(D_k mod M) vanishes with probability ≤ 32/2^256 over ρ. Otherwise
 S(X) := Σρ^{32−k}(D_k mod M) is a nonzero polynomial of degree < 12, and the verifier checks S(z) = (Q − Q*)(z)·M(z)
 with Q committed before z; S − (Q − Q*)M ≠ 0 (M does not divide a nonzero polynomial of degree < 12), of degree
-≤ max(247, 2·118 − 1 + 12) = 247 for every accepted witness. **ε ≤ (32 + 247)/2^256 ≈ 2^−247.9** per random-oracle
+≤ max(247, 2·118 − 1 + 12) = 247 for every accepted witness. The closing state W = Frob(S_c) has degree 11, not 6:
+Frob(X^j) = Φ(γ1^j)X^j, and each s_j·Φ(γ1^j)(X)·X^j reaches degree j + 6. `degDBound` (protocol.mjs) counts 11 for the
+last chunk and 6 for every other chunk, which closes against a monic degree-6 state; the last chunk reaches only
+deg D ≤ 219 + 11 = 230 ≤ 247. **ε ≤ (32 + 247)/2^256 ≈ 2^−247.9** per random-oracle
 query (z is uniform on [0, 2^256) ⊂ [0, p): no bias factor).
 
 **Completeness.** Honest provers fail only if a monic representative does not exist (probability ~1/p per state), the
