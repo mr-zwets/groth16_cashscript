@@ -24,7 +24,9 @@ exact field or integer equation.** No prover-supplied evaluation is used anywher
 | liveness sweep | 239 cases (6 fixtures, 18 forced extremes, special and low-n_q statements, a non-canonical-digit witness, 200 random proofs), all accepted in both modes; minimum margin = the forced witness above |
 | soundness error | ε ≤ 279 / 2^256 ≈ **2^−247.9** per random-oracle query (degree bound 247, 33 batched identities) |
 
-Gates (exact-id driver, `scripts/bench-ids.mts` in the task folder): GATES_LINE
+Gates (exact-id driver, `scripts/bench-ids.mts` in the task folder): valid accepted, 16/16 invalid vectors rejected, 6/6 proofs
+runtime-general, worst-case proof accepted (27,507,420 consensus), standard (relayable), public inputs bound (9/9 mutated
+claims rejected), rejection suite 87/87 rejected (bench red-team gate: 0 accepted), secure packaging.
 
 Other fixtures (score, n_q, standard op % of budget): proof1 26,928 (55, 89.0%), dense 28,560 (89, 91.0%), zero 26,496
 (46, 89.5%), max 27,792 (73, 89.1%), msm-identity 28,080 (79, 87.7%). The score depends on the statement only through
@@ -194,9 +196,9 @@ leading quotient word is zero after trimming (~1/p), or z = 0 (2^−256).
 ```sh
 # in this directory, with the repository's dependencies (@noble/curves 2.2.0, @bitauth/libauth 3.1.0-next.8)
 node test.mjs                                      # math cross-check + protocol self-test
-node build.mjs                                     # redeem 12,853 B, sha256 REDEEM_SHA; writes redeem.hex, build.json
-node export.mjs vectors.json                       # sha256 VECTORS_SHA
-node redteam.mjs vectors.json redteam.json redteam-report.json   # REDTEAM_RUNS runs rejected; redteam.json sha256 REDTEAM_SHA
+node build.mjs                                     # redeem 12,853 B, sha256 d8d5cf75…6f74; writes redeem.hex, build.json
+node export.mjs vectors.json                       # sha256 f140609f…e11b
+node redteam.mjs vectors.json redteam.json redteam-report.json   # 87 runs rejected; redteam.json sha256 51bb2c7e…076f
 node worst.mjs                                     # forced liveness witnesses
 SWEEP_N=200 node sweep.mjs sweep.json              # SWEEP_SHARD=k/n to split
 SIGLS_EA=9 node build.mjs && SIGLS_EA=9 node worst.mjs    # the E_A knob (rebuild with the default afterwards)
@@ -208,10 +210,30 @@ and `pnpm benchmark:json` (score).
 
 ## Verification
 
-- **Rejection suite** (`redteam.mjs`, REDTEAM_RUNS runs, all rejected in consensus and standard mode;
-  `redteam-report.json` names the guard that fires): REDTEAM_SUMMARY
+- **Rejection suite** (`redteam.mjs`, 87 runs, all rejected in consensus and standard mode;
+  `redteam-report.json` names the guard that fires): 
+  - off-curve A, C and off-twist B; the identity encoded as (0, 0) for A, B, C (curve checks);
+  - +p aliases of all 8 coordinates (also with a rebuilt transcript), a 2^384 − 1 word (RD range checks);
+  - B off G2: a random twist point and G2 + cofactor point (rebuilt; the endpoint check fires), and a point of order
+    13 that makes the affine walk reach x = x_B at the event-2 addition (rebuilt; the x ≠ x_B guard fires);
+  - −A, −B, C from another proof (rebuilt; final identity);
+  - n + r, 2^256 − 1, top-bit n, n0 + 1 and swapped n (public-input range and binding);
+  - nibbles 0x10, 0x80, 0xff (mask), a nibble bit flip, a digit bit flip with a rebuilt transcript (exact binding);
+  - witnessed slopes: +1 byte-level, +p alias, and rebuilt wrong / negated / swapped slopes (the slope equations fire);
+  - state, residue and statement tampering, state aliases and top-bit words, swapped states, states of another proof,
+    one-byte re-parses across field boundaries;
+  - quotient: word tampering, alias, top bit, a leading zero word, missing words, 119 words (cap + 1), a length not a
+    multiple of 48, empty;
+  - layout: extra, missing and reordered pushes, WS ±1 byte and ±1 slope, one merged push, a flipped redeem byte,
+    OP_NOP and a non-minimal push in the unlocking.
+
   Positive controls (accepted): `committed`, and a valid witness with non-canonical GLS digits.
-- **Liveness** (`sweep.json`, 239 cases, all accepted in both modes): SWEEP_SUMMARY
+- **Liveness** (`sweep.json`, 239 cases, all accepted in both modes): the 6 fixtures; the forced extremes of `worst.mjs` for
+  n_q targets 46..80 and every nibble nonzero (minimum standard margin **1,825,764 = 6.21%** at n_q 53 with 119 nonzero
+  nibbles; consensus 1,879,780 = 6.40%); special statements (1, r − 1, |x|-power and digit-boundary values); the six
+  lowest-n_q statements of a 4,000-statement search (n_q 46); a valid non-canonical-digit witness; 200 random proofs
+  (n_q 83..109, minimum standard margin 8.81%). Maximum op 28,208,354 standard (random, n_q ~ 100).
+  Sensitivity (E_A knob, worst forced witness, standard): E_A 9 → 5.69%, 10 → 6.21%, 11 → 6.73%.
 - **Protocol** (`test.mjs`): math cross-check against the second design; honest proofs for 6 statements and the 6
   fixtures accepted by the mirror verifier, tampering rejected; identity fixtures unencodable; a false statement has
   no honest witness.
