@@ -1,0 +1,170 @@
+[
+ {
+  "role": 0,
+  "blob": 2769,
+  "redeem": 68,
+  "unlocking": 7774,
+  "prologue": 233,
+  "cons": {
+   "op": 1193164,
+   "budget": 6252000,
+   "error": null
+  },
+  "std": {
+   "op": 1237836,
+   "budget": 6252000,
+   "error": null
+  },
+  "sections": {
+   "loader": 54342,
+   "blob:prologue": 1424,
+   "blob:pin": 8510,
+   "blob:transcript": 194931,
+   "blob:consts": 31628,
+   "blob:statement": 60611,
+   "blob:env": 136108,
+   "blob:tables": 632465,
+   "blob:start": 31236,
+   "blob:handoff": 1345,
+   "blob:post-loop-constants": 4342,
+   "blob:out": 37485,
+   "blob:cleanup": 43409
+  },
+  "verify": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+ },
+ {
+  "role": 1,
+  "blob": 2823,
+  "redeem": 68,
+  "unlocking": 9921,
+  "prologue": 233,
+  "cons": {
+   "op": 1288050,
+   "budget": 7969600,
+   "error": null
+  },
+  "std": {
+   "op": 1334770,
+   "budget": 7969600,
+   "error": null
+  },
+  "sections": {
+   "loader": 56740,
+   "blob:prologue": 1424,
+   "blob:pin": 10657,
+   "blob:transcript": 199867,
+   "blob:consts": 37973,
+   "blob:statement": 60612,
+   "blob:env": 136108,
+   "blob:tables": 632465,
+   "blob:start": 76781,
+   "blob:handoff": 34178,
+   "blob:post-loop-constants": 4485,
+   "blob:out": 40071,
+   "blob:cleanup": 43409
+  },
+  "verify": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation."
+ },
+ {
+  "role": 2,
+  "blob": 2823,
+  "redeem": 68,
+  "unlocking": 9407,
+  "prologue": 233,
+  "cons": {
+   "op": 1288346,
+   "budget": 7558400,
+   "error": null
+  },
+  "std": {
+   "op": 1334682,
+   "budget": 7558400,
+   "error": null
+  },
+  "sections": {
+   "loader": 56226,
+   "blob:prologue": 1424,
+   "blob:pin": 10143,
+   "blob:transcript": 199886,
+   "blob:consts": 39599,
+   "blob:statement": 60612,
+   "blob:env": 136108,
+   "blob:tables": 632465,
+   "blob:start": 76781,
+   "blob:handoff": 36764,
+   "blob:post-loop-constants": 4485,
+   "blob:out": 36780,
+   "blob:cleanup": 43409
+  },
+  "verify": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation."
+ },
+ {
+  "role": 3,
+  "blob": 2821,
+  "redeem": 68,
+  "unlocking": 8950,
+  "prologue": 233,
+  "cons": {
+   "op": 1285169,
+   "budget": 7192800,
+   "error": null
+  },
+  "std": {
+   "op": 1331121,
+   "budget": 7192800,
+   "error": null
+  },
+  "sections": {
+   "loader": 55767,
+   "blob:prologue": 1424,
+   "blob:pin": 9686,
+   "blob:transcript": 197339,
+   "blob:consts": 35348,
+   "blob:statement": 60612,
+   "blob:env": 136108,
+   "blob:tables": 632465,
+   "blob:start": 76779,
+   "blob:handoff": 33473,
+   "blob:post-loop-constants": 4485,
+   "blob:out": 44226,
+   "blob:cleanup": 43409
+  },
+  "verify": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation."
+ },
+ {
+  "role": 4,
+  "blob": 4628,
+  "redeem": 68,
+  "unlocking": 9896,
+  "prologue": 233,
+  "cons": {
+   "op": 2975360,
+   "budget": 7949600,
+   "error": null
+  },
+  "std": {
+   "op": 3022208,
+   "budget": 7949600,
+   "error": null
+  },
+  "sections": {
+   "loader": 63896,
+   "blob:prologue": 1424,
+   "blob:pin": 10632,
+   "blob:transcript": 205947,
+   "blob:consts": 36074,
+   "blob:statement": 59804,
+   "blob:global": 93440,
+   "blob:env": 136109,
+   "blob:tables": 632465,
+   "blob:start": 76205,
+   "blob:handoff": 40919,
+   "blob:post-loop-constants": 4485,
+   "blob:terminal": 345168,
+   "blob:horner": 998151,
+   "blob:binding": 271272,
+   "blob:cleanup": 46217
+  },
+  "verify": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation."
+ }
+]

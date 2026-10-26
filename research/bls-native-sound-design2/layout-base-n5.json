@@ -1,0 +1,133 @@
+{
+ "N": 5,
+ "margin": 0.1,
+ "variant": "base",
+ "ok": true,
+ "ins": [
+  {
+   "j": 0,
+   "chunks": [
+    0,
+    7
+   ],
+   "events": 14,
+   "op": {
+    "std": 6961728,
+    "cons": 6916728
+   },
+   "mandatory": 5952,
+   "q": 0,
+   "cb": 0,
+   "need": 9557,
+   "content": 5952,
+   "pad": 3605,
+   "wit": 9557,
+   "unlocking": 9629,
+   "budget": 7736000,
+   "marginStd": 0.10008686659772492,
+   "marginCons": 0.1059038262668045
+  },
+  {
+   "j": 1,
+   "chunks": [
+    7,
+    14
+   ],
+   "events": 14,
+   "op": {
+    "std": 6637512,
+    "cons": 6591512
+   },
+   "mandatory": 5232,
+   "q": 3840,
+   "cb": 0,
+   "need": 9106,
+   "content": 9072,
+   "pad": 34,
+   "wit": 9106,
+   "unlocking": 9178,
+   "budget": 7375200,
+   "marginStd": 0.10002277904328016,
+   "marginCons": 0.10625989803666336
+  },
+  {
+   "j": 2,
+   "chunks": [
+    14,
+    22
+   ],
+   "events": 16,
+   "op": {
+    "std": 6973071,
+    "cons": 6927071
+   },
+   "mandatory": 5712,
+   "q": 0,
+   "cb": 0,
+   "need": 9572,
+   "content": 5712,
+   "pad": 3860,
+   "wit": 9572,
+   "unlocking": 9644,
+   "budget": 7748000,
+   "marginStd": 0.10001664945792466,
+   "marginCons": 0.10595366546205476
+  },
+  {
+   "j": 3,
+   "chunks": [
+    22,
+    29
+   ],
+   "events": 14,
+   "op": {
+    "std": 6637141,
+    "cons": 6591141
+   },
+   "mandatory": 5232,
+   "q": 2496,
+   "cb": 0,
+   "need": 9106,
+   "content": 7728,
+   "pad": 1378,
+   "wit": 9106,
+   "unlocking": 9178,
+   "budget": 7375200,
+   "marginStd": 0.10007308276385729,
+   "marginCons": 0.10631020175724049
+  },
+  {
+   "j": 4,
+   "chunks": [
+    29,
+    32
+   ],
+   "events": 6,
+   "op": {
+    "std": 5158895,
+    "cons": 5112895
+   },
+   "mandatory": 2352,
+   "q": 0,
+   "cb": 7000,
+   "need": 7053,
+   "content": 9352,
+   "pad": 0,
+   "wit": 9352,
+   "unlocking": 9424,
+   "budget": 7572000,
+   "marginStd": 0.3186879292128896,
+   "marginCons": 0.32476294241944004
+  }
+ ],
+ "bytes": 47053,
+ "score": 47463,
+ "pad": 8877,
+ "cuts": [
+  0,
+  7,
+  14,
+  22,
+  29
+ ]
+}

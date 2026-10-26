@@ -1,0 +1,157 @@
+{
+ "N": 6,
+ "margin": 0.2,
+ "variant": "bcast",
+ "ok": true,
+ "ins": [
+  {
+   "j": 0,
+   "chunks": [
+    0,
+    6
+   ],
+   "events": 12,
+   "op": {
+    "std": 6421875,
+    "cons": 6376875
+   },
+   "mandatory": 9456,
+   "q": 0,
+   "cb": 0,
+   "need": 9922,
+   "content": 9456,
+   "pad": 466,
+   "wit": 9922,
+   "unlocking": 9994,
+   "budget": 8028000,
+   "marginStd": 0.2000653961136024,
+   "marginCons": 0.20567077727952165
+  },
+  {
+   "j": 1,
+   "chunks": [
+    6,
+    11
+   ],
+   "events": 10,
+   "op": {
+    "std": 4366079,
+    "cons": 4341079
+   },
+   "mandatory": 3888,
+   "q": 0,
+   "cb": 0,
+   "need": 6709,
+   "content": 3888,
+   "pad": 2821,
+   "wit": 6709,
+   "unlocking": 6781,
+   "budget": 5457600,
+   "marginStd": 0.2000001832307241,
+   "marginCons": 0.20458095133391963
+  },
+  {
+   "j": 2,
+   "chunks": [
+    11,
+    17
+   ],
+   "events": 12,
+   "op": {
+    "std": 4700076,
+    "cons": 4675076
+   },
+   "mandatory": 4368,
+   "q": 288,
+   "cb": 0,
+   "need": 7231,
+   "content": 4656,
+   "pad": 2575,
+   "wit": 7231,
+   "unlocking": 7303,
+   "budget": 5875200,
+   "marginStd": 0.20001429738562093,
+   "marginCons": 0.20426947167755993
+  },
+  {
+   "j": 3,
+   "chunks": [
+    17,
+    23
+   ],
+   "events": 12,
+   "op": {
+    "std": 4700678,
+    "cons": 4675678
+   },
+   "mandatory": 4368,
+   "q": 2832,
+   "cb": 0,
+   "need": 7232,
+   "content": 7200,
+   "pad": 32,
+   "wit": 7232,
+   "unlocking": 7304,
+   "budget": 5876000,
+   "marginStd": 0.20002076242341726,
+   "marginCons": 0.2042753573859769
+  },
+  {
+   "j": 4,
+   "chunks": [
+    23,
+    29
+   ],
+   "events": 12,
+   "op": {
+    "std": 5069844,
+    "cons": 5044844
+   },
+   "mandatory": 4560,
+   "q": 3216,
+   "cb": 0,
+   "need": 7809,
+   "content": 7776,
+   "pad": 33,
+   "wit": 7809,
+   "unlocking": 7881,
+   "budget": 6337600,
+   "marginStd": 0.2000372380711941,
+   "marginCons": 0.2039819490027771
+  },
+  {
+   "j": 5,
+   "chunks": [
+    29,
+    32
+   ],
+   "events": 6,
+   "op": {
+    "std": 4296095,
+    "cons": 4271095
+   },
+   "mandatory": 2352,
+   "q": 0,
+   "cb": 7000,
+   "need": 6600,
+   "content": 9352,
+   "pad": 0,
+   "wit": 9352,
+   "unlocking": 9424,
+   "budget": 7572000,
+   "marginStd": 0.4326340464870576,
+   "marginCons": 0.43593568409931327
+  }
+ ],
+ "bytes": 48687,
+ "score": 49175,
+ "pad": 5927,
+ "cuts": [
+  0,
+  6,
+  11,
+  17,
+  23,
+  29
+ ]
+}

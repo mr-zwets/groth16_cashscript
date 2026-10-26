@@ -1,0 +1,15 @@
+{
+ "_source": "proto_skeleton.mjs, 5-input BCH 2026 transaction, proofs seed 3 and 11 (max taken); blob size is an estimate for the all-roles blob (role blobs measured 2,823 B event / 4,628 B terminal)",
+ "setup": {"std": 1335000, "cons": 1289000},
+ "firstInputSaving": {"std": 97000, "cons": 96000},
+ "terminal": 1710000,
+ "loopPerEvent": 6000,
+ "blob": 7000,
+ "redeem": 68,
+ "tablesOp": 632000,
+ "consumerBase": {"std": 308000, "cons": 283000},
+ "sharedDecodeFixed": 25000,
+ "sharedDecodePerWord": 1600,
+ "sharedCheckPerWord": 1900,
+ "bcastWords": 87
+}
