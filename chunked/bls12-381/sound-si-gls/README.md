@@ -15,27 +15,27 @@ exact field or integer equation.** No prover-supplied evaluation is used anywher
 
 | | |
 |---|---|
-| **score** (scripts + tx overhead) | **26,544** = 35 locking + 26,446 unlocking + 63 |
-| unlocking | 26,446 = redeem 12,853 + WS 11,328 + WQ 2,256 (47 words) + push headers 9 |
-| redeem 12,853 | δ-slope pile 6,579 · 37 field constants + p 1,813 · other data 192 · code 4,269 |
+| **score** (scripts + tx overhead) | **26,484** = 35 locking + 26,386 unlocking + 63 |
+| unlocking | 26,386 = redeem 12,793 + WS 11,328 + WQ 2,256 (47 words) + push headers 9 |
+| redeem 12,793 | δ-slope pile 6,579 · 37 field constants + p 1,813 · other data 192 · code 4,209 |
 | WS 11,328 | statement 384 · n0, n1 64 · GLS nibbles 128 · residue root 288 · 32 states 9,216 · 13 affine B slopes 1,248 |
-| op cost (`committed`) | 26,113,031 consensus / 26,166,535 standard of 29,156,800 (89.6% / 89.7%) |
-| worst forced liveness witness | n_q 53, 119 nonzero GLS nibbles: 27,561,436 standard of 29,387,200, **margin 1,825,764 (6.21%)**; consensus margin 1,879,780 (6.40%) |
-| liveness sweep | 239 cases (6 fixtures, 18 forced extremes, special and low-n_q statements, a non-canonical-digit witness, 200 random proofs), all accepted in both modes; minimum margin = the forced witness above |
+| op cost (`committed`) | 26,070,993 consensus / 26,124,497 standard of 29,108,800 (89.6% / 89.7%) |
+| worst forced liveness witness | n_q 53, 119 nonzero GLS nibbles (59 bytes with both nibbles nonzero), the worst of 41 proofs: 27,538,312 standard of 29,339,200, **margin 1,800,888 (6.14%)**; consensus margin 1,854,904 (6.32%) |
+| liveness sweep | 279 cases (6 fixtures, 18 forced extremes, 40 proof samples of the n_q 53 extreme, special and low-n_q statements, a non-canonical-digit witness, 200 random proofs), all accepted in both modes; minimum margin = the forced witness above |
 | soundness error | ε ≤ 279 / 2^256 ≈ **2^−247.9** per random-oracle query (degree bound 247, 33 batched identities) |
 
 Gates (exact-id driver, `scripts/bench-ids.mts` in the task folder): valid accepted, 16/16 invalid vectors rejected, 6/6 proofs
-runtime-general, worst-case proof accepted (27,507,420 consensus), standard (relayable), public inputs bound (9/9 mutated
+runtime-general, worst-case proof accepted (27,484,296 consensus), standard (relayable), public inputs bound (9/9 mutated
 claims rejected), rejection suite 87/87 rejected (bench red-team gate: 0 accepted), secure packaging.
 
-Other fixtures (score, n_q, standard op % of budget): proof1 26,928 (55, 89.0%), dense 28,560 (89, 91.0%), zero 26,496
-(46, 89.5%), max 27,792 (73, 89.1%), msm-identity 28,080 (79, 87.7%). The score depends on the statement only through
+Other fixtures (score, n_q, standard op % of budget): proof1 26,868 (55, 89.0%), dense 28,500 (89, 91.0%), zero 26,436
+(46, 89.5%), max 27,732 (73, 89.1%), msm-identity 28,020 (79, 87.7%). The score depends on the statement only through
 n_q (48 B per word; 46 ≤ n_q ≤ 118). 200 random statements: n_q 83..109, minimum standard margin 8.81%.
 
 Op-cost profile (`committed`, standard, `UNLIMITED=1 node --stack-size=60000 profile.mjs`): B projective doublings
-12.40M (53 × 234k), δ steps 5.56M (68 × 82k), B affine doublings 1.49M (10 × 149k), B additions 1.12M (3 affine ×
-149k, 2 projective × 334k), GT-GLS lookups 0.91M (2.2M at the forced worst witness), state boundaries 1.83M
-(32 × 57k), quotient 0.42M, set-up, tables and terminal ~2.0M.
+12.38M (53 × 234k), δ steps 5.20M (68 × 76k), B affine doublings 1.48M (10 × 148k), additions (B and δ) 1.68M,
+GT-GLS lookups 0.91M (2.2M at the forced worst witness), state boundaries 1.88M (32 × 59k), quotient 0.42M, set-up,
+tables and terminal ~2.2M.
 
 ## Protocol
 
@@ -176,18 +176,20 @@ leading quotient word is zero after trimming (~1/p), or z = 0 (2^−256).
 - **E_A = 10 (design estimate 15).** The build rule (smallest E_A whose worst forced witness keeps ≥ 6% standard
   margin) gives 10 on the measured script: the kernels came out cheaper than the design model (projective doubling
   234k vs 245k, no inner reduction of the doubling line's X² term, Karatsuba X3/Z3, 3b′Z² left unreduced). Worst
-  standard margins by E_A (same kernels): 9: 5.69%, 10: 6.21%, 11: 6.73%.
+  standard margins by E_A (same kernels, worst of 41 proofs): 9: 5.64%, 10: 6.14%, 11: 6.65%.
 - **IF bodies are functions.** The bch-spec VM charges 100 op for every instruction of a skipped branch, so each
   branch body of the event loop (affine/projective doubling and addition, the state boundary) is an OP_DEFINE'd
   function; a skipped branch costs two instructions.
-- **Score 26,544 vs the design's ~27,475**: E_A 10 instead of 15 (−576 B) and slightly less code.
+- **Score 26,484 vs the design's ~27,475**: E_A 10 instead of 15 (−576 B) and slightly less code.
 - **Rejection suite instead of a red team with forged statements.** Per the constructive policy, `redteam.mjs`
   contains malformed and invalid inputs only (no forged statement with a rebuilt witness).
 
 ## Compiler and tooling
 
 - `asm.mjs`: the BN254 SI-GLS symbolic-stack assembler with the kernel cost model on 48-byte field words (plus an
-  if/else option to adopt the else branch's layout).
+  if/else option to adopt the else branch's layout, and a peephole that cancels a SWAP emitted directly after another
+  SWAP, in the kernel scheduler and across roll/kernel boundaries; SWAP SWAP is the identity, so the symbolic stack is
+  unchanged).
 - `script.mjs`: the program. The event loop is one OP_BEGIN … OP_UNTIL over a flag string (addition, boundary, affine);
   its stack layout is the computed fixed point of one event. The affine kernels pass Z through and the projective
   kernels pass the (then empty) slope blob through, so both branches end in the same layout.
@@ -204,11 +206,12 @@ leading quotient word is zero after trimming (~1/p), or z = 0 (2^−256).
 ```sh
 # in this directory, with the repository's dependencies (@noble/curves 2.2.0, @bitauth/libauth 3.1.0-next.8)
 node test.mjs                                      # math cross-check + protocol self-test
-node build.mjs                                     # redeem 12,853 B, sha256 d8d5cf75…6f74; writes redeem.hex, build.json
-node export.mjs vectors.json                       # sha256 f140609f…e11b
-node redteam.mjs vectors.json redteam.json redteam-report.json   # 87 runs rejected; redteam.json sha256 51bb2c7e…076f
-node worst.mjs                                     # forced liveness witnesses
-SWEEP_N=200 node sweep.mjs sweep.json              # SWEEP_SHARD=k/n to split
+node build.mjs                                     # redeem 12,793 B, sha256 c93557ac…8f74; writes redeem.hex, build.json
+node export.mjs vectors.json                       # sha256 9a3732a8…8e03 (searches 40 proofs for the worst case, ~1 min)
+node redteam.mjs vectors.json redteam.json redteam-report.json   # 87 runs rejected; redteam.json sha256 ededc8f4…9191
+WORST_PROOFS=40 node worst.mjs                     # forced liveness witnesses, each with 40 sampled proofs
+SWEEP_N=200 node sweep.mjs sweep.json              # sha256 e7b60eee…4f72; generated, never edited
+# or split: SWEEP_SHARD=k/n node sweep.mjs sk.json for each k, then node sweep.mjs --merge sweep.json s0.json s1.json … (byte-identical)
 SIGLS_EA=9 node build.mjs && SIGLS_EA=9 node worst.mjs    # the E_A knob (rebuild with the default afterwards)
 ```
 
@@ -236,12 +239,14 @@ and `pnpm benchmark:json` (score).
     OP_NOP and a non-minimal push in the unlocking.
 
   Positive controls (accepted): `committed`, and a valid witness with non-canonical GLS digits.
-- **Liveness** (`sweep.json`, 239 cases, all accepted in both modes): the 6 fixtures; the forced extremes of `worst.mjs` for
-  n_q targets 46..80 and every nibble nonzero (minimum standard margin **1,825,764 = 6.21%** at n_q 53 with 119 nonzero
-  nibbles; consensus 1,879,780 = 6.40%); special statements (1, r − 1, |x|-power and digit-boundary values); the six
+- **Liveness** (`sweep.json`, 279 cases, all accepted in both modes): the 6 fixtures; the forced extremes of `worst.mjs` for
+  n_q targets 46..80 and every nibble nonzero, and 40 sampled proofs (random B, C) of the n_q 53 extreme (minimum
+  standard margin **1,800,888 = 6.14%** at n_q 53 with 119 nonzero nibbles, proof sample #27; consensus 1,854,904 =
+  6.32%). The forced patterns maximise the nonzero nibble count and then the bytes with both nibbles nonzero (a slot-2
+  byte costs more op than two slot-1 bytes); the op cost varies by ~20k with the proof bytes. Special statements (1, r − 1, |x|-power and digit-boundary values); the six
   lowest-n_q statements of a 4,000-statement search (n_q 46); a valid non-canonical-digit witness; 200 random proofs
-  (n_q 83..109, minimum standard margin 8.81%). Maximum op 28,208,354 standard (random, n_q ~ 100).
-  Sensitivity (E_A knob, worst forced witness, standard): E_A 9 → 5.69%, 10 → 6.21%, 11 → 6.73%.
+  (n_q 83..109, minimum standard margin 8.81%). Maximum op 28,166,315 standard (random, n_q ~ 100).
+  Sensitivity (E_A knob, worst forced witness over 41 proofs, standard): E_A 9 → 5.64%, 10 → 6.14%, 11 → 6.65%.
 - **Protocol** (`test.mjs`): math cross-check against the second design; honest proofs for 6 statements and the 6
   fixtures accepted by the mirror verifier, tampering rejected; identity fixtures unencodable; a false statement has
   no honest witness.
@@ -262,6 +267,6 @@ and `pnpm benchmark:json` (score).
   the bytecode.
 - **Rconst′ placement** (2^−63 power in the initial value) is new relative to BN; it is a build-time assertion, not a
   runtime check.
-- **Op margin is about 6.2% at the worst forced witness** (n_q 53 with 119 nonzero nibbles). The op cost is almost
+- **Op margin is about 6.1% at the worst forced witness** (n_q 53 with 119 nonzero nibbles). The op cost is almost
   statement-independent except for the GT-GLS lookups; the budget shrinks with n_q. Any change that adds op cost must be
   re-checked with `worst.mjs`; E_A is the knob (+1 affine event ≈ +0.5% margin for 96 B).

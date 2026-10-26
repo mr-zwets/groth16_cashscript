@@ -35,7 +35,7 @@ if (process.argv[2] === '--merge') {
   const results = parts.flatMap((x) => x.results).sort((a, b) => a.case - b.case);
   results.forEach((x, i) => assert.equal(x.case, i, 'missing or duplicate case ' + i));
   const {summary, failed} = summarize(results);
-  writeFileSync(process.argv[3], JSON.stringify({seed: parts[0].seed, shard: 'merged', summary, results}, null, 1) + '\n');
+  writeFileSync(process.argv[3], JSON.stringify({seed: parts[0].seed, shard: '0/1', summary, results}, null, 1) + '\n');
   assert.equal(failed.length, 0); process.exit(0);
 }
 
