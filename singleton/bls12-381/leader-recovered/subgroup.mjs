@@ -141,21 +141,6 @@ function membership(d, doubleName, addName) {
   return s.code.join('\n');
 }
 
-export function subgroupDeclarations(identifiers) {
-  const result = [];
-  for (const [d, first] of [[1, 101], [2, 104]]) {
-    const prefix = `securityG${d}`, doubleName = prefix + 'Double', addName = prefix + 'Add';
-    for (const [name, id] of [[doubleName, first], [addName, first + 1], [prefix + 'Prime', first + 2]]) {
-      assert(!identifiers.has(name)); assert(![...identifiers.values()].includes(id));
-      identifiers.set(name, id);
-    }
-    result.push({name: doubleName, body: doubling(d)},
-      {name: addName, body: addition(d, doubleName)},
-      {name: prefix + 'Prime', body: membership(d, doubleName, addName)});
-  }
-  return result;
-}
-
 const inverseMod = (a, p) => {
   let [r,s,x,y]=[p,a,0n,1n];
   while(s!==0n){const q=r/s;[r,s]=[s,r-q*s];[x,y]=[y,x-q*y];}
