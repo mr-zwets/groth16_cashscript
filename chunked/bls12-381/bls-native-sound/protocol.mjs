@@ -60,7 +60,8 @@ export const ROLES = Array.from({length: NIN}, (_, i) => {
 
 // ---------------- placement of the movable bytes (constant blocks, program blob) ----------------
 // Each role's delta block K_i is a constant (SHA256 baked in the program) and may sit in any input's unlocking as
-// one or more fixed-size pushes ("pieces"); the program blob sits in one carrier input (last push before the redeem).
+// one or more fixed-size pushes ("pieces"); the program blob is split into parts, each the last push before the redeem
+// of its carrier input (PLACE.blob = [carrier, ...], PLACE.blobLens = lengths of all parts but the last).
 // PLACE.K[i] = [[host, len], ...] (in order, lengths sum to kSize). Overridable for layout search (NATIVE_PLACE json).
 export const PLACE = (() => {
   const dflt = {blob: 3, K: ROLES.map((ro) => [[ro.i, ro.kSize]])};
@@ -68,7 +69,9 @@ export const PLACE = (() => {
   if (!pl.K) pl.K = dflt.K;
   pl.K = pl.K.map((pcs, i) => { const tot = pcs.reduce((s, [, l]) => s + l, 0); const fixed = pcs.map(([h, l]) => [h, l]);
     if (tot !== ROLES[i].kSize) { const lastLen = fixed.at(-1)[1] + ROLES[i].kSize - tot; assert.ok(lastLen >= 48, 'K piece'); fixed.at(-1)[1] = lastLen; } return fixed; });
-  assert.ok(pl.blob > 0 && pl.blob < NIN, 'the carrier is not input 0 (its WQ has a variable length)');
+  if (!Array.isArray(pl.blob)) pl.blob = [pl.blob]; pl.blobLens = pl.blobLens ?? [];
+  assert.equal(pl.blobLens.length, pl.blob.length - 1); assert.equal(new Set(pl.blob).size, pl.blob.length);
+  pl.blob.forEach((c) => assert.ok(c > 0 && c < NIN, 'a carrier is not input 0 (its WQ has a variable length)'));
   pl.K.forEach((pcs) => pcs.forEach(([h, l]) => assert.ok(h >= 0 && h < NIN && l >= 48)));
   return pl;
 })();
@@ -78,11 +81,11 @@ export const pushesOf = (h) => {
   const out = [];
   if (h === 0) out.push({name: 'ZR', size: 2 * W});
   out.push({name: 'G', size: ROLES[h].regionSize});
+  out.push({name: 'CL', size: ROLES[h].claimSize});                              // right after G: one slice reads both
   PLACE.K.forEach((pcs, i) => pcs.forEach(([host, len], j) => { if (host === h) out.push({name: `K${i}_${j}`, size: len, role: i, piece: j}); }));
   if (PLACE.fill?.[h]) out.push({name: 'PAD', size: PLACE.fill[h]});           // budget filler (zero bytes), only if a layout needs it
-  out.push({name: 'CL', size: ROLES[h].claimSize});
   if (h === 0) out.push({name: 'WQ', size: null});
-  if (h === PLACE.blob) out.push({name: 'BLOB', size: null});
+  if (PLACE.blob.includes(h)) out.push({name: 'BLOB', size: null, part: PLACE.blob.indexOf(h)});
   return out;
 };
 // byte offset of the data of push `name` in input h's unlocking (only for pushes before any variable-size push)
@@ -254,14 +257,16 @@ export function splitClaims(w, st, sched) {
 }
 
 // ---------------- the transaction's unlocking pushes (before the redeem) ----------------
+export const blobParts = (blob) => { const out = []; let o = 0; PLACE.blob.forEach((h, j) => { const n = j < PLACE.blobLens.length ? PLACE.blobLens[j] : blob.length - o; out.push(blob.subarray(o, o + n)); o += n; }); return out; };
 export function txPushes(w, blob) {
+  const parts = blobParts(blob);
   const ZR = Buffer.concat([W48(w.z), W48(w.rho)]);
   return Array.from({length: NIN}, (_, h) => pushesOf(h).map((ps) => {
     if (ps.name === 'ZR') return ZR;
     if (ps.name === 'G') return w.regions[h];
     if (ps.name === 'CL') return w.claims.bytes[h];
     if (ps.name === 'WQ') return w.WQ;
-    if (ps.name === 'BLOB') return Buffer.from(blob);
+    if (ps.name === 'BLOB') return Buffer.from(parts[ps.part]);
     if (ps.name === 'PAD') return Buffer.alloc(ps.size);
     const pcs = PLACE.K[ps.role]; const off = pcs.slice(0, ps.piece).reduce((s, [, l]) => s + l, 0);
     return K_BLOCKS[ps.role].subarray(off, off + ps.size);

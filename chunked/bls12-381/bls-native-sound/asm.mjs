@@ -135,8 +135,9 @@ export class Asm {
     f.body(s, ins); assert.equal(s.st.length - 1, f.nOut, 'local function output count'); assert.equal(s.st[0], '__floor');
     return s.code;
   }
-  invoke(name, outs) {
+  invoke(name, outs, {arrange = false} = {}) {
     const f = this.ctx.funcs.get(name); assert.ok(f, 'no function ' + name);
+    if (arrange && f.kind === 'bound' && f.entry) this.arrangeAll(f.entry); // re-create the compiled call-site layout
     if (f.id === null) {
       f.id = this.ctx.nextId++; assert.ok(f.id <= 127, 'function ids exhausted');
       if (f.kind === 'local') f.code = this.compileLocal(f);
@@ -150,7 +151,7 @@ export class Asm {
       this.st.splice(this.st.length - f.nIn, f.nIn); const o = outs ?? Array.from({length: f.nOut}, () => this.fresh('o')); assert.equal(o.length, f.nOut); this.st.push(...o);
     } else {
       // every item the body touches must sit at the same position; untouched items are carried through
-      assert.equal(this.st.length, f.entry.length, `bound function ${name}: stack height differs`); this.sameCtx(f.entryCtx, 'bound function ' + name);
+      if (this.st.length !== f.entry.length) throw new Error(`bound function ${name}: stack height differs ${this.st.length} vs ${f.entry.length}: now ${this.st.slice(-30).join(" ")} | entry ${f.entry.slice(-30).join(" ")}`); this.sameCtx(f.entryCtx, 'bound function ' + name);
       for (const t of f.touched) if (f.entry.includes(t) || this.st.includes(t)) assert.equal(this.st.lastIndexOf(t), f.entry.lastIndexOf(t), `bound function ${name}: '${t}' at a different position`);
       const E2 = this.st; this.st = f.exit.map((n) => (f.touched.has(n) || !f.entry.includes(n) ? n : E2[f.entry.lastIndexOf(n)]));
       if (this.touched) for (const t of f.touched) this.touched.add(t);
