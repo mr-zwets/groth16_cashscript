@@ -55,7 +55,7 @@ export const ROLES = Array.from({length: NIN}, (_, i) => {
   return {i, c0, c1, e0, e1, events, states, nslopes, dstep0, last: i === NIN - 1,
     regionSize: (i === 0 ? STMT_SIZE : 0) + 288 * states.length + 96 * nslopes,
     claimSize: i === NIN - 1 ? W : W + 4 * W,
-    kSize: 288 + 96 * nslopes};                                // delta block: start state (x, c, l) + one slope per step
+    kSize: 192 + 96 * nslopes};                                // delta block: start point (x, y) + one slope per step
 });
 
 // ---------------- placement of the movable bytes (constant blocks, program blob) ----------------
@@ -79,6 +79,7 @@ export const pushesOf = (h) => {
   if (h === 0) out.push({name: 'ZR', size: 2 * W});
   out.push({name: 'G', size: ROLES[h].regionSize});
   PLACE.K.forEach((pcs, i) => pcs.forEach(([host, len], j) => { if (host === h) out.push({name: `K${i}_${j}`, size: len, role: i, piece: j}); }));
+  if (PLACE.fill?.[h]) out.push({name: 'PAD', size: PLACE.fill[h]});           // budget filler (zero bytes), only if a layout needs it
   out.push({name: 'CL', size: ROLES[h].claimSize});
   if (h === 0) out.push({name: 'WQ', size: null});
   if (h === PLACE.blob) out.push({name: 'BLOB', size: null});
@@ -109,8 +110,10 @@ export const DELTA = (() => {
   }
   return {states};
 })();
-export const kBlock = (i) => { const ro = ROLES[i]; const s = DELTA.states[ro.dstep0];
-  const b = Buffer.concat([...[s.x.c0, s.x.c1, s.c.c0, s.c.c1, s.l.c0, s.l.c1].map(W48), ...VKC.lams.slice(ro.dstep0, ro.dstep0 + ro.nslopes).flatMap((l) => [W48(l.c0), W48(l.c1)])]);
+// the start point (x_j, y_j) of role i's first delta step (y_j = c_{j-1} - l_{j-1} x_j); the script resumes the recursion
+// with l_{j-1} := 0 and c_{j-1} := y_j, which gives the same c_j = l_j x_j - y_j
+export const kBlock = (i) => { const ro = ROLES[i]; const s = DELTA.states[ro.dstep0]; const y = F2.sub(s.c, F2.mul(s.l, s.x));
+  const b = Buffer.concat([...[s.x.c0, s.x.c1, y.c0, y.c1].map(W48), ...VKC.lams.slice(ro.dstep0, ro.dstep0 + ro.nslopes).flatMap((l) => [W48(l.c0), W48(l.c1)])]);
   assert.equal(b.length, ro.kSize); return b; };
 export const K_BLOCKS = ROLES.map((_, i) => kBlock(i));
 export const K_HASH = K_BLOCKS.map((b) => sha(b));
@@ -259,6 +262,7 @@ export function txPushes(w, blob) {
     if (ps.name === 'CL') return w.claims.bytes[h];
     if (ps.name === 'WQ') return w.WQ;
     if (ps.name === 'BLOB') return Buffer.from(blob);
+    if (ps.name === 'PAD') return Buffer.alloc(ps.size);
     const pcs = PLACE.K[ps.role]; const off = pcs.slice(0, ps.piece).reduce((s, [, l]) => s + l, 0);
     return K_BLOCKS[ps.role].subarray(off, off + ps.size);
   }));

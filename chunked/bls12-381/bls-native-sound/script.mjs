@@ -80,8 +80,8 @@ function kTable(mult) {
 export const FLAGS = Array.from({length: NE}, (_, e) => (isAdd(e) ? 1 : 0) | (isBoundary(e) ? 2 : 0));
 const ZP = ['z', 'z2', 'z3', 'z4', 'z5', 'z6'], EZP = ['ez', 'ez2', 'ez3', 'ez4', 'ez5', 'z6'];
 // canonical frame: every role re-creates exactly this main stack (alt empty) before SETUP
-const FRAME = ['CL', 'SCH', 'f', 'N0', 'N1', 'ST', 'SL', 'D', 'dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'X0', 'X1', 'Y0', 'Y1',
-  'xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC', 'sc0', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5', 'z', 'rho'];
+const FRAME = ['CL', 'D', 'dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'z', 'rho', 'xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC',
+  'sc0', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5', 'N0', 'N1', 'X0', 'X1', 'Y0', 'Y1', 'SL', 'ST', 'SCH', 'f'];
 const HOT = ['xd0', 'xd1', 'xB0', 'xB1', 'yB0', 'yB1', 'Scp', 'Scm', 'oC', 'cz2', 'cz2t', 'oP', 'xz2', 'xz2t', 't', 'p'];
 const STATE = ['SL', 'X0', 'X1', 'Y0', 'Y1', 'D', 'dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'Fp', 'Fm'];
 
@@ -227,6 +227,33 @@ function gen(L0guess, BLOB_LEN) {
     a.roll('CL').op(OP.EQUALVERIFY, 2);
   });
 
+  const toLoop = (a, L0g) => {
+    a.toAlt('ST').push(0, 'R').toAlt().toAlt('SCH').toAlt('N0').toAlt('N1').toAlt('f');
+    const moved = new Set([...HOT, ...STATE]);
+    a.arrangeAll(L0g ?? [...a.st.filter((x) => !moved.has(x)), ...HOT, ...STATE]);
+  };
+  // WORK (inputs 1..3): z~ rho~ and the statement from input 0; this input's nibble slices; the predecessor's last state and
+  // T~; own states | slopes; then the setup, the start value F+- = S_start(+-z) and the event loop
+  top.defBound('WORK', (a) => {
+    a.invoke('READ0', ['z', 'rho', 'xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC', 'NB', 'sc0', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5']);
+    // nibble slices of this input's events (event e uses nibble e + 1): bytes [pE0, pE0 + pNE) of N0 and of N1
+    a.roll('NB').push(64).op(OP.SPLIT, 2, 'N0', 'N1');
+    for (const n of ['N0', 'N1']) a.roll(n).pick('pE0').op(OP.SPLIT, 2, 'x', n).drop('x').roll(n).pick('pNE').op(OP.SPLIT, 2, n, 'x').drop('x');
+    a.drop('pE0').drop('pNE');
+    // the predecessor: its last state (the start of this input's first identity) and its B-walk end point T~
+    a.roll('pH').op(OP.INPUTBYTECODE, 1, 'u').roll('pOS').op(OP.SPLIT, 2, 'x', 'u').drop('x').push(288).op(OP.SPLIT, 2, 'S0', 'u')
+      .roll('pOT').op(OP.SPLIT, 2, 'x', 'u').drop('x').push(192).op(OP.SPLIT, 2, 'Tt', 'x').drop('x');
+    a.roll('Tt'); for (const n of ['X0', 'X1', 'Y0', 'Y1']) a.invoke('RD', [n, 'Tt']); a.drop('Tt');
+    // own region: states | slopes
+    a.roll('G').roll('pNS').op(OP.SPLIT, 2, 'STo', 'SL');
+    a.roll('S0').roll('STo').op(OP.CAT, 2, 'ST');
+    a.arrangeAll(FRAME); assert.equal(a.alt.length, 0);
+    a.invoke('SETUP');
+    a.invoke('WSTART');
+    toLoop(a, L0guess);
+    a.invoke('LOOP');
+  });
+
   // ---- role bodies ----
   const roleCode = [];
   const stats = {};
@@ -238,7 +265,7 @@ function gen(L0guess, BLOB_LEN) {
     a.emit(OP.DEPTH, ...pushNum(ps.length), OP.NUMEQUALVERIFY);
     for (const x of ps) { if (x.name === 'WQ') continue; a.roll(x.name).emit(OP.SIZE); a.st.push('sz'); a.push(x.size ?? BLOB_LEN).op(OP.NUMEQUALVERIFY, 2); }
     // pushes held for other inputs (their constant pieces, the blob) are not used here
-    for (const x of ps) if (x.name === 'BLOB' || (x.role !== undefined && x.role !== i)) a.drop(x.name);
+    for (const x of ps) if (x.name === 'BLOB' || x.name === 'PAD' || (x.role !== undefined && x.role !== i)) a.drop(x.name);
     // 2. the constant block K_i: pieces in order (own stack or introspection), SHA256 == K_HASH[i]
     PLACE.K[i].forEach(([h, len], j) => {
       const nm = `K${i}_${j}`;
@@ -247,33 +274,17 @@ function gen(L0guess, BLOB_LEN) {
       a.rename(`K${i}_${j}`, 'K');
     });
     a.pick('K', 'Kc').op(OP.SHA256, 1, 'kh').pushBytes(K_HASH[i]).op(OP.EQUALVERIFY, 2);
-    a.roll('K').push(288).op(OP.SPLIT, 2, 'ks', 'D').roll('ks');
-    for (const n of ['dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1']) { a.push(48).op(OP.SPLIT, 2, 'w', 'ks').roll('w'); U(a, n); a.roll('ks'); }
-    a.drop('ks');
+    // delta start: (x_j, y_j), resumed as (x, c, l) = (x_j, y_j, 0)
+    a.roll('K').push(192).op(OP.SPLIT, 2, 'ks', 'D').roll('ks');
+    for (const n of ['dx0', 'dx1', 'dc0', 'dc1']) { a.push(48).op(OP.SPLIT, 2, 'w', 'ks').roll('w'); U(a, n); a.roll('ks'); }
+    a.drop('ks').push(0, 'dl0').push(0, 'dl1');
     sect('pin+K');
-    if (i === 0) head(a, U, lookup);
-    else {
-      a.invoke('READ0', ['z', 'rho', 'xA', 'yA', 'xB0', 'xB1', 'yB0', 'yB1', 'xC', 'yC', 'NB', 'sc0', 'sc1', 'sc2', 'sc3', 'sc4', 'sc5']);
-      // nibble slices of this input's events (event e uses nibble e + 1)
-      a.roll('NB').push(64).op(OP.SPLIT, 2, 'N0', 'N1');
-      for (const n of ['N0', 'N1']) a.roll(n).push(ro.e0 + 1).op(OP.SPLIT, 2, 'x', n).drop('x').roll(n).push(ro.e1 - ro.e0 + 1).op(OP.SPLIT, 2, n, 'x').drop('x');
-      // the predecessor: its last state (the start of this input's first identity) and its B-walk end point T~
-      { const h = i - 1, ph = ROLES[h]; const oS = offsetOf(h, 'G') + (h === 0 ? STMT_SIZE : 0) + 288 * (ph.states.length - 1), oT = offsetOf(h, 'CL') + 48;
-        assert.ok(oT > oS + 288);
-        a.push(h).op(OP.INPUTBYTECODE, 1, 'u').push(oS).op(OP.SPLIT, 2, 'x', 'u').drop('x').push(288).op(OP.SPLIT, 2, 'S0', 'u')
-          .push(oT - oS - 288).op(OP.SPLIT, 2, 'x', 'u').drop('x').push(192).op(OP.SPLIT, 2, 'Tt', 'x').drop('x');
-        a.roll('Tt'); for (const n of ['X0', 'X1', 'Y0', 'Y1']) a.invoke('RD', [n, 'Tt']); a.drop('Tt'); }
-      // own region: states | slopes
-      a.roll('G').push(288 * ro.states.length).op(OP.SPLIT, 2, 'STo', 'SL');
-      a.roll('S0').roll('STo').op(OP.CAT, 2, 'ST');
-      sect('reads');
-    }
-    // flags of this input's events: f = flag(e0), SCH = flags(e0 + 1 .. e1) + a dummy byte (the loop exits when SCH is empty)
-    a.pushBytes(Buffer.from([...FLAGS.slice(ro.e0 + 1, ro.e1 + 1), 0]), 'SCH').push(FLAGS[ro.e0], 'f');
-    a.arrangeAll(FRAME); assert.equal(a.alt.length, 0);
-    a.invoke('SETUP');
-    sect('setup');
     if (i === 0) {
+      head(a, U, lookup);
+      a.pushBytes(Buffer.from([...FLAGS.slice(ro.e0 + 1, ro.e1 + 1), 0]), 'SCH').push(FLAGS[ro.e0], 'f');
+      a.arrangeAll(FRAME); assert.equal(a.alt.length, 0);
+      a.invoke('SETUP');
+      sect('setup');
       // initial value: F+ = S_c(-z) Rc'(z) TP0[N0[0]] TP1[N1[0]], F- = S_c(z) Rc'(-z) TM0[..] TM1[..]
       for (let j = 0; j < 6; j++) a.push(VKC.Rconst[j]); for (const n of ZP) a.pick(n); a.invoke('EV', ['rcp', 'rcm']);
       a.roll('N0').push(1).op(OP.SPLIT, 2, 'b0', 'N0').roll('b0').op(OP.BIN2NUM, 1, 'i0');
@@ -283,14 +294,21 @@ function gen(L0guess, BLOB_LEN) {
         a.op(OP.MUL, 2, 'uv').pick('p').op(OP.MOD, 2, 'uv').pick(S, 'sv').roll(Rc).op(OP.MUL, 2, 'sr').op(OP.MUL, 2, 'w').pick('p').op(OP.MOD, 2, F);
       }
       a.drop('i0').drop('i1');
-    } else a.invoke('WSTART');
-    a.toAlt('ST').push(0, 'R').toAlt().toAlt('SCH').toAlt('N0').toAlt('N1').toAlt('f');
-    const moved = new Set([...HOT, ...STATE]);
-    const L0 = L0guess ?? [...a.st.filter((x) => !moved.has(x)), ...HOT, ...STATE];
-    a.arrangeAll(L0);
-    sect('start');
-    a.invoke('LOOP');
-    sect('loop');
+      toLoop(a, L0guess);
+      sect('start');
+      a.invoke('LOOP');
+      sect('loop');
+    } else {
+      // role parameters, then the shared worker body: reads, setup, start, the event loop
+      const h = i - 1, ph = ROLES[h]; const oS = offsetOf(h, 'G') + (h === 0 ? STMT_SIZE : 0) + 288 * (ph.states.length - 1), oT = offsetOf(h, 'CL') + 48;
+      assert.ok(oT > oS + 288);
+      a.push(ro.e0 + 1, 'pE0').push(ro.e1 - ro.e0 + 1, 'pNE').push(h, 'pH').push(oS, 'pOS').push(oT - oS - 288, 'pOT').push(288 * ro.states.length, 'pNS');
+      a.pushBytes(Buffer.from([...FLAGS.slice(ro.e0 + 1, ro.e1 + 1), 0]), 'SCH').push(FLAGS[ro.e0], 'f');
+      a.arrangeAll(['CL', 'D', 'dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'G', 'pE0', 'pNE', 'pH', 'pOS', 'pOT', 'pNS', 'SCH', 'f']);
+      sect('params');
+      a.invoke('WORK');
+      sect('work');
+    }
     if (i < NIN - 1) a.invoke('FINW');
     else terminal(a);
     // clean stack: drop everything (all checks are VERIFYs), leave TRUE
@@ -428,7 +446,7 @@ function gen(L0guess, BLOB_LEN) {
   for (let i = 0; i < NIN; i++) pro.push(...pushData(roleCode[i]), ...pushNum(1 + i), OP.DEFINE);
   const blob = Uint8Array.from([...pro, OP.INPUTINDEX, OP.ADD1, OP.INVOKE]);
   info.funcs = Object.fromEntries(defs.map((f) => [[...ctx.funcs].find(([, g]) => g === f)[0], f.code.length]));
-  info.roles = roleCode.map((c) => c.length); info.sections = stats; info.prologue = pro.length;
+  info.roles = roleCode.map((c) => c.length); info.sections = stats; info.prologue = pro.length; info.ctx = ctx; info.roleCode = roleCode;
   return {blob, info, L0: L0guess};
 }
 

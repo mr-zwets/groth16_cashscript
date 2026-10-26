@@ -7,7 +7,7 @@
 //   node worst.mjs [nq,...]     prints n_q, nonzero nibbles, op and margin (consensus / standard) per target
 import assert from 'node:assert/strict';
 import {r, AX, AXPOW, mint} from './math.mjs';
-import {LAYOUT, CHUNK_END, K_IDS, degDBound, NQ_MAX, prove} from './protocol.mjs';
+import {CHUNK_END, K_IDS, degDBound, NQ_MAX, N_MIN, prove} from './protocol.mjs';
 
 // slots: s[j] in {0, 1, 2} nonzero nibbles at byte j (j = 0: the initial value; j = e + 1: event e)
 // a chunk's structural degree only depends on its own bytes (chunk 0 also owns byte 0)
