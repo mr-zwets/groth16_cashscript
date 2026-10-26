@@ -1,0 +1,1997 @@
+{
+ "generator": "redteam.mjs",
+ "locking": "aa20359c94315e8d60d839be62561aef3a2a7b725f9680e17e41a20a9f064ecb2df687",
+ "results": [
+  {
+   "name": "honest transaction (fixture committed)",
+   "kind": "control",
+   "consensus": {
+    "valid": true,
+    "rejectingInputs": [],
+    "errors": [
+     "ok",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": true,
+    "rejectingInputs": [],
+    "errors": [
+     "ok",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "honest transaction (fixture dense)",
+   "kind": "control",
+   "consensus": {
+    "valid": true,
+    "rejectingInputs": [],
+    "errors": [
+     "ok",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": true,
+    "rejectingInputs": [],
+    "errors": [
+     "ok",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "a 5th input (copy of input 1)",
+   "kind": "pins",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3,
+     4
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "inputs 1 and 2 swapped",
+   "kind": "pins",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "inputs 0 and 3 swapped",
+   "kind": "pins",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
+     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
+     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
+     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
+     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
+     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286.",
+     "Program called an OP_SPLIT operation with an invalid index. stack item length: 2854; requested split index: 4286."
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "input 2 spends a foreign locking (P2SH32 of another redeem)",
+   "kind": "pins",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "redeem byte changed in input 1 (P2SH32 mismatch)",
+   "kind": "pins",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     1
+    ],
+    "errors": [
+     "ok",
+     "The P2SH redeem bytecode provided in this input does not match the hash required by the locking bytecode. Top stack item: \"\".",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     1
+    ],
+    "errors": [
+     "ok",
+     "The P2SH redeem bytecode provided in this input does not match the hash required by the locking bytecode. Top stack item: \"\".",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "input 1: region one byte longer",
+   "kind": "layout",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "input 3: an extra push before the witness",
+   "kind": "layout",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "input 2: a non-push opcode in the unlocking",
+   "kind": "layout",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Unlocking bytecode may contain only push operations in version 1 and 2 transactions.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Unlocking bytecode may contain only push operations in version 1 and 2 transactions.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "input 0: claims push one byte short",
+   "kind": "layout",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "relocated constant pieces swapped in input 1 (K0_1 <-> K1_0)",
+   "kind": "layout",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "relocated constant piece resized (48 B moved from K3_1 to K1_0 in input 1)",
+   "kind": "layout",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     1,
+     3
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     1,
+     3
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "filler push not zero (input 2)",
+   "kind": "layout",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     2
+    ],
+    "errors": [
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     2
+    ],
+    "errors": [
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "program part 0 (input 3) tampered",
+   "kind": "program",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "program part 1 (input 2) tampered",
+   "kind": "program",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "delta constant block K2 tampered (wrong K_const)",
+   "kind": "constants",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     2
+    ],
+    "errors": [
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     2
+    ],
+    "errors": [
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "delta constant piece K0_1 (hosted in input 1) tampered",
+   "kind": "constants",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "delta start point of K3 replaced by K2's",
+   "kind": "constants",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     3
+    ],
+    "errors": [
+     "ok",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     3
+    ],
+    "errors": [
+     "ok",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "statement x_A changed",
+   "kind": "transcript",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "state word changed (region 2)",
+   "kind": "transcript",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     2
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     2
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "B slope changed (region 1, first slope)",
+   "kind": "transcript",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "GLS nibble changed (N0[9] ^ 1)",
+   "kind": "transcript",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "residue root s^c changed",
+   "kind": "transcript",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "public input n0 + 1",
+   "kind": "statement",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "public input n1 = n1 + r",
+   "kind": "statement",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "quotient word + 1 (middle)",
+   "kind": "quotient",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "WQ with 43 words (below the floor)",
+   "kind": "quotient",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "WQ with 117 words (above the cap, zero-padded)",
+   "kind": "quotient",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "WQ with a leading zero word above the floor",
+   "kind": "quotient",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "WQ length not a multiple of 48",
+   "kind": "quotient",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "z~ + 1",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "z~ + p (non-canonical alias)",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "rho~ + 1",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "rho~ + p (non-canonical alias)",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "R~_0 + 1",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "R~_1 + 1",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "R~_2 + 1",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     2
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     2
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "R~_3 + 1",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "R~_2 + p (non-canonical alias)",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     2
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     2
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "R~_3 one byte changed",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "T~_0 x.c0 + 1",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "T~_1 x.c0 + 1",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     1,
+     2
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     1,
+     2
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "T~_2 x.c0 + 1",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     2,
+     3
+    ],
+    "errors": [
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     2,
+     3
+    ],
+    "errors": [
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "T~_1 y.c1 + p (non-canonical alias)",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     1,
+     2
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     1,
+     2
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "T~_0 one byte changed",
+   "kind": "claims",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "alias: B slope + p (region 1), consistent transcript",
+   "kind": "canonical",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     1
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     1
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "alias: state word + p (region 2), consistent transcript",
+   "kind": "canonical",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     2
+    ],
+    "errors": [
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     2
+    ],
+    "errors": [
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "alias: last state of region 1 + p (read by input 2), consistent transcript",
+   "kind": "canonical",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     1,
+     2
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     1,
+     2
+    ],
+    "errors": [
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok"
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "alias: x_A + p, consistent transcript",
+   "kind": "canonical",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "alias: s^c word + p, consistent transcript",
+   "kind": "canonical",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "alias: n0 + r, consistent transcript",
+   "kind": "canonical",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "nibble 0x10 (out of range), consistent transcript",
+   "kind": "canonical",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "A off the curve (y + 1), consistent witness",
+   "kind": "points",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "C off the curve (y + 1), consistent witness",
+   "kind": "points",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "A negated (-A), consistent witness",
+   "kind": "points",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "B on the twist but not in G2, consistent witness",
+   "kind": "points",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "B off the twist (y + 1), consistent witness",
+   "kind": "points",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true,
+   "ownerRejects": true
+  },
+  {
+   "name": "a different valid proof's B (proof1) with this proof's A, C",
+   "kind": "points",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "ok"
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "staple: inputs 1.. from proof1, 0..0 from committed",
+   "kind": "staple",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     1,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "staple: inputs 2.. from proof1, 0..1 from committed",
+   "kind": "staple",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     2,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "Program failed an OP_VERIFY operation.",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true
+  },
+  {
+   "name": "staple: inputs 3.. from proof1, 0..2 from committed",
+   "kind": "staple",
+   "consensus": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "standard": {
+    "valid": false,
+    "rejectingInputs": [
+     0,
+     3
+    ],
+    "errors": [
+     "Program failed an OP_VERIFY operation.",
+     "ok",
+     "ok",
+     "Program failed an OP_VERIFY operation."
+    ]
+   },
+   "ok": true
+  }
+ ]
+}

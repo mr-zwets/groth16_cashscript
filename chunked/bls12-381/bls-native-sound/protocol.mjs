@@ -9,6 +9,7 @@
 // The B walk is affine for every event, with witnessed slopes, each fixed by an exact field equation.
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {readFileSync} from 'node:fs';
 import {p, r, mod, F2, F12, f2, AXPOW, BITS, NE, ADD_EVENTS, LAMBDA, N6R, B_TWIST, GAMMA2, GAMMA3, conj2, VKC, VK_ENCODING,
   glsFactor, glsDigits, lineAffPoly, frob1Monic, fromPoly, monicRep, pmul, psub, pneg, peval, pdivM, isZero, M} from './math.mjs';
 
@@ -44,7 +45,9 @@ export const STMT_SIZE = 864;
 
 // ---------------- the 4 inputs: chunk ownership ----------------
 export const NIN = 4;
-export const CUTS = (process.env.NATIVE_CUTS ?? '0,5,15,25,33').split(',').map(Number); // input i owns chunks [CUTS[i], CUTS[i+1])
+// the layout (layout.json, checked in; NATIVE_CUTS / NATIVE_PLACE override it for layout search and measurement)
+export const LAYOUT_FILE = JSON.parse(readFileSync(new URL('./layout.json', import.meta.url), 'utf8'));
+export const CUTS = process.env.NATIVE_CUTS ? process.env.NATIVE_CUTS.split(',').map(Number) : LAYOUT_FILE.cuts; // input i owns chunks [CUTS[i], CUTS[i+1])
 assert.equal(CUTS.length, NIN + 1); assert.equal(CUTS[0], 0); assert.equal(CUTS[NIN], K_IDS);
 export const ROLES = Array.from({length: NIN}, (_, i) => {
   const c0 = CUTS[i], c1 = CUTS[i + 1]; const e0 = CHUNK_START[c0], e1 = CHUNK_END[c1 - 1];
@@ -65,7 +68,7 @@ export const ROLES = Array.from({length: NIN}, (_, i) => {
 // PLACE.K[i] = [[host, len], ...] (in order, lengths sum to kSize). Overridable for layout search (NATIVE_PLACE json).
 export const PLACE = (() => {
   const dflt = {blob: 3, K: ROLES.map((ro) => [[ro.i, ro.kSize]])};
-  const pl = process.env.NATIVE_PLACE ? JSON.parse(process.env.NATIVE_PLACE) : dflt;
+  const pl = process.env.NATIVE_PLACE ? JSON.parse(process.env.NATIVE_PLACE) : process.env.NATIVE_CUTS ? dflt : structuredClone(LAYOUT_FILE.place);
   if (!pl.K) pl.K = dflt.K;
   pl.K = pl.K.map((pcs, i) => { const tot = pcs.reduce((s, [, l]) => s + l, 0); const fixed = pcs.map(([h, l]) => [h, l]);
     if (tot !== ROLES[i].kSize) { const lastLen = fixed.at(-1)[1] + ROLES[i].kSize - tot; assert.ok(lastLen >= 48, 'K piece'); fixed.at(-1)[1] = lastLen; } return fixed; });
@@ -211,16 +214,23 @@ export function prove(fx, {digits = null, forge = false, slopeOverride = null} =
     for (const k of ro.states) parts.push(...states[k].slice(0, 6).map(W48));
     for (let n = 0; n < ro.nslopes; n++) parts.push(slopeBytes[si++]);
     const g = Buffer.concat(parts); if (!forge || slopeOverride === null) assert.equal(g.length, ro.regionSize); return g; });
+  const w = {regions, ns, digits: dg, N, Sc, states, c, stmt, slopes: sched.slopes, debug: {sched, ids, forge, popBound: nqFor((ev) => [0, 1].reduce((s, k) => s + popc(N[k][ev + 1]), 0))}};
+  return finishWitness(w, regions);
+}
+// transcript, challenges, aggregated quotient and claims for given region bytes (the honest prover; also used by the rejection
+// suite to re-derive a consistent transcript for a re-encoded region, e.g. a +p alias, which must then fail its range check)
+export function finishWitness(w0, regions) {
+  const {ids, forge, popBound, sched} = w0.debug;
   const {h0, rhoRaw} = transcript(regions); const rho = toCh(rhoRaw);
   // aggregated quotient Q = sum_k rho^(K-1-k) Q_k (odd), trimmed; canonical length >= N_MIN (zero-padded below)
   const Qagg = []; ids.forEach((id, k) => { const wgt = mod(rho ** BigInt(K_IDS - 1 - k)); id.Q.forEach((x, i) => { Qagg[i] = mod((Qagg[i] ?? 0n) + wgt * x); }); });
   const qOdd = Qagg.filter((_, i) => i % 2 === 1); while (qOdd.length > 1 && qOdd.at(-1) === 0n) qOdd.pop();
   const nqTrue = qOdd.length; while (qOdd.length < N_MIN) qOdd.push(0n);
-  if (!forge) { assert.ok(nqTrue <= nqFor((ev) => [0, 1].reduce((s, k) => s + popc(N[k][ev + 1]), 0)), 'n_q within the structural bound'); assert.ok(qOdd.length <= NQ_MAX); }
+  if (!forge) { assert.ok(nqTrue <= popBound, 'n_q within the structural bound'); assert.ok(qOdd.length <= NQ_MAX); }
   const WQ = Buffer.concat(qOdd.slice().reverse().map(W48)); // highest coefficient first
   const z = toCh(sha(h0, rhoRaw, WQ));
-  const w = {regions, WQ, nq: qOdd.length, nqTrue, ns, digits: dg, N, Sc, states, c, stmt, slopes: sched.slopes, z, rho, h0, debug: {sched, ids}};
-  w.claims = splitClaims(w, st, sched);
+  const w = {...w0, regions, WQ, nq: qOdd.length, nqTrue, z, rho, h0};
+  w.claims = splitClaims(w, null, sched);
   return w;
 }
 export function transcript(regions) {

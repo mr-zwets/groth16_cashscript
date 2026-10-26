@@ -275,7 +275,9 @@ function gen(L0guess, BLOB_LENS) {
     a.emit(OP.DEPTH, ...pushNum(ps.length), OP.NUMEQUALVERIFY);
     for (const x of ps) { if (x.name === 'WQ') continue; a.roll(x.name).emit(OP.SIZE); a.st.push('sz'); a.push(x.size ?? BLOB_LENS[x.part]).op(OP.NUMEQUALVERIFY, 2); }
     // pushes held for other inputs (their constant pieces, the blob) are not used here
-    for (const x of ps) if (x.name === 'BLOB' || x.name === 'PAD' || (x.role !== undefined && x.role !== i)) a.drop(x.name);
+    // a filler push must be all zero bytes (no malleable content)
+    for (const x of ps) if (x.name === 'PAD') { a.roll('PAD').push(0).push(x.size).op(OP.NUM2BIN, 2, 'z').op(OP.EQUALVERIFY, 2); }
+    for (const x of ps) if (x.name === 'BLOB' || (x.role !== undefined && x.role !== i)) a.drop(x.name);
     // 2. the constant block K_i: pieces in order (own stack or introspection), SHA256 == K_HASH[i]
     PLACE.K[i].forEach(([h, len], j) => {
       const nm = `K${i}_${j}`;
