@@ -4,6 +4,7 @@
 // against each layout's fixed per-input budget, in consensus and standard accounting; reports the minimum margins.
 //   node sweep.mjs measure <first> <count> <out.json>        (proof list index range; run several in parallel)
 //   node sweep.mjs margins <chunks.json ...> -- <layout.json ...>
+//   node sweep.mjs merge <chunk-costs-9.json> <chunks.json ...>   (per-chunk max/min/mean over all measured proofs -> chunk-costs.json)
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {r, mod, X_ABS} from './blsmath.mjs';
@@ -31,6 +32,11 @@ if (mode === 'measure') {
     rows.push({name, chunks: ch, loop: ch.reduce((a, b) => a + b, 0)}); writeFileSync(out, JSON.stringify(rows));
     console.log(name, (rows.at(-1).loop / 1e6).toFixed(3) + 'M');
   }
+} else if (mode === 'merge') {
+  const base = JSON.parse(readFileSync(process.argv[3])); const rows = process.argv.slice(4).flatMap((f) => JSON.parse(readFileSync(f)));
+  const per = base.perChunk.map((s, k) => { const xs = rows.map((rw) => rw.chunks[k]); return {min: Math.min(s.min, ...xs), max: Math.max(s.max, ...xs), mean: Math.round((s.mean * base.proofs.length + xs.reduce((a, b) => a + b, 0)) / (base.proofs.length + xs.length))}; });
+  const out = {bounds: base.bounds, proofs: [...base.proofs, ...rows.map((rw) => rw.name)], perChunk: per, totalOfMax: per.reduce((a, s) => a + s.max, 0)};
+  writeFileSync('chunk-costs.json', JSON.stringify(out, null, 1)); console.log('proofs', out.proofs.length, 'sum of per-chunk max', out.totalOfMax);
 } else if (mode === 'margins') {
   const sep = process.argv.indexOf('--'); const rows = process.argv.slice(3, sep).flatMap((f) => JSON.parse(readFileSync(f)));
   const SK = JSON.parse(readFileSync(new URL('./skeleton.json', import.meta.url)));

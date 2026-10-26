@@ -11,7 +11,7 @@ import {VKC, nqMax, uniformBounds} from './protocol.mjs';
 
 const args = process.argv.slice(2).filter((x, i, a) => !x.startsWith('--') && a[i - 1] !== '--json');
 const N = Number(args[0] ?? 5), MARGIN = Number(args[1] ?? 0.10), VARIANT = args[2] ?? 'base', PARTS = Number(args[3] ?? 1);
-const REDEEM = (n) => n + 45 * (PARTS - 1); // each extra blob part: holder index, offset, length, SHA-256 in the loader
+const REDEEM = (n) => n + 15 * (PARTS - 1); // each extra blob part: <host> INPUTBYTECODE <off> SPLIT NIP <len> SPLIT DROP CAT (one SHA-256 over the concatenation; measured 68 -> 81 B)
 const outJson = process.argv.includes('--json') ? process.argv[process.argv.indexOf('--json') + 1] : null;
 const CH = JSON.parse(readFileSync(new URL('./chunk-costs.json', import.meta.url)));
 const SK = JSON.parse(readFileSync(new URL('./skeleton.json', import.meta.url)));

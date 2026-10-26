@@ -151,6 +151,7 @@ export const FACTS = (() => {
   assert.equal(gcd(LAMBDA, nE2), r, 'gcd(p - x, #E\'(Fp2)) = r'); assert.ok((nE2 / r) % r !== 0n, 'r || #E\'(Fp2)');
   // G1: cofactor h1 = (x-1)^2/3, gcd(h1, r) = 1 (A, C are only curve-checked; see README "G1 cofactor")
   const h1 = ((X_ABS + 1n) ** 2n) / 3n; assert.equal(h1 * r, p + 1n - t, '#E(Fp) = h1 r'); assert.equal(gcd(h1, r), 1n);
+  assert.equal((h1 * r) % 2n, 1n, '#E(Fp) odd: no 2-torsion, so y_A, y_C != 0 and every line keeps its X^3 term');
   return {nE2, h2: nE2 / r, h1, lambdaOverR: LAMBDA / r};
 })();
 function sqrtBig(n) { if (n < 2n) return n; let x = 1n << BigInt(Math.ceil(n.toString(2).length / 2) + 1); for (;;) { const y = (x + n / x) >> 1n; if (y >= x) return x; x = y; } } // Newton from above: floor(sqrt(n))
