@@ -19,6 +19,8 @@ import {
 } from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
+// zk-verifier-bench checkout (sibling of this repo by default; override with BENCH_DIR)
+const BENCH = process.env.BENCH_DIR || join(here, '../../../zk-verifier-bench');
 const STANDARD_BUDGET = (41 + 10_000) * 800;
 
 const HUGE = Number.MAX_SAFE_INTEGER;
@@ -42,7 +44,7 @@ const evalPair = (vm, locking, unlocking) => {
 const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const unlockingFor = (args) => Uint8Array.from(args.slice().reverse().flatMap((a) => [...pushInt(a)]));
 
-const vec = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/checkpoints/pairing-vectors.json', 'utf8'));
+const vec = JSON.parse(readFileSync(join(BENCH, 'src/checkpoints/pairing-vectors.json'), 'utf8'));
 // spend(Ax,Ay, Bxa,Bxb,Bya,Byb, Cx,Cy, in0,in1)
 const proofArgs = (inputs) => {
   const A = vec.proof.a, B = vec.proof.b, C = vec.proof.c;
@@ -87,5 +89,5 @@ const out = {
   looseAccept: looseAccept.accepted,
   rejectInvalid: !looseRejectInvalid.accepted,
 };
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-singleton-vectors.json', JSON.stringify(out, null, 2));
+writeFileSync(join(BENCH, 'src/bch/groth16-singleton-vectors.json'), JSON.stringify(out, null, 2));
 console.log('wrote src/bch/groth16-singleton-vectors.json');

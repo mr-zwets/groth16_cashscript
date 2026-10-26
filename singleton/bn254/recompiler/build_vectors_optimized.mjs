@@ -6,7 +6,7 @@
 //   4. write verifier/src/bch/groth16-singleton-opcode-optimized{,-multiproof}-vectors.json
 //
 // Run:  node singleton/bn254/recompiler/build_vectors_optimized.mjs
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
@@ -19,7 +19,8 @@ import { outlineArtifact } from './outline.mjs';
 const MAIN_INARITY = 10; // spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1)
 
 const here = dirname(fileURLToPath(import.meta.url));
-const VDIR = join(here, '../../../../verifier/src/bch') + '/';
+// zk-verifier-bench checkout (sibling of this repo by default; override with BENCH_DIR)
+const VDIR = join(process.env.BENCH_DIR || join(here, '../../../../zk-verifier-bench'), 'src/bch') + '/';
 const STANDARD_BUDGET = (41 + 10_000) * 800;
 const realVm = createVirtualMachineBch2026(false);
 
@@ -100,10 +101,24 @@ for (const p of mpBase.proofs) {
   if (evalFull(optimized, hexToBin(p.invalidUnlocking)).accepted) allOk = false;
 }
 if (!allOk) throw new Error('optimized contract failed a multiproof accept/reject');
+// canonical zero public inputs (n0 = 0, n1 = 0, both): valid proofs must verify (vk_x keeps IC0
+// when an MSM term is the point at infinity), tampered inputs must be rejected
+let zeroChecked = 0;
+if (existsSync(VDIR + 'groth16-singleton-zero-input-vectors.json')) {
+  const zero = JSON.parse(readFileSync(VDIR + 'groth16-singleton-zero-input-vectors.json', 'utf8'));
+  for (const p of zero.proofs) {
+    if (!evalFull(optimized, hexToBin(p.unlocking)).accepted) throw new Error(`optimized contract rejected the valid ${p.label} proof`);
+    for (const t of p.invalid) {
+      if (evalFull(optimized, hexToBin(t.unlocking)).accepted) throw new Error(`optimized contract accepted ${p.label} tamper ${t.label}`);
+    }
+    zeroChecked++;
+  }
+}
 const mp = { ...mpBase, contract: main.contract, description: 'multiproof set for the opcode-optimized singleton (same distinct proofs, optimized locking).', lockingOK: optimizedHex, lockingBytes: optimized.length };
 writeFileSync(VDIR + 'groth16-singleton-opcode-optimized-multiproof-vectors.json', JSON.stringify(mp, null, 2));
 
 console.log(`\nlooseAccept ${looseAccept.accepted}  rejectInvalid ${!looseReject.accepted}  opCost ${opCost.toLocaleString()}  inputsNeeded ${main.inputsNeeded}`);
 console.log(`realAccepted ${realAccept.accepted}  realError ${realAccept.error ?? '(none)'}`);
 console.log(`multiproof ${mpBase.proofs.length}/${mpBase.proofs.length} accept+reject OK`);
+console.log(`zero-input proofs ${zeroChecked} accept+reject OK`);
 console.log('wrote groth16-singleton-opcode-optimized-vectors.json + -multiproof-vectors.json');
