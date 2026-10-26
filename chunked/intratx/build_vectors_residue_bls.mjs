@@ -169,7 +169,11 @@ function specsVkxGlv(inst) {
       outLimbs: [vkxAff.x, vkxAff.y], extras: [vkxGlvZinv(k10, k20, k11, k21), GLV_TABLE_BYTES], role: 'cross',
       cmp: { cmpExpr: 'outBlob', nextFullInLen: MILLER_IN_LIMBS * W, skip: VKX_LIMB_OFFSET * W, cmpLen: 2 * W },
       label: 'GLV vk_x final -> assemble vk_x', checkpoint: 'vk_x',
-      enforceExactInputLength: QUOTIENT_TORUS,
+      // The final GLV chunk is a cross-stage boundary in both BLS modes. Its
+      // reader consumes the fixed Miller genesis prefix from the successor
+      // input; reject trailing state in the carrier on the default Fp6-tail
+      // path as well as in quotient-torus mode.
+      enforceExactInputLength: true,
     };
     return { file: join(GEN, `vkxglv_${String(ch.idx).padStart(2, '0')}.cash`), inLimbs, outLimbs: [...vkxGlvStateAt(k10, k20, k11, k21, ch.hi), ...scal], extras: [], role: 'within', label: `GLV vk_x [${ch.lo},${ch.hi})`, checkpoint: undefined };
   });
