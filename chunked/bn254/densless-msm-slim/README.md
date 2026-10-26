@@ -4,7 +4,8 @@
 > claims for the submitted densless constructions ([#28 reply](https://github.com/mr-zwets/groth16_cashscript/issues/28), [#32](https://github.com/mr-zwets/groth16_cashscript/issues/32) F6,
 > [zk-verifier-bench#49](https://github.com/mr-zwets/zk-verifier-bench/issues/49)): the shared `millerEvent` consumes slopes without the
 > tangent/chord equations, the terminal's carried-R predicate compares a value with itself
-> instead of checking the B endpoint, and line/root values are not bound to the committed state.
+> instead of checking the B endpoint, and, at the #22 / bench#42 head (densless-msm-slim), line/root
+> values are not bound to the committed state.
 > No end-to-end false acceptance is claimed. Do not treat this verifier as sound. For a sound
 > BN254 design see [`../sound-si-gls`](../sound-si-gls/README.md).
 

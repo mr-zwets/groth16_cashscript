@@ -34,16 +34,18 @@ claims for the submitted densless constructions
 
 The author reports this as missing constraints found by review. No end-to-end false
 acceptance was executed. The single-input draft shares the densless folding, so it has no
-soundness argument either. The designs below are therefore the sound alternative to
-densless, not a hedge against #28: each closes exactly these gaps (slopes and the B endpoint
-are checked by exact equations, every line value is computed on-chain, and every state is
-hash-committed before the challenge it meets).
+soundness argument either. The designs below are built to close these gaps by construction
+(slopes and the B endpoint are checked by exact equations, every line value is computed
+on-chain, and every state is hash-committed before the challenge it meets). Only SI-GLS
+([`chunked/bn254/sound-si-gls`](../../chunked/bn254/sound-si-gls/README.md)) is built and
+independently reviewed; commit-all and hybrid-direct remain design records (see the review
+status table below).
 
 The sound reference points are:
 
 | Verifier | Inputs | Score | Soundness |
 |---|---|---|---|
-| densless-msm-spec-single (draft) | 1 | 28,433 B | none: densless claims withdrawn (#28, #32 F6) |
+| densless-msm-spec-single (draft) | 1 | 28,433 B | none: shares the withdrawn densless folding (#32 F6) |
 | intratx-residue-large | 4 | 58,460 B | exact arithmetic, no open finding (not independently reviewed) |
 | singleton-minop, moved to one bch-spec input | 1 | ~71–81 kB (estimate) | exact arithmetic, no open finding (not independently reviewed) |
 

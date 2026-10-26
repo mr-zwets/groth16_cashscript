@@ -13,7 +13,9 @@ BCH 2026 VM:
   withdrawn: its author withdrew the densless soundness claims ([#28](https://github.com/mr-zwets/groth16_cashscript/issues/28), [#32](https://github.com/mr-zwets/groth16_cashscript/issues/32) F6).
 - **BLS12-381** — the singleton verifier (baseline and op-optimized), on the **same
   curve as the nChain reference** so the benchmark gets a true apples-to-apples
-  comparison (7,347 B vs nChain's 522,564 B, ~71× smaller), **plus** current-BCH
+  comparison (7,347 B vs nChain's 522,564 B, ~71× smaller; that baseline singleton and its
+  5,828 B opcode-optimized build are held as withdrawn on maintainer review: no coordinate
+  range, curve-equation or G2 subgroup checks, see [singleton/bls12-381](singleton/bls12-381/README.md)), **plus** current-BCH
   linked and grouped-residue chunked constructions (the grouped quotient-residue
   verifier is 26 inputs in 3 standard transactions; the Fiat-Shamir intra-tx build fits
   one standard transaction; the smallest non-withdrawn one,

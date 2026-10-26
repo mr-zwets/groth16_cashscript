@@ -8,7 +8,8 @@ The design is the spike's SI-GLS ("single batched torus identity at ±z, GT-GLS 
 the soundness gaps of the densless entries (issue #28: fixed-table and checkpoint evaluations supplied by the prover).
 The densless author has since withdrawn those entries' soundness claims ([#28 reply](https://github.com/mr-zwets/groth16_cashscript/issues/28),
 [#32 F6](https://github.com/mr-zwets/groth16_cashscript/issues/32): unconstrained Miller slopes, a terminal that compares
-a value with itself instead of checking the B endpoint, and line/root values not bound to the committed state), so this is
+a value with itself instead of checking the B endpoint, and, at the #22 / bench#42 head, line/root values not bound to the
+committed state), so this is
 the sound BN254 alternative, not a hedge. It is the smallest non-withdrawn BN254 entry in the bch-spec category.
 **Every accept-relevant value is either computed on-chain, a baked VK constant, hash-committed before the challenge
 it meets, or checked by an exact field or integer equation.** No prover-supplied evaluation is used anywhere.

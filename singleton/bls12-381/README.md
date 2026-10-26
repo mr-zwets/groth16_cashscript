@@ -1,5 +1,15 @@
 # singleton/bls12-381/ — BLS12-381 Groth16 verifier (singleton oracle)
 
+> **Withdrawn (held, 2026-10-26).** The bench entries built from `groth16.cash`,
+> `bch-groth16-bls12381-singleton` (7,347 B) and `bch-groth16-bls12381-singleton-opcode-optimized`
+> (5,828 B), are held as withdrawn on maintainer review; this is not an author withdrawal.
+> `groth16.cash` range-checks only the public inputs: the proof coordinates (A, B, C) get no
+> `< p` range checks, A, C and B get no curve-equation checks, and B gets no G2 subgroup
+> check. `lib/G2Check.cash` (the ψ check) exists but is not imported by `groth16.cash`. The
+> vk_x MSM handles identity and zero inputs correctly (F4 does not apply). Do not treat these
+> two entries as sound verifiers. `bch-groth16-bls12381-singleton-minop` (`groth16_minop.cash`)
+> is a separate source and is not covered by this note.
+
 The complete Groth16 verifier on **BLS12-381** — the same curve as the nChain
 reference, so the benchmark can compare on the same curve. On-chain `vk_x`
 (`vkx.cash`), the field tower (Fp2→Fp6→Fp12), the Miller loop, and the final

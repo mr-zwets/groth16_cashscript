@@ -34,10 +34,12 @@ withdrawn by their author ([#32], [bench#49]) or are held as withdrawn because a
 finding applies to the code they ship. Their rows stay here as history. The current best
 non-withdrawn BN254 entries are `bch-groth16-intratx-crown8-rawchain` (77,193 B, current-BCH
 deployable) and `bch-groth16-sound-si-gls-single` (21,915 B, proposed `bch-spec` VM, one input).
-The densless family (`-densless`, `-densless-msm`, `-densless-msm-slim`, `-densless-msm-spec`)
-is withdrawn under F6: the Miller slopes are not constrained by the tangent/chord
-equations, the terminal compares a value with itself instead of checking the B endpoint, and
-line/root values are not bound to the committed state ([#28], [#32]).
+The densless family (`-densless-msm`, `-densless-msm-slim`, `-densless-msm-spec`) is
+withdrawn under F6: the Miller slopes are not constrained by the tangent/chord equations and
+the terminal compares a value with itself instead of checking the B endpoint ([#28], [#32]);
+at the #22 / bench#42 head (`-densless-msm-slim`) line/root values are also not bound to the
+committed state. The plain `-pairfold5-densless` baseline is excluded from the author's
+withdrawal and is held as withdrawn on our reading (see below).
 
 | entry | form / variant | headline | notes |
 |---|---|---|---|
@@ -70,9 +72,12 @@ line/root values are not bound to the committed state ([#28], [#32]).
 (33,179 B), `-pairfold5-pevalfuse` (36,836 B) and `-pairfold7` (54,483 B) are still registered
 but currently **fail** the benchmark: the maintainer red-team accepts a forged public input
 (`n0 + 2` with the true vk_x kept), because their vk_x is not bound to the claimed inputs.
-All four are also **withdrawn**: pevalfuse and pairfold5 under [#32] F9 (pairfold5's genesis is
-byte-identical to pevalfuse's), pairfold5-densless under F6 (same Miller event and terminal as
-the densless family), and pairfold7 as the same public-statement-binding class as F9. The
+All four are also **withdrawn**: pevalfuse under [#32] F9; pairfold5 because its genesis is
+byte-identical to pevalfuse's, so F9 applies to it as well; pairfold5-densless **withdrawn**
+(held: same `millerEvent`/terminal bytes as F6; the author's withdrawal excludes the
+plain-densless baseline); pairfold7 **withdrawn** (held: the same public-statement-binding
+class as F9, from the failing red-team verdict, found by maintainer review; not withdrawn by
+the author). The
 `-densless-msm` entries above were the successors that repaired the vk_x binding, but they
 keep the densless pairing part and are withdrawn under F6.
 
@@ -100,8 +105,8 @@ non-withdrawn BLS12-381 deployable entry is `bch-groth16-bls12381-intratx-fs-fus
 | `bch-groth16-bls12381-chunked-covenant` | chunked, covenant chain with transcript thread | **69 tx / 635,295 B / 420.5M op** | non-standard (chain depth) |
 | `bch-groth16-bls12381-intratx-residue-large` | chunked, intra-tx + residue, **`bch-spec`** | **3 inputs / 161,660 B / 146.6M op** | **withdrawn** (held: same F1 generator pattern, no exact-length gate; not confirmed by the author); proposed-VM-only; non-standard by total transaction size — see [Target VM](#target-vm-bch-spec) |
 | `bch-groth16-bls12381-singleton-genpow` | singleton, symbolic assembly | **3,722 B / 20.7B op** | **withdrawn** ([#32] F5: compact decoder curve/cofactor domain; a fix is proposed in groth16_cashscript#31 / bench#48); formerly the smallest entry overall (~140× smaller than nChain); built from `singleton/bls12-381/leader-recovered`, not cashc; oracle only |
-| `bch-groth16-bls12381-singleton-opcode-optimized` | singleton, baseline + rescheduled/outlined | **5,828 B / 1.0B op** | oracle |
-| `bch-groth16-bls12381-singleton` | singleton, baseline | **7,347 B / 979M op** | **~71× smaller bytecode than the nChain reference** |
+| `bch-groth16-bls12381-singleton-opcode-optimized` | singleton, baseline + rescheduled/outlined | **5,828 B / 1.0B op** | **withdrawn** (held: no coordinate range, curve-equation or G2 subgroup checks in `singleton/bls12-381/groth16.cash`; `lib/G2Check.cash` exists but is not imported; found by maintainer review); same source as `-singleton`; oracle |
+| `bch-groth16-bls12381-singleton` | singleton, baseline | **7,347 B / 979M op** | **withdrawn** (held: no coordinate range, curve-equation or G2 subgroup checks in `singleton/bls12-381/groth16.cash`; `lib/G2Check.cash` exists but is not imported; found by maintainer review); formerly ~71× smaller bytecode than the nChain reference |
 | `bch-groth16-bls12381-singleton-minop` | singleton, op-optimized | **58,841 B / 145.6M op** | quotient torus (`λ=p+|x|`, 6-limb root u) + GLV; fused G2 ψ-check; A/C on-curve (G1 subgroup checks omitted) |
 | `bch-groth16-bls12381-singleton-fs` | singleton, **Fiat-Shamir PIT** | **124,238 B / 58.7M op** | single-script qsplit tail-22 (`chunked/bls12-381/measure_fs_singleton.mjs`); separate security model |
 | `bch-pairing-bls12381-singleton` | singleton, pairing-only | **6,652 B / 968M op** | the pairing verdict milestone (`verify.cash`) |
