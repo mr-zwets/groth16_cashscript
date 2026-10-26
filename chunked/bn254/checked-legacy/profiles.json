@@ -92,7 +92,7 @@
       "n1Push": 35,
       "argumentCount": 37,
       "declaredVm": "bch-2026",
-      "verificationKeyScope": "known fixed checker VK; original PairFold-7 VK intent is not established"
+      "verificationKeyScope": "explicit public checker VK; original PairFold-7 contains 14 matching coordinate values and 12 matching raw-Miller factor coefficients; original individual alpha/beta declaration and independent legacy role binding remain unestablished"
     }
   ]
 }

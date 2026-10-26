@@ -18,7 +18,7 @@
     "completeDeclaredConsensusGraphsAccepted": 0,
     "completeDeclaredStandardGraphsAccepted": 0
   },
-  "verificationKeyScope": "The successor relation is against the copied checker fixed VK. Six legacy profiles have explicit leader/densless VK source lineage. Original PairFold-7 VK intent is unavailable in the current source tree: its successor is qualified only against the known checker VK; original-key equivalence is not asserted. A deployment tag is not treated as a verification-key hash.",
+  "verificationKeyScope": "The successor relation is against the explicit public checker VK. Six profiles have source key lineage. PairFold-7 carries 14 matching gamma/delta/IC coordinate values and twelve separate terminal coefficient pushes exactly equal to that key's raw pre-final-exponentiation Miller(alpha,beta) factor. This establishes the coefficient identity; it does not recover the original individual alpha/beta declaration or independently prove their legacy role bindings. The original historical soundness withdrawal remains.",
   "livePremises": [
     "Correctness of the referenced fixed-key checker theorem and field/pairing facts.",
     "Pinned VM function-definition, signed-number and minimal-push semantics.",
@@ -31,5 +31,20 @@
     "Native resource or whole-transaction admission",
     "Relay or mainnet deployment"
   ],
-  "fixturePolicy": "Only existing positive payloads are transported. Proof/public/auxiliary/state/table/padding instructions are byte-identical; only static executable code/redeem/locking transport changes. No new proof or negative suite is supplied."
+  "fixturePolicy": "Only existing positive payloads are transported. Proof/public/auxiliary/state/table/padding instructions are byte-identical; only static executable code/redeem/locking transport changes. No new proof or negative suite is supplied.",
+  "verificationKeyOwner": {
+    "repository": "mr-zwets/zk-verifier-bench",
+    "revision": "b140f64ca073c6d0466083fe14b5d9c83776d844",
+    "file": "src/checkpoints/pairing-vectors.json",
+    "sha256": "e393e8b6af6f528c93f97f37656802bf44daefa5819640a557fbff95e236739e",
+    "check": "verify-key-provenance.mjs reads the existing public key owner, verifies its field orders and point validity, and matches all 20 coordinate literals at instruction boundaries in the exact already-proved checker bank."
+  },
+  "pairfold7Provenance": {
+    "pointCoordinateConstantsMatched": 14,
+    "rawMillerCoefficientsMatched": 12,
+    "coefficientEncoding": "twelve separate PUSH32 instructions consumed by the terminal polynomial evaluator",
+    "originalAlphaBetaDeclaration": "UNRECOVERED",
+    "fullHistoricalVerifierSoundness": "NOT_ESTABLISHED; withdrawal unchanged",
+    "reproduce": "node chunked/bn254/checked-legacy/verify-key-provenance.mjs benchmark-dir new-report.json"
+  }
 }
