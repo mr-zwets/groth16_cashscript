@@ -1,21 +1,24 @@
 // Liveness sweep on the real bch-2026 VM, consensus and standard modes: every case must be a valid transaction (every
 // input accepted within its budget (41 + unlocking length) * 800), and every unlocking must fit the standard 10,000-byte
-// cap and the transaction 100,000 bytes. The op cost of the Miller inputs is almost statement-independent except for the
-// GT-GLS lookups (a nonzero nibble costs ~24k op more than a zero one); input 0's budget grows with n_q (48 B per word).
-// So the forced liveness witnesses (worst.mjs: as many nonzero nibbles as the degree allows at a target n_q, down to the
-// floor N_MIN) and the dense statements are the extremes. Cases: the 6 fixtures (B = the G2 generator in `committed`),
-// forced n_q targets, every nibble nonzero, the zero statement, special public inputs, random B and C, random proofs.
-//   [SWEEP_N=40] [SWEEP_SEED=bls-native-sound-v1] [SWEEP_SHARD=k/n] node sweep.mjs [sweep.json]
+// cap and the transaction 100,000 bytes. Op cost model (worst.mjs): ~24k op per nonzero GLS nibble, ~0.2k op per extra
+// set bit, ~2k op (sd) from B and C; only input 0's budget grows with n_q (48 B per WQ word). So the extremes are
+//  * inputs 1-3: the every-nibble-15 statement ALL15 (n_q = NQ_MAX = 116, also the cap-size regression case for
+//    input 0's unlocking), swept with random B and C;
+//  * input 0: the forced witnesses at the floor n_q = N_MIN (most op at the smallest n_q), swept with random B and C.
+// Random proofs land between (their inputs 1-3 are within ~0.2% of ALL15) and are sampled widely.
+// Cases: the 6 fixtures, forced n_q targets, every nibble nonzero, ALL15, the zero statement, special public inputs,
+// SWEEP_W x (ALL15, forced N_MIN, forced N_MIN + 1) with random B and C, SWEEP_W random B and C, SWEEP_N random proofs.
+//   [SWEEP_N=400] [SWEEP_W=40] [SWEEP_SEED=bls-native-sound-v2] [SWEEP_SHARD=k/n] node sweep.mjs [sweep.json]
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {writeFileSync} from 'node:fs';
 import {FIXTURES, FIXTURE_NAMES, r, mint, synthetic} from './math.mjs';
 import {N_MIN, NQ_MAX} from './protocol.mjs';
-import {forcedCases} from './worst.mjs';
+import {forcedCases, maxSlots, statementFor, ALL15} from './worst.mjs';
 import {pushesFor, unlockingsOf, ctxOf} from './transaction.mjs';
 import {evalTx, verifyTx, txSize} from './vm.mjs';
 
-const N = Number(process.env.SWEEP_N ?? 40), seed = process.env.SWEEP_SEED ?? 'bls-native-sound-v1';
+const N = Number(process.env.SWEEP_N ?? 400), NW = Number(process.env.SWEEP_W ?? 40), seed = process.env.SWEEP_SEED ?? 'bls-native-sound-v2';
 const [shard, shards] = (process.env.SWEEP_SHARD ?? '0/1').split('/').map(Number);
 export function sweepCases() {
   let ctr = 0; const rnd = () => BigInt('0x' + createHash('sha256').update(`${seed}:${ctr++}`).digest('hex')) % r;
@@ -25,7 +28,12 @@ export function sweepCases() {
   for (const c of forcedCases(targets)) cases.push({label: c.label, fx: mint(c.ns)});
   for (const [label, ns] of [['n = (0, 0)', [0n, 0n]], ['n = (1, 0)', [1n, 0n]], ['n = (r-1, r-1)', [r - 1n, r - 1n]], ['n = (r-1, 0)', [r - 1n, 0n]], ['n = (2^64, 2^128)', [1n << 64n, 1n << 128n]], ['n = (r/2, r/3)', [r / 2n, r / 3n]]])
     cases.push({label, fx: mint(ns)});
-  for (let i = 0; i < 6; i++) { const ns = [rnd(), rnd()]; cases.push({label: `random B and C #${i}`, fx: synthetic(ns, 1n + rnd() % (r - 1n), 1n + rnd() % (r - 1n))}); }
+  const sc = () => 1n + rnd() % (r - 1n);
+  const f0 = statementFor(maxSlots(N_MIN)).ns, f1 = statementFor(maxSlots(N_MIN + 1)).ns;
+  for (let i = 0; i < NW; i++) cases.push({label: `ALL15, random B and C #${i}`, fx: synthetic([ALL15, ALL15], sc(), sc())});
+  for (let i = 0; i < NW; i++) cases.push({label: `forced n_q<=${N_MIN}, random B and C #${i}`, fx: synthetic(f0, sc(), sc())});
+  for (let i = 0; i < NW; i++) cases.push({label: `forced n_q<=${N_MIN + 1}, random B and C #${i}`, fx: synthetic(f1, sc(), sc())});
+  for (let i = 0; i < NW; i++) { const ns = [rnd(), rnd()]; cases.push({label: `random B and C #${i}`, fx: synthetic(ns, 1n + rnd() % (r - 1n), 1n + rnd() % (r - 1n))}); }
   for (let i = 0; i < N; i++) cases.push({label: `random proof #${i}`, fx: mint([rnd(), rnd()])});
   return cases;
 }

@@ -1,5 +1,5 @@
 {
- "note": "chunk ownership and placement of the movable bytes; layout.mjs (MARGIN=0.06) then tune.mjs (fillers fitted on the VM to the worst measured witnesses)",
+ "note": "chunk ownership and placement of the movable bytes; layout.mjs (MARGIN=0.06) then tune.mjs (MARGIN=0.062, WIT=default; fillers fitted on the VM to the worst measured witnesses)",
  "cuts": [
   0,
   5,
@@ -50,10 +50,10 @@
    ]
   ],
   "fill": [
-   8,
-   92,
-   19,
-   93
+   24,
+   124,
+   45,
+   115
   ]
  }
 }

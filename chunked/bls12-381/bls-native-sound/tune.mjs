@@ -1,10 +1,10 @@
 // Fit the zero fillers of a layout to the measured worst case: build with the layout, run the worst witnesses on the
 // real VM (standard mode: the tighter one), set each input's filler so that its smallest margin is >= MARGIN, repeat
 // until stable; writes layout.json. A filler is only added where an input's own bytes do not buy enough budget.
-//   MARGIN=0.06 WIT=dense,forced:44,random:1,random:2,random:3 node tune.mjs '{"cuts":[...],"place":{...}}'
+//   [MARGIN=0.062] [WIT=forced:44,forced:44:0,all15:0,...] node tune.mjs '{"cuts":[...],"place":{...}}'
 import {writeFileSync, readFileSync} from 'node:fs';
 import {execFileSync} from 'node:child_process';
-const MARGIN = Number(process.env.MARGIN ?? 0.06), WIT = process.env.WIT ?? 'dense,forced:44,forced:45,forced:46,forced:47,random:1,random:2,random:3,sweep:random proof #37,sweep:random proof #26,sweep:random proof #27,sweep:random B and C #2,sweep:random proof #9,sweep:random proof #34,sweep:random B and C #1';
+const MARGIN = Number(process.env.MARGIN ?? 0.062), WIT = process.env.WIT ?? 'forced:44,forced:44:0,forced:44:1,forced:44:2,forced:44:3,forced:45,forced:46,forced:47,all15,all15:0,all15:1,all15:2,all15:3,dense,random:1,random:2,random:3';
 const L = JSON.parse(process.argv[2] ?? readFileSync(new URL('./layout.json', import.meta.url), 'utf8'));
 L.place.fill = L.place.fill ?? [0, 0, 0, 0];
 for (let it = 0; it < 6; it++) {
@@ -40,5 +40,5 @@ for (let it = 0; it < 6; it++) {
   L.place.fill = fill;
   if (!changed) break;
 }
-writeFileSync(new URL('./layout.json', import.meta.url), JSON.stringify({note: 'chunk ownership and placement of the movable bytes; layout.mjs (MARGIN=' + MARGIN + ') then tune.mjs (fillers fitted on the VM to the worst measured witnesses)', cuts: L.cuts, place: L.place}, null, 1) + '\n');
+writeFileSync(new URL('./layout.json', import.meta.url), JSON.stringify({note: 'chunk ownership and placement of the movable bytes; layout.mjs (MARGIN=0.06) then tune.mjs (MARGIN=' + MARGIN + ', WIT=' + (process.env.WIT ?? 'default') + '; fillers fitted on the VM to the worst measured witnesses)', cuts: L.cuts, place: L.place}, null, 1) + '\n');
 console.log('wrote layout.json', JSON.stringify(L));
