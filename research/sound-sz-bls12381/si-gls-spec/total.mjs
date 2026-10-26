@@ -82,9 +82,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const nqOf = {}; for (const [name, fx] of Object.entries(FIXTURES)) nqOf[name] = (e) => prove(fx, {eaff: e, layout}).nq;
     // liveness: the smallest quotient is the all-zero-digit statement ("zero")
     let best = null;
-    for (let eaff = 0; eaff <= NE; eaff++) {
+    const fixed = arg('eaff', null);
+    for (let eaff = fixed === null ? 0 : Number(fixed); eaff <= (fixed === null ? NE : Number(fixed)); eaff++) {
       const live = model({layout, eaff, nq: nqOf.zero(eaff)});
-      if (live.op > (1 - MARGIN) * live.budget) continue;
+      if (fixed === null && live.op > (1 - MARGIN) * live.budget) continue;
       const prim = model({layout, eaff, nq: nqOf.committed(eaff)});
       if (!best || prim.score < best.prim.score) best = {eaff, live, prim};
     }

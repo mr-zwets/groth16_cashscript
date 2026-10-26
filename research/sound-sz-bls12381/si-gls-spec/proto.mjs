@@ -102,12 +102,15 @@ export const VKC = (() => {
   const R = [1, 2].map((k) => [monicRep(mIC[k]), monicRep(F12.frobeniusMap(mIC[k], 1))]);
   // factor (k, i) is a representative of Frob^i(m_k)^((-1)^i)
   R.forEach((Rk, k) => [0, 1, 2, 3].forEach((i) => { let t = F12.frobeniusMap(mIC[k + 1], i); if (i % 2) t = F12.conjugate(t); assert.ok(sameClass(fromPoly(glsFactorPoly(Rk, i)), t), 'GLS factor ' + k + i); }));
-  const Rconst = monicRep(F12.mul(miller(VK.alpha, VK.beta), mIC[0]));
-  return {mIC, R, Rconst};
+  const mConst = F12.mul(miller(VK.alpha, VK.beta), mIC[0]);
+  const Rconst = monicRep(mConst);
+  // Rconst' for a placement followed by s squarings: rep[mConst^(2^-s mod r)], so FE(Rconst'^(2^s)) = FE(mConst)
+  const RconstAfter = (s) => { const e = Fr.pow(Fr.inv(2n), BigInt(s)); const v = monicRep(F12.pow(mConst, e)); assert.ok(F12.eql(FE(F12.pow(fromPoly(v), 1n << BigInt(s))), FE(mConst)), "FE(Rconst'^(2^s)) = FE(m_ab m_IC0)"); return v; };
+  return {mIC, R, Rconst, mConst, RconstAfter};
 })();
 
 // ---------------- prover ----------------
-export function prove(fix, {eaff = 0, layout = LAYOUTS.a2, seed = 'rho'} = {}) {
+export function prove(fix, {eaff = 0, layout = LAYOUTS.a2, seed = 'rho', rc = 0} = {}) {
   const {inputs, proof} = fix; const P0 = proof.a.negate(), P1 = proof.c;
   const Bw = walkB(P0, proof.b, eaff), Dw = walkDelta(P1, VK.delta);
   // B endpoint: [|x|]B == -psi(B)
@@ -119,9 +122,11 @@ export function prove(fix, {eaff = 0, layout = LAYOUTS.a2, seed = 'rho'} = {}) {
   const Gpair = (j) => pmul(G(0, nib[0][j]), G(1, nib[1][j]));
   // event factor polynomial (without the c multiplier)
   const evFac = (e) => { let f = [1n]; for (const l of [...Bw.ev[e], ...Dw.ev[e]]) f = pmul(f, l); return pmul(f, Gpair(e + 1)); };
-  // f' (no c): F_loop = G_init, then per event square and multiply; times Rconst
-  let fl = fromPoly(Gpair(0)); for (let e = 0; e < NE; e++) fl = F12.mul(F12.sqr(fl), fromPoly(evFac(e)));
-  const fprime = F12.mul(fl, fromPoly(VKC.Rconst));
+  // Rconst' sits at the end of chunk rc (after event eRc), followed by NE - 1 - eRc squarings
+  const eRc = layout.slice(0, rc + 1).reduce((a, b) => a + b, 0) - 1; const Rc = VKC.RconstAfter(NE - 1 - eRc);
+  // f' (no c): F_loop = G_init, then per event square and multiply; Rconst' after event eRc
+  let fl = fromPoly(Gpair(0)); for (let e = 0; e < NE; e++) { fl = F12.mul(F12.sqr(fl), fromPoly(evFac(e))); if (e === eRc) fl = F12.mul(fl, fromPoly(Rc)); }
+  const fprime = fl;
   assert.ok(F12.eql(FE(fprime), F12.ONE), 'Groth16 equation (FE(f\') = 1)');
   // residue root: [f'] = [c]^lambda; u = f'^(p^6 - 1) has order | N6R; t = u^(lambda^-1 mod N6R); c = 1 + conj(t)
   const u = F12.div(F12.conjugate(fprime), fprime); // f'^(p^6-1)
@@ -136,7 +141,7 @@ export function prove(fix, {eaff = 0, layout = LAYOUTS.a2, seed = 'rho'} = {}) {
   const states = [], Qs = [], degP = [], degD = []; let e = 0;
   for (let k = 0; k < K; k++) {
     let P = start; for (let j = 0; j < layout[k]; j++, e++) P = pmul(pmul(P, P), evC(e));
-    const last = k === K - 1; if (last) P = pmul(P, VKC.Rconst);
+    const last = k === K - 1; if (k === rc) P = pmul(P, Rc);
     const Snext = last ? W : monicRep(fromPoly(P));
     const D = psub(pmul(P, pneg(Snext)), pmul(pneg(P), Snext));
     const {q, r: rem} = pdivM(D); assert.ok(isZero(rem), `identity ${k} divisible by M`);
@@ -153,7 +158,7 @@ export function prove(fix, {eaff = 0, layout = LAYOUTS.a2, seed = 'rho'} = {}) {
   let R = 0n; e = 0; start = pmul(ScNeg, Gpair(0)); let Fp_ = peval(start, z), Fm_ = peval(start, mod(-z));
   for (let k = 0; k < K; k++) {
     for (let j = 0; j < layout[k]; j++, e++) { const f = evC(e); Fp_ = mod(Fp_ * Fp_ * peval(f, z)); Fm_ = mod(Fm_ * Fm_ * peval(f, mod(-z))); }
-    const last = k === K - 1; if (last) { Fp_ = mod(Fp_ * peval(VKC.Rconst, z)); Fm_ = mod(Fm_ * peval(VKC.Rconst, mod(-z))); }
+    const last = k === K - 1; if (k === rc) { Fp_ = mod(Fp_ * peval(Rc, z)); Fm_ = mod(Fm_ * peval(Rc, mod(-z))); }
     const S = last ? W : states[k]; R = mod(R * rho + Fp_ * peval(S, mod(-z)) - Fm_ * peval(S, z));
     if (!last) { Fp_ = peval(S, z); Fm_ = peval(S, mod(-z)); }
   }
@@ -162,13 +167,13 @@ export function prove(fix, {eaff = 0, layout = LAYOUTS.a2, seed = 'rho'} = {}) {
 }
 
 // ---------------- worst-case degree bound for a layout (every GLS bit set) ----------------
-export function worstBound(layout, eaff) {
+export function worstBound(layout, eaff, rc = 0) {
   const lB = (e) => (e < eaff ? 8 : 9);
   const f = (e, bits) => lB(e) + 8 + (BITS[e] ? lB(e) + 8 + 6 : 0) + 6 * bits;
   let e = 0, worst = 0; const per = [];
   layout.forEach((len, k) => {
     let d = k === 0 ? 6 + 48 : 6; for (let j = 0; j < len; j++, e++) d = 2 * d + f(e, 8);
-    if (k === layout.length - 1) d += 6; const dD = d + (k === layout.length - 1 ? 11 : 6);
+    if (k === rc) d += 6; const dD = d + (k === layout.length - 1 ? 11 : 6);
     per.push(dD); worst = Math.max(worst, dD);
   });
   const odd = worst % 2 ? worst : worst - 1; // D is odd
