@@ -1,0 +1,4 @@
+edge: n = 1, 2^64 22.367M
+edge: B = G2, C = G1 23.394M
+random 0 23.323M
+random 1 23.343M

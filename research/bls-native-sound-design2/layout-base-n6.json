@@ -1,0 +1,159 @@
+{
+ "N": 6,
+ "margin": 0.15,
+ "variant": "base",
+ "parts": 2,
+ "ok": true,
+ "ins": [
+  {
+   "j": 0,
+   "chunks": [
+    0,
+    4
+   ],
+   "events": 8,
+   "op": {
+    "std": 4878200,
+    "cons": 4834200
+   },
+   "mandatory": 3936,
+   "q": 0,
+   "cb": 0,
+   "need": 7046,
+   "content": 3936,
+   "pad": 3110,
+   "wit": 7046,
+   "unlocking": 7133,
+   "budget": 5739200,
+   "marginStd": 0.15002090883746866,
+   "marginCons": 0.15768748257596876
+  },
+  {
+   "j": 1,
+   "chunks": [
+    4,
+    10
+   ],
+   "events": 12,
+   "op": {
+    "std": 5965424,
+    "cons": 5919424
+   },
+   "mandatory": 4560,
+   "q": 4080,
+   "cb": 0,
+   "need": 8645,
+   "content": 8640,
+   "pad": 5,
+   "wit": 8645,
+   "unlocking": 8732,
+   "budget": 7018400,
+   "marginStd": 0.15003077624529804,
+   "marginCons": 0.15658497663285076
+  },
+  {
+   "j": 2,
+   "chunks": [
+    10,
+    15
+   ],
+   "events": 10,
+   "op": {
+    "std": 4890556,
+    "cons": 4844556
+   },
+   "mandatory": 3696,
+   "q": 0,
+   "cb": 0,
+   "need": 7064,
+   "content": 3696,
+   "pad": 3368,
+   "wit": 7064,
+   "unlocking": 7151,
+   "budget": 5753600,
+   "marginStd": 0.15000069521690762,
+   "marginCons": 0.1579956896551724
+  },
+  {
+   "j": 3,
+   "chunks": [
+    15,
+    22
+   ],
+   "events": 14,
+   "op": {
+    "std": 6300140,
+    "cons": 6254140
+   },
+   "mandatory": 5040,
+   "q": 0,
+   "cb": 3500,
+   "need": 9137,
+   "content": 8540,
+   "pad": 597,
+   "wit": 9137,
+   "unlocking": 9224,
+   "budget": 7412000,
+   "marginStd": 0.15000809498111167,
+   "marginCons": 0.15621424716675658
+  },
+  {
+   "j": 4,
+   "chunks": [
+    22,
+    27
+   ],
+   "events": 10,
+   "op": {
+    "std": 5260331,
+    "cons": 5214331
+   },
+   "mandatory": 3888,
+   "q": 2256,
+   "cb": 0,
+   "need": 7608,
+   "content": 6144,
+   "pad": 1464,
+   "wit": 7608,
+   "unlocking": 7695,
+   "budget": 6188800,
+   "marginStd": 0.15002407574974141,
+   "marginCons": 0.15745685754912098
+  },
+  {
+   "j": 5,
+   "chunks": [
+    27,
+    32
+   ],
+   "events": 10,
+   "op": {
+    "std": 6635223,
+    "cons": 6589223
+   },
+   "mandatory": 3696,
+   "q": 0,
+   "cb": 3500,
+   "need": 9630,
+   "content": 7196,
+   "pad": 2434,
+   "wit": 9630,
+   "unlocking": 9717,
+   "budget": 7806400,
+   "marginStd": 0.15002779770444763,
+   "marginCons": 0.1559203986472638
+  }
+ ],
+ "bytes": 49652,
+ "score": 50140,
+ "pad": 10978,
+ "cuts": [
+  0,
+  4,
+  10,
+  15,
+  22,
+  27
+ ],
+ "hub": 0
+}

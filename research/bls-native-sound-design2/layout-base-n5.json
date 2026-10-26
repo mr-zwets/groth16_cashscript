@@ -1,0 +1,135 @@
+{
+ "N": 5,
+ "margin": 0.1,
+ "variant": "base",
+ "parts": 2,
+ "ok": true,
+ "ins": [
+  {
+   "j": 0,
+   "chunks": [
+    0,
+    7
+   ],
+   "events": 14,
+   "op": {
+    "std": 6993239,
+    "cons": 6949239
+   },
+   "mandatory": 5952,
+   "q": 2448,
+   "cb": 0,
+   "need": 9585,
+   "content": 8400,
+   "pad": 1185,
+   "wit": 9585,
+   "unlocking": 9672,
+   "budget": 7770400,
+   "marginStd": 0.10001557191392974,
+   "marginCons": 0.10567808607021523
+  },
+  {
+   "j": 1,
+   "chunks": [
+    7,
+    14
+   ],
+   "events": 14,
+   "op": {
+    "std": 6669858,
+    "cons": 6623858
+   },
+   "mandatory": 5232,
+   "q": 0,
+   "cb": 3500,
+   "need": 9136,
+   "content": 8732,
+   "pad": 404,
+   "wit": 9136,
+   "unlocking": 9223,
+   "budget": 7411200,
+   "marginStd": 0.1000299546632124,
+   "marginCons": 0.10623677677029364
+  },
+  {
+   "j": 2,
+   "chunks": [
+    14,
+    22
+   ],
+   "events": 16,
+   "op": {
+    "std": 7005223,
+    "cons": 6959223
+   },
+   "mandatory": 5712,
+   "q": 3888,
+   "cb": 0,
+   "need": 9602,
+   "content": 9600,
+   "pad": 2,
+   "wit": 9602,
+   "unlocking": 9689,
+   "budget": 7784000,
+   "marginStd": 0.10004843268242547,
+   "marginCons": 0.10595799075025691
+  },
+  {
+   "j": 3,
+   "chunks": [
+    22,
+    28
+   ],
+   "events": 12,
+   "op": {
+    "std": 5965184,
+    "cons": 5919184
+   },
+   "mandatory": 4560,
+   "q": 0,
+   "cb": 0,
+   "need": 8157,
+   "content": 4560,
+   "pad": 3597,
+   "wit": 8157,
+   "unlocking": 8244,
+   "budget": 6628000,
+   "marginStd": 0.10000241400120702,
+   "marginCons": 0.10694266747133374
+  },
+  {
+   "j": 4,
+   "chunks": [
+    28,
+    32
+   ],
+   "events": 8,
+   "op": {
+    "std": 5930370,
+    "cons": 5884370
+   },
+   "mandatory": 3024,
+   "q": 0,
+   "cb": 3500,
+   "need": 8109,
+   "content": 6524,
+   "pad": 1585,
+   "wit": 8109,
+   "unlocking": 8196,
+   "budget": 6589600,
+   "marginStd": 0.10004097365545706,
+   "marginCons": 0.10702167051110845
+  }
+ ],
+ "bytes": 45024,
+ "score": 45434,
+ "pad": 6773,
+ "cuts": [
+  0,
+  7,
+  14,
+  22,
+  28
+ ],
+ "hub": 0
+}

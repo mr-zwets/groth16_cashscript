@@ -1,0 +1,62 @@
+{
+ "BDbl": {
+  "op": 233993,
+  "bytes": 423,
+  "desc": "BDbl (projective dbl + line + F^2)"
+ },
+ "BAdd": {
+  "op": 329561,
+  "bytes": 585,
+  "desc": "BAdd (projective mixed add + line * c)"
+ },
+ "ADbl": {
+  "op": 148159,
+  "bytes": 262,
+  "desc": "ADbl (affine dbl, witnessed slope, checks)"
+ },
+ "AAdd": {
+  "op": 147866,
+  "bytes": 282,
+  "desc": "AAdd (affine add, witnessed slope, checks)"
+ },
+ "ADbl2": {
+  "op": 144392,
+  "bytes": 268,
+  "desc": "ADbl2 (affine dbl, lazy cc)"
+ },
+ "DStep": {
+  "op": 78448,
+  "bytes": 147,
+  "desc": "DStep (delta line, slope-only bake, recursion)"
+ },
+ "DStep2": {
+  "op": 73524,
+  "bytes": 141,
+  "desc": "DStep2 (delta step, c unreduced)"
+ },
+ "DLine": {
+  "op": 32752,
+  "bytes": 47,
+  "desc": "DLine (delta line fully baked)"
+ },
+ "EV": {
+  "op": 28256,
+  "bytes": 46,
+  "desc": "EV (monic deg-6 at +-x)"
+ },
+ "TM": {
+  "op": 92180,
+  "bytes": 111,
+  "desc": "TM (16-entry product table)"
+ },
+ "TA": {
+  "op": 10647,
+  "bytes": 78,
+  "desc": "TA (16-entry sum table, < r)"
+ },
+ "Bound": {
+  "op": 15219,
+  "bytes": 24,
+  "desc": "Bound (R update)"
+ }
+}
