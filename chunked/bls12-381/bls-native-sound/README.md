@@ -239,8 +239,8 @@ node redteam.mjs redteam.json redteam-report.json       # 63/63 as expected
 for k in 0 1 2 3; do SWEEP_SHARD=$k/4 node sweep.mjs sweep/sweep-$k.json & done; wait   # 71 proofs
 # layout (only after a program change): measure, search, tune
 NATIVE_CUTS=0,5,15,25,33 NATIVE_PLACE='<a cap-feasible placement>' WIT=committed,dense,forced:44,random:1,random:2,random:3 node measure.mjs meas.json
-MARGIN=0.06 node layout.mjs meas.json 3 && node tune.mjs   # measure.json: the measurement behind layout.json
-# then: '<the chosen {"cuts", "place"}>'
+MARGIN=0.06 node layout.mjs meas.json 3                # measure.json is the measurement behind layout.json
+node tune.mjs '<the chosen {"cuts", "place"}>'          # fits placement and fillers on the VM; writes layout.json
 ```
 
 In zk-verifier-bench: copy `vectors.json` to `src/bch/groth16-bls12381-sound-native-vectors.json` and `redteam.json` to
