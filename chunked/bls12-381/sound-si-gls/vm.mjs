@@ -19,3 +19,11 @@ export function bare(code, pushes, mode = 'consensus') {
   return {error: st.error, opCost: st.metrics.operationCost, stack: st.stack, ip: st.ip};
 }
 export const num = (b) => vmNumberToBigInt(b, {requireMinimalEncoding: false});
+// diagnostics only (profile.mjs, debugging): the bch-spec VM with a 100x density base, so a spend that exceeds the
+// real budget can still be run to completion and profiled. Never used for any acceptance claim.
+import {createVirtualMachine, createInstructionSetBchSpec, ripemd160, secp256k1, sha1, sha256} from '@bitauth/libauth';
+import {createRequire} from 'node:module';
+import {pathToFileURL} from 'node:url';
+const specConsensusPath = createRequire(import.meta.url).resolve('@bitauth/libauth').replace(/index\.js$/, 'lib/vm/instruction-sets/bch/spec/bch-spec-consensus.js');
+const {ConsensusBchSpec} = await import(pathToFileURL(specConsensusPath).href);
+export const VM_UNLIMITED = createVirtualMachine(createInstructionSetBchSpec(true, {consensus: {...ConsensusBchSpec, densityControlBaseLength: 1_000_000}, ripemd160, secp256k1, sha1, sha256}));

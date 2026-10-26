@@ -104,12 +104,12 @@ export class Asm {
   diff(layout) { const a = new Set(this.st), b = new Set(layout); return `missing [${[...b].filter((x) => !a.has(x)).join(',')}] extra [${[...a].filter((x) => !b.has(x)).join(',')}]`; }
   // ---- control flow ----
   sub(stack = this.st) { const s = new Asm(stack, this.ctx); s.localFloor = this.localFloor; s.alt = [...this.alt]; s.piles = new Map(this.piles); s.touched = this.touched; return s; }
-  ifElse(thenFn, elseFn, {layout} = {}) {
+  ifElse(thenFn, elseFn, {layout, prefer = 'then'} = {}) {
     this.st.pop(); // condition
     const entry = this.st.slice();
     const a = this.sub(), b = this.sub();
     thenFn(a); if (elseFn) elseFn(b);
-    const target = layout ?? (elseFn ? a.st.slice() : entry);
+    const target = layout ?? (elseFn ? (prefer === 'else' ? b.st.slice() : a.st.slice()) : entry);
     a.arrangeAll(target); b.arrangeAll(target); a.sameCtx(b, 'if/else');
     const base = this.code.length + 1;
     if (b.code.length === 0) { this.absorb(a, base); this.emit(OP.IF, ...a.code, OP.ENDIF); }
