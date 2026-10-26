@@ -70,11 +70,12 @@ const three = f2(3n, 0n);
 // st: {xA, yA, xB, yB, xC, yC, N}; N[k][j] (j = 0..63) = nibble j: bit i = bit (63 - j) of digit a_{k,i}.
 // slopes: the witnessed affine slopes (verifier) or null (prover: computed). Returns per-event factor lists
 // (without c), the start factors, the slopes used, and the endpoint verdict; fail(why) on a violated exact check.
-export function factorSchedule(st, slopes = null, {eaff = E_A} = {}) {
+export function factorSchedule(st, slopes = null, {eaff = E_A, lenient = false} = {}) {
   const {xA, yA, xB, yB, xC, yC, N} = st;
   const xP = xA, yP = mod(-yA);                           // P0 = -A
   const out = {events: [], slopes: [], ok: true};
-  const fail = (why) => ({ok: false, why});
+  const fail = (why) => (lenient ? null : {ok: false, why}); // lenient (forge mode only): keep going past a violated check
+  const div = (a, b) => (F2.is0(b) ? F2.ZERO : F2.div(a, b));
   const tbl = (k, n) => { let poly = [1n]; for (let i = 0; i < 4; i++) if ((n >> i) & 1) poly = pmul(poly, glsFactor(k, i)); return poly; };
   const gls = (j) => pmul(tbl(0, N[0][j]), tbl(1, N[1][j]));
   // delta (fixed): baked slopes, the on-chain recursion
@@ -86,8 +87,8 @@ export function factorSchedule(st, slopes = null, {eaff = E_A} = {}) {
   for (let e = 0; e < NE; e++) {
     const fs = [];
     if (e < eaff) {
-      const l = nextSlope(() => F2.div(F2.mul(three, F2.sqr(aff.x)), F2.add(aff.y, aff.y)));
-      if (!F2.is0(F2.sub(F2.mul(F2.add(aff.y, aff.y), l), F2.mul(three, F2.sqr(aff.x))))) return fail('affine doubling slope');
+      const l = nextSlope(() => div(F2.mul(three, F2.sqr(aff.x)), F2.add(aff.y, aff.y)));
+      if (!F2.is0(F2.sub(F2.mul(F2.add(aff.y, aff.y), l), F2.mul(three, F2.sqr(aff.x)))) && fail()) return fail('affine doubling slope');
       fs.push(lineAffPoly(xP, yP, l, F2.sub(F2.mul(l, aff.x), aff.y)));
       const x3 = F2.sub(F2.sqr(l), F2.add(aff.x, aff.x)); aff = {x: x3, y: F2.sub(F2.mul(l, F2.sub(aff.x, x3)), aff.y)};
     } else {
@@ -97,9 +98,9 @@ export function factorSchedule(st, slopes = null, {eaff = E_A} = {}) {
     fs.push(dstep(false));
     if (isAdd(e)) {
       if (e < eaff) {
-        if (F2.eql(aff.x, xB)) return fail('affine addition x = xB');
-        const l = nextSlope(() => F2.div(F2.sub(yB, aff.y), F2.sub(xB, aff.x)));
-        if (!F2.is0(F2.sub(F2.mul(l, F2.sub(xB, aff.x)), F2.sub(yB, aff.y)))) return fail('affine addition slope');
+        if (F2.eql(aff.x, xB) && fail()) return fail('affine addition x = xB');
+        const l = nextSlope(() => div(F2.sub(yB, aff.y), F2.sub(xB, aff.x)));
+        if (!F2.is0(F2.sub(F2.mul(l, F2.sub(xB, aff.x)), F2.sub(yB, aff.y))) && fail()) return fail('affine addition slope');
         fs.push(lineAffPoly(xP, yP, l, F2.sub(F2.mul(l, aff.x), aff.y)));
         const x3 = F2.sub(F2.sub(F2.sqr(l), aff.x), xB); aff = {x: x3, y: F2.sub(F2.mul(l, F2.sub(aff.x, x3)), aff.y)};
       } else { const a = projAdd(proj, [xB, yB]); proj = a.T; fs.push(lineGenPoly(xP, yP, ...a.line)); }
@@ -109,7 +110,7 @@ export function factorSchedule(st, slopes = null, {eaff = E_A} = {}) {
     out.events.push({fs, c: isAdd(e)});
   }
   assert.equal(j, lam.length);
-  if (slopes !== null && si !== slopes.length) return fail('slope count');
+  if (slopes !== null && si !== slopes.length && fail()) return fail('slope count');
   out.start = [VKC.Rconst, gls(0)];
   // endpoint [T]B = -psi(B): X gamma1^2 = conj(xB) Z, Y gamma1^3 = -conj(yB) Z, Z != 0 (all-affine: Z = 1)
   const [X, Y, Z] = proj ?? [aff.x, aff.y, F2.ONE];
@@ -131,7 +132,7 @@ export function prove(fx, {digits = null, forge = false, eaff = E_A, slopeOverri
   const N = dg.map((a) => Array.from({length: 64}, (_, j) => a.reduce((s, ai, i) => s | (Number((ai >> BigInt(63 - j)) & 1n) << i), 0)));
   const Aa = A.toAffine(), Ba = B.toAffine(), Ca = C.toAffine();
   const st = {xA: Aa.x, yA: Aa.y, xB: Ba.x, yB: Ba.y, xC: Ca.x, yC: Ca.y, N};
-  const sched = factorSchedule(st, slopeOverride, {eaff});
+  const sched = factorSchedule(st, slopeOverride, {eaff, lenient: forge});
   assert.ok(sched.ok, 'schedule: ' + sched.why);
   if (!forge) assert.ok(sched.endpoint, 'B endpoint');
   // f' (no c): the full Miller product with Rconst' and the GLS factors; FE(f') = 1 for a valid proof

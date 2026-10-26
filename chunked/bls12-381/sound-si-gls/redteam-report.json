@@ -1,0 +1,704 @@
+{
+ "runs": [
+  {
+   "label": "A.x + 1 (off curve)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > G1C"
+  },
+  {
+   "label": "A.y + 1 (off curve)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > G1C"
+  },
+  {
+   "label": "B.x.c0 + 1 (off twist)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks"
+  },
+  {
+   "label": "B.y.c1 + 1 (off twist)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks"
+  },
+  {
+   "label": "C.x + 1 (off curve)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > G1C"
+  },
+  {
+   "label": "C.y + 1 (off curve)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > G1C"
+  },
+  {
+   "label": "A.x + p (alias, same point mod p)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "A.y + p (alias, same point mod p)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "B.x.c0 + p (alias, same point mod p)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "B.x.c1 + p (alias, same point mod p)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "B.y.c0 + p (alias, same point mod p)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "B.y.c1 + p (alias, same point mod p)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "C.x + p (alias, same point mod p)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "C.y + p (alias, same point mod p)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "A.x + p (alias) with a rebuilt transcript",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "A.y = 2^384 - 1",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "A = (0, 0) (identity encoding)",
+   "kind": "identity-point",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > G1C"
+  },
+  {
+   "label": "B = (0, 0) (identity encoding)",
+   "kind": "identity-point",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks"
+  },
+  {
+   "label": "C = (0, 0) (identity encoding)",
+   "kind": "identity-point",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > G1C"
+  },
+  {
+   "label": "B on the twist, not in G2 (rebuilt)",
+   "kind": "subgroup",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "terminal (slope count, endpoint, binding)"
+  },
+  {
+   "label": "B + an r-torsion-free cofactor point (rebuilt)",
+   "kind": "subgroup",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "terminal (slope count, endpoint, binding)"
+  },
+  {
+   "label": "B of order 13: x = xB at the event-2 affine addition (rebuilt)",
+   "kind": "subgroup",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "loop:add > AFFADD"
+  },
+  {
+   "label": "A negated (rebuilt)",
+   "kind": "invalid-proof",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "B negated (rebuilt)",
+   "kind": "invalid-proof",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "C from proof 1 (rebuilt)",
+   "kind": "invalid-proof",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "n0 + r (non-canonical alias)",
+   "kind": "public-input-encoding",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks"
+  },
+  {
+   "label": "n1 + r (non-canonical alias)",
+   "kind": "public-input-encoding",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks"
+  },
+  {
+   "label": "n0 = 2^256 - 1",
+   "kind": "public-input-encoding",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks"
+  },
+  {
+   "label": "n0 with the top bit set",
+   "kind": "public-input-encoding",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks"
+  },
+  {
+   "label": "n0 + 1 (byte level)",
+   "kind": "public-input-encoding",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "terminal (slope count, endpoint, binding)"
+  },
+  {
+   "label": "n0, n1 swapped (byte level)",
+   "kind": "public-input-encoding",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "terminal (slope count, endpoint, binding)"
+  },
+  {
+   "label": "nibble N0[30] = 0x10 (> 15)",
+   "kind": "gls-digit",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks"
+  },
+  {
+   "label": "nibble N1[63] = 0x80 (negative zero)",
+   "kind": "gls-digit",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks"
+  },
+  {
+   "label": "nibble N0[0] = 0xff",
+   "kind": "gls-digit",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks"
+  },
+  {
+   "label": "nibble N1[10] bit flip",
+   "kind": "gls-digit",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "terminal (slope count, endpoint, binding)"
+  },
+  {
+   "label": "digit a_{0,0} bit 5 flipped, binding off (rebuilt)",
+   "kind": "gls-binding",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "terminal (slope count, endpoint, binding)"
+  },
+  {
+   "label": "slope 0 c0 + 1 (byte level)",
+   "kind": "slope",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "loop:bdbl > AFFDBL"
+  },
+  {
+   "label": "slope 12 c1 + p (alias)",
+   "kind": "non-canonical-slope",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "loop:bdbl > AFFDBL > RD"
+  },
+  {
+   "label": "slope 1 (the event-0 addition) + 1 (rebuilt)",
+   "kind": "slope",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "loop:add > AFFADD"
+  },
+  {
+   "label": "slope 3 negated (rebuilt)",
+   "kind": "slope",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "loop:bdbl > AFFDBL"
+  },
+  {
+   "label": "slopes 4 and 5 swapped (rebuilt)",
+   "kind": "slope",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "loop:add > AFFADD"
+  },
+  {
+   "label": "statement byte 5",
+   "kind": "tamper-transcript",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > G1C"
+  },
+  {
+   "label": "statement byte 200",
+   "kind": "tamper-transcript",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks"
+  },
+  {
+   "label": "statement byte 400",
+   "kind": "tamper-transcript",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "terminal (slope count, endpoint, binding)"
+  },
+  {
+   "label": "state 1 word 0 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "state 1 word 5 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "state 2 word 0 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "state 2 word 5 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "state 16 word 0 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "state 16 word 5 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "state 32 word 0 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "state 32 word 5 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "state 9 word 2 + p (alias)",
+   "kind": "non-canonical-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "loop:bnd > BND > RD"
+  },
+  {
+   "label": "state 32 word 5 = p",
+   "kind": "non-canonical-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "loop:bnd > BND > RD"
+  },
+  {
+   "label": "state 2 word 0 top bit set",
+   "kind": "non-canonical-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "loop:bnd > BND > RD"
+  },
+  {
+   "label": "states 5 and 6 swapped",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "all states from proof 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "residue root s^c word 0 + 1",
+   "kind": "tamper-residue",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "residue root s^c word 3 + p (alias)",
+   "kind": "non-canonical-state",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "bytes swapped across the state 1 / state 2 boundary",
+   "kind": "transcript-encoding",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "loop:bnd > BND > RD"
+  },
+  {
+   "label": "residue root shifted by one byte (re-parse)",
+   "kind": "transcript-encoding",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "parse + range/curve checks > RD"
+  },
+  {
+   "label": "WS from proof 0 with WQ from proof 1",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "Q word 0 + 1",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "Q word 1 + 1",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "Q word 23 + 1",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "Q word 46 + 1",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "Q word 3 + p (alias)",
+   "kind": "non-canonical-quotient",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "quotient (Horner) > RD"
+  },
+  {
+   "label": "Q word 7 top bit set",
+   "kind": "non-canonical-quotient",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "quotient (Horner) > RD"
+  },
+  {
+   "label": "Q with a leading zero word (non-canonical n_q)",
+   "kind": "non-canonical-quotient",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "Q missing the leading word",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "Q missing the last word",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "Q padded to 119 words (over the cap)",
+   "kind": "quotient-cap",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "Q length not a multiple of 48",
+   "kind": "quotient-cap",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "Q empty",
+   "kind": "quotient-cap",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "Q all zero but a nonzero leading word",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the st",
+   "at": "final identity (result false)"
+  },
+  {
+   "label": "extra push at the bottom",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "extra push between WQ and WS",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "WQ missing",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "WQ and WS swapped",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "WS one byte short",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "WS one byte long",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "WS one slope short (96 B)",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "WS one slope long (96 B)",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "WS + WQ as one push",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "transcript/size checks"
+  },
+  {
+   "label": "redeem byte flipped",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: The P2SH redeem bytecode provided in this input does not match the hash req",
+   "at": "transaction rules"
+  },
+  {
+   "label": "OP_NOP in the unlocking",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Unlocking bytecode may contain only push operations in version 1 and 2 tran",
+   "at": "transaction rules"
+  },
+  {
+   "label": "WQ pushed with a non-minimal PUSHDATA4",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Push operations must use the smallest possible encoding.",
+   "at": "p2sh/unlocking"
+  }
+ ],
+ "controls": [
+  "committed",
+  "n0 = 5 + 7|x| + 9|x|^2 with non-canonical GLS digits (a_0 + |x|, a_1 - 1)"
+ ]
+}

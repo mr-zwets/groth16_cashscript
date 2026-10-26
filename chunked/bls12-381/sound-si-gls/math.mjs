@@ -315,3 +315,7 @@ export const VKC = (() => {
   return {deltaAff: d, lams, mIC, mConst, R, Rconst, RC_SQUARINGS};
 })();
 export const glsFactor = (k, i) => glsFactorPoly(VKC.R[k], i);
+// a valid NON-canonical digit vector for (n0, n1): a_{k,0} + |x|, a_{k,1} - 1 for the first k where both stay in
+// [0, 2^64) (the binding sum is unchanged); null if neither k allows it. Used as a positive control.
+export const nonCanonicalDigits = (ns) => { const dg = ns.map(glsDigits);
+  for (const k of [0, 1]) if (dg[k][1] > 0n && dg[k][0] + AX < 1n << 64n) { dg[k][0] += AX; dg[k][1] -= 1n; return dg; } return null; };

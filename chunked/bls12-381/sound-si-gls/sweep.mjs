@@ -1,0 +1,54 @@
+// Liveness sweep on the proposed bch-spec VM, consensus and standard modes: every case must be accepted, and the op
+// cost must fit the input's budget (10,000 + unlocking length) * 800 with the margin reported. The op cost is nearly
+// statement-independent except for the GT-GLS lookups (a nonzero nibble costs more than a zero one), and the budget
+// grows with the quotient length n_q, so the binding cases are the forced witnesses of worst.mjs (as many nonzero
+// nibbles as each small n_q allows). Also: the six fixtures, special statements, the minimum-n_q statements a random
+// search finds, a valid witness with non-canonical digits, and random proofs minted under the fixture VK.
+// Usage: [SWEEP_N=200] [SWEEP_SEED=bls-si-gls-v1] [SWEEP_SHARD=k/n] node sweep.mjs [out.json]
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {writeFileSync} from 'node:fs';
+import {FIXTURES, FIXTURE_NAMES, r, AX, AXPOW, mint, glsDigits, nonCanonicalDigits} from './math.mjs';
+import {nqFor, NQ_MAX, E_A, prove} from './protocol.mjs';
+import {locking, redeem} from './transaction.mjs';
+import {spend, unlockingFor} from './vm.mjs';
+import {forcedCases} from './worst.mjs';
+
+const N = Number(process.env.SWEEP_N ?? 200);
+const seed = process.env.SWEEP_SEED ?? 'bls-si-gls-v1';
+const [shard, shards] = (process.env.SWEEP_SHARD ?? '0/1').split('/').map(Number);
+let ctr = 0; const rnd = () => BigInt('0x' + createHash('sha256').update(`${seed}:${ctr++}`).digest('hex')) % r;
+const popc = (n) => [0, 1, 2, 3].filter((i) => (n >> i) & 1).length;
+const nibblesOf = (n) => { const a = glsDigits(n); return Array.from({length: 64}, (_, j) => a.reduce((s, ai, i) => s | (Number((ai >> BigInt(63 - j)) & 1n) << i), 0)); };
+const nqOf = (ns) => { const N2 = ns.map(nibblesOf); return nqFor((e) => popc(N2[0][e + 1]) + popc(N2[1][e + 1])); };
+const cases = [];
+for (const n of FIXTURE_NAMES) cases.push({label: `fixture ${n}`, fx: FIXTURES[n]});
+for (const c of forcedCases([46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 60, 62, 64, 70, 80])) cases.push({label: c.label, fx: mint(c.ns)});
+for (const [label, ns] of [['n = (1, 0)', [1n, 0n]], ['n = (r-1, 0)', [r - 1n, 0n]], ['n = (|x|-1, |x|^3)', [AX - 1n, AX ** 3n]], ['n = (2^64, 2^128)', [1n << 64n, 1n << 128n]], ['n = (r/2, r/3)', [r / 2n, r / 3n]], ['n = (|x|^4 - |x|^3 ..., ) max digits', [r - 1n - AX ** 2n, r - 2n]]])
+  cases.push({label, fx: mint(ns.map((x) => ((x % r) + r) % r))});
+// the lowest-n_q statements of a random search (the smallest budget among typical statements)
+{ const cand = []; for (let i = 0; i < 4000; i++) cand.push([rnd(), rnd()]);
+  for (let a = 0n; a < 64n; a++) cand.push([a, 0n], [a * AX, 0n], [0n, a * AXPOW[3]], [a << 32n, a]);
+  const scored = cand.map((ns) => ({ns, q: nqOf(ns)})).sort((x, y) => x.q - y.q);
+  for (const x of scored.slice(0, 6)) cases.push({label: `low n_q search: n_q ${x.q}`, fx: mint(x.ns)}); }
+// a valid witness with non-canonical digits (a_0 + |x|, a_1 - 1)
+{ const fx = mint([5n + 7n * AX + 9n * AX ** 2n, 456n]); cases.push({label: 'n0 = 5 + 7|x| + 9|x|^2, non-canonical GLS digits', fx, opts: {digits: nonCanonicalDigits(fx.inputs)}}); }
+for (let i = 0; i < N; i++) cases.push({label: `random #${i}`, fx: mint([rnd(), rnd()])});
+
+const results = [];
+for (const [k, c] of cases.entries()) {
+  if (k % shards !== shard) continue;
+  const w = prove(c.fx, c.opts); const u = unlockingFor(w.WS, w.WQ, redeem);
+  const row = {label: c.label, publicInputs: c.fx.inputs.map(String), nq: w.nq, unlockingLength: u.length};
+  for (const mode of ['consensus', 'standard']) { const x = spend(locking, u, mode); row[mode] = {accepted: x.accepted, opCost: x.opCost, budget: x.budget, margin: x.budget - x.opCost, error: x.error}; }
+  results.push(row);
+  console.log(`${c.label.padEnd(52)} nq=${String(w.nq).padStart(3)} len=${u.length} cons ${row.consensus.accepted} ${row.consensus.opCost} (margin ${row.consensus.margin}) std ${row.standard.accepted} ${row.standard.opCost} (margin ${row.standard.margin}, ${(100 * row.standard.margin / row.standard.budget).toFixed(2)}%)`);
+}
+const failed = results.filter((x) => !x.consensus.accepted || !x.standard.accepted);
+const summary = {E_A, NQ_MAX, cases: results.length, failed: failed.length};
+for (const mode of ['consensus', 'standard']) { const m = results.reduce((a, x) => (x[mode].margin < a[mode].margin ? x : a)); const M = results.reduce((a, x) => (x[mode].opCost > a[mode].opCost ? x : a));
+  summary[mode] = {minMargin: m[mode].margin, minMarginPct: +(100 * m[mode].margin / m[mode].budget).toFixed(3), at: m.label, nq: m.nq, maxOp: M[mode].opCost, maxOpAt: M.label};
+  console.log(`min ${mode} margin ${m[mode].margin} (${(100 * m[mode].margin / m[mode].budget).toFixed(2)}% of ${m[mode].budget}) at ${m.label}; max op ${M[mode].opCost} at ${M.label}`); }
+console.log(`cases ${results.length}, failed ${failed.length}`);
+if (process.argv[2]) writeFileSync(process.argv[2], JSON.stringify({seed, shard: `${shard}/${shards}`, summary, results}, null, 1) + '\n');
+assert.equal(failed.length, 0, `rejected: ${failed.map((x) => x.label).join(', ')}`);
