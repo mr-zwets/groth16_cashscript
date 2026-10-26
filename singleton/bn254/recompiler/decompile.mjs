@@ -65,6 +65,10 @@ export function decompile(body, arity, inArity = 0) {
   let alt = [];      // symbolic alt stack (top = last)
   let entryDepth = 0, entryAlt = 0;
   let rawStart = 0;  // index into ops where current block began
+  // side-effect-only invocations (a callee with 0 outputs, e.g. a function that only
+  // require()s): no value flows out of them, so they are scheduling roots of their block,
+  // not dead code -- without this the scheduler would silently drop the call and its checks
+  let effects = [];
   const ctrlDepth = []; // for IF/ELSE/ENDIF reconciliation: {m, a} depths at IF (for else)
 
   // relabel current main+alt stacks as fresh entry slots
@@ -72,9 +76,10 @@ export function decompile(body, arity, inArity = 0) {
     entryDepth = main.length; entryAlt = alt.length;
     main = main.map((_, i) => ({ k: 'in', i }));
     alt = alt.map((_, i) => ({ k: 'ain', i }));
+    effects = [];
   }
   function closeBlock(opIndexEnd) {
-    items.push({ block: { entryDepth, entryAlt, exit: main.slice(), exitAlt: alt.slice(), rawOps: ops.slice(rawStart, opIndexEnd) } });
+    items.push({ block: { entryDepth, entryAlt, exit: main.slice(), exitAlt: alt.slice(), effects: effects.slice(), rawOps: ops.slice(rawStart, opIndexEnd) } });
   }
 
   beginBlock();
@@ -126,6 +131,7 @@ export function decompile(body, arity, inArity = 0) {
           const ins = []; for (let k = 0; k < a.in; k++) ins.unshift(main.pop());
           const node = freshNode({ k: 'invoke', invId: id, ins });
           for (let j = 0; j < a.out; j++) main.push({ k: 'out', node, j });
+          if (a.out === 0) effects.push(node);
           break;
         }
         if (VALOP.has(op)) {
