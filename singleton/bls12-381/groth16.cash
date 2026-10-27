@@ -73,10 +73,16 @@ function computeVkx(int in0, int in1) returns (int, int) {
         vx, vy, vz,
         838589206289216005799424730305866328161735431124665289961769162861615689790485775997575391185127590486775437397838,
         3450209970729243429733164009999191867485184320918914219895632678707687208996709678363578245114137957452475385814312);
-    int zInv = inverseFp(vz);
-    int zInv2 = sqrFp(zInv);
-    int zInv3 = mulFp(zInv2, zInv);
-    return mulFp(vx, zInv2), mulFp(vy, zInv3);
+    // Keep the projective neutral result as the unique affine sentinel (0,0). It is off-curve,
+    // so it cannot collide with a finite G1 point. The caller maps this sentinel to e(O, gamma).
+    int outX = 0; int outY = 0;
+    if (vz != 0) {
+        int zInv = inverseFp(vz);
+        int zInv2 = sqrFp(zInv);
+        int zInv3 = mulFp(zInv2, zInv);
+        outX = mulFp(vx, zInv2); outY = mulFp(vy, zInv3);
+    }
+    return outX, outY;
 }
 
 // A proof G1 point (A or C) must be canonical, 0 <= x, y < p, and on E(Fp): y^2 = x^3 + 4. The
@@ -148,10 +154,20 @@ contract Groth16Verify() {
         // outputs; cashc warns about the unused bR*/cR*/dR* variables.
         (int b0,int b1,int b2,int b3,int b4,int b5,int b6,int b7,int b8,int b9,int b10,int b11, int bR0,int bR1,int bR2,int bR3,int bR4,int bR5) =
             millerSingleR(betaXa,betaXb,betaYa,betaYb, alphaX, alphaY);
-        (int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11, int cR0,int cR1,int cR2,int cR3,int cR4,int cR5) =
-            millerSingleR(gammaXa,gammaXb,gammaYa,gammaYb, affX, affY);
+        int unused discardedB0 = bR0; int unused discardedB1 = bR1; int unused discardedB2 = bR2;
+        int unused discardedB3 = bR3; int unused discardedB4 = bR4; int unused discardedB5 = bR5;
+        int c0 = 1; int c1 = 0; int c2 = 0; int c3 = 0; int c4 = 0; int c5 = 0;
+        int c6 = 0; int c7 = 0; int c8 = 0; int c9 = 0; int c10 = 0; int c11 = 0;
+        int unused cR0 = 0; int unused cR1 = 0; int unused cR2 = 0; int unused cR3 = 0; int unused cR4 = 0; int unused cR5 = 0;
+        // A neutral computed vk_x contributes the pairing unit; only finite vk_x enters Miller.
+        if (affX != 0 || affY != 0) {
+            (c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11, cR0,cR1,cR2,cR3,cR4,cR5) =
+                millerSingleR(gammaXa,gammaXb,gammaYa,gammaYb, affX, affY);
+        }
         (int d0,int d1,int d2,int d3,int d4,int d5,int d6,int d7,int d8,int d9,int d10,int d11, int dR0,int dR1,int dR2,int dR3,int dR4,int dR5) =
             millerSingleR(deltaXa,deltaXb,deltaYa,deltaYb, Cx, Cy);
+        int unused discardedD0 = dR0; int unused discardedD1 = dR1; int unused discardedD2 = dR2;
+        int unused discardedD3 = dR3; int unused discardedD4 = dR4; int unused discardedD5 = dR5;
         (int ab0,int ab1,int ab2,int ab3,int ab4,int ab5,int ab6,int ab7,int ab8,int ab9,int ab10,int ab11) =
             fp12Mul(a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11, b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11);
         (int abc0,int abc1,int abc2,int abc3,int abc4,int abc5,int abc6,int abc7,int abc8,int abc9,int abc10,int abc11) =
