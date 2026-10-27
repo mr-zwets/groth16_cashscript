@@ -209,6 +209,34 @@ The bytecode evaluates the complete four-pair equation without collapsing it thr
 relations, but these fixtures do not establish circuit knowledge, secure application public-input
 binding, arbitrary-key verification, or interoperability with an independently generated setup.
 
+## Covenant-residue composition and deployment premises
+
+`bch-groth16-bls12381-chunked-covenant-residue` uses the same lifecycle code as the BN254
+covenant. The full argument (enforced rules, the deployment premises P1/P2, the token-provenance
+lemma and the composition theorem) is in
+[`../pairing/README.md`](../pairing/README.md#covenant-residue-composition-what-the-scripts-enforce-and-what-the-deployment-supplies).
+It applies here with these BLS references:
+
+- The lifecycle block is at `build_vectors_covenant_residue.mjs:102-123`. It is inserted before
+  the close of the single `spend` function at `:134-141`, with the successor pin at `:137-140`.
+  At genesis the input commitment check and the category-equality line are removed (`:128-133`).
+- `covIn` / `covOut` (48-byte limbs) are at `_vkxmath.mjs:92-109`; `CATEGORY` is at
+  `_vkxmath.mjs:86`, with the fixture value `0xbe`×32. The seam assertions are at
+  `build_vectors_covenant_residue.mjs:336-343`. The builder refuses to write vectors unless every
+  mutation is rejected (`:203-258`, `:718`). The shipped `verification` block counts 324
+  category/capability, 81 successor/terminal-locking and 6 baton mutations.
+- `N = 27`: 5 GLV, 21 fused Miller, 1 Fp6 residue verdict. The statement `(n0, n1)` is in the
+  genesis (step 0) unlocking: pushes 4 and 6 are `n0`, pushes 2 and 5 are `n1` (bench
+  `publicInputs`). Full-stage GLV: `A, B, C` enter as witnesses at the last GLV step
+  (`GLV vk_x [103,128) bind (-A,B,C,vk_x)`). From there, that step's output commitment binds
+  them together with `vk_x`.
+- The same opcode census holds for all 27 shipped redeems (genesis / forward / terminal counts as
+  in the BN table).
+
+P1 (category genesis creates only `L_0` batons, `C` regenerated for the deployment) and P2 (the
+verdict is an unspendable, empty-commitment immutable NFT read off-chain through its unique
+one-input ancestry) are deployment-supplied, exactly as for BN254.
+
 ## How it works
 
 A GENERIC (proof-agnostic) covenant: each chunk carries **no baked proof**; only VK
