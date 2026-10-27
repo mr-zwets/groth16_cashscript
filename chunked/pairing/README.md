@@ -80,7 +80,8 @@ The builder appends one fixed lifecycle block to each generated contract
 single `spend` function (`:147-154`), and pins each nonterminal's successor (`:150-153`). The
 per-step state checks come from `covIn` / `covOut` (`_millermath.mjs:461-477`). `CATEGORY` is a
 constant (`_millermath.mjs:456`, the fixture value `0xcd`×32). An opcode census of the shipped
-redeems agrees with the table below. Each redeem P2SH32-hashes to its step's locking. The
+redeems (`node chunked/pairing/covenant_lifecycle_census.mjs <vector file>`) agrees with the table
+below. Each redeem P2SH32-hashes to its step's locking. The
 literal `C‖02`, `C‖01` and `C` pushes appear where the table needs them. The token introspection
 counts are:
 - genesis: 1 input-category, 1 input-commitment (the empty check), 2 output-category,
@@ -108,12 +109,18 @@ Facts used below (CashTokens consensus rules): a mutable or immutable NFT of `C`
 existence only (a) in the category-genesis transaction of `C`, (b) from a transaction that spends
 a minting NFT of `C`, or (c) as the single replacement of a spent mutable NFT of `C`. Immutable
 NFTs can only be moved unchanged. Fungible tokens of `C` cannot create NFTs. The category reads
-return `C‖01` for mutable, `C‖02` for minting and bare `C` for an immutable NFT.
+return `C‖01` for mutable, `C‖02` for minting and bare `C` for an immutable NFT. Bare `C` with an
+empty commitment is also what an output carrying only fungible tokens of `C` reports. So if
+fungible tokens of `C` exist and ride on the thread's input, the terminal's out0 check is also met
+by a fungible-only output; that spend burns the thread and leaves no verdict NFT. This affects
+liveness only, not soundness: the theorem below concerns outputs that carry an immutable NFT, and
+P1 need not exclude fungible tokens of `C`.
 
 ### Deployment premises (supplied by the deployer, not by the scripts)
 
-- **P1 (category genesis).** The deployer chooses the category-genesis outpoint first, sets `C` to
-  its transaction id, and regenerates the graph with that `C`. The bench bytes use the
+- **P1 (category genesis).** The deployer first chooses the outpoint that input 0 of the
+  category-genesis transaction will spend; it must be an outpoint with output index 0. `C` is the
+  transaction id of that outpoint, and the deployer regenerates the graph with that `C`. The bench bytes use the
   placeholder `0xcd`×32 (BN) or `0xbe`×32 (BLS); they are not a deployment, and their lockings and
   hashes change with `C`. The category-genesis transaction must create no NFT of `C` except
   minting NFTs locked by `L_0` with an empty commitment (normally exactly one: the baton). No
@@ -131,8 +138,12 @@ return `C‖01` for mutable, `C‖02` for minting and bare `C` for an immutable 
   2. follow input 0 of each transaction back `N-1` transactions (every graph transaction has exactly
      one input, so this ancestry is a unique linear chain) to the transaction whose input spends a
      `C‖02` baton locked by `L_0`;
-  3. read `n0` and `n1` from that genesis unlocking. The bench descriptor's `publicInputs` lists
-     the push positions: BN step 0 pushes 4 and 6 (`n0`) and 2 and 5 (`n1`).
+  3. read the statement from that genesis unlocking. The genesis `spend(Ax, .., Cy, in0, in1, k10,
+     k20, k11, k21, zeroPadding)` pushes its arguments last-first, so push 6 is `in0` (`n0`) and
+     push 5 is `in1` (`n1`) (`gen_vkx_glv.mjs:174-176,285`). Pushes 4 and 2 are the GLV witnesses
+     `k10` and `k11`. They equal `n0` and `n1` only for small scalars (as in the committed
+     fixture), so a consumer must not read the statement from them. The bench descriptor's
+     `publicInputs` is a mutation-test list, not a statement locator.
 
   In step 2, a consumer that also checks each spent output's locking `== L_k` gets a
   self-contained proof that does not depend on P1. Each of those transactions was consensus-valid

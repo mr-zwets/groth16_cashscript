@@ -226,8 +226,11 @@ It applies here with these BLS references:
   mutation is rejected (`:203-258`, `:718`). The shipped `verification` block counts 324
   category/capability, 81 successor/terminal-locking and 6 baton mutations.
 - `N = 27`: 5 GLV, 21 fused Miller, 1 Fp6 residue verdict. The statement `(n0, n1)` is in the
-  genesis (step 0) unlocking: pushes 4 and 6 are `n0`, pushes 2 and 5 are `n1` (bench
-  `publicInputs`). Full-stage GLV: `A, B, C` enter as witnesses at the last GLV step
+  genesis (step 0) unlocking: push 6 is `in0` (`n0`) and push 5 is `in1` (`n1`), since the genesis
+  `spend(.., in0, in1, k10, k20, k11, k21, zeroPadding)` pushes its arguments last-first. Pushes 4
+  and 2 are the GLV witnesses `k10` and `k11`, which equal `n0` and `n1` only for small scalars;
+  a consumer must not read the statement from them (the bench `publicInputs` list is a
+  mutation-test list, not a statement locator). Full-stage GLV: `A, B, C` enter as witnesses at the last GLV step
   (`GLV vk_x [103,128) bind (-A,B,C,vk_x)`). From there, that step's output commitment binds
   them together with `vk_x`.
 - The same opcode census holds for all 27 shipped redeems (genesis / forward / terminal counts as
