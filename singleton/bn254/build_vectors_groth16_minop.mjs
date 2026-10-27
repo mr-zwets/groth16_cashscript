@@ -52,7 +52,7 @@ const unlockingFor = (args) => Uint8Array.from(args.slice().reverse().flatMap((a
   a instanceof Uint8Array ? [...encodeDataPush(a)] : [...pushInt(a)]));
 const canon = (x) => ((x % Pm) + Pm) % Pm;
 
-const vec = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/checkpoints/pairing-vectors.json', 'utf8'));
+const vec = JSON.parse(readFileSync(C.verifierPath('src/checkpoints/pairing-vectors.json'), 'utf8'));
 const Baff = C.proof.b.toAffine();
 const B = [[Baff.x.c0, Baff.x.c1], [Baff.y.c0, Baff.y.c1]];
 
@@ -78,8 +78,9 @@ function torusWit(publicInputs, pf) {
   const slopes = trace.ops.flatMap((op) => (op.affineSlopes ?? []).flatMap((m) => [canon(m.c0), canon(m.c1)]));
   return { u: u6(root.u), slopes };
 }
-// spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1, u[6], iAy,iVy,iCy, slopes[176], k10,k20,k11,k21,vkxZinv)
-// (torus/full). The staged legacy layout keeps the old c/ci/w + zinv shape.
+// spend(Ax,Ay,Bxa,Bxb,Bya,Byb,Cx,Cy,in0,in1, u[6], iAy,iVy,iCy, slopes[176], k10,k20,k11,k21, nb, glvSlopes)
+// (torus/full; glvSlopes is the affine-GLV slope blob, 32 B per step). The staged legacy layout
+// keeps the old c/ci/w + zinv shape.
 // `limbs`={Ax..Cy} are the proof's affine coords (unlocking), `Bpair`=[[Bxa,Bxb],[Bya,Byb]] for zinv.
 function argsFor(publicInputs, wit, limbs, Bpair, pf = C.proof) {
   const base = [
@@ -136,7 +137,7 @@ function parseProofUnlocking(hex) {
     proof: C.proofFromLimbs(d[0], d[1], d[2], d[3], d[4], d[5], d[6], d[7]),
   };
 }
-const mp = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-singleton-multiproof-vectors.json', 'utf8'));
+const mp = JSON.parse(readFileSync(C.verifierPath('src/bch/groth16-singleton-multiproof-vectors.json'), 'utf8'));
 const wc = parseProofUnlocking(mp.worstCaseProof.unlocking);
 
 const template = hexToBin(compileFile(join(here, `${CASH}.cash`), { rescheduleStacks: true }).debug.bytecode);
@@ -227,6 +228,6 @@ if (STAGE === 'full' && CASH === 'groth16_minop') {
     looseAccept: looseAccept.accepted,
     rejectInvalid: !looseRejectInvalid.accepted,
   };
-  writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/groth16-singleton-minop-vectors.json', JSON.stringify(out, null, 2));
+  writeFileSync(C.verifierPath('src/bch/groth16-singleton-minop-vectors.json'), JSON.stringify(out, null, 2));
   console.log('wrote src/bch/groth16-singleton-minop-vectors.json');
 }
