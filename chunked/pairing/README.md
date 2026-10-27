@@ -62,6 +62,158 @@ The legacy 20-transaction non-quotient residue graph remains reproducible by run
 
 Every chunk is validated on the real BCH 2026 VM.
 
+## Covenant-residue composition: what the scripts enforce and what the deployment supplies
+
+This section is the composition argument for `bch-groth16-chunked-covenant-residue` (BN254, 12
+transactions) and, with the BLS line numbers in `../bls12-381/README.md`, for
+`bch-groth16-bls12381-chunked-covenant-residue` (27 transactions). It covers only how the steps
+compose into one verdict. The per-step arithmetic (GLV `vk_x`, canonical points, curve and G2
+subgroup checks, quotient-torus Miller, residue terminal) is argued in the review notes and the
+`prove_*` scripts listed below. Notation: `C` is the 32-byte token category baked into every
+redeem, `L_0 .. L_{N-1}` are the graph's P2SH32 lockings (`N = 12`), and `S_k` is the state that
+step `k` emits.
+
+### What every redeem enforces (code, not convention)
+
+The builder appends one fixed lifecycle block to each generated contract
+(`build_vectors_covenant_residue.mjs:115-136`), inserted before the close of the contract's
+single `spend` function (`:147-154`), and pins each nonterminal's successor (`:150-153`). The
+per-step state checks come from `covIn` / `covOut` (`_millermath.mjs:461-477`). `CATEGORY` is a
+constant (`_millermath.mjs:456`, the fixture value `0xcd`×32). An opcode census of the shipped
+redeems (`node chunked/pairing/covenant_lifecycle_census.mjs <vector file>`) agrees with the table
+below. Each redeem P2SH32-hashes to its step's locking. The
+literal `C‖02`, `C‖01` and `C` pushes appear where the table needs them. The token introspection
+counts are:
+- genesis: 1 input-category, 1 input-commitment (the empty check), 2 output-category,
+  2 output-commitment and 2 output-locking reads, and 1 spent-locking read;
+- forward: 2 input-category, 1 input-commitment, 2 output-category, 1 output-commitment and
+  1 output-locking read;
+- terminal: 1 of each, plus 1 spent-locking read.
+
+| step | inputs / outputs | spent token (active input) | created tokens | state |
+|---|---|---|---|---|
+| genesis `L_0` (GLV chunk 0) | exactly 1 / exactly 2 | category+capability `== C‖02` (minting), commitment empty | out0 `== C‖01` (mutable) at a locking with `hash256 == hash256(L_1)`; out1 `== C‖02` (minting), commitment empty, locking `==` the active input's locking (`L_0`) | no `covIn`: the genesis input check is removed (`:141-146`); out0 commitment `== hash256(S_0)`, computed from the genesis unlocking (public inputs, GLV witnesses, raw proof tuple) |
+| forward `L_k`, `0<k<N-1` | exactly 1 / exactly 1 | `== C‖01` (mutable) | out0 `== C‖01` at a locking with `hash256 == hash256(L_{k+1})` | `covIn`: input commitment `== hash256(S_{k-1})` over the pushed limbs; `covOut`: out0 commitment `== hash256(S_k)` |
+| terminal `L_{N-1}` | exactly 1 / exactly 1 | `== C‖01` (mutable) | out0 `== C` (immutable), commitment empty, locking `==` the active input's locking (`L_{N-1}`) | `covIn` on `S_{N-2}`, then the quotient-torus verdict; no state is emitted |
+
+Each commitment is `hash256` of fixed-width little-endian limbs (32 B for BN254, 48 B for BLS12-381,
+`toPaddedBytes`, i.e. `OP_NUM2BIN`). A fixed-width `OP_NUM2BIN` is injective on the integers that
+fit, and a value that does not fit fails the script. So a commitment fixes every limb value, up to
+a `hash256` collision. The builder also asserts that `out0` of step `k` is the `in` of step `k+1`,
+both as a commitment and as a locking (`:365-372`). It refuses to write vectors unless every
+lifecycle mutation is rejected (`:257-311`, `:1195`): wrong category, wrong capability, wrong
+successor, terminal self-lock, baton commitment and baton locking. The shipped file's
+`verification` block records the counts.
+
+Facts used below (CashTokens consensus rules): a mutable or immutable NFT of `C` can come into
+existence only (a) in the category-genesis transaction of `C`, (b) from a transaction that spends
+a minting NFT of `C`, or (c) as the single replacement of a spent mutable NFT of `C`. Immutable
+NFTs can only be moved unchanged. Fungible tokens of `C` cannot create NFTs. The category reads
+return `C‖01` for mutable, `C‖02` for minting and bare `C` for an immutable NFT. Bare `C` with an
+empty commitment is also what an output carrying only fungible tokens of `C` reports. So if
+fungible tokens of `C` exist and ride on the thread's input, the terminal's out0 check is also met
+by a fungible-only output; that spend burns the thread and leaves no verdict NFT. This affects
+liveness only, not soundness: the theorem below concerns outputs that carry an immutable NFT, and
+P1 need not exclude fungible tokens of `C`.
+
+### Deployment premises (supplied by the deployer, not by the scripts)
+
+- **P1 (category genesis).** The deployer first chooses the outpoint that input 0 of the
+  category-genesis transaction will spend; it must be an outpoint with output index 0. `C` is the
+  transaction id of that outpoint, and the deployer regenerates the graph with that `C`. The
+  bench bytes use the placeholder `0xcd`×32 (BN) or `0xbe`×32 (BLS); they are not a deployment,
+  and their lockings and hashes change with `C`. The category-genesis transaction must create no
+  NFT of `C` except
+  minting NFTs locked by `L_0` with an empty commitment (normally exactly one: the baton). No
+  other minting or mutable NFT of `C` may ever exist outside the graph. Nothing on-chain checks
+  this, because a script cannot see the category-genesis transaction. It is checkable once, by
+  inspecting that one transaction.
+- **P2 (how a consumer reads a verdict).** The verdict is the immutable, empty-commitment `C` NFT
+  at `L_{N-1}`. The terminal contract requires its active input to carry `C‖01`, and the verdict
+  reports `C`. So the verdict output can never be spent: it is a permanent ledger fact, and its
+  satoshis are locked with it. No on-chain contract can consume it. Its commitment is empty, so
+  it does not name the statement. A consumer is therefore off-chain (a full node, an indexer, or
+  SPV with the ancestor transactions). To accept "the Groth16 statement `(n0, n1)` verified for
+  this VK", the consumer must:
+  1. find an output locked by `L_{N-1}` that carries an immutable `C` NFT with an empty commitment;
+  2. follow input 0 of each transaction back `N-1` transactions (every graph transaction has exactly
+     one input, so this ancestry is a unique linear chain) to the transaction whose input spends a
+     `C‖02` baton locked by `L_0`;
+  3. read the statement from that genesis unlocking. The genesis `spend(Ax, .., Cy, in0, in1, k10,
+     k20, k11, k21, zeroPadding)` pushes its arguments last-first, so (counting from push 0,
+     `zeroPadding`) push 6 is `in0` (`n0`) and
+     push 5 is `in1` (`n1`) (`gen_vkx_glv.mjs:174-176,285`). Pushes 4 and 2 are the GLV witnesses
+     `k10` and `k11`. They equal `n0` and `n1` only for small scalars (as in the committed
+     fixture), so a consumer must not read the statement from them. The bench descriptor's
+     `publicInputs` is a mutation-test list, not a statement locator.
+
+  In step 2, a consumer that also checks each spent output's locking `== L_k` gets a
+  self-contained proof that does not depend on P1. Each of those transactions was consensus-valid
+  under the contract of `L_k`. A consumer that relies on P1 may skip those locking checks. It
+  still needs steps 2 and 3 to learn which statement was verified.
+- **Not provided.** The covenant does not constrain satoshi values (see above). The baton is the
+  single input of every genesis spend and has no signature check, so any party may start a thread.
+  Each thread is funded from the baton's value, and that value bounds how many genesis spends are
+  possible. This is a liveness and funding matter for the deployment, not a soundness one. The
+  synthetic-VK caveat above applies unchanged.
+
+### Composition argument (assuming P1)
+
+**Lemma (token provenance).** Under P1, every NFT of `C` that ever exists is one of:
+- (i) a minting NFT locked by `L_0` with an empty commitment;
+- (ii) a mutable NFT locked by `L_k` (`1 ≤ k ≤ N-1`), created by a valid execution of the contract
+  of `L_{k-1}`, whose commitment is `hash256(S_{k-1})` for the state that execution computed;
+- (iii) an immutable, empty-commitment NFT locked by `L_{N-1}`, created by a valid execution of the
+  terminal contract.
+
+*Proof*, by induction over ledger order. The category-genesis transaction creates only (i) (P1).
+A later NFT of `C` is created only by spending a minting NFT of `C` or by replacing a mutable one.
+By induction, those are of kind (i) or (ii), so their spend runs the contract of `L_0` or `L_k`.
+- A spend of `L_0` has exactly one input (the baton) and exactly two outputs: a mutable NFT at
+  `L_1` committing the genesis state, and a minting NFT with an empty commitment back at `L_0`.
+  These are kinds (ii) and (i).
+- A spend of `L_k` (`0<k<N-1`) has exactly one input and one output: a mutable NFT at `L_{k+1}`
+  committing the state it computed. That is kind (ii).
+- A spend of `L_{N-1}` emits only the immutable kind (iii).
+
+Kind (iii) can never be spent (P2), and no other transaction can introduce a token of `C`.
+Because every graph transaction has exactly one input, no second token of `C` (from another
+thread or another kind) can ever enter a graph transaction. ∎
+
+**Theorem.** Under P1, if an output of kind (iii) exists, then its unique ancestry `T_0 .. T_{N-1}`
+consists of valid executions of the contracts `L_0 .. L_{N-1}` in order:
+- `T_0` spends a baton;
+- `T_k` spends the single output of `T_{k-1}`;
+- the state that `T_k` checks with `covIn` is exactly the state `S_{k-1}` that `T_{k-1}` computed
+  (an injective commitment, up to a `hash256` collision).
+
+So the chain is one deterministic run of the reviewed per-step computation on the inputs of
+`T_0`'s unlocking (the public inputs `n0, n1` and the GLV witnesses), plus the proof tuple:
+- for BN, `T_0` commits the raw proof tuple;
+- for BLS (full-stage GLV), `A, B, C` enter at the last GLV step, and from there they are bound by
+  that step's output commitment.
+
+The terminal accepted, so by the per-step arguments the Groth16 equation holds for
+`vk_x = IC0 + n0·IC1 + n1·IC2`, with `n0, n1` taken from `T_0`. *Proof:* by the lemma, the
+mutable input of the terminal is kind (ii), created by `L_{N-2}`. Repeat back to `L_0`, whose
+input is kind (i). The state hand-off at each seam follows from `covIn`/`covOut` and the
+successor pin. ∎
+
+**Without P1** (for example, if the deployer kept a minting NFT of `C` or minted extra mutable
+NFTs at category genesis), a mutable NFT with any commitment could be placed at any `L_k`, so
+kind (iii) alone proves nothing. The consumer procedure of P2, *with* the per-transaction locking
+checks, still yields the theorem's conclusion for the chain it walks. That walk replaces P1 and
+does not depend on it.
+
+Per-step references:
+- GLV: `prove_vkx_glv_split.mjs`, `prove_projective_vkx.mjs` (the non-grouped legacy prologue is
+  used here);
+- affine and unit-line Miller: `prove_miller_affine*.mjs`, `prove_miller_unit_lines.mjs`;
+- G2 endpoint subgroup: `prove_miller_endpoint_subgroup.mjs`;
+- quotient torus: `prove_miller_torus.mjs`;
+- the B-identity flag, derived only from the all-zero raw B: `gen_miller_residue.mjs`
+  (`B_INFINITY_FLAG` branch).
+
 ## Optimizations
 
 - **Lazy reduction** — `addFp`/`subFp` defer the `% p` with per-call-site bias (option-B;
