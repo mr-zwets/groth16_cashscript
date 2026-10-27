@@ -88,7 +88,8 @@ cancellation degree of at most 23, and the alpha identity has degree at most
 137. The full random-oracle bound, with the commitment/opening lemma and the fixed-anchor
 binding terms, is stated in [chunked/bls12-381/README.md](chunked/bls12-381/README.md), section 5:
 `(23·q_β + 160·q_α)/2^256 + 3·N(N−1)/2^257`, where q counts every SHA-256 query by the adversary
-and the verifier and `N = q + N₀` adds the fewer than `2^22 + 2^7` setup hashes.
+and the verifier, `q_β, q_α ≤ q` the beta/alpha queries among them, and `N = q + N₀` adds the
+fewer than `2^22 + 2^7` setup hashes.
 
 `B` is checked on-curve and in the order-r G2 subgroup using the psi relation and
 the affine tangent/chord denominator guards. `A` and `C` are canonical on-curve
