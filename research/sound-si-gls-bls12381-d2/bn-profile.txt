@@ -1,0 +1,33 @@
+total 23381269
+loop:bdbl                            9.305M
+loop:add > fn(531 instr)             3.901M
+loop:dstep > fn(168 instr)           3.189M
+loop:gls                             1.315M
+loop:add > fn(168 instr)             1.029M
+loop:bnd                             0.733M
+quotient                             0.574M
+loop:bnd > fn(46 instr)              0.521M
+terminal > fn(531 instr)             0.359M
+loop:add                             0.300M
+loop:bnd > fn(12 instr)              0.286M
+terminal                             0.219M
+gls-tables > fn(111 instr)           0.194M
+loop:loopend                         0.165M
+quotient > fn(12 instr)              0.164M
+gls-tables > fn(46 instr)            0.126M
+powers                               0.119M
+parse+checks > fn(12 instr)          0.112M
+parse+checks                         0.104M
+transcript                           0.099M
+loop:digit                           0.098M
+terminal > fn(168 instr)             0.097M
+p2sh > fn(3 instr)                   0.056M
+cleanup                              0.054M
+loop:dstep                           0.046M
+loop-setup                           0.046M
+gls-tables                           0.038M
+terminal > fn(46 instr)              0.032M
+loop:bnd > fn(1 instr)               0.026M
+
+CONSENSUS
+total 23336981

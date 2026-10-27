@@ -1,0 +1,86 @@
+{
+ "score": 26884,
+ "content": 26628,
+ "op": 20971833,
+ "fill": 56,
+ "ins": [
+  {
+   "events": [
+    0,
+    24
+   ],
+   "bytes": 9087,
+   "op": 7156017,
+   "budget": 7302400,
+   "margin": 2,
+   "B": {
+    "redeemAndHeaders": 70,
+    "states": 2304,
+    "bWitness": 1024,
+    "handover": 0,
+    "statementAndDigests": 738,
+    "code": 4932,
+    "filler": 19
+   },
+   "O": {
+    "setup": 870000,
+    "loop": 6221017,
+    "ownerChecks": 20000,
+    "remoteReads": 45000
+   }
+  },
+  {
+   "events": [
+    24,
+    48
+   ],
+   "bytes": 9037,
+   "op": 7116540,
+   "budget": 7262400,
+   "margin": 2.01,
+   "B": {
+    "redeemAndHeaders": 70,
+    "states": 2304,
+    "bWitness": 1024,
+    "handover": 224,
+    "consts": 1812,
+    "DS1": 2048,
+    "DS2": 1536,
+    "filler": 19
+   },
+   "O": {
+    "setup": 870000,
+    "loop": 6226540,
+    "remoteReads": 20000
+   }
+  },
+  {
+   "events": [
+    48,
+    65
+   ],
+   "bytes": 8504,
+   "op": 6699276,
+   "budget": 6836000,
+   "margin": 2,
+   "B": {
+    "redeemAndHeaders": 70,
+    "states": 1728,
+    "bWitness": 768,
+    "handover": 224,
+    "WQ": 3648,
+    "DS0": 2048,
+    "filler": 18
+   },
+   "O": {
+    "setup": 870000,
+    "loop": 4316696,
+    "terminal": 540000,
+    "binding": 130000,
+    "quotient": 737580,
+    "final": 60000,
+    "remoteReads": 45000
+   }
+  }
+ ]
+}

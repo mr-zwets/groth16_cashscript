@@ -1,0 +1,29 @@
+{
+ "_source": "proto_skeleton.mjs in real 5-input BCH 2026 transactions (layout-rec.json = recommended bcast layout with a 2-part blob; layout-e5.json = base), proofs seed 3 and 11, max taken, rounded up, expressed for a 1-part loader (the model adds 30k per extra blob part to every input; measured +27k); producer OUT and hub broadcast checks test (computed - claimed) mod p; terminal = terminal + quotient Horner + GLS binding + curve/range/nibble checks (1,694k measured); blob = estimate for the all-roles blob (measured role blobs: base event 2,823 B, base terminal 4,628 B, bcast hub 3,952 B, bcast consumer 1,139 B, bcast terminal 2,914 B)",
+ "base": {
+  "first": {
+   "std": 1238000,
+   "cons": 1194000
+  },
+  "other": {
+   "std": 1336000,
+   "cons": 1290000
+  }
+ },
+ "bcast": {
+  "first": {
+   "std": 1615000,
+   "cons": 1568000
+  },
+  "other": {
+   "std": 590000,
+   "cons": 580000
+  },
+  "bcastWords": 83
+ },
+ "terminalExtraSetup": 35000,
+ "terminal": 1710000,
+ "loopPerEvent": 6000,
+ "blob": 7000,
+ "redeem": 68
+}

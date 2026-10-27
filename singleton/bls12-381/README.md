@@ -6,7 +6,7 @@
 > inputs. It now validates the proof points before any pairing work (see
 > [Proof-point validation](#proof-point-validation)): every coordinate is range-checked
 > (`0 <= v < p`), A and C must satisfy `y^2 = x^3 + 4`, B must satisfy the twist equation
-> `y^2 = x^3 + 4(1+u)`, and B must pass the G2 subgroup check `psi(B) == [-x]B`, fused into B's
+> `y^2 = x^3 + 4(1+u)`, and B must pass the G2 subgroup check `psi(B) == [x]B` (x < 0, so `[x]B = -[|x|]B`), fused into B's
 > Miller walk with a `Z != 0` guard. Both entries are rebuilt with their original pipelines.
 > An independent review (2026-10-26) found no soundness gaps; its minor follow-ups (more
 > non-canonical-encoding tests, the cofactor-malleability note below) are done, and both entries
@@ -69,7 +69,7 @@ squaring are identical; the tower/G1 layers are near-mechanical re-parameterizat
 | coordinates `0 <= v < p` | `within(v, 0, P)` on Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy |
 | A, C on `E(Fp)`: `y^2 = x^3 + 4` | `g1Check(x, y)` (range + curve), one body called twice |
 | B on `E'(Fp2)`: `y^2 = x^3 + 4(1+u)` | two `fp2Sqr` and one `fp2Mul` |
-| B in G2: `psi(B) == [-x]B` | fused into B's Miller walk (below), no separate `[\|x\|]B` walk |
+| B in G2: `psi(B) == [x]B` (x < 0) | fused into B's Miller walk (below), no separate `[\|x\|]B` walk |
 
 **Points at infinity.** The affine encoding has no point at infinity, and `(0,0)` is off both
 curves, so A = O, B = O and C = O are all rejected by the curve checks. The honest fixtures never
@@ -99,6 +99,29 @@ standard Groth16 proof does. This is malleability only. It matters only if an ap
 the proof bytes themselves as an identifier or nullifier. Such an application should bind the
 public inputs instead, as it must for Groth16 anyway, since Groth16 proofs are re-randomizable.
 (B has no such variants: it must be in G2.)
+
+**`vk_x = O` (neutral public inputs) verifies correctly.** Unlike A, B and C, `vk_x` is computed
+on-chain and can be O for valid public inputs (with this key's IC scalars 2, 4, 6, inputs
+`[1, r-1]` give `2 + 4 - 6 = 0`). The program then evaluates `e(O, gamma)` as exactly 1:
+- `jacAddAffineG1` is complete (`R = O` returns the affine addend, `R = P` doubles, `R = -P`
+  gives `h = 0` and so `Z = 0`), and doubling is skipped while `Z = 0` (`groth16.cash:18-36,
+  60-75`). So `vz == 0` exactly when `vk_x = O`. `inverseFp(0)` is `0^(p-2) = 0`
+  (`lib/Fp.cash:20-28`), so `computeVkx` returns `(0,0)` (`groth16.cash:76-79`).
+- At `P = (0,0)` every `line()` sets `o1 = c1*Px = 0` and `o4 = c2*Py = 0`
+  (`lib/Miller.cash:67-78`), and `mul014` with `o1 = o4 = 0` is multiplication by `c0`
+  (`lib/Fp12.cash:116-134`). So each line value is its `c0` coefficient, which lies in the
+  subfield Fp2 (Fp12 slot 0), and the gamma Miller value `f_gamma` is a product of these
+  (`groth16.cash:151-152`). Gamma's walk is fixed, so `f_gamma` is the same Fp2 element for
+  every such spend. It is nonzero: the replay below accepts, and a zero factor would make the
+  verdict 0.
+- `fp12Conj` fixes Fp6 ⊇ Fp2 (`groth16.cash:161-162`), and the easy part of `finalExp` computes
+  `conj(f) * f^-1 = f^(p^6-1)` (`lib/FinalExp.cash:59-65`). Every element of Fp6* has order
+  dividing `p^6 - 1`, so the factor `f_gamma` maps to 1, and the verdict is the final
+  exponentiation of the other three pairs: `e(-A,B) * e(alpha,beta) * e(C,delta) == 1`, which
+  is the Groth16 equation with `e(O, gamma) = 1`.
+
+Replay: the archived valid proof for `[1, r-1]` (bench PR 14, `extraValidProofs[13]`) is accepted
+by the registered 7,026 B locking at 980,610,078 op-cost.
 
 **Tests.** `domain_checks_test.mjs` runs the honest instance, the bench multiproof set, and 17
 out-of-domain cases from `domain_cases.mjs`: off-curve A and C, off-twist B, `(0,0)` for A, B and
@@ -165,26 +188,84 @@ node singleton/bls12-381/build_vectors_optimized.mjs# -> groth16-bls12381-single
 ## Op-optimized variant (`groth16_minop.cash`, generated)
 
 `gen_singleton_minop.mjs` emits the BLS analog of `../bn254/groth16_minop.cash`
-(`bch-groth16-bls12381-singleton-minop`): lazy tower + ONE batched c^-|x|-fused Miller
-(only `(-A,B)` runs on-chain G2; `e(alpha,beta)` and the `(vk_x,gamma)`/`(C,delta)` line
-coefficients baked) + witnessed-residue final exp + GLV vk_x. 64,510-byte locking,
-**~153.8M op-cost (~20 inputs) vs the baseline's ~966M (~121) as currently measured
-by the harness** — ~84% less (~90% vs the 1.48B the baseline measured pre-rescheduler).
+(`bch-groth16-bls12381-singleton-minop`, status **reviewed** after two independent constructive
+reviews on 2026-10-27). It combines a lazy tower, ONE batched `c^-|x|`-fused Miller loop (only
+`(-A,B)` runs on-chain G2 arithmetic; `e(alpha,beta)` and the `(vk_x,gamma)`/`(C,delta)` line
+coefficients are baked), a **quotient-torus** residue verdict in place of the final
+exponentiation, and GLV `vk_x`. Shipped: **58,007 B locking, 58,841 B scored, 145,596,803 op-cost
+(19 inputs; worst case 171,126,234)**, against 994,589,979 (124 inputs) for the
+`bch-groth16-bls12381-singleton` baseline on the current harness (about 85% less).
+`node gen_singleton_minop.mjs` regenerates the `.cash` byte for byte, and the cashc fork
+(`rescheduleStacks: true`) recompiles it to the shipped `lockingOK`.
 
-BLS-specific differences vs the BN254 min-op (see `../../chunked/bls12-381/_residuemath.mjs`):
+The spend takes 21 arguments: `Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy, in0, in1, u0..u5, k10, k20,
+k11, k21, vkxZinv`. There are no slope witnesses, and the only inverse witness is `vkxZinv` (fixed by an exact
+equation, see the table): the G2 walk is homogeneous projective, and the GLV accumulator is Jacobian.
 
-- residue relation `c^lambda == g*w` with `lambda = p + |x|`; the tail is a single
-  Frobenius: `gF*w == frob(c,1)`, on the **unconjugated** boundary (x<0's final
-  conjugation is absorbed into the witness — conj is an automorphism);
-- the witness construction removes the boundary's nontrivial A-part with one projection and
-  produces `w` in the embedded `Fp6*`; the on-chain membership check is six zero upper limbs.
-  This suffices because `p^6-1` divides `(p^12-1)/r`, while `c*cInv==1` and the terminal
-  relation exclude zero;
-- the G2 subgroup check `psi(B) == [-x]B` is fused into the Miller tail and reuses
-  `[|x|]B`;
-- G1 subgroup checks for A and C are omitted as redundant: both points remain checked
-  on-curve and are paired only with order-`r` G2 points, so their cofactor components
-  pair trivially. This matches the grouped/intra-tx residue verifiers.
+### Soundness (owner table)
+
+Line numbers refer to `groth16_minop.cash`; kernels live in `lib/lazy/`.
+
+| value | owner | where |
+|---|---|---|
+| `Ax, Ay, Cx, Cy` | canonical and on `y^2 = x^3 + 4`. No G1 subgroup check: see the cofactor note above (malleability only) | L18-35 |
+| `Bxa..Byb` | canonical and on `y^2 = x^3 + 4(1+u)`. In G2 by the fused psi check below | L18-40, L413-419 |
+| `u0..u5` (residue root) | canonical. Otherwise free: the verdict argument holds for **every** `u` | L28-33 |
+| `k10, k20, k11, k21` | `within(k, 0, 2^128)` | L42 |
+| `in0, in1` | exact equation `in = (k1 + k2*lambda_GLV) % r` with `k >= 0`, so `in` lies in `[0, r)` | L43-44 |
+| GLV table, `IC0`, `lambda_GLV = -x^2 mod r` | VK constants: the 15 entries are the subset sums of `{IC1, phi(IC1), IC2, phi(IC2)}`, `phi(x,y) = (beta*x, y) = [lambda_GLV]` | L43-57 |
+| `vk_x` | computed on-chain: a fixed 128-iteration MSB Straus loop over all bits of `k`. `jacAddG1` is complete (`O + Q`, `P == Q` goes to doubling, `P == -Q` gives `Z = 0`), and the final addend is `IC0` | L45-61 |
+| `vkxZinv` | exact equation `icz * vkxZinv == 1`. This forces `vk_x != O` and an exact affine conversion | L58-61 |
+| runtime G2 lines and `R` | computed on-chain by `pointDouble` / `pointAdd` (`Bls12381Lazy.cash:333, 362`) from `B`; each line is evaluated once at `-A = (Ax, -Ay)` | L62-411 |
+| baked `(vk_x,gamma)`, `(C,delta)` lines | VK constants: the 69 + 69 lines of the projective walk of gamma and delta on the `|x|` schedule, recomputed independently by both reviews | L62-411 |
+| baked `e(alpha,beta)` torus constant `K` | VK constant: `[1 + tW]` with `FE(K)` matching the model `e(alpha,beta)` (recomputed by review 1; an accepted honest proof also pins `K^FE`) | L412 |
+| `psi`, `torusFrob1` constants | curve constants. `torusFrob1` uses `xi^((p-1)/3)`, `xi^(2(p-1)/3)`, `xi^((p-1)/6)`, and `fp2Half = (p+1)/2`. The psi coefficients map E' to E' and satisfy `psi^2 - (x+1) psi + p = 0`. Both reviews recomputed these against noble | `Bls12381LazyG.cash:92`, `Bls12381LazyTorus.cash:27` |
+| Fp12 accumulator | computed on-chain as one SSA chain from the genesis `[1 - uW]` (squared by the first op, L67) through every square, line and `c`/`c^-1` fold | L62-412 |
+
+The verifier is one input with no introspection, state or sibling inputs, so there is no
+multi-input binding to argue.
+
+**Miller schedule.** The runtime walk starts at `R = B` and runs 64 doubles and 5 adds over
+`|x| = 0xd201000000010000` on a signed-digit schedule: one `-B` add (with a `c` fold) and four
+`+B` adds, so the double count is 64, not 63. Every Fp12 op consumes the previous Fp12 output, and every G2 op
+consumes the previous point. The `c` exponent is exactly `-|x|`. The loop is unconjugated, so
+it computes the Miller value of `[|x|]`, whose final exponentiation is the inverse of the ate
+pairing for `x`. It is used consistently for all four pairs and for `K`, so the verdict still
+expresses the Groth16 equation.
+
+**Residue verdict (quotient torus, no `w`, no `c*cInv` gate).** The accumulator lives in
+`Fp12*/Fp6*`, with `[c] = [1 + uW]` and `[c^-1] = [1 - uW]`, because `(1+uW)(1-uW) = 1 - u^2 v`
+lies in Fp6. The terminal (L420-424) reduces the final accumulator to `tF = (tF_a, tF_b)` with
+limbs `mulFp(., 1)` in `(-p, p)`. It then requires:
+
+1. `sum(tF) != 0`. A limb in `(-p, p)` that is `0 mod p` is exactly 0, so this rejects the
+   vacuous `[0:0]`. A nonzero class whose signed limbs sum to 0 is also rejected, which costs
+   completeness only, with negligible probability.
+2. `tF_a * frob1(u) == tF_b` mod p, limb by limb, i.e. `[tF] = [1 + frob1(u) W] = [c^p]`. With
+   `tF != [0:0]`, `tF_a = 0` would force `tF_b = 0`, so this is an exact class equality.
+
+Write `f` for the Miller value of `(-A,B)`, `(vk_x,gamma)` and `(C,delta)`. An accepted spend
+gives `f * K = c^(p+|x|) * s` with `s` in `Fp6*`. Here `r | p + |x|` (`p ≡ x mod r`, x < 0), and
+`p^6 - 1` divides `(p^12 - 1)/r`. Raising to `(p^12-1)/r` therefore kills both factors for any
+`u`, which leaves `e(-A,B) * e(alpha,beta) * e(vk_x,gamma) * e(C,delta) = 1`.
+
+**G2 membership (fused psi check).** L413 requires `Z != 0` on the final `R`. `Z = 0` is
+absorbing under both formulas: `pointDouble` gives `nZ = 2Y^3 Z` and `pointAdd` gives
+`nZ = Z t1^3`. Every exceptional step (`R = ±B` in an add, `Y = 0` in a double) produces `Z = 0`.
+So `Z != 0` means every step was a regular group operation and `R = [|x|]B` exactly. This
+closes the vacuous case in [psi-subgroup-degeneracy.md](../../psi-subgroup-degeneracy.md).
+
+L414-419 then require `X == psi(B).x * Z` and `Y == -psi(B).y * Z`, i.e.
+`[|x|]B = -psi(B)`, i.e. `psi(B) = [x]B` (x negative). On `E'(Fp2)`,
+`psi^2 - (x+1) psi + p = 0`, `N(psi - x) = p - x`, `gcd(p - x, h2) = 1` and `r ∤ h2`. So
+`psi(B) = [x]B` holds exactly for B in G2. The compares are integer equalities of reduced
+values, which implies congruence.
+
+**What changed from the earlier construction.** Earlier revisions of this section described a
+witness `w` in the embedded `Fp6*`, a "six zero upper limbs" membership check and a
+`c*cInv == 1` gate. The shipped quotient-torus code has none of these: `w` vanishes in the
+quotient, and `[c^-1]` is `[1 - uW]` by construction. The model is
+`../../chunked/bls12-381/_residuemath.mjs`.
 
 ```
 node singleton/bls12-381/gen_singleton_minop.mjs         # regenerate groth16_minop.cash
@@ -205,8 +286,8 @@ comparison, unlike the BN254 entries):
   compile, then auto-outlining); 5,515-byte locking, ~1.004B op-cost. The pair shows the
   bytesize-vs-opcost tradeoff, mirroring the BN254 plain/optimized split.
 - `bch-groth16-bls12381-singleton-minop` — the op-optimized COMPLETE verifier
-  (`groth16_minop.cash`); 67,163 total bytes, **~256.6M op-cost (~32 inputs)** vs the baseline's
-  ~966M (~121) on the current harness.
+  (`groth16_minop.cash`); 58,007 B locking / 58,841 B scored, **145,596,803 op-cost (19 inputs)**
+  vs the baseline's 994,589,979 (124) on the current harness.
 - `bch-pairing-bls12381-singleton` — the pairing-only milestone (`verify.cash`);
   ~19.8 KB, ~1.38B op-cost.
 

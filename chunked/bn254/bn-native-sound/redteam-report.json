@@ -1,0 +1,2003 @@
+{
+ "runs": [
+  {
+   "label": "claim n0 + 1 (honest witness otherwise; DG recommitted)",
+   "kind": "public-input-binding",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:binding",
+   "bench": true
+  },
+  {
+   "label": "claim n0 - 1 (honest witness otherwise; DG recommitted)",
+   "kind": "public-input-binding",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:binding",
+   "bench": true
+  },
+  {
+   "label": "claim n1 + 1 (honest witness otherwise; DG recommitted)",
+   "kind": "public-input-binding",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:binding",
+   "bench": true
+  },
+  {
+   "label": "claim n0 = 0 (honest witness otherwise; DG recommitted)",
+   "kind": "public-input-binding",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:binding",
+   "bench": true
+  },
+  {
+   "label": "claim n0, n1 swapped (honest witness otherwise; DG recommitted)",
+   "kind": "public-input-binding",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:binding",
+   "bench": true
+  },
+  {
+   "label": "claim n0 := fixture 1 n0 (honest witness otherwise; DG recommitted)",
+   "kind": "public-input-binding",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:binding",
+   "bench": true
+  },
+  {
+   "label": "n0 + r (non-canonical alias of n0)",
+   "kind": "public-input-encoding",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > STMT@28",
+   "bench": true
+  },
+  {
+   "label": "n1 + r (non-canonical alias of n1)",
+   "kind": "public-input-encoding",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > STMT@40",
+   "bench": true
+  },
+  {
+   "label": "n0 with the top bit set",
+   "kind": "public-input-encoding",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > STMT@28",
+   "bench": true
+  },
+  {
+   "label": "n0 = 2^256 - 1",
+   "kind": "public-input-encoding",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > STMT@28",
+   "bench": true
+  },
+  {
+   "label": "n0 + 1 without recommitting DG",
+   "kind": "public-input-binding",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:transcript",
+   "bench": true
+  },
+  {
+   "label": "A.x + 1 (off curve)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > G1C@17",
+   "bench": true
+  },
+  {
+   "label": "A.y + 1",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > G1C@17",
+   "bench": true
+  },
+  {
+   "label": "B.x.c0 + 1 (off twist)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement",
+   "bench": true
+  },
+  {
+   "label": "B.y.c1 + 1",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement",
+   "bench": true
+  },
+  {
+   "label": "C.x + 1",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > G1C@17",
+   "bench": true
+  },
+  {
+   "label": "C.y + 1",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > G1C@17",
+   "bench": true
+  },
+  {
+   "label": "A.x + p (non-canonical alias of the same point)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "A.y + p (non-canonical alias of the same point)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "B.x.c1 + p (non-canonical alias of the same point)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "B.y.c0 + p (non-canonical alias of the same point)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "C.x + p (non-canonical alias of the same point)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "C.y + p (non-canonical alias of the same point)",
+   "kind": "non-canonical-coordinate",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "A = (0, 0)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > G1C@17",
+   "bench": true
+  },
+  {
+   "label": "C = (0, 0)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > G1C@17",
+   "bench": true
+  },
+  {
+   "label": "B = (0, 0)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement",
+   "bench": true
+  },
+  {
+   "label": "-A (y negated, on the curve)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "-C (y negated)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "-B (y negated, on the twist)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "A from proof 1",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "B from proof 1 (in G2; the inverse-norm witnesses no longer match)",
+   "kind": "invalid-proof-point",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:loop > BDBL@275",
+   "bench": true
+  },
+  {
+   "label": "B on the twist but outside G2 (t, DG, rho, z, handovers recomputed; states, quotient honest)",
+   "kind": "g2-subgroup",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "expect": [
+    "accept",
+    "accept",
+    "r2:t:endpoint"
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:t:endpoint",
+   "bench": true
+  },
+  {
+   "label": "nibble N0[30] = 0x10 (out of range)",
+   "kind": "gls-digit",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > STMT@63",
+   "bench": true
+  },
+  {
+   "label": "nibble N1[64] = 0x80 (negative zero)",
+   "kind": "gls-digit",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > STMT@63",
+   "bench": true
+  },
+  {
+   "label": "nibble N0[0] = 0xff",
+   "kind": "gls-digit",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > STMT@63",
+   "bench": true
+  },
+  {
+   "label": "nibble N1[10] bit flip (in range, binding broken)",
+   "kind": "gls-digit",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "nibble N0[50] bit flip (role 2 range)",
+   "kind": "gls-digit",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:binding",
+   "bench": true
+  },
+  {
+   "label": "lattice-shifted GLS digits (binding holds) with stale states and quotient",
+   "kind": "gls-digit",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "lattice-shifted GLS digits and states with the old quotient",
+   "kind": "gls-digit",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "residue root s^c word 0 + 1",
+   "kind": "tamper-residue",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "residue root s^c word 3 + p (alias)",
+   "kind": "non-canonical-state",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:statement > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "residue root from proof 1",
+   "kind": "tamper-residue",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "role 0 state 1 of its range, word 0 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "role 0 state 12 of its range, word 5 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "role 1 state 1 of its range, word 2 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "role 1 state 7 of its range, word 0 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "role 2 state 1 of its range, word 1 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "final stack 1",
+   "at": "input 2: r2:cleanup",
+   "bench": true
+  },
+  {
+   "label": "role 2 state 9 of its range, word 5 + 1",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "final stack 1",
+   "at": "input 2: r2:cleanup",
+   "bench": true
+  },
+  {
+   "label": "role 1 state 3 word 2 + p (alias)",
+   "kind": "non-canonical-state",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:loop > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "role 2 last state word 5 = p",
+   "kind": "non-canonical-state",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:loop > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "role 0 states 2 and 3 swapped",
+   "kind": "tamper-state",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "role 0 first doubling t + p (non-canonical)",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:loop > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "role 0 first doubling t = 0",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:loop > BDBL@275",
+   "bench": true
+  },
+  {
+   "label": "role 0 first doubling t + 1 (wrong inverse)",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:loop > BDBL@275",
+   "bench": true
+  },
+  {
+   "label": "role 1 first t (doubling) + p (non-canonical)",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:loop > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "role 1 first t (doubling) = 0",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:loop > BDBL@275",
+   "bench": true
+  },
+  {
+   "label": "role 1 first t (doubling) + 1 (wrong inverse)",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:loop > BDBL@275",
+   "bench": true
+  },
+  {
+   "label": "role 0 an addition t (event 1) + p (non-canonical)",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:loop > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "role 0 an addition t (event 1) = 0",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:loop > BADD@262",
+   "bench": true
+  },
+  {
+   "label": "role 0 an addition t (event 1) + 1 (wrong inverse)",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:loop > BADD@262",
+   "bench": true
+  },
+  {
+   "label": "role 2 terminal t_psi + p (non-canonical)",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:t:badd1 > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "role 2 terminal t_psi = 0",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:t:badd1 > BADD@262",
+   "bench": true
+  },
+  {
+   "label": "role 2 terminal t_psi + 1 (wrong inverse)",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:t:badd1 > BADD@262",
+   "bench": true
+  },
+  {
+   "label": "role 2 terminal t_{-psi^2} + p (non-canonical)",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:t:badd2 > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "role 2 terminal t_{-psi^2} = 0",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:t:badd2 > BADD@262",
+   "bench": true
+  },
+  {
+   "label": "role 2 terminal t_{-psi^2} + 1 (wrong inverse)",
+   "kind": "inverse-norm",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:t:badd2 > BADD@262",
+   "bench": true
+  },
+  {
+   "label": "role 0 stream from proof 1",
+   "kind": "staple",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:loop > BDBL@275",
+   "bench": true
+  },
+  {
+   "label": "role 1 stream from proof 1",
+   "kind": "staple",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:loop > BDBL@275",
+   "bench": true
+  },
+  {
+   "label": "role 2 stream from proof 1",
+   "kind": "staple",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:loop > BDBL@275",
+   "bench": true
+  },
+  {
+   "label": "role 0 stream byte flipped (DG not recommitted)",
+   "kind": "tamper-transcript",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:transcript",
+   "bench": true
+  },
+  {
+   "label": "role 2 stream byte flipped (DG not recommitted)",
+   "kind": "tamper-transcript",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:transcript",
+   "bench": true
+  },
+  {
+   "label": "Q word 0 + 1",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "final stack 1",
+   "at": "input 2: r2:cleanup",
+   "bench": true
+  },
+  {
+   "label": "Q word 1 + 1",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "final stack 1",
+   "at": "input 2: r2:cleanup",
+   "bench": true
+  },
+  {
+   "label": "Q word 57 + 1",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "final stack 1",
+   "at": "input 2: r2:cleanup",
+   "bench": true
+  },
+  {
+   "label": "Q word 113 + 1",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "final stack 1",
+   "at": "input 2: r2:cleanup",
+   "bench": true
+  },
+  {
+   "label": "Q word 3 + p (alias)",
+   "kind": "non-canonical-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:quotient > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "Q word 7 top bit set",
+   "kind": "non-canonical-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:quotient > RD|FILL@10",
+   "bench": true
+  },
+  {
+   "label": "Q with a leading zero word (non-canonical n_q)",
+   "kind": "non-canonical-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:layout",
+   "bench": true
+  },
+  {
+   "label": "Q missing the leading word",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "final stack 1",
+   "at": "input 2: r2:cleanup",
+   "bench": true
+  },
+  {
+   "label": "Q missing the last word",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "final stack 1",
+   "at": "input 2: r2:cleanup",
+   "bench": true
+  },
+  {
+   "label": "Q padded to 133 words (over the cap)",
+   "kind": "quotient-cap",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:layout",
+   "bench": true
+  },
+  {
+   "label": "Q length not a multiple of 32",
+   "kind": "quotient-cap",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:layout",
+   "bench": true
+  },
+  {
+   "label": "Q all zero (same length)",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "final stack 1",
+   "at": "input 2: r2:cleanup",
+   "bench": true
+  },
+  {
+   "label": "Q from proof 1",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "final stack 1",
+   "at": "input 2: r2:cleanup",
+   "bench": true
+  },
+  {
+   "label": "Q word flipped (z not recomputed: stale handovers)",
+   "kind": "tamper-quotient",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "Q empty",
+   "kind": "quotient-cap",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_1 x_T.c0 + 1",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_1 x_T.c0 + p (alias)",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_1 y_T.c1 + 1",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_1 y_T.c1 + p (alias)",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_1 F+ + 1",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_1 F+ + p (alias)",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_1 R + 1",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_1 R + p (alias)",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_1 single bit flipped",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_1 words shifted by one (off-by-one word)",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_1 from proof 1",
+   "kind": "staple",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_2 x_T.c0 + 1",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_2 x_T.c0 + p (alias)",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_2 y_T.c1 + 1",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_2 y_T.c1 + p (alias)",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_2 F+ + 1",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_2 F+ + p (alias)",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_2 R + 1",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_2 R + p (alias)",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_2 single bit flipped",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_2 words shifted by one (off-by-one word)",
+   "kind": "handover",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "HAND_2 from proof 1",
+   "kind": "staple",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:post",
+   "bench": true
+  },
+  {
+   "label": "input 0 from proof 1",
+   "kind": "staple",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:transcript",
+   "bench": true
+  },
+  {
+   "label": "input 1 from proof 1",
+   "kind": "staple",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "input 2 from proof 1",
+   "kind": "staple",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:transcript",
+   "bench": true
+  },
+  {
+   "label": "inputs 0, 1 from proof 1",
+   "kind": "staple",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:transcript",
+   "bench": true
+  },
+  {
+   "label": "inputs 1, 2 from proof 1",
+   "kind": "staple",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:transcript",
+   "bench": true
+  },
+  {
+   "label": "input 0: extra push at the bottom",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: unlocking/redeem",
+   "bench": true
+  },
+  {
+   "label": "input 0: filler push missing",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:layout",
+   "bench": true
+  },
+  {
+   "label": "input 0: first two pushes swapped",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:layout",
+   "bench": true
+  },
+  {
+   "label": "input 0: filler with a nonzero byte",
+   "kind": "filler",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:layout > RD|FILL@9",
+   "bench": true
+  },
+  {
+   "label": "input 0: filler of 0x80 bytes (BIN2NUM zero)",
+   "kind": "filler",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:layout > RD|FILL@9",
+   "bench": true
+  },
+  {
+   "label": "input 0: redeem byte flipped",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0
+   ],
+   "reason": "\"\".",
+   "at": "input 0: unlocking/redeem",
+   "bench": true
+  },
+  {
+   "label": "input 1: extra push at the bottom",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: unlocking/redeem",
+   "bench": true
+  },
+  {
+   "label": "input 1: filler push missing",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:layout",
+   "bench": true
+  },
+  {
+   "label": "input 1: first two pushes swapped",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:remote",
+   "bench": true
+  },
+  {
+   "label": "input 1: filler with a nonzero byte",
+   "kind": "filler",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:layout > RD|FILL@9",
+   "bench": true
+  },
+  {
+   "label": "input 1: filler of 0x80 bytes (BIN2NUM zero)",
+   "kind": "filler",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:layout > RD|FILL@9",
+   "bench": true
+  },
+  {
+   "label": "input 1: redeem byte flipped",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1
+   ],
+   "reason": "\"\".",
+   "at": "input 1: unlocking/redeem",
+   "bench": true
+  },
+  {
+   "label": "input 2: extra push at the bottom",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:remote",
+   "bench": true
+  },
+  {
+   "label": "input 2: filler push missing",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "input 2: first two pushes swapped",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:remote",
+   "bench": true
+  },
+  {
+   "label": "input 2: filler with a nonzero byte",
+   "kind": "filler",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "input 2: filler of 0x80 bytes (BIN2NUM zero)",
+   "kind": "filler",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "input 2: redeem byte flipped",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "\"\".",
+   "at": "input 2: unlocking/redeem",
+   "bench": true
+  },
+  {
+   "label": "input 2: filler grown so the unlocking exceeds 10,000 B",
+   "kind": "filler",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "10000; item length: 10003 bytes.",
+   "at": "input 0: r0:remote",
+   "bench": true
+  },
+  {
+   "label": "input 0: code piece byte flipped (K_code)",
+   "kind": "code",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: unlocking/redeem",
+   "bench": true
+  },
+  {
+   "label": "input 1: code piece byte flipped (K_code)",
+   "kind": "code",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: unlocking/redeem",
+   "bench": true
+  },
+  {
+   "label": "input 0: delta slice byte flipped (K_DS)",
+   "kind": "constants",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:layout",
+   "bench": true
+  },
+  {
+   "label": "input 2: delta slice byte flipped (K_DS)",
+   "kind": "constants",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 2: r2:layout",
+   "bench": true
+  },
+  {
+   "label": "input 2: DG byte flipped",
+   "kind": "tamper-transcript",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "input 1: HAND_1 pushed with a non-minimal PUSHDATA2 (remote offset shift)",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: unlocking/redeem",
+   "bench": true
+  },
+  {
+   "label": "input 2: STMT pushed with a non-minimal PUSHDATA4 (remote offset shift)",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:remote",
+   "bench": true
+  },
+  {
+   "label": "input 2: WQ pushed with a non-minimal PUSHDATA4",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:post",
+   "bench": true
+  },
+  {
+   "label": "input 0: OP_NOP in the unlocking",
+   "kind": "layout",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Unlocking bytecode may contain only push operations in version 1 and 2 transactions.",
+   "at": "input 0: unlocking/redeem",
+   "bench": true
+  },
+  {
+   "label": "inputs 0 and 1 swapped (unlockings)",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: unlocking/redeem",
+   "bench": true
+  },
+  {
+   "label": "inputs 1 and 2 swapped (unlockings)",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "3181; requested split index: 3543.",
+   "at": "input 0: unlocking/redeem",
+   "bench": true
+  },
+  {
+   "label": "2 inputs (input 2 missing)",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:graph > GRAPH@2",
+   "bench": false
+  },
+  {
+   "label": "4 inputs (input 2 duplicated)",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2,
+    3
+   ],
+   "expect": [
+    "r0:graph > GRAPH@2",
+    "r1:graph > GRAPH@2",
+    "r2:graph > GRAPH@2",
+    "unlocking/redeem"
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:graph > GRAPH@2",
+   "bench": false
+  },
+  {
+   "label": "input 2 replaced by a foreign P2SH32(OP_TRUE) input",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:graph > GRAPH@16",
+   "bench": false
+  },
+  {
+   "label": "a foreign P2SH32(OP_TRUE) input appended",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1,
+    2
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:graph > GRAPH@2",
+   "bench": false
+  },
+  {
+   "label": "input 0 replaced by a foreign P2SH32(OP_TRUE) input",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "reason": "2; requested split index: 5385.",
+   "at": "input 1: unlocking/redeem",
+   "bench": false
+  },
+  {
+   "label": "foreign P2SH32 input at index 0 carrying the honest pushes",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    1,
+    2
+   ],
+   "expect": [
+    "foreign",
+    "r1:graph > GRAPH@8",
+    "r2:graph > GRAPH@8"
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 1: r1:graph > GRAPH@8",
+   "bench": false
+  },
+  {
+   "label": "foreign P2SH32 input at index 1 carrying the honest pushes",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    2
+   ],
+   "expect": [
+    "r0:graph > GRAPH@12",
+    "foreign",
+    "r2:graph > GRAPH@12"
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:graph > GRAPH@12",
+   "bench": false
+  },
+  {
+   "label": "foreign P2SH32 input at index 2 carrying the honest pushes",
+   "kind": "graph",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    0,
+    1
+   ],
+   "expect": [
+    "r0:graph > GRAPH@16",
+    "r1:graph > GRAPH@16",
+    "foreign"
+   ],
+   "reason": "Program failed an OP_VERIFY operation.",
+   "at": "input 0: r0:graph > GRAPH@16",
+   "bench": false
+  }
+ ],
+ "controls": [
+  "fixture 0 (vectors)",
+  "fixture 0, lattice-shifted GLS decomposition"
+ ]
+}

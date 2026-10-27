@@ -1,0 +1,4 @@
+forced: all GLS nibbles nonzero 23.445M
+forced: all nibbles nonzero, B = G2 23.434M
+edge: n = 0, 0 (all nibbles 0) 21.930M
+edge: n = r-1 22.428M

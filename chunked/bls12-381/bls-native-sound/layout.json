@@ -1,0 +1,59 @@
+{
+ "note": "chunk ownership and placement of the movable bytes; layout.mjs (MARGIN=0.06) then tune.mjs (MARGIN=0.062, WIT=default; fillers fitted on the VM to the worst measured witnesses)",
+ "cuts": [
+  0,
+  5,
+  15,
+  25,
+  33
+ ],
+ "place": {
+  "blob": [
+   1,
+   2
+  ],
+  "blobLens": [
+   4229
+  ],
+  "K": [
+   [
+    [
+     0,
+     513
+    ],
+    [
+     3,
+     447
+    ]
+   ],
+   [
+    [
+     1,
+     171
+    ],
+    [
+     3,
+     2037
+    ]
+   ],
+   [
+    [
+     2,
+     2208
+    ]
+   ],
+   [
+    [
+     3,
+     1728
+    ]
+   ]
+  ],
+  "fill": [
+   27,
+   124,
+   45,
+   115
+  ]
+ }
+}

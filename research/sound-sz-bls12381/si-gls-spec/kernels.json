@@ -1,0 +1,232 @@
+{
+ "B affine dbl + line + F^2, witnessed slope": {
+  "opCost": 146769,
+  "bytes": 238,
+  "naiveSim": 148076,
+  "breakdown": {
+   "copy": 13237,
+   "move": 6196,
+   "mul": 65220,
+   "mod": 52360,
+   "addsub": 7792,
+   "const": 202,
+   "nMul": 25,
+   "nMod": 10,
+   "nAdd": 30,
+   "nCopy": 56,
+   "nMove": 41
+  }
+ },
+ "B affine add + line + c-mul, witnessed slope": {
+  "opCost": 145832,
+  "bytes": 256,
+  "naiveSim": 146988,
+  "breakdown": {
+   "copy": 15018,
+   "move": 6081,
+   "mul": 58908,
+   "mod": 57264,
+   "addsub": 7784,
+   "const": 0,
+   "nMul": 21,
+   "nMod": 12,
+   "nAdd": 30,
+   "nCopy": 64,
+   "nMove": 35
+  }
+ },
+ "B projective dbl + line + F^2": {
+  "opCost": 245441,
+  "bytes": 415,
+  "naiveSim": 247639,
+  "breakdown": {
+   "copy": 21177,
+   "move": 11710,
+   "mul": 94981,
+   "mod": 102900,
+   "addsub": 11998,
+   "const": 909,
+   "nMul": 41,
+   "nMod": 21,
+   "nAdd": 50,
+   "nCopy": 94,
+   "nMove": 72
+  }
+ },
+ "B projective mixed add + line + c-mul": {
+  "opCost": 331901,
+  "bytes": 588,
+  "naiveSim": 334287,
+  "breakdown": {
+   "copy": 32310,
+   "move": 17817,
+   "mul": 139682,
+   "mod": 124180,
+   "addsub": 16640,
+   "const": 0,
+   "nMul": 52,
+   "nMod": 25,
+   "nAdd": 65,
+   "nCopy": 138,
+   "nMove": 104
+  }
+ },
+ "delta step, baked slope (dbl)": {
+  "opCost": 78991,
+  "bytes": 148,
+  "naiveSim": 79492,
+  "breakdown": {
+   "copy": 8205,
+   "move": 5168,
+   "mul": 25952,
+   "mod": 33532,
+   "addsub": 5358,
+   "const": 0,
+   "nMul": 10,
+   "nMod": 7,
+   "nAdd": 21,
+   "nCopy": 35,
+   "nMove": 27
+  }
+ },
+ "delta step, baked slope (add)": {
+  "opCost": 79001,
+  "bytes": 148,
+  "naiveSim": 79502,
+  "breakdown": {
+   "copy": 8205,
+   "move": 5168,
+   "mul": 25956,
+   "mod": 33532,
+   "addsub": 5362,
+   "const": 0,
+   "nMul": 10,
+   "nMod": 7,
+   "nAdd": 21,
+   "nCopy": 35,
+   "nMove": 27
+  }
+ },
+ "state eval + residual + rho fold": {
+  "opCost": 43303,
+  "bytes": 68,
+  "naiveSim": 44062,
+  "breakdown": {
+   "copy": 3183,
+   "move": 2562,
+   "mul": 20712,
+   "mod": 14412,
+   "addsub": 2434,
+   "const": 0,
+   "nMul": 8,
+   "nMod": 3,
+   "nAdd": 9,
+   "nCopy": 14,
+   "nMove": 18
+  }
+ },
+ "Horner x4 words": {
+  "opCost": 18706,
+  "bytes": 29,
+  "naiveSim": 19313,
+  "breakdown": {
+   "copy": 1245,
+   "move": 1105,
+   "mul": 10384,
+   "mod": 4804,
+   "addsub": 1168,
+   "const": 0,
+   "nMul": 4,
+   "nMod": 1,
+   "nAdd": 4,
+   "nCopy": 5,
+   "nMove": 8
+  }
+ },
+ "monic deg-6 eval at +-x": {
+  "opCost": 28279,
+  "bytes": 46,
+  "naiveSim": 28983,
+  "breakdown": {
+   "copy": 2287,
+   "move": 1558,
+   "mul": 12976,
+   "mod": 9606,
+   "addsub": 1852,
+   "const": 0,
+   "nMul": 5,
+   "nMod": 2,
+   "nAdd": 7,
+   "nCopy": 10,
+   "nMove": 11
+  }
+ },
+ "Frob(S_c) at +-x": {
+  "opCost": 101623,
+  "bytes": 128,
+  "naiveSim": 102186,
+  "breakdown": {
+   "copy": 7164,
+   "move": 2318,
+   "mul": 45930,
+   "mod": 42604,
+   "addsub": 3310,
+   "const": 101,
+   "nMul": 15,
+   "nMod": 7,
+   "nAdd": 13,
+   "nCopy": 30,
+   "nMove": 14
+  }
+ },
+ "Fp2 x const": {
+  "opCost": 22958,
+  "bytes": 29,
+  "naiveSim": 22958,
+  "breakdown": {
+   "copy": 1790,
+   "move": 700,
+   "mul": 10376,
+   "mod": 9512,
+   "addsub": 580,
+   "const": 0,
+   "nMul": 4,
+   "nMod": 2,
+   "nAdd": 2,
+   "nCopy": 8,
+   "nMove": 7
+  }
+ },
+ "GLS table (16 entries, one sign, one group)": {
+  "opCost": 92630,
+  "bytes": 111,
+  "naiveSim": 92729,
+  "breakdown": {
+   "copy": 7611,
+   "move": 3518,
+   "mul": 28556,
+   "mod": 52844,
+   "addsub": 0,
+   "const": 101,
+   "nMul": 11,
+   "nMod": 11,
+   "nAdd": 0,
+   "nCopy": 33,
+   "nMove": 15
+  }
+ },
+ "glsLoop": {
+  "opCost": 2350665,
+  "perEvent": 37312,
+  "bytesPerEventUnrolled": 82
+ },
+ "decodeWord": {
+  "opCost": 9196,
+  "perWord": 1533,
+  "bytes": 81
+ },
+ "challenge": {
+  "opCost": 1060,
+  "bytes": 11
+ }
+}
