@@ -121,7 +121,8 @@ P1 need not exclude fungible tokens of `C`.
 - **P1 (category genesis).** The deployer first chooses the outpoint that input 0 of the
   category-genesis transaction will spend; it must be an outpoint with output index 0. `C` is the
   transaction id of that outpoint, and the deployer regenerates the graph with that `C`. The
-  bench bytes use the `0xcd`×32 (BN) or `0xbe`×32 (BLS); they are not a deployment, and their lockings and
+  bench bytes use the placeholder `0xcd`×32 (BN) or `0xbe`×32 (BLS); they are not a deployment,
+  and their lockings and
   hashes change with `C`. The category-genesis transaction must create no NFT of `C` except
   minting NFTs locked by `L_0` with an empty commitment (normally exactly one: the baton). No
   other minting or mutable NFT of `C` may ever exist outside the graph. Nothing on-chain checks
