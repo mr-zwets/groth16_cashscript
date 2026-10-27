@@ -234,7 +234,7 @@ disclosed above and in `verifiers.md`.
 
 ### 2. Transcript (what is committed before each challenge)
 
-All hashes are SHA-256 with framing `MAGIC ‖ len(tag) ‖ tag ‖ u32(len) ‖ payload`
+All transcript hashes are SHA-256 with framing `MAGIC ‖ len(tag) ‖ tag ‖ u32(len) ‖ payload`
 (`m:302-307`).
 - **Pre-β** (`commitmentRoot`, `m:999-1016` generator, `m:2045-2077` on-chain). This is a
   Merkle tree over 22 leaves: the 737-byte statement (`m:967-995`: `Bidentity`, effective B,
@@ -269,9 +269,9 @@ commitments `H('BLSGTP1' ‖ 'B' ‖ first ‖ count ‖ roots)`, and these are 
 helper (`m:2502-2508`, `m:2592-2597`). Six hosts run the helper (coordinator, blocks 0, 1, 2, 15,
 20). Each pushes its own constant `(first, count)`, and the six batches partition 0..31
 (`m:2489-2500`, `m:3809-3900`). The window roots are VK-derived (`prove_gt_window_preimage.mjs`;
-the blob hash is asserted at `m:2485`). Reviewers independently recomputed all 32 roots. With
-SHA-256 collision resistance, each authenticated factor is the table entry for (block, window,
-digits).
+the blob hash is asserted at `m:2485`). Reviewers independently recomputed all 32 roots.
+Outside the event COLL of step 5 (lemma (a)), each authenticated factor is the table entry for
+(block, window, digits).
 
 **Zero windows (from `1003775`).** A window whose two digit bytes are both zero carries a 32-byte
 record instead of a 704-byte one. The length is derived three times from the committed statement:
@@ -310,16 +310,107 @@ a redeem constant (`m:3211-3215`).
 
 ### 5. Fiat–Shamir bound (random-oracle model)
 
-Model SHA-256 as a random oracle and let the adversary make q queries. Write `R̄_e = R_e mod m`.
-Suppose not all `R̄_e` are 0. Then `P(X) = Σ R̄_e·X^e ∈ Fp6[X]` is nonzero of degree ≤ 23, and a
-fresh nonzero β is a root with probability ≤ 23/(2²⁵⁶−1). Otherwise `S = Σ β^e·R_e` satisfies
-`S mod m ≠ 0`. For the quotient Q already fixed by `qroot`, `T = S − Q·m` is a nonzero
-polynomial of degree ≤ 137, and a fresh α is a root with probability ≤ 137/2²⁵⁶. This holds
-because `m(α) ≠ 0` for any α: m is irreducible. The **per-query** error is therefore
-≤ 160/(2²⁵⁶−1), and over q queries ≤ `q·160/(2²⁵⁶−1)`. Binding all roots to unique openings adds
-the usual Merkle term ≤ `q(q+1)/2²⁵⁶` for collisions and unqueried preimages; the earlier
-statements of the bound omitted it. If all `R̄_e = 0`, step 1 gives the pairing equation. This
-matches `../../BLS_QSPLIT_TAIL22_STATUS.md:86-89` and states the omitted collision term explicitly.
+**Game.** SHA-256 is a random oracle H (SHA-256 is Merkle–Damgård; as usual for Fiat–Shamir,
+we idealize it as a random oracle, and no secret-prefix MAC use occurs here), sampled lazily: an
+output is drawn uniformly from `{0,1}²⁵⁶` when its input is first evaluated, independently of
+everything evaluated so far.
+Every SHA-256 evaluation by any party is a query; `OP_HASH256` is two. There are three kinds:
+- **Setup** (N₀ queries, made first): the hashes that fix the deployed anchors. These are the GT
+  table (32 windows of at most 2¹⁶ leaves and 2¹⁶−1 nodes, `prove_gt_window_preimage.mjs:43-48`),
+  the six batch commitments (`m:2502-2508`), the fixed-blob commitments (`m:789`), the P2SH32
+  redeem hashes and the sibling-locking digest (`_coordinator_binding.mjs:2-8`). N₀ < 2²² + 2⁷.
+- **Adversary** (q_A queries): adaptive, in any order.
+- **Verifier** (q_V queries): every SHA-256 evaluation the VM performs on the submitted
+  transaction. The transcript part is 22 leaf and 23 node hashes for `root` (22→11→6→3→2→1,
+  `m:999-1016`), one leaf hash for `qroot`, β and α (`m:2246-2252`). The rest are the GT path
+  and batch checks (at most 32·17 + 6, `m:2573-2597`), the fixed-blob checks (`m:1835-1837`),
+  the sibling digest, and two per input for P2SH32. For the shipped transactions q_V < 2¹⁰
+  (48 transcript, ≤ 550 GT, ≤ 21 fixed-blob, 1 sibling digest, 44 P2SH32), so with q_A = 0 the
+  bound is below 2⁻²¹¹.
+
+Let `q = q_A + q_V`, `N = N₀ + q`, and let `q_β, q_α ≤ q` count the distinct `beta`- and
+`alpha`-frame inputs among the q queries. An accepting run has `q_β, q_α ≥ 1` even when
+`q_A = 0`. A challenge or opening that the adversary never queried is evaluated by the
+verifier and counted in q_V, so there is no separate guessing term (`ε_guess = 0`).
+
+**Bound.** Pr[every input passes and the pairing equation of the Claim fails] ≤
+`ε_SZ + ε_binding`, where `ε_SZ = (23·q_β + 160·q_α)/2²⁵⁶ ≤ 160·q/2²⁵⁶` and
+`ε_binding = N(N−1)/2²⁵⁷ + N(N−1)/2²⁵⁶`. For example, q ≤ 2⁶⁴ gives less than 2⁻¹²⁶.
+
+**Binding events (ε_binding).**
+- **COLL**: two distinct queried inputs have the same output. Probability ≤ `N(N−1)/2²⁵⁷`.
+- **LATE**: an output equals a *child* of an input queried earlier. The children of a
+  transcript frame are L and R of a `node` frame, `root` of a `beta` frame, and `root`,
+  `qroot` of an `alpha` frame; other inputs have none. Frames parse uniquely
+  (`MAGIC ‖ len(tag) ‖ tag ‖ u32(len)`, `m:302-307`). The j-th distinct input (a fresh
+  sample) has at most 2(j−1) targets, so the probability is ≤ `Σ 2(j−1)/2²⁵⁶ = N(N−1)/2²⁵⁶`.
+
+No domain separation between hash kinds is assumed. COLL covers equal outputs across all of
+them, and LATE counts the children of every input that parses as a transcript frame, whatever its
+origin. The prefixes are distinct anyway: `BLS12-381-RPA-v2` (`m:162`) for transcript frames,
+`BLSGTP1` (`m:466`, `m:2456-2457`) for the GT table.
+
+**Lemma (binding and order).** Outside COLL ∪ LATE:
+- **(a) Fixed anchors.** Every opening the verifier accepts against a deployed constant equals
+  the setup opening. This covers the GT factor for (block, window, digits) (step 3), the fixed
+  blob, the sibling lockings and the P2SH32 redeems (step 6). Walk down from the anchor. The
+  verifier's input and the setup input have the same output, so they are equal (no COLL). Their
+  child at the walked position is then equal too, since the position is fixed by `globalIndex`,
+  level and parent index. Repeat down to the leaf. A zero-window record is the window root itself.
+- **(b) Order.** Let ρ and κ be the `root` and `qroot` the coordinator accepts. The verifier
+  evaluates its own fixed-shape trees over the transaction's payloads. With no COLL, the input it
+  evaluates to each node value is that value's only queried preimage. With no LATE, each child value
+  was first output by a query made before the parent's first query. A child c of a parent input I
+  is also the output of its own verifier-evaluated preimage I_c ≠ I (a different tag, or a `node`
+  frame at a different level). If c first appeared as an output at I's own first query, then
+  H(I) = c = H(I_c), which is COLL; if it appeared later, that is LATE. Likewise ρ is output
+  before the first query of `beta(ρ)`, and ρ and κ before the first query of `alpha(ρ, κ)`.
+  So when β is first sampled, the 22 leaf payloads are fixed by earlier queries, and with them
+  every `R_e(Y)` (step 4: each coefficient is a payload value or an id constant).
+  When α is first sampled, both the `R_e` and Q are fixed. This holds whether or not openings
+  were present when a challenge was queried, and in either query order. A challenge
+  queried on a root with no queried opening can only be used later through LATE, so it gets no
+  ε_SZ charge.
+
+**Openings at challenge time.** For a value v and a time t, the *opening of v at t* is
+obtained by walking down from v through the earliest-queried preimage (among queries made before
+t) of each value: a `node` frame with the expected level and index recurses into L and R, and the
+walk stops at `leaf` frames. It exists if the walk yields the 22-leaf shape of step 2 (for ρ) or
+the one-leaf quotient shape (for κ), with payloads of the exact lengths the verifier checks. It
+then determines every `R_e(Y)` (for ρ) or `Q(Y)` (for κ). It is a function of the oracle history
+before t, so a challenge first sampled at t is independent of it. A β query on ρ is charged using
+the opening of ρ at the moment β(ρ) is first sampled. An α query on (ρ, κ) is charged using the
+openings of ρ and κ at the moment α(ρ, κ) is first sampled. A query whose openings do not exist,
+or give all `R̄_e = 0`, is not charged. By (b), outside COLL ∪ LATE these are exactly the openings
+the verifier evaluates in an accepting run.
+
+**Schwartz–Zippel step (ε_SZ).** Let `T(X,Y) = Σ X^e·R_e(Y) − Q(Y)·m(Y) = Σ X^e·T_e(Y)`, with
+`T_0 = R_0 − Q·m` and `T_e = R_e` for e ≥ 1. Accepting requires `T(β, α) = 0` in Fp: the block
+sums give `Σ β^e·R_e(α)`, and the coordinator checks it against `Q(α)·m(α)` (`m:1603`, `m:1795`,
+`m:2026-2036`). Here `deg_X T ≤ 23`, `deg_Y T ≤ 137` (step 4) and `T_e mod m = R̄_e`, where
+`R̄_e = R_e mod m`. For a charged query, its openings give some `R̄_e ≠ 0`. β and α are integers
+below 2²⁵⁶ < p, so a nonzero polynomial of degree d has a fresh challenge as a root with
+probability ≤ d/2²⁵⁶. Each query is charged as follows:
+- **β query** on ρ: `P(X) = Σ R̄_e·X^e ∈ Fp6[X]` is nonzero of degree ≤ 23 (Fp6 is a field,
+  step 1, so it has at most 23 roots). The query is bad if `P(β) = 0`, probability ≤ 23/2²⁵⁶.
+- **α query** on (ρ, κ) after β(ρ): β is already fixed, so `T(β, Y) = S − Q·m` with
+  `S = Σ β^e·R_e` is fixed before α is sampled. The query is bad if `T(β, Y) ≠ 0` and
+  `T(β, α) = 0`, probability ≤ 137/2²⁵⁶. When `P(β) ≠ 0`, `T(β, Y) mod m = S mod m = P(β) ≠ 0`,
+  so `T(β, Y) ≠ 0`.
+- **α query** on (ρ, κ) before β(ρ): pick e* with `R̄_{e*} ≠ 0`, so `T_{e*} ≠ 0` with degree
+  ≤ 137. The query is bad if `T_{e*}(α) = 0` (≤ 137/2²⁵⁶). It is also bad if, when β(ρ) is
+  later sampled, `T(β, α) = 0` while `T(X, α)` is nonzero of degree ≤ 23 (≤ 23/2²⁵⁶).
+
+Each β query is charged at most 23/2²⁵⁶ and each α query at most 160/2²⁵⁶. This holds however
+many quotient roots are tried per β, and the union bound gives ε_SZ. Suppose a run accepts, outside
+COLL ∪ LATE and with no bad query. By (b), the openings used to charge the final (ρ, κ) pair are
+the ones the verifier evaluates. If some `R̄_e ≠ 0`, there are two cases. If β(ρ) was sampled
+first, then either `P(β) = 0` (the β query is bad), or `T(β, Y) ≠ 0` and acceptance forces
+`T(β, α) = 0` (the α query is bad). If α(ρ, κ) was sampled first, then either `T_{e*}(α) = 0`, or
+`T(X, α) ≠ 0` and acceptance forces `T(β, α) = 0`; both are charged to the α query. So all
+`R̄_e = 0`. Step 1, with the GT factors authenticated by (a), gives the pairing equation.
+The degree constants match `../../BLS_QSPLIT_TAIL22_STATUS.md:86-88`. Earlier statements of the
+bound, `160/(2²⁵⁶−1)` per query plus `q(q+1)/2²⁵⁶`, are replaced by this one.
 
 ### 6. Composition across inputs
 
@@ -384,9 +475,9 @@ redeems:
   "baseline compiler differs" assert (`m:2297-2300`). The scheduled template compiler is
   `RPA_TEMPLATE_CASHC` at `efc6ab80d9cbbea06c3c364b8fd5e915b9da84b4`. `-intratx-fs` (`77ab0ac`)
   uses only `1c707c1d`, with the default environment of `run_full_multiproof.mjs`.
-- **`-intratx-fs` source**: the bench header cites `d15ed70 (local candidate)`, which is not in
-  this repository. The pinned artifact hash `83d2b28f…` is this file at `77ab0ac`, and the ids
-  rebuild from there.
+- **`-intratx-fs` source**: the bench header cites `77ab0ac`. The pinned artifact hash
+  `83d2b28f…` is this file at that revision, and the ids rebuild from there. The previously cited
+  `d15ed70 (local candidate)` is not in this repository.
 - **`-fs-compact` and `-fs-fused-final` (`1003775`)**: their vector files record no `buildFlags`.
   Reconstructed flags that rebuild both byte-identically (review 2026-10-27): start from the
   `buildFlags` of `-fs-fused-regular`. Unset `RPA_FUSE_REGULAR_PAIR` and
