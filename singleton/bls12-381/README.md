@@ -100,6 +100,29 @@ the proof bytes themselves as an identifier or nullifier. Such an application sh
 public inputs instead, as it must for Groth16 anyway, since Groth16 proofs are re-randomizable.
 (B has no such variants: it must be in G2.)
 
+**`vk_x = O` (neutral public inputs) verifies correctly.** Unlike A, B and C, `vk_x` is computed
+on-chain and can be O for valid public inputs (with this key's IC scalars 2, 4, 6, inputs
+`[1, r-1]` give `2 + 4 - 6 = 0`). The program then evaluates `e(O, gamma)` as exactly 1:
+- `jacAddAffineG1` is complete (`R = O` returns the affine addend, `R = P` doubles, `R = -P`
+  gives `h = 0` and so `Z = 0`), and doubling is skipped while `Z = 0` (`groth16.cash:18-36,
+  60-75`). So `vz == 0` exactly when `vk_x = O`. `inverseFp(0)` is `0^(p-2) = 0`
+  (`lib/Fp.cash:20-28`), so `computeVkx` returns `(0,0)` (`groth16.cash:76-79`).
+- At `P = (0,0)` every `line()` sets `o1 = c1*Px = 0` and `o4 = c2*Py = 0`
+  (`lib/Miller.cash:67-78`), and `mul014` with `o1 = o4 = 0` is multiplication by `c0`
+  (`lib/Fp12.cash:116-134`). So each line value is its `c0` coefficient, which lies in the
+  subfield Fp2 (Fp12 slot 0), and the gamma Miller value `f_gamma` is a product of these
+  (`groth16.cash:151-152`). Gamma's walk is fixed, so `f_gamma` is the same Fp2 element for
+  every such spend. It is nonzero: the replay below accepts, and a zero factor would make the
+  verdict 0.
+- `fp12Conj` fixes Fp6 ⊇ Fp2 (`groth16.cash:161-162`), and the easy part of `finalExp` computes
+  `conj(f) * f^-1 = f^(p^6-1)` (`lib/FinalExp.cash:59-65`). Every element of Fp6* has order
+  dividing `p^6 - 1`, so the factor `f_gamma` maps to 1, and the verdict is the final
+  exponentiation of the other three pairs: `e(-A,B) * e(alpha,beta) * e(C,delta) == 1`, which
+  is the Groth16 equation with `e(O, gamma) = 1`.
+
+Replay: the archived valid proof for `[1, r-1]` (bench PR 14, `extraValidProofs[13]`) is accepted
+by the registered 7,026 B locking at 980,610,078 op-cost.
+
 **Tests.** `domain_checks_test.mjs` runs the honest instance, the bench multiproof set, and 17
 out-of-domain cases from `domain_cases.mjs`: off-curve A and C, off-twist B, `(0,0)` for A, B and
 C, B on the twist but outside G2 (`B + T13` with `T13` of order 13, `T13` alone, and `B + [r]Q`),
