@@ -393,8 +393,10 @@ function emitTorusMillerLazy(trace, FABT) {
   L.push('        (int t20,int t21,int t22,int t23,int t24,int t25) = torusFrob2(u0,u1,u2,u3,u4,u5);');
   L.push('        (int t30,int t31,int t32,int t33,int t34,int t35) = torusFrob2(t10,t11,t12,t13,t14,t15);');
   L.push(`        (${F}) = fp12MulTorus(${F}, t20,t21,t22,t23,t24,t25);`);
-  L.push('        // These limbs are canonical and nonnegative, so their integer sum is zero');
-  L.push('        // exactly for the vacuous projective representative [0:0].');
+  L.push('        // fp12MulTorus returns signedFp limbs in (-p,p), not canonical ones. A limb in');
+  L.push('        // (-p,p) that is 0 mod p is exactly 0, so the vacuous representative [0:0]');
+  L.push('        // (all limbs 0 mod p) has integer sum 0 and is rejected here. A nonzero class');
+  L.push('        // whose signed limbs happen to sum to 0 is also rejected (completeness only).');
   L.push(`        require(${N(12).map((i) => `F${i}`).join(' + ')} != 0);`);
   L.push('        (int q0,int q1,int q2,int q3,int q4,int q5) = fp6MulRaw(t10,t11,t12,t13,t14,t15, t30,t31,t32,t33,t34,t35);');
   L.push('        (int cl0,int cl1,int cl2,int cl3,int cl4,int cl5) = fp6MulRaw(F0,F1,F2,F3,F4,F5, t10+t30,t11+t31,t12+t32,t13+t33,t14+t34,t15+t35);');

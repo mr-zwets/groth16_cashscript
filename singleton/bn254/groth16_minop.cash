@@ -615,8 +615,10 @@ contract Groth16VerifyMinOp() {
         (int t20,int t21,int t22,int t23,int t24,int t25) = torusFrob2(u0,u1,u2,u3,u4,u5);
         (int t30,int t31,int t32,int t33,int t34,int t35) = torusFrob2(t10,t11,t12,t13,t14,t15);
         (F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11) = fp12MulTorus(F0,F1,F2,F3,F4,F5,F6,F7,F8,F9,F10,F11, t20,t21,t22,t23,t24,t25);
-        // These limbs are canonical and nonnegative, so their integer sum is zero
-        // exactly for the vacuous projective representative [0:0].
+        // fp12MulTorus returns signedFp limbs in (-p,p), not canonical ones. A limb in
+        // (-p,p) that is 0 mod p is exactly 0, so the vacuous representative [0:0]
+        // (all limbs 0 mod p) has integer sum 0 and is rejected here. A nonzero class
+        // whose signed limbs happen to sum to 0 is also rejected (completeness only).
         require(F0 + F1 + F2 + F3 + F4 + F5 + F6 + F7 + F8 + F9 + F10 + F11 != 0);
         (int q0,int q1,int q2,int q3,int q4,int q5) = fp6MulRaw(t10,t11,t12,t13,t14,t15, t30,t31,t32,t33,t34,t35);
         (int cl0,int cl1,int cl2,int cl3,int cl4,int cl5) = fp6MulRaw(F0,F1,F2,F3,F4,F5, t10+t30,t11+t31,t12+t32,t13+t33,t14+t34,t15+t35);
