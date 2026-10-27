@@ -73,41 +73,20 @@ function computeVkx(int in0, int in1) returns (int, int) {
         vx, vy, vz,
         838589206289216005799424730305866328161735431124665289961769162861615689790485775997575391185127590486775437397838,
         3450209970729243429733164009999191867485184320918914219895632678707687208996709678363578245114137957452475385814312);
-    // Keep the projective neutral result as the unique affine sentinel (0,0). It is off-curve,
-    // so it cannot collide with a finite G1 point. The caller maps this sentinel to e(O, gamma).
-    int outX = 0; int outY = 0;
-    if (vz != 0) {
-        int zInv = inverseFp(vz);
-        int zInv2 = sqrFp(zInv);
-        int zInv3 = mulFp(zInv2, zInv);
-        outX = mulFp(vx, zInv2); outY = mulFp(vy, zInv3);
-    }
-    return outX, outY;
+    int zInv = inverseFp(vz);
+    int zInv2 = sqrFp(zInv);
+    int zInv3 = mulFp(zInv2, zInv);
+    return mulFp(vx, zInv2), mulFp(vy, zInv3);
 }
 
-// Finite proof points have canonical Fp coordinates, lie on y^2 = x^3 + 4,
-// and satisfy [r]P = O. The caller handles the unique (0,0) infinity sentinel.
-function requireStrictG1Subgroup(int x, int y) {
-    int rx = 0;
-    int ry = 1;
-    int rz = 0;
-    int r = 52435875175126190479447740508185965837690552500527637822603658699938581184513;
-    for (int k = 0; k < 255; k = k + 1) {
-        int i = 254 - k;
-        if (rz != 0) {
-            (rx, ry, rz) = jacDoubleG1(rx, ry, rz);
-        }
-        if ((r >> i) % 2 == 1) {
-            (rx, ry, rz) = jacAddAffineG1(rx, ry, rz, x, y);
-        }
-    }
-    require(rz == 0);
-}
-
+// A proof G1 point (A or C) must be canonical, 0 <= x, y < p, and on E(Fp): y^2 = x^3 + 4. The
+// affine encoding has no point at infinity and (0,0) is off-curve, so O is rejected. No G1
+// subgroup check: A and C are paired only with order-r G2 points (B is subgroup-checked in
+// spend(), gamma and delta are fixed), so a G1 cofactor component pairs to 1 (the same argument
+// as groth16_minop.cash; see psi-subgroup-degeneracy.md).
 function g1Check(int x, int y) {
     require(within(x, 0, P)); require(within(y, 0, P));
     require(sqrFp(y) == addFp(mulFp(sqrFp(x), x), 4));
-    requireStrictG1Subgroup(x, y);
 }
 
 contract Groth16Verify() {
@@ -127,23 +106,20 @@ contract Groth16Verify() {
         // A and C: range + curve equation in g1Check.
         require(within(Bxa, 0, P)); require(within(Bxb, 0, P));
         require(within(Bya, 0, P)); require(within(Byb, 0, P));
-        // (0,0) is the unique off-curve infinity sentinel for G1 A/C. Mixed zero
-        // coordinates remain ordinary finite points and take the finite curve path.
-        if (Ax != 0 || Ay != 0) { g1Check(Ax, Ay); }
-        if (Cx != 0 || Cy != 0) { g1Check(Cx, Cy); }
-        // (0,0,0,0) is the unique G2 infinity sentinel. Mixed zero coordinates
-        // remain finite and must satisfy the twist equation.
-        if (Bxa != 0 || Bxb != 0 || Bya != 0 || Byb != 0) {
-            (int bx2a, int bx2b) = fp2Sqr(Bxa, Bxb);
-            (int bx3a, int bx3b) = fp2Mul(bx2a, bx2b, Bxa, Bxb);
-            (int by2a, int by2b) = fp2Sqr(Bya, Byb);
-            require(by2a == addFp(bx3a, 4)); require(by2b == addFp(bx3b, 4));
-        }
+        g1Check(Ax, Ay);
+        g1Check(Cx, Cy);
+        // B on the M-twist E'(Fp2): y^2 = x^3 + 4(1+u). B = O has no encoding and (0,0) is off-curve.
+        (int bx2a, int bx2b) = fp2Sqr(Bxa, Bxb);
+        (int bx3a, int bx3b) = fp2Mul(bx2a, bx2b, Bxa, Bxb);
+        (int by2a, int by2b) = fp2Sqr(Bya, Byb);
+        require(by2a == addFp(bx3a, 4)); require(by2b == addFp(bx3b, 4));
 
         // vk_x = IC0 + in0*IC1 + in1*IC2 in one shared-doubling Shamir pass.
         (int affX, int affY) = computeVkx(in0, in1);
 
         // baked VK G1/G2 points
+        int alphaX = 1527649530533633684281386512094328299672026648504329745640827351945739272160755686119065091946435084697047221031460;
+        int alphaY = 487897572011753812113448064805964756454529228648704488481988876974355015977479905373670519228592356747638779818193;
         int betaXa = 626266753989782654150694692036924390988881741494970156941802666795495657949695370746846269655547812403809070556808; int betaXb = 151216712330486580381289676720993530468452734725315418939914686037671894984472908062266534423934877412152819881174;
         int betaYa = 3957221353860521190838035852656308152792962079075169227140436352788803481025497873165648235984294733156170881957140; int betaYb = 1417335358548100222817200951198539764927940191545220572034594310270669391308385540419375417621016275437603665889670;
         int gammaXa = 709940604317203372084363045234008717826848775332345256708783709065481460296552174594695120412283630827121870605628; int gammaXb = 2002357927014343339248864414634364694493007010346797894329949366020574238568791702800705687329188574611271276704968;
@@ -151,12 +127,10 @@ contract Groth16Verify() {
         int deltaXa = 1414233674125543175670442142161219904678696635137359956217258319910176681577698159556769950285699078470141974527203; int deltaXb = 240938208200978084434604451743378343954809779124870652952168000872069182319249638508725782467748570196270345417136;
         int deltaYa = 3530302418949228934091667310294175693003022032414424968762352951695783200280895198385592038318823552301823495139379; int deltaYb = 3641837813198967662575394539948599175533608045000606654724943255491235392098335065445605489678881045687449867006307;
 
-        int alphaX = 1527649530533633684281386512094328299672026648504329745640827351945739272160755686119065091946435084697047221031460;
-        int alphaY = 487897572011753812113448064805964756454529228648704488481988876974355015977479905373670519228592356747638779818193;
         int nAy = negFp(Ay);
-        int a0 = 1; int a1 = 0; int a2 = 0; int a3 = 0; int a4 = 0; int a5 = 0;
-        int a6 = 0; int a7 = 0; int a8 = 0; int a9 = 0; int a10 = 0; int a11 = 0;
-        int Rxa = 0; int Rxb = 0; int Rya = 0; int Ryb = 0; int Rza = 0; int Rzb = 0;
+        (int a0,int a1,int a2,int a3,int a4,int a5,int a6,int a7,int a8,int a9,int a10,int a11,
+         int Rxa,int Rxb,int Rya,int Ryb,int Rza,int Rzb) =
+            millerSingleR(Bxa,Bxb,Bya,Byb, Ax, nAy);
         // ---- G2 subgroup check on B, fused into its Miller walk ----
         // The walk ends at R = (X:Y:Z) = [|x|]B unless some step was exceptional, which leaves
         // Z = 0 (absorbing); e.g. an order-13 B collapses at the NAF prefix 13. Require Z != 0
@@ -164,48 +138,20 @@ contract Groth16Verify() {
         // psi(B) == [-x]B = -[|x|]B projectively: X == psi(B).x * Z and Y == -psi(B).y * Z.
         // psi(B) == [x]B holds exactly for B in G2 (x the BLS12-381 seed; see
         // psi-subgroup-degeneracy.md). g2psi is lib/G2Check.cash's psi endomorphism.
-        if (Bxa != 0 || Bxb != 0 || Bya != 0 || Byb != 0) {
-            // A=O skips its pairing evaluation, but B still runs the exact subgroup
-            // walk at the fixed finite alpha evaluation point.
-            int evalX = Ax; int evalY = nAy;
-            if (Ax == 0 && Ay == 0) { evalX = alphaX; evalY = alphaY; }
-            (a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11, Rxa,Rxb,Rya,Ryb,Rza,Rzb) =
-                millerSingleR(Bxa,Bxb,Bya,Byb, evalX, evalY);
-            require(Rza + Rzb != 0);
-            (int psxa,int psxb,int psya,int psyb) = g2psi(Bxa, Bxb, Bya, Byb);
-            (int gxa,int gxb) = fp2Mul(psxa, psxb, Rza, Rzb);
-            require(Rxa == gxa); require(Rxb == gxb);
-            (int gya,int gyb) = fp2Mul(psya, psyb, Rza, Rzb);
-            require(addFp(Rya, gya) == 0); require(addFp(Ryb, gyb) == 0);
-            // A=O contributes e(O,B)=1 after the independent B subgroup check.
-            if (Ax == 0 && Ay == 0) {
-                a0 = 1; a1 = 0; a2 = 0; a3 = 0; a4 = 0; a5 = 0;
-                a6 = 0; a7 = 0; a8 = 0; a9 = 0; a10 = 0; a11 = 0;
-            }
-        }
+        require(Rza + Rzb != 0);
+        (int psxa,int psxb,int psya,int psyb) = g2psi(Bxa, Bxb, Bya, Byb);
+        (int gxa,int gxb) = fp2Mul(psxa, psxb, Rza, Rzb);
+        require(Rxa == gxa); require(Rxb == gxb);
+        (int gya,int gyb) = fp2Mul(psya, psyb, Rza, Rzb);
+        require(addFp(Rya, gya) == 0); require(addFp(Ryb, gyb) == 0);
         // The fixed pairs reuse millerSingleR (one Miller body in the bytecode) and drop its R
         // outputs; cashc warns about the unused bR*/cR*/dR* variables.
         (int b0,int b1,int b2,int b3,int b4,int b5,int b6,int b7,int b8,int b9,int b10,int b11, int bR0,int bR1,int bR2,int bR3,int bR4,int bR5) =
             millerSingleR(betaXa,betaXb,betaYa,betaYb, alphaX, alphaY);
-        int unused discardedB0 = bR0; int unused discardedB1 = bR1; int unused discardedB2 = bR2;
-        int unused discardedB3 = bR3; int unused discardedB4 = bR4; int unused discardedB5 = bR5;
-        int c0 = 1; int c1 = 0; int c2 = 0; int c3 = 0; int c4 = 0; int c5 = 0;
-        int c6 = 0; int c7 = 0; int c8 = 0; int c9 = 0; int c10 = 0; int c11 = 0;
-        int unused cR0 = 0; int unused cR1 = 0; int unused cR2 = 0; int unused cR3 = 0; int unused cR4 = 0; int unused cR5 = 0;
-        // A neutral computed vk_x contributes the pairing unit; only finite vk_x enters Miller.
-        if (affX != 0 || affY != 0) {
-            (c0,c1,c2,c3,c4,c5,c6,c7,c8,c9,c10,c11, cR0,cR1,cR2,cR3,cR4,cR5) =
-                millerSingleR(gammaXa,gammaXb,gammaYa,gammaYb, affX, affY);
-        }
-        int d0 = 1; int d1 = 0; int d2 = 0; int d3 = 0; int d4 = 0; int d5 = 0;
-        int d6 = 0; int d7 = 0; int d8 = 0; int d9 = 0; int d10 = 0; int d11 = 0;
-        int dR0 = 0; int dR1 = 0; int dR2 = 0; int dR3 = 0; int dR4 = 0; int dR5 = 0;
-        if (Cx != 0 || Cy != 0) {
-            (d0,d1,d2,d3,d4,d5,d6,d7,d8,d9,d10,d11, dR0,dR1,dR2,dR3,dR4,dR5) =
-                millerSingleR(deltaXa,deltaXb,deltaYa,deltaYb, Cx, Cy);
-        }
-        int unused discardedD0 = dR0; int unused discardedD1 = dR1; int unused discardedD2 = dR2;
-        int unused discardedD3 = dR3; int unused discardedD4 = dR4; int unused discardedD5 = dR5;
+        (int c0,int c1,int c2,int c3,int c4,int c5,int c6,int c7,int c8,int c9,int c10,int c11, int cR0,int cR1,int cR2,int cR3,int cR4,int cR5) =
+            millerSingleR(gammaXa,gammaXb,gammaYa,gammaYb, affX, affY);
+        (int d0,int d1,int d2,int d3,int d4,int d5,int d6,int d7,int d8,int d9,int d10,int d11, int dR0,int dR1,int dR2,int dR3,int dR4,int dR5) =
+            millerSingleR(deltaXa,deltaXb,deltaYa,deltaYb, Cx, Cy);
         (int ab0,int ab1,int ab2,int ab3,int ab4,int ab5,int ab6,int ab7,int ab8,int ab9,int ab10,int ab11) =
             fp12Mul(a0,a1,a2,a3,a4,a5,a6,a7,a8,a9,a10,a11, b0,b1,b2,b3,b4,b5,b6,b7,b8,b9,b10,b11);
         (int abc0,int abc1,int abc2,int abc3,int abc4,int abc5,int abc6,int abc7,int abc8,int abc9,int abc10,int abc11) =

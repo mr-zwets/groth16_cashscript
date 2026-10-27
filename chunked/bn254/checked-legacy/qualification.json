@@ -8,7 +8,7 @@
     "The copied checker is identical to the checked native5 function bank. It enforces canonical proof-coordinate/public-scalar bounds, curve/subgroup conditions, actual public MSM, and the complete fixed-key four-pair equation.",
     "The mandatory bridge copies the declared n0,n1 slots and the original 448-byte proof tuple. Legacy -Ay is mapped to Ay by canonical modular negation. The checker invocation is immediately followed by VERIFY.",
     "The guard restores the original argument frame before the old program. Legacy auxiliary predicates impose further acceptance restrictions and receive no independent soundness credit.",
-    "For six profiles the immutable terminal root is transferred to the selected guarded genesis locking. The slim reference uses a bare terminal locking so its original reverse-offset frame remains unchanged. Externally anchored graph root and successful execution of the complete ordered input graph remain premises."
+    "For six profiles the immutable terminal root is transferred to the selected guarded genesis locking. The slim reference uses a bare terminal locking that first HASH256/EQUALVERIFY-authenticates its retained terminal redeem item, then executes the guard and old program. Push-only and minimal-push VM rules bind the same canonical wire suffix used by the unchanged reverse-offset readers. Externally anchored graph roots and successful execution of the complete ordered input graph remain premises."
   ],
   "existingPositiveObservations": {
     "profiles": 7,
@@ -18,7 +18,7 @@
     "completeDeclaredConsensusGraphsAccepted": 0,
     "completeDeclaredStandardGraphsAccepted": 0
   },
-  "verificationKeyScope": "The successor relation is against the explicit public checker VK. Six profiles have source key lineage. PairFold-7 carries 14 matching gamma/delta/IC coordinate values and twelve separate terminal coefficient pushes exactly equal to that key's raw pre-final-exponentiation Miller(alpha,beta) factor. This establishes the coefficient identity; it does not recover the original individual alpha/beta declaration or independently prove their legacy role bindings. The original historical soundness withdrawal remains.",
+  "verificationKeyScope": "The successor relation is against the explicit public checker VK. The paired benchmark declared-key readback now matches all 20 coordinate-role assignments in the pre-existing source declaration at 037f0361c2ad1a18cacb5b01266ffc8ad147448b, and all 12 original PairFold-7 terminal raw Miller coefficients. This establishes declared-key compatibility. The original exporter/setup link and historical verifier soundness remain unestablished; original withdrawals stand.",
   "livePremises": [
     "Correctness of the referenced fixed-key checker theorem and field/pairing facts.",
     "Pinned VM function-definition, signed-number and minimal-push semantics.",
@@ -43,8 +43,12 @@
     "pointCoordinateConstantsMatched": 14,
     "rawMillerCoefficientsMatched": 12,
     "coefficientEncoding": "twelve separate PUSH32 instructions consumed by the terminal polynomial evaluator",
-    "originalAlphaBetaDeclaration": "UNRECOVERED",
+    "originalAlphaBetaDeclaration": "RECOVERED_PRE_EXISTING_SOURCE_DECLARATION",
     "fullHistoricalVerifierSoundness": "NOT_ESTABLISHED; withdrawal unchanged",
-    "reproduce": "node chunked/bn254/checked-legacy/verify-key-provenance.mjs benchmark-dir new-report.json"
+    "reproduce": "node chunked/bn254/checked-legacy/verify-key-provenance.mjs benchmark-dir new-report.json",
+    "declaredCoordinateRolesChecked": 20,
+    "preExistingSourceRevision": "037f0361c2ad1a18cacb5b01266ffc8ad147448b",
+    "originalExporterLink": "UNESTABLISHED",
+    "qualification": "Paired benchmark artifacts/pairfold7-key-provenance; declaration compatibility does not restore the withdrawn legacy algorithm or its performance claims."
   }
 }

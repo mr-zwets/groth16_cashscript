@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {decodeAuthenticationInstructions, encodeDataPush} from '@bitauth/libauth';
+import {decodeAuthenticationInstructions, encodeDataPush, OpcodesBCH} from '@bitauth/libauth';
 import {buildGuard} from './guard.mjs';
 
 const sha = bytes => createHash('sha256').update(bytes).digest();
@@ -50,11 +50,15 @@ export function repairExistingPositives(artifactBytes, profile) {
     selectedLockings[terminal] = locking(programs[terminal]);
   }
   if (guardInLocking) {
-    // Slim stages locate state from the end of the terminal's original redeem
-    // push. Keep that wire frame intact: execute the guard in a bare terminal
-    // locking, dropping the archived redeem data before the unchanged program.
-    // This is a mathematical reference transport, with native admission HOLD.
-    selectedLockings[terminal] = Buffer.concat([Buffer.from([0x75]), guard.bytecode, programs[terminal]]);
+    // Slim stages keep the terminal redeem push in the unlocking suffix while
+    // executing a bare terminal locking. Authenticate that exact canonical
+    // push before entering the copied equation guard and unchanged program;
+    // an unconditional OP_DROP would let arbitrary data occupy this frame.
+    const terminalRedeemHash = hash256(programs[terminal]);
+    selectedLockings[terminal] = Buffer.concat([
+      Buffer.from([OpcodesBCH.OP_HASH256]), encodeDataPush(terminalRedeemHash),
+      Buffer.from([OpcodesBCH.OP_EQUALVERIFY]), guard.bytecode, programs[terminal],
+    ]);
   }
   const positiveCases = cases.map(({name, steps}) => ({name, steps: steps.map((step, i) => {
     const decoded = decode(step.unlocking);
@@ -66,8 +70,14 @@ export function repairExistingPositives(artifactBytes, profile) {
     assert(unlocking.subarray(0, decoded.prefix.length).equals(decoded.prefix));
     return {...step, locking: selectedLockings[i].toString('hex'), unlocking: unlocking.toString('hex')};
   })}));
+  const terminalRedeem = guardInLocking ? programs[terminal] : null;
   return {id: profile.id, originalSha256: profile.originalSha256, positiveCases,
     catalog: {programs: programs.map(p => p.toString('hex')), lockings: selectedLockings.map(p => p.toString('hex')),
-      equationLoaderSha256: guard.equationLoaderSha256, bridgeSource: guard.bridgeSource},
+      equationLoaderSha256: guard.equationLoaderSha256, bridgeSource: guard.bridgeSource,
+      ...(terminalRedeem ? {
+        terminalRedeemBytes: terminalRedeem.length,
+        terminalRedeemSha256: sha(terminalRedeem).toString('hex'),
+        terminalRedeemHash256: hash256(terminalRedeem).toString('hex'),
+      } : {})},
     qualification: 'Complete deterministic fixed-VK equation guard; legacy auxiliary checks receive no independent soundness credit. Native admission HOLD pending declared-mode outcomes.'};
 }

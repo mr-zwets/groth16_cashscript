@@ -8,6 +8,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { compileString, utils } from 'cashc';
 import {
@@ -19,6 +20,24 @@ import {
 } from '@bitauth/libauth';
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
+
+// The gate certificates below were produced by this exact CashScript package.
+// Pin both package metadata and the resolved compiler entry so a later local
+// dependency cannot silently change the selected instruction boundary.
+const require = createRequire(import.meta.url);
+const cashcPackagePath = require.resolve('cashc/package.json');
+const cashcEntryPath = require.resolve('cashc');
+const cashcPackage = JSON.parse(readFileSync(cashcPackagePath, 'utf8'));
+export const CASHC_COMPILER_PIN = Object.freeze({
+  packageVersion: '0.14.0-next.1',
+  gitHead: 'bf02a4b641d5d03c035d052247a545109c17b708',
+  packageSha256: '672de1d16406b72316157d2f3c34eca9e089960f8eeeae2432afd9cb24ea1c48',
+  entrySha256: '2ebf0b95e78a2b7dc12c4778a1ee2fcac258aa3244d9f3a6871d8000b2b3e6fc',
+});
+assert.equal(cashcPackage.version, CASHC_COMPILER_PIN.packageVersion);
+assert.equal(cashcPackage.gitHead, CASHC_COMPILER_PIN.gitHead);
+assert.equal(sha256(readFileSync(cashcPackagePath)), CASHC_COMPILER_PIN.packageSha256);
+assert.equal(sha256(readFileSync(cashcEntryPath)), CASHC_COMPILER_PIN.entrySha256);
 
 // Public allowlist: this helper is intentionally limited to the five archived
 // BN positive fixtures reviewed for this correction. The hash is over the raw
@@ -122,6 +141,12 @@ function repairStep(raw, successorLocks, successorNewLocks, certificates) {
   const state = pushes[0];
   const redeem = pushes.at(-1);
   assert.equal(redeem.end, unlocking.length, `${raw.label}: redeem must be final push`);
+  assert(Buffer.from(encodeDataPush(redeem.data)).equals(unlocking.subarray(redeem.start)), `${raw.label}: noncanonical redeem push`);
+  assert.equal(
+    Buffer.from(encodeLockingBytecodeP2sh32(hash256(redeem.data))).toString('hex'),
+    raw.locking,
+    `${raw.label}: original redeem P2SH32 owner`,
+  );
   const expectedHeader = state.length <= 75 ? state.length : state.length <= 255 ? 0x4c : 0x4d;
   assert.equal(state.opcode, expectedHeader, `${raw.label}: noncanonical state header`);
   assert.equal(redeem.data[0], 0x75, `${raw.label}: redeem does not begin OP_DROP`);
@@ -253,6 +278,7 @@ export function repairFixture(originalBytes) {
     originalFixtureSha256,
     gateCertificates: certificates,
     gateCertificateSha256: sha256(Buffer.from(JSON.stringify(certificates))),
+    cashcCompiler: CASHC_COMPILER_PIN,
     positiveOnly: true,
   };
   assert.equal(repaired.repair.gateCertificateSha256, EXPECTED_GATE_CERTIFICATE_SHA256[profile], `${profile}: gate bytes changed`);

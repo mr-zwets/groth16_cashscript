@@ -13,7 +13,7 @@ const hash256 = (bytes) => sha256(sha256(bytes));
 const repairs = new Map(manifest.repairs.map((row) => [row.input, row]));
 assert.equal(manifest.originalProgramSha256.length, 3);
 assert.equal(manifest.selectedProgramSha256.length, 3);
-assert.equal(repairs.size, 2);
+assert.equal(repairs.size, 3);
 
 function pushes(bytes) {
   const result = [];
@@ -97,7 +97,7 @@ export function repairPositiveArtifact(originalBytes) {
   assert.equal(original.extraValidProofs.length, 1);
   const steps = repairRun(original.steps);
   return {
-    description: 'Frozen registered BLS12-381 residue-large mathematical repair: exact 288-byte GLV carrier and 1632-byte terminal owners; positive contexts only. Native admission HOLD.',
+    description: 'Frozen registered BLS12-381 residue-large mathematical repair: exact 288-byte GLV carrier, 768-byte input-validation carrier, and 1632-byte terminal owner; positive contexts only. Native admission HOLD.',
     method: original.method,
     deployment: original.deployment,
     curve: original.curve,
@@ -111,7 +111,7 @@ export function repairPositiveArtifact(originalBytes) {
       schema: manifest.schema,
       originalFixtureSha256: manifest.inputFixtureSha256,
       selectedProgramSha256: manifest.selectedProgramSha256,
-      statement: 'The selected positive fixture keeps every non-code byte identical and adds only the two role-specific exact frame predicates. This is an artifact correction, not a current-BCH or full-domain admission certificate.',
+      statement: 'The selected positive fixture keeps every non-code byte identical and adds only the three role-specific exact frame predicates. This is an artifact correction, not a current-BCH or full-domain admission certificate.',
       scope: manifest.scope,
       sourceBinding: manifest.sourceBinding,
       negatives: 'Original invalid fixtures remain only in the unchanged historical input; none are read or emitted by this helper.',
@@ -124,5 +124,5 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
   assert(input && output && extra.length === 0, 'usage: node repair_registered_bls_large.mjs <exact-original.json> <new-positive-only.json>');
   assert.notEqual(resolve(input), resolve(output));
   writeFileSync(output, `${JSON.stringify(repairPositiveArtifact(readFileSync(input)), null, 2)}\n`, { flag: 'wx' });
-  console.log(JSON.stringify({ inputs: 3, positiveContexts: 3, guardedPrograms: 2, nativeAdmission: 'HOLD', output }));
+  console.log(JSON.stringify({ inputs: 3, positiveContexts: 3, guardedPrograms: 3, nativeAdmission: 'HOLD', output }));
 }

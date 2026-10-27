@@ -8,10 +8,22 @@
   ],
   "selectedProgramSha256": [
     "19ae99e5393a4f9593c472d75b268bb16ce7fe3a0c156069d34414654affa55c",
-    "3d697156f625da8c6d7e7592e0f0d740ac589555dfb8bcb30b6c87a1d9d03c38",
+    "bb2836d8fcdef2ba8d5f8852f4952d8d09406afa85fbd7351df35169022ee723",
     "6d809785131dee6a1397b7392c50e0f50db0c24c9a9ce6e4a2e70baba4ac8845"
   ],
   "repairs": [
+    {
+      "input": 1,
+      "label": "Miller input-validation carrier",
+      "originalProgramSha256": "3d697156f625da8c6d7e7592e0f0d740ac589555dfb8bcb30b6c87a1d9d03c38",
+      "programSha256": "bb2836d8fcdef2ba8d5f8852f4952d8d09406afa85fbd7351df35169022ee723",
+      "requiredLength": 768,
+      "gateHex": "7682770200039d",
+      "gateOffset": 1,
+      "argumentDepth": 0,
+      "registryPrefixSha256": "0bfe935e70c321c7ca3afc75ce0d0ca2f98b5422e008bb31c00c6d7f1f1c0ad6",
+      "registrySuffixSha256": "b5ea6fe631117cada5a6fd29a1a717bb3be1a7f71b34794ab9c1b2c162e7bbeb"
+    },
     {
       "input": 0,
       "label": "GLV vk_x final -> assemble vk_x",
@@ -50,6 +62,6 @@
     "sourceBaseRevision": "8eb2c5dd6b1fd88dce3cdf90acc2bb19bfa78db7",
     "builderSha256": "6ab4a1dcf6b09e42c20976113d1ec69e0ac39e496a27daa187314fb94eab339f",
     "transformSha256": "930fc3e48e9e994569e7f38843e563f07978f41a357d9e02aa0f1a6e5d47777d",
-    "note": "The source builder patch is independently reviewable against sourceBaseRevision; the frozen repair below is byte-pinned to this exact registered positive fixture and does not claim compiler byte reproduction."
+    "note": "The source builder patch is independently reviewable against sourceBaseRevision; the frozen repair below is byte-pinned to this exact registered positive fixture and does not claim compiler byte reproduction. Input 1 owns the 768-byte state carrier consumed after the archived OP_DROP; input 2 owns the 1632-byte terminal state."
   }
 }
