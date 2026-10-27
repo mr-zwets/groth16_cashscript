@@ -173,7 +173,7 @@ genuine root proves nothing.
 ### 1. Algebra (exact)
 
 `Fp6 = Fp[Y]/m`, `m = Y⁶ − 2Y³ + 2`, `Fp12 = Fp6[W]/(W² − Y)`. This is a field: the generator
-asserts that Y is a non-square in Fp6 (`m:627-631`). `BLS_PROJECTIVE_GT_MATH.md:15` gives the
+asserts that Y is a non-square in Fp6 (`m:627-631`). `../../BLS_PROJECTIVE_GT_MATH.md:15` gives the
 tower irreducibility. Let `Q = Fp12*/Fp6*`, cyclic of order `p⁶+1`. The map `[f] ↦ f^(p⁶−1)`
 identifies Q with the order-`(p⁶+1)` subgroup, so `f^((p¹²−1)/r) = 1 ⇔ [f]` is an r-th power in
 Q. Let `λ = p + |x|`. Then `gcd(λ, p⁶+1) = r` (`prove_miller_torus.mjs:51-53`), so the λ-power
@@ -189,9 +189,11 @@ factors:
 - root folds `1 ∓ u_c·W`;
 - the fixed fold `1 + u_fix·W` (`m:1772-1773`);
 - projective PIC factors `D' + N'·W`. `D' ≠ 0` holds universally for every canonical parameter
-  tuple (`BLS_PROJECTIVE_GT_MATH.md:66`; `applyCompressed`, `m:1450-1465`);
+  tuple (`../../BLS_PROJECTIVE_GT_MATH.md:66`; `applyCompressed`, `m:1450-1465`);
 - the zero-window scale `9·Y²` (`m:1903`). This is exactly the decoder output for the
-  designated identity encoding `s = t = 0`, scaled by `9ξ` (`BLS_PROJECTIVE_GT_MATH.md:70,83`).
+  designated identity encoding `s = t = 0`, scaled by `9ξ` (`../../BLS_PROJECTIVE_GT_MATH.md:70,83`).
+  More simply, `9·Y²` is a nonzero element of Fp6, so its class in `Q = Fp12*/Fp6*` (below) is
+  the identity.
 
 All these factors are nonzero field elements, so every block state is nonzero. The block's cross
 relation is `other − selected·u_out ≡ 0 (mod m)` (`m:1730-1735`). With flag 0 this forces
@@ -215,10 +217,17 @@ Groth16 product, up to elements killed by the final exponentiation.
 (`m:2112-2116`). It checks B on the twist (`m:2134-2141`) and A, C on the unit curve
 `v = 4u³ + 16v³` (`m:2143-2150`). The unit curve is in bijection with E(Fp) because `#E(Fp)` is
 odd; `(0,0)` is O. B is walked in affine coordinates with exact slope equations and nonzero
-guards on canonical operands (`pointDoubleAffine`/`pointAddAffine`, `m:1340-1373`). The walk
+guards (`pointDoubleAffine`/`pointAddAffine`, `m:1340-1373`). A guard `x ≠ 0` decides
+`x ≢ 0 (mod p)` whenever `|x| < p`, and every guarded operand satisfies this: each is a statement
+limb range-checked into `[0, p)` by the coordinator (`m:2112-2116`), a predecessor `outR` limb
+that is range-checked (`m:1527-1529`) and pinned by integer equality to a computed value
+(`m:1729-1730`), or the result of a CashScript `% P` (`mAdd`/`mSub`/`mulFp`), which lies in
+`(−p, p)`. The remaining guards are `effectiveBSum` (a sum of range-checked nonnegative fields)
+and the committed β (256 bits, below p). All other checks are integer equalities, which imply
+congruence. The walk
 therefore computes `[|x|]B` exactly, and the terminal requires `outR = −ψ(B)`
 (`m:1757-1758`), i.e. `ψ(B) = [x]B`. That implies B ∈ G2 \ {O}: `gcd(λ, h2) = 1`
-(`qsplit_soundness_audit.mjs:42-44`, `psi-subgroup-degeneracy.md`). `Bidentity = 1` forces the
+(`../../qsplit_soundness_audit.mjs:42-44`, `../../psi-subgroup-degeneracy.md`). `Bidentity = 1` forces the
 fixed substitute B and zeroes the `(-A)` units, so that pair contributes 1 (`m:1509`,
 `m:2129-2133`). A and C are cofactor-equivalent: their cofactor components pair to 1, as already
 disclosed above and in `verifiers.md`.
@@ -310,7 +319,7 @@ because `m(α) ≠ 0` for any α: m is irreducible. The **per-query** error is t
 ≤ 160/(2²⁵⁶−1), and over q queries ≤ `q·160/(2²⁵⁶−1)`. Binding all roots to unique openings adds
 the usual Merkle term ≤ `q(q+1)/2²⁵⁶` for collisions and unqueried preimages; the earlier
 statements of the bound omitted it. If all `R̄_e = 0`, step 1 gives the pairing equation. This
-matches `BLS_QSPLIT_TAIL22_STATUS.md:86-89` and states the omitted collision term explicitly.
+matches `../../BLS_QSPLIT_TAIL22_STATUS.md:86-89` and states the omitted collision term explicitly.
 
 ### 6. Composition across inputs
 
@@ -324,7 +333,7 @@ matches `BLS_QSPLIT_TAIL22_STATUS.md:86-89` and states the omitted collision ter
   predecessor's first two pushes, or from the altstack inside a group (`m:3205-3210`,
   `m:1908-1922`). These are the same bytes the coordinator commits as that block's leaf.
 - **Root framing (`9c1f0fe`)**: `rootFrameGuard` requires the root's argument region to be exactly
-  `argumentBytes` (`_root_frame.mjs:18-22`). Push-only, minimal encoding and clean stack then make
+  `argumentBytes` (`_root_frame.mjs:10-15`). Push-only, minimal encoding and clean stack then make
   every fixed-offset read of input 0 hit the intended argument.
 
 **Code imports and binder order.** Every import takes the last `len(redeem)` bytes of a bound
@@ -345,11 +354,19 @@ redeems:
   (`_coordinator_tail.mjs:47-72`), but this helper import comes before it. This ordering is
   **fail-closed**. The binder runs unconditionally afterwards at control depth 0, and it depends
   only on `OP_UTXOBYTECODE` introspection and a literal digest. Imported code cannot end
-  evaluation early with success. It cannot redefine a function identifier, because
-  `OP_DEFINE` of an existing identifier is an error in the 2026 VM. Every function the root
+  evaluation early with success (`OP_RETURN` is an error). It also cannot change the caller's
+  control flow: in the 2026 VM (`libauth` 3.1.0-next.8) `OP_INVOKE` pushes a return frame onto
+  the control stack, `OP_ELSE`/`OP_ENDIF`/`OP_UNTIL` error when that frame is on top, and a
+  function body that ends with an open `IF` or loop leaves a non-empty control stack, which is an
+  error. So imported code can neither close nor flip a caller conditional, and the binder always
+  executes at control depth 0. Imported code also cannot redefine a function identifier, because
+  `OP_DEFINE` of an existing identifier is an error in the 2026 VM (the binder itself invokes no
+  function). In a valid transaction the sibling's own P2SH32 evaluation must also pass, so the
+  pre-binder import is the sibling's genuine redeem. Every function the root
   invokes is defined by root-executed `OP_DEFINE`s. So either the block-4 sibling is genuine (and
   the helper is the genuine helper) or the transaction fails. This is an argument, not
-  binder-first code; a reviewer should accept or reject it explicitly.
+  binder-first code. Two independent reviews (2026-10-27) accepted it after
+  checking the binder span in the bytes of all 13 roots.
 
 ### 7. Per-revision differences
 
@@ -380,7 +397,7 @@ redeems:
   ```
 
   This gives fused-final. With `RPA_FUSE_FINAL_PAIR=1`, the generator forces entry `19` to 0
-  (`m:3574`). For **compact**, also unset `RPA_FUSE_FINAL_PAIR`. The padding is
+  (`m:3574` at `9c1f0fe`; line 3210 at `1003775`, where both are built). For **compact**, also unset `RPA_FUSE_FINAL_PAIR`. The padding is
   `PUSHDATA2 <zeros> DROP` before the Regular redeem (`m:3578-3597`) and is not
   soundness-relevant. Both use `RPA_PROOF_FIXTURE=committed`,
   `RPA_GT_CACHE=bls-gt-merkle-w8-position-regular-projective-v1.json` and the two compilers above.
