@@ -52,8 +52,9 @@ in the on-chain `vk_x` (also standalone in `vkx.cash`) for the complete Groth16 
   lazy tower, fixed-VK line coeffs baked so only `(-A,B)` runs on-chain G2 arithmetic),
   affine runtime B with witnessed slopes, the exact G2 subgroup check fused into the psi
   endpoint, and affine witnessed-slope GLV `vk_x` — all gated witnesses.
-  Build: `node singleton/bn254/gen_singletons.mjs`,
-  then `build_vectors_groth16_minop.mjs` + `VARIANT=minop node gen_multiproof_opt.mjs`.
+  Build (with `VERIFIER_DIR` set to the zk-verifier-bench checkout):
+  `node singleton/bn254/gen_singletons.mjs`, then `build_vectors_groth16_minop.mjs` +
+  `VARIANT=minop node gen_multiproof_opt.mjs` (both write into `$VERIFIER_DIR/src/bch/`).
   `pnpm benchmark`: `PASS`, **64,840,336 op-cost** (worst case 72,761,016; −92% vs the baseline's 771,300,238 on the
   current harness), 9 inputs,
   50,539 B locking / 58,073 B scored — below the

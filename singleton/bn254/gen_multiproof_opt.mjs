@@ -23,7 +23,7 @@ const VARIANT = process.env.VARIANT ?? 'minbytes';
 const useFastG2 = VARIANT === 'minop';
 const useGlv = VARIANT === 'minop';
 const EXTRA = Number(process.env.EXTRA_PROOFS ?? 3);
-const VDIR = 'C:/Users/mathi/Desktop/verifier/';
+const VDIR = C.verifierPath('.') + '/'; // zk-verifier-bench checkout (VERIFIER_DIR, required by _millermath.mjs)
 
 const r = bn254.fields.Fr.ORDER;
 const Pm = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
