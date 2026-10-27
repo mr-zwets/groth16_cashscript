@@ -147,6 +147,244 @@ RPA_TEMPLATE_CASHC='/path/to/zk-language/packages/cashc/dist/compiler.js' \
 node measure_d3_two_chart_binary.mjs
 ```
 
+## FS-PIT soundness argument (intra-transaction `-fs` family)
+
+*Added 2026-10-27 by the verifier.cash maintainers from a constructive review of the shipped
+code: no exploit or forgery was attempted. The text above is unchanged. It disclaims a
+universal theorem for resources, live relay and the finite corpus; this section gives the
+written soundness argument for the accept decision. It does not change any resource claim.*
+
+**Scope.** The 13 benchmark ids `bch-groth16-bls12381-intratx-fs` and `-fs-{compact,
+fused-final, fused-regular, fused-regular-pairs, fused-regular-pairs-packed,
+fused-regular-triples, fused-carrier-pair, fused-middle-pair, fused-first-tail,
+regular-initializer, fused-coordinator-head, fused-coordinator-head-fields}`. All are produced by
+`measure_d3_two_chart_binary.mjs` (below: `m:`*line*). Line numbers refer to `9c1f0fe`. The
+`chunked/bls12-381/*.mjs` files are byte-identical between `9c1f0fe` and current `main`. Older
+pinned revisions contain the same emitter text at other line numbers. The differences that matter
+are listed in "Per-revision differences".
+
+**Claim.** Fix the verification key and the 9 to 22 locking programs of one id. Suppose a
+transaction spends the root/coordinator locking at input 0 and every input passes the BCH 2026
+VM. Then, except with the probability bounded in step 5, the statement's `(A, B, C, in0, in1)`
+satisfies `e(-A,B)·e(α,β)·e(vk_x,γ)·e(C,δ) = 1` with `vk_x = IC0 + in0·IC1 + in1·IC2`. Here B is
+in G2 and A, C are on-curve. Only the root is anchored: spending the worker UTXOs without the
+genuine root proves nothing.
+
+### 1. Algebra (exact)
+
+`Fp6 = Fp[Y]/m`, `m = Y⁶ − 2Y³ + 2`, `Fp12 = Fp6[W]/(W² − Y)`. This is a field: the generator
+asserts that Y is a non-square in Fp6 (`m:627-631`). `BLS_PROJECTIVE_GT_MATH.md:15` gives the
+tower irreducibility. Let `Q = Fp12*/Fp6*`, cyclic of order `p⁶+1`. The map `[f] ↦ f^(p⁶−1)`
+identifies Q with the order-`(p⁶+1)` subgroup, so `f^((p¹²−1)/r) = 1 ⇔ [f]` is an r-th power in
+Q. Let `λ = p + |x|`. Then `gcd(λ, p⁶+1) = r` (`prove_miller_torus.mjs:51-53`), so the λ-power
+image in Q is exactly the r-th powers. Hence **if `[F] = [c]^λ` for some c, then F lies in the
+final-exponentiation kernel**.
+
+**Relations.** Every Miller block keeps a pair `(s0, s1) ↔ s0 + s1·W`. Its in- and out-states are
+canonical charts: flag 0 means `[1 : u]`, flag 1 means `[0 : 1]` with `u = 0` forced
+(`m:389-425` generator; on-chain `m:1518-1521`, split `m:1568-1571`). Each block applies these
+factors:
+- squarings;
+- line factors `1 + t·W` (`lineEval`, `m:1329-1338`);
+- root folds `1 ∓ u_c·W`;
+- the fixed fold `1 + u_fix·W` (`m:1772-1773`);
+- projective PIC factors `D' + N'·W`. `D' ≠ 0` holds universally for every canonical parameter
+  tuple (`BLS_PROJECTIVE_GT_MATH.md:66`; `applyCompressed`, `m:1450-1465`);
+- the zero-window scale `9·Y²` (`m:1903`). This is exactly the decoder output for the
+  designated identity encoding `s = t = 0`, scaled by `9ξ` (`BLS_PROJECTIVE_GT_MATH.md:70,83`).
+
+All these factors are nonzero field elements, so every block state is nonzero. The block's cross
+relation is `other − selected·u_out ≡ 0 (mod m)` (`m:1730-1735`). With flag 0 this forces
+`s0 ≠ 0` and `[s] = [1 : u_out]`. With flag 1 it forces `s0 = 0` and `[s] = [0 : 1]`. No inverse
+witness is needed (`RPA_INVERSES=off`, asserted at `m:192`). There are 24 relations: 21 block
+cross relations, the two split relations of blocks 0 and 15, and the terminal relation. Together
+they give `[c^(−|x|) · M · PIC · fixed] = [frob(c)]`, where:
+- block 0 starts from `1 − u_c·W` (`m:1617-1620`);
+- the round and fold schedule is the binary expansion of `|x| = 0xd201000000010000` (asserted
+  `m:572-580`);
+- the terminal is `torusFrobFlat(root)` (`m:1775-1778`).
+
+So `[M·PIC·fixed] = [c]^λ`, and by the paragraph above the final exponentiation of `M·PIC·fixed`
+is 1. Here M is the product of the runtime `(-A, B)` and fixed `(C, δ)` line classes. The line
+factors are the affine line functions scaled by elements of Fp4*, which the final exponent
+kills (`prove_miller_unit_lines.mjs:1-11`). PIC is the authenticated GT table product (step 3).
+`fixed` is the VK constant for `e(α,β)·e(IC0,γ)` (`m:626`). Together they reproduce the four-pair
+Groth16 product, up to elements killed by the final exponentiation.
+
+**G2 / G1 domain (exact).** The coordinator range-checks every statement field
+(`m:2112-2116`). It checks B on the twist (`m:2134-2141`) and A, C on the unit curve
+`v = 4u³ + 16v³` (`m:2143-2150`). The unit curve is in bijection with E(Fp) because `#E(Fp)` is
+odd; `(0,0)` is O. B is walked in affine coordinates with exact slope equations and nonzero
+guards on canonical operands (`pointDoubleAffine`/`pointAddAffine`, `m:1340-1373`). The walk
+therefore computes `[|x|]B` exactly, and the terminal requires `outR = −ψ(B)`
+(`m:1757-1758`), i.e. `ψ(B) = [x]B`. That implies B ∈ G2 \ {O}: `gcd(λ, h2) = 1`
+(`qsplit_soundness_audit.mjs:42-44`, `psi-subgroup-degeneracy.md`). `Bidentity = 1` forces the
+fixed substitute B and zeroes the `(-A)` units, so that pair contributes 1 (`m:1509`,
+`m:2129-2133`). A and C are cofactor-equivalent: their cofactor components pair to 1, as already
+disclosed above and in `verifiers.md`.
+
+### 2. Transcript (what is committed before each challenge)
+
+All hashes are SHA-256 with framing `MAGIC ‖ len(tag) ‖ tag ‖ u32(len) ‖ payload`
+(`m:302-307`).
+- **Pre-β** (`commitmentRoot`, `m:999-1016` generator, `m:2045-2077` on-chain). This is a
+  Merkle tree over 22 leaves: the 737-byte statement (`m:967-995`: `Bidentity`, effective B,
+  `in0`, `in1` as 32-byte LE, the root `u_c`, and the unit coordinates of A and C, each
+  fixed-width), followed by the 21 block payloads. Each leaf is `frame('leaf', u32(index) ‖
+  u32(22) ‖ u32(length) ‖ payload)`; each node is `frame('node', u32(level) ‖ u32(index) ‖ L ‖
+  R)`. A payload holds everything the block's residuals depend on that is not a constant: the
+  out-chart, `outR`, the runtime slopes, the split chart, the PIC records, and the fixed line
+  coefficients. The fixed coefficients are additionally pinned by `sha256(fixedBlob) ==
+  fixedCommitment`, a redeem constant (`m:1835-1837`, `m:3211-3222`). The coordinator recomputes
+  the root from the workers' raw unlocking bytes, with exact PUSHDATA2 headers and the following
+  `0x30` evaluation push (`m:2154-2181`). It then requires `committedRoot == root` and
+  `β = H(frame('beta', u32(21) ‖ root))`, nonzero (`m:2110`, `m:2247-2250`).
+- **Pre-α**: `qroot`, a one-leaf tree over the 132 quotient coefficients. They are 48-byte,
+  range-checked (`m:2013`), carried as a 110-coefficient head and a 22-coefficient tail with exact
+  lengths (`m:2186-2227`). The coordinator requires `α = H(frame('alpha', root ‖ qroot))`
+  (`m:2251-2252`). β and α are read as unsigned 256-bit LE integers, which are below p
+  (`m:200`).
+- **Fixed by exact equations, not committed**: the 48-byte running evaluation sums. Each block
+  requires `previous + Σ β^e·R_e(α) == own` (`m:1603`, `m:1795`), block 0 starts at 0, and the
+  final quotient check is `Q(α)·m(α) == total` (`m:2026-2036`). All workers read β and α from the
+  root's 128-byte header (`m:1484-1486`).
+
+### 3. GT table (Merkle binding, VK-derived)
+
+Window j (0..31) uses byte j of both canonical 32-byte scalars. `in0, in1 < r` is checked by the
+coordinator, the PIC helper and every Regular worker (`m:1876-1878`, `m:2544`). The leaf is
+`H('BLSGTP1' ‖ 'L' ‖ block ‖ window ‖ digits ‖ factor192)`. The 16-level path with
+`'BLSGTP1' ‖ 'N' ‖ level ‖ parent` nodes is walked from `globalIndex = digits ‖ window` and must
+end at `globalIndex == window` (`m:2573-2591`). Each window root is grouped into one of six batch
+commitments `H('BLSGTP1' ‖ 'B' ‖ first ‖ count ‖ roots)`, and these are literal constants of the
+helper (`m:2502-2508`, `m:2592-2597`). Six hosts run the helper (coordinator, blocks 0, 1, 2, 15,
+20). Each pushes its own constant `(first, count)`, and the six batches partition 0..31
+(`m:2489-2500`, `m:3809-3900`). The window roots are VK-derived (`prove_gt_window_preimage.mjs`;
+the blob hash is asserted at `m:2485`). Reviewers independently recomputed all 32 roots. With
+SHA-256 collision resistance, each authenticated factor is the table entry for (block, window,
+digits).
+
+**Zero windows (from `1003775`).** A window whose two digit bytes are both zero carries a 32-byte
+record instead of a 704-byte one. The length is derived three times from the committed statement:
+- coordinator: `(in>>8j)%256` sums, or the OR mask `m:2154` from `9c1f0fe` (`m:2160-2171`);
+- worker: `digits == 0x0000` (`m:1883-1891`);
+- PIC helper: `m:2551-2559`.
+
+These three derivations agree because byte j of the LE encoding is `(in >> 8j) mod 256`. The
+coordinator puts the derived length into the leaf metadata and checks the push header. The
+helper requires the 32 bytes to equal the window root itself (`root = record`, `m:2573`), so they
+are fixed by the batch commitment. The worker multiplies by the identity representative `9Y²`
+(step 1). This is correct because the window's GT contribution `e(0, γ)` is 1.
+
+### 4. Degree
+
+`segmentDegreeCeiling` (`m:816-858`) propagates the degrees in Y of the formal polynomials
+evaluated on-chain:
+- line, fold and fixed factors have degree ≤ 5;
+- projective PIC factors have `deg D' ≤ 5` and `deg N' ≤ 4`;
+- the zero-window `9Y²` is dominated by the PIC bound.
+
+It covers both input charts. The universal maximum relation degree is 137 (asserted
+`m:932-934`), so the quotient has ≤ 132 coefficients. On-chain, every residual is computed as
+the evaluation at Y = α of a polynomial `R_e(Y) ∈ Fp[Y]` (`eval6`, `pairSquareEval`,
+`pairMulEval`, `lineEval`, `applyCompressed`: `m:1314-1338`, `m:1450-1465`). Evaluation is a ring
+homomorphism, and every coefficient comes from step-2 commitments or constants. The 24
+relations get the distinct β exponents 0..23:
+- split 0 → 0, cross 0 → 1;
+- block k → k+1 for k = 1..14;
+- split 15 → 16, cross 15 → 17;
+- block k → k+2 for k = 16..20;
+- terminal → 23.
+
+Sources: `m:1062-1100` generator; `m:1391-1447` on-chain. In the Regular template, `blockIndex` is
+a redeem constant (`m:3211-3215`).
+
+### 5. Fiat–Shamir bound (random-oracle model)
+
+Model SHA-256 as a random oracle and let the adversary make q queries. Write `R̄_e = R_e mod m`.
+Suppose not all `R̄_e` are 0. Then `P(X) = Σ R̄_e·X^e ∈ Fp6[X]` is nonzero of degree ≤ 23, and a
+fresh nonzero β is a root with probability ≤ 23/(2²⁵⁶−1). Otherwise `S = Σ β^e·R_e` satisfies
+`S mod m ≠ 0`. For the quotient Q already fixed by `qroot`, `T = S − Q·m` is a nonzero
+polynomial of degree ≤ 137, and a fresh α is a root with probability ≤ 137/2²⁵⁶. This holds
+because `m(α) ≠ 0` for any α: m is irreducible. The **per-query** error is therefore
+≤ 160/(2²⁵⁶−1), and over q queries ≤ `q·160/(2²⁵⁶−1)`. Binding all roots to unique openings adds
+the usual Merkle term ≤ `q(q+1)/2²⁵⁶` for collisions and unqueried preimages; the earlier
+statements of the bound omitted it. If all `R̄_e = 0`, step 1 gives the pairing equation. This
+matches `BLS_QSPLIT_TAIL22_STATUS.md:86-89` and states the omitted collision term explicitly.
+
+### 6. Composition across inputs
+
+- **Count**: every program requires `tx.inputs.length == n` (`m:1481`, `m:2101`). The coordinator
+  requires exactly one OP_RETURN output (`m:2102-2103`).
+- **Order and sibling code**: the coordinator requires 35-byte lockings and
+  `sha256(locking[1] ‖ … ‖ locking[n−1]) == digest` (`_coordinator_binding.mjs:2-8`). Each
+  locking is `OP_HASH256 hash256(redeem) OP_EQUAL`, so every worker's redeem is fixed. Every worker
+  requires its `activeInputIndex`. Group members use the packed physical-index map (`m:138-141`).
+- **State hand-off**: the predecessor payload and evaluation are read by introspection from the
+  predecessor's first two pushes, or from the altstack inside a group (`m:3205-3210`,
+  `m:1908-1922`). These are the same bytes the coordinator commits as that block's leaf.
+- **Root framing (`9c1f0fe`)**: `rootFrameGuard` requires the root's argument region to be exactly
+  `argumentBytes` (`_root_frame.mjs:18-22`). Push-only, minimal encoding and clean stack then make
+  every fixed-offset read of input 0 hit the intended argument.
+
+**Code imports and binder order.** Every import takes the last `len(redeem)` bytes of a bound
+sibling's unlocking (`SIZE <len> SUB SPLIT NIP`), which is that sibling's P2SH32 redeem
+(`m:3299-3307`, `m:3527-3545`, `_coordinator_head.mjs:96-100`). Workers trust the root, and the
+root trusts the binder. The order in the root differs by revision, checked in the shipped root
+redeems:
+- **`fused-coordinator-head`, `-fields` (`9c1f0fe`)**: binder first. Only literal push/DROP data
+  and the self-frame guard precede it. The PIC batch-0 helper, the arithmetic library, the
+  Regular initializer and the coordinator code pages (funding carriers 5/8/11/16 plus the
+  First/Tail overflow) are all loaded afterwards (`_coordinator_head.mjs:102-106`). The prefix
+  cache `0x67`/`0x68` turns a bounded slice of input 0's own first pushes into one literal data
+  push. Witness bytes never execute (`_root_prefix.mjs:27-43`), and only bounded header/statement
+  reads are rewritten (`_root_prefix.mjs:73-80`).
+- **The other 11 ids: binder-before-loader does NOT hold literally.** The coordinator loads the
+  batch-0 PIC helper from the block-4 sibling (input 3, 4 or 5) and invokes it before the
+  sibling-locking check (`m:3976-3984`). The tail profile cuts only after the check
+  (`_coordinator_tail.mjs:47-72`), but this helper import comes before it. This ordering is
+  **fail-closed**. The binder runs unconditionally afterwards at control depth 0, and it depends
+  only on `OP_UTXOBYTECODE` introspection and a literal digest. Imported code cannot end
+  evaluation early with success. It cannot redefine a function identifier, because
+  `OP_DEFINE` of an existing identifier is an error in the 2026 VM. Every function the root
+  invokes is defined by root-executed `OP_DEFINE`s. So either the block-4 sibling is genuine (and
+  the helper is the genuine helper) or the transaction fails. This is an argument, not
+  binder-first code; a reviewer should accept or reject it explicitly.
+
+### 7. Per-revision differences
+
+| revision | ids | differences relevant above |
+| --- | --- | --- |
+| `77ab0ac` | `-intratx-fs` | No zero windows: all 32 records are 704 B. The coordinator reads payloads at fixed offsets without raw header checks; framing rests on the workers' exact lengths plus push-only, minimal and clean-stack rules. The PIC helper is imported before the binder. |
+| `1003775` … `c5c3a91` | compact, fused-final … regular-initializer | Zero windows (coordinator sums of shifted digits). Raw header checks. PIC helper imported before the binder. `c5c3a91` carries the coordinator tail after the binder. |
+| `9c1f0fe` | coordinator-head, `-fields` | Fused root: binder first. OR-mask zero detection. Prefix cache. |
+
+### 8. Provenance
+
+- **Arithmetic cashc**: the `cashc` package resolved by `import('cashc')` (`m:2273`) must be
+  CashScript `1c707c1dbf87396b30ba5e0704b1db44475ce893`. Per `COMPACT.md`, the dist entry SHA-256
+  is `2ebf0b95…`. Reviewers observed that `dab3f89f` fails the generator's
+  "baseline compiler differs" assert (`m:2297-2300`). The scheduled template compiler is
+  `RPA_TEMPLATE_CASHC` at `efc6ab80d9cbbea06c3c364b8fd5e915b9da84b4`. `-intratx-fs` (`77ab0ac`)
+  uses only `1c707c1d`, with the default environment of `run_full_multiproof.mjs`.
+- **`-intratx-fs` source**: the bench header cites `d15ed70 (local candidate)`, which is not in
+  this repository. The pinned artifact hash `83d2b28f…` is this file at `77ab0ac`, and the ids
+  rebuild from there.
+- **`-fs-compact` and `-fs-fused-final` (`1003775`)**: their vector files record no `buildFlags`.
+  Reconstructed flags that rebuild both byte-identically (review 2026-10-27): start from the
+  `buildFlags` of `-fs-fused-regular`. Unset `RPA_FUSE_REGULAR_PAIR` and
+  `RPA_GROUP_DENSITY_PADDING`, and set the padding map:
+
+  ```sh
+  RPA_COMPACT_REGULAR_DENSITY_PADDING='{"3":334,"5":320,"6":276,"7":283,"8":266,"9":272,"10":273,"11":281,"12":276,"13":283,"14":285,"16":305,"17":279,"18":281,"19":289}'
+  ```
+
+  This gives fused-final. With `RPA_FUSE_FINAL_PAIR=1`, the generator forces entry `19` to 0
+  (`m:3574`). For **compact**, also unset `RPA_FUSE_FINAL_PAIR`. The padding is
+  `PUSHDATA2 <zeros> DROP` before the Regular redeem (`m:3578-3597`) and is not
+  soundness-relevant. Both use `RPA_PROOF_FIXTURE=committed`,
+  `RPA_GT_CACHE=bls-gt-merkle-w8-position-regular-projective-v1.json` and the two compilers above.
+
 ## Optimizations (prepared batched Miller + lazy reduction)
 
 The first two passes cut the full verifier from 196 chunks / 2.28 MB / 1.137 B op to
