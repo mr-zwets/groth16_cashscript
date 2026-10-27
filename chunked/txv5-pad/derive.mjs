@@ -80,7 +80,7 @@ let fnBodies = 0;
   // in the main code AND in every function body (the push before each <id> OP_DEFINE in the prologue)
   const scan = (ins, where) => {
     assert.ok(!ins.some((i) => i.opcode >= 0xc0 && i.opcode <= 0xd3), `introspection opcode in ${where}`);
-    ins.forEach((i, j) => { if (i.opcode === 0x89) { const body = ins[j - 2]; assert.ok(body && 'data' in body, 'OP_DEFINE body is a push'); scan(decodeAuthenticationInstructions(body.data), `${where} > function ${j}`); bodies++; } });
+    ins.forEach((i, j) => { if (i.opcode === 0x89) { const id = ins[j - 1], body = ins[j - 2]; assert.ok(id && ('data' in id || id.opcode === 0x00 || (id.opcode >= 0x4f && id.opcode <= 0x60)), 'OP_DEFINE id is a literal push'); assert.ok(body && 'data' in body, 'OP_DEFINE body is a push'); scan(decodeAuthenticationInstructions(body.data), `${where} > function ${j}`); bodies++; } });
   };
   let bodies = 0; scan(a, 'redeem'); assert.ok(bodies > 0, 'function bodies scanned');
   fnBodies = bodies;
