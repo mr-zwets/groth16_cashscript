@@ -1,0 +1,98 @@
+{
+ "note": "TXv5-grading pad-slot variant (derive.mjs); the reviewed artifact is unchanged",
+ "reviewed": {
+  "redeemBytes": 12793,
+  "redeemSha256": "c93557ac85f8082011ffb4a582892396d17bbd58373d815e65d7cd5f255e8f74",
+  "lockingHex": "aa20ee10ce1f00643f7c48c659af8fb6f68ac7ea17fec743b59e1395e2851ce88f7a87",
+  "entryOffset": 2269,
+  "entryBytes": "74529d"
+ },
+ "variant": {
+  "redeemBytes": 12794,
+  "redeemSha256": "a570e2571515b3d3a1763f9a6a33a03fc0478b08181eadb919f5944cabb05953",
+  "lockingHex": "aa20a55cec39e00fbff4ed6f089757510d856b71200e52ffaefc7c4adc5a573cabdf87",
+  "entryBytes": "74539d75",
+  "unlockingLayout": "<WQ> <WS> <pad> <redeem>"
+ },
+ "honestRuns": {
+  "valid": [
+   26071195,
+   26124699
+  ],
+  "extraValidProofs": [
+   [
+    26135410,
+    26189682
+   ],
+   [
+    27885050,
+    27942522
+   ],
+   [
+    25964185,
+    26017561
+   ],
+   [
+    26763197,
+    26819133
+   ],
+   [
+    26538240,
+    26594816
+   ]
+  ],
+  "worstCaseProof": [
+   27484498,
+   27538514
+  ],
+  "note": "bch-spec op-cost [consensus, standard] with a 1-byte zero pad"
+ },
+ "padIndependence": [
+  {
+   "padLen": 0,
+   "opCostStandard": 26124698,
+   "hashIters": 418
+  },
+  {
+   "padLen": 1,
+   "opCostStandard": 26124699,
+   "hashIters": 418
+  },
+  {
+   "padLen": 2,
+   "opCostStandard": 26124700,
+   "hashIters": 418
+  },
+  {
+   "padLen": 75,
+   "opCostStandard": 26124773,
+   "hashIters": 418
+  },
+  {
+   "padLen": 76,
+   "opCostStandard": 26124774,
+   "hashIters": 418
+  },
+  {
+   "padLen": 520,
+   "opCostStandard": 26125218,
+   "hashIters": 418
+  },
+  {
+   "padLen": 4000,
+   "opCostStandard": 26128698,
+   "hashIters": 418
+  },
+  {
+   "padLen": 20000,
+   "opCostStandard": 26144698,
+   "hashIters": 418
+  }
+ ],
+ "invalid": {
+  "carried": 16,
+  "pad": 3
+ },
+ "functionBodiesScanned": 12,
+ "reviewedVectorsSha256": "9a3732a858655896e577d5411821602950c1550ae2450d7d7b26128255468e03"
+}
