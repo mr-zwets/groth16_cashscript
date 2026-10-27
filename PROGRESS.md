@@ -11,3 +11,4 @@ Base: origin/main 276b74b. CLEANUP-RESULT.md "Our own minop" items 1, 2, 3, 5. D
     Verified: both scripts run against a scratch copy of bench origin/main src/ (VERIFIER_DIR=scratch) and reproduce
     groth16-singleton-minop-vectors.json and -minop-multiproof-vectors.json exactly (JSON-equal, every key).
     BLS minop build scripts already used verifierPath. NOT touched: 13 other non-minop scripts with C:/ paths (listed in the return).
+FINALIZE (review 1 ok, no blocking): fixed nits — BLS README vkxZinv inverse-witness wording, genesis [1-uW], signed-digit schedule note, psi(B)==[x]B (x<0) in L9/L72; BN README stale 15,867/888,690,550 -> 8,206/771,300,238/~97 inputs, ~1,428x, COMPILER_FIX_NOTE.md ref -> cashscript-compiler-fork.md. PROGRESS.md dropped on merge. Generator/test comments with [-x]B left (comments only, regen identity kept).

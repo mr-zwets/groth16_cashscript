@@ -45,8 +45,8 @@ in the on-chain `vk_x` (also standalone in `vkx.cash`) for the complete Groth16 
 - `bch-groth16-singleton` — the COMPLETE verifier (byte reference), in the main **Groth16**
   leaderboard head-to-head with nchain/scrypt. Build:
   `node singleton/bn254/build_vectors_groth16.mjs` → `verifier/src/bch/groth16-singleton-vectors.json`.
-  `pnpm benchmark`: `PASS`, 15,867 B scored, 888,690,550 op-cost, ~111 inputs.
-  Same BN254 curve as scrypt-bn256 → **~734× smaller bytecode** (15.9 KB vs 11.7 MB).
+  `pnpm benchmark`: `PASS`, 8,206 B scored, 771,300,238 op-cost, ~97 inputs (bench results.json, 2026-10-27).
+  Same BN254 curve as scrypt-bn256 → **~1,428× smaller bytecode** (8.2 KB vs 11.7 MB).
 - `bch-groth16-singleton-minop` — the **op-optimized** variant: an unrolled batched
   c^-(6x+2)-fused Miller evaluated in the quotient torus Fp12*/Fp6* (6-limb canonical root,
   lazy tower, fixed-VK line coeffs baked so only `(-A,B)` runs on-chain G2 arithmetic),
@@ -60,7 +60,7 @@ in the on-chain `vk_x` (also standalone in `vkx.cash`) for the complete Groth16 
   50,539 B locking / 58,073 B scored — below the
   13-input chunked verifier's total op-cost; beats scrypt on both bytes and op. The unroll
   (needed to bake coeffs as literals; runtime blob indexing is ~100 op/byte for OP_SPLIT) makes
-  the script large and needs the cashc fork's large-contract compile fix (`COMPILER_FIX_NOTE.md` Fix 2).
+  the script large and needs the cashc fork's large-contract compile support (see [cashscript-compiler-fork.md](../../cashscript-compiler-fork.md)).
 - `bch-pairing-singleton` — the pairing-only milestone (leaderboard "Groth16 pairing
   (BCH-native)"). Build: `node singleton/bn254/build_vectors.mjs`. 20,735 B, ~1.21B, ~151 inputs.
   The standalone `vk_x` baseline (`bch-vkx-singleton`) builds with `node singleton/bn254/build_vectors_vkx.mjs`.

@@ -6,7 +6,7 @@
 > inputs. It now validates the proof points before any pairing work (see
 > [Proof-point validation](#proof-point-validation)): every coordinate is range-checked
 > (`0 <= v < p`), A and C must satisfy `y^2 = x^3 + 4`, B must satisfy the twist equation
-> `y^2 = x^3 + 4(1+u)`, and B must pass the G2 subgroup check `psi(B) == [-x]B`, fused into B's
+> `y^2 = x^3 + 4(1+u)`, and B must pass the G2 subgroup check `psi(B) == [x]B` (x < 0, so `[x]B = -[|x|]B`), fused into B's
 > Miller walk with a `Z != 0` guard. Both entries are rebuilt with their original pipelines.
 > An independent review (2026-10-26) found no soundness gaps; its minor follow-ups (more
 > non-canonical-encoding tests, the cofactor-malleability note below) are done, and both entries
@@ -69,7 +69,7 @@ squaring are identical; the tower/G1 layers are near-mechanical re-parameterizat
 | coordinates `0 <= v < p` | `within(v, 0, P)` on Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy |
 | A, C on `E(Fp)`: `y^2 = x^3 + 4` | `g1Check(x, y)` (range + curve), one body called twice |
 | B on `E'(Fp2)`: `y^2 = x^3 + 4(1+u)` | two `fp2Sqr` and one `fp2Mul` |
-| B in G2: `psi(B) == [-x]B` | fused into B's Miller walk (below), no separate `[\|x\|]B` walk |
+| B in G2: `psi(B) == [x]B` (x < 0) | fused into B's Miller walk (below), no separate `[\|x\|]B` walk |
 
 **Points at infinity.** The affine encoding has no point at infinity, and `(0,0)` is off both
 curves, so A = O, B = O and C = O are all rejected by the curve checks. The honest fixtures never
@@ -176,8 +176,8 @@ exponentiation, and GLV `vk_x`. Shipped: **58,007 B locking, 58,841 B scored, 14
 (`rescheduleStacks: true`) recompiles it to the shipped `lockingOK`.
 
 The spend takes 21 arguments: `Ax, Ay, Bxa, Bxb, Bya, Byb, Cx, Cy, in0, in1, u0..u5, k10, k20,
-k11, k21, vkxZinv`. There are no slope or inverse witnesses: the G2 walk is homogeneous
-projective, and the GLV accumulator is Jacobian.
+k11, k21, vkxZinv`. There are no slope witnesses, and the only inverse witness is `vkxZinv` (fixed by an exact
+equation, see the table): the G2 walk is homogeneous projective, and the GLV accumulator is Jacobian.
 
 ### Soundness (owner table)
 
@@ -197,13 +197,14 @@ Line numbers refer to `groth16_minop.cash`; kernels live in `lib/lazy/`.
 | baked `(vk_x,gamma)`, `(C,delta)` lines | VK constants: the 69 + 69 lines of the projective walk of gamma and delta on the `|x|` schedule, recomputed independently by both reviews | L62-411 |
 | baked `e(alpha,beta)` torus constant `K` | VK constant: `[1 + tW]` with `FE(K)` matching the model `e(alpha,beta)` (recomputed by review 1; an accepted honest proof also pins `K^FE`) | L412 |
 | `psi`, `torusFrob1` constants | curve constants. `torusFrob1` uses `xi^((p-1)/3)`, `xi^(2(p-1)/3)`, `xi^((p-1)/6)`, and `fp2Half = (p+1)/2`. The psi coefficients map E' to E' and satisfy `psi^2 - (x+1) psi + p = 0`. Both reviews recomputed these against noble | `Bls12381LazyG.cash:92`, `Bls12381LazyTorus.cash:27` |
-| Fp12 accumulator | computed on-chain as one SSA chain from the genesis `(1 - uW)^2` through every square, line and `c`/`c^-1` fold | L62-412 |
+| Fp12 accumulator | computed on-chain as one SSA chain from the genesis `[1 - uW]` (squared by the first op, L67) through every square, line and `c`/`c^-1` fold | L62-412 |
 
 The verifier is one input with no introspection, state or sibling inputs, so there is no
 multi-input binding to argue.
 
 **Miller schedule.** The runtime walk starts at `R = B` and runs 64 doubles and 5 adds over
-`|x| = 0xd201000000010000`. Every Fp12 op consumes the previous Fp12 output, and every G2 op
+`|x| = 0xd201000000010000` on a signed-digit schedule: one `-B` add (with a `c` fold) and four
+`+B` adds, so the double count is 64, not 63. Every Fp12 op consumes the previous Fp12 output, and every G2 op
 consumes the previous point. The `c` exponent is exactly `-|x|`. The loop is unconjugated, so
 it computes the Miller value of `[|x|]`, whose final exponentiation is the inverse of the ate
 pairing for `x`. It is used consistently for all four pairs and for `K`, so the verdict still
