@@ -145,8 +145,12 @@ the transaction's own payloads. The G2 walk, slope checks, ψ terminal relation,
 `λ=p+|x|` residue terminal stay exact. Consequences, disclosed in its status doc:
 
 - Soundness is computational, in the SHA-256 random-oracle model, with a stated union
-  bound of `160/(2^256-1)` per oracle query plus the Merkle collision term `q(q+1)/2^256`
-  (the argument is in [chunked/bls12-381/README.md](chunked/bls12-381/README.md), sections 1-6; reviewed 2026-10-27) — STARK-class, but a **new assumption** the
+  bound `23Nβ/(2^256-1) + 137Nα/2^256 + Adv_bind`. The challenge counters include
+  adversarial prequeries and fresh verifier queries; `Adv_bind` separately covers the
+  commitment/code hash bindings. If both challenge counts are at most q, the degree
+  contribution is at most `q·160/(2^256-1)`; an adversary-only q does not also bound
+  all Merkle/preprocessing hash work. The argument and query convention are in
+  [chunked/bls12-381/README.md](chunked/bls12-381/README.md), sections 1-6 (reviewed 2026-10-27) — STARK-class, but a **new assumption** the
   unconditional entries do not make. It is therefore filed under this separate name
   rather than as a successor to `-intratx-residue` / `-grouped-residue`.
 - A and C are graded **cofactor-equivalent**: on-curve is enforced and the pairing verdict

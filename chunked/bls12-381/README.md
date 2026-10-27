@@ -310,16 +310,34 @@ a redeem constant (`m:3211-3215`).
 
 ### 5. Fiat–Shamir bound (random-oracle model)
 
-Model SHA-256 as a random oracle and let the adversary make q queries. Write `R̄_e = R_e mod m`.
-Suppose not all `R̄_e` are 0. Then `P(X) = Σ R̄_e·X^e ∈ Fp6[X]` is nonzero of degree ≤ 23, and a
-fresh nonzero β is a root with probability ≤ 23/(2²⁵⁶−1). Otherwise `S = Σ β^e·R_e` satisfies
-`S mod m ≠ 0`. For the quotient Q already fixed by `qroot`, `T = S − Q·m` is a nonzero
-polynomial of degree ≤ 137, and a fresh α is a root with probability ≤ 137/2²⁵⁶. This holds
-because `m(α) ≠ 0` for any α: m is irreducible. The **per-query** error is therefore
-≤ 160/(2²⁵⁶−1), and over q queries ≤ `q·160/(2²⁵⁶−1)`. Binding all roots to unique openings adds
-the usual Merkle term ≤ `q(q+1)/2²⁵⁶` for collisions and unqueried preimages; the earlier
-statements of the bound omitted it. If all `R̄_e = 0`, step 1 gives the pairing equation. This
-matches `../../BLS_QSPLIT_TAIL22_STATUS.md:86-89` and states the omitted collision term explicitly.
+Model SHA-256 as a classical random oracle. Condition on the commitment and code bindings
+used below: every accepted opening identifies the same fixed bytes that define its residuals.
+For a fresh β query those residual coefficients must be fixed before the oracle responds;
+for a fresh α query the statement root and all quotient coefficients must likewise be fixed
+before the response. A predictive opening or scheduling failure belongs to `Adv_bind`.
+Write `R̄_e = R_e mod m`. Suppose not all `R̄_e` are 0. Then
+`P(X) = Σ R̄_e·X^e ∈ Fp6[X]` is nonzero of degree ≤ 23, and a fresh nonzero β is a root
+with probability ≤ 23/(2²⁵⁶−1). Otherwise `S = Σ β^e·R_e` satisfies `S mod m ≠ 0`.
+For the quotient Q already fixed by `qroot`, `T = S − Q·m` is a nonzero polynomial
+of degree ≤ 137, and a fresh α is a root with probability ≤ 137/2²⁵⁶.
+Here `m(α) ≠ 0` because m is irreducible.
+
+Let `Nβ` and `Nα` bound all distinct relevant framed challenge queries in the experiment,
+including adversarial prequeries and any fresh final-verifier queries. Repeating an identical
+input gives the same challenge and is not a fresh trial. Let `Adv_bind` bound failure of the
+Merkle, fixed-table and code bindings, including collisions and predicting a commitment
+before its checked opening is fixed. Then the conservative union bound is
+
+`Pr[false equation accepted] ≤ 23Nβ/(2²⁵⁶−1) + 137Nα/2²⁵⁶ + Adv_bind.`
+
+If `Nβ,Nα ≤ q`, the degree contribution is at most `q·160/(2²⁵⁶−1)`.
+The earlier shorthand `q(q+1)/2²⁵⁶` for the binding term requires a separately specified
+hash experiment: its budget must cover the relevant preprocessing/reference hashes,
+adversarial and verifier hash evaluations, and predictive opening targets. An
+adversary-only challenge-query count does not by itself bound those events. This text
+therefore keeps `Adv_bind` explicit rather than assigning that shorthand an unstated
+query convention. If all `R̄_e = 0`, step 1 gives the pairing equation. These are
+conditional equation-soundness statements, not application knowledge-soundness claims.
 
 ### 6. Composition across inputs
 
@@ -363,8 +381,12 @@ redeems:
   `OP_DEFINE` of an existing identifier is an error in the 2026 VM (the binder itself invokes no
   function). In a valid transaction the sibling's own P2SH32 evaluation must also pass, so the
   pre-binder import is the sibling's genuine redeem. Every function the root
-  invokes is defined by root-executed `OP_DEFINE`s. So either the block-4 sibling is genuine (and
-  the helper is the genuine helper) or the transaction fails. This is an argument, not
+  invokes is defined by root-executed `OP_DEFINE`s. `OP_INVOKE` shares the caller's data
+  stack and altstack: this is not a claim that arbitrary imported code preserves caller state.
+  The accepted path relies on the genuine PIC helper's reviewed ABI, its immediate verdict
+  check, and the binder's dependence only on introspection plus its literal digest.
+  So either the block-4 sibling is genuine (and the helper is the genuine helper) or the
+  transaction fails. This is an argument, not
   binder-first code. Two independent reviews (2026-10-27) accepted it after
   checking the binder span in the bytes of all 13 roots.
 
