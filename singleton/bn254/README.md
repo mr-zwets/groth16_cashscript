@@ -54,7 +54,8 @@ in the on-chain `vk_x` (also standalone in `vkx.cash`) for the complete Groth16 
   endpoint, and affine witnessed-slope GLV `vk_x` — all gated witnesses.
   Build: `node singleton/bn254/gen_singletons.mjs`,
   then `build_vectors_groth16_minop.mjs` + `VARIANT=minop node gen_multiproof_opt.mjs`.
-  `pnpm benchmark`: `PASS`, **64,840,336 op-cost (−93%)** (worst case 72,761,016), 9 inputs,
+  `pnpm benchmark`: `PASS`, **64,840,336 op-cost** (worst case 72,761,016; −92% vs the baseline's 771,300,238 on the
+  current harness), 9 inputs,
   50,539 B locking / 58,073 B scored — below the
   13-input chunked verifier's total op-cost; beats scrypt on both bytes and op. The unroll
   (needed to bake coeffs as literals; runtime blob indexing is ~100 op/byte for OP_SPLIT) makes
