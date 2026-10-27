@@ -30,11 +30,13 @@ function decodeStep(step) {
 }
 
 function frameGate(gate) {
-  // PICK copies the designated owner. SIZE/NIP leaves only its length; NUMEQUALVERIFY
-  // consumes that length and the constant, preserving the entire original argument stack.
+  // PICK copies the designated owner. SIZE/NIP leaves only its length; the comparison
+  // consumes that length and its bound, preserving the entire original argument stack.
   const pick = gate.depth === 0 ? Buffer.from([0x76])
     : Buffer.concat([pushNumber(gate.depth), Buffer.from([0x79])]);
-  return Buffer.concat([pick, Buffer.from([0x82, 0x77]), pushNumber(gate.length), Buffer.from([0x9d])]);
+  assert(gate.comparison === 'equal' || gate.comparison === 'less-than');
+  const comparison = gate.comparison === 'equal' ? [0x9d] : [0x9f, 0x69];
+  return Buffer.concat([pick, Buffer.from([0x82, 0x77]), pushNumber(gate.length), Buffer.from(comparison)]);
 }
 
 function selectCases(artifact, layout) {
@@ -61,7 +63,8 @@ export function repairHistoricalPositives(profileId, originalBytes) {
   assert.equal(profile.originalProgramSha256.length, profile.programCount);
   assert.equal(profile.repairedProgramSha256.length, profile.programCount);
   const gates = new Map(profile.gates.map(gate => [gate.input, gate]));
-  assert.equal(gates.size, 2);
+  assert.equal(gates.size, profile.gates.length);
+  assert(gates.size > 0 && gates.size <= 2);
 
   const cases = runs.map(run => {
     assert.equal(run.steps.length, profile.programCount);
@@ -72,7 +75,9 @@ export function repairHistoricalPositives(profileId, originalBytes) {
       let code = decoded.code;
       if (gate) {
         assert.equal(code[0], 0x75, 'archived discarded padding owner');
-        assert.equal(decoded.instructions[0].data?.length, gate.length, 'original positive state frame');
+        const frameLength = decoded.instructions[0].data?.length;
+        if (gate.comparison === 'less-than') assert(frameLength < gate.length, 'original positive header bound');
+        else assert.equal(frameLength, gate.length, 'original positive state frame');
         assert.equal(decoded.instructions.length - 1, gate.depth + 2, 'original argument frame arity');
         const instructions = decodeAuthenticationInstructions(code);
         assert(instructions.every(i => !('error' in i)));

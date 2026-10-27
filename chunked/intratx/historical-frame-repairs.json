@@ -23,14 +23,16 @@
           "offset": 653,
           "length": 228,
           "depth": 2,
-          "hex": "5279827702e4009d"
+          "hex": "5279827702e4009d",
+          "comparison": "equal"
         },
         {
           "input": 26,
           "offset": 1941,
           "length": 1664,
           "depth": 12,
-          "hex": "5c7982770280069d"
+          "hex": "5c7982770280069d",
+          "comparison": "equal"
         }
       ],
       "originalProgramSha256": [
@@ -108,7 +110,8 @@
           "qualifiedRepairedNativeAndGroupedMathematicalReviewSha256": "4b2fe4928dcebcefc2f7205e7d3755d22f8eb56752142e487a3412b4e9124bd1",
           "requiredAdapterSupplementSha256": "097032b789568e6a8f309b9dbe21de62340406f6d102a7c7e431952f40428649"
         }
-      }
+      },
+      "declaredVm": "bch-2026"
     },
     {
       "id": "bch-groth16-historical-bn27-grouped-frame-corrected",
@@ -131,14 +134,16 @@
           "offset": 653,
           "length": 228,
           "depth": 2,
-          "hex": "5279827702e4009d"
+          "hex": "5279827702e4009d",
+          "comparison": "equal"
         },
         {
           "input": 26,
           "offset": 1941,
           "length": 1664,
           "depth": 12,
-          "hex": "5c7982770280069d"
+          "hex": "5c7982770280069d",
+          "comparison": "equal"
         }
       ],
       "originalProgramSha256": [
@@ -217,7 +222,8 @@
           "requiredAdapterSupplementSha256": "097032b789568e6a8f309b9dbe21de62340406f6d102a7c7e431952f40428649"
         }
       },
-      "tokenCategoryHex": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd"
+      "tokenCategoryHex": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "declaredVm": "bch-2026"
     },
     {
       "id": "bch-groth16-historical-bls26-frame-corrected",
@@ -240,14 +246,16 @@
           "offset": 667,
           "length": 432,
           "depth": 2,
-          "hex": "5279827702b0019d"
+          "hex": "5279827702b0019d",
+          "comparison": "equal"
         },
         {
           "input": 25,
           "offset": 1904,
           "length": 1632,
           "depth": 0,
-          "hex": "7682770260069d"
+          "hex": "7682770260069d",
+          "comparison": "equal"
         }
       ],
       "originalProgramSha256": [
@@ -324,7 +332,8 @@
           "adapterSemanticsSha256": "00abc6fe19f09650db55daf795444a4da6645d110e6ee6424b586415eab397f2",
           "rawByteFunctionsSha256": "14bcba3d51ea055a68582d344d217186849c1542358770009e9a0df1926fcd6f"
         }
-      }
+      },
+      "declaredVm": "bch-2026"
     },
     {
       "id": "bch-groth16-historical-bls24-frame-corrected",
@@ -347,14 +356,16 @@
           "offset": 667,
           "length": 432,
           "depth": 2,
-          "hex": "5279827702b0019d"
+          "hex": "5279827702b0019d",
+          "comparison": "equal"
         },
         {
           "input": 23,
           "offset": 1904,
           "length": 1632,
           "depth": 0,
-          "hex": "7682770260069d"
+          "hex": "7682770260069d",
+          "comparison": "equal"
         }
       ],
       "originalProgramSha256": [
@@ -426,6 +437,265 @@
           "selectedNativeFullConditionalFiniteDomainCompositionSha256": "4c58b5ba519f30c86d54b2ecadafa07234f2f1c05dd187917dc39aa08ef4f95c",
           "wholeHeadMathematicalDispositionSha256": "8b9745207f5324a2d29a3ee4b4175024d39dade0e0f902a2510122400cd26785"
         }
+      },
+      "declaredVm": "bch-2026"
+    },
+    {
+      "id": "bch-groth16-historical-bn13-frame-corrected",
+      "layout": "intratx",
+      "curve": "BN254",
+      "programCount": 13,
+      "caseCount": 3,
+      "sourcePr": 5,
+      "sourceHead": "2831928fe224d252fc90dfc26ecfdf52f29e9399",
+      "benchmarkPr": 11,
+      "declaredVm": "bch-2026",
+      "originalFixture": {
+        "repository": "mr-zwets/zk-verifier-bench",
+        "revision": "d1004f640e9ef7de1a3d64da9027c4dd54888cb2",
+        "file": "src/bch/groth16-intratx-residue-vectors.json",
+        "sha256": "4302edf3280328bec71c748c6f10bf27775d74fd2e87ffdc5ce05a3c382bd528"
+      },
+      "gates": [
+        {
+          "input": 2,
+          "offset": 586,
+          "length": 228,
+          "depth": 2,
+          "hex": "5279827702e4009d",
+          "comparison": "equal"
+        }
+      ],
+      "originalProgramSha256": [
+        "c442f5b5aa3952cc5b6f866a9bad9f6e19b3d159ed4af83dd847f083e52402c3",
+        "9d530b81176bd464be816294294c074116b75c48f0ce276066a21e0223f05638",
+        "0026e1a9d701df602f52bf3fb562e43fd0ba4e7441f7c25dd711f8e1a1ba653e",
+        "0a008ddca1b7816b852fd9ea27a1088be6098d2eab7e5e275bb3e2487404dba3",
+        "c8e8b8e3cd094b507aa48aac219c434f87e474cecf47828e0215ae877bc22b09",
+        "d1c4c46153b926bbf12187eec5f6f726dd8bfc5e2b118bfe223badb9fdc8ef57",
+        "6366fc0f68dd130063f2be80e4cecee2b0c3d86cfc823c0536028ed7a51c89a0",
+        "603e59f18f9eea65e5c2052d0e308c886763d3b4247a11c7fb19bd45f0187b58",
+        "6b016d45f5c81a09288813b166ec557af1905836ca9107b7ef45ae42aeeac0ce",
+        "a7bc4a65b5a5aa4ef4a07b1e7f95e8f0e92e2cc0d04da0c8905bfd7a6614f785",
+        "42f15caa9ddbf657c630873bc914ac8d141ca2c1e2691180bd99f2868c988067",
+        "3c0d5305b759329088fd53485fa31475fdfafa13f6461667b073aae2a59f6fe8",
+        "f3bd9c464c0f85cf4fd9140719bdfa417327d1d4598fa67644beb02004869908"
+      ],
+      "repairedProgramSha256": [
+        "c442f5b5aa3952cc5b6f866a9bad9f6e19b3d159ed4af83dd847f083e52402c3",
+        "9d530b81176bd464be816294294c074116b75c48f0ce276066a21e0223f05638",
+        "dc559408e9fcb27b06399edb2552a51b8d0a0bb166471c939a21e8c16b3b6654",
+        "0a008ddca1b7816b852fd9ea27a1088be6098d2eab7e5e275bb3e2487404dba3",
+        "c8e8b8e3cd094b507aa48aac219c434f87e474cecf47828e0215ae877bc22b09",
+        "d1c4c46153b926bbf12187eec5f6f726dd8bfc5e2b118bfe223badb9fdc8ef57",
+        "6366fc0f68dd130063f2be80e4cecee2b0c3d86cfc823c0536028ed7a51c89a0",
+        "603e59f18f9eea65e5c2052d0e308c886763d3b4247a11c7fb19bd45f0187b58",
+        "6b016d45f5c81a09288813b166ec557af1905836ca9107b7ef45ae42aeeac0ce",
+        "a7bc4a65b5a5aa4ef4a07b1e7f95e8f0e92e2cc0d04da0c8905bfd7a6614f785",
+        "42f15caa9ddbf657c630873bc914ac8d141ca2c1e2691180bd99f2868c988067",
+        "3c0d5305b759329088fd53485fa31475fdfafa13f6461667b073aae2a59f6fe8",
+        "f3bd9c464c0f85cf4fd9140719bdfa417327d1d4598fa67644beb02004869908"
+      ],
+      "qualification": {
+        "claim": "The recorded mandatory frame predicates close the reviewed byte-owner gaps in this exact ordered graph. The existing finite-domain necessary pairing equation transfers by exact selected compiled program identity.",
+        "domain": "Canonical public scalars, finite canonical proof points and finite public MSM, with the reviewed nonzero subgroup and residue/root-domain conditions.",
+        "premises": [
+          "Exact complete ordered graph and intended public statement are externally anchored.",
+          "Pinned VM, function/byte/integer/hash semantics and the reviewed curve/field/pairing facts."
+        ],
+        "neutralDomainComplete": false,
+        "arbitraryKeySupport": false,
+        "wholeTransactionAdmission": "NOT_ESTABLISHED_BY_PER_INPUT_REPLAY",
+        "historicalClaim": "WITHDRAWN_REMAINS_WITHDRAWN",
+        "theoremPins": {
+          "selectedFiniteEquationSha256": "b4929315d267368e4b8228bab158a93694989e6e9f1e6497a364f052cc5818cc"
+        }
+      },
+      "standardDensityHoldsMayOccur": true
+    },
+    {
+      "id": "bch-groth16-historical-bls34-frame-corrected",
+      "layout": "intratx",
+      "curve": "BLS12-381",
+      "programCount": 34,
+      "caseCount": 3,
+      "sourcePr": 5,
+      "sourceHead": "2831928fe224d252fc90dfc26ecfdf52f29e9399",
+      "benchmarkPr": 11,
+      "declaredVm": "bch-2026",
+      "originalFixture": {
+        "repository": "mr-zwets/zk-verifier-bench",
+        "revision": "d1004f640e9ef7de1a3d64da9027c4dd54888cb2",
+        "file": "src/bch/groth16-bls12381-intratx-residue-vectors.json",
+        "sha256": "66f65ef80de990688b0647d77caf86d8e48ce84dae8dfb6ea014ea49aff611dc"
+      },
+      "gates": [
+        {
+          "input": 4,
+          "offset": 667,
+          "length": 432,
+          "depth": 2,
+          "hex": "5279827702b0019d",
+          "comparison": "equal"
+        },
+        {
+          "input": 33,
+          "offset": 1894,
+          "length": 1632,
+          "depth": 0,
+          "hex": "7682770260069d",
+          "comparison": "equal"
+        }
+      ],
+      "originalProgramSha256": [
+        "5ff2a1e16a30d69312e21e745823c02b58a6d0f04ea26ea573785ede34db6caf",
+        "3a498e704474f017f830a603128aa69994a2311f605ef461b00cbcc4af8f7956",
+        "3b40ba349aed8dc865384ab3fc6669c3bb62e5dd25ec08b0750bc9f2d3c69eb6",
+        "204f13da764b2f3af1e99da7406773c7cd8c74ddc582b3b46aeb54a49efed32f",
+        "1307bbd4f95fc61792bb5e606882afcadf557c726a5526d46d8d88fc1661336c",
+        "61308bc129b956353c4f93897e96cbaa7d294c614de4a27680a24a2f978d98cc",
+        "4373e42905b0e3a9aea619534c0e40935f244ecc8b043c85e4b3c5f8e3970eb4",
+        "359539e7cde5587c3d382f8156aa19f3b4691caac3fd9e883d547db2e6b83c92",
+        "aa81f9106354367574864b14601e28713b29d771e5b22f744f44ee7d15a9154f",
+        "997402c610679a235671d5df4fad6b4bb40c51f5c09e870305c34b7c213bfbb0",
+        "28e7aa96324bb63a27cd43b7dfe662825d2d22408e8ab0ff20026e584a8b2fcb",
+        "4d3763b4ad84f184f1efe1f8e7f681afc1c9e8bd9b23bc7ac1d7ff1c99745004",
+        "d1a30032cb561531d83311317df9159723e1b218cbfa13c6a9871c5297e374ba",
+        "d5336e1ab9a308bdd74a9b6601f6b273aa57c1e5511a10a4c66155196543a9fd",
+        "90766e39710ae9004841bcb45bd8c22fa9cda4fe6fccdf9fe3a66b292958b193",
+        "a2bb1c69c5a24f259567192b577939bee4a3d947f904344976b577cc5be46f08",
+        "e087b192f9bbbe279bb3b56aa0c4bf19415731da77282cd9f4636987fc919587",
+        "33aba93c00eaa9f702edb1d6ca914d58613ed7cc70ef2aa4ac71213fc9ca3bd1",
+        "cc5c0a81aec35b3b02921165e43cb016d9388e4842637f6750e497855759bd2e",
+        "f88e46650c7885923106da2fac8f0bc15330ad5f68a453acb035abb9855737bf",
+        "8331849197c97e55957d23e5bfb61f49c74e923bf370ba571350ba21030188ec",
+        "07db9aaf427fa5bb8ec40577d3e18d5902cb63f8ae67369988cc6be41f38b76e",
+        "ddeb201d58368a90c2305c7f53f427a2883792857d2beca4df4cacc205396115",
+        "db0d73227c3e76b23b1b748956cba972055b8d9bb8b3a3c0df7abcaf742db472",
+        "e4452337c59fc94fe442337d82fa390ee40beacd0cd0499e6e0cc4f9eaf04097",
+        "6252f620eeadbd6eadb1bec111e94d190d365e4d9e523c37ac656e9a6f886475",
+        "657f14b5983c97ea02162dea5da57ee5333c4de4747fb05ee09ea0ebae2e406a",
+        "c8afd6088ffd91417ef892f449c1abc7041be7cd8dce00ec7e7830b9e24c5008",
+        "05dae8a4586f0dff8008af92b96ba169de51823deef11c4308e42e26f1d22331",
+        "c3fc337bded5d2114169c7768525dee4709f06ecfee48ae4186db4fd6fc18f9e",
+        "f213a42916afe80accedcebffc799faad624cde7fd95b0984def91ede9ba3087",
+        "fb9116499d3f236cb9bf3ce6aa64424edb1eb6441a19e6687836f1ebfe0519de",
+        "fc8d5188cb511e4d43c4185ab94ed546d68ea28b3347d20e4566beb0f3c4f055",
+        "0203a367581b68cde7b85f44137df677b57a00c7cd4a87d9ab58c3db844e472e"
+      ],
+      "repairedProgramSha256": [
+        "5ff2a1e16a30d69312e21e745823c02b58a6d0f04ea26ea573785ede34db6caf",
+        "3a498e704474f017f830a603128aa69994a2311f605ef461b00cbcc4af8f7956",
+        "3b40ba349aed8dc865384ab3fc6669c3bb62e5dd25ec08b0750bc9f2d3c69eb6",
+        "204f13da764b2f3af1e99da7406773c7cd8c74ddc582b3b46aeb54a49efed32f",
+        "ff8066771971947383ed1e291409545eb2f26ee2241d9e8678df5e4b1d67153e",
+        "61308bc129b956353c4f93897e96cbaa7d294c614de4a27680a24a2f978d98cc",
+        "4373e42905b0e3a9aea619534c0e40935f244ecc8b043c85e4b3c5f8e3970eb4",
+        "359539e7cde5587c3d382f8156aa19f3b4691caac3fd9e883d547db2e6b83c92",
+        "aa81f9106354367574864b14601e28713b29d771e5b22f744f44ee7d15a9154f",
+        "997402c610679a235671d5df4fad6b4bb40c51f5c09e870305c34b7c213bfbb0",
+        "28e7aa96324bb63a27cd43b7dfe662825d2d22408e8ab0ff20026e584a8b2fcb",
+        "4d3763b4ad84f184f1efe1f8e7f681afc1c9e8bd9b23bc7ac1d7ff1c99745004",
+        "d1a30032cb561531d83311317df9159723e1b218cbfa13c6a9871c5297e374ba",
+        "d5336e1ab9a308bdd74a9b6601f6b273aa57c1e5511a10a4c66155196543a9fd",
+        "90766e39710ae9004841bcb45bd8c22fa9cda4fe6fccdf9fe3a66b292958b193",
+        "a2bb1c69c5a24f259567192b577939bee4a3d947f904344976b577cc5be46f08",
+        "e087b192f9bbbe279bb3b56aa0c4bf19415731da77282cd9f4636987fc919587",
+        "33aba93c00eaa9f702edb1d6ca914d58613ed7cc70ef2aa4ac71213fc9ca3bd1",
+        "cc5c0a81aec35b3b02921165e43cb016d9388e4842637f6750e497855759bd2e",
+        "f88e46650c7885923106da2fac8f0bc15330ad5f68a453acb035abb9855737bf",
+        "8331849197c97e55957d23e5bfb61f49c74e923bf370ba571350ba21030188ec",
+        "07db9aaf427fa5bb8ec40577d3e18d5902cb63f8ae67369988cc6be41f38b76e",
+        "ddeb201d58368a90c2305c7f53f427a2883792857d2beca4df4cacc205396115",
+        "db0d73227c3e76b23b1b748956cba972055b8d9bb8b3a3c0df7abcaf742db472",
+        "e4452337c59fc94fe442337d82fa390ee40beacd0cd0499e6e0cc4f9eaf04097",
+        "6252f620eeadbd6eadb1bec111e94d190d365e4d9e523c37ac656e9a6f886475",
+        "657f14b5983c97ea02162dea5da57ee5333c4de4747fb05ee09ea0ebae2e406a",
+        "c8afd6088ffd91417ef892f449c1abc7041be7cd8dce00ec7e7830b9e24c5008",
+        "05dae8a4586f0dff8008af92b96ba169de51823deef11c4308e42e26f1d22331",
+        "c3fc337bded5d2114169c7768525dee4709f06ecfee48ae4186db4fd6fc18f9e",
+        "f213a42916afe80accedcebffc799faad624cde7fd95b0984def91ede9ba3087",
+        "fb9116499d3f236cb9bf3ce6aa64424edb1eb6441a19e6687836f1ebfe0519de",
+        "fc8d5188cb511e4d43c4185ab94ed546d68ea28b3347d20e4566beb0f3c4f055",
+        "debd894f3922be569587b196d0e6605c7d91f8c82b3c7a81c14c0dc9a689693d"
+      ],
+      "qualification": {
+        "claim": "The recorded mandatory frame predicates close the reviewed byte-owner gaps in this exact ordered graph. The existing finite-domain necessary pairing equation transfers by exact selected compiled program identity.",
+        "domain": "Canonical public scalars, finite canonical proof points and finite public MSM, with the reviewed nonzero subgroup and residue/root-domain conditions.",
+        "premises": [
+          "Exact complete ordered graph and intended public statement are externally anchored.",
+          "Pinned VM, function/byte/integer/hash semantics and the reviewed curve/field/pairing facts."
+        ],
+        "neutralDomainComplete": false,
+        "arbitraryKeySupport": false,
+        "wholeTransactionAdmission": "NOT_ESTABLISHED_BY_PER_INPUT_REPLAY",
+        "historicalClaim": "WITHDRAWN_REMAINS_WITHDRAWN",
+        "theoremPins": {
+          "selectedFiniteEquationSha256": "ef49eb74b373dfb6cbc37840789a1730731e46691ac7d94c3489a8664a25fd8e"
+        }
+      }
+    },
+    {
+      "id": "bch-groth16-historical-bn-large4-frame-corrected",
+      "layout": "intratx",
+      "curve": "BN254",
+      "programCount": 4,
+      "caseCount": 3,
+      "sourcePr": 5,
+      "sourceHead": "2831928fe224d252fc90dfc26ecfdf52f29e9399",
+      "benchmarkPr": 11,
+      "declaredVm": "bch-spec",
+      "originalFixture": {
+        "repository": "mr-zwets/zk-verifier-bench",
+        "revision": "d1004f640e9ef7de1a3d64da9027c4dd54888cb2",
+        "file": "src/bch/groth16-intratx-residue-large-vectors.json",
+        "sha256": "fef9590c2b4253cc77d9a4d222064bbd9999e2ca2091d3ad2a66c78c14d4e3c8"
+      },
+      "gates": [
+        {
+          "input": 2,
+          "offset": 1949,
+          "length": 65536,
+          "depth": 0,
+          "hex": "768277030000019f69",
+          "comparison": "less-than"
+        },
+        {
+          "input": 3,
+          "offset": 2656,
+          "length": 1664,
+          "depth": 12,
+          "hex": "5c7982770280069d",
+          "comparison": "equal"
+        }
+      ],
+      "originalProgramSha256": [
+        "69d0d47dd34fd9ce51467f552e596edba27a09f6e4a2f8b503c42458bbbffea5",
+        "751bb7a4dacc58a49cb84df910d02dbf1204eeb5d9f3b6e28d9ec7855a1be855",
+        "26d17d6a4b05d35991addca623f0337d94b5261daca6e1cb3d4e8bc8ac4e10b0",
+        "8eeb38fd8835ed773a27d22017456abf3ef8ffa1de15e9604e6e8002234c3136"
+      ],
+      "repairedProgramSha256": [
+        "69d0d47dd34fd9ce51467f552e596edba27a09f6e4a2f8b503c42458bbbffea5",
+        "751bb7a4dacc58a49cb84df910d02dbf1204eeb5d9f3b6e28d9ec7855a1be855",
+        "355df1ad7e990bba3606cb7bac1c25a0a742b7eb03c4adaaf4e6281e687aa245",
+        "448f31ccf40bf08ac54e55d0c8b453f2f3b4b53ddccdb18d0c32cca5cb12f3c3"
+      ],
+      "qualification": {
+        "claim": "The recorded mandatory frame predicates close the reviewed byte-owner gaps in this exact ordered graph. The existing finite-domain necessary pairing equation transfers by exact selected compiled program identity.",
+        "domain": "Canonical public scalars, finite canonical proof points and finite public MSM, with the reviewed nonzero subgroup and residue/root-domain conditions.",
+        "premises": [
+          "Exact complete ordered graph and intended public statement are externally anchored.",
+          "Pinned VM, function/byte/integer/hash semantics and the reviewed curve/field/pairing facts."
+        ],
+        "neutralDomainComplete": false,
+        "arbitraryKeySupport": false,
+        "wholeTransactionAdmission": "NOT_ESTABLISHED_BY_PER_INPUT_REPLAY",
+        "historicalClaim": "WITHDRAWN_REMAINS_WITHDRAWN",
+        "theoremPins": {
+          "selectedFiniteEquationSha256": "12a0b4d0cc1dd807f0749f120dcff8c1bf4f903f30f5092e79f25a8232057eb4"
+        },
+        "currentProducerCorrespondence": "Not claimed; this is the exact archived selected four-program proposed-spec repair."
       }
     }
   ]
