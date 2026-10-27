@@ -67,7 +67,11 @@ None of this touches REGISTRY, the feed, results.json or any score. Once B1 is f
 
 ## Positive re-runs (existing fixtures only)
 
-POSITIVE_RUNS_PLACEHOLDER
+- BLS-large corrected: 9/9 inputs and 3/3 graphs in each of the oracle, proposed-spec consensus and proposed-spec standard modes, so 27/27 (matches the PR).
+- BLS vk_x successor: 22/22 inputs and 2/2 graphs in each of the oracle, BCH2026 consensus and BCH2026 standard modes, so 66/66 (matches the PR).
+- Guarded BN references, oracle: 185/185 inputs, 35/35 graphs (matches the PR).
+- Guarded BN references, declared native mode: 0 complete graphs for all 7 profiles, which matches native HOLD. The per-input counts are 0/25 for 4 profiles, 20/25 for slim and spec, and 0/35 for PairFold-7. The PR text gives no per-input native figure, so these counts are new information, not a mismatch.
+- BN exact-frame, seal patched locally: 52 runs, 908/908 inputs (matches the PR).
 
 ## Draft GitHub comment (for g#34, with a pointer on b#51; not posted)
 

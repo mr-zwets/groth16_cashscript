@@ -6,3 +6,4 @@
 - Slim bare-terminal: dropped redeem push unowned; executors read input 4 via reverse offsets (vkx-stages.mjs:46-53). Finding (doc/argument), no credit impact.
 - vkx successor catalog: identical. Guards: loader 5901B sha 0c295f.. same construction as native5; bridge field order matches native5 genesis; all 7 programs = guard ++ exact original; new root present in terminal (6 profiles); public slots match original descriptors.
 - FINDING b51: bch-bn-exact-frame-corrected.ts EXPECTED_CATALOG_SHA256 abe6e0.. != committed catalog fb6e834c.. -> descriptor throws on import; with seal patched validator gives PASS 52 runs/908 inputs.
+- positives re-run: all PR figures reproduced. VERDICT.md final.
