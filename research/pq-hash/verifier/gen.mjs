@@ -64,11 +64,22 @@ function localFn(args, build) {
   const s = new Stk(args);
   const outs = build(s);
   const extra = s.st.filter((x) => !outs.includes(x));
-  if (extra.length) throw new Error('local function leaves ' + extra.join(','));
+  if (extra.length || s.st.length !== outs.length) throw new Error('local function leaves ' + (extra.join(',') || s.st.join(',')));
   s.arrange(outs);
   return s.bytes();
 }
-const slpFn = (args, prog, outs) => localFn(args, (s) => { compileSlp(s, prog); return outs; });
+// compile a program in sections (for size accounting): names used by later sections are kept until then
+function compileSections(stk, prog, cuts, keep, after) {
+  const bounds = [0, ...cuts, prog.length];
+  const refs = (e, acc) => { if (e.t === 'v') acc.add(e.n); else if (e.args) e.args.forEach((x) => refs(x, acc)); return acc; };
+  for (let k = 0; k + 1 < bounds.length; k++) {
+    const later = new Set();
+    for (const [, e] of prog.slice(bounds[k + 1])) refs(e, later);
+    compileSlp(stk, prog.slice(bounds[k], bounds[k + 1]), {keep: [...keep, ...later]});
+    after?.(k);
+  }
+}
+const slpFn = (args, prog, outs) => localFn(args, (s) => { compileSlp(s, prog, {keep: outs}); return outs; });
 
 export function buildB(prm, statement, opts = {}) {
   const {e, s, h, r, a, D, sizes, trees} = prm;
@@ -133,7 +144,7 @@ export function buildB(prm, statement, opts = {}) {
   // HORN: acc' = acc * YG + unpack(P) (P packs e slots of SLOT bits)
   F.HORN = defFn('HORN', localFn([...names('a', e), 'P', 'Y'], (st) => {
     st.roll('P');
-    for (let c = 0; c < e - 1; c++) st.raw(['DUP', 1n << BigInt(SLOT), 'MOD', 'SWAP', SLOT, 'RSHIFTNUM'], 1, ['u' + c, 'P']);
+    for (let c = 0; c < e - 1; c++) st.raw(['DUP', 1, SLOT, 'LSHIFTNUM', 'MOD', 'SWAP', SLOT, 'RSHIFTNUM'], 1, ['u' + c, 'P']);
     st.rename('P', 'u' + (e - 1));
     const b = new PB(e);
     for (let c = 0; c < e; c++) b.red(add(mul(V('a' + c), V('Y')), V('u' + c)), 'o' + c);
@@ -148,23 +159,42 @@ export function buildB(prm, statement, opts = {}) {
   // PARSE8: a 64-byte chunk -> 8 values (8-byte LE, unsigned; first value deepest)
   F.PARSE8 = defFn('PARSE8', asm(Array.from({length: 7}, () => [8, 'SPLIT', 'SWAP', B0, 'CAT', 'BIN2NUM', 'SWAP']), B0, 'CAT', 'BIN2NUM'));
 
+  // DZ(z, w): constants for the norm/adjugate of (x - w z), x in F_p: m0 = p - zc0, and (e = 3) z1, z2, K0 = -7 z1 z2,
+  // K1 = 7 z2^2, K2 = z1^2, cA = -21 z1 z2, cB = -(49 z2^3 + 7 z1^3); (e = 2) z1, cN = -7 z1^2  (zc = w z)
+  const dzOut = e === 3 ? ['m0', 'z1', 'z2', 'K0', 'K1', 'K2', 'cA', 'cB'] : ['m0', 'z1', 'cN'];
+  {
+    const b = new PB(e);
+    const zc = names('y', e).map((x) => b.red(mul(V(x), V('w'))));
+    b.red(sub(K(P), V(zc[0])), 'm0');
+    if (e === 3) {
+      b.let(V(zc[1]), 'z1'); b.let(V(zc[2]), 'z2');
+      b.red(mul(mul(V('z1'), V('z2')), K(P - 7n)), 'K0');
+      b.red(mul(mul(V('z2'), V('z2')), K(7)), 'K1');
+      b.red(mul(V('z1'), V('z1')), 'K2');
+      b.red(mul(mul(V('z1'), V('z2')), K(P - 21n)), 'cA');
+      b.red(add(mul(mul(mul(V('z2'), V('z2')), V('z2')), K(49)), mul(mul(mul(V('z1'), V('z1')), V('z1')), K(7))), 'q');
+      b.red(sub(K(P), V('q')), 'cB');
+    } else {
+      b.let(V(zc[1]), 'z1');
+      b.red(mul(mul(V('z1'), V('z1')), K(P - 7n)), 'cN');
+    }
+    F.DZ = defFn('DZ', slpFn([...names('y', e), 'w'], b.prog, dzOut));
+  }
   // FOLD<a>: binary fold of a coset of a values with x0^-1 = X and beta^(2^l) (l < log2 a): pairs (j, j + half),
   // g = beta^(2^l) x_j^-1; returns the unscaled fold (a times the folded value)
   const foldArgs = (ai) => [...Array.from({length: ai}, (_, j) => names(`v${j}_`, e)).flat(), 'X', ...Array.from({length: Math.log2(ai)}, (_, l) => names(`b${l}_`, e)).flat()];
-  for (const ai of new Set(a)) {
+  // recursive: FOLD<a> = the a/2 level-0 pair steps, then FOLD<a/2> on the results with X^2 and beta^2.. (FOLD2 = one pair)
+  const arSet = new Set(); for (const ai of a) for (let x = ai; x >= 2; x >>= 1) arSet.add(x);
+  for (const ai of [...arSet].sort((x, y) => x - y)) {
     const b = new PB(e, F);
-    const wai = invp(rou(ai));
-    let cur = Array.from({length: ai}, (_, j) => names(`v${j}_`, e)), X = 'X';
-    for (let l = 0; cur.length > 1; l++) {
-      if (l > 0) X = b.mm(X, X);
-      const half = cur.length / 2, nxt = [];
-      for (let j = 0; j < half; j++) {
-        const xj = j === 0 ? X : b.mm(X, K(powp(wai, BigInt(j << l))));
-        const g = b.mulF(names(`b${l}_`, e), xj);
-        nxt.push(b.call(F.PAIR, [...cur[j], ...cur[j + half], ...g], e, cur.length === 2 ? names('o', e) : undefined));
-      }
-      cur = nxt;
+    const wai = invp(rou(ai)), half = ai / 2;
+    const nxt = [];
+    for (let j = 0; j < half; j++) {
+      const xj = j === 0 ? 'X' : b.mm('X', K(powp(wai, BigInt(j))));
+      const g = b.mulF(names('b0_', e), xj);
+      nxt.push(b.call(F.PAIR, [...names(`v${j}_`, e), ...names(`v${j + half}_`, e), ...g], e, ai === 2 ? names('o', e) : undefined));
     }
+    if (ai > 2) b.call(F['FOLD' + half], [...nxt.flat(), b.mm('X', 'X'), ...Array.from({length: Math.log2(ai) - 1}, (_, l) => names(`b${l + 1}_`, e)).flat()], e, names('o', e));
     F['FOLD' + ai] = defFn('FOLD' + ai, slpFn(foldArgs(ai), b.prog, names('o', e)));
   }
 
@@ -241,28 +271,15 @@ export function buildB(prm, statement, opts = {}) {
     const q3 = b.mul(b.mul(names('al4_', e), xy), b.mul(zn1, z1));
     const rhs = b.add(b.add(q1, q2), q3);
     lhs.forEach((x, i) => b.chk(chk('NUMEQUALVERIFY', V(x), V(rhs[i]))));
+    const cut1 = b.prog.length;
     // DEEP constants at z: C1 = g1 X + g2 Y + g4 H0 + g5 H1, C2 = g3 X(wz)
     const p1 = b.mul(gam(1), X), p2 = b.mul(gam(2), Y), p4 = b.mul(gam(4), A), p5 = b.mul(gam(5), Bv);
     b.add(b.add(p1, p2), b.add(p4, p5), names('dC1_', e));
     b.mul(gam(3), W, names('dC2_', e));
-    // norm/adjugate constants of (x - z) and (x - wz) for base-field x
-    for (const [zi, zs] of [[0, names('z', e).map(V)], [1, names('z', e).map((x) => mul(V(x), K(prm.wn)))]]) {
-      const zc = zs.map((x) => b.red(x));
-      const pfx = `dz${zi}_`;
-      b.red(sub(K(P), V(zc[0])), pfx + 'm0');
-      if (e === 3) {
-        b.let(V(zc[1]), pfx + 'z1'); b.let(V(zc[2]), pfx + 'z2');
-        b.red(mul(mul(V(zc[1]), V(zc[2])), K(P - 7n)), pfx + 'K0');
-        b.red(mul(mul(V(zc[2]), V(zc[2])), K(7)), pfx + 'K1');
-        b.red(mul(V(zc[1]), V(zc[1])), pfx + 'K2');
-        b.red(mul(mul(V(zc[1]), V(zc[2])), K(P - 21n)), pfx + 'cA');
-        const z2c = b.red(mul(mul(V(zc[2]), V(zc[2])), V(zc[2]))), z1c = b.red(mul(mul(V(zc[1]), V(zc[1])), V(zc[1])));
-        b.red(add(mul(V(z2c), K(P - 49n)), mul(V(z1c), K(P - 7n))), pfx + 'cB');
-      } else {
-        b.let(V(zc[1]), pfx + 'z1');
-        b.red(mul(mul(V(zc[1]), V(zc[1])), K(P - 7n)), pfx + 'cN');
-      }
-    }
+    const cut2 = b.prog.length;
+    // norm/adjugate constants of (x - z) and (x - wz) for base-field x (function DZ, scale 1 and w_n)
+    for (const [zi, w] of [[0, 1n], [1, prm.wn]]) b.call(F.DZ, [...names('z', e), w], dzOut.length, dzOut.map((x) => `dz${zi}_` + x));
+    const cut3 = b.prog.length;
     // beta powers bp<i>_<l>_<c> = beta_i^(2^l)
     for (let i = 0; i < r; i++) {
       let bp = names(`be${i}_`, e);
@@ -271,7 +288,8 @@ export function buildB(prm, statement, opts = {}) {
         else { bp.forEach((x, c) => b.let(V(x), `bp${i}_${l}_${c}`)); bp = names(`bp${i}_0_`, e); }
       }
     }
-    compileSlp(S, b.prog, {keep: [...[1, 2, 3, 4, 5].flatMap(gam), ...b.prog.flatMap(([n]) => (Array.isArray(n) ? n : [n])).filter((n) => typeof n === 'string' && n.startsWith('bp'))]});
+    const keepAll = [...[1, 2, 3, 4, 5].flatMap(gam), ...b.prog.flatMap(([n]) => (Array.isArray(n) ? n : [n])).filter((n) => typeof n === 'string' && n.startsWith('bp'))];
+    compileSections(S, b.prog, [cut1, cut2, cut3], keepAll, (k) => mark(S, 'air-' + k));
     for (const x of [...S.st]) if (/^(al\d_\d|z\d|be\d_\d|o[XYWAB]\d)$/.test(x)) S.drop(x);
   }
   // everything the query function reads must sit above the index list
@@ -288,7 +306,8 @@ export function buildB(prm, statement, opts = {}) {
   // ---------------- phase 2: Merkle (LIFO programs) ----------------
   const freshLevel = ['FROMALTSTACK', 'DUP', 2, 'MOD', 'SWAP', 1, 'RSHIFTNUM', 'FROMALTSTACK', h, 'SPLIT', 'TOALTSTACK', 'SWAP', 'TOALTSTACK', 'SWAP', 'ROLL', 'CAT', 'SHA256', ...trunc];
   const freshRun = (n) => asm('TOALTSTACK', 'SWAP', 'TOALTSTACK', Array.from({length: n}, () => freshLevel), 'FROMALTSTACK', 'FROMALTSTACK', 'ROT', 'SWAP', 0);
-  defFn('F1', freshRun(1), OPS.F1); defFn('F2', freshRun(2), OPS.F2); defFn('F4', freshRun(4), OPS.F4); defFn('F8', freshRun(8), OPS.F8);
+  defFn('F1', freshRun(1), OPS.F1); defFn('F2', freshRun(2), OPS.F2); defFn('F4', freshRun(4), OPS.F4);
+  defFn('F8', asm(OPS.F4, 'INVOKE', 'DROP', OPS.F4, 'INVOKE'), OPS.F8);
   defFn('F16', asm(OPS.F8, 'INVOKE', 'DROP', OPS.F8, 'INVOKE'), OPS.F16);
   {
     const m = new Stk(['k', 'cur', 'rb']);
@@ -315,29 +334,36 @@ export function buildB(prm, statement, opts = {}) {
   }
   const MARKER = Uint8Array.of(0x00, 0x80); // non-minimal number: can never pass as a parked index
   const roots = ['rT', 'rC', ...rF];
+  // one record function for all trees; per-tree parameters (leaf-index modulus, 2^depth, leaf offset and length, tag)
+  // sit below root/acc/cnt; roots are copied, so every tree sees the same stack shape
+  let idREC = null;
   trees.forEach((tree, ti) => {
     S.raw([MARKER, 'TOALTSTACK'], 0);
-    S.roll(roots[ti]); S.rename(S.top(), 'root'); S.push(0, 'acc'); S.push(s, 'cnt');
-    const m = S.clone();
-    m.bottom(); m.rename(m.top(), 'rb');
-    m.raw([1, 'SPLIT', 'SWAP', 'BIN2NUM'], 1, ['rb', 'sg']);
-    m.push(1); m.pick('sg'); m.raw(['LSHIFTNUM'], 2, ['pw']); m.roll('acc'); m.raw(['ADD'], 2, ['acc']);
-    { const d0 = m.depth('idx0'); m.pick('sg'); m.raw([d0, 'ADD', 'PICK'], 1, ['idx']); }
-    if (tree.layer > 0) m.raw([sizes[tree.layer + 1], 'MOD'], 1, ['idx']);
-    m.raw([1 << tree.depth, 'ADD'], 1, ['k']);
-    { m.roll('sg'); const dl = m.depth('L' + (s - 1)) - 1 + s - 1; m.raw([dl, 'SWAP', 'SUB', 'PICK'], 1, ['Lc']); }
-    m.raw([...(tree.off ? [tree.off, 'SPLIT', 'NIP'] : []), tree.leaf_bytes, 'SPLIT', 'DROP', Uint8Array.of(tree.tag), 'SWAP', 'CAT', 'SHA256', ...trunc], 1, ['cur']);
-    m.arrange([...m.st.filter((x) => !['root', 'acc', 'k', 'cur', 'rb'].includes(x)), 'root', 'acc', 'k', 'cur', 'rb']);
-    m.raw(['BEGIN', 1, 'SPLIT', 'SWAP', 'DUP', 10, 'LESSTHAN', 'VERIFY', 'INVOKE', 'UNTIL'], 3, ['rb']);
-    m.raw([0, 'EQUALVERIFY'], 1);
-    m.arrange(S.st.slice(1));
-    const id = defFn('REC' + ti, m.bytes());
-    S.raw(['BEGIN', id, 'INVOKE', '1SUB', 'DUP', 'NOT', 'UNTIL', 'DROP'], 1);
+    S.push(sizes[tree.layer + 1], 'pM'); S.push(1 << tree.depth, 'pK'); S.push(tree.off, 'pO'); S.push(tree.leaf_bytes, 'pN'); S.push(Uint8Array.of(tree.tag), 'pT');
+    S.pick(roots[ti], 'root'); S.push(0, 'acc'); S.push(s, 'cnt');
+    if (idREC === null) {
+      const m = S.clone();
+      m.bottom(); m.rename(m.top(), 'rb');
+      m.raw([1, 'SPLIT', 'SWAP', 'BIN2NUM'], 1, ['rb', 'sg']);
+      m.push(1); m.pick('sg'); m.raw(['LSHIFTNUM'], 2, ['pw']); m.roll('acc'); m.raw(['ADD'], 2, ['acc']);
+      { const d0 = m.depth('idx0'); m.pick('sg'); m.raw([d0, 'ADD', 'PICK'], 1, ['idx']); }
+      m.pick('pM'); m.raw(['MOD'], 2, ['idx']); m.pick('pK'); m.raw(['ADD'], 2, ['k']);
+      { m.roll('sg'); const dl = m.depth('L' + (s - 1)) - 1 + s - 1; m.raw([dl, 'SWAP', 'SUB', 'PICK'], 1, ['Lc']); }
+      m.pick('pO'); m.raw(['SPLIT', 'NIP'], 2, ['Lc']); m.pick('pN'); m.raw(['SPLIT', 'DROP'], 2, ['Lc']);
+      m.pick('pT'); m.raw(['SWAP', 'CAT', 'SHA256', ...trunc], 2, ['cur']);
+      m.arrange([...m.st.filter((x) => !['root', 'acc', 'k', 'cur', 'rb'].includes(x)), 'root', 'acc', 'k', 'cur', 'rb']);
+      m.raw(['BEGIN', 1, 'SPLIT', 'SWAP', 'DUP', 10, 'LESSTHAN', 'VERIFY', 'INVOKE', 'UNTIL'], 3, ['rb']);
+      m.raw([0, 'EQUALVERIFY'], 1);
+      m.arrange(S.st.slice(1));
+      idREC = defFn('REC', m.bytes());
+    }
+    S.raw(['BEGIN', idREC, 'INVOKE', '1SUB', 'DUP', 'NOT', 'UNTIL', 'DROP'], 1);
     S.st.splice(0, s);
     S.roll('acc'); S.raw([(1n << BigInt(s)) - 1n, 'NUMEQUALVERIFY'], 1);
     S.raw(['FROMALTSTACK', MARKER, 'EQUALVERIFY'], 0);
-    S.drop('root');
+    S.raw(['2DROP', '2DROP', '2DROP'], 6);
   });
+  for (const x of roots) S.drop(x);
   mark(S, 'merkle');
 
   // ---------------- phase 3: final polynomial unpack ----------------
