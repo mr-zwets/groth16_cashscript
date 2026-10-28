@@ -12,7 +12,8 @@ import {p, r, mod, ETA, GAMMA1, B_TWIST, DIGITS, NE, VKC, NBITS} from './math.mj
 import {W_SIZE, WL} from './protocol.mjs';
 
 const ITERS = Number(process.env.SCHED_ITERS ?? 3000);
-const SQR_MODE = process.env.T2_SQR ?? 'inline'; // inline: dedicated squaring kernel; mulc: F^2 via two MULC calls + glue (smaller, more op)
+const SQR_MODE = process.env.T2_SQR ?? 'inline'; // inline: dedicated squaring kernel; mulc: F^2 = F * (A + X^6 B) via two MULC calls + GLUE (smaller, more op)
+const GLUE_FN = SQR_MODE === 'mulc' || process.env.T2_GLUE_FN === '1'; // one shared GLUE local function instead of inline glue kernels
 
 // ---------------- polynomial kernels (mod M) ----------------
 // reduce a coefficient array (node ids or undefined) of degree <= 22 mod M: X^12 = 18 X^6 - 82
@@ -156,6 +157,8 @@ function gen(Lg, stop) {
   local('MULL', MULL_IN, kMulSparse([0, 1, 3, 6, 7, 9], 'L', false), FN);
   local('MULC', MULC_IN, kMulSparse([0, 1, 2, 3, 4, 5], 'G', true), FN);
   local('PSI', PSI_IN, kPsi(), ['x0', 'x1', 'y0', 'y1']);
+  const UN = FN.map((_, i) => 'U' + i), VN = FN.map((_, i) => 'V' + i), GLUE_IN = [...UN, ...VN, ...FN, 'p'];
+  if (GLUE_FN) local('GLUE', GLUE_IN, kGlue(false), FN);
   const dbl = (s, w) => { call(s, 'DBL', DBL_IN, wmap(w), [...W_ST(w), ...LN]); call(s, 'MULL', MULL_IN, {}, FN); };
   const addQ = (s, w) => { call(s, 'ADD', ADD_IN, wmap(w), [...W_ST(w), ...LN]); call(s, 'MULL', MULL_IN, {}, FN); };
   const mulc = (s) => call(s, 'MULC', MULC_IN, {}, FN);
@@ -166,7 +169,8 @@ function gen(Lg, stop) {
     call(s, 'MULC', MULC_IN, Object.fromEntries(FN.map((f, i) => [f, 'U' + i])), FN.map((_, i) => 'U' + i));
     for (let i = 0; i < 12; i++) s.pick('F' + i, 'V' + i); for (let j = 0; j < 6; j++) s.roll('B' + j).rename('G' + j);
     call(s, 'MULC', MULC_IN, Object.fromEntries(FN.map((f, i) => [f, 'V' + i])), FN.map((_, i) => 'V' + i));
-    s.kernel(kGlue(oddOnly), outs, {iters: ITERS});
+    if (GLUE_FN) { call(s, 'GLUE', GLUE_IN, {}, FN); if (oddOnly) { for (let i = 0; i < 12; i += 2) s.drop('F' + i); for (let i = 1; i < 12; i += 2) s.roll('F' + i).rename('o' + i); } }
+    else s.kernel(kGlue(oddOnly), outs, {iters: ITERS});
   };
   section('init');
 
@@ -246,7 +250,8 @@ function gen(Lg, stop) {
   { const keep = a.st.slice(); const L0 = fixLoop('miller', a, keep);
     a.loop((s) => {
       s.roll('SCH').push(1).op(OP.SPLIT, 2, 'db', 'SCH').roll('db').op(OP.BIN2NUM, 1, 'd');
-      s.mark('sqr'); if (SQR_MODE === 'inline') s.kernel(kSqr(), FN, {iters: ITERS}); else throw new Error('T2_SQR=' + SQR_MODE + ' not implemented');
+      s.mark('sqr'); if (SQR_MODE === 'inline') s.kernel(kSqr(), FN, {iters: ITERS});
+      else { for (let j = 0; j < 6; j++) { s.pick('F' + j, 'A' + j); s.pick('F' + (j + 6), 'B' + j); } mul12(s, false, FN); }
       s.mark('dbl'); for (const w of ['B', 'G', 'D']) dbl(s, w);
       s.mark('add'); s.pick('d').ifElse((t) => {
         for (const w of ['B', 'G', 'D']) { const [x0, x1, y0, y1] = QX[w];

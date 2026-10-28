@@ -1,0 +1,236 @@
+[
+ {
+  "label": "(0,0)",
+  "consensus": {
+   "accepted": true,
+   "opCost": 129734671,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 129753103,
+   "error": null
+  }
+ },
+ {
+  "label": "(1,0)",
+  "consensus": {
+   "accepted": true,
+   "opCost": 129787341,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 129805773,
+   "error": null
+  }
+ },
+ {
+  "label": "(0,1)",
+  "consensus": {
+   "accepted": true,
+   "opCost": 129761804,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 129780236,
+   "error": null
+  }
+ },
+ {
+  "label": "(r-1,r-1)",
+  "consensus": {
+   "accepted": true,
+   "opCost": 133472240,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 133490672,
+   "error": null
+  }
+ },
+ {
+  "label": "(2^253, 2^253-1)",
+  "consensus": {
+   "accepted": true,
+   "opCost": 139017256,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 139035688,
+   "error": null
+  }
+ },
+ {
+  "label": "dense (2^254-1 mod r)",
+  "consensus": {
+   "accepted": true,
+   "opCost": 135416105,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 135434537,
+   "error": null
+  }
+ },
+ {
+  "label": "random #0",
+  "consensus": {
+   "accepted": true,
+   "opCost": 136761236,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 136779668,
+   "error": null
+  }
+ },
+ {
+  "label": "random #1",
+  "consensus": {
+   "accepted": true,
+   "opCost": 136803990,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 136822422,
+   "error": null
+  }
+ },
+ {
+  "label": "random #2",
+  "consensus": {
+   "accepted": true,
+   "opCost": 136368401,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 136386833,
+   "error": null
+  }
+ },
+ {
+  "label": "random #3",
+  "consensus": {
+   "accepted": true,
+   "opCost": 136507879,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 136526311,
+   "error": null
+  }
+ },
+ {
+  "label": "random #4",
+  "consensus": {
+   "accepted": true,
+   "opCost": 137057759,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 137076191,
+   "error": null
+  }
+ },
+ {
+  "label": "random #5",
+  "consensus": {
+   "accepted": true,
+   "opCost": 137168804,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 137187236,
+   "error": null
+  }
+ },
+ {
+  "label": "random #6",
+  "consensus": {
+   "accepted": true,
+   "opCost": 137159036,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 137177468,
+   "error": null
+  }
+ },
+ {
+  "label": "random #7",
+  "consensus": {
+   "accepted": true,
+   "opCost": 136590027,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 136608459,
+   "error": null
+  }
+ },
+ {
+  "label": "random #8",
+  "consensus": {
+   "accepted": true,
+   "opCost": 136938211,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 136956643,
+   "error": null
+  }
+ },
+ {
+  "label": "random #9",
+  "consensus": {
+   "accepted": true,
+   "opCost": 136868719,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 136887151,
+   "error": null
+  }
+ },
+ {
+  "label": "random #10",
+  "consensus": {
+   "accepted": true,
+   "opCost": 136622413,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 136640845,
+   "error": null
+  }
+ },
+ {
+  "label": "random #11",
+  "consensus": {
+   "accepted": true,
+   "opCost": 136918677,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 136937109,
+   "error": null
+  }
+ }
+]
