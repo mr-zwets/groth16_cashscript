@@ -19,6 +19,8 @@ export function applyTamper(proof, tc) {
   return b;
 }
 
+if (import.meta.url === `file://${process.argv[1]}`) main();
+function main() {
 const files = process.argv.slice(2);
 let bad = 0;
 for (const path of files) {
@@ -42,3 +44,4 @@ for (const path of files) {
 }
 console.log(bad ? `${bad} unexpected` : 'all as expected');
 process.exit(bad ? 1 : 0);
+}

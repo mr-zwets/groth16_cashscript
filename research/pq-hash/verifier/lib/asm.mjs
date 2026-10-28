@@ -1,4 +1,5 @@
-// Minimal CashVM (BCH 2026) assembler for the pq-hash kernel measurements.
+// Minimal CashVM (BCH 2026) assembler, copied from the pq-hash kernels (wip/pq-hash-kernels lib/asm.mjs) and extended
+// with bottom-of-stack access (DEPTH 1SUB ROLL), cloning and raw emission with explicit stack effects.
 //
 //   asm(...parts) -> Uint8Array. A part is
 //     - an opcode name without the OP_ prefix ('ADD', 'SHA256', 'LSHIFTBIN', ...),
@@ -81,6 +82,12 @@ export class Stk {
     return this;
   }
   bytes() { return Uint8Array.from(this.code); }
+  // move the bottom-most item to the top (DEPTH 1SUB ROLL): unlocking data consumed in push order
+  bottom() { this.emit('DEPTH', '1SUB', 'ROLL'); const n = this.st.shift(); this.st.push(n); return n; }
+  clone() { const c = new this.constructor([...this.st]); return c; }
+  // raw code with a declared stack effect: pops `pops` items, pushes `outs`
+  raw(parts, pops, outs = []) { this.emit(parts); this.st.splice(this.st.length - pops, pops); this.st.push(...outs); return this; }
+  dropAll(names) { for (const n of names) this.drop(n); return this; }
 }
 
 export const hex = (b) => Buffer.from(b).toString('hex');

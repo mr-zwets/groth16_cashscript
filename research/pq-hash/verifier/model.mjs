@@ -336,8 +336,11 @@ export function encodeB(prm, proof) {
     return prod === 0n ? 0n : invp(prod);
   });
   const pt = [f.st, f.rT, f.rC, f.ood, ...Array.from({length: r - 1}, (_, i) => f['rF' + (i + 1)]), f.fin, f.nonce];
+  const records = programs.map((p) => p.programs.map((x) => x.bytes));
+  // bytes after the last multiproof (a malformed proof) ride at the end of the last record: the script rejects them
+  if (o < proof.length) { const lr = records[records.length - 1]; lr[lr.length - 1] = cat(lr[lr.length - 1], proof.subarray(o)); }
   return {
-    model: m, tr, pt, leafBlobs: leaves.map((L, q) => cat(L, le8(T[q]))), records: programs.map((p) => p.programs.map((x) => x.bytes)),
+    model: m, tr, pt, leafBlobs: leaves.map((L, q) => cat(L, le8(T[q]))), records,
     siblings: programs.map((p) => p.siblings), trailing: proof.length - o,
   };
 }
