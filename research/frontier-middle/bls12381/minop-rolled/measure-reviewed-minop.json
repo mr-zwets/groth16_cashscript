@@ -1,0 +1,148 @@
+{
+ "contract": "groth16_minop.cash",
+ "lockingBytes": 58007,
+ "lockingSha256": "f943ef5570a16938c5beb4167fb963328fbed9d098395747bae22eeddec52645",
+ "score": 58817,
+ "opDefines": 27,
+ "opDefineBodyBytes": 2480,
+ "committed": {
+  "opCost": 145596803,
+  "bchnAdjusted": 145599283
+ },
+ "worstCase": {
+  "opCost": 171126234,
+  "bchnAdjusted": 171128714,
+  "unlockingBytes": 869
+ },
+ "validAccepted": "5/5",
+ "invalidRejected": "10/10",
+ "allAsExpected": true,
+ "rows": [
+  {
+   "label": "committed",
+   "expect": "accept",
+   "accepted": true,
+   "error": null,
+   "opCost": 145596803,
+   "unlockingBytes": 747,
+   "bchnAdjusted": 145599283
+  },
+  {
+   "label": "multiproof #1 (237787,703942)",
+   "expect": "accept",
+   "accepted": true,
+   "error": null,
+   "opCost": 147917798,
+   "unlockingBytes": 753,
+   "bchnAdjusted": 147920278
+  },
+  {
+   "label": "multiproof #2 (460834,887992)",
+   "expect": "accept",
+   "accepted": true,
+   "error": null,
+   "opCost": 147289905,
+   "unlockingBytes": 753,
+   "bchnAdjusted": 147292385
+  },
+  {
+   "label": "multiproof #3 (975480,241358)",
+   "expect": "accept",
+   "accepted": true,
+   "error": null,
+   "opCost": 148072176,
+   "unlockingBytes": 752,
+   "bchnAdjusted": 148074656
+  },
+  {
+   "label": "worstCaseProof (dense inputs)",
+   "expect": "accept",
+   "accepted": true,
+   "error": null,
+   "opCost": 171126234,
+   "unlockingBytes": 869,
+   "bchnAdjusted": 171128714
+  },
+  {
+   "label": "invalidUnlocking (n0 + 1)",
+   "expect": "reject",
+   "accepted": false,
+   "error": "Program failed an OP_VERIFY operation.",
+   "opCost": 145424622,
+   "unlockingBytes": 747
+  },
+  {
+   "label": "non-canonical B.x limb",
+   "expect": "reject",
+   "accepted": false,
+   "error": "Program failed an OP_VERIFY operation.",
+   "opCost": 15875,
+   "unlockingBytes": 747
+  },
+  {
+   "label": "non-canonical torus u low limb",
+   "expect": "reject",
+   "accepted": false,
+   "error": "Program failed an OP_VERIFY operation.",
+   "opCost": 20669,
+   "unlockingBytes": 747
+  },
+  {
+   "label": "non-canonical torus u high limb",
+   "expect": "reject",
+   "accepted": false,
+   "error": "Program failed an OP_VERIFY operation.",
+   "opCost": 24515,
+   "unlockingBytes": 747
+  },
+  {
+   "label": "negative GLV decomposition limb",
+   "expect": "reject",
+   "accepted": false,
+   "error": "Program failed an OP_VERIFY operation.",
+   "opCost": 165902,
+   "unlockingBytes": 746
+  },
+  {
+   "label": "multiproof #0 invalidUnlocking",
+   "expect": "reject",
+   "accepted": false,
+   "error": "Program failed an OP_VERIFY operation.",
+   "opCost": 145424622,
+   "unlockingBytes": 747
+  },
+  {
+   "label": "multiproof #1 invalidUnlocking",
+   "expect": "reject",
+   "accepted": false,
+   "error": "Program failed an OP_VERIFY operation.",
+   "opCost": 147895123,
+   "unlockingBytes": 753
+  },
+  {
+   "label": "multiproof #2 invalidUnlocking",
+   "expect": "reject",
+   "accepted": false,
+   "error": "Program failed an OP_VERIFY operation.",
+   "opCost": 147415380,
+   "unlockingBytes": 753
+  },
+  {
+   "label": "multiproof #3 invalidUnlocking",
+   "expect": "reject",
+   "accepted": false,
+   "error": "Program failed an OP_VERIFY operation.",
+   "opCost": 148209547,
+   "unlockingBytes": 752
+  },
+  {
+   "label": "worstCaseProof invalidUnlocking",
+   "expect": "reject",
+   "accepted": false,
+   "error": "Program failed an OP_VERIFY operation.",
+   "opCost": 171267389,
+   "unlockingBytes": 869
+  }
+ ],
+ "ms": 5429
+}
