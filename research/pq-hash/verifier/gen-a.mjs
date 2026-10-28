@@ -40,7 +40,7 @@ export function buildA(prm, statement, plan, opts = {}) {
   const headFor = (kind) => {
     const S = new Stk([...ptOrder, 'PAD']);
     S.emit('DEPTH', ptOrder.length + 1, 'NUMEQUALVERIFY');
-    S.drop('PAD');
+    S.raw(['SIZE', 0, 'SWAP', 'NUM2BIN', 'EQUALVERIFY'], 1);   // the pad is all zero
     emitTranscript(c, S, statement, {grinding: true, lo: 0, hi: 0, keepG: !!thread});
     emitAirConsts(c, S, statement, {withAir: true, withConsts: false});
     if (thread) {
@@ -75,7 +75,7 @@ export function buildA(prm, statement, plan, opts = {}) {
     const S = new Stk(['PAD', 'lo', 'hi']);   // the own L/PTH pairs lie below and are reached with DEPTH 1SUB ROLL only
     // own layout: DEPTH == 2 (hi - lo) + 3
     S.pick('hi'); S.pick('lo'); S.raw(['SUB', 2, 'MUL', 4, 'ADD', 'DEPTH', 'NUMEQUALVERIFY'], 2);   // + the computed value itself
-    S.drop('PAD');
+    S.roll('PAD'); S.raw(['SIZE', 0, 'SWAP', 'NUM2BIN', 'EQUALVERIFY'], 1);   // the pad is all zero
     // PT from HEAD's unlocking: header bytes checked before each item, then the item
     S.raw([0, 'INPUTBYTECODE'], 0, ['HU']);
     for (const x of ptOrder) {

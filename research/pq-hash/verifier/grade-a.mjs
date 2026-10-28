@@ -13,11 +13,11 @@ const args = process.argv.slice(2);
 const per = args.includes('--per') ? Number(args[args.indexOf('--per') + 1]) : 3;
 const files = args.filter((x) => x.endsWith('.json'));
 const MARGIN = 0.94;
-export function gradeA(prm, proof, {per: perQ = per} = {}) {
+export function gradeA(prm, proof, {per: perQ = per, fast = !args.includes('--compact')} = {}) {
   const perTx = prm.s > 30 ? Math.ceil(prm.s / 2) : prm.s;  // P128 / U100: two transactions
   const plan = makePlan(prm, {per: perQ, perTx});
   const st = Uint8Array.from(proof.subarray(0, 16));
-  const pg = programA(prm, st, plan);
+  const pg = programA(prm, st, plan, {fast});
   const enc = encodeA(prm, proof);
   if (plan.thread) plan.thread.commitment = sha(Buffer.from('pq-hash/thread'), enc.tr.G, Uint8Array.of(1));
   const defineBytes = pg.code.length + [...pg.fns.values()].reduce((a, f) => a + f.body.length, 0);
@@ -36,7 +36,7 @@ export function gradeA(prm, proof, {per: perQ = per} = {}) {
   }
   const real = txs.map((tx) => ({std: evaluateTx(tx, 'bchStd'), cons: evaluateTx(tx, 'bchCons')}));
   const out = {
-    set: prm.name, proofBytes: proof.length, queries: prm.s, perInput: perQ, codeBytes: pg.code.length, redeemBytes: pg.redeem.length, defineBytes,
+    set: prm.name, variant: fast ? 'fast' : 'compact', proofBytes: proof.length, queries: prm.s, perInput: perQ, codeBytes: pg.code.length, redeemBytes: pg.redeem.length, defineBytes,
     transactions: txs.length, inputs: txs.reduce((a, t) => a + t.unl.length, 0), totalBytes: txs.reduce((a, t) => a + t.txBytes, 0),
     txBytes: txs.map((t) => t.txBytes), padBytes: Object.values(pads).reduce((a, b) => a + b, 0),
     accepted: real.every((r) => r.std.every((x) => x.accepted) && r.cons.every((x) => x.accepted)),
@@ -63,5 +63,5 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   mkdirSync(new URL('./results/', import.meta.url), {recursive: true});
   const file = new URL('./results/layout-a.json', import.meta.url);
   let prev = []; try { prev = JSON.parse(readFileSync(file, 'utf8')); } catch {}
-  writeFileSync(file, JSON.stringify([...prev.filter((x) => !all.some((y) => y.vector === x.vector && y.perInput === x.perInput)), ...all].sort((a, b) => a.vector.localeCompare(b.vector)), null, 1) + '\n');
+  writeFileSync(file, JSON.stringify([...prev.filter((x) => !all.some((y) => y.vector === x.vector && y.perInput === x.perInput && y.variant === x.variant)), ...all].sort((a, b) => a.vector.localeCompare(b.vector)), null, 1) + '\n');
 }

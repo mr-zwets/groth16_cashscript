@@ -16,7 +16,7 @@
 // index list, which shrinks by one per query.
 import {asm, fresh, Stk} from './lib/asm.mjs';
 import {compileSlp, V, K, chk, call, add, sub, mul, modp, sum, ex} from './lib/slp.mjs';
-import {P, powp, invp, rou, sha, leNum} from './field.mjs';
+import {P, powp, invp, rou, sha, leNum, le8, cat} from './field.mjs';
 import {OPS} from './model.mjs';
 
 const B0 = Uint8Array.of(0);
@@ -118,7 +118,13 @@ export function defineShared(c) {
     : [B0, 'CAT', 'BIN2NUM', 'DUP', P, 'MOD', 'SWAP', P, 'DIV', P, 'MOD'];
   F.E = defFn('E', asm(Ecode));
   // PAIR: u + v + g (u - v) for u, v < 2^64, g canonical
-  {
+  if (opts.fast) {   // lazy inline (one OP_MOD per output coefficient): bigger, cheaper
+    const b = new PB(e);
+    const d = Array.from({length: e}, (_, c) => add(sub(V('u' + c), V('v' + c)), K(2n * P)));
+    const gd = mulE(e, names('g', e), d);
+    for (let c = 0; c < e; c++) b.red(add(add(V('u' + c), V('v' + c)), gd[c]), 'o' + c);
+    F.PAIR = defFn('PAIR', slpFn([...names('g', e), ...names('u', e), ...names('v', e)], b.prog, names('o', e)));
+  } else {
     const b = new PB(e, F);
     const d = Array.from({length: e}, (_, c) => b.let(add(sub(V('u' + c), V('v' + c)), K(2n * P))));
     const gd = b.mul(names('g', e), d);
@@ -143,7 +149,16 @@ export function defineShared(c) {
   // DEEPPT: f0(x) = n * a1 n1 + m * a2 n2, n = g1 X + g2 Y + g4 H0 + g5 H1 - C1, m = g3 X - C2
   const deepArgs = ['X', 'Y', ...names('H', e), ...names('J', e), ...names('a', e), 'n1', ...names('b', e), 'n2',
     ...[1, 2, 3, 4, 5].flatMap((j) => names(`g${j}_`, e)), ...names('C', e), ...names('D', e)];
-  {
+  if (opts.fast) {
+    const b = new PB(e);
+    const i1 = names('a', e).map((x) => b.red(mul(V(x), V('n1')))), i2 = names('b', e).map((x) => b.red(mul(V(x), V('n2'))));
+    const p4 = mulE(e, names('g4_', e), names('H', e)), p5 = mulE(e, names('g5_', e), names('J', e));
+    const nn = Array.from({length: e}, (_, c) => b.let(sum(mul(V('g1_' + c), V('X')), mul(V('g2_' + c), V('Y')), p4[c], p5[c], sub(K(P), V('C' + c)))));
+    const mm = Array.from({length: e}, (_, c) => b.let(add(mul(V('g3_' + c), V('X')), sub(K(P), V('D' + c)))));
+    const t1 = mulE(e, nn, i1), t2 = mulE(e, mm, i2);
+    t1.forEach((x, c) => b.red(add(x, t2[c]), 'f' + c));
+    F.DEEPPT = defFn('DEEPPT', slpFn(deepArgs, b.prog, names('f', e)));
+  } else {
     const b = new PB(e, F);
     const i1 = b.mulF(names('a', e), 'n1'), i2 = b.mulF(names('b', e), 'n2');
     const p4 = b.mul(names('g4_', e), names('H', e)), p5 = b.mul(names('g5_', e), names('J', e));
@@ -166,7 +181,14 @@ export function defineShared(c) {
   // POWS: y -> y^1 .. y^G (loop, counter on the altstack)
   F.POWS = defFn('POWS', asm('DUP', G - 1, 'TOALTSTACK', 'BEGIN', 'DUP', 2, 'PICK', 'MUL', P, 'MOD', 'SWAP', 'FROMALTSTACK', '1SUB', 'DUP', 'TOALTSTACK', 'NOT', 'UNTIL', 'FROMALTSTACK', 'DROP', 'DROP'));
   // XPOW: v -> 7 * w_N^v (square and multiply over the bits of v)
-  F.XPOW = defFn('XPOW', asm(7, rou(sizes[0]), 'ROT', 'BEGIN', 'DUP', 2, 'MOD', 'IF', 'ROT', 2, 'PICK', 'MUL', P, 'MOD', 'ROT', 'ROT', 'ENDIF',
+  if (opts.fast) {
+    const w = rou(sizes[0]), bits = Math.log2(sizes[1]), windows = Math.ceil(bits / 4);
+    const tables = Array.from({length: windows}, (_, k) => cat(...Array.from({length: 16}, (_, j) => le8((k === 0 ? 7n : 1n) * powp(w, BigInt(j) << BigInt(4 * k)) % P))));
+    F.XPOW = defFn('XPOW', asm(
+      'DUP', 16, 'MOD', 8, 'MUL', tables[0], 'SWAP', 'SPLIT', 'NIP', 8, 'SPLIT', 'DROP', B0, 'CAT', 'BIN2NUM', 'SWAP', 4, 'RSHIFTNUM', 'SWAP',
+      tables.slice(1).map((t, k) => ['OVER', 16, 'MOD', 8, 'MUL', t, 'SWAP', 'SPLIT', 'NIP', 8, 'SPLIT', 'DROP', B0, 'CAT', 'BIN2NUM', 'MUL', P, 'MOD', ...(k < windows - 2 ? ['SWAP', 4, 'RSHIFTNUM', 'SWAP'] : [])]),
+      'NIP'));
+  } else F.XPOW = defFn('XPOW', asm(7, rou(sizes[0]), 'ROT', 'BEGIN', 'DUP', 2, 'MOD', 'IF', 'ROT', 2, 'PICK', 'MUL', P, 'MOD', 'ROT', 'ROT', 'ENDIF',
     1, 'RSHIFTNUM', 'SWAP', 'DUP', 'MUL', P, 'MOD', 'SWAP', 'DUP', 'NOT', 'UNTIL', '2DROP'));
   // PARSE8: a 64-byte chunk -> 8 values (8-byte LE, unsigned; first value deepest)
   F.PARSE8 = defFn('PARSE8', asm(Array.from({length: 7}, () => [8, 'SPLIT', 'SWAP', B0, 'CAT', 'BIN2NUM', 'SWAP']), B0, 'CAT', 'BIN2NUM'));
@@ -480,7 +502,9 @@ export function emitQuery(c, Q) {
     const bb = new PB(e, F);
     const y = bb.pow2k(xb, Math.log2(a[r - 1]));
     compileSlp(Q, bb.prog);
-    Q.roll(y); Q.raw([F.POWS, 'INVOKE'], 1, Array.from({length: G}, (_, k) => 'Y' + (k + 1)));
+    Q.roll(y);
+    if (opts.fast) Q.raw(['DUP', ...Array(G - 1).fill(['DUP', 2, 'PICK', 'MUL', P, 'MOD', 'SWAP']), 'DROP'], 1, Array.from({length: G}, (_, k) => 'Y' + (k + 1)));
+    else Q.raw([F.POWS, 'INVOKE'], 1, Array.from({length: G}, (_, k) => 'Y' + (k + 1)));
     for (let c = 0; c < e; c++) Q.push(0, 'acc' + c);
     if (opts.dbgFinal) Q.emit('NOP');
     // GRP: entry = this shape + [o]; o = depth of the group's first coefficient (counted with o on the stack)
