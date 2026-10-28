@@ -50,6 +50,18 @@ for (const path of files) {
   mut('ood_value_flip', (it) => { const x = [...it]; const k = x.length - 2 - (prm.r - 1) - 1; const f = Uint8Array.from(x[k]); f[3] ^= 4; x[k] = f; return x; });
   mut('extra_push', (it) => [new Uint8Array(1), ...it]);
   mut('missing_record', (it) => it.slice(1));
+  // witness-shape cases that keep the item count (the entry DEPTH check alone does not see them)
+  const nG = Math.ceil(prm.s / 2);   // record pushes per tree (recGroup 2)
+  const cat2 = (a, b) => Uint8Array.from([...a, ...b]);
+  // tree 0's first two record pushes packed into one; the freed slot is filled with a copy of L0 (leafBytes + 8 B),
+  // placed after the records so that it would sit at the bottom when the query phase starts
+  mut('records_repacked_filler_L0', (it) => { const x = [...it]; const n = nR(it); const L0 = x[n]; x.splice(0, 2, cat2(x[0], x[1])); x.splice(n - 1, 0, Uint8Array.from(L0)); return x; });
+  // same with a zero filler of the leaf-blob size
+  mut('records_repacked_filler_zero', (it) => { const x = [...it]; const n = nR(it); x.splice(0, 2, cat2(x[0], x[1])); x.splice(n - 1, 0, new Uint8Array(prm.leafBytes + 8)); return x; });
+  // records moved across push boundaries between trees (same records, same item count): tree 0 split at a record
+  // boundary into one more push, tree 1's first two pushes packed into one
+  mut('records_shifted_between_trees', (it, enc) => { const x = [...it]; const r0 = enc.records[0][0].length; const g = x[0];
+    x.splice(0, 1, g.subarray(0, r0), g.subarray(r0)); const t1 = nG + 1; x.splice(t1, 2, cat2(x[t1], x[t1 + 1])); return x; });
   for (const cs of cases) {
     let r;
     let sp;

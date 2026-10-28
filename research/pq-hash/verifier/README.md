@@ -4,7 +4,7 @@ This folder holds the on-chain verifier for the pq-hash track: a SHA-256 DEEP-FR
 - **layout (b)**: one P2SH32 input under TXv5 or libauth bch-spec;
 - **layout (a)**: today's standard rules, with inputs of at most 10,000 B and transactions of at most 100,000 B.
 
-It also measures the verifier. The report and the harness cross-check live in zk-verifier-bench `wip/pq-hash-verifier`, `research/pq-hash/verifier/`. **This is research only, not a leaderboard entry.** It is not registered anywhere.
+It also measures the verifier. The harness cross-check (`crosscheck.ts`) and copies of `results/` live in zk-verifier-bench `wip/pq-hash-verifier`, `research/pq-hash/verifier/`. The written report is pending: it comes with the Analysis phase of the track. **This is research only, not a leaderboard entry.** It is not registered anywhere.
 
 Zero-knowledge is out of scope: the proof has no masking. Soundness for the chosen parameters is in scope.
 
@@ -30,7 +30,12 @@ node test-model.mjs ../prover/vectors/*.json      # model: 14 accepted, 100 tamp
 node test-fns.mjs                                 # shared functions against JS references
 node grade-b.mjs ../prover/vectors/*-[0-3].json   # layout (b): bch-spec and TXv5-as-written grades
 node grade-a.mjs ../prover/vectors/*-[0-3].json   # layout (a): real BCH 2026 VM, standard and consensus
-node test-b.mjs ../prover/vectors/*-[0-3].json; node test-a.mjs ../prover/vectors/P128-0.json ../prover/vectors/P128-1.json
+node test-b.mjs ../prover/vectors/*-[0-3].json > results/test-b.log
+# layout (a) sweeps, one run per set (results/test-a.log); P128 also gets the cross-proof thread splice case
+: > results/test-a.log
+for S in P100 C100 C128 U100; do node test-a.mjs ../prover/vectors/$S-0.json >> results/test-a.log; done
+node test-a.mjs ../prover/vectors/P128-0.json ../prover/vectors/P128-1.json >> results/test-a.log
+node profile-b.mjs ../prover/vectors/*-[0-3].json                     # results/profile-b.json
 ```
 
 ## Design notes (soundness-relevant)
@@ -41,6 +46,8 @@ node test-b.mjs ../prover/vectors/*-[0-3].json; node test-a.mjs ../prover/vector
   - Every node carries its heap index k. MERGE requires pk + k = 4·(k >> 1) + 1, which makes pk the sibling of k. DUPM requires equal index and equal digest. ROOT requires k = 1 and the committed root.
   - Parked nodes live on the altstack above a non-numeric marker, which is checked at the end of each tree.
   - Every record is consumed exactly. Op bytes are range-checked before OP_INVOKE.
+  - The witness shape is pinned at run time: DEPTH is checked on entry and again after every tree. Record pushes are pulled from the bottom on demand, so without the per-tree check the number of pushes a tree consumes would be free. Repacked records would then leave other items at the bottom, where the query phase takes its leaf blobs, while the Merkle phase PICKs the blobs at a fixed depth from the top. With the pin, each tree consumes exactly ceil(s/2) pushes, and the query phase reads exactly the blobs L0..L(s−1) that the Merkle phase authenticated. This was a review blocker on a9c6017, fixed in the next commit; `test-b.mjs` cases `records_repacked_filler_*` and `records_shifted_between_trees` cover it. The pin costs 20 B of redeem.
+  - The TXv5-as-written grading variant checks its PAD item is all zero, as layout (a) does.
 
   Every leaf's chain of hashes therefore ends in the committed root at its true position. The hints change only the cost, never the verdict.
 - **DEEP inverses.** One Montgomery batch per query (8 norms and x0) with a hinted inverse T, checked by Π·T ≡ 1.

@@ -2,7 +2,7 @@
 // gen-a.mjs. plan(): partition the queries into QRY inputs; txs(): witnesses, the transaction(s) and their source
 // outputs; evaluateTx(): every input on a given VM with per-input metrics (op-cost, budget, hash iterations).
 import {readFileSync} from 'node:fs';
-import {createTestAuthenticationProgramBch, hash256} from '@bitauth/libauth';
+import {createTestAuthenticationProgramBch, encodeTransaction, hash256} from '@bitauth/libauth';
 import {makeParams} from './params.mjs';
 import {encodeA} from './model.mjs';
 import {buildA} from './gen-a.mjs';
@@ -64,7 +64,7 @@ export function txsA(prm, plan, pg, wit) {
       ? [{lockingBytecode: lock, valueSatoshis: 1000n, token: tok('minting')}, {lockingBytecode: lock, valueSatoshis: 1000n, token: tok('none', plan.thread.commitment)}]
       : [{lockingBytecode: Uint8Array.from([0x76, 0xa9, 0x14, ...new Uint8Array(20), 0x88, 0xac]), valueSatoshis: 1000n}];
     const transaction = {version: 2, locktime: 0, inputs: unl.map((u, i) => ({outpointTransactionHash: new Uint8Array(32).fill(t + 1), outpointIndex: i, sequenceNumber: 0, unlockingBytecode: u})), outputs};
-    const txBytes = 4 + 1 + unl.reduce((a, u) => a + 36 + (u.length < 253 ? 1 : 3) + u.length + 4, 0) + 1 + outputs.reduce((a, o) => a + 8 + 1 + o.lockingBytecode.length + (o.token ? 1 + 32 + 1 + 1 + o.token.nft.commitment.length + (o.token.nft.commitment.length ? 1 : 0) : 0), 0) + 4;
+    const txBytes = encodeTransaction(transaction).length;   // encoded size (token prefixes included)
     return {transaction, sourceOutputs, unl, txBytes};
   });
 }
@@ -75,4 +75,9 @@ export function evaluateTx(tx, vmName) {
     return {...r, unlocking: u.length, budget: (41 + u.length) * 800};
   });
 }
-void createTestAuthenticationProgramBch; void VMS;
+// full-transaction verification (libauth vm.verify: every input plus the transaction-level rules: token accounting,
+// sizes, standardness of outputs); returns true or the error string
+export function verifyTx(tx, vmName) {
+  return VMS[vmName].verify({transaction: tx.transaction, sourceOutputs: tx.sourceOutputs});
+}
+void createTestAuthenticationProgramBch;

@@ -30,3 +30,13 @@ Status 2 (verifier phase complete)
 - rejection suites: results/test-b.log (175), results/test-a.log (183); harness cross-check in zk-verifier-bench
   wip/pq-hash-verifier research/pq-hash/verifier/crosscheck.ts (agrees). REPORT.md text returned in the phase output
   (Write tool refused the .md report file).
+
+Status 3 (review fixes)
+- BLOCKER fixed: layout (b) did not pin how many record pushes each tree consumes, so a witness could leave
+  unauthenticated items at the bottom for the query phase. gen.mjs now checks DEPTH after every tree (+20 B redeem)
+  and checks the TXv5 PAD is zero. New test-b cases: records_repacked_filler_{L0,zero}, records_shifted_between_trees.
+  The old code let the filler cases reach the query phase; it accepted the shifted case (malleable). All now reject in the Merkle phase.
+- re-graded: P128-3 tx 99,981 B (19 B spare), op 72,002,598 std, 90.1% TXv5; P100-3 57,526 B, 38,818,064, 84.4%.
+  test-b 190/190 rejected (38 per set), test-a 182 rejected, 0 unexpected.
+- layout (a): tx sizes now from encodeTransaction (token tx0 -2 B), full-tx vm.verify std+cons in grade-a (all pass),
+  BCHN figure labelled as an upper bound; test-a thread cases labelled with the real tx index; README runs all 5 sets.

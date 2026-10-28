@@ -551,7 +551,7 @@ export function buildB(prm, statement, opts = {}) {
   if (opts.padSlot) init.push('PAD');   // TXv5-as-written grading variant: a zero pad the script ignores
   const S = new Stk(init);
   S.emit('DEPTH', init.length, 'NUMEQUALVERIFY');
-  if (opts.padSlot) S.drop('PAD');
+  if (opts.padSlot) S.raw(['SIZE', 0, 'SWAP', 'NUM2BIN', 'EQUALVERIFY'], 1);   // the pad is all zero (non-malleable, as layout a)
   mark(S, 'entry');
 
   emitTranscript(c, S, statement);
@@ -593,6 +593,12 @@ export function buildB(prm, statement, opts = {}) {
     S.roll('rbc'); S.raw([0, 'EQUALVERIFY'], 1);   // the tree's records are consumed exactly
     S.raw(['FROMALTSTACK', MARKER, 'EQUALVERIFY'], 0);
     S.raw(['2DROP', '2DROP', '2DROP'], 6);
+    // pin the witness shape: REC pulls record pushes from the bottom only on demand, so without this the number of
+    // pushes a tree consumes is free, and repacked records would leave other items at the bottom for the query phase
+    // (which takes its leaf blobs from the bottom while the Merkle phase PICKs them at fixed depth from the top). With
+    // DEPTH fixed after every tree, each tree consumes exactly nRec pushes and the query phase sees exactly L0..L(s-1),
+    // the items the Merkle phase authenticated.
+    if ((opts.depthPin ?? 'tree') === 'tree' || ti === trees.length - 1) S.emit('DEPTH', S.st.length, 'NUMEQUALVERIFY');
   });
   for (const x of roots) S.drop(x);
   mark(S, 'merkle');

@@ -16,10 +16,11 @@ const base = gradeA(prm, proof, {fast: true});
 const {plan, pg, pads} = base;
 let bad = 0;
 const verdict = (txs, vm = 'bchStd') => txs.map((tx) => evaluateTx(tx, vm));
-const report = (name, txs, expectOk = false) => {
+// t0: index of txs[0] in the full plan (thread cases pass tx1 alone), so rejections carry the real tx index
+const report = (name, txs, expectOk = false, t0 = 0) => {
   const r = verdict(txs);
   const allOk = r.every((rs) => rs.every((x) => x.accepted));
-  const rej = r.flatMap((rs, t) => rs.map((x, i) => [t, i, x]).filter(([, , x]) => !x.accepted)).map(([t, i, x]) => `tx${t}/in${i}: ${String(x.error).slice(0, 50)}`);
+  const rej = r.flatMap((rs, t) => rs.map((x, i) => [t, i, x]).filter(([, , x]) => !x.accepted)).map(([t, i, x]) => `tx${t + t0}/in${i}: ${String(x.error).slice(0, 50)}`);
   const ok = expectOk ? allOk : !allOk;
   console.log(`  ${name.padEnd(30)} ${allOk ? 'ACCEPT' : 'REJECT'} ${ok ? '' : '<-- UNEXPECTED'} ${rej.slice(0, 2).join(' | ')}${rej.length > 2 ? ` (+${rej.length - 2} inputs)` : ''}`);
   bad += !ok;
@@ -71,7 +72,7 @@ mut('code_byte', (w) => { w[0][1][0] = flip(w[0][1][0], 200); return w; });
 if (plan.thread) {
   // thread: tx1 with a commitment for another G; tx0 without the thread output; tx1 output carrying the category;
   // tx1 spliced with the PT and queries of another proof (B) but the thread NFT of proof A
-  report('thread_wrong_commitment', build(enc, {thread: sha(Uint8Array.of(1, 2, 3))}).slice(1));
+  report('thread_wrong_commitment', build(enc, {thread: sha(Uint8Array.of(1, 2, 3))}).slice(1), false, 1);
   {
     const txs = build(enc);
     txs[0].transaction.outputs = txs[0].transaction.outputs.slice(0, 1);
@@ -81,7 +82,7 @@ if (plan.thread) {
     const txs = build(enc);
     const o = txs[1].transaction.outputs[0];
     txs[1].transaction.outputs = [{...o, token: {...txs[0].transaction.outputs[1].token}}];
-    report('thread_tx1_keeps_token', [txs[1]]);
+    report('thread_tx1_keeps_token', [txs[1]], false, 1);
   }
   if (pathB) {
     const B = loadVector(pathB);
@@ -89,7 +90,7 @@ if (plan.thread) {
     const pgB = programA(prm, Uint8Array.from(B.proof.subarray(0, 16)), plan, {fast: true});
     const planB = JSON.parse(JSON.stringify(plan)); planB.thread = {category: plan.thread.category};
     const txsB = build(encB, {pg: pgB, plan: planB, thread: commitOf(enc)});   // proof B's tx1 with proof A's thread NFT
-    report('thread_splice_tx1_of_B', [txsB[1]]);
+    report('thread_splice_tx1_of_B', [txsB[1]], false, 1);
   }
 }
 console.log(bad ? `${bad} unexpected` : 'all as expected');
