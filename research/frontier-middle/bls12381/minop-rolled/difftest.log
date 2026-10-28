@@ -1,0 +1,6 @@
+committed                JS rolled == JS unrolled: true; unrolled debug accepts expF: true; rolled debug accepts expF: true; expF+1 rejected: true/true -> EQUAL
+multiproof #1            JS rolled == JS unrolled: true; unrolled debug accepts expF: true; rolled debug accepts expF: true; expF+1 rejected: true/true -> EQUAL
+multiproof #2            JS rolled == JS unrolled: true; unrolled debug accepts expF: true; rolled debug accepts expF: true; expF+1 rejected: true/true -> EQUAL
+multiproof #3            JS rolled == JS unrolled: true; unrolled debug accepts expF: true; rolled debug accepts expF: true; expF+1 rejected: true/true -> EQUAL
+worstCaseProof (dense)   JS rolled == JS unrolled: true; unrolled debug accepts expF: true; rolled debug accepts expF: true; expF+1 rejected: true/true -> EQUAL
+differential test PASSED: F_rolled == F_unrolled on all vectors

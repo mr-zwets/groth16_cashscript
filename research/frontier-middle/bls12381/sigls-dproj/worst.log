@@ -1,0 +1,15 @@
+forced n_q<=48: 85 nonzero nibbles               n_q  48 ACCEPT 37774134 / 46070400 (81.99%, margin 8296266) | ACCEPT 37812534 / 46070400 (82.08%, margin 8257866) default proof
+forced n_q<=49: 85 nonzero nibbles               n_q  48 ACCEPT 37774134 / 46070400 (81.99%, margin 8296266) | ACCEPT 37812534 / 46070400 (82.08%, margin 8257866) default proof
+forced n_q<=50: 85 nonzero nibbles               n_q  48 ACCEPT 37774134 / 46070400 (81.99%, margin 8296266) | ACCEPT 37812534 / 46070400 (82.08%, margin 8257866) default proof
+forced n_q<=51: 90 nonzero nibbles               n_q  51 ACCEPT 37859851 / 46300800 (81.77%, margin 8440949) | ACCEPT 37898507 / 46300800 (81.85%, margin 8402293) default proof
+forced n_q<=52: 90 nonzero nibbles               n_q  51 ACCEPT 37859851 / 46300800 (81.77%, margin 8440949) | ACCEPT 37898507 / 46300800 (81.85%, margin 8402293) default proof
+forced n_q<=53: 90 nonzero nibbles               n_q  51 ACCEPT 37859851 / 46300800 (81.77%, margin 8440949) | ACCEPT 37898507 / 46300800 (81.85%, margin 8402293) default proof
+forced n_q<=54: 119 nonzero nibbles              n_q  54 ACCEPT 38305317 / 46531200 (82.32%, margin 8225883) | ACCEPT 38344229 / 46531200 (82.41%, margin 8186971) default proof
+forced n_q<=56: 119 nonzero nibbles              n_q  54 ACCEPT 38305317 / 46531200 (82.32%, margin 8225883) | ACCEPT 38344229 / 46531200 (82.41%, margin 8186971) default proof
+forced n_q<=58: 120 nonzero nibbles              n_q  57 ACCEPT 38343929 / 46761600 (82.00%, margin 8417671) | ACCEPT 38383097 / 46761600 (82.08%, margin 8378503) default proof
+forced n_q<=60: 124 nonzero nibbles              n_q  60 ACCEPT 38401637 / 46992000 (81.72%, margin 8590363) | ACCEPT 38441189 / 46992000 (81.80%, margin 8550811) default proof
+forced: all 128 nibbles nonzero (1 bit each)     n_q  66 ACCEPT 38530187 / 47452800 (81.20%, margin 8922613) | ACCEPT 38570251 / 47452800 (81.28%, margin 8882549) default proof
+zero statement (every nibble 0)                  n_q  48 ACCEPT 36787518 / 46070400 (79.85%, margin 9282882) | ACCEPT 36825918 / 46070400 (79.93%, margin 9244482) default proof
+proofs per forced pattern: default + 10
+min standard margin 8183216 (17.587%) forced n_q<=54: 119 nonzero nibbles n_q 54 b 293a233a.. c fb88e1b5.. pattern 2202202222222202222222222222222222222222222222022222222222222221 NQ_MAX 120
+min consensus margin 8222128 (17.670%) forced n_q<=54: 119 nonzero nibbles n_q 54 b 293a233a.. c fb88e1b5..

@@ -1,0 +1,2124 @@
+{
+ "seed": "bls-si-gls-v1",
+ "shard": "0/1",
+ "summary": {
+  "E_A": 0,
+  "NQ_MAX": 120,
+  "cases": 87,
+  "failed": 0,
+  "consensus": {
+   "minMargin": 8225883,
+   "minMarginPct": 17.678,
+   "at": "forced n_q<=54: 119 nonzero nibbles",
+   "nq": 54,
+   "maxOp": 38902783,
+   "maxOpAt": "random #1"
+  },
+  "standard": {
+   "minMargin": 8186971,
+   "minMarginPct": 17.595,
+   "at": "forced n_q<=54: 119 nonzero nibbles",
+   "nq": 54,
+   "maxOp": 38946559,
+   "maxOpAt": "random #1"
+  },
+  "random": {
+   "count": 40,
+   "minStdMarginPct": 21.17,
+   "nqRange": [
+    87,
+    105
+   ]
+  }
+ },
+ "results": [
+  {
+   "case": 0,
+   "label": "fixture committed",
+   "publicInputs": [
+    "123",
+    "456"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 36894701,
+    "budget": 46070400,
+    "margin": 9175699,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 36933101,
+    "budget": 46070400,
+    "margin": 9137299,
+    "error": null
+   }
+  },
+  {
+   "case": 1,
+   "label": "fixture proof1",
+   "publicInputs": [
+    "135208",
+    "67633"
+   ],
+   "nq": 57,
+   "unlockingLength": 19226,
+   "consensus": {
+    "accepted": true,
+    "opCost": 36981085,
+    "budget": 46761600,
+    "margin": 9780515,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37020253,
+    "budget": 46761600,
+    "margin": 9741347,
+    "error": null
+   }
+  },
+  {
+   "case": 2,
+   "label": "fixture dense",
+   "publicInputs": [
+    "40792793307691160132937706698213704133054528069427933762012433436987942497952",
+    "20976222017425405296340351928930328963278634447870202382235661951061637561134"
+   ],
+   "nq": 90,
+   "unlockingLength": 20810,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38701245,
+    "budget": 49296000,
+    "margin": 10594755,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38743613,
+    "budget": 49296000,
+    "margin": 10552387,
+    "error": null
+   }
+  },
+  {
+   "case": 3,
+   "label": "fixture zero",
+   "publicInputs": [
+    "0",
+    "0"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 36789927,
+    "budget": 46070400,
+    "margin": 9280473,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 36828327,
+    "budget": 46070400,
+    "margin": 9242073,
+    "error": null
+   }
+  },
+  {
+   "case": 4,
+   "label": "fixture max",
+   "publicInputs": [
+    "52435875175126190479447740508185965837690552500527637822603658699938581184512",
+    "52435875175126190479447740508185965837690552500527637822603658699938581184512"
+   ],
+   "nq": 75,
+   "unlockingLength": 20090,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37593163,
+    "budget": 48144000,
+    "margin": 10550837,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37634123,
+    "budget": 48144000,
+    "margin": 10509877,
+    "error": null
+   }
+  },
+  {
+   "case": 5,
+   "label": "fixture msm-identity",
+   "publicInputs": [
+    "3",
+    "52435875175126190479447740508185965837690552500527637822603658699938581184511"
+   ],
+   "nq": 81,
+   "unlockingLength": 20378,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37385553,
+    "budget": 48604800,
+    "margin": 11219247,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37427025,
+    "budget": 48604800,
+    "margin": 11177775,
+    "error": null
+   }
+  },
+  {
+   "case": 6,
+   "label": "forced n_q<=48: 85 nonzero nibbles",
+   "publicInputs": [
+    "265360647544385863633659562878719560847912140519697691355142864575509858440",
+    "265360647544385863631588421089264641193238793429270889082920249905041899520"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37774134,
+    "budget": 46070400,
+    "margin": 8296266,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37812534,
+    "budget": 46070400,
+    "margin": 8257866,
+    "error": null
+   }
+  },
+  {
+   "case": 7,
+   "label": "forced n_q<=49: 85 nonzero nibbles",
+   "publicInputs": [
+    "265360647544385863633659562878719560847912140519697691355142864575509858440",
+    "265360647544385863631588421089264641193238793429270889082920249905041899520"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37774134,
+    "budget": 46070400,
+    "margin": 8296266,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37812534,
+    "budget": 46070400,
+    "margin": 8257866,
+    "error": null
+   }
+  },
+  {
+   "case": 8,
+   "label": "forced n_q<=50: 85 nonzero nibbles",
+   "publicInputs": [
+    "265360647544385863633659562878719560847912140519697691355142864575509858440",
+    "265360647544385863631588421089264641193238793429270889082920249905041899520"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37774134,
+    "budget": 46070400,
+    "margin": 8296266,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37812534,
+    "budget": 46070400,
+    "margin": 8257866,
+    "error": null
+   }
+  },
+  {
+   "case": 9,
+   "label": "forced n_q<=51: 90 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37859851,
+    "budget": 46300800,
+    "margin": 8440949,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37898507,
+    "budget": 46300800,
+    "margin": 8402293,
+    "error": null
+   }
+  },
+  {
+   "case": 10,
+   "label": "forced n_q<=52: 90 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37859851,
+    "budget": 46300800,
+    "margin": 8440949,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37898507,
+    "budget": 46300800,
+    "margin": 8402293,
+    "error": null
+   }
+  },
+  {
+   "case": 11,
+   "label": "forced n_q<=53: 90 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37859851,
+    "budget": 46300800,
+    "margin": 8440949,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37898507,
+    "budget": 46300800,
+    "margin": 8402293,
+    "error": null
+   }
+  },
+  {
+   "case": 12,
+   "label": "forced n_q<=54: 119 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "4261375985661297388596481127158271988451774239513441452686048413292994267272"
+   ],
+   "nq": 54,
+   "unlockingLength": 19082,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38305317,
+    "budget": 46531200,
+    "margin": 8225883,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38344229,
+    "budget": 46531200,
+    "margin": 8186971,
+    "error": null
+   }
+  },
+  {
+   "case": 13,
+   "label": "forced n_q<=55: 119 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "4261375985661297388596481127158271988451774239513441452686048413292994267272"
+   ],
+   "nq": 54,
+   "unlockingLength": 19082,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38305317,
+    "budget": 46531200,
+    "margin": 8225883,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38344229,
+    "budget": 46531200,
+    "margin": 8186971,
+    "error": null
+   }
+  },
+  {
+   "case": 14,
+   "label": "forced n_q<=56: 119 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "4261375985661297388596481127158271988451774239513441452686048413292994267272"
+   ],
+   "nq": 54,
+   "unlockingLength": 19082,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38305317,
+    "budget": 46531200,
+    "margin": 8225883,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38344229,
+    "budget": 46531200,
+    "margin": 8186971,
+    "error": null
+   }
+  },
+  {
+   "case": 15,
+   "label": "forced n_q<=57: 120 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280"
+   ],
+   "nq": 57,
+   "unlockingLength": 19226,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38343929,
+    "budget": 46761600,
+    "margin": 8417671,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38383097,
+    "budget": 46761600,
+    "margin": 8378503,
+    "error": null
+   }
+  },
+  {
+   "case": 16,
+   "label": "forced n_q<=58: 120 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280"
+   ],
+   "nq": 57,
+   "unlockingLength": 19226,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38343929,
+    "budget": 46761600,
+    "margin": 8417671,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38383097,
+    "budget": 46761600,
+    "margin": 8378503,
+    "error": null
+   }
+  },
+  {
+   "case": 17,
+   "label": "forced n_q<=60: 124 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392589767109550612533203049601679202787285801212522925951112",
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280"
+   ],
+   "nq": 60,
+   "unlockingLength": 19370,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38401637,
+    "budget": 46992000,
+    "margin": 8590363,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38441189,
+    "budget": 46992000,
+    "margin": 8550811,
+    "error": null
+   }
+  },
+  {
+   "case": 18,
+   "label": "forced n_q<=62: 124 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392589767109550612533203049601679202787285801212522925951112",
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280"
+   ],
+   "nq": 60,
+   "unlockingLength": 19370,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38401637,
+    "budget": 46992000,
+    "margin": 8590363,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38441189,
+    "budget": 46992000,
+    "margin": 8550811,
+    "error": null
+   }
+  },
+  {
+   "case": 19,
+   "label": "forced n_q<=64: 124 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392589767109550612533203049601679202787285801212522925951112",
+    "265360647544385864161800719197407787280895592303015403814350348960867846280"
+   ],
+   "nq": 63,
+   "unlockingLength": 19514,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38434716,
+    "budget": 47222400,
+    "margin": 8787684,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38474524,
+    "budget": 47222400,
+    "margin": 8747876,
+    "error": null
+   }
+  },
+  {
+   "case": 20,
+   "label": "forced n_q<=70: 128 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392589767109550612533203049601679202787285801212522925951112",
+    "4261375985661297392589767109550612533203049601679202787285801212522925951112"
+   ],
+   "nq": 66,
+   "unlockingLength": 19658,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38530187,
+    "budget": 47452800,
+    "margin": 8922613,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38570251,
+    "budget": 47452800,
+    "margin": 8882549,
+    "error": null
+   }
+  },
+  {
+   "case": 21,
+   "label": "forced n_q<=80: 128 nonzero nibbles",
+   "publicInputs": [
+    "4261375985661297392589767109550612533203049601679202787285801212522925951112",
+    "4261375985661297392589767109550612533203049601679202787285801212522925951112"
+   ],
+   "nq": 66,
+   "unlockingLength": 19658,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38530187,
+    "budget": 47452800,
+    "margin": 8922613,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38570251,
+    "budget": 47452800,
+    "margin": 8882549,
+    "error": null
+   }
+  },
+  {
+   "case": 22,
+   "label": "forced: all 128 nibbles nonzero (1 bit each)",
+   "publicInputs": [
+    "4261375985661297392589767109550612533203049601679202787285801212522925951112",
+    "4261375985661297392589767109550612533203049601679202787285801212522925951112"
+   ],
+   "nq": 66,
+   "unlockingLength": 19658,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38530187,
+    "budget": 47452800,
+    "margin": 8922613,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38570251,
+    "budget": 47452800,
+    "margin": 8882549,
+    "error": null
+   }
+  },
+  {
+   "case": 23,
+   "label": "zero statement (every nibble 0)",
+   "publicInputs": [
+    "0",
+    "0"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 36787518,
+    "budget": 46070400,
+    "margin": 9282882,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 36825918,
+    "budget": 46070400,
+    "margin": 9244482,
+    "error": null
+   }
+  },
+  {
+   "case": 24,
+   "label": "n = (1, 0)",
+   "publicInputs": [
+    "1",
+    "0"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 36797015,
+    "budget": 46070400,
+    "margin": 9273385,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 36835415,
+    "budget": 46070400,
+    "margin": 9234985,
+    "error": null
+   }
+  },
+  {
+   "case": 25,
+   "label": "n = (r-1, 0)",
+   "publicInputs": [
+    "52435875175126190479447740508185965837690552500527637822603658699938581184512",
+    "0"
+   ],
+   "nq": 57,
+   "unlockingLength": 19226,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37115631,
+    "budget": 46761600,
+    "margin": 9645969,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37154799,
+    "budget": 46761600,
+    "margin": 9606801,
+    "error": null
+   }
+  },
+  {
+   "case": 26,
+   "label": "n = (|x|-1, |x|^3)",
+   "publicInputs": [
+    "15132376222941642751",
+    "3465144826073652318776269530687742778270252468765361963008"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37050899,
+    "budget": 46300800,
+    "margin": 9249901,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37089555,
+    "budget": 46300800,
+    "margin": 9211245,
+    "error": null
+   }
+  },
+  {
+   "case": 27,
+   "label": "n = (2^64, 2^128)",
+   "publicInputs": [
+    "18446744073709551616",
+    "340282366920938463463374607431768211456"
+   ],
+   "nq": 66,
+   "unlockingLength": 19658,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37955518,
+    "budget": 47452800,
+    "margin": 9497282,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37995582,
+    "budget": 47452800,
+    "margin": 9457218,
+    "error": null
+   }
+  },
+  {
+   "case": 28,
+   "label": "n = (r/2, r/3)",
+   "publicInputs": [
+    "26217937587563095239723870254092982918845276250263818911301829349969290592256",
+    "17478625058375396826482580169395321945896850833509212607534552899979527061504"
+   ],
+   "nq": 66,
+   "unlockingLength": 19658,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37855929,
+    "budget": 47452800,
+    "margin": 9596871,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37895993,
+    "budget": 47452800,
+    "margin": 9556807,
+    "error": null
+   }
+  },
+  {
+   "case": 29,
+   "label": "n = (|x|^4 - |x|^3 ..., ) max digits",
+   "publicInputs": [
+    "52435875175126190479447740508185965837461563690374988244538805122978187051008",
+    "52435875175126190479447740508185965837690552500527637822603658699938581184511"
+   ],
+   "nq": 90,
+   "unlockingLength": 20810,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37758365,
+    "budget": 49296000,
+    "margin": 11537635,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37800733,
+    "budget": 49296000,
+    "margin": 11495267,
+    "error": null
+   }
+  },
+  {
+   "case": 30,
+   "label": "low n_q search: n_q 48",
+   "publicInputs": [
+    "0",
+    "0"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 36787518,
+    "budget": 46070400,
+    "margin": 9282882,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 36825918,
+    "budget": 46070400,
+    "margin": 9244482,
+    "error": null
+   }
+  },
+  {
+   "case": 31,
+   "label": "low n_q search: n_q 48",
+   "publicInputs": [
+    "0",
+    "0"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 36787518,
+    "budget": 46070400,
+    "margin": 9282882,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 36825918,
+    "budget": 46070400,
+    "margin": 9244482,
+    "error": null
+   }
+  },
+  {
+   "case": 32,
+   "label": "low n_q search: n_q 48",
+   "publicInputs": [
+    "0",
+    "0"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 36787518,
+    "budget": 46070400,
+    "margin": 9282882,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 36825918,
+    "budget": 46070400,
+    "margin": 9244482,
+    "error": null
+   }
+  },
+  {
+   "case": 33,
+   "label": "low n_q search: n_q 48",
+   "publicInputs": [
+    "0",
+    "0"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 36787518,
+    "budget": 46070400,
+    "margin": 9282882,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 36825918,
+    "budget": 46070400,
+    "margin": 9244482,
+    "error": null
+   }
+  },
+  {
+   "case": 34,
+   "label": "low n_q search: n_q 48",
+   "publicInputs": [
+    "1",
+    "0"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 36797015,
+    "budget": 46070400,
+    "margin": 9273385,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 36835415,
+    "budget": 46070400,
+    "margin": 9234985,
+    "error": null
+   }
+  },
+  {
+   "case": 35,
+   "label": "low n_q search: n_q 48",
+   "publicInputs": [
+    "15132376222941642752",
+    "0"
+   ],
+   "nq": 48,
+   "unlockingLength": 18794,
+   "consensus": {
+    "accepted": true,
+    "opCost": 36797287,
+    "budget": 46070400,
+    "margin": 9273113,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 36835687,
+    "budget": 46070400,
+    "margin": 9234713,
+    "error": null
+   }
+  },
+  {
+   "case": 36,
+   "label": "forced n_q<=53, proof sample #1",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37855939,
+    "budget": 46300800,
+    "margin": 8444861,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37894595,
+    "budget": 46300800,
+    "margin": 8406205,
+    "error": null
+   }
+  },
+  {
+   "case": 37,
+   "label": "forced n_q<=53, proof sample #2",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37858532,
+    "budget": 46300800,
+    "margin": 8442268,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37897188,
+    "budget": 46300800,
+    "margin": 8403612,
+    "error": null
+   }
+  },
+  {
+   "case": 38,
+   "label": "forced n_q<=53, proof sample #3",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37855400,
+    "budget": 46300800,
+    "margin": 8445400,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37894056,
+    "budget": 46300800,
+    "margin": 8406744,
+    "error": null
+   }
+  },
+  {
+   "case": 39,
+   "label": "forced n_q<=53, proof sample #4",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37856519,
+    "budget": 46300800,
+    "margin": 8444281,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37895175,
+    "budget": 46300800,
+    "margin": 8405625,
+    "error": null
+   }
+  },
+  {
+   "case": 40,
+   "label": "forced n_q<=53, proof sample #5",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37860340,
+    "budget": 46300800,
+    "margin": 8440460,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37898996,
+    "budget": 46300800,
+    "margin": 8401804,
+    "error": null
+   }
+  },
+  {
+   "case": 41,
+   "label": "forced n_q<=53, proof sample #6",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37853862,
+    "budget": 46300800,
+    "margin": 8446938,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37892518,
+    "budget": 46300800,
+    "margin": 8408282,
+    "error": null
+   }
+  },
+  {
+   "case": 42,
+   "label": "forced n_q<=53, proof sample #7",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37848234,
+    "budget": 46300800,
+    "margin": 8452566,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37886890,
+    "budget": 46300800,
+    "margin": 8413910,
+    "error": null
+   }
+  },
+  {
+   "case": 43,
+   "label": "forced n_q<=53, proof sample #8",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37858333,
+    "budget": 46300800,
+    "margin": 8442467,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37896989,
+    "budget": 46300800,
+    "margin": 8403811,
+    "error": null
+   }
+  },
+  {
+   "case": 44,
+   "label": "forced n_q<=53, proof sample #9",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37859488,
+    "budget": 46300800,
+    "margin": 8441312,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37898144,
+    "budget": 46300800,
+    "margin": 8402656,
+    "error": null
+   }
+  },
+  {
+   "case": 45,
+   "label": "forced n_q<=53, proof sample #10",
+   "publicInputs": [
+    "4261375985661297392061625953231924307228043770201184230956300882058356230280",
+    "249689999159841647544807590972773097472433264381581059750734953472883984520"
+   ],
+   "nq": 51,
+   "unlockingLength": 18938,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37855435,
+    "budget": 46300800,
+    "margin": 8445365,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37894091,
+    "budget": 46300800,
+    "margin": 8406709,
+    "error": null
+   }
+  },
+  {
+   "case": 46,
+   "label": "n0 = 5 + 7|x| + 9|x|^2, non-canonical GLS digits",
+   "publicInputs": [
+    "2060899291373846202689608826204138700805",
+    "456"
+   ],
+   "nq": 54,
+   "unlockingLength": 19082,
+   "consensus": {
+    "accepted": true,
+    "opCost": 37008902,
+    "budget": 46531200,
+    "margin": 9522298,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 37047814,
+    "budget": 46531200,
+    "margin": 9483386,
+    "error": null
+   }
+  },
+  {
+   "case": 47,
+   "label": "random #0",
+   "publicInputs": [
+    "17665910461484786559359583134944887838588956454888729743485922455830398995208",
+    "41664085219005478086524027407862096982294806002090999750170380108845826471336"
+   ],
+   "nq": 99,
+   "unlockingLength": 21242,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38702297,
+    "budget": 49987200,
+    "margin": 11284903,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38745561,
+    "budget": 49987200,
+    "margin": 11241639,
+    "error": null
+   }
+  },
+  {
+   "case": 48,
+   "label": "random #1",
+   "publicInputs": [
+    "34005663019843093301690844519307212085069744978264248718474272794254331304762",
+    "37229674166985136851721559926205788113491432880367192890002951827212280613708"
+   ],
+   "nq": 105,
+   "unlockingLength": 21530,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38902783,
+    "budget": 50448000,
+    "margin": 11545217,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38946559,
+    "budget": 50448000,
+    "margin": 11501441,
+    "error": null
+   }
+  },
+  {
+   "case": 49,
+   "label": "random #2",
+   "publicInputs": [
+    "20233392337763358607808382993252146086520431651573618597357374776223463391305",
+    "33681237637028228217973633555477127740486565741543013263590888265366541368207"
+   ],
+   "nq": 99,
+   "unlockingLength": 21242,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38761527,
+    "budget": 49987200,
+    "margin": 11225673,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38804791,
+    "budget": 49987200,
+    "margin": 11182409,
+    "error": null
+   }
+  },
+  {
+   "case": 50,
+   "label": "random #3",
+   "publicInputs": [
+    "23522488872822071530953250203448821726936928633309800828185780303687537356131",
+    "40752433271842488164280032901443901248309210379599974709018382656287488356037"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38667020,
+    "budget": 49526400,
+    "margin": 10859380,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38709644,
+    "budget": 49526400,
+    "margin": 10816756,
+    "error": null
+   }
+  },
+  {
+   "case": 51,
+   "label": "random #4",
+   "publicInputs": [
+    "14158026226111321903914657140129844482352428454667248857039167609729734607360",
+    "19078297285172729420350328490215227477130976269673709304524960912805709797959"
+   ],
+   "nq": 90,
+   "unlockingLength": 20810,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38650479,
+    "budget": 49296000,
+    "margin": 10645521,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38692847,
+    "budget": 49296000,
+    "margin": 10603153,
+    "error": null
+   }
+  },
+  {
+   "case": 52,
+   "label": "random #5",
+   "publicInputs": [
+    "4497334458188605350552999394044297969415306890115466962412331835500057444880",
+    "1612219561689766966695970259306302252082663538436805698170615149450584632216"
+   ],
+   "nq": 99,
+   "unlockingLength": 21242,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38759961,
+    "budget": 49987200,
+    "margin": 11227239,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38803225,
+    "budget": 49987200,
+    "margin": 11183975,
+    "error": null
+   }
+  },
+  {
+   "case": 53,
+   "label": "random #6",
+   "publicInputs": [
+    "9372452273473102371324577569453000876068072236739219422778428517406692172197",
+    "40796880616086452753637089352932585941976411397382207899911476750665149948779"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38718623,
+    "budget": 49526400,
+    "margin": 10807777,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38761247,
+    "budget": 49526400,
+    "margin": 10765153,
+    "error": null
+   }
+  },
+  {
+   "case": 54,
+   "label": "random #7",
+   "publicInputs": [
+    "34240870250982703175006348100716223236773726582354664806041990872354846715700",
+    "8984139801029701845353781185457892988158473234858557373187445490754200579601"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38708769,
+    "budget": 49526400,
+    "margin": 10817631,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38751393,
+    "budget": 49526400,
+    "margin": 10775007,
+    "error": null
+   }
+  },
+  {
+   "case": 55,
+   "label": "random #8",
+   "publicInputs": [
+    "12705229170072304605602251611180648478237248072804222556992029224073018998551",
+    "4095238721344630129278016159561946527839068901582290516475887022346779952135"
+   ],
+   "nq": 105,
+   "unlockingLength": 21530,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38853531,
+    "budget": 50448000,
+    "margin": 11594469,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38897307,
+    "budget": 50448000,
+    "margin": 11550693,
+    "error": null
+   }
+  },
+  {
+   "case": 56,
+   "label": "random #9",
+   "publicInputs": [
+    "1998452338072590273019503221276131223391065665494247035282396109298616145946",
+    "28306690975416117966661263113960335865346236608602995602274526058754116803417"
+   ],
+   "nq": 87,
+   "unlockingLength": 20666,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38627980,
+    "budget": 49065600,
+    "margin": 10437620,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38670092,
+    "budget": 49065600,
+    "margin": 10395508,
+    "error": null
+   }
+  },
+  {
+   "case": 57,
+   "label": "random #10",
+   "publicInputs": [
+    "33798446848728911800727068279245809790024897617429342436267580740315083741892",
+    "51311278980931564920026642286035163208427912247440613959308786222197690753602"
+   ],
+   "nq": 96,
+   "unlockingLength": 21098,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38670963,
+    "budget": 49756800,
+    "margin": 11085837,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38713971,
+    "budget": 49756800,
+    "margin": 11042829,
+    "error": null
+   }
+  },
+  {
+   "case": 58,
+   "label": "random #11",
+   "publicInputs": [
+    "23289620042674496283982250107461862269883471465746423718584980612086265518852",
+    "13240439193713809732633752444477036252397969025138888808880590996000666832848"
+   ],
+   "nq": 99,
+   "unlockingLength": 21242,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38700792,
+    "budget": 49987200,
+    "margin": 11286408,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38744056,
+    "budget": 49987200,
+    "margin": 11243144,
+    "error": null
+   }
+  },
+  {
+   "case": 59,
+   "label": "random #12",
+   "publicInputs": [
+    "2701303040161480577426673776907272804305717478413111963654442595863419162004",
+    "51941986517617366283835091180878662302922298610196235456297733095777426516662"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38705236,
+    "budget": 49526400,
+    "margin": 10821164,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38747860,
+    "budget": 49526400,
+    "margin": 10778540,
+    "error": null
+   }
+  },
+  {
+   "case": 60,
+   "label": "random #13",
+   "publicInputs": [
+    "11493255925578121816826868565319107432765910247524585849874812696580296489878",
+    "32300645309945627789643841117857789526805735868716212632693209951722194341169"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38723280,
+    "budget": 49526400,
+    "margin": 10803120,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38765904,
+    "budget": 49526400,
+    "margin": 10760496,
+    "error": null
+   }
+  },
+  {
+   "case": 61,
+   "label": "random #14",
+   "publicInputs": [
+    "46229597227561253777811994469720167595702978795275342645248227077085852046832",
+    "8867950589399619501619851160421815891440620458639762209527181078351832138371"
+   ],
+   "nq": 90,
+   "unlockingLength": 20810,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38682720,
+    "budget": 49296000,
+    "margin": 10613280,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38725088,
+    "budget": 49296000,
+    "margin": 10570912,
+    "error": null
+   }
+  },
+  {
+   "case": 62,
+   "label": "random #15",
+   "publicInputs": [
+    "16039733681432466567899165551797557183722732249837005977074628826877382280627",
+    "26860864285326999178097207279869733771149372421639264546406115012458958948587"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38702948,
+    "budget": 49526400,
+    "margin": 10823452,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38745572,
+    "budget": 49526400,
+    "margin": 10780828,
+    "error": null
+   }
+  },
+  {
+   "case": 63,
+   "label": "random #16",
+   "publicInputs": [
+    "37458154480773872267304056140678099218716001201301722366137970478507682781781",
+    "5433016849805422724643491715576961509327388291452090916993437884058141463533"
+   ],
+   "nq": 102,
+   "unlockingLength": 21386,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38796005,
+    "budget": 50217600,
+    "margin": 11421595,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38839525,
+    "budget": 50217600,
+    "margin": 11378075,
+    "error": null
+   }
+  },
+  {
+   "case": 64,
+   "label": "random #17",
+   "publicInputs": [
+    "46642400089917348970105438734042487918655403603891221869970196756067275930595",
+    "15765661914332647804469145523152831666024664981539188245517293813851191941013"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38738764,
+    "budget": 49526400,
+    "margin": 10787636,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38781388,
+    "budget": 49526400,
+    "margin": 10745012,
+    "error": null
+   }
+  },
+  {
+   "case": 65,
+   "label": "random #18",
+   "publicInputs": [
+    "5701682291306147699106922455262116824413159918340478752938300314011452355119",
+    "47916780256791170229330829894192154700036655960489332207670182711116193136861"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38712469,
+    "budget": 49526400,
+    "margin": 10813931,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38755093,
+    "budget": 49526400,
+    "margin": 10771307,
+    "error": null
+   }
+  },
+  {
+   "case": 66,
+   "label": "random #19",
+   "publicInputs": [
+    "21334319724631570031040213663265678002949935666011059726979850080402173417290",
+    "32226017648725649728980219871112213289707323681144800062488610974899268127528"
+   ],
+   "nq": 90,
+   "unlockingLength": 20810,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38687018,
+    "budget": 49296000,
+    "margin": 10608982,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38729386,
+    "budget": 49296000,
+    "margin": 10566614,
+    "error": null
+   }
+  },
+  {
+   "case": 67,
+   "label": "random #20",
+   "publicInputs": [
+    "46846715498903286264760572219787383518260565685741767153727399505919983150142",
+    "2887699227968564328061270523759834227289651295653673832691830123088170218347"
+   ],
+   "nq": 96,
+   "unlockingLength": 21098,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38734722,
+    "budget": 49756800,
+    "margin": 11022078,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38777730,
+    "budget": 49756800,
+    "margin": 10979070,
+    "error": null
+   }
+  },
+  {
+   "case": 68,
+   "label": "random #21",
+   "publicInputs": [
+    "16719719933701384737533637526201293915861084055451279410705507377838651087565",
+    "37242570475431029806793243307652346987132927240229720605484530561124683432255"
+   ],
+   "nq": 99,
+   "unlockingLength": 21242,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38742399,
+    "budget": 49987200,
+    "margin": 11244801,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38785663,
+    "budget": 49987200,
+    "margin": 11201537,
+    "error": null
+   }
+  },
+  {
+   "case": 69,
+   "label": "random #22",
+   "publicInputs": [
+    "12188994534751730064413301222666740012552305646448333214517798482242799694082",
+    "39022510777206738170310405320212382801917456522938629040016062886109632147126"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38673100,
+    "budget": 49526400,
+    "margin": 10853300,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38715724,
+    "budget": 49526400,
+    "margin": 10810676,
+    "error": null
+   }
+  },
+  {
+   "case": 70,
+   "label": "random #23",
+   "publicInputs": [
+    "26134798203336274214449895823673387789018580989279075844415583758031530623418",
+    "22556271718743331435671697444934375090835293759217975760364614832580419831795"
+   ],
+   "nq": 96,
+   "unlockingLength": 21098,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38714635,
+    "budget": 49756800,
+    "margin": 11042165,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38757643,
+    "budget": 49756800,
+    "margin": 10999157,
+    "error": null
+   }
+  },
+  {
+   "case": 71,
+   "label": "random #24",
+   "publicInputs": [
+    "23045873639027198739109413802191114426612148140409097425328154350424278761536",
+    "8864221429583080812176996390558882497128813199360081837119830935875201980376"
+   ],
+   "nq": 90,
+   "unlockingLength": 20810,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38641863,
+    "budget": 49296000,
+    "margin": 10654137,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38684231,
+    "budget": 49296000,
+    "margin": 10611769,
+    "error": null
+   }
+  },
+  {
+   "case": 72,
+   "label": "random #25",
+   "publicInputs": [
+    "36869624654464723724286231064121335644761253408454803567897922660726567325409",
+    "6617079484709933242241281560680368252142059091957956795779372145301964044759"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38677677,
+    "budget": 49526400,
+    "margin": 10848723,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38720301,
+    "budget": 49526400,
+    "margin": 10806099,
+    "error": null
+   }
+  },
+  {
+   "case": 73,
+   "label": "random #26",
+   "publicInputs": [
+    "43458251579450312603016461243754163106923099946547042991632797952467307687532",
+    "44751714887736026195230616731363650935119926583084826072987478000654992380278"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38691032,
+    "budget": 49526400,
+    "margin": 10835368,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38733656,
+    "budget": 49526400,
+    "margin": 10792744,
+    "error": null
+   }
+  },
+  {
+   "case": 74,
+   "label": "random #27",
+   "publicInputs": [
+    "48697702786216924064532585065484515339930259851376449584628828349904641754582",
+    "2442668542129802892743292054093940454612432464082211590032605644002363888292"
+   ],
+   "nq": 90,
+   "unlockingLength": 20810,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38562735,
+    "budget": 49296000,
+    "margin": 10733265,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38605103,
+    "budget": 49296000,
+    "margin": 10690897,
+    "error": null
+   }
+  },
+  {
+   "case": 75,
+   "label": "random #28",
+   "publicInputs": [
+    "27047822063878674203491259213758287150720324513903867087308375913198215970153",
+    "47096965684443722916942534767994985474882038823579930778775848133268691596534"
+   ],
+   "nq": 96,
+   "unlockingLength": 21098,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38686884,
+    "budget": 49756800,
+    "margin": 11069916,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38729892,
+    "budget": 49756800,
+    "margin": 11026908,
+    "error": null
+   }
+  },
+  {
+   "case": 76,
+   "label": "random #29",
+   "publicInputs": [
+    "18890208927860148167290882350125398001100797514665836728950016564426523025359",
+    "50794011817533120167889062440184621570632193769142336624170240051163527202074"
+   ],
+   "nq": 96,
+   "unlockingLength": 21098,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38727243,
+    "budget": 49756800,
+    "margin": 11029557,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38770251,
+    "budget": 49756800,
+    "margin": 10986549,
+    "error": null
+   }
+  },
+  {
+   "case": 77,
+   "label": "random #30",
+   "publicInputs": [
+    "37654158520550811305702990270244293036447912738390040452080530998178467321690",
+    "33861648359777020422007815234001453952000005096192987668445638892697068038359"
+   ],
+   "nq": 102,
+   "unlockingLength": 21386,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38833415,
+    "budget": 50217600,
+    "margin": 11384185,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38876935,
+    "budget": 50217600,
+    "margin": 11340665,
+    "error": null
+   }
+  },
+  {
+   "case": 78,
+   "label": "random #31",
+   "publicInputs": [
+    "5780814475061656560499598914692945582513501402768999287969569882317450909531",
+    "47922947271986153594067142644831664600922985776059892157198847739376111718341"
+   ],
+   "nq": 99,
+   "unlockingLength": 21242,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38695237,
+    "budget": 49987200,
+    "margin": 11291963,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38738501,
+    "budget": 49987200,
+    "margin": 11248699,
+    "error": null
+   }
+  },
+  {
+   "case": 79,
+   "label": "random #32",
+   "publicInputs": [
+    "27601448917165572445654709395410546162372508284374664420789060912831170380789",
+    "34276490578919078690941701568952131821044134022055733590002010478881657619797"
+   ],
+   "nq": 90,
+   "unlockingLength": 20810,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38713314,
+    "budget": 49296000,
+    "margin": 10582686,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38755682,
+    "budget": 49296000,
+    "margin": 10540318,
+    "error": null
+   }
+  },
+  {
+   "case": 80,
+   "label": "random #33",
+   "publicInputs": [
+    "12379941955688438264488190687075242519829994199094839486619381158171306840301",
+    "8453634735707223974931162515096887755206422650857331587899070735745219160293"
+   ],
+   "nq": 93,
+   "unlockingLength": 20954,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38672410,
+    "budget": 49526400,
+    "margin": 10853990,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38715034,
+    "budget": 49526400,
+    "margin": 10811366,
+    "error": null
+   }
+  },
+  {
+   "case": 81,
+   "label": "random #34",
+   "publicInputs": [
+    "8247362908978259519048596711824866115028852948242645452662829872213070899364",
+    "35837274194676035492724389583757044736003753700918881545894849583177943792714"
+   ],
+   "nq": 99,
+   "unlockingLength": 21242,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38720391,
+    "budget": 49987200,
+    "margin": 11266809,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38763655,
+    "budget": 49987200,
+    "margin": 11223545,
+    "error": null
+   }
+  },
+  {
+   "case": 82,
+   "label": "random #35",
+   "publicInputs": [
+    "7257887030252490442303547700847878790159845693623553552920605116814457985783",
+    "2107010478298826023241723651092874797577034986077269188472680085869065983883"
+   ],
+   "nq": 96,
+   "unlockingLength": 21098,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38627755,
+    "budget": 49756800,
+    "margin": 11129045,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38670763,
+    "budget": 49756800,
+    "margin": 11086037,
+    "error": null
+   }
+  },
+  {
+   "case": 83,
+   "label": "random #36",
+   "publicInputs": [
+    "25424740797163787570483312302322851656450909324716926400986120464365414522753",
+    "35195751094557100998733240852681548688531280037658654856777078949870811653206"
+   ],
+   "nq": 102,
+   "unlockingLength": 21386,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38837226,
+    "budget": 50217600,
+    "margin": 11380374,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38880746,
+    "budget": 50217600,
+    "margin": 11336854,
+    "error": null
+   }
+  },
+  {
+   "case": 84,
+   "label": "random #37",
+   "publicInputs": [
+    "48906525216164792584383237669530674544621720476788712625222523411660768390377",
+    "14953194097448382892757668968687930350266038462369329195770606206684806387509"
+   ],
+   "nq": 87,
+   "unlockingLength": 20666,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38636297,
+    "budget": 49065600,
+    "margin": 10429303,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38678409,
+    "budget": 49065600,
+    "margin": 10387191,
+    "error": null
+   }
+  },
+  {
+   "case": 85,
+   "label": "random #38",
+   "publicInputs": [
+    "42130580313283651850440252607329541604280816943070396862303833532816070641149",
+    "9140442191591992731205244249207934286692929093998245003148956228407135821310"
+   ],
+   "nq": 96,
+   "unlockingLength": 21098,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38770602,
+    "budget": 49756800,
+    "margin": 10986198,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38813610,
+    "budget": 49756800,
+    "margin": 10943190,
+    "error": null
+   }
+  },
+  {
+   "case": 86,
+   "label": "random #39",
+   "publicInputs": [
+    "27173502408017045823072548981385166777644017780669835003513109354573193834318",
+    "39465747197146319707318663294620861215403670407872741627781535494156943513381"
+   ],
+   "nq": 96,
+   "unlockingLength": 21098,
+   "consensus": {
+    "accepted": true,
+    "opCost": 38707029,
+    "budget": 49756800,
+    "margin": 11049771,
+    "error": null
+   },
+   "standard": {
+    "accepted": true,
+    "opCost": 38750037,
+    "budget": 49756800,
+    "margin": 11006763,
+    "error": null
+   }
+  }
+ ]
+}

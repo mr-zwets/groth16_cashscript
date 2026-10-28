@@ -1,0 +1,42 @@
+{
+ "redeemBytes": 8468,
+ "redeemSha256": "87167732e5b83dc88b336115d551a20ab82be5ac9997a9af897548855e562653",
+ "lockingHex": "aa203b86ac4bb96398ae0f111058eaa34f91943b896e2a9fc9b7f64f1afb6c37ef4687",
+ "unlockingBytes": 9018,
+ "committed": {
+  "consensus": {
+   "accepted": true,
+   "opCost": 147416156,
+   "error": null
+  },
+  "standard": {
+   "accepted": true,
+   "opCost": 147433308,
+   "error": null
+  }
+ },
+ "invalidInputsRejected": true,
+ "invalidError": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\".",
+ "sections": {
+  "init": 0,
+  "parse+checks": 308,
+  "vkx": 641,
+  "setup": 771,
+  "loop": 1210,
+  "terminal-lines": 943,
+  "terminal-residue": 1357,
+  "cleanup": 7
+ },
+ "functions": {
+  "P": 33,
+  "RD": 14,
+  "G1C": 18,
+  "DBL": 424,
+  "ADD": 558,
+  "MULL": 828,
+  "MULC": 835,
+  "PSI": 72,
+  "GLUE": 412
+ },
+ "prologue": 3231
+}
