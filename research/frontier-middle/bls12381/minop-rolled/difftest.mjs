@@ -7,7 +7,7 @@
 // debug contracts accepting the same expF proves F_rolled == F_unrolled. A JS replay of the rolled op order (on-chain
 // gamma/delta walks, per-digit reordering) is also asserted equal to expF.
 //   node difftest.mjs
-import { readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { compileFile, utils } from 'cashc';
 import { hexToBin, decodeAuthenticationInstructions, vmNumberToBigInt, bigIntToVmNumber, encodeDataPush, createVirtualMachine, createInstructionSetBch2026,
   createTestAuthenticationProgramBch, ConsensusBch2025, ripemd160, secp256k1, sha1, sha256 } from '@bitauth/libauth';
@@ -15,7 +15,9 @@ const here = new URL('./', import.meta.url).pathname;
 const C = await import('../../../../chunked/bls12-381/_pairingmath.mjs');
 const { bls12_381 } = await import('../../../../chunked/bls12-381/_vkxmath.mjs');
 const { Fp, Fp2, Fp6, Fp12 } = bls12_381.fields; const P = Fp.ORDER; const G1 = bls12_381.G1.Point, G2 = bls12_381.G2.Point;
-const BENCH = process.env.BENCH_DIR ?? new URL('../../../../../bench/', import.meta.url).pathname;
+// BENCH_DIR default: the sibling of this repository's checkout, zk-verifier-bench/ or bench/, whichever has the vectors
+const REPO_PARENT = new URL('../../../../../', import.meta.url).pathname;
+const BENCH = process.env.BENCH_DIR ?? (['zk-verifier-bench/', 'bench/'].map((d) => REPO_PARENT + d).find((d) => existsSync(d + 'src/bch/groth16-bls12381-singleton-minop-vectors.json')) ?? REPO_PARENT + 'zk-verifier-bench/');
 const v = JSON.parse(readFileSync(BENCH + 'src/bch/groth16-bls12381-singleton-minop-vectors.json', 'utf8'));
 const mp = JSON.parse(readFileSync(BENCH + 'src/bch/groth16-bls12381-singleton-minop-multiproof-vectors.json', 'utf8'));
 const HUGE = Number.MAX_SAFE_INTEGER;

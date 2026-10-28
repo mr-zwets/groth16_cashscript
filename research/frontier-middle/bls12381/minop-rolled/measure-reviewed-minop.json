@@ -2,7 +2,7 @@
  "contract": "groth16_minop.cash",
  "lockingBytes": 58007,
  "lockingSha256": "f943ef5570a16938c5beb4167fb963328fbed9d098395747bae22eeddec52645",
- "score": 58817,
+ "score": 58841,
  "opDefines": 27,
  "opDefineBodyBytes": 2480,
  "committed": {

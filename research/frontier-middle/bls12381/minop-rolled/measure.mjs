@@ -3,7 +3,7 @@
 //   valid + 3 extra proofs + dense worst case must be accepted; invalidUnlocking, the range-invalid set and each
 //   multiproof invalidUnlocking must be rejected. No new invalid inputs are constructed here.
 //   node measure.mjs [contract.cash] [out.json]      (BENCH_DIR: zk-verifier-bench checkout with the vectors)
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { compileFile, utils } from 'cashc';
 import {
@@ -11,7 +11,10 @@ import {
   createTestAuthenticationProgramBch, ConsensusBch2025, ripemd160, secp256k1, sha1, sha256,
 } from '@bitauth/libauth';
 
-const BENCH = process.env.BENCH_DIR ?? new URL('../../../../../bench/', import.meta.url).pathname;
+// BENCH_DIR default: the sibling of this repository's checkout, zk-verifier-bench/ (side-by-side clones) or bench/ (the
+// work/<task>/{src,bench} worktree layout), whichever has the minop vectors
+const REPO_PARENT = new URL('../../../../../', import.meta.url).pathname;
+const BENCH = process.env.BENCH_DIR ?? (['zk-verifier-bench/', 'bench/'].map((d) => REPO_PARENT + d).find((d) => existsSync(d + 'src/bch/groth16-bls12381-singleton-minop-vectors.json')) ?? REPO_PARENT + 'zk-verifier-bench/');
 const file = process.argv[2] ?? new URL('./groth16_minop_rolled.cash', import.meta.url).pathname;
 const t0 = Date.now();
 const locking = utils.asmToBytecode(compileFile(file, { rescheduleStacks: true }).bytecode);
@@ -34,7 +37,7 @@ const run = (u) => { const st = vm.evaluate(createTestAuthenticationProgramBch({
 const ins = decodeAuthenticationInstructions(locking); let defBody = 0, nDef = 0, lastDef = -1;
 ins.forEach((x, i) => { if (x.opcode === 0x89) { const body = ins[i - 2]; defBody += body.data?.length ?? 0; nDef++; lastDef = i; } });
 const flow = ins.slice(0, lastDef + 1).some((x) => [0x63, 0x64, 0x65, 0x66, 0x67, 0x68].includes(x.opcode)); if (flow) throw new Error('OP_DEFINE after flow control: adjust by trace');
-const TXO = 63; // the harness's single-input tx overhead (results.json scores: locking + unlocking + 63)
+const TXO = 87; // the harness tx overhead for this one-input, minop-interface spend (results.json minop score 58,841 = locking + unlocking + 87)
 const rows = [];
 const valid = [['committed', v.unlocking], ...mp.proofs.filter((p) => !p.committed).map((p, i) => [`multiproof #${i + 1} (${p.publicInputs.join(',')})`, p.unlocking]), ['worstCaseProof (dense inputs)', mp.worstCaseProof.unlocking]];
 const invalid = [['invalidUnlocking (n0 + 1)', v.invalidUnlocking], ...v.rangeInvalidUnlockings.map((x) => [x.label, x.unlocking]), ...mp.proofs.map((p, i) => [`multiproof #${i} invalidUnlocking`, p.invalidUnlocking]), ['worstCaseProof invalidUnlocking', mp.worstCaseProof.invalidUnlocking]];

@@ -1,9 +1,11 @@
 # BLS12-381 rolled minop (research design T2)
 
-**Research artifact, not a ranked entry.** It is not in the bench registry and it is not reviewed. It fits the
-bch-2026 per-input script and standard unlocking caps when packaged as P2SH32: redeem 7,840 B, unlocking 8,590 B.
-Its op-cost, though, needs a budget about 28–31× looser than bch-2026. Track 2 (the empty middle of the bytes vs
-op-cost frontier) uses it as a data point.
+**Bench entry `bch-groth16-bls12381-singleton-minop-rolled`** (vmTarget bch-2026, P2SH32). It had two Track 2 reviews
+(soundness; measurement reproduction), both pass with minor findings only, handled in the 2026-10-28 fix round (see
+"Review follow-ups"). It fits the bch-2026 per-input script and standard unlocking caps when packaged as P2SH32:
+redeem 7,840 B, unlocking 8,590 B. Its op-cost, though, needs a budget about 28–31× looser than bch-2026, so the bench
+grades it "not BCH-compatible: op-cost", like the singletons. It is a Track 2 (the empty middle of the bytes vs op-cost
+frontier) design.
 
 It is a rolled version of the reviewed `singleton/bls12-381/groth16_minop.cash`, bench id
 `bch-groth16-bls12381-singleton-minop`, which had two independent reviews on 2026-10-27 (verifiers.md line 117). The
@@ -33,7 +35,7 @@ they are.
 | op cost, committed | **192,759,049** libauth; **BCHN-adjusted 192,761,316** (+2,267) | 192,742,808 |
 | op cost, dense worst-case proof | 218,289,447; BCHN-adjusted 218,291,714 | 218,273,206 |
 | op budget needed (bch-2026 base, BCHN-adjusted) | k_min 27.9 committed, 31.2 worst case | 306 (the budget does not count a bare locking) |
-| harness gates | valid accepted; 4/4 proofs runtime-general; worst case accepted; invalid 5/5 rejected; public-input gate 9/9 rejected; secure packaging | same |
+| harness gates | valid accepted; 4/4 proofs runtime-general; worst case accepted; invalid 9/9 rejected (the registered entry: invalidUnlocking, 4 range-invalid, 3 multiproof and the worst-case invalidUnlocking; the research run loaded the first 5); public-input gate 9/9 rejected; secure packaging | same |
 
 `measure.mjs` gives the same verdicts on the full existing vector set:
 - 5/5 valid accepted: committed, 3 multiproof proofs, the dense worst case;
@@ -93,6 +95,24 @@ only where the γ/δ line coefficients come from and the control flow.
 4. **No new kernel.** pointDouble, pointAdd, line, fp12Sqr and fp12MulTorus are the reviewed library bodies
    (`singleton/bls12-381/lib/lazy/`), imported unchanged.
 
+5. **Control flow does not depend on the input.** The loop runs over the baked NAF digit string, and the γ/δ walks are
+   VK constants; only the B walk and the line evaluations depend on the proof. So every branch of the rolled program,
+   including the −1 digit at position 62, runs on every vector, and the difftest exercises all of them on each of the
+   5 vectors.
+6. **Lazy-tower bound envelope: liveness only.** The lazy library's input envelope ("every input below 310p") was
+   proved by `bound_analysis` for the reviewed unrolled dataflow. The rolled program changes that dataflow: the γ/δ
+   walk outputs feed back into pointDouble/pointAdd, the −Q constants come from mSub instead of fp2Neg, and the c-fold
+   takes a `line()` output instead of an fp12Sqr output. The envelope has **not** been re-established for it, and this
+   does not affect soundness:
+   - all Miller-loop arithmetic is exact signed-integer arithmetic (BCH bignums), so it preserves congruence mod p
+     whatever the size of the intermediates;
+   - the terminal and ψ checks are congruence tests or comparisons, and a value outside the envelope can only make a
+     check fail or the VM hit a number-size limit, i.e. turn a valid proof into a rejection;
+   - so an envelope violation costs liveness (false rejection), never soundness.
+
+   Liveness is covered empirically: the committed proof, the 3 multiproof proofs and the dense worst case are accepted,
+   and on all 5 the accumulator F equals the reviewed unrolled program's (item 3).
+
 The terminal accepts iff [F] = [frob(c, 1)] in the quotient torus, exactly as in the reviewed minop. F is the same
 value, so acceptance is the same predicate on the same inputs.
 
@@ -105,9 +125,22 @@ node --stack-size=60000 difftest.mjs           # F differential test vs the revi
 HOIST=0 node gen_minop_rolled.mjs              # variant with gamma/delta literals inlined at every use (+471 B)
 ```
 
-`BENCH_DIR` points at a zk-verifier-bench checkout. The default is the sibling `bench` worktree of this research
-workspace. Bench measurement: zk-verifier-bench branch `wip/frontier-middle-build-bls12381`,
-`research/frontier-middle/bls12381/run.ts`.
+`BENCH_DIR` points at a zk-verifier-bench checkout. The default is the sibling of this repository's checkout,
+`../zk-verifier-bench` (side-by-side clones) or `../bench` (the `work/<task>/{src,bench}` worktree layout), whichever
+has the minop vectors. `measure.mjs` scores with the harness's 87 B tx overhead for this spend (it used 63 B before the
+fix round; the `score` fields of `measure-rolled.json` / `.log` and `measure-reviewed-minop.json` are corrected to
+8,674 and 58,841, the bare-locking scores the harness gives; the P2SH32 entry scores 8,712).
+
+Bench: `pnpm benchmark minop-rolled` (redeem `src/bch/groth16-bls12381-singleton-minop-rolled-redeem.hex`, sha256
+d9dd1e4f…b736, the compiled `groth16_minop_rolled.cash`; the reviewed minop's existing vectors with the redeem
+appended). The Track 2 measurement glue is zk-verifier-bench `research/frontier-middle/bls12381/run.ts`.
+
+## Review follow-ups (fix round, 2026-10-28)
+
+- The lazy-tower bound envelope is stated as a liveness-only matter (soundness item 6), with the input-independent
+  control flow noted (item 5). `bound_analysis` was not re-run on the rolled dataflow.
+- `measure.mjs` uses the harness's 87 B overhead; the stale 8,650 score in the side files is corrected.
+- `measure.mjs` / `difftest.mjs` default `BENCH_DIR` to the sibling checkout.
 
 ## Not done
 
