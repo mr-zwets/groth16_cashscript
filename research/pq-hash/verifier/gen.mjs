@@ -55,7 +55,7 @@ export class PB {
   add(A, B, out) { return this.fn?.ADDE ? this.call(this.fn.ADDE, [...A, ...B], this.e, out) : A.map((a, i) => this.red(add(ex(a), ex(B[i])), out?.[i])); }
   // A - B for B < 2^64 (raw or canonical): + 2p keeps the dividend positive
   sub(A, B, out) { return this.fn?.SUBE ? this.call(this.fn.SUBE, [...A, ...B], this.e, out) : A.map((a, i) => this.red(add(sub(ex(a), ex(B[i])), K(2n * P)), out?.[i])); }
-  subBase0(A, c) { return [this.red(add(sub(ex(A[0]), ex(c)), K(2n * P))), ...A.slice(1)]; }
+  subBase0(A, c) { return [this.fn?.ADDC ? this.call(this.fn.ADDC, [A[0], K(2n * P - BigInt(c))], 1)[0] : this.red(add(sub(ex(A[0]), ex(c)), K(2n * P))), ...A.slice(1)]; }
   pow2k(x, k) { for (let i = 0; i < k; i++) x = this.mm(x, x); return x; }
 }
 
@@ -101,6 +101,9 @@ export function buildB(prm, statement, opts = {}) {
   { const b = new PB(e); names('a', e).forEach((x, i) => b.red(mul(V(x), V('s')), 'c' + i)); F.MULF = defFn('MULF', slpFn([...names('a', e), 's'], b.prog, names('c', e))); }
   { const b = new PB(e); names('a', e).forEach((x, i) => b.red(add(V(x), V('b' + i)), 'c' + i)); F.ADDE = defFn('ADDE', slpFn([...names('a', e), ...names('b', e)], b.prog, names('c', e))); }
   { const b = new PB(e); names('a', e).forEach((x, i) => b.red(add(sub(V(x), V('b' + i)), K(2n * P)), 'c' + i)); F.SUBE = defFn('SUBE', slpFn([...names('a', e), ...names('b', e)], b.prog, names('c', e))); }
+  F.ADDC = defFn('ADDC', asm('ADD', P, 'MOD'));
+  { const b = new PB(e, F); const m = b.mul(names('a', e), names('z', e)); b.red(add(V(m[0]), V('k')), 'c0'); m.slice(1).forEach((x, i) => b.let(V(x), 'c' + (i + 1)));
+    F.HSTEP = defFn('HSTEP', slpFn([...names('a', e), ...names('z', e), 'k'], b.prog, names('c', e))); }
   const Ecode = e === 3
     ? [B0, 'CAT', 'BIN2NUM', 'DUP', P, 'MOD', 'SWAP', P, 'DIV', 'DUP', P, 'MOD', 'SWAP', P, 'DIV', P, 'MOD']
     : [B0, 'CAT', 'BIN2NUM', 'DUP', P, 'MOD', 'SWAP', P, 'DIV', P, 'MOD'];
@@ -111,7 +114,7 @@ export function buildB(prm, statement, opts = {}) {
     const d = Array.from({length: e}, (_, c) => b.let(add(sub(V('u' + c), V('v' + c)), K(2n * P))));
     const gd = b.mul(names('g', e), d);
     for (let c = 0; c < e; c++) b.red(add(add(V('u' + c), V('v' + c)), V(gd[c])), 'o' + c);
-    F.PAIR = defFn('PAIR', slpFn([...names('u', e), ...names('v', e), ...names('g', e)], b.prog, names('o', e)));
+    F.PAIR = defFn('PAIR', slpFn([...names('g', e), ...names('u', e), ...names('v', e)], b.prog, names('o', e)));
   }
   // NA: norm and adjugate of (x - zz) for base-field x, from the per-proof constants of zz
   const naArgs = e === 3 ? ['x', 'm0', 'z1', 'z2', 'K0', 'K1', 'K2', 'cA', 'cB'] : ['x', 'm0', 'cN'];
@@ -182,7 +185,7 @@ export function buildB(prm, statement, opts = {}) {
   }
   // FOLD<a>: binary fold of a coset of a values with x0^-1 = X and beta^(2^l) (l < log2 a): pairs (j, j + half),
   // g = beta^(2^l) x_j^-1; returns the unscaled fold (a times the folded value)
-  const foldArgs = (ai) => [...Array.from({length: ai}, (_, j) => names(`v${j}_`, e)).flat(), 'X', ...Array.from({length: Math.log2(ai)}, (_, l) => names(`b${l}_`, e)).flat()];
+  const foldArgs = (ai) => [...Array.from({length: ai}, (_, j) => names(`v${j}_`, e)).flat(), ...Array.from({length: Math.log2(ai)}, (_, l) => names(`b${l}_`, e)).flat(), 'X'];
   // recursive: FOLD<a> = the a/2 level-0 pair steps, then FOLD<a/2> on the results with X^2 and beta^2.. (FOLD2 = one pair)
   const arSet = new Set(); for (const ai of a) for (let x = ai; x >= 2; x >>= 1) arSet.add(x);
   for (const ai of [...arSet].sort((x, y) => x - y)) {
@@ -192,9 +195,9 @@ export function buildB(prm, statement, opts = {}) {
     for (let j = 0; j < half; j++) {
       const xj = j === 0 ? 'X' : b.mm('X', K(powp(wai, BigInt(j))));
       const g = b.mulF(names('b0_', e), xj);
-      nxt.push(b.call(F.PAIR, [...names(`v${j}_`, e), ...names(`v${j + half}_`, e), ...g], e, ai === 2 ? names('o', e) : undefined));
+      nxt.push(b.call(F.PAIR, [...g, ...names(`v${j}_`, e), ...names(`v${j + half}_`, e)], e, ai === 2 ? names('o', e) : undefined));
     }
-    if (ai > 2) b.call(F['FOLD' + half], [...nxt.flat(), b.mm('X', 'X'), ...Array.from({length: Math.log2(ai) - 1}, (_, l) => names(`b${l + 1}_`, e)).flat()], e, names('o', e));
+    if (ai > 2) { const X2 = b.mm('X', 'X'); b.call(F['FOLD' + half], [...nxt.flat(), ...Array.from({length: Math.log2(ai) - 1}, (_, l) => names(`b${l + 1}_`, e)).flat(), X2], e, names('o', e)); }
     F['FOLD' + ai] = defFn('FOLD' + ai, slpFn(foldArgs(ai), b.prog, names('o', e)));
   }
 
@@ -205,8 +208,10 @@ export function buildB(prm, statement, opts = {}) {
   const rF = Array.from({length: r - 1}, (_, i) => 'rF' + (i + 1));
   const pt = ['rT', 'rC', 'OOD', ...rF, 'FIN', 'NONCE'];   // the statement is baked into the code
   init.push(...pt);
+  if (opts.padSlot) init.push('PAD');   // TXv5-as-written grading variant: a zero pad the script ignores
   const S = new Stk(init);
   S.emit('DEPTH', init.length, 'NUMEQUALVERIFY');
+  if (opts.padSlot) S.drop('PAD');
   mark(S, 'entry');
 
   // ---------------- phase 1: transcript ----------------
@@ -250,7 +255,9 @@ export function buildB(prm, statement, opts = {}) {
   {
     S.roll('OODc');
     const ood = ['oX', 'oY', 'oW', 'oA', 'oB'].flatMap((x) => names(x, e));
-    S.raw([...Array.from({length: ood.length - 1}, () => [8, 'SPLIT', 'SWAP', B0, 'CAT', 'BIN2NUM', 'SWAP']), B0, 'CAT', 'BIN2NUM'], 1, ood);
+    { const nfull = Math.floor(ood.length / 8), rest = ood.length - 8 * nfull;
+      S.raw([...Array.from({length: nfull}, () => [64, 'SPLIT', 'SWAP', F.PARSE8, 'INVOKE', 8, 'ROLL']),
+        ...Array.from({length: rest - 1}, () => [8, 'SPLIT', 'SWAP', B0, 'CAT', 'BIN2NUM', 'SWAP']), B0, 'CAT', 'BIN2NUM'], 1, ood); }
     const b = new PB(e, F);
     const [X, Y, W, A, Bv] = ['oX', 'oY', 'oW', 'oA', 'oB'].map((x) => names(x, e));   // raw (< 2^64): every consumer accepts raw inputs
     const n = BigInt(prm.n), wl = powp(prm.wn, n - 1n);
@@ -258,8 +265,8 @@ export function buildB(prm, statement, opts = {}) {
     for (let i = 0; i < 13; i++) zz = b.sq(zz);
     const zp = zz; for (let i = 0; i < 3; i++) zz = b.sq(zz); const zn = zz;
     // c(z) = Pc(zp): Horner with base coefficients
-    let cz = [b.red(add(mul(V(zp[0]), K(prm.Pc[7])), K(prm.Pc[6]))), ...zp.slice(1).map((x) => b.red(mul(V(x), K(prm.Pc[7]))))];
-    for (let k = 5; k >= 0; k--) { const m = b.mul(cz, zp); cz = [b.red(add(V(m[0]), K(prm.Pc[k]))), ...m.slice(1)]; }
+    let cz = [K(prm.Pc[7]), ...Array(e - 1).fill(K(0))];
+    for (let k = 6; k >= 0; k--) cz = b.call(F.HSTEP, [...cz, ...zp, K(prm.Pc[k])], e);
     const sv = b.add(cz, X);
     const C1 = b.sub(Y, b.mul(b.sq(sv), sv));
     const C2 = b.sub(W, b.mul(b.sq(Y), sv));
@@ -428,7 +435,7 @@ export function buildB(prm, statement, opts = {}) {
     const consts = [...[1, 2, 3, 4, 5].flatMap(gam), ...names('dC1_', e), ...names('dC2_', e)];
     const f0 = xs.map((_, j) => b.call(F.DEEPPT, ['tX' + j, 'tY' + j, ...names(`cA${j}_`, e), ...names(`cB${j}_`, e),
       ...na[j][0].adj, inv[2 * j], ...na[j][1].adj, inv[2 * j + 1], ...consts], e));
-    const foldB = (bb, i, cur, X) => bb.call(F['FOLD' + a[i]], [...cur.flat(), X, ...Array.from({length: Math.log2(a[i])}, (_, l) => names(`bp${i}_${l}_`, e)).flat()], e);
+    const foldB = (bb, i, cur, X) => bb.call(F['FOLD' + a[i]], [...cur.flat(), ...Array.from({length: Math.log2(a[i])}, (_, l) => names(`bp${i}_${l}_`, e)).flat(), X], e);
     let Fv = foldB(b, 0, f0, x0inv);
     const keepC = () => Q.st.filter((x) => /^(bp\d|ga|dC|dz)/.test(x));
     compileSlp(Q, b.prog, {keep: [...keepC(), 'x0', x0inv]});
@@ -438,19 +445,49 @@ export function buildB(prm, statement, opts = {}) {
       const d = Q.depth(first); Q.pick(slot);
       Q.raw([...(stride > 1 ? [stride, 'MUL'] : []), d, 'SWAP', 'SUB', 'PICK'], 1, [out]);
     };
+    // layers i >= 1: LAYER<a_i> checks the previous fold against the leaf's slot value, updates the coset bases and folds.
+    // Entry: [ .. v_i block (a_i e values) | F (e) xp xbp wp wn slot scale bp (log2 a_i e) ]; exit [ .. F' xinv xb ].
+    // Fri leaves were parsed last layer first, so each layer's block is on top when its turn comes.
     let xinv = x0inv, xb = 'x0';
     for (let i = 1; i < r; i++) {
-      const sel = names(`sel${i}_`, e);
-      sel.forEach((nm, c) => pickRT('sl' + i, `v${i}_0_${c}`, e, nm));
-      pickRT('sl' + i, `Wp${a[i]}_0`, 1, 'wp' + i); pickRT('sl' + i, `Wn${a[i]}_0`, 1, 'wn' + i); Q.drop('sl' + i);
+      const ai = a[i], L = Math.log2(ai);
       const bb = new PB(e, F);
-      // a_{i-1} * (leaf value at the slot) == the unscaled fold of layer i-1
-      sel.forEach((nm, c) => bb.chk(chk('NUMEQUALVERIFY', R(mul(V(nm), K(a[i - 1]))), V(Fv[c]))));
-      xinv = bb.mm(bb.pow2k(xinv, Math.log2(a[i - 1])), 'wp' + i);
-      xb = bb.mm(bb.pow2k(xb, Math.log2(a[i - 1])), 'wn' + i);
-      Fv = foldB(bb, i, Array.from({length: a[i]}, (_, j) => names(`v${i}_${j}_`, e)), xinv);
-      compileSlp(Q, bb.prog, {keep: [...keepC(), ...(i < r - 1 ? [xinv] : [])]});
+      const xp = bb.pow2k(xinv, Math.log2(a[i - 1])), xbp = bb.pow2k(xb, Math.log2(a[i - 1]));
+      compileSlp(Q, bb.prog, {keep: keepC()});
+      pickRT('sl' + i, `Wp${ai}_0`, 1, 'wp' + i); pickRT('sl' + i, `Wn${ai}_0`, 1, 'wn' + i);
+      if (!F['LAYER' + ai]) {
+        const sl = new Stk([...Array.from({length: ai}, (_, j) => names(`v${j}_`, e)).flat(), ...names('F', e), 'xp', 'xbp', 'wp', 'wn', 'sl', 'sc', ...Array.from({length: L}, (_, l) => names(`b${l}_`, e)).flat()]);
+        const sel = names('sel', e);
+        sel.forEach((nm, c) => { const d = sl.depth(`v0_${c}`); sl.pick('sl'); sl.raw([...(e > 1 ? [e, 'MUL'] : []), d, 'SWAP', 'SUB', 'PICK'], 1, [nm]); });
+        sl.drop('sl');
+        const lb0 = new PB(e, F);
+        lb0.call(F.MM, ['xbp', 'wn'], 1, ['xb']);
+        compileSlp(sl, lb0.prog);
+        sl.raw(['TOALTSTACK'], 1);
+        const lb = new PB(e, F);
+        sel.forEach((nm, c) => lb.chk(chk('NUMEQUALVERIFY', R(mul(V(nm), V('sc'))), V('F' + c))));
+        lb.call(F.MM, ['xp', 'wp'], 1, ['xi']);
+        compileSlp(sl, lb.prog);
+        sl.raw(['DUP', 'TOALTSTACK'], 0);                  // keep a copy of x_i^-1 for the next layer
+        const lb2 = new PB(e, F);
+        lb2.call(F['FOLD' + ai], [...Array.from({length: ai}, (_, j) => names(`v${j}_`, e)).flat(), ...Array.from({length: L}, (_, l) => names(`b${l}_`, e)).flat(), 'xi'], e, names('o', e));
+        compileSlp(sl, lb2.prog, {keep: names('o', e)});
+        sl.raw(['FROMALTSTACK', 'FROMALTSTACK'], 0, ['xi', 'xb']);
+        sl.arrange([...names('o', e), 'xi', 'xb']);
+        F['LAYER' + ai] = defFn('LAYER' + ai, sl.bytes());
+      }
+      // arguments directly on top of the v_i block: everything above the block must be an argument
+      const block = Array.from({length: ai}, (_, j) => names(`v${i}_${j}_`, e)).flat();
+      const args = [...Fv, xp, xbp, 'wp' + i, 'wn' + i, 'sl' + i];
+      const stray = Q.st.slice(Q.st.lastIndexOf(block[block.length - 1]) + 1).filter((x) => !args.includes(x));
+      if (stray.length) throw new Error('items above the layer block: ' + stray.join(','));
+      const lb = new PB(e, F);
+      const out = lb.call(F['LAYER' + ai], [...args, K(a[i - 1]), ...Array.from({length: L}, (_, l) => names(`bp${i}_${l}_`, e)).flat()], e + 2);
+      compileSlp(Q, lb.prog, {keep: keepC()});
+      for (const x of block) Q.st.splice(Q.st.lastIndexOf(x), 1);   // consumed by the call (below its arguments)
+      Fv = out.slice(0, e); xinv = out[e]; xb = out[e + 1];
     }
+    Q.drop(xinv);   // the last layer's x^-1 is not needed
     mark(Q, 'q-layers');
     // final polynomial: y = xb^(a_{r-1}); y^1..y^G; per group a packed dot product (GRP), then Horner over groups
     {

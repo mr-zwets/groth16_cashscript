@@ -58,7 +58,26 @@ export function compileSlp(stk, prog, {keep = []} = {}) {
       const dying = (x) => x.t === 'v' && uses.get(x.n) === 1 && !keepSet.has(x.n);
       const names = e.args.map((x) => x.n);
       const inPlace = e.args.every(dying) && new Set(names).size === n && stk.st.slice(-n).every((x, i) => x === names[i]);
-      if (inPlace) names.forEach((x) => uses.set(x, 0)); else e.args.forEach(emitE);
+      if (inPlace) names.forEach((x) => uses.set(x, 0));
+      else {
+        // in-place prefix: the first k args are dying names already contiguous and in order, and every item above them
+        // is referenced by the remaining args (so evaluating those leaves exactly [prefix | rest] on top)
+        let k = 0;
+        for (let len = n; len >= 1 && !k; len--) {
+          const pre = e.args.slice(0, len);
+          if (!pre.every(dying) || new Set(pre.map((x) => x.n)).size !== len) continue;
+          const at = stk.st.lastIndexOf(pre[0].n);
+          if (at < 0 || !pre.every((x, i) => stk.st[at + i] === x.n)) continue;
+          const above = stk.st.slice(at + len);
+          const restNames = new Set();
+          const collect = (x) => { if (x.t === 'v') restNames.add(x.n); else if (x.args) x.args.forEach(collect); };
+          e.args.slice(len).forEach(collect);
+          if (above.every((x) => restNames.has(x) && dying({t: 'v', n: x}))) k = len;
+        }
+        e.args.slice(0, k).forEach((x) => uses.set(x.n, 0));
+        e.args.slice(k).forEach(emitE);
+        if (k && stk.st.slice(-n, -n + k).some((x, i) => x !== e.args[i].n)) throw new Error('in-place prefix broken');
+      }
       stk.raw([e.id, 'INVOKE'], n, name);
       continue;
     }

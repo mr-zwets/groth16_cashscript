@@ -34,7 +34,7 @@ test('SQE', A, F.mul(A, A));
 test('MULF', [...A, s], F.smul(A, s));
 { const d = sha(Uint8Array.of(1, 2, 3)); test('E', [d], F.fromDigest(d)); }
 { const u = Array.from({length: e}, () => rnd(1n << 64n)), w = Array.from({length: e}, () => rnd(1n << 64n)), g = Array.from({length: e}, () => rnd());
-  test('PAIR', [...u, ...w, ...g], F.add(F.add(F.red(u), F.red(w)), F.mul(g, F.sub(F.red(u), F.red(w)))), ['MULE']); }
+  test('PAIR', [...g, ...u, ...w], F.add(F.add(F.red(u), F.red(w)), F.mul(g, F.sub(F.red(u), F.red(w)))), ['MULE']); }
 { const z = Array.from({length: e}, () => rnd()); const dc = deepConsts(prm, z)[0]; const x = rnd();
   const na = normAdj(prm, x, dc);
   const args = e === 3 ? [x, md(-dc.z0), dc.z1, dc.z2, dc.K0, dc.K1, dc.K2, dc.cA, dc.cB] : [x, md(-dc.z0), dc.cN];

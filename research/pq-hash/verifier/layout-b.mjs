@@ -13,9 +13,10 @@ export function loadVector(path) {
 
 const cache = new Map();
 export function program(prm, statement, opts = {}) {
-  const key = prm.name + Buffer.from(statement).toString('hex') + JSON.stringify(opts);
+  const {pad, ...o} = opts; void pad;
+  const key = prm.name + Buffer.from(statement).toString('hex') + JSON.stringify(o);
   if (!cache.has(key)) {
-    const built = buildB(prm, statement, opts);
+    const built = buildB(prm, statement, o);
     const redeem = redeemB(built);
     cache.set(key, {built, redeem, locking: p2sh32(redeem)});
   }
@@ -31,6 +32,7 @@ export function spendB(prm, statement, proof, opts = {}, mutate) {
   const pg = program(prm, statement, opts);
   const enc = encodeB(prm, proof);
   let items = witnessItems(prm, enc);
+  if (opts.padSlot) items.push(new Uint8Array(opts.pad ?? 0));
   if (mutate) items = mutate(items, enc);
   const unlocking = pushes([...items, pg.redeem]);
   return {...pg, enc, items, unlocking};
