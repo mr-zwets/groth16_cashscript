@@ -13,11 +13,13 @@ export const sub = (a, b) => op('SUB', a, b);
 export const mul = (a, b) => op('MUL', a, b);
 export const modp = (a, p) => op('MOD', a, K(p));
 export const sum = (...xs) => xs.reduce((a, b) => add(a, b));
+// call node: [outNames[], call(id, args)] invokes function `id` with the evaluated args on top (first arg deepest)
+export const call = (id, args) => ({t: 'call', id, args});
 export const ex = (x) => (typeof x === 'string' ? V(x) : typeof x === 'bigint' || typeof x === 'number' ? K(x) : x);
 
 function countUses(e, uses) {
   if (e.t === 'v') uses.set(e.n, (uses.get(e.n) ?? 0) + 1);
-  else if (e.t === 'op') e.args.forEach((x) => countUses(x, uses));
+  else if (e.t === 'op' || e.t === 'call') e.args.forEach((x) => countUses(x, uses));
 }
 const COMM = new Set(['ADD', 'MUL', 'BOOLAND', 'BOOLOR', 'NUMEQUAL', 'MIN', 'MAX', 'NUMEQUALVERIFY', 'EQUALVERIFY', 'EQUAL']);
 
@@ -51,6 +53,15 @@ export function compileSlp(stk, prog, {keep = []} = {}) {
     stk.op(e.o, n, ...outs);
   };
   for (const [name, e] of prog) {
+    if (e.t === 'call') {
+      const n = e.args.length;
+      const dying = (x) => x.t === 'v' && uses.get(x.n) === 1 && !keepSet.has(x.n);
+      const names = e.args.map((x) => x.n);
+      const inPlace = e.args.every(dying) && new Set(names).size === n && stk.st.slice(-n).every((x, i) => x === names[i]);
+      if (inPlace) names.forEach((x) => uses.set(x, 0)); else e.args.forEach(emitE);
+      stk.raw([e.id, 'INVOKE'], n, name);
+      continue;
+    }
     emitE(e);
     if (name !== null) stk.st[stk.st.length - 1] = name;
   }

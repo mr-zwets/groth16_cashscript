@@ -23,9 +23,10 @@ const loose = {
 export const consensusTxv5 = {...consensusBch2026, maximumBytecodeLength: 100_000, maximumStackItemLength: 100_000, maximumStandardUnlockingBytecodeLength: 100_000};
 
 export let nopCount = 0;
+export let snaps = [];
 function withNop(is) {
   const nop = is.operations[0x61];
-  return {...is, operations: {...is.operations, [0x61]: (s) => { nopCount++; return nop(s); }}};
+  return {...is, operations: {...is.operations, [0x61]: (s) => { nopCount++; const m = s.metrics; snaps.push({op: m.operationCost, instr: m.evaluatedInstructionCount, arith: m.arithmeticCost, pushed: m.stackPushedBytes, iters: m.hashDigestIterations}); return nop(s); }}};
 }
 const mk = (standard, consensus) => createVirtualMachine(withNop(createInstructionSetBch2026(standard, {consensus, ...crypto})));
 export const VMS = {
@@ -41,12 +42,12 @@ export const p2sh32 = (redeem) => Uint8Array.from([0xaa, 0x20, ...hash256(redeem
 export const pushes = (items) => Uint8Array.from(items.flatMap((b) => [...encodeDataPush(Uint8Array.from(b))]));
 
 export function evaluate(vmName, locking, unlocking, program) {
-  nopCount = 0;
+  nopCount = 0; snaps = [];
   const prog = program ?? createTestAuthenticationProgramBch({lockingBytecode: locking, unlockingBytecode: unlocking, valueSatoshis: 1000n});
   const st = VMS[vmName].evaluate(prog);
   const top = st.stack[st.stack.length - 1];
   const accepted = st.error === undefined && st.stack.length === 1 && top?.length === 1 && top[0] === 1;
   const m = st.metrics;
   return {accepted, error: st.error, markers: nopCount, opCost: m.operationCost, instr: m.evaluatedInstructionCount,
-    arith: m.arithmeticCost, pushed: m.stackPushedBytes, iters: m.hashDigestIterations, stackTop: st.stack.slice(-6).map((x) => Buffer.from(x).toString('hex').slice(0, 64))};
+    arith: m.arithmeticCost, pushed: m.stackPushedBytes, iters: m.hashDigestIterations, snaps, stackTop: st.stack.slice(-6).map((x) => Buffer.from(x).toString('hex').slice(0, 64))};
 }
