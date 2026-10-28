@@ -1,0 +1,2 @@
+per-kernel differential test: all outputs equal the references mod p
+kSqr 32, kMulSparse MULL 32, kMulSparse MULC 32, kGlue 32, kGlue odd 32, kDbl 32, kAdd 32, kDbl/kAdd on curve 32, kPsi 32, kJDbl 32, kJAdd 32, kJDbl/kJAdd on curve 32, kCfold 32, kScEta 32, kResidueAB 32, kConsts 1

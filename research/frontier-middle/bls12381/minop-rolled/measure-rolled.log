@@ -1,0 +1,36 @@
+{
+ "contract": "groth16_minop_rolled.cash",
+ "lockingBytes": 7840,
+ "lockingSha256": "d9dd1e4f2e7d5b5eb670b2927a21819bc8ecc191186eec9bbf8faffda9f5b736",
+ "score": 8674,
+ "opDefines": 26,
+ "opDefineBodyBytes": 2267,
+ "committed": {
+  "opCost": 192742808,
+  "bchnAdjusted": 192745075
+ },
+ "worstCase": {
+  "opCost": 218273206,
+  "bchnAdjusted": 218275473,
+  "unlockingBytes": 869
+ },
+ "validAccepted": "5/5",
+ "invalidRejected": "10/10",
+ "allAsExpected": true,
+ "ms": 7097
+}
+accept ACCEPT  192742808 committed 
+accept ACCEPT  195062493 multiproof #1 (237787,703942) 
+accept ACCEPT  194433162 multiproof #2 (460834,887992) 
+accept ACCEPT  195217397 multiproof #3 (975480,241358) 
+accept ACCEPT  218273206 worstCaseProof (dense inputs) 
+reject REJECT  192567032 invalidUnlocking (n0 + 1) | Program failed an OP_VERIFY operation.
+reject REJECT      15361 non-canonical B.x limb | Program failed an OP_VERIFY operation.
+reject REJECT      20155 non-canonical torus u low limb | Program failed an OP_VERIFY operation.
+reject REJECT      24001 non-canonical torus u high limb | Program failed an OP_VERIFY operation.
+reject REJECT     166501 negative GLV decomposition limb | Program failed an OP_VERIFY operation.
+reject REJECT  192567032 multiproof #0 invalidUnlocking | Program failed an OP_VERIFY operation.
+reject REJECT  195038886 multiproof #1 invalidUnlocking | Program failed an OP_VERIFY operation.
+reject REJECT  194554537 multiproof #2 invalidUnlocking | Program failed an OP_VERIFY operation.
+reject REJECT  195351741 multiproof #3 invalidUnlocking | Program failed an OP_VERIFY operation.
+reject REJECT  218409043 worstCaseProof invalidUnlocking | Program failed an OP_VERIFY operation.
