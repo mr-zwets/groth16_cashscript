@@ -14,7 +14,7 @@ const F2c = (a) => [a.c0, a.c1];
 const B_DBL_ENV = {yP: 'yP', yPt: 'yPt', xz3: 'xz3', xz3t: 'xz3t', st: ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1']};
 export const D_DBL_ENV = {yP: 'yC', yPt: 'yCt', xz3: 'cz3', xz3t: 'cz3t', st: ['DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1']};
 export function kBDbl(V = B_DBL_ENV, sq = true) {
-  const k = new Kernel(); const I = (n) => k.in(n), E = (n) => k.env(n), m = (x) => k.mod(x), mul = (a, b) => k.mul(a, b), add = (a, b) => k.add(a, b), sub = (a, b) => k.sub(a, b);
+  const k = new Kernel(); const I = (n) => k.in(n), E = (n) => (V.local ? k.in(n) : k.env(n)), m = (x) => k.mod(x), mul = (a, b) => k.mul(a, b), add = (a, b) => k.add(a, b), sub = (a, b) => k.sub(a, b);
   const [X0, X1, Y0, Y1, Z0, Z1] = V.st.map(I);
   const [b0, b1] = [E('b30'), E('b31')];
   const B0 = m(mul(add(Y0, Y1), sub(Y0, Y1))), B1 = m(mul(add(Y0, Y0), Y1));
@@ -44,7 +44,7 @@ export function kBDbl(V = B_DBL_ENV, sq = true) {
 const B_ADD_ENV = {yP: 'yP', yPt: 'yPt', xz: 'xz', xzt: 'xzt', st: ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1'], c: true};
 export const D_ADD_ENV = {yP: 'yC', yPt: 'yCt', xz: 'cz', xzt: 'czt', st: ['DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1'], c: false};
 export function kBAdd(V = B_ADD_ENV) {
-  const k = new Kernel(); const I = (n) => k.in(n), E = (n) => k.env(n), m = (x) => k.mod(x), mul = (a, b) => k.mul(a, b), add = (a, b) => k.add(a, b), sub = (a, b) => k.sub(a, b);
+  const k = new Kernel(); const I = (n) => k.in(n), E = (n) => (V.local ? k.in(n) : k.env(n)), m = (x) => k.mod(x), mul = (a, b) => k.mul(a, b), add = (a, b) => k.add(a, b), sub = (a, b) => k.sub(a, b);
   const [X0, X1, Y0, Y1, Z0, Z1, xq0, xq1, yq0, yq1] = [...V.st, 'xq0', 'xq1', 'yq0', 'yq1'].map(I);
   const fm = (a0, a1, b0, b1) => { const u0 = mul(a0, b0), u1 = mul(a1, b1), u2 = mul(add(a0, a1), add(b0, b1)); return [sub(u0, u1), sub(sub(u2, u0), u1)]; };
   const fs = (a0, a1, b0, b1) => [sub(mul(a0, b0), mul(a1, b1)), add(mul(a0, b1), mul(a1, b0))];
@@ -80,6 +80,31 @@ function kTable(mult) {
   return k.output(...T.slice().reverse());
 }
 
+// ---------------- shared G2 kernels (dproj) ----------------
+// DPROJ_SHARED=1 (default): ONE local doubling function and ONE local mixed-addition function serve both walks
+// (B at P = -A, delta at P = C). Every operand is passed on the stack under the kernel's own names (state items
+// rolled, env items picked), so the same bytecode runs at every call site; delta passes c = 1. B squares F
+// before its doubling call. DPROJ_SHARED=0: B inline / BADD and an inline delta doubling / DADD (bound).
+const SHARED = (process.env.DPROJ_SHARED ?? '1') === '1';
+const DBL_IN = ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'Fp', 'Fm', 'yP', 'yPt', 'xz3', 'xz3t', 'z3', 'z3t', 'b30', 'b31', 'p'];
+const ADD_IN = ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'xq0', 'xq1', 'yq0', 'yq1', 'Fp', 'Fm', 'cp', 'cm', 'yP', 'yPt', 'xz', 'xzt', 'z3', 'z3t', 'p'];
+const G2_OUT = ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'Fp', 'Fm'];
+const D_MAP = {X0: 'DX0', X1: 'DX1', Y0: 'DY0', Y1: 'DY1', Z0: 'DZ0', Z1: 'DZ1', yP: 'yC', yPt: 'yCt', xz3: 'cz3', xz3t: 'cz3t', xz: 'cz', xzt: 'czt'};
+const CONSUMED = new Set(['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1', 'Fp', 'Fm', 'xq0', 'xq1', 'yq0', 'yq1', 'cp', 'cm']);
+function callG2(s, fname, IN, delta) {
+  for (const n of IN) { const src = (delta && D_MAP[n]) || n; if (CONSUMED.has(src)) s.roll(src).rename(n); else s.pick(src, n); }
+  s.invoke(fname, delta ? ['DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1', 'Fp', 'Fm'] : G2_OUT);
+}
+const defShared = (a) => {
+  a.defLocal('DBL', DBL_IN.length, 8, (s) => { DBL_IN.forEach((n, i) => s.rename('in' + i, n)); s.kernel(kBDbl({...B_DBL_ENV, local: true}, false), G2_OUT, {iters: ITERS}); s.drop('p'); });
+  a.defLocal('ADD', ADD_IN.length, 8, (s) => { ADD_IN.forEach((n, i) => s.rename('in' + i, n)); s.kernel(kBAdd({...B_ADD_ENV, local: true}), G2_OUT, {iters: ITERS}); s.drop('p'); });
+};
+const sqF = (s) => { const k = new Kernel(); const Fp = k.in('Fp'), Fm = k.in('Fm'); k.output(k.mod(k.mul(Fp, Fp)), k.mod(k.mul(Fm, Fm))); s.kernel(k, ['Fp', 'Fm'], {iters: 100}); };
+const bDbl = (s) => { if (SHARED) { sqF(s); callG2(s, 'DBL', DBL_IN, false); } else s.kernel(kBDbl(), G2_OUT, {iters: ITERS}); };
+const dDbl = (s) => { if (SHARED) callG2(s, 'DBL', DBL_IN, true); else s.kernel(kBDbl(D_DBL_ENV, false), ['DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1', 'Fp', 'Fm'], {iters: ITERS}); };
+const bAdd = (s) => { if (SHARED) callG2(s, 'ADD', ADD_IN, false); else s.invoke('BADD'); };
+const dAdd = (s) => { if (SHARED) { s.push(1, 'cp').push(1, 'cm'); callG2(s, 'ADD', ADD_IN, true); } else s.invoke('DADD'); };
+
 // ---------------- program ----------------
 // Layout during the event loop (bottom -> top):
 //   main: [setup/terminal env | GT-GLS tables | hot env | loop state]
@@ -108,8 +133,9 @@ function gen(L0guess, stop) {
   a.defLocal('TM', 4, 16, (s) => s.kernel(kTable(true), Array.from({length: 16}, (_, i) => 'T' + (15 - i)), {iters: ITERS}));
   a.defLocal('TA', 4, 16, (s) => s.kernel(kTable(false), Array.from({length: 16}, (_, i) => 'T' + (15 - i)), {iters: ITERS}));
   a.defLocal('G1C', 2, 0, (s) => { const k = new Kernel(); const x = k.in('in0'), y = k.in('in1'); k.output(k.mod(k.sub(k.mul(y, y), k.add(k.mul(k.mul(x, x), x), k.c(3n))))); s.kernel(k, ['d'], {iters: 200}); s.op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1); });
-  a.defBound('BADD', (s) => s.kernel(kBAdd(), ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'Fp', 'Fm'], {iters: ITERS}));
-  a.defBound('DADD', (s) => s.kernel(kBAdd(D_ADD_ENV), ['DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1', 'Fp', 'Fm'], {iters: ITERS}));
+  if (SHARED) defShared(a);
+  else a.defBound('BADD', (s) => s.kernel(kBAdd(), ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'Fp', 'Fm'], {iters: ITERS}));
+  if (!SHARED) a.defBound('DADD', (s) => s.kernel(kBAdd(D_ADD_ENV), ['DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1', 'Fp', 'Fm'], {iters: ITERS}));
   section('init');
 
   // ---- 1. layout pin; WQ to the altstack; the delta-slope pile at the bottom; transcript and challenges ----
@@ -220,17 +246,17 @@ function gen(L0guess, stop) {
     s.emit(...pushNum(d0), OP.ADD, OP.PICK); s.st.push(out);
   };
   a.loop((s) => {
-    s.mark('bdbl'); s.kernel(kBDbl(), ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'Fp', 'Fm'], {iters: ITERS});
-    s.mark('ddbl'); s.kernel(kBDbl(D_DBL_ENV, false), ['DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1', 'Fp', 'Fm'], {iters: ITERS});
+    s.mark('bdbl'); bDbl(s);
+    s.mark('ddbl'); dDbl(s);
     s.mark('add'); s.peekAlt('dt').ifElse((t) => {
       t.peekAlt('dt').push(0).op(OP.LESSTHAN, 2, 'neg').ifElse(
         (u) => { u.pick('xB0', 'xq0').pick('xB1', 'xq1').pick('nyB0', 'yq0').pick('nyB1', 'yq1').pick('Scp', 'cp').pick('Scm', 'cm'); },
         (u) => { u.pick('xB0', 'xq0').pick('xB1', 'xq1').pick('yB0', 'yq0').pick('yB1', 'yq1').pick('Scm', 'cp').pick('Scp', 'cm'); });
-      t.invoke('BADD');
+      bAdd(t);
       // delta mixed addition with d_e * delta = (x_delta, d_e y_delta), d_e = +-1 (the current digit)
       t.pick('xd0', 'xq0').pick('xd1', 'xq1').peekAlt('dg');
       { const k = new Kernel(); const g = k.in('dg'); k.output(k.mul(k.env('yd0'), g), k.mul(k.env('yd1'), g)); t.kernel(k, ['yq0', 'yq1'], {iters: 50}); }
-      t.invoke('DADD');
+      dAdd(t);
     });
     // GLS/digit group out of the altstack; next digit (SCH holds the digits of events 1..64 and a dummy)
     s.mark('digit'); for (const n of ['d', 'acc1', 'acc0', 'N1', 'N0', 'SCH']) s.fromAlt(n);
@@ -271,14 +297,14 @@ function gen(L0guess, stop) {
   const conjMul = (k, a0, a1, g0, g1) => [k.mod(k.add(k.mul(a0, g0), k.mul(a1, g1))), k.mod(k.sub(k.mul(a0, g1), k.mul(a1, g0)))];
   const psiKernel = () => { const k = new Kernel(); const [x0, x1, y0, y1, g20, g21, g30, g31] = ['xB0', 'xB1', 'yB0', 'yB1', 'g20', 'g21', 'g30', 'g31'].map((n) => k.env(n)); return {k, px: conjMul(k, x0, x1, g20, g21), py: conjMul(k, y0, y1, g30, g31)}; };
   { const {k, px, py} = psiKernel(); k.output(...px, ...py); a.kernel(k, ['xq0', 'xq1', 'yq0', 'yq1'], {iters: 300}); }
-  a.push(1, 'cp').push(1, 'cm').invoke('BADD');
+  a.push(1, 'cp').push(1, 'cm'); bAdd(a);
   { const k = new Kernel(); k.output(...conjMul(k, k.env('xd0'), k.env('xd1'), k.env('g20'), k.env('g21')), ...conjMul(k, k.env('yd0'), k.env('yd1'), k.env('g30'), k.env('g31')));
     a.kernel(k, ['xq0', 'xq1', 'yq0', 'yq1'], {iters: 200}); } // psi(delta)
-  a.invoke('DADD');
+  dAdd(a);
   { const k = new Kernel(); k.output(k.mod(k.mul(k.env('xB0'), k.env('om'))), k.mod(k.mul(k.env('xB1'), k.env('om')))); a.kernel(k, ['xq0', 'xq1'], {iters: 50}); }
-  a.pick('yB0', 'yq0').pick('yB1', 'yq1').push(1, 'cp').push(1, 'cm').invoke('BADD');
+  a.pick('yB0', 'yq0').pick('yB1', 'yq1').push(1, 'cp').push(1, 'cm'); bAdd(a);
   { const k = new Kernel(); k.output(k.mod(k.mul(k.env('xd0'), k.env('om'))), k.mod(k.mul(k.env('xd1'), k.env('om')))); a.kernel(k, ['xq0', 'xq1'], {iters: 50}); }
-  a.pick('yd0', 'yq0').pick('yd1', 'yq1').invoke('DADD'); // -psi^2(delta) = (omega x_delta, y_delta)
+  a.pick('yd0', 'yq0').pick('yd1', 'yq1'); dAdd(a); // -psi^2(delta) = (omega x_delta, y_delta)
   // endpoint: (X : Y : Z) == -psi^3(B) = (omega px, py), Z != 0  (exact G2 membership; no exceptional step)
   { const {k, px, py} = psiKernel(); const [X0, X1, Y0, Y1, Z0, Z1] = ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1'].map((n) => k.in(n));
     const fs = (a0, a1, b0, b1) => [k.sub(k.mul(a0, b0), k.mul(a1, b1)), k.add(k.mul(a0, b1), k.mul(a1, b0))];

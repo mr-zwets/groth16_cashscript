@@ -1,23 +1,23 @@
 {
- "redeemBytes": 6470,
- "redeemSha256": "6db610c9de1499032584dc976b109fc1b59c47e88beaf5aaa11ee736266e225a",
- "lockingHex": "aa20e92e77dfb8ff259c51fb1d5f6d10ca25b746008af44234ba0780387da6368bec87",
- "lockingSha256": "d85d0d716fa97fc7d567f850320a84f4ba6cd58e86804c550c8873f10861cc3c",
+ "redeemBytes": 5838,
+ "redeemSha256": "980482d4b359bc8bca2991bf06bbc3fde51606c83b1d688e2090028f05fd1125",
+ "lockingHex": "aa20dc168ffb02db138b07855a60f7eabafe0ae2af68c548addcbe088af60987276987",
+ "lockingSha256": "443a75163819dcf02e843219f755fa43081699e01e22891109aedd18e9f145b7",
  "witness": {
   "WS": 6978,
   "WQ_fixture0": 3648,
   "nq_fixture0": 114,
   "NQ_MAX": 132
  },
- "unlockingBytes_fixture0": 17105,
+ "unlockingBytes_fixture0": 16473,
  "fixture0": {
   "consensus": {
-   "opCost": 32021353,
-   "budget": 21684000
+   "opCost": 33317244,
+   "budget": 21178400
   },
   "standard": {
-   "opCost": 32056297,
-   "budget": 21684000
+   "opCost": 33350908,
+   "budget": 21178400
   }
  },
  "sections": {
@@ -27,8 +27,8 @@
   "powers": 464,
   "gls-tables": 1120,
   "loop-setup": 503,
-  "loop": 1175,
-  "terminal": 1078,
+  "loop": 499,
+  "terminal": 1302,
   "final": 155,
   "cleanup": 7
  },
@@ -39,10 +39,10 @@
   "TM": 111,
   "TA": 78,
   "G1C": 18,
-  "BADD": 594,
-  "DADD": 585
+  "DBL": 422,
+  "ADD": 577
  },
- "prologue": 1509,
+ "prologue": 1329,
  "schedule": {
   "events": 65,
   "digits": "0-101000-10-1000-1010-100-100000100-10100-10000-101000-10-1001000-100-10101000",
