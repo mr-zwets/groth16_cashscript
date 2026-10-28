@@ -1,0 +1,13 @@
+runs 81, accepted 0; kinds: invalid-proof-point, non-canonical-coordinate, identity-point, subgroup, invalid-proof, public-input-encoding, gls-digit, gls-binding, tamper-transcript, tamper-state, non-canonical-state, tamper-residue, transcript-encoding, tamper-quotient, non-canonical-quotient, quotient-cap, layout; positive controls accepted: committed; n0 = 5 + 7|x| + 9|x|^2 with non-canonical GLS digits (a_0 + |x|, a_1 - 1)
+{
+ "parse + range/curve checks > G1C": 7,
+ "parse + range/curve checks": 11,
+ "parse + range/curve checks > RD": 12,
+ "terminal (slope count, endpoint, binding)": 7,
+ "final identity (result false)": 22,
+ "loop:bnd > BND > RD": 4,
+ "quotient (Horner) > RD": 2,
+ "transcript/size checks": 13,
+ "transaction rules": 2,
+ "p2sh/unlocking": 1
+}
