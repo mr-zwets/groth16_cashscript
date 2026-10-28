@@ -329,7 +329,8 @@ Every SHA-256 evaluation by any party is a query; `OP_HASH256` is two. There are
   bound is below 2⁻²¹¹.
 
 Let `q = q_A + q_V`, `N = N₀ + q`, and let `q_β, q_α ≤ q` count the distinct `beta`- and
-`alpha`-frame inputs among the q queries. An accepting run has `q_β, q_α ≥ 1` even when
+`alpha`-frame inputs among the q queries. The distinct frame tags imply `q_β + q_α ≤ q`.
+An accepting run has `q_β, q_α ≥ 1` even when
 `q_A = 0`. A challenge or opening that the adversary never queried is evaluated by the
 verifier and counted in q_V, so there is no separate guessing term (`ε_guess = 0`).
 
