@@ -9,7 +9,9 @@ import { dirname, join } from 'node:path';
 import { compileTemplate, evalArgs } from './_harness.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const vec = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/checkpoints/pairing-vectors.json', 'utf8'));
+// zk-verifier-bench checkout (vector inputs/outputs): VERIFIER_DIR, default the sibling checkout.
+const VERIFIER_DIR = process.env.VERIFIER_DIR ?? fileURLToPath(new URL('../../../zk-verifier-bench/', import.meta.url));
+const vec = JSON.parse(readFileSync(join(VERIFIER_DIR, 'src/checkpoints/pairing-vectors.json'), 'utf8'));
 
 // spend(Ax,Ay, Bxa,Bxb,Bya,Byb, Cx,Cy, in0,in1) -- A is the raw proof point (negated in-script)
 const A = vec.proof.a, B = vec.proof.b, C = vec.proof.c;

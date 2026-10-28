@@ -28,6 +28,8 @@ import { bn254 } from '@noble/curves/bn254.js';
 const { Fp2 } = bn254.fields;
 
 const here = dirname(fileURLToPath(import.meta.url));
+// zk-verifier-bench checkout (vector inputs/outputs): VERIFIER_DIR, default the sibling checkout.
+const VERIFIER_DIR = process.env.VERIFIER_DIR ?? fileURLToPath(new URL('../../../zk-verifier-bench/', import.meta.url));
 const STANDARD_BUDGET = (41 + 10_000) * 800; // 8,032,800
 
 const HUGE = Number.MAX_SAFE_INTEGER;
@@ -54,7 +56,7 @@ const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const unlockingFor = (args) => Uint8Array.from(args.slice().reverse().flatMap((a) => [...pushInt(a)]));
 
 // --- reconstruct the 4 Groth16 pairs (valid + invalid) from the committed instance ---
-const vec = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/checkpoints/pairing-vectors.json', 'utf8'));
+const vec = JSON.parse(readFileSync(join(VERIFIER_DIR, 'src/checkpoints/pairing-vectors.json'), 'utf8'));
 const g1 = (o) => bn254.G1.Point.fromAffine({ x: BigInt(o.x), y: BigInt(o.y) });
 const g2 = (o) => bn254.G2.Point.fromAffine({ x: Fp2.fromBigTuple([BigInt(o.x.c0), BigInt(o.x.c1)]), y: Fp2.fromBigTuple([BigInt(o.y.c0), BigInt(o.y.c1)]) });
 const vk = { alpha: g1(vec.vk.alpha), beta: g2(vec.vk.beta), gamma: g2(vec.vk.gamma), delta: g2(vec.vk.delta), ic: vec.vk.ic.map(g1) };
@@ -104,6 +106,6 @@ const out = {
   looseAccept: looseAccept.accepted,
   rejectInvalid: !looseRejectInvalid.accepted,
 };
-const outPath = process.env.OUT || 'C:/Users/mathi/Desktop/verifier/src/bch/pairing-singleton-vectors.json';
+const outPath = process.env.OUT || join(VERIFIER_DIR, 'src/bch/pairing-singleton-vectors.json');
 writeFileSync(outPath, JSON.stringify(out, null, 2));
 console.log('wrote', outPath);

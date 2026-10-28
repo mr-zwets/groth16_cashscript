@@ -23,6 +23,8 @@ import {
 } from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
+// zk-verifier-bench checkout (vector inputs/outputs): VERIFIER_DIR, default the sibling checkout.
+const VERIFIER_DIR = process.env.VERIFIER_DIR ?? fileURLToPath(new URL('../../../zk-verifier-bench/', import.meta.url));
 
 const INPUT0 = PUBLIC_INPUTS[0];
 const INPUT1 = PUBLIC_INPUTS[1];
@@ -110,5 +112,5 @@ const out = {
   rejectBadExpected: !looseRejectBadExpected.accepted,
   rejectBadInput: !looseRejectBadInput.accepted,
 };
-writeFileSync('C:/Users/mathi/Desktop/verifier/src/bch/vkx-bls12381-singleton-vectors.json', JSON.stringify(out, null, 2));
+writeFileSync(join(VERIFIER_DIR, 'src/bch/vkx-bls12381-singleton-vectors.json'), JSON.stringify(out, null, 2));
 console.log('wrote src/bch/vkx-bls12381-singleton-vectors.json');

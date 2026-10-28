@@ -34,6 +34,8 @@ import {
 } from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
+// zk-verifier-bench checkout (vector inputs/outputs): VERIFIER_DIR, default the sibling checkout.
+const VERIFIER_DIR = process.env.VERIFIER_DIR ?? fileURLToPath(new URL('../../../zk-verifier-bench/', import.meta.url));
 const manifest = JSON.parse(readFileSync(join(here, 'generated', 'manifest.json'), 'utf8'));
 
 const TARGET_UNLOCK = 10_000;      // pad each unlocking up to this many bytes
@@ -179,6 +181,6 @@ console.log('---');
 console.log(`chunks=${manifest.numChunks} K=${manifest.K} | total op-cost ${totalOp.toLocaleString()} | max/step ${maxOp.toLocaleString()} (budget ${STANDARD_BUDGET.toLocaleString()})`);
 console.log(`max lock ${maxLock}B max unlock ${maxUnlock}B | allLooseAccept=${allAccept} allRealAccept=${allReal} allFit=${allFit}`);
 
-const outPath = process.env.OUT || 'C:/Users/mathi/Desktop/verifier/src/bch/vkx-chunked-shamir-vectors.json';
+const outPath = process.env.OUT || join(VERIFIER_DIR, 'src/bch/vkx-chunked-shamir-vectors.json');
 writeFileSync(outPath, JSON.stringify(out, null, 2));
 console.log('wrote', outPath);

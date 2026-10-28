@@ -1,6 +1,6 @@
 // Domain-check rejection tests for the BLS12-381 singleton verifier (groth16.cash):
 // coordinate range (0 <= v < p), curve equations for A, C (y^2 = x^3 + 4) and B
-// (y^2 = x^3 + 4(1+u)), and the G2 subgroup check on B (psi(B) == [-x]B, fused into
+// (y^2 = x^3 + 4(1+u)), and the G2 subgroup check on B (psi(B) == [x]B with x < 0, fused into
 // B's Miller walk with the Z != 0 guard). Valid proofs (the committed instance and the
 // bench multiproof set) must still verify. The negative cases live in domain_cases.mjs.
 //
