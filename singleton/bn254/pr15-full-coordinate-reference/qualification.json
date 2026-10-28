@@ -1,0 +1,55 @@
+{
+  "schema": "source15-full-coordinate-public-source-qualification/v1",
+  "status": "CONDITIONALLY_QUALIFIED_FULL_COORDINATE_REFERENCE_NATIVE_HOLD",
+  "historicalAttribution": {
+    "sourcePr": "15",
+    "benchmarkPr": "32",
+    "sourceHead": "1e7c52ab3b6af132c3f3f87effd38821828c874d",
+    "benchmarkHead": "aede1967237b3d7e28f9ca74ab52232e7e6d5421"
+  },
+  "source": {
+    "path": "verifier.asm",
+    "bytes": 25375,
+    "sha256": "32e947c07ce5566e5fe56f10ab70d43824b4a1af3dd21fb19b5073690569fd82",
+    "role": "candidate-v3 full-coordinate BN254 singleton source"
+  },
+  "minimalFix": {
+    "path": "minimal-correction.patch",
+    "bytes": 2500,
+    "sha256": "80733a86baddb8142cab90ca7e035a2eccf99c4d454b441d61e6192b01bc4f04",
+    "role": "record of the source-level mathematical correction"
+  },
+  "sourceHelper": {
+    "reviewedOwner": "singleton/bn254/genpow-reconstructed/build.mjs",
+    "reviewedSha256": "f64f587523365c6a057263dfc71ccac258c75e22c736599ae8bbdd4677ddad04",
+    "localBuild": "local-build.mjs",
+    "localBuildSha256": "3206c562b1259032907e8762182b30217d800aecc7aeb783f58408c618374b44"
+  },
+  "compiledProjection": {
+    "pairedArtifactDirectory": "artifacts/bn254-pr15-full-coordinate-reference",
+    "path": "artifacts/bn254-pr15-full-coordinate-reference/verifier-4681.hex",
+    "bytes": 4681,
+    "sha256": "dc2b929c5645d3baaac4fb544ba7565bf54c34156532a715053432d4f9913782",
+    "assemblySha256": "32e947c07ce5566e5fe56f10ab70d43824b4a1af3dd21fb19b5073690569fd82",
+    "originalProgramSha256": "a7686356eba90eb594d2a05189e645111506e67fc3c52007144081761d357cd0"
+  },
+  "fixedKeyLiteralRoleFingerprint": {
+    "owner": "main",
+    "ownerBytes": 1944,
+    "ownerSha256": "5171fbfc2fc1e59e58acf1eb18735e7576819480e693d1c494de86c9c15305af",
+    "roles": [
+      "P",
+      "alpha",
+      "beta",
+      "gamma",
+      "delta",
+      "IC0",
+      "IC1",
+      "IC2"
+    ],
+    "interpretation": "The main body owns the embedded fixed-key literals and their caller placement; no separate mutable VK input is accepted."
+  },
+  "rebuildQualification": "local-build.mjs reuses the reviewed function/call/end assembler semantics, resolves only the pinned libauth dependency from the benchmark repository, and reproduces the exact 4681-byte artifact. No compiler variant or byte optimization is introduced.",
+  "mathematicalScope": "Canonical EIP197 point-value and canonical Fr public scalar domain, with explicit curve, pairing, VM and application-ABI premises; native resource admission and trusted-setup validity remain separate.",
+  "pairedDisposition": "artifacts/bn254-pr15-full-coordinate-reference/mathematical-disposition.json"
+}
