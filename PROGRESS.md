@@ -21,3 +21,12 @@ Status 1 (layout b done)
   U100 does not fit (unlocking > 100,000 B consensus cap). C100/C128 fit easily.
 - careful: `git checkout <file>` reverts all uncommitted edits in that file (lost and reapplied once).
 Next: layout (a) (standard rules, multi-input; P128 two tx with NFT thread).
+
+Status 2 (verifier phase complete)
+- layout (b): all 14 vectors graded (results/layout-b.json); P128 x4 fit one TXv5 input (<= 99,961 B tx), U100 too big.
+- layout (a): gen-a.mjs/layout-a.mjs/grade-a.mjs; all 14 vectors accepted on the real BCH 2026 VM (std+cons):
+  P100 1 tx/10 inputs/77.6 KB, P128 2 tx/19 inputs/154.8 KB (NFT thread), U100 2/31/188.6 KB, C100 1/6/36.8 KB,
+  C128 1/7/60.4 KB. Full per-query paths (pruned cap not used: QRY inputs are op-bound, see report).
+- rejection suites: results/test-b.log (175), results/test-a.log (183); harness cross-check in zk-verifier-bench
+  wip/pq-hash-verifier research/pq-hash/verifier/crosscheck.ts (agrees). REPORT.md text returned in the phase output
+  (Write tool refused the .md report file).
