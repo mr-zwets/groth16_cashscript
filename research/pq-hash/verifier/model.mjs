@@ -344,3 +344,28 @@ export function encodeB(prm, proof) {
     siblings: programs.map((p) => p.siblings), trailing: proof.length - o,
   };
 }
+
+// ---- layout (a) witness: per query the leaf blob (leaves ‖ T) and the full authentication paths of the four trees ----
+// Paths are read from the node map of the proof's own canonical multiproof (so a tampered proof is encoded as an honest
+// prover would encode it; missing nodes become zero bytes).
+export function encodeA(prm, proof) {
+  const enc = encodeB(prm, proof);
+  const f = parsePT(prm, proof);
+  const tr = enc.tr;
+  let o = f.end + prm.s * prm.leafBytes;
+  const pos = tr.idx.map((v) => positions(prm, v));
+  const paths = tr.idx.map(() => []);
+  for (const tree of prm.trees) {
+    const leaves = tr.idx.map((_, q) => {
+      const L = enc.leafBlobs[q];
+      return [pos[q][tree.layer + 1], sha(Uint8Array.of(tree.tag), L.subarray(tree.off, tree.off + tree.leaf_bytes)).subarray(0, prm.h)];
+    });
+    const can = canonicalTree(prm, tree, leaves, proof, o);
+    o = can.end;
+    tr.idx.forEach((_, q) => {
+      let k = pos[q][tree.layer + 1];
+      for (let l = 0; l < tree.depth; l++, k >>= 1) paths[q].push(can.map.get(`${l}:${k ^ 1}`) ?? new Uint8Array(prm.h));
+    });
+  }
+  return {...enc, paths: paths.map((p) => cat(...p))};
+}

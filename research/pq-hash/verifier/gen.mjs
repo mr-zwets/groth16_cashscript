@@ -242,7 +242,7 @@ export function defineShared(c) {
 
 // Fiat-Shamir transcript from the PT items rT rC OOD rF.. FIN NONCE (names on S); keeps the roots, FIN and a copy of
 // OOD (OODc); leaves alpha, z, gamma, beta and the indices idx_lo..idx_{hi-1}
-export function emitTranscript(c, S, statement, {grinding = true, lo = 0, hi = c.s} = {}) {
+export function emitTranscript(c, S, statement, {grinding = true, lo = 0, hi = c.s, keepG = false} = {}) {
   const {prm, opts, e, s, h, r, a, D, sizes, trees, e8, G, SLOT, fns, defFn, mark, trunc, F, gam, dzOut} = c;
   void prm; void opts; void s; void h; void r; void D; void trees; void e8; void G; void SLOT; void fns; void mark; void trunc; void gam; void dzOut; void sizes;
   const rF = Array.from({length: r - 1}, (_, i) => 'rF' + (i + 1));
@@ -280,8 +280,7 @@ export function emitTranscript(c, S, statement, {grinding = true, lo = 0, hi = c
   S.roll('G');
   if (hi > lo) S.raw([hi - 1, 'BEGIN', '2DUP', 2, 'NUM2BIN', 'CAT', 'SHA256', 3, 'SPLIT', 'DROP', B0, 'CAT', 'BIN2NUM', N1, 'MOD', 'ROT', 'ROT',
     '1SUB', 'DUP', lo, 'LESSTHAN', 'UNTIL', '2DROP'], 1, Array.from({length: hi - lo}, (_, k) => 'idx' + (hi - 1 - k)));
-  else S.drop('G');
-  mark(S, 'transcript');
+  else if (!keepG) S.drop('G');
 
 }
 
@@ -335,8 +334,9 @@ export function emitAirConsts(c, S, statement, {withAir = true, withConsts = tru
         else { bp.forEach((x, c) => b.let(V(x), `bp${i}_${l}_${c}`)); bp = names(`bp${i}_0_`, e); }
       }
     }
+    if (!withConsts) { b.prog.length = cut1; }
     const keepAll = [...[1, 2, 3, 4, 5].flatMap(gam), ...b.prog.flatMap(([n]) => (Array.isArray(n) ? n : [n])).filter((n) => typeof n === 'string' && n.startsWith('bp'))];
-    compileSections(S, b.prog, [cut1, cut2, cut3], keepAll, (k) => mark(S, 'air-' + k));
+    compileSections(S, b.prog, withConsts ? [cut1, cut2, cut3] : [], withConsts ? keepAll : [], (k) => mark(S, 'air-' + k));
     for (const x of [...S.st]) if (/^(al\d_\d|z\d|be\d_\d|o[XYWAB]\d)$/.test(x)) S.drop(x);
     if (!withConsts) for (const x of [...S.st]) if (/^(ga\d_\d|dC\d_\d|dz\d_|bp\d)/.test(x)) S.drop(x);
   }
@@ -347,7 +347,7 @@ export function emitLiftTables(c, S, bottomIdx, keepBelow) {
   const {prm, opts, e, s, h, r, a, D, sizes, trees, e8, G, SLOT, fns, defFn, mark, trunc, F, gam, dzOut} = c;
   void prm; void opts; void s; void h; void r; void D; void trees; void e8; void G; void SLOT; void fns; void mark; void trunc; void gam; void dzOut; void sizes;
   // everything the query function reads must sit above the index list
-  { const lo = S.st.indexOf(bottomIdx); for (const x of S.st.slice(0, lo)) if (!keepBelow.test(x)) S.roll(x); }
+  if (bottomIdx) { const lo = S.st.indexOf(bottomIdx); for (const x of S.st.slice(0, lo)) if (!keepBelow.test(x)) S.roll(x); }
   // runtime-indexed tables per distinct arity a_i (i >= 1): Wp<a>_<j> = w_a^j, Wn<a>_<j> = w_a^-j (loops)
   const arities = [...new Set(a.slice(1))];
   for (const ai of arities) {
