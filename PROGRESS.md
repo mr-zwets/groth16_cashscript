@@ -1,11 +1,10 @@
 # PROGRESS (wip/pq-hash-prover only; never merge to main)
 
-Task: pq-hash Prover phase. Off-chain prover + reference verifier + vectors for P100, P128, U100, C100, C128.
-Spec: work/pq-hash/design/SPEC.md (zk-verifier-bench wip/pq-hash-design c3497a1).
+Task: pq-hash Prover phase. Spec: zk-verifier-bench wip/pq-hash-design c3497a1 (work/pq-hash/design/SPEC.md).
 
-- [x] pqfield / pqparams / pqproto / verifier / prover (numpy) written; small-n round trip e=2,3 OK
-- [ ] full-size proofs per set, timings
-- [ ] gen_vectors.py + tampered vectors
-- [x] test_soundness.py (14 tests, cross-checks design calculator) + test_roundtrip.py
-- [x] SERIALIZATION.md  - [ ] README.md
-- [x] verify.mjs independent JS verifier, agrees on P128
+- [x] pqfield / pqparams / pqproto / verifier.py / prover.py (numpy)
+- [x] vectors for P100 (4), P128 (4), U100 (2), C100 (2), C128 (2); 20 tamper cases per set
+- [x] test_soundness.py (stdlib, matches design calculator) + test_roundtrip.py (numpy)
+- [x] SERIALIZATION.md, README.md (results)
+- [x] verify.mjs: independent JS verifier, agrees on all vectors
+Next (Build): layout (a)/(b) scripts from vectors; consider p99 proof size for P128 single-input fit.
