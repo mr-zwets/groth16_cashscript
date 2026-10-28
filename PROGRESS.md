@@ -1,10 +1,13 @@
-# PROGRESS (wip/pq-hash-prover only; never merge to main)
+# PROGRESS (wip/pq-hash-verifier) -- work note, must never land on main
 
-Task: pq-hash Prover phase. Spec: zk-verifier-bench wip/pq-hash-design c3497a1 (work/pq-hash/design/SPEC.md).
+Verifier phase of the pq-hash track. Sources: research/pq-hash/verifier/ (this repo, groth16_cashscript).
+Harness glue + report: zk-verifier-bench worktree work/pq-hash/verifier-bench, research/pq-hash/ (branch wip/pq-hash-verifier).
+Inputs: SPEC (wip/pq-hash-design c3497a1), prover vectors (wip/pq-hash-prover f8d8a3f, research/pq-hash/prover/vectors),
+kernels (wip/pq-hash-kernels 1abcccb).
 
-- [x] pqfield / pqparams / pqproto / verifier.py / prover.py (numpy)
-- [x] vectors for P100 (4), P128 (4), U100 (2), C100 (2), C128 (2); 20 tamper cases per set
-- [x] test_soundness.py (stdlib, matches design calculator) + test_roundtrip.py (numpy)
-- [x] SERIALIZATION.md, README.md (results)
-- [x] verify.mjs: independent JS verifier, agrees on all vectors
-Next (Build): layout (a)/(b) scripts from vectors; consider p99 proof size for P128 single-input fit.
+Plan
+1. layout (b): one P2SH32 input, code = redeem with OP_DEFINE functions; phases: transcript+AIR (1), Merkle (2), FRI queries (3).
+   Merkle: sorted-order LIFO multiproof with hinted processing order (sigma, permutation by sum of 2^sigma) and hinted
+   op stream (fresh runs / merge / dup / park / root); heap index k tracked so every merge is position-checked.
+2. layout (a): multi-input standard (code from sibling inputs, pruned caps, TOP blobs), P128 two-tx NFT thread.
+3. measure: libauth BCH_2026 loosened, bch-spec, TXv5-as-written (base 41) incl. pad, BCHN-adjusted op-cost.
