@@ -85,13 +85,11 @@ the locking programs. All ten fixtures share one locking set with SHA-256
 
 In the SHA-256 random-oracle model, the 24 pre-beta relations give a beta
 cancellation degree of at most 23, and the alpha identity has degree at most
-137. With `Nβ` and `Nα` counting distinct relevant adversarial prequeries and fresh
-final-verifier queries, the conditional bound is
-`23Nβ/(2^256-1) + 137Nα/2^256 + Adv_bind`. The binding term separately covers
-Merkle/fixed-table/code commitments and predictive openings. If both challenge counts
-are at most q, the degree contribution is at most `q*160/(2^256-1)`.
-See `chunked/bls12-381/README.md`, FS-PIT section 5, for the full query convention;
-a challenge-only count does not also bound all Merkle/preprocessing hash work.
+137. The full random-oracle bound, with the commitment/opening lemma and the fixed-anchor
+binding terms, is stated in [chunked/bls12-381/README.md](chunked/bls12-381/README.md), section 5:
+`(23·q_β + 160·q_α)/2^256 + 3·N(N−1)/2^257`, where q counts every SHA-256 query by the adversary
+and the verifier, `q_β, q_α ≤ q` the beta/alpha queries among them, and `N = q + N₀` adds the
+fewer than `2^22 + 2^7` setup hashes.
 
 `B` is checked on-curve and in the order-r G2 subgroup using the psi relation and
 the affine tangent/chord denominator guards. `A` and `C` are canonical on-curve
