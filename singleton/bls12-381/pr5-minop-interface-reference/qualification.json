@@ -1,0 +1,30 @@
+{
+  "schema": "bls-pr5-minop-interface-source/v1",
+  "status": "CONDITIONALLY_QUALIFIED_FIXED_KEY_FINITE_DOMAIN_REFERENCE_NATIVE_HOLD",
+  "historicalSourceRevision": "2831928fe224d252fc90dfc26ecfdf52f29e9399",
+  "sourceFiles": {
+    "rebuild.mjs": "8fc26031375ad2c45788d8e4ba56efcd66c28fabd0026bf6a1d23e905ade7c21",
+    "groth16_minop.cash": "00641ad5178d450277a0738b999e43cc6fc87598e27cf547ed25a35871c883ae",
+    "transport-51-to-45.mjs": "40fcca5654dd2f678d5370adc99d1e3f9923dd52e7d68bc39b668629386041ba",
+    "lib/lazy/Bls12381LazyG.cash": "6c9527d3083940041931ca4cd1e682609089adbc30ae0b56a18a181d41b03bf6",
+    "lib/lazy/Bls12381Lazy.cash": "c6aa944554eb8bdea3295ca1e9c209edfacec62e264c8085d50c060acb04f462"
+  },
+  "pairedBenchmarkArtifact": "artifacts/bls-pr5-minop-interface-reference",
+  "compiledBytes": 64396,
+  "compiledSha256": "42ca73a63775c062898e97ecde2b9a3d57b5f292d11677341a9fe5d6063ae0d3",
+  "abiArgumentCount": 45,
+  "transport": "Eight proof coordinates, two public scalars, c[12], cInv[12], w[6], four nonnegative 128-bit GLV components and vkxZinv. Existing51-argument records include six extra zero w limbs; only those six are removed, all retained raw pushes preserved.",
+  "mathematics": "The residue w is in the embedded Fp6: the upper six Fp12 limbs are identically zero in the existing constructor and implicit zero in the checker. The full compiled finite-domain composition binds scalar/seed/GLV/field/group/Miller/residue/terminal owners.",
+  "rangeQualification": "Proof coordinates and GLV components are explicitly bounded; public scalar range follows the bounded-decomposition congruence. Modular inverse representatives for vkxZinv reduce to the same field point. Finite external point and finite reconstructed-vk_x qualifications remain.",
+  "genericCurrentSource": "The current 21-argument torus ABI is a different source; no generic builder/producer is retargeted.",
+  "theoremSha256": "2869d18a091354bd2d5163c5c71bca490efe34b15902e6e73153d40d9f198c54",
+  "constraints": {
+    "existingProofsOnly": true,
+    "auxiliaryTransportOnly": true,
+    "newProofs": 0,
+    "negativeCases": 0,
+    "cybersecurityTesting": false,
+    "byteOptimization": false,
+    "resourceOrRelayClaim": false
+  }
+}
