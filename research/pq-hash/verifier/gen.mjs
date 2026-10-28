@@ -203,7 +203,9 @@ export function buildB(prm, statement, opts = {}) {
 
   // ---------------- initial stack ----------------
   const init = [];
-  trees.forEach((_, ti) => { for (let i = 0; i < s; i++) init.push(`R${ti}_${i}`); });
+  const RG = opts.recGroup ?? 2;          // Merkle records per push (consecutive records of one tree)
+  const nRec = Math.ceil(s / RG);
+  trees.forEach((_, ti) => { for (let i = 0; i < nRec; i++) init.push(`R${ti}_${i}`); });
   for (let q = 0; q < s; q++) init.push(`L${q}`);
   const rF = Array.from({length: r - 1}, (_, i) => 'rF' + (i + 1));
   const pt = ['rT', 'rC', 'OOD', ...rF, 'FIN', 'NONCE'];   // the statement is baked into the code
@@ -347,10 +349,11 @@ export function buildB(prm, statement, opts = {}) {
   trees.forEach((tree, ti) => {
     S.raw([MARKER, 'TOALTSTACK'], 0);
     S.push(sizes[tree.layer + 1], 'pM'); S.push(1 << tree.depth, 'pK'); S.push(tree.off, 'pO'); S.push(tree.leaf_bytes, 'pN'); S.push(Uint8Array.of(tree.tag), 'pT');
-    S.pick(roots[ti], 'root'); S.push(0, 'acc'); S.push(s, 'cnt');
+    S.push(0, 'rbc'); S.pick(roots[ti], 'root'); S.push(0, 'acc'); S.push(s, 'cnt');
     if (idREC === null) {
       const m = S.clone();
-      m.bottom(); m.rename(m.top(), 'rb');
+      // the current group blob; when it is used up, the next one comes from the bottom of the stack
+      m.roll('rbc'); m.raw(['SIZE', 'NOT', 'IF', 'DROP', 'DEPTH', '1SUB', 'ROLL', 'ENDIF'], 1, ['rb']);
       m.raw([1, 'SPLIT', 'SWAP', 'BIN2NUM'], 1, ['rb', 'sg']);
       m.push(1); m.pick('sg'); m.raw(['LSHIFTNUM'], 2, ['pw']); m.roll('acc'); m.raw(['ADD'], 2, ['acc']);
       { const d0 = m.depth('idx0'); m.pick('sg'); m.raw([d0, 'ADD', 'PICK'], 1, ['idx']); }
@@ -359,14 +362,14 @@ export function buildB(prm, statement, opts = {}) {
       m.pick('pO'); m.raw(['SPLIT', 'NIP'], 2, ['Lc']); m.pick('pN'); m.raw(['SPLIT', 'DROP'], 2, ['Lc']);
       m.pick('pT'); m.raw(['SWAP', 'CAT', 'SHA256', ...trunc], 2, ['cur']);
       m.arrange([...m.st.filter((x) => !['root', 'acc', 'k', 'cur', 'rb'].includes(x)), 'root', 'acc', 'k', 'cur', 'rb']);
-      m.raw(['BEGIN', 1, 'SPLIT', 'SWAP', 'DUP', 10, 'LESSTHAN', 'VERIFY', 'INVOKE', 'UNTIL'], 3, ['rb']);
-      m.raw([0, 'EQUALVERIFY'], 1);
-      m.arrange(S.st.slice(1));
+      m.raw(['BEGIN', 1, 'SPLIT', 'SWAP', 'DUP', 10, 'LESSTHAN', 'VERIFY', 'INVOKE', 'UNTIL'], 3, ['rbc']);
+      m.arrange(S.st);
       idREC = defFn('REC', m.bytes());
     }
     S.raw(['BEGIN', idREC, 'INVOKE', '1SUB', 'DUP', 'NOT', 'UNTIL', 'DROP'], 1);
-    S.st.splice(0, s);
+    S.st.splice(0, nRec);
     S.roll('acc'); S.raw([(1n << BigInt(s)) - 1n, 'NUMEQUALVERIFY'], 1);
+    S.roll('rbc'); S.raw([0, 'EQUALVERIFY'], 1);   // the tree's records are consumed exactly
     S.raw(['FROMALTSTACK', MARKER, 'EQUALVERIFY'], 0);
     S.raw(['2DROP', '2DROP', '2DROP'], 6);
   });

@@ -24,14 +24,16 @@ export function program(prm, statement, opts = {}) {
 }
 
 // witness items in push order (bottom first), matching gen.mjs `init`
-export function witnessItems(prm, enc) {
-  return [...enc.records.flat(), ...enc.leafBlobs, ...enc.pt.slice(1)];   // statement baked into the code
+export function witnessItems(prm, enc, opts = {}) {
+  const RG = opts.recGroup ?? 2;
+  const groups = enc.records.flatMap((recs) => Array.from({length: Math.ceil(recs.length / RG)}, (_, g) => Buffer.concat(recs.slice(g * RG, g * RG + RG))));
+  return [...groups, ...enc.leafBlobs, ...enc.pt.slice(1)];   // statement baked into the code
 }
 
 export function spendB(prm, statement, proof, opts = {}, mutate) {
   const pg = program(prm, statement, opts);
   const enc = encodeB(prm, proof);
-  let items = witnessItems(prm, enc);
+  let items = witnessItems(prm, enc, opts);
   if (opts.padSlot) items.push(new Uint8Array(opts.pad ?? 0));
   if (mutate) items = mutate(items, enc);
   const unlocking = pushes([...items, pg.redeem]);
