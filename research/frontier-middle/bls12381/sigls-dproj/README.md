@@ -1,9 +1,11 @@
 # BLS12-381 SI-GLS with an on-chain projective δ walk (research design T1, "dproj")
 
-**Research artifact, not a ranked entry.** It is not in the bench registry and it is not reviewed. It needs an op
-budget about 1.65× looser than bch-spec gives (k ≥ 1.64 on the bch-spec base, k ≥ 2.49 on the bch-2026 base), so it
-is not valid on any VM that exists or is proposed today. Track 2 (the empty middle of the bytes vs op-cost
-frontier) uses it as a data point.
+**Bench entry `bch-groth16-bls12381-sound-si-gls-dproj`** (vmTarget bch-spec). It had two Track 2 reviews (soundness;
+measurement reproduction), both pass with minor findings only, handled in the 2026-10-28 fix round (see "Review
+follow-ups"). It needs an op budget about 1.65× looser than bch-spec gives (k ≥ 1.65 on the bch-spec base, k ≥ 2.50
+on the bch-2026 base, over the sweep), so it is not valid on any VM that exists or is proposed today; the bench grades
+it on bch-spec as "not BCH-compatible: op-cost". It is a Track 2 (the empty middle of the bytes vs op-cost frontier)
+design.
 
 This is a fork of the reviewed `chunked/bls12-381/sound-si-gls`, bench id `bch-groth16-bls12381-sound-si-gls-single`,
 independently reviewed 2026-10-26 (verifiers.md line 102). It makes exactly two changes:
@@ -28,12 +30,12 @@ domain-separated.
 | unlocking | 18,794 = redeem 6,401 + WS 10,080 + WQ 2,304 (48 words) + push headers |
 | redeem 6,401 | field constants and p 1,813 · other data 192 (includes the 4 δ coordinates) · code 4,396 (prologue 2,490; PROJDBL 436, PROJADD 608, DDBL 431, DADD 579) |
 | op cost, committed | 36,894,701 libauth consensus / 36,933,101 standard; **BCHN-adjusted 36,897,147** (+2,446 B of OP_DEFINE bodies, each defined once in the prologue) |
-| op cost, bench worst-case proof | 37,863,895 libauth (n_q 51); BCHN-adjusted 37,866,341 |
+| op cost, bench worst-case vector | 37,863,895 libauth (n_q 51); BCHN-adjusted 37,866,341. This is the bench's worst-case proof vector, not the binding case (see the sweep rows) |
 | maximum over the sweep | 38,946,559 standard (a random statement with n_q around 100; the budget grows with n_q) |
-| op budget needed | k_min = 1.64 (bch-spec base, BCHN-adjusted, worst-case proof); 2.49 on the bch-2026 base |
+| op budget needed | **k_min ≈ 1.65 on the bch-spec base, ≈ 2.50 on the bch-2026 base**: the maximum over the sweep and the bench vectors (the binding case is the forced n_q 54 pattern, lowest margin 17.59% standard / 17.67% consensus at k = 2: (38,309,072 + 2,446) / (46,531,200 / 2) = 1.647). Over the bench vectors alone it is 1.64 / 2.49 (bench worst-case vector). The bch-2026-base figure is a density number only: the unlocking (18,794 B) and the WS push (10,080 B) are over the bch-2026 10,000 B caps, so T1 needs bch-spec size limits at any k, like today's SI-GLS single |
 | op profile | B doublings 14.69M (63), δ doublings 13.73M (63), B additions 1.66M, δ additions 1.57M, GT-GLS 0.91M, state boundaries 1.84M, the rest ~2.5M |
 | liveness sweep (k = 2) | 87 cases (6 fixtures, forced extremes n_q 48..80, the n_q 54 extreme with 10 proof samples, special statements, 40 random proofs): all accepted in both modes. Minimum standard margin 17.6% at the forced n_q 54 pattern |
-| rejection | bench vectors 15/15 rejected; the public-input gate 9/9 mutations rejected; `redteam.mjs` 81/81 rejected (the reviewed suite minus the 5 slope classes and the affine x = x_B case, which no longer exist) |
+| rejection | bench vectors 15/15 rejected; the public-input gate 9/9 mutations rejected; `redteam.mjs` 82/82 rejected: the reviewed suite minus the 5 slope classes (no slopes exist), with the reviewed order-13 B case kept as a projective-degeneracy run (rejected at the endpoint guard Z_T ≠ 0, see soundness item 3) |
 | degree bound | max deg P 246, deg D 251, NQ_MAX 120 (was 118); ε ≤ (32 + 251)/2^256 ≈ **2^−247.86** per random-oracle query |
 
 **Model prediction vs measured.** The prediction was 18,661 B (band 18,541–18,841) at 37.3M (band 34.7–40.6M); the
@@ -73,7 +75,24 @@ The argument is the reviewed SI-GLS argument (`chunked/bls12-381/sound-si-gls/RE
 3. **E_A = 0.** This is a value of the reviewed design's own parameter. The README's rules apply unchanged: "the
    projective walk enters at Z = 1 with no witness"; Z = 0 is absorbing; Z_T ≠ 0 is checked at the endpoint. The B
    walk is therefore exact from event 0, and B ∈ G2 follows from the same ψ endpoint argument. With no affine
-   segment, the witnessed-slope equations and the x ≠ x_B guard simply do not occur.
+   segment, the witnessed-slope equations and the x ≠ x_B guard simply do not occur. What makes this work is the
+   following lemma, which **replaces both the affine slope equations and the x ≠ x_B guard**:
+
+   **Lemma (exactness of the projective walk).** Let the walk start at (x_B : y_B : 1) and let every step be the
+   homogeneous doubling (Z3 = 4BH = 8Y³Z) or the mixed addition with ±B (Z3 = Z·λ′³, λ′ = X − x_q Z). If the final
+   Z_T ≠ 0, then every step was an exact group operation on affine points and every line had ℓ3 ≠ 0.
+   - Z = 0 is absorbing: both formulas have Z3 divisible by Z. So Z_T ≠ 0 implies Z ≠ 0 before and after every step.
+   - Doubling: Z3 = 8Y³Z ≠ 0 implies Y ≠ 0 (and Z ≠ 0), so T is not 2-torsion and the tangent formula is the true
+     doubling; ℓ3 = H = 2YZ ≠ 0.
+   - Mixed addition: Z3 = Z·λ′³ ≠ 0 implies λ′ ≠ 0, i.e. x(T) ≠ x_q, so T ≠ ±Q and the chord formula is the true
+     addition; ℓ3 = λ′ ≠ 0.
+   - Hence each projective line is ℓ3 · (affine line) with ℓ3 ∈ Fp2*, which the nonzero-line step (item 2) needs, and
+     the endpoint compares the true [|x|]B.
+
+   The degenerate cases this rules out (T = ±B at an addition, or Y = 0 at a doubling) make Z = 0 and, for T = B,
+   a zero line, after which every chunk identity holds trivially as 0 = 0; only the endpoint guard Z_T ≠ 0 then
+   rejects. `redteam.mjs` keeps the reviewed suite's order-13 B vector as exactly this case (the walk reaches T = B at
+   a projective addition), and it is rejected at the endpoint guard.
 4. **Degrees and cap.** A δ line has degree 9 instead of 8. `protocol.mjs` re-derives the bound from the schedule
    (`LINE_DEG_D = 9`), and `build.mjs` re-asserts it. The worst chunk is 2(12 + 66) + 90 = 246, deg D ≤ 251, so
    NQ_MAX = 120. That is the on-chain cap (48 ≤ SIZE(WQ) ≤ 48·120). The Schwartz–Zippel bound becomes
@@ -83,8 +102,18 @@ The argument is the reviewed SI-GLS argument (`chunked/bls12-381/sound-si-gls/RE
 
 The G1 cofactor argument, GT-GLS binding, residue argument and completeness are the reviewed ones, word for word. The
 same caveat applies: formula correctness is tested, not machine-proved. Here it is tested by exact divisibility of
-every honest identity in the prover, the value-level mirror verifier (`verifyValues`), the δ assertions above, and
-every accepted sweep proof.
+every honest identity in the prover, the value-level mirror verifier (`verifyValues`), the δ assertions above, every
+accepted sweep proof, and a value-level trace test of the on-chain kernels (`dkerneltest.mjs`, output in
+`dkerneltest.log`):
+- **δ (ROLE.D).** The δ walk does not depend on the input; its only input-dependent use is the evaluation of each line
+  at P = C and ±z. The test compiles DDBL / DADD (`kProjDbl(ROLE.D)`, `kProjAdd(ROLE.D)`) alone with the redeem's
+  assembler, and runs them on the VM at all 68 steps, fed the DPROJ point before the step and the script's ±z
+  environment for a fixture C at a uniform random z, with uniform random F±. At every step the output point equals
+  DPROJ's next point coordinate for coordinate, and F± out equals F± · L_j(±z) for L_j the DPROJ line (4 trials, 272
+  steps). So the on-chain δ section reproduces DPROJ.lines and DPROJ's walk points at the value level.
+- **B (ROLE.B).** With SL removed from the kernel I/O, the ROLE.B kernels give the same outputs as the reviewed
+  `chunked/bls12-381/sound-si-gls` kProjDbl / kProjAdd (SL aside) and as the projDbl / projAdd + line reference, at
+  32 independent uniform random inputs.
 
 ## Files
 
@@ -92,8 +121,9 @@ These are the reviewed design's files with the changes above. `script.mjs` has t
 pile, no affine branch, and a δ state DX0..DZ1 in the loop. `protocol.mjs` has the `DPROJ` walk and assertions,
 E_A = 0, the δ line degree and NQ_MAX. `vm.mjs` evaluates on bch-spec with `operationCostBudgetPerByte = 800·OPK`
 (default OPK = 2; OPK = 1 is stock bch-spec, where the spend fails on op-cost only). `export.mjs`, `redteam.mjs` and
-`worst.mjs` drop the slope classes and the affine-only order-13 case. `test.mjs` is the reviewed cross-check (it
-passes).
+`worst.mjs` drop the slope classes; `redteam.mjs` keeps the order-13 case as a projective-degeneracy run (the forge
+prover commits X^6 states when the B walk degenerates to zero lines). `test.mjs` is the reviewed cross-check (it
+passes). `dkerneltest.mjs` is the δ / B kernel trace test above.
 
 ## Reproduce
 
@@ -101,12 +131,24 @@ passes).
 node test.mjs
 node build.mjs                                   # redeem 6,401 B sha256 bd3fe6eb…d30c
 node export.mjs vectors.json                     # bench vectors (worst case: n_q 51)
-node redteam.mjs vectors.json redteam.json redteam-report.json    # 81 runs, all rejected
+node redteam.mjs vectors.json redteam.json redteam-report.json    # 82 runs, all rejected
+node dkerneltest.mjs 4                           # delta kernels vs DPROJ (68 steps), ROLE.B vs the reviewed kernels
 WORST_PROOFS=10 node worst.mjs; SWEEP_N=40 WORST_PROOFS=10 node sweep.mjs sweep.json
 UNLIMITED=1 node --stack-size=60000 profile.mjs
 ```
 
-Bench measurement: zk-verifier-bench branch `wip/frontier-middle-build-bls12381`, `research/frontier-middle/bls12381/run.ts`.
+Bench: `pnpm benchmark bls12381-sound-si-gls-dproj` (vectors `src/bch/groth16-bls12381-sound-si-gls-dproj-vectors.json`,
+byte-identical to `export.mjs`). The Track 2 measurement glue is zk-verifier-bench `research/frontier-middle/bls12381/run.ts`.
+
+## Review follow-ups (fix round, 2026-10-28)
+
+- Value-level trace test of the on-chain δ kernels against DPROJ, plus ROLE.B against the reviewed kernels:
+  `dkerneltest.mjs` (`DPROJ` now also returns its walk points).
+- The order-13 vector is kept as a projective-degeneracy rejection (`redteam.mjs`, 82/82 rejected, this one at the
+  endpoint guard).
+- The E_A = 0 exactness lemma is stated (soundness item 3).
+- k_min is the maximum over the sweep and the bench vectors (≈ 1.65 / 2.50); 37.87M is labelled the bench
+  worst-case vector; the bch-2026-base k is marked as a density figure (T1 needs bch-spec size limits).
 
 ## Not done
 

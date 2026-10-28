@@ -46,8 +46,15 @@ add('C = (0, 0) (identity encoding)', 'identity-point', std(W0.WQ, setW(setW(W0.
 const twistPt = (seed) => { const t = randomTwistPoint(seed); return G2.fromAffine({x: t.x, y: t.y}); };
 { const P = twistPt(11); assert.ok(!smul(P, r).is0()); add('B on the twist, not in G2 (rebuilt)', 'subgroup', forged(withB(fx0, P))); }
 { const P = fx0.proof.b.add(smul(twistPt(12), r)); assert.ok(!smul(P, r).is0()); add('B + an r-torsion-free cofactor point (rebuilt)', 'subgroup', forged(withB(fx0, P))); }
-// (dproj) the order-13 B case of the reviewed suite targeted the affine x = xB guard; with E_A = 0 there is no affine
-// segment and the forge prover cannot build a witness (the projective walk reaches Z = 0, every later line is 0), so it is dropped.
+// B of order 13 (13 | h2), kept from the reviewed suite as a PROJECTIVE-DEGENERACY rejection (review item). The
+// reviewed suite aimed it at the affine x = xB guard; with E_A = 0 there is no affine segment, so the walk reaches T = B at
+// a projective addition: theta = lambda' = 0, the line and Z3 = Z lambda'^3 are 0, Z = 0 is absorbing and every later B
+// line is 0. Then P = 0 and every chunk identity holds as 0 = 0 (the forge prover commits X^6 states), so the run must be
+// rejected by the endpoint guard Z_T != 0, the guard the E_A = 0 exactness lemma relies on (README, soundness item 3).
+{ let h = BigInt(FACTS.h2); assert.equal(h % 13n, 0n); while (h % 13n === 0n) h /= 13n; // 13^2 || h2: strip the 13-part, then descend to order 13
+  let P = null; for (let s = 20; !P && s < 60; s++) { let Q = smul(twistPt(s), r * h); if (Q.is0()) continue; while (!smul(Q, 13n).is0()) Q = smul(Q, 13n); P = Q; }
+  assert.ok(smul(P, 13n).is0()); assert.equal(E_A, 0, 'no affine segment');
+  add('B of order 13: the walk reaches T = B at a projective addition, Z = 0 absorbing (rebuilt; endpoint Z_T != 0 guard)', 'projective-degeneracy', forged(withB(fx0, P))); }
 // -A, -B, -C (valid points, wrong proof; rebuilt transcripts reach the final identity)
 add('A negated (rebuilt)', 'invalid-proof', forged({inputs: fx0.inputs, proof: {...fx0.proof, a: fx0.proof.a.negate()}}));
 add('B negated (rebuilt)', 'invalid-proof', forged(withB(fx0, fx0.proof.b.negate())));

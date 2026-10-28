@@ -169,6 +169,14 @@
    "at": "terminal (slope count, endpoint, binding)"
   },
   {
+   "label": "B of order 13: the walk reaches T = B at a projective addition, Z = 0 absorbing (rebuilt; endpoint Z_T != 0 guard)",
+   "kind": "projective-degeneracy",
+   "consensus": false,
+   "standard": false,
+   "reason": "error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "at": "terminal (slope count, endpoint, binding)"
+  },
+  {
    "label": "A negated (rebuilt)",
    "kind": "invalid-proof",
    "consensus": false,

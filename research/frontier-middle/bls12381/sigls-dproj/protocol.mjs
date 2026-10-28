@@ -73,17 +73,18 @@ const three = f2(3n, 0n);
 // l3 != 0 at every step, and each projective line is l3 * (c_j, -lambda_j, 1), the baked affine line of the reviewed
 // design (lambda_j = VKC.lams[j], asserted there against noble's millerTrace), so the classes are unchanged.
 export const DPROJ = (() => {
-  const d = VKC.deltaAff; let T = [d.x, d.y, F2.ONE], Tn = VK.delta; const lines = []; let j = 0;
+  const d = VKC.deltaAff; let T = [d.x, d.y, F2.ONE], Tn = VK.delta; const lines = [], points = [], kinds = []; let j = 0;
   const check = (line, Ta) => { const [l0, l2, l3] = line; assert.ok(!F2.is0(l3), 'delta l3 != 0 at step ' + j);
     const lam = VKC.lams[j], c = F2.sub(F2.mul(lam, Ta.x), Ta.y);
     assert.ok(F2.eql(l0, F2.mul(l3, c)) && F2.eql(l2, F2.neg(F2.mul(l3, lam))), 'delta projective line = l3 * affine line, step ' + j); lines.push(line); j++; };
   const same = (T, P) => { const a = P.toAffine(); assert.ok(!F2.is0(T[2]), 'delta Z != 0'); const zi = F2.inv(T[2]); return F2.eql(F2.mul(T[0], zi), a.x) && F2.eql(F2.mul(T[1], zi), a.y); };
   for (let e = 0; e < NE; e++) {
-    assert.ok(same(T, Tn)); { const r1 = projDbl(T); check(r1.line, Tn.toAffine()); T = r1.T; Tn = Tn.double(); assert.ok(same(T, Tn), 'delta walk = noble after dbl ' + e); }
-    if (BITS[e]) { const r2 = projAdd(T, [d.x, d.y]); check(r2.line, Tn.toAffine()); T = r2.T; Tn = Tn.add(VK.delta); assert.ok(same(T, Tn), 'delta walk = noble after add ' + e); }
+    assert.ok(same(T, Tn)); { points.push(T); kinds.push('dbl'); const r1 = projDbl(T); check(r1.line, Tn.toAffine()); T = r1.T; Tn = Tn.double(); assert.ok(same(T, Tn), 'delta walk = noble after dbl ' + e); }
+    if (BITS[e]) { points.push(T); kinds.push('add'); const r2 = projAdd(T, [d.x, d.y]); check(r2.line, Tn.toAffine()); T = r2.T; Tn = Tn.add(VK.delta); assert.ok(same(T, Tn), 'delta walk = noble after add ' + e); }
   }
   assert.equal(j, 68); assert.ok(Tn.equals(VK.delta.multiply(AX)));
-  return {lines};
+  // points[j] is the projective walk point before step j (kinds[j] = dbl | add); end is the point after the last step
+  return {lines, points, kinds, end: T};
 })();
 
 // ---------------- the schedule as polynomials (shared by prover and reference verifier) ----------------
@@ -160,8 +161,11 @@ export function prove(fx, {digits = null, forge = false, eaff = E_A, slopeOverri
   if (!forge) assert.ok(F12.eql(F12.finalExponentiate(fprime), F12.ONE), 'Groth16 equation fails (FE(f\') != 1)');
   // residue root: [c]^lambda = [f'];  u = f'^(p^6-1) (order | N6R), t = u^(lambda^-1 mod N6R), c = 1 + conj(t)
   const minv = (a, m) => { let [x, y] = [mod(a, m), m], [s0, s1] = [1n, 0n]; while (y) { const q = x / y; [x, y] = [y, x - q * y]; [s0, s1] = [s1, s0 - q * s1]; } assert.equal(x, 1n); return mod(s0, m); };
-  const u = F12.mul(F12.conjugate(fprime), F12.inv(fprime)), t = F12.pow(u, minv(LAMBDA, N6R)), c = F12.add(F12.ONE, F12.conjugate(t));
-  const Sc = monicRep(c); const ScNeg = pneg(Sc);       // [S_c(-X)] = [c^-1]
+  // forge only: a degenerate B walk (a projective addition at T = B, e.g. a small-order B) makes a line, and so f', zero
+  // (Z = 0 is absorbing and every later B line is 0); f' has no residue root then, so commit S_c = X^6 (the trivial class)
+  const degenerate = forge && F12.is0(fprime);
+  const u = degenerate ? F12.ONE : F12.mul(F12.conjugate(fprime), F12.inv(fprime)), t = F12.pow(u, minv(LAMBDA, N6R)), c = F12.add(F12.ONE, F12.conjugate(t));
+  const Sc = degenerate ? [0n, 0n, 0n, 0n, 0n, 0n, 1n] : monicRep(c); const ScNeg = pneg(Sc);       // [S_c(-X)] = [c^-1]
   // chain: start = c^-1 * Rconst' * GLS_0; per chunk P = start^(2^len) * prod(events), states at boundaries, W = Frob(S_c) at the end
   let start = pmul(pmul(ScNeg, sched.start[0]), sched.start[1]);
   const evPoly = (e) => { let f = [1n]; for (const x of sched.events[e].fs) f = pmul(f, x); return sched.events[e].c ? pmul(f, ScNeg) : f; };
@@ -169,7 +173,9 @@ export function prove(fx, {digits = null, forge = false, eaff = E_A, slopeOverri
   const states = [], ids = []; let e = 0;
   for (let k = 0; k < K_IDS; k++) {
     let P = start; for (; e <= CHUNK_END[k]; e++) P = pmul(pmul(P, P), evPoly(e));
-    const last = k === K_IDS - 1; const S = last ? Wp : monicRep(fromPoly(P));
+    // forge only: P = 0 mod M (degenerate walk) has no monic representative; commit X^6 (every chunk identity then holds
+    // as 0 = 0, so only the endpoint guard Z_T != 0 can reject: the redteam's projective-degeneracy run)
+    const last = k === K_IDS - 1; const S = last ? Wp : (forge && isZero(pdivM(P).r) ? [0n, 0n, 0n, 0n, 0n, 0n, 1n] : monicRep(fromPoly(P)));
     const D = psub(pmul(P, pneg(S)), pmul(pneg(P), S)); const {q, r: rem} = pdivM(D);
     if (!forge) { assert.ok(isZero(rem), `identity ${k} not divisible by M`); assert.ok(q.every((x, i) => i % 2 === 1 || x === 0n), 'quotient not odd'); }
     ids.push({P, S, D, Q: q}); if (!last) { states.push(S); start = S; }
