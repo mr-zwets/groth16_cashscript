@@ -1,0 +1,21 @@
+// Deterministic reproduction of the frozen 45-argument artifact; no producer or variant selection.
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+import {readFileSync,writeFileSync,mkdirSync} from 'node:fs';
+import {resolve,dirname,join} from 'node:path';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+const [compilerEntry,outputDir]=process.argv.slice(2);
+assert(compilerEntry&&outputDir&&process.argv.length===4,'usage: node rebuild.mjs pinned-cashc-dist-index.js new-output-dir');
+const sha=b=>createHash('sha256').update(b).digest('hex');
+const entry=resolve(compilerEntry),dist=dirname(entry);
+for(const [file,hash] of [[entry,'2ebf0b95e78a2b7dc12c4778a1ee2fcac258aa3244d9f3a6871d8000b2b3e6fc'],[join(dist,'compiler.js'),'5e92acd05a37bea1d71e0a5ae35fe0d79d437229e1ef6e354d94147e7375bd70'],[join(dist,'..','package.json'),'672de1d16406b72316157d2f3c34eca9e089960f8eeeae2432afd9cb24ea1c48']])assert.equal(sha(readFileSync(file)),hash);
+const source=new URL('./groth16_minop.cash',import.meta.url);
+assert.equal(sha(readFileSync(source)),'00641ad5178d450277a0738b999e43cc6fc87598e27cf547ed25a35871c883ae');
+const {compileFile}=await import(pathToFileURL(entry).href);
+const artifact=compileFile(fileURLToPath(source),{rescheduleStacks:true});
+const bytes=Buffer.from(artifact.debug.bytecode,'hex');
+assert.equal(bytes.length,64396);
+assert.equal(sha(bytes),'42ca73a63775c062898e97ecde2b9a3d57b5f292d11677341a9fe5d6063ae0d3');
+mkdirSync(outputDir,{recursive:false});
+writeFileSync(join(outputDir,'program.hex'),bytes.toString('hex')+'\n',{flag:'wx'});
+writeFileSync(join(outputDir,'rebuild.json'),JSON.stringify({schema:'bls-pr5-minop45-fixed-rebuild/v1',bytes:bytes.length,sha256:sha(bytes),sourceSha256:sha(readFileSync(source)),options:{rescheduleStacks:true},compilerVariants:0,newProofs:0,byteOptimization:false},null,2)+'\n',{flag:'wx'});

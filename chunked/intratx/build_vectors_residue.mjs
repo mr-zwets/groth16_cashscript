@@ -509,7 +509,11 @@ function buildSpecs(inst) {
       { targetSpecIndex: millerGenesisIndex, sourceOffset: 6 * W, targetOffset: 0, length: 8 * W },
     ];
   }
-  return [...g2, ...vkx, ...miller];
+  // Every linked state blob is a complete physical frame, including the
+  // G2 carrier, GLV/Miller states, and terminal owner.
+  const specs = [...g2, ...vkx, ...miller];
+  specs.forEach((spec) => { spec.enforceExactInputLength = true; });
+  return specs;
 }
 
 // ---- assemble: transform+compile each chunk, build the single tx, tune pad, verify ----

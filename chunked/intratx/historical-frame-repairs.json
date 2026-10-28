@@ -1,0 +1,702 @@
+{
+  "schema": "historical-frame-repair-profiles/v1",
+  "positiveOnly": true,
+  "profiles": [
+    {
+      "id": "bch-groth16-historical-bn27-intratx-frame-corrected",
+      "layout": "intratx",
+      "curve": "BN254",
+      "programCount": 27,
+      "caseCount": 3,
+      "sourcePr": 3,
+      "sourceHead": "b4cf1eadeb596fc80350d9c00c66c5983cb43c77",
+      "benchmarkPr": 9,
+      "originalFixture": {
+        "repository": "mr-zwets/zk-verifier-bench",
+        "revision": "84c177c40aa86d7ce5c31e0082981cbc6ccae8ba",
+        "file": "src/bch/groth16-intratx-residue-vectors.json",
+        "sha256": "8f133bbcbf432192f104df19acaba6d12968f202c2f9856e270ab2c1a8301372"
+      },
+      "gates": [
+        {
+          "input": 6,
+          "offset": 653,
+          "length": 228,
+          "depth": 2,
+          "hex": "5279827702e4009d",
+          "comparison": "equal"
+        },
+        {
+          "input": 26,
+          "offset": 1941,
+          "length": 1664,
+          "depth": 12,
+          "hex": "5c7982770280069d",
+          "comparison": "equal"
+        }
+      ],
+      "originalProgramSha256": [
+        "8264da0e5bb0500d47d7e205f78840d273cf67992aea6e25e9ad5d98f59e3c41",
+        "c38e41e8aee8e76fd7794c8b2be91ac34abc82a55e1e734dc2c14daf0c5367ea",
+        "bf06d8f2346a492eb6232c71e9d328078d389dad13c62773df25a37d510a9e7c",
+        "ba7d21197ba87e0b4f00ce53e5176e1e149e18d8524f68051ba0cb07f39e24d9",
+        "183890b7745cd8f784bc5471556c9a9fed31e4c72c938eacd031a29f5d4dc01f",
+        "cc9372e8dc0cff8850e0ac6c5329cf8c42e419893b2368e8067fbd818b0d32b2",
+        "9cba21bf9f11f4f4fdb95d3a11a96f1f3736a5f42afaaf20904ff96ffae305c6",
+        "4929be33fdac1f3db5c532d728ecfbae8fed43debdeb17a7438094556b83b69d",
+        "b9f7afbbd8a5e4ac96a27ba4f3d5b2c89464b59f1acab9edd47f1a393335deda",
+        "8085ffdad4f4b580bd6e35ea3c2a257e0bdeb1e9a7015f741d7cf7258a981883",
+        "2f48bb608f421f3427cc499464c0219f5298bb68d6953633eeb3e89c544e6512",
+        "4edc51452b21613a4d6400a6348a28d73fcbb5f383a4b8b7d6cd14595260ceff",
+        "28a263fc69f7261b102fa7bb7676eb77001bb422087766d2031bde91e100b5ac",
+        "c9d67cddde7ab15e8ade193a466feba61568b5861c007a6b661357758c961595",
+        "d963c8848105d1f36dd8c06c922831504082cfa742783591e1b342ec6be7edbd",
+        "d296681206ef29097901721a6694d3c1de907aab3e9491b0ca82ad29b8be545e",
+        "1fabeeb57c435a7330a6e79b94772bd4eb0d2bbb73e4e462f48ac2dcb13daf33",
+        "c2f4dde017ac8201b67906228ddbdb22afa1f1e04241d5424c104bbae4cb2e2e",
+        "ea36aa1863c23f2e22e92c59754a8808237d0e1e578cba749401562189e501b4",
+        "8cace6bea42bbc3c093d990b1adc8270542963a600b538cd1c8e7536f112ceb1",
+        "15cd711df54e3a1e18b345437ab99ab4d4872f0fea571325ac60e8eb0b2e81f1",
+        "6028ed37f4c3d84bcb8e0d632b33b13966051ed7271e1ea442b598b8c2b5ad78",
+        "486d6f6be9af9afb94d5ef7e6626b98d84af32ce598bb3e08cc54571b2cac34e",
+        "a993b2d9480f2b86d9ee448866433ed9314de63a10ac743996b94eb750052f30",
+        "044b613ed53a0263e91105fbe92bb4ea69449dad540737e7c573e286d07b4e2f",
+        "8ba5a796b7394d826de9eade030a094c802fed416616297e6e95ebcd477affc0",
+        "4f5a26981c37e37d7da046af9b6589e3c9b296839c0edae8979d029ee4aa1c0c"
+      ],
+      "repairedProgramSha256": [
+        "8264da0e5bb0500d47d7e205f78840d273cf67992aea6e25e9ad5d98f59e3c41",
+        "c38e41e8aee8e76fd7794c8b2be91ac34abc82a55e1e734dc2c14daf0c5367ea",
+        "bf06d8f2346a492eb6232c71e9d328078d389dad13c62773df25a37d510a9e7c",
+        "ba7d21197ba87e0b4f00ce53e5176e1e149e18d8524f68051ba0cb07f39e24d9",
+        "183890b7745cd8f784bc5471556c9a9fed31e4c72c938eacd031a29f5d4dc01f",
+        "cc9372e8dc0cff8850e0ac6c5329cf8c42e419893b2368e8067fbd818b0d32b2",
+        "a625a895964d3e170cf9bb54b1a988530c013dc2a5c50f11b0c35e1f8272317b",
+        "4929be33fdac1f3db5c532d728ecfbae8fed43debdeb17a7438094556b83b69d",
+        "b9f7afbbd8a5e4ac96a27ba4f3d5b2c89464b59f1acab9edd47f1a393335deda",
+        "8085ffdad4f4b580bd6e35ea3c2a257e0bdeb1e9a7015f741d7cf7258a981883",
+        "2f48bb608f421f3427cc499464c0219f5298bb68d6953633eeb3e89c544e6512",
+        "4edc51452b21613a4d6400a6348a28d73fcbb5f383a4b8b7d6cd14595260ceff",
+        "28a263fc69f7261b102fa7bb7676eb77001bb422087766d2031bde91e100b5ac",
+        "c9d67cddde7ab15e8ade193a466feba61568b5861c007a6b661357758c961595",
+        "d963c8848105d1f36dd8c06c922831504082cfa742783591e1b342ec6be7edbd",
+        "d296681206ef29097901721a6694d3c1de907aab3e9491b0ca82ad29b8be545e",
+        "1fabeeb57c435a7330a6e79b94772bd4eb0d2bbb73e4e462f48ac2dcb13daf33",
+        "c2f4dde017ac8201b67906228ddbdb22afa1f1e04241d5424c104bbae4cb2e2e",
+        "ea36aa1863c23f2e22e92c59754a8808237d0e1e578cba749401562189e501b4",
+        "8cace6bea42bbc3c093d990b1adc8270542963a600b538cd1c8e7536f112ceb1",
+        "15cd711df54e3a1e18b345437ab99ab4d4872f0fea571325ac60e8eb0b2e81f1",
+        "6028ed37f4c3d84bcb8e0d632b33b13966051ed7271e1ea442b598b8c2b5ad78",
+        "486d6f6be9af9afb94d5ef7e6626b98d84af32ce598bb3e08cc54571b2cac34e",
+        "a993b2d9480f2b86d9ee448866433ed9314de63a10ac743996b94eb750052f30",
+        "044b613ed53a0263e91105fbe92bb4ea69449dad540737e7c573e286d07b4e2f",
+        "8ba5a796b7394d826de9eade030a094c802fed416616297e6e95ebcd477affc0",
+        "316e279d4aa4b94ef2b9f6910e146820a57d955df7b8f594d07d80c93c84a41d"
+      ],
+      "qualification": {
+        "claim": "The two exact frame predicates close the reviewed byte-owner gaps in this exact ordered program graph. The previously reviewed finite-domain necessary pairing equation transfers by exact selected program identity.",
+        "domain": "Canonical public scalars; finite canonical G1 proof representatives; finite nonzero strict r-subgroup G2 proof; finite public MSM; the reviewed nonzero residue/root chart.",
+        "premises": [
+          "Exact complete ordered program graph and intended public statement are externally anchored.",
+          "Grouped graphs also require actual valid incoming/outgoing token-spend continuity and authenticated initial state.",
+          "Pinned VM integer/byte/function semantics, hash binding, and curve/tower/group/pairing facts."
+        ],
+        "neutralDomainComplete": false,
+        "arbitraryKeySupport": false,
+        "wholeTransactionAdmission": "NOT_ESTABLISHED_BY_PER_INPUT_REPLAY",
+        "historicalClaim": "WITHDRAWN_REMAINS_WITHDRAWN",
+        "theoremPins": {
+          "parentMathematicalReviewSha256": "76d6b36873d8396107c5d64d905d0d98ab473d9f1aa3803db75ce1f85fb87bc2",
+          "qualifiedRepairedNativeAndGroupedMathematicalReviewSha256": "4b2fe4928dcebcefc2f7205e7d3755d22f8eb56752142e487a3412b4e9124bd1",
+          "requiredAdapterSupplementSha256": "097032b789568e6a8f309b9dbe21de62340406f6d102a7c7e431952f40428649"
+        }
+      },
+      "declaredVm": "bch-2026"
+    },
+    {
+      "id": "bch-groth16-historical-bn27-grouped-frame-corrected",
+      "layout": "grouped",
+      "curve": "BN254",
+      "programCount": 27,
+      "caseCount": 3,
+      "sourcePr": 3,
+      "sourceHead": "b4cf1eadeb596fc80350d9c00c66c5983cb43c77",
+      "benchmarkPr": 9,
+      "originalFixture": {
+        "repository": "mr-zwets/zk-verifier-bench",
+        "revision": "84c177c40aa86d7ce5c31e0082981cbc6ccae8ba",
+        "file": "src/bch/groth16-grouped-residue-vectors.json",
+        "sha256": "5ff2fa580d3d99c9d819fc8c300bec4b518ce26e709cbd8fd4227e516999f6d6"
+      },
+      "gates": [
+        {
+          "input": 6,
+          "offset": 653,
+          "length": 228,
+          "depth": 2,
+          "hex": "5279827702e4009d",
+          "comparison": "equal"
+        },
+        {
+          "input": 26,
+          "offset": 1941,
+          "length": 1664,
+          "depth": 12,
+          "hex": "5c7982770280069d",
+          "comparison": "equal"
+        }
+      ],
+      "originalProgramSha256": [
+        "8264da0e5bb0500d47d7e205f78840d273cf67992aea6e25e9ad5d98f59e3c41",
+        "c38e41e8aee8e76fd7794c8b2be91ac34abc82a55e1e734dc2c14daf0c5367ea",
+        "bf06d8f2346a492eb6232c71e9d328078d389dad13c62773df25a37d510a9e7c",
+        "ba7d21197ba87e0b4f00ce53e5176e1e149e18d8524f68051ba0cb07f39e24d9",
+        "183890b7745cd8f784bc5471556c9a9fed31e4c72c938eacd031a29f5d4dc01f",
+        "cc9372e8dc0cff8850e0ac6c5329cf8c42e419893b2368e8067fbd818b0d32b2",
+        "9cba21bf9f11f4f4fdb95d3a11a96f1f3736a5f42afaaf20904ff96ffae305c6",
+        "4929be33fdac1f3db5c532d728ecfbae8fed43debdeb17a7438094556b83b69d",
+        "e500cd95074d5e30687a8ff94a6df0a0c5dff7a9ca514bbb577f4b39fd88f4a6",
+        "36050492ce7407168f15b257f1084d3eaad9110cddb5bdd35629be22066d2480",
+        "2f48bb608f421f3427cc499464c0219f5298bb68d6953633eeb3e89c544e6512",
+        "4edc51452b21613a4d6400a6348a28d73fcbb5f383a4b8b7d6cd14595260ceff",
+        "28a263fc69f7261b102fa7bb7676eb77001bb422087766d2031bde91e100b5ac",
+        "c9d67cddde7ab15e8ade193a466feba61568b5861c007a6b661357758c961595",
+        "d963c8848105d1f36dd8c06c922831504082cfa742783591e1b342ec6be7edbd",
+        "d296681206ef29097901721a6694d3c1de907aab3e9491b0ca82ad29b8be545e",
+        "1fabeeb57c435a7330a6e79b94772bd4eb0d2bbb73e4e462f48ac2dcb13daf33",
+        "929b6d201db51dfbd95bd0cce1c7639f9a5f08d98f672ac76ac9494653a0a5b8",
+        "782d995f0906b4c6461e11ce5cce2e45cde90b032a4b6f151a5b04cf42f47d9b",
+        "8cace6bea42bbc3c093d990b1adc8270542963a600b538cd1c8e7536f112ceb1",
+        "15cd711df54e3a1e18b345437ab99ab4d4872f0fea571325ac60e8eb0b2e81f1",
+        "6028ed37f4c3d84bcb8e0d632b33b13966051ed7271e1ea442b598b8c2b5ad78",
+        "486d6f6be9af9afb94d5ef7e6626b98d84af32ce598bb3e08cc54571b2cac34e",
+        "a993b2d9480f2b86d9ee448866433ed9314de63a10ac743996b94eb750052f30",
+        "044b613ed53a0263e91105fbe92bb4ea69449dad540737e7c573e286d07b4e2f",
+        "8ba5a796b7394d826de9eade030a094c802fed416616297e6e95ebcd477affc0",
+        "4f5a26981c37e37d7da046af9b6589e3c9b296839c0edae8979d029ee4aa1c0c"
+      ],
+      "repairedProgramSha256": [
+        "8264da0e5bb0500d47d7e205f78840d273cf67992aea6e25e9ad5d98f59e3c41",
+        "c38e41e8aee8e76fd7794c8b2be91ac34abc82a55e1e734dc2c14daf0c5367ea",
+        "bf06d8f2346a492eb6232c71e9d328078d389dad13c62773df25a37d510a9e7c",
+        "ba7d21197ba87e0b4f00ce53e5176e1e149e18d8524f68051ba0cb07f39e24d9",
+        "183890b7745cd8f784bc5471556c9a9fed31e4c72c938eacd031a29f5d4dc01f",
+        "cc9372e8dc0cff8850e0ac6c5329cf8c42e419893b2368e8067fbd818b0d32b2",
+        "a625a895964d3e170cf9bb54b1a988530c013dc2a5c50f11b0c35e1f8272317b",
+        "4929be33fdac1f3db5c532d728ecfbae8fed43debdeb17a7438094556b83b69d",
+        "e500cd95074d5e30687a8ff94a6df0a0c5dff7a9ca514bbb577f4b39fd88f4a6",
+        "36050492ce7407168f15b257f1084d3eaad9110cddb5bdd35629be22066d2480",
+        "2f48bb608f421f3427cc499464c0219f5298bb68d6953633eeb3e89c544e6512",
+        "4edc51452b21613a4d6400a6348a28d73fcbb5f383a4b8b7d6cd14595260ceff",
+        "28a263fc69f7261b102fa7bb7676eb77001bb422087766d2031bde91e100b5ac",
+        "c9d67cddde7ab15e8ade193a466feba61568b5861c007a6b661357758c961595",
+        "d963c8848105d1f36dd8c06c922831504082cfa742783591e1b342ec6be7edbd",
+        "d296681206ef29097901721a6694d3c1de907aab3e9491b0ca82ad29b8be545e",
+        "1fabeeb57c435a7330a6e79b94772bd4eb0d2bbb73e4e462f48ac2dcb13daf33",
+        "929b6d201db51dfbd95bd0cce1c7639f9a5f08d98f672ac76ac9494653a0a5b8",
+        "782d995f0906b4c6461e11ce5cce2e45cde90b032a4b6f151a5b04cf42f47d9b",
+        "8cace6bea42bbc3c093d990b1adc8270542963a600b538cd1c8e7536f112ceb1",
+        "15cd711df54e3a1e18b345437ab99ab4d4872f0fea571325ac60e8eb0b2e81f1",
+        "6028ed37f4c3d84bcb8e0d632b33b13966051ed7271e1ea442b598b8c2b5ad78",
+        "486d6f6be9af9afb94d5ef7e6626b98d84af32ce598bb3e08cc54571b2cac34e",
+        "a993b2d9480f2b86d9ee448866433ed9314de63a10ac743996b94eb750052f30",
+        "044b613ed53a0263e91105fbe92bb4ea69449dad540737e7c573e286d07b4e2f",
+        "8ba5a796b7394d826de9eade030a094c802fed416616297e6e95ebcd477affc0",
+        "316e279d4aa4b94ef2b9f6910e146820a57d955df7b8f594d07d80c93c84a41d"
+      ],
+      "qualification": {
+        "claim": "The two exact frame predicates close the reviewed byte-owner gaps in this exact ordered program graph. The previously reviewed finite-domain necessary pairing equation transfers by exact selected program identity.",
+        "domain": "Canonical public scalars; finite canonical G1 proof representatives; finite nonzero strict r-subgroup G2 proof; finite public MSM; the reviewed nonzero residue/root chart.",
+        "premises": [
+          "Exact complete ordered program graph and intended public statement are externally anchored.",
+          "Grouped graphs also require actual valid incoming/outgoing token-spend continuity and authenticated initial state.",
+          "Pinned VM integer/byte/function semantics, hash binding, and curve/tower/group/pairing facts."
+        ],
+        "neutralDomainComplete": false,
+        "arbitraryKeySupport": false,
+        "wholeTransactionAdmission": "NOT_ESTABLISHED_BY_PER_INPUT_REPLAY",
+        "historicalClaim": "WITHDRAWN_REMAINS_WITHDRAWN",
+        "theoremPins": {
+          "parentMathematicalReviewSha256": "76d6b36873d8396107c5d64d905d0d98ab473d9f1aa3803db75ce1f85fb87bc2",
+          "qualifiedRepairedNativeAndGroupedMathematicalReviewSha256": "4b2fe4928dcebcefc2f7205e7d3755d22f8eb56752142e487a3412b4e9124bd1",
+          "requiredAdapterSupplementSha256": "097032b789568e6a8f309b9dbe21de62340406f6d102a7c7e431952f40428649"
+        }
+      },
+      "tokenCategoryHex": "cdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd",
+      "declaredVm": "bch-2026"
+    },
+    {
+      "id": "bch-groth16-historical-bls26-frame-corrected",
+      "layout": "intratx",
+      "curve": "BLS12-381",
+      "programCount": 26,
+      "caseCount": 3,
+      "sourcePr": 11,
+      "sourceHead": "106bbb1bb09c32fdf3fc02c1aeb5f9af4721fd69",
+      "benchmarkPr": 18,
+      "originalFixture": {
+        "repository": "mr-zwets/zk-verifier-bench",
+        "revision": "c180fa77db4a1ad9126d60bfdea176692ec6360a",
+        "file": "src/bch/groth16-bls12381-intratx-residue-vectors.json",
+        "sha256": "8b27aec8874f0072fd52c609f25c77244432b74085b949d834925860c7c9e858"
+      },
+      "gates": [
+        {
+          "input": 4,
+          "offset": 667,
+          "length": 432,
+          "depth": 2,
+          "hex": "5279827702b0019d",
+          "comparison": "equal"
+        },
+        {
+          "input": 25,
+          "offset": 1904,
+          "length": 1632,
+          "depth": 0,
+          "hex": "7682770260069d",
+          "comparison": "equal"
+        }
+      ],
+      "originalProgramSha256": [
+        "31e505f050a10c96bcd9930970e64255bcb49b883578e4bda637318c68e33378",
+        "7e0c1fcc82443597196ccba37ed26d61f4c5284e814aad1184451e6eeed78034",
+        "50245e22249c00d4c7b55e6d2addfe62e632c91d7c683fd7e3fcd76eb04ebd42",
+        "d901364266e0c99b0053e741e25855072e0d0a0ecfe692381b3be62f69b7d778",
+        "c2789f86dd316b60a7f04a8d4c8c8464a708282e363b0ee0c5de43d7fa4e5a22",
+        "3bf65d19f8b04638f0337e24fc07d66ae533db4cc9f26b9086f7e71a7403cc8f",
+        "e6d7ecb0f610b85794924a5fff8448bf98c8efa5e765b6424e60b2df065b8ae5",
+        "432680d3f6163f6b6cb9791701470f143772d9e386fba15b403b3060210eae8c",
+        "409c57b110b55e7ac25a1e26790400eeb7e06932c7e7e8c3b1555c479acdbc0a",
+        "857bf4000f454fd88cdae40a28b66a7142f71aa30514df8bedbadb077d28940f",
+        "4c4d45f361ab7280a898599d8c3018fd6d3f015379f88adf13a385e0010c02cb",
+        "2b85ff05709b2ac531b8b8be550655ada12254c081b20ec56ac63b39caec5af2",
+        "26c7ca7467d9e2402c30baf02313530b0801597047a9a7be913f5a9b4b430182",
+        "ede4cb6b74484fe4d8b5a37efdbe2bbd9cb6989dc184f6210bce635b8bbf0569",
+        "b3f7db22e9382330b985530ba85ec26c2ee3c1a22449bfeeadcdca83aa00013f",
+        "3557ac33647507f806cd0d09fec960c3b8d6219df0d07270f3b43b5088f894f9",
+        "bb0e81358a29d9c95439200e3a127acc70478f7c993e4355d5b6d43cd0ecd6d4",
+        "c6fadb001e8c44ff89ca53016436d1e484fd6c3423e378c185bddfd91e8e01a1",
+        "79427a80547c0bfc03438d2af42612f6161c6be0487b334d08016359f379495a",
+        "50a2b611fd9ddfa99060414c019095f9da8f116414e4386db1e166183e996d72",
+        "f7bb31bafca3165ea9f34dd3561bd6f92b62b94f1efe3b6f061b2d7fb1d9a4b7",
+        "aa32fa4f3059248fb0cc5256e4de12365fedd72da1b985c01d8f50559b6f85a1",
+        "ab64928a64056d834822091c125daa0ad99bdf414746e2049995f9d3185e9738",
+        "4bcf409ffec5cf4555549b6c392611f776a145fa75de9758a6c7b28ca50e0020",
+        "40a75c0e76a7c74adc183e78e12c1cfbbfe3f2862ceb4d396e3c2ee570545c5d",
+        "ebfc758d141f3d9e10d8813e5a8aff2efa2bdb13f473c70044d979e95bca5381"
+      ],
+      "repairedProgramSha256": [
+        "31e505f050a10c96bcd9930970e64255bcb49b883578e4bda637318c68e33378",
+        "7e0c1fcc82443597196ccba37ed26d61f4c5284e814aad1184451e6eeed78034",
+        "50245e22249c00d4c7b55e6d2addfe62e632c91d7c683fd7e3fcd76eb04ebd42",
+        "d901364266e0c99b0053e741e25855072e0d0a0ecfe692381b3be62f69b7d778",
+        "c4cb8c6ea8ed86c3d77286c19948c1478b37e5fd7c4d4428f1504a0872b582aa",
+        "3bf65d19f8b04638f0337e24fc07d66ae533db4cc9f26b9086f7e71a7403cc8f",
+        "e6d7ecb0f610b85794924a5fff8448bf98c8efa5e765b6424e60b2df065b8ae5",
+        "432680d3f6163f6b6cb9791701470f143772d9e386fba15b403b3060210eae8c",
+        "409c57b110b55e7ac25a1e26790400eeb7e06932c7e7e8c3b1555c479acdbc0a",
+        "857bf4000f454fd88cdae40a28b66a7142f71aa30514df8bedbadb077d28940f",
+        "4c4d45f361ab7280a898599d8c3018fd6d3f015379f88adf13a385e0010c02cb",
+        "2b85ff05709b2ac531b8b8be550655ada12254c081b20ec56ac63b39caec5af2",
+        "26c7ca7467d9e2402c30baf02313530b0801597047a9a7be913f5a9b4b430182",
+        "ede4cb6b74484fe4d8b5a37efdbe2bbd9cb6989dc184f6210bce635b8bbf0569",
+        "b3f7db22e9382330b985530ba85ec26c2ee3c1a22449bfeeadcdca83aa00013f",
+        "3557ac33647507f806cd0d09fec960c3b8d6219df0d07270f3b43b5088f894f9",
+        "bb0e81358a29d9c95439200e3a127acc70478f7c993e4355d5b6d43cd0ecd6d4",
+        "c6fadb001e8c44ff89ca53016436d1e484fd6c3423e378c185bddfd91e8e01a1",
+        "79427a80547c0bfc03438d2af42612f6161c6be0487b334d08016359f379495a",
+        "50a2b611fd9ddfa99060414c019095f9da8f116414e4386db1e166183e996d72",
+        "f7bb31bafca3165ea9f34dd3561bd6f92b62b94f1efe3b6f061b2d7fb1d9a4b7",
+        "aa32fa4f3059248fb0cc5256e4de12365fedd72da1b985c01d8f50559b6f85a1",
+        "ab64928a64056d834822091c125daa0ad99bdf414746e2049995f9d3185e9738",
+        "4bcf409ffec5cf4555549b6c392611f776a145fa75de9758a6c7b28ca50e0020",
+        "40a75c0e76a7c74adc183e78e12c1cfbbfe3f2862ceb4d396e3c2ee570545c5d",
+        "80b9be89c33ce1b73063e1e4813e4625469da3cc913313764f19b2d809cd7d87"
+      ],
+      "qualification": {
+        "claim": "The two exact frame predicates close the reviewed byte-owner gaps in this exact ordered program graph. The previously reviewed finite-domain necessary pairing equation transfers by exact selected program identity.",
+        "domain": "Canonical public scalars; finite canonical G1 proof representatives; finite nonzero strict r-subgroup G2 proof; finite public MSM; the reviewed nonzero residue/root chart.",
+        "premises": [
+          "Exact complete ordered program graph and intended public statement are externally anchored.",
+          "Grouped graphs also require actual valid incoming/outgoing token-spend continuity and authenticated initial state.",
+          "Pinned VM integer/byte/function semantics, hash binding, and curve/tower/group/pairing facts."
+        ],
+        "neutralDomainComplete": false,
+        "arbitraryKeySupport": false,
+        "wholeTransactionAdmission": "NOT_ESTABLISHED_BY_PER_INPUT_REPLAY",
+        "historicalClaim": "WITHDRAWN_REMAINS_WITHDRAWN",
+        "theoremPins": {
+          "parentReviewSha256": "e0f44d0908ce65ca08b0d0bcc93744c3c057727123209bc8f45128761aa4f3b8",
+          "compositionSha256": "444f3815767a0c46a20ace81b5a3b6bab8bb6fe94b9ccc9c4152e04e87684389",
+          "adapterSemanticsSha256": "00abc6fe19f09650db55daf795444a4da6645d110e6ee6424b586415eab397f2",
+          "rawByteFunctionsSha256": "14bcba3d51ea055a68582d344d217186849c1542358770009e9a0df1926fcd6f"
+        }
+      },
+      "declaredVm": "bch-2026"
+    },
+    {
+      "id": "bch-groth16-historical-bls24-frame-corrected",
+      "layout": "intratx",
+      "curve": "BLS12-381",
+      "programCount": 24,
+      "caseCount": 3,
+      "sourcePr": 13,
+      "sourceHead": "2b76007bec86727ccc0018dcb4ea9b905042a52f",
+      "benchmarkPr": 20,
+      "originalFixture": {
+        "repository": "mr-zwets/zk-verifier-bench",
+        "revision": "8bc667a1be97d511d484b623f9adb10e35cf747c",
+        "file": "src/bch/groth16-bls12381-intratx-residue-vectors.json",
+        "sha256": "ce60c541019ee1053926bed9f047d477971fc69ee37bfb64779f0050caffd31d"
+      },
+      "gates": [
+        {
+          "input": 4,
+          "offset": 667,
+          "length": 432,
+          "depth": 2,
+          "hex": "5279827702b0019d",
+          "comparison": "equal"
+        },
+        {
+          "input": 23,
+          "offset": 1904,
+          "length": 1632,
+          "depth": 0,
+          "hex": "7682770260069d",
+          "comparison": "equal"
+        }
+      ],
+      "originalProgramSha256": [
+        "16f4ad813935928e26eef9a87746315c43de74145fae48bf0273fa8a486a2584",
+        "877aeecc926596c3a654adad8751a67cf5f1999a60d48c7e47527c01aff30b69",
+        "f45725228023cda39aa50ca733037d3f2fbbd653fac36097d1b7fe152b7d9f67",
+        "b443abefbab50d648500ded5eddcf2ad59d93b9616ff115ff695daea27a08856",
+        "c3394c9a34339cce4f290967082dd0529d1516a21fd90e27c37d530f3a6077b5",
+        "3bf65d19f8b04638f0337e24fc07d66ae533db4cc9f26b9086f7e71a7403cc8f",
+        "e6d7ecb0f610b85794924a5fff8448bf98c8efa5e765b6424e60b2df065b8ae5",
+        "514802aecef5db7b06f2ee868d082bf3d8e7f68641c53e3623c72a5c986f9c81",
+        "f019c4fe56c5e15478616ba29d31ec61e5b31b3145e3f2f6f366480dc54076ad",
+        "d07628b2e9874616e23cb268b79bdb5849e155f06165fa139fc2ef089d0b4bdc",
+        "8a3711d41de46563777f64a0539726532bcf5e9cfb32c8aebc063119584fd105",
+        "a3f864a6d4f257971a5a7610fac8eb0c0a34c1261d197bbe9e3754d641e2400f",
+        "4ba808cde05334ab49ed64db14c62378ef66610c0d281a214d2f3c7cf672914e",
+        "4afbd8d9904e763e150169a602d6469daaecb13d35e6f93fc8377ee8650a66e7",
+        "678c4355ef86488b9e60efee0975b48816f6af1145de00227d1eb70e63faf488",
+        "3710a1e91a58f26c8614c66bbb18dea6bf787e27d009980b836fdb39fbca9237",
+        "f64c01a493de05e7b14dfa473f637b232eba6fc8b0a9eabc40a3e7745a16e11b",
+        "b8754edba91b6b7e58fbf843af535455d9b3c5fb8141c0192d2b7d841196ba47",
+        "7544d3f4769ef3585d620ea21d9686de2e9d14192818a61a2dbcfd229531b0d3",
+        "ce43b2621e75082e0997b97d0ae45b585fb1618cba804fc96dd08c404c993949",
+        "16fdf839816a584bb048ab7b0dfbec3dc15d89a3ccbf694cd45d78cea6a25945",
+        "33cadb70b76033aa7385f684db9f8ef2ed1802ada6912fba639a8273522da0ea",
+        "2083181677d034ae137669156c70dcd8fec6ad806ca5b1a8eaec3976a23e61d8",
+        "5e16798fa1408cc61ed3067f468113c920f89bd52bb32c609971b90825e70f50"
+      ],
+      "repairedProgramSha256": [
+        "16f4ad813935928e26eef9a87746315c43de74145fae48bf0273fa8a486a2584",
+        "877aeecc926596c3a654adad8751a67cf5f1999a60d48c7e47527c01aff30b69",
+        "f45725228023cda39aa50ca733037d3f2fbbd653fac36097d1b7fe152b7d9f67",
+        "b443abefbab50d648500ded5eddcf2ad59d93b9616ff115ff695daea27a08856",
+        "37102090a806a077d0e4424b524139cbe15b566dbb39c0d90a02eefd1d112c8d",
+        "3bf65d19f8b04638f0337e24fc07d66ae533db4cc9f26b9086f7e71a7403cc8f",
+        "e6d7ecb0f610b85794924a5fff8448bf98c8efa5e765b6424e60b2df065b8ae5",
+        "514802aecef5db7b06f2ee868d082bf3d8e7f68641c53e3623c72a5c986f9c81",
+        "f019c4fe56c5e15478616ba29d31ec61e5b31b3145e3f2f6f366480dc54076ad",
+        "d07628b2e9874616e23cb268b79bdb5849e155f06165fa139fc2ef089d0b4bdc",
+        "8a3711d41de46563777f64a0539726532bcf5e9cfb32c8aebc063119584fd105",
+        "a3f864a6d4f257971a5a7610fac8eb0c0a34c1261d197bbe9e3754d641e2400f",
+        "4ba808cde05334ab49ed64db14c62378ef66610c0d281a214d2f3c7cf672914e",
+        "4afbd8d9904e763e150169a602d6469daaecb13d35e6f93fc8377ee8650a66e7",
+        "678c4355ef86488b9e60efee0975b48816f6af1145de00227d1eb70e63faf488",
+        "3710a1e91a58f26c8614c66bbb18dea6bf787e27d009980b836fdb39fbca9237",
+        "f64c01a493de05e7b14dfa473f637b232eba6fc8b0a9eabc40a3e7745a16e11b",
+        "b8754edba91b6b7e58fbf843af535455d9b3c5fb8141c0192d2b7d841196ba47",
+        "7544d3f4769ef3585d620ea21d9686de2e9d14192818a61a2dbcfd229531b0d3",
+        "ce43b2621e75082e0997b97d0ae45b585fb1618cba804fc96dd08c404c993949",
+        "16fdf839816a584bb048ab7b0dfbec3dc15d89a3ccbf694cd45d78cea6a25945",
+        "33cadb70b76033aa7385f684db9f8ef2ed1802ada6912fba639a8273522da0ea",
+        "2083181677d034ae137669156c70dcd8fec6ad806ca5b1a8eaec3976a23e61d8",
+        "e49b01a001f4cdab9376ca08899eaafa46d7dbcc2e8f641db9455e64f697f0bc"
+      ],
+      "qualification": {
+        "claim": "The two exact frame predicates close the reviewed byte-owner gaps in this exact ordered program graph. The previously reviewed finite-domain necessary pairing equation transfers by exact selected program identity.",
+        "domain": "Canonical public scalars; finite canonical G1 proof representatives; finite nonzero strict r-subgroup G2 proof; finite public MSM; the reviewed nonzero residue/root chart.",
+        "premises": [
+          "Exact complete ordered program graph and intended public statement are externally anchored.",
+          "Grouped graphs also require actual valid incoming/outgoing token-spend continuity and authenticated initial state.",
+          "Pinned VM integer/byte/function semantics, hash binding, and curve/tower/group/pairing facts."
+        ],
+        "neutralDomainComplete": false,
+        "arbitraryKeySupport": false,
+        "wholeTransactionAdmission": "NOT_ESTABLISHED_BY_PER_INPUT_REPLAY",
+        "historicalClaim": "WITHDRAWN_REMAINS_WITHDRAWN",
+        "theoremPins": {
+          "compiledByteBindingRepairProofSha256": "f0bd0a66e43ccb03b716c28d8df38e1b2d2093f39635e2d72f575f44df3a63f8",
+          "selectedNativeFullConditionalFiniteDomainCompositionSha256": "4c58b5ba519f30c86d54b2ecadafa07234f2f1c05dd187917dc39aa08ef4f95c",
+          "wholeHeadMathematicalDispositionSha256": "8b9745207f5324a2d29a3ee4b4175024d39dade0e0f902a2510122400cd26785"
+        }
+      },
+      "declaredVm": "bch-2026"
+    },
+    {
+      "id": "bch-groth16-historical-bn13-frame-corrected",
+      "layout": "intratx",
+      "curve": "BN254",
+      "programCount": 13,
+      "caseCount": 3,
+      "sourcePr": 5,
+      "sourceHead": "2831928fe224d252fc90dfc26ecfdf52f29e9399",
+      "benchmarkPr": 11,
+      "declaredVm": "bch-2026",
+      "originalFixture": {
+        "repository": "mr-zwets/zk-verifier-bench",
+        "revision": "d1004f640e9ef7de1a3d64da9027c4dd54888cb2",
+        "file": "src/bch/groth16-intratx-residue-vectors.json",
+        "sha256": "4302edf3280328bec71c748c6f10bf27775d74fd2e87ffdc5ce05a3c382bd528"
+      },
+      "gates": [
+        {
+          "input": 2,
+          "offset": 586,
+          "length": 228,
+          "depth": 2,
+          "hex": "5279827702e4009d",
+          "comparison": "equal"
+        }
+      ],
+      "originalProgramSha256": [
+        "c442f5b5aa3952cc5b6f866a9bad9f6e19b3d159ed4af83dd847f083e52402c3",
+        "9d530b81176bd464be816294294c074116b75c48f0ce276066a21e0223f05638",
+        "0026e1a9d701df602f52bf3fb562e43fd0ba4e7441f7c25dd711f8e1a1ba653e",
+        "0a008ddca1b7816b852fd9ea27a1088be6098d2eab7e5e275bb3e2487404dba3",
+        "c8e8b8e3cd094b507aa48aac219c434f87e474cecf47828e0215ae877bc22b09",
+        "d1c4c46153b926bbf12187eec5f6f726dd8bfc5e2b118bfe223badb9fdc8ef57",
+        "6366fc0f68dd130063f2be80e4cecee2b0c3d86cfc823c0536028ed7a51c89a0",
+        "603e59f18f9eea65e5c2052d0e308c886763d3b4247a11c7fb19bd45f0187b58",
+        "6b016d45f5c81a09288813b166ec557af1905836ca9107b7ef45ae42aeeac0ce",
+        "a7bc4a65b5a5aa4ef4a07b1e7f95e8f0e92e2cc0d04da0c8905bfd7a6614f785",
+        "42f15caa9ddbf657c630873bc914ac8d141ca2c1e2691180bd99f2868c988067",
+        "3c0d5305b759329088fd53485fa31475fdfafa13f6461667b073aae2a59f6fe8",
+        "f3bd9c464c0f85cf4fd9140719bdfa417327d1d4598fa67644beb02004869908"
+      ],
+      "repairedProgramSha256": [
+        "c442f5b5aa3952cc5b6f866a9bad9f6e19b3d159ed4af83dd847f083e52402c3",
+        "9d530b81176bd464be816294294c074116b75c48f0ce276066a21e0223f05638",
+        "dc559408e9fcb27b06399edb2552a51b8d0a0bb166471c939a21e8c16b3b6654",
+        "0a008ddca1b7816b852fd9ea27a1088be6098d2eab7e5e275bb3e2487404dba3",
+        "c8e8b8e3cd094b507aa48aac219c434f87e474cecf47828e0215ae877bc22b09",
+        "d1c4c46153b926bbf12187eec5f6f726dd8bfc5e2b118bfe223badb9fdc8ef57",
+        "6366fc0f68dd130063f2be80e4cecee2b0c3d86cfc823c0536028ed7a51c89a0",
+        "603e59f18f9eea65e5c2052d0e308c886763d3b4247a11c7fb19bd45f0187b58",
+        "6b016d45f5c81a09288813b166ec557af1905836ca9107b7ef45ae42aeeac0ce",
+        "a7bc4a65b5a5aa4ef4a07b1e7f95e8f0e92e2cc0d04da0c8905bfd7a6614f785",
+        "42f15caa9ddbf657c630873bc914ac8d141ca2c1e2691180bd99f2868c988067",
+        "3c0d5305b759329088fd53485fa31475fdfafa13f6461667b073aae2a59f6fe8",
+        "f3bd9c464c0f85cf4fd9140719bdfa417327d1d4598fa67644beb02004869908"
+      ],
+      "qualification": {
+        "claim": "The recorded mandatory frame predicates close the reviewed byte-owner gaps in this exact ordered graph. The existing finite-domain necessary pairing equation transfers by exact selected compiled program identity.",
+        "domain": "Canonical public scalars, finite canonical proof points and finite public MSM, with the reviewed nonzero subgroup and residue/root-domain conditions.",
+        "premises": [
+          "Exact complete ordered graph and intended public statement are externally anchored.",
+          "Pinned VM, function/byte/integer/hash semantics and the reviewed curve/field/pairing facts."
+        ],
+        "neutralDomainComplete": false,
+        "arbitraryKeySupport": false,
+        "wholeTransactionAdmission": "NOT_ESTABLISHED_BY_PER_INPUT_REPLAY",
+        "historicalClaim": "WITHDRAWN_REMAINS_WITHDRAWN",
+        "theoremPins": {
+          "selectedFiniteEquationSha256": "b4929315d267368e4b8228bab158a93694989e6e9f1e6497a364f052cc5818cc"
+        }
+      },
+      "standardDensityHoldsMayOccur": true
+    },
+    {
+      "id": "bch-groth16-historical-bls34-frame-corrected",
+      "layout": "intratx",
+      "curve": "BLS12-381",
+      "programCount": 34,
+      "caseCount": 3,
+      "sourcePr": 5,
+      "sourceHead": "2831928fe224d252fc90dfc26ecfdf52f29e9399",
+      "benchmarkPr": 11,
+      "declaredVm": "bch-2026",
+      "originalFixture": {
+        "repository": "mr-zwets/zk-verifier-bench",
+        "revision": "d1004f640e9ef7de1a3d64da9027c4dd54888cb2",
+        "file": "src/bch/groth16-bls12381-intratx-residue-vectors.json",
+        "sha256": "66f65ef80de990688b0647d77caf86d8e48ce84dae8dfb6ea014ea49aff611dc"
+      },
+      "gates": [
+        {
+          "input": 4,
+          "offset": 667,
+          "length": 432,
+          "depth": 2,
+          "hex": "5279827702b0019d",
+          "comparison": "equal"
+        },
+        {
+          "input": 33,
+          "offset": 1894,
+          "length": 1632,
+          "depth": 0,
+          "hex": "7682770260069d",
+          "comparison": "equal"
+        }
+      ],
+      "originalProgramSha256": [
+        "5ff2a1e16a30d69312e21e745823c02b58a6d0f04ea26ea573785ede34db6caf",
+        "3a498e704474f017f830a603128aa69994a2311f605ef461b00cbcc4af8f7956",
+        "3b40ba349aed8dc865384ab3fc6669c3bb62e5dd25ec08b0750bc9f2d3c69eb6",
+        "204f13da764b2f3af1e99da7406773c7cd8c74ddc582b3b46aeb54a49efed32f",
+        "1307bbd4f95fc61792bb5e606882afcadf557c726a5526d46d8d88fc1661336c",
+        "61308bc129b956353c4f93897e96cbaa7d294c614de4a27680a24a2f978d98cc",
+        "4373e42905b0e3a9aea619534c0e40935f244ecc8b043c85e4b3c5f8e3970eb4",
+        "359539e7cde5587c3d382f8156aa19f3b4691caac3fd9e883d547db2e6b83c92",
+        "aa81f9106354367574864b14601e28713b29d771e5b22f744f44ee7d15a9154f",
+        "997402c610679a235671d5df4fad6b4bb40c51f5c09e870305c34b7c213bfbb0",
+        "28e7aa96324bb63a27cd43b7dfe662825d2d22408e8ab0ff20026e584a8b2fcb",
+        "4d3763b4ad84f184f1efe1f8e7f681afc1c9e8bd9b23bc7ac1d7ff1c99745004",
+        "d1a30032cb561531d83311317df9159723e1b218cbfa13c6a9871c5297e374ba",
+        "d5336e1ab9a308bdd74a9b6601f6b273aa57c1e5511a10a4c66155196543a9fd",
+        "90766e39710ae9004841bcb45bd8c22fa9cda4fe6fccdf9fe3a66b292958b193",
+        "a2bb1c69c5a24f259567192b577939bee4a3d947f904344976b577cc5be46f08",
+        "e087b192f9bbbe279bb3b56aa0c4bf19415731da77282cd9f4636987fc919587",
+        "33aba93c00eaa9f702edb1d6ca914d58613ed7cc70ef2aa4ac71213fc9ca3bd1",
+        "cc5c0a81aec35b3b02921165e43cb016d9388e4842637f6750e497855759bd2e",
+        "f88e46650c7885923106da2fac8f0bc15330ad5f68a453acb035abb9855737bf",
+        "8331849197c97e55957d23e5bfb61f49c74e923bf370ba571350ba21030188ec",
+        "07db9aaf427fa5bb8ec40577d3e18d5902cb63f8ae67369988cc6be41f38b76e",
+        "ddeb201d58368a90c2305c7f53f427a2883792857d2beca4df4cacc205396115",
+        "db0d73227c3e76b23b1b748956cba972055b8d9bb8b3a3c0df7abcaf742db472",
+        "e4452337c59fc94fe442337d82fa390ee40beacd0cd0499e6e0cc4f9eaf04097",
+        "6252f620eeadbd6eadb1bec111e94d190d365e4d9e523c37ac656e9a6f886475",
+        "657f14b5983c97ea02162dea5da57ee5333c4de4747fb05ee09ea0ebae2e406a",
+        "c8afd6088ffd91417ef892f449c1abc7041be7cd8dce00ec7e7830b9e24c5008",
+        "05dae8a4586f0dff8008af92b96ba169de51823deef11c4308e42e26f1d22331",
+        "c3fc337bded5d2114169c7768525dee4709f06ecfee48ae4186db4fd6fc18f9e",
+        "f213a42916afe80accedcebffc799faad624cde7fd95b0984def91ede9ba3087",
+        "fb9116499d3f236cb9bf3ce6aa64424edb1eb6441a19e6687836f1ebfe0519de",
+        "fc8d5188cb511e4d43c4185ab94ed546d68ea28b3347d20e4566beb0f3c4f055",
+        "0203a367581b68cde7b85f44137df677b57a00c7cd4a87d9ab58c3db844e472e"
+      ],
+      "repairedProgramSha256": [
+        "5ff2a1e16a30d69312e21e745823c02b58a6d0f04ea26ea573785ede34db6caf",
+        "3a498e704474f017f830a603128aa69994a2311f605ef461b00cbcc4af8f7956",
+        "3b40ba349aed8dc865384ab3fc6669c3bb62e5dd25ec08b0750bc9f2d3c69eb6",
+        "204f13da764b2f3af1e99da7406773c7cd8c74ddc582b3b46aeb54a49efed32f",
+        "ff8066771971947383ed1e291409545eb2f26ee2241d9e8678df5e4b1d67153e",
+        "61308bc129b956353c4f93897e96cbaa7d294c614de4a27680a24a2f978d98cc",
+        "4373e42905b0e3a9aea619534c0e40935f244ecc8b043c85e4b3c5f8e3970eb4",
+        "359539e7cde5587c3d382f8156aa19f3b4691caac3fd9e883d547db2e6b83c92",
+        "aa81f9106354367574864b14601e28713b29d771e5b22f744f44ee7d15a9154f",
+        "997402c610679a235671d5df4fad6b4bb40c51f5c09e870305c34b7c213bfbb0",
+        "28e7aa96324bb63a27cd43b7dfe662825d2d22408e8ab0ff20026e584a8b2fcb",
+        "4d3763b4ad84f184f1efe1f8e7f681afc1c9e8bd9b23bc7ac1d7ff1c99745004",
+        "d1a30032cb561531d83311317df9159723e1b218cbfa13c6a9871c5297e374ba",
+        "d5336e1ab9a308bdd74a9b6601f6b273aa57c1e5511a10a4c66155196543a9fd",
+        "90766e39710ae9004841bcb45bd8c22fa9cda4fe6fccdf9fe3a66b292958b193",
+        "a2bb1c69c5a24f259567192b577939bee4a3d947f904344976b577cc5be46f08",
+        "e087b192f9bbbe279bb3b56aa0c4bf19415731da77282cd9f4636987fc919587",
+        "33aba93c00eaa9f702edb1d6ca914d58613ed7cc70ef2aa4ac71213fc9ca3bd1",
+        "cc5c0a81aec35b3b02921165e43cb016d9388e4842637f6750e497855759bd2e",
+        "f88e46650c7885923106da2fac8f0bc15330ad5f68a453acb035abb9855737bf",
+        "8331849197c97e55957d23e5bfb61f49c74e923bf370ba571350ba21030188ec",
+        "07db9aaf427fa5bb8ec40577d3e18d5902cb63f8ae67369988cc6be41f38b76e",
+        "ddeb201d58368a90c2305c7f53f427a2883792857d2beca4df4cacc205396115",
+        "db0d73227c3e76b23b1b748956cba972055b8d9bb8b3a3c0df7abcaf742db472",
+        "e4452337c59fc94fe442337d82fa390ee40beacd0cd0499e6e0cc4f9eaf04097",
+        "6252f620eeadbd6eadb1bec111e94d190d365e4d9e523c37ac656e9a6f886475",
+        "657f14b5983c97ea02162dea5da57ee5333c4de4747fb05ee09ea0ebae2e406a",
+        "c8afd6088ffd91417ef892f449c1abc7041be7cd8dce00ec7e7830b9e24c5008",
+        "05dae8a4586f0dff8008af92b96ba169de51823deef11c4308e42e26f1d22331",
+        "c3fc337bded5d2114169c7768525dee4709f06ecfee48ae4186db4fd6fc18f9e",
+        "f213a42916afe80accedcebffc799faad624cde7fd95b0984def91ede9ba3087",
+        "fb9116499d3f236cb9bf3ce6aa64424edb1eb6441a19e6687836f1ebfe0519de",
+        "fc8d5188cb511e4d43c4185ab94ed546d68ea28b3347d20e4566beb0f3c4f055",
+        "debd894f3922be569587b196d0e6605c7d91f8c82b3c7a81c14c0dc9a689693d"
+      ],
+      "qualification": {
+        "claim": "The recorded mandatory frame predicates close the reviewed byte-owner gaps in this exact ordered graph. The existing finite-domain necessary pairing equation transfers by exact selected compiled program identity.",
+        "domain": "Canonical public scalars, finite canonical proof points and finite public MSM, with the reviewed nonzero subgroup and residue/root-domain conditions.",
+        "premises": [
+          "Exact complete ordered graph and intended public statement are externally anchored.",
+          "Pinned VM, function/byte/integer/hash semantics and the reviewed curve/field/pairing facts."
+        ],
+        "neutralDomainComplete": false,
+        "arbitraryKeySupport": false,
+        "wholeTransactionAdmission": "NOT_ESTABLISHED_BY_PER_INPUT_REPLAY",
+        "historicalClaim": "WITHDRAWN_REMAINS_WITHDRAWN",
+        "theoremPins": {
+          "selectedFiniteEquationSha256": "ef49eb74b373dfb6cbc37840789a1730731e46691ac7d94c3489a8664a25fd8e"
+        }
+      }
+    },
+    {
+      "id": "bch-groth16-historical-bn-large4-frame-corrected",
+      "layout": "intratx",
+      "curve": "BN254",
+      "programCount": 4,
+      "caseCount": 3,
+      "sourcePr": 5,
+      "sourceHead": "2831928fe224d252fc90dfc26ecfdf52f29e9399",
+      "benchmarkPr": 11,
+      "declaredVm": "bch-spec",
+      "originalFixture": {
+        "repository": "mr-zwets/zk-verifier-bench",
+        "revision": "d1004f640e9ef7de1a3d64da9027c4dd54888cb2",
+        "file": "src/bch/groth16-intratx-residue-large-vectors.json",
+        "sha256": "fef9590c2b4253cc77d9a4d222064bbd9999e2ca2091d3ad2a66c78c14d4e3c8"
+      },
+      "gates": [
+        {
+          "input": 2,
+          "offset": 1949,
+          "length": 65536,
+          "depth": 0,
+          "hex": "768277030000019f69",
+          "comparison": "less-than"
+        },
+        {
+          "input": 3,
+          "offset": 2656,
+          "length": 1664,
+          "depth": 12,
+          "hex": "5c7982770280069d",
+          "comparison": "equal"
+        }
+      ],
+      "originalProgramSha256": [
+        "69d0d47dd34fd9ce51467f552e596edba27a09f6e4a2f8b503c42458bbbffea5",
+        "751bb7a4dacc58a49cb84df910d02dbf1204eeb5d9f3b6e28d9ec7855a1be855",
+        "26d17d6a4b05d35991addca623f0337d94b5261daca6e1cb3d4e8bc8ac4e10b0",
+        "8eeb38fd8835ed773a27d22017456abf3ef8ffa1de15e9604e6e8002234c3136"
+      ],
+      "repairedProgramSha256": [
+        "69d0d47dd34fd9ce51467f552e596edba27a09f6e4a2f8b503c42458bbbffea5",
+        "751bb7a4dacc58a49cb84df910d02dbf1204eeb5d9f3b6e28d9ec7855a1be855",
+        "355df1ad7e990bba3606cb7bac1c25a0a742b7eb03c4adaaf4e6281e687aa245",
+        "448f31ccf40bf08ac54e55d0c8b453f2f3b4b53ddccdb18d0c32cca5cb12f3c3"
+      ],
+      "qualification": {
+        "claim": "The recorded mandatory frame predicates close the reviewed byte-owner gaps in this exact ordered graph. The existing finite-domain necessary pairing equation transfers by exact selected compiled program identity.",
+        "domain": "Canonical public scalars, finite canonical proof points and finite public MSM, with the reviewed nonzero subgroup and residue/root-domain conditions.",
+        "premises": [
+          "Exact complete ordered graph and intended public statement are externally anchored.",
+          "Pinned VM, function/byte/integer/hash semantics and the reviewed curve/field/pairing facts."
+        ],
+        "neutralDomainComplete": false,
+        "arbitraryKeySupport": false,
+        "wholeTransactionAdmission": "NOT_ESTABLISHED_BY_PER_INPUT_REPLAY",
+        "historicalClaim": "WITHDRAWN_REMAINS_WITHDRAWN",
+        "theoremPins": {
+          "selectedFiniteEquationSha256": "12a0b4d0cc1dd807f0749f120dcff8c1bf4f903f30f5092e79f25a8232057eb4"
+        },
+        "currentProducerCorrespondence": "Not claimed; this is the exact archived selected four-program proposed-spec repair."
+      }
+    }
+  ]
+}

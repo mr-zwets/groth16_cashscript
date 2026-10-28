@@ -292,6 +292,15 @@ Run a single piece directly if needed: `node gen_miller.mjs`, `node gen_finalexp
 `node gen_vkx.mjs`, etc. Fast probes (no planner): `node gen_miller.mjs probe`,
 `node gen_finalexp.mjs probe`.
 
+## Frozen PR6 grouped-affine reference
+
+[The separate PR6 component reference](pr6-grouped-affine-reference/README.md)
+contains the exact repaired two-window CashScript sources, provenance patch and
+byte-identity reproduction commands. Its theorem is conditional on the specified
+ordered graph/table/successor interfaces and finite affine output. The current
+generator already handles equality inside `jacAddAffine`; the old fallback is not
+applied again. Matching full-verifier fixture coverage remains unestablished.
+
 ## Files
 
 | file | role | committed |

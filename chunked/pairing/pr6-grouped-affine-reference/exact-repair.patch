@@ -1,0 +1,21 @@
+--- a/chunked/pairing/gen_vkx_glv.mjs
++++ b/chunked/pairing/gen_vkx_glv.mjs
+@@ -226,7 +226,9 @@
+     return aX, aY;
+ }`;
+ 
+-const groupedPrologue = (sharedTable) => `function jacDouble(int x, int y, int z) returns (int, int, int) {
++const groupedPrologue = (sharedTable) => `function mulFp(int x, int y) returns (int) { return (x * y) % ${Pstr}; }
++function sqrFp(int x) returns (int) { return (x * x) % ${Pstr}; }
++function jacDouble(int x, int y, int z) returns (int, int, int) {
+     int a = (x * x) % ${Pstr}; int b = (y * y) % ${Pstr}; int c = (b * b) % ${Pstr};
+     int d = (4 * x * b) % ${Pstr};
+     int e = (a * 3) % ${Pstr}; int f = (e * e) % ${Pstr};
+@@ -333,6 +335,7 @@
+   if (final) {
+     if (!projectiveOutput) {
+       L.push(`        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, ${IC0[0]}, ${IC0[1]});`);
++      if (grouped) L.push('        if (icy == 0) { (icx, icy, icz) = jacDouble(rX, rY, rZ); }');
+       L.push('        require(mulFp(icz, zInv) == 1);');
+       L.push('        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);');
+       L.push('        int vkxX = mulFp(icx, zInv2);');

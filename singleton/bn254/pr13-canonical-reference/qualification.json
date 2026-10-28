@@ -1,0 +1,70 @@
+{
+  "schema": "bn254-pr13-canonical-reference-source/v1",
+  "status": "CONDITIONALLY_QUALIFIED_FULL_FIXED_KEY_EQUATION_CANONICAL_FINITE_EXTERNAL_DOMAIN_NATIVE_HOLD",
+  "historicalContribution": {
+    "sourceRepository": "mr-zwets/groth16_cashscript",
+    "sourceRevision": "0b5b2240cbb2f723a87dce2f43b92fc6f38e4b4d",
+    "sourceFile": "singleton/bn254/groth16.cash",
+    "repairedSourceSha256": "3a28b29a40835a9bc3b0c7c2634a9af6702f8f34df766d635194263a12c030c7",
+    "benchmarkRepository": "mr-zwets/zk-verifier-bench",
+    "benchmarkPr": 13,
+    "benchmarkRevision": "0eb69cbdd1a96a83b13fca1045c45169249bc743"
+  },
+  "assembly": "repaired-body.asm",
+  "assemblySha256": "5e6e08c934202bbdb22ca54b033486df4f514d701379f4407978ad31877bafd3",
+  "builder": "build.mjs",
+  "builderSha256": "47e0f8d6fde95e6d912d8641bc8813f208646557d5aeafe96d24267469e3aa64",
+  "bodyBytes": 8539,
+  "bodySha256": "5276a859c7c087b7cba6b2e9d17944bae14157d30c74fabb74c3958b4d7f7296",
+  "guardedBytes": 8922,
+  "guardedSha256": "cbd27cf7a971d0fa1ad86dcf3bc8db9a21b717905b3440ba9ec598195e5f59b0",
+  "abiTopToBottom": [
+    "Ax",
+    "Ay",
+    "Bxa",
+    "Bxb",
+    "Bya",
+    "Byb",
+    "Cx",
+    "Cy",
+    "in0",
+    "in1"
+  ],
+  "equation": "e(-A,B)*e(alpha,beta)*e(IC0+in0*IC1+in1*IC2,gamma)*e(C,delta)=1",
+  "domain": "Eight canonical Fp coordinates, two canonical Fr scalars; finite affine A/C on G1 and finite order-r B on the twist. Computed vk_x may be neutral. Exact fixed synthetic VK. External infinity encodings are not added.",
+  "guardTransfer": "DEPTH enforces ten words. Ten PICK/0/bound/WITHIN/VERIFY predicates enforce the actual p/r bounds and preserve the original stack. The exact compiled repaired body, function namespace, altstack and call graph are unchanged.",
+  "bodyTheorem": {
+    "canonicalEquationCompositionSha256": "56b3a609b99e0ed70534b10730de299507743310a0cb8c7495481feed2dd992b",
+    "finalAssessmentSha256": "26f8bc8482c9148c179bd19680ff10a836bc9651af700eed5cfb56e6b1e7752b",
+    "requiredG1PredicateSupplementSha256": "e419248d08924db89c98e5892ebda9f8f9f4f3ba715c4500f87fed9a4c969ada",
+    "coverage": {
+      "actualHelpers": 44,
+      "mainHelperCalls": 296,
+      "g2SubgroupIterations": 128,
+      "millerEventsPerCall": 241,
+      "finalCoordinatePredicates": 12
+    },
+    "transfer": "The earlier complete canonical-domain equation theorem applies to the unchanged body; the new prefix establishes its previously external integer-range and ten-slot ABI premises."
+  },
+  "premises": [
+    "Pinned integer/byte/function/control semantics of the BCH2026 VM.",
+    "Standard BN254 field, curve, subgroup and pairing facts, and the recorded exact-body conditional theorem.",
+    "The exact fixed public key and original proof/public tuple; secure setup, circuit knowledge soundness and deployment are outside this statement."
+  ],
+  "validation": {
+    "existingPositiveProofs": 5,
+    "oracleAccepted": 5,
+    "nativeConsensusAccepted": 0,
+    "nativeStandardAccepted": 0,
+    "nativeAdmission": "HOLD: unchanged operation-cost density ceilings; no padding or resource tuning.",
+    "scope": "Existing positive proofs only; finite coverage does not itself prove the universal conditional equation."
+  },
+  "constraints": {
+    "newProofs": 0,
+    "negativeCases": 0,
+    "producerOrCompilerInvocation": false,
+    "byteOptimization": false,
+    "cybersecurityTesting": false,
+    "registryOrScoreChange": false
+  }
+}

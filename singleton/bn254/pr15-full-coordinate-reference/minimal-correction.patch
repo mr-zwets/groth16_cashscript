@@ -1,0 +1,207 @@
+--- a/singleton/bn254/genpow-reconstructed/verifier.asm
++++ b/singleton/bn254/genpow-reconstructed/verifier.asm
+@@ -654,6 +654,31 @@
+ end
+ 
+ function outline_40 40
++OP_5
++OP_PICK
++OP_5
++OP_PICK
++OP_BOOLOR
++OP_NOT
++OP_4
++OP_PICK
++OP_4
++OP_PICK
++OP_4
++OP_PICK
++OP_4
++OP_PICK
++OP_BOOLOR
++OP_BOOLOR
++OP_BOOLOR
++OP_NOT
++OP_BOOLOR
++OP_IF
++OP_2DROP
++OP_2DROP
++OP_2DROP
++call outline_62
++OP_ELSE
+ call outline_62
+ OP_12
+ OP_PICK
+@@ -997,6 +1022,7 @@
+ OP_ROLL
+ OP_DROP
+ call outline_21
++OP_ENDIF
+ end
+ 
+ function outline_41 41
+@@ -1084,6 +1110,23 @@
+ end
+ 
+ function outline_32 32
++OP_5
++OP_PICK
++OP_0
++OP_NUMEQUAL
++OP_IF
++OP_5
++OP_ROLL
++OP_DROP
++OP_4
++OP_ROLL
++OP_DROP
++OP_3
++OP_ROLL
++OP_DROP
++OP_SWAP
++OP_ROT
++OP_ELSE
+ OP_3
+ OP_PICK
+ OP_5
+@@ -1262,6 +1305,7 @@
+ OP_3
+ OP_ROLL
+ OP_DROP
++OP_ENDIF
+ end
+ 
+ function outline_42 42
+@@ -1838,7 +1882,73 @@
+ end
+ 
+ main
+-# Proof and public-input checks, point arithmetic and Miller accumulation.
++# Canonical EIP-197 full-coordinate proof interface, including infinity.
++OP_0
++OP_PICK
++OP_0
++constant P
++OP_WITHIN
++OP_VERIFY
++OP_1
++OP_PICK
++OP_0
++constant P
++OP_WITHIN
++OP_VERIFY
++OP_2
++OP_PICK
++OP_0
++constant P
++OP_WITHIN
++OP_VERIFY
++OP_3
++OP_PICK
++OP_0
++constant P
++OP_WITHIN
++OP_VERIFY
++OP_4
++OP_PICK
++OP_0
++constant P
++OP_WITHIN
++OP_VERIFY
++OP_5
++OP_PICK
++OP_0
++constant P
++OP_WITHIN
++OP_VERIFY
++OP_6
++OP_PICK
++OP_0
++constant P
++OP_WITHIN
++OP_VERIFY
++OP_7
++OP_PICK
++OP_0
++constant P
++OP_WITHIN
++OP_VERIFY
++OP_8
++OP_PICK
++OP_0
++push 010000f093f5e1439170b97948e833285d588181b64550b829a031e1724e6430
++OP_WITHIN
++OP_VERIFY
++OP_9
++OP_PICK
++OP_0
++push 010000f093f5e1439170b97948e833285d588181b64550b829a031e1724e6430
++OP_WITHIN
++OP_VERIFY
++OP_1
++OP_PICK
++OP_1
++OP_PICK
++OP_BOOLOR
++OP_IF
+ OP_OVER
+ OP_2
+ OP_PICK
+@@ -1854,6 +1964,13 @@
+ call fp_mul
+ call fp_add
+ OP_NUMEQUALVERIFY
++OP_ENDIF
++OP_7
++OP_PICK
++OP_7
++OP_PICK
++OP_BOOLOR
++OP_IF
+ OP_7
+ OP_PICK
+ OP_8
+@@ -1870,6 +1987,19 @@
+ call fp_mul
+ call fp_add
+ OP_NUMEQUALVERIFY
++OP_ENDIF
++OP_5
++OP_PICK
++OP_5
++OP_PICK
++OP_5
++OP_PICK
++OP_5
++OP_PICK
++OP_BOOLOR
++OP_BOOLOR
++OP_BOOLOR
++OP_IF
+ OP_2OVER
+ call outline_5
+ OP_5
+@@ -2223,6 +2353,7 @@
+ OP_ROT
+ OP_NUMEQUALVERIFY
+ OP_NUMEQUALVERIFY
++OP_ENDIF
+ OP_SWAP
+ OP_0
+ call fp_sub_top_minus_next
+@@ -2353,7 +2484,6 @@
+ OP_14
+ OP_ROLL
+ call outline_25
+-# Exact integer derivation of (P^12 - 1) / R from BN_X.
+ constant BN_X
+ OP_DUP
+ OP_DUP
+@@ -2399,7 +2529,6 @@
+ OP_1SUB
+ OP_SWAP
+ OP_DIV
+-# Full generic final exponentiation and Fp12 identity check.
+ OP_0
+ OP_BEGIN
+ OP_DUP

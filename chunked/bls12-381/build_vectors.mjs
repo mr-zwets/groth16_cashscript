@@ -18,6 +18,7 @@ import {
   P, PUBLIC_INPUTS, computeVkx, compileBytecode, commitBin, CATEGORY, tok,
   vkxStateAt, vkxFinalZinv, TARGET_UNLOCK, OP_DROP, OP_PUSHDATA2, OP_BUDGET, verifierPath,
 } from './_vkxmath.mjs';
+import { buildSuccessorLockings } from './successor-lock.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const GEN = join(here, 'generated');
@@ -28,14 +29,14 @@ const pushInt = (n) => encodeDataPush(bigIntToVmNumber(n));
 const padPush = (argLen, target) => { const N = target - argLen - 3; return Uint8Array.from([OP_PUSHDATA2, ...numberToBinUint16LE(N), ...new Uint8Array(N)]); };
 const tunedLen = (argLen, opCost) => Math.min(TARGET_UNLOCK, Math.max(argLen + 3, Math.ceil(opCost / 800) - 41 + 96));
 
-function evalCov(locking, unlocking, inCommit, outCommit) {
+function evalCov(locking, unlocking, inCommit, outCommit, outLocking) {
   const program = {
     inputIndex: 0,
     sourceOutputs: [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(inCommit) }],
     transaction: {
       version: 2,
       inputs: [{ outpointTransactionHash: new Uint8Array(32), outpointIndex: 0, sequenceNumber: 0, unlockingBytecode: unlocking }],
-      outputs: [{ lockingBytecode: locking, valueSatoshis: 1000n, token: tok(outCommit) }],
+      outputs: [{ lockingBytecode: outLocking, valueSatoshis: 1000n, token: tok(outCommit) }],
       locktime: 0,
     },
   };
@@ -50,31 +51,39 @@ function evalCov(locking, unlocking, inCommit, outCommit) {
 // order). `allArgs` = everything the unlocking pushes (== commitLimbs, except the
 // final chunk also pushes an uncommitted zInv).
 const compileCache = new Map();
-function buildCovStep(cashFile, commitLimbs, outLimbs, label, checkpoint, allArgs) {
+function buildCovStep(redeem, commitLimbs, outLimbs, label, checkpoint, allArgs, nextLocking) {
   const pushArgs = allArgs ?? commitLimbs;
-  let redeem = compileCache.get(cashFile);
-  if (!redeem) { redeem = compileBytecode(readFileSync(cashFile, 'utf8')); compileCache.set(cashFile, redeem); }
   const locking = Uint8Array.from([...redeem]); // no OP_DROP: trailing `bytes unused zeroPadding` param
+  const outLocking = nextLocking ?? locking;
   const inCommit = commitBin(commitLimbs.map(BigInt)), outCommit = commitBin(outLimbs.map(BigInt));
   const argBytes = Uint8Array.from([...pushArgs].reverse().flatMap((c) => [...pushInt(BigInt(c))]));
   // `zeroPadding` is the LAST spend param -> pushed FIRST -> the pad leads the unlocking ([pad][args]).
-  const probe = evalCov(locking, Uint8Array.from([...padPush(argBytes.length, TARGET_UNLOCK), ...argBytes]), inCommit, outCommit);
+  const probe = evalCov(locking, Uint8Array.from([...padPush(argBytes.length, TARGET_UNLOCK), ...argBytes]), inCommit, outCommit, outLocking);
   let target = tunedLen(argBytes.length, probe.operationCost);
   let unlocking = Uint8Array.from([...padPush(argBytes.length, target), ...argBytes]);
-  let real = evalCov(locking, unlocking, inCommit, outCommit);
-  while (!real.accepted && target < TARGET_UNLOCK) { target = Math.min(TARGET_UNLOCK, target + 256); unlocking = Uint8Array.from([...padPush(argBytes.length, target), ...argBytes]); real = evalCov(locking, unlocking, inCommit, outCommit); }
+  let real = evalCov(locking, unlocking, inCommit, outCommit, outLocking);
+  while (!real.accepted && target < TARGET_UNLOCK) { target = Math.min(TARGET_UNLOCK, target + 256); unlocking = Uint8Array.from([...padPush(argBytes.length, target), ...argBytes]); real = evalCov(locking, unlocking, inCommit, outCommit, outLocking); }
   // tamper a state limb: args follow the leading pad, so the first arg push payload is at padLen + 1.
   const invalid = Uint8Array.from(unlocking); const padLen = unlocking.length - argBytes.length; invalid[padLen + 1] ^= 0x01;
-  const invReal = evalCov(locking, invalid, inCommit, outCommit);
+  const invReal = evalCov(locking, invalid, inCommit, outCommit, outLocking);
   return {
     step: {
       label, locking: binToHex(locking), unlocking: binToHex(unlocking), invalidUnlocking: binToHex(invalid), checkpoint,
-      covenant: { category: binToHex(CATEGORY), capability: 'mutable', inCommitment: binToHex(inCommit), outCommitment: binToHex(outCommit), outLockingBytecode: binToHex(locking) },
+      covenant: { category: binToHex(CATEGORY), capability: 'mutable', inCommitment: binToHex(inCommit), outCommitment: binToHex(outCommit), outLockingBytecode: binToHex(outLocking) },
       lockingBytes: locking.length, unlockingBytes: unlocking.length, operationCost: real.operationCost,
     },
     accepted: real.accepted, invalidRejected: !invReal.accepted, operationCost: real.operationCost,
     fits: locking.length <= 10000 && unlocking.length <= 10000 && real.operationCost <= OP_BUDGET && real.accepted,
   };
+}
+
+function compileBareCash(cashFile) {
+  const cacheKey = cashFile;
+  const cached = compileCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+  const compiled = compileBytecode(readFileSync(cashFile, 'utf8'));
+  compileCache.set(cacheKey, compiled);
+  return compiled;
 }
 
 // ---- the two public-input instances: #0 committed, #1 from the BLS multiproof ----
@@ -93,6 +102,15 @@ const INSTANCES = [
 
 const man = JSON.parse(readFileSync(join(GEN, 'manifest_vkx.json'), 'utf8'));
 if (man.genesisDerived !== true || man.fullStageBound !== false) throw new Error('standalone vk_x manifest is not derived-genesis/default namespace');
+// Compile bare chunks first, then let the source-owned pure helper build the
+// exact successor graph. This keeps successor transport separate from the
+// existing commitment/state/proof/public-input/padding calculation.
+const bareChunks = man.chunks.map(ch => compileBareCash(join(GEN, `vkx_${String(ch.idx).padStart(2, '0')}.cash`)));
+const boundLockings = buildSuccessorLockings(bareChunks);
+const boundChunks = boundLockings.map((redeem, idx) => ({
+  redeem,
+  nextLocking: idx + 1 < boundLockings.length ? boundLockings[idx + 1] : undefined,
+}));
 const stats = { maxLock: 0, maxUnlock: 0, allFit: true, allAccept: true, allInvalid: true };
 function buildVkx(inst) {
   const [in0, in1] = inst.inputs;
@@ -104,7 +122,8 @@ function buildVkx(inst) {
     let outLimbs, allArgs;
     if (ch.final) { outLimbs = [vkxAff.x, vkxAff.y]; allArgs = [...commitLimbs, vkxFinalZinv(in0, in1)]; }
     else { outLimbs = [...vkxStateAt(in0, in1, ch.hi), in0, in1]; allArgs = commitLimbs; }
-    const r = buildCovStep(join(GEN, `vkx_${String(ch.idx).padStart(2, '0')}.cash`), commitLimbs, outLimbs, `vk_x [${ch.lo},${ch.hi})${ch.final ? ' assemble vk_x' : ''}`, ch.final ? 'vk_x' : undefined, allArgs);
+    const bound = boundChunks[ch.idx];
+    const r = buildCovStep(bound.redeem, commitLimbs, outLimbs, `vk_x [${ch.lo},${ch.hi})${ch.final ? ' assemble vk_x' : ''}`, ch.final ? 'vk_x' : undefined, allArgs, bound.nextLocking);
     stats.maxLock = Math.max(stats.maxLock, r.step.lockingBytes); stats.maxUnlock = Math.max(stats.maxUnlock, r.step.unlockingBytes);
     stats.allFit &&= r.fits; stats.allAccept &&= r.accepted; stats.allInvalid &&= r.invalidRejected;
     steps.push(r.step);

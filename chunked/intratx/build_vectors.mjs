@@ -208,6 +208,9 @@ const chosenCache = new Map();  // key -> 'resched' | 'raw'; fixed on the FIRST 
                                 // instance shares identical lockings.
 const specConfig = (specs, i) => {
   const s = specs[i];
+  // Each linked state blob is a complete physical frame. The transform otherwise
+  // parses only the declared prefix while sibling/external readers use fixed offsets.
+  const enforceExactInputLength = s.enforceExactInputLength !== false;
   let forward = null;
   if (s.role === 'within') { const outLen = s.outLimbs.length * W; forward = { cmpExpr: null, nextFullInLen: outLen, skip: 0, cmpLen: outLen }; }
   else if (s.role === 'cross') forward = s.cmp;
@@ -223,16 +226,18 @@ const specConfig = (specs, i) => {
       length: binding.length,
     };
   });
-  const key = `${s.file}|${s.role}|${JSON.stringify(forward)}|${JSON.stringify(externalBindings)}`;
-  return { key, forward, externalBindings };
+  const key = `${s.file}|${s.role}|exact=${enforceExactInputLength}|${JSON.stringify(forward)}|${JSON.stringify(externalBindings)}`;
+  return { key, forward, externalBindings, enforceExactInputLength };
 };
 function compileSpec(specs, i) {
   const s = specs[i];
-  const { key, forward, externalBindings } = specConfig(specs, i);
+  const { key, forward, externalBindings, enforceExactInputLength } = specConfig(specs, i);
   let v = compileCache.get(key);
   if (!v) {
     // compile from a file (probe in generated/) so the chunk's relative library import resolves
-    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), { W, prime: PRIME, forward, externalBindings }).src);
+    writeFileSync(PROBE, transformChunk(readFileSync(s.file, 'utf8'), {
+      W, prime: PRIME, forward, externalBindings, enforceExactInputLength,
+    }).src);
     const resched = compileFileBytecode(PROBE);
     const raw = RESCHED ? compileFileBytecodeRaw(PROBE) : resched;
     v = { resched: Uint8Array.from([OP_DROP, ...resched]) }; // [OP_DROP, contract] — OP_DROP discards the pad

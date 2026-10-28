@@ -1,0 +1,67 @@
+{
+  "schema": "verifier.cash/registered-bls12381-residue-large-exact-code-repair/v2",
+  "inputFixtureSha256": "1d40321a78968b99d837bb4c6e18df3ca87b9826f35f411d3c5b31254b6054e7",
+  "originalProgramSha256": [
+    "ec3606f0bf53bdbfbcd3fc11c22b67b7ed80e4b21d3a428e349ea2159dbbf33f",
+    "3d697156f625da8c6d7e7592e0f0d740ac589555dfb8bcb30b6c87a1d9d03c38",
+    "3dead938919132466679e1ca14a96daccb70486640fbebe46077b57c73b6059a"
+  ],
+  "selectedProgramSha256": [
+    "19ae99e5393a4f9593c472d75b268bb16ce7fe3a0c156069d34414654affa55c",
+    "bb2836d8fcdef2ba8d5f8852f4952d8d09406afa85fbd7351df35169022ee723",
+    "6d809785131dee6a1397b7392c50e0f50db0c24c9a9ce6e4a2e70baba4ac8845"
+  ],
+  "repairs": [
+    {
+      "input": 1,
+      "label": "Miller input-validation carrier",
+      "originalProgramSha256": "3d697156f625da8c6d7e7592e0f0d740ac589555dfb8bcb30b6c87a1d9d03c38",
+      "programSha256": "bb2836d8fcdef2ba8d5f8852f4952d8d09406afa85fbd7351df35169022ee723",
+      "requiredLength": 768,
+      "gateHex": "7682770200039d",
+      "gateOffset": 1,
+      "argumentDepth": 0,
+      "registryPrefixSha256": "0bfe935e70c321c7ca3afc75ce0d0ca2f98b5422e008bb31c00c6d7f1f1c0ad6",
+      "registrySuffixSha256": "b5ea6fe631117cada5a6fd29a1a717bb3be1a7f71b34794ab9c1b2c162e7bbeb"
+    },
+    {
+      "input": 0,
+      "label": "GLV vk_x final -> assemble vk_x",
+      "originalProgramSha256": "ec3606f0bf53bdbfbcd3fc11c22b67b7ed80e4b21d3a428e349ea2159dbbf33f",
+      "programSha256": "19ae99e5393a4f9593c472d75b268bb16ce7fe3a0c156069d34414654affa55c",
+      "requiredLength": 288,
+      "gateHex": "7c7682770220019d7c",
+      "gateOffset": 1,
+      "argumentDepth": 1,
+      "registryPrefixSha256": "0bfe935e70c321c7ca3afc75ce0d0ca2f98b5422e008bb31c00c6d7f1f1c0ad6",
+      "registrySuffixSha256": "308d5181ff78207cbaf8f7ae42682e9f9878ba6f15e60b6d6b2cc30c49d882ba"
+    },
+    {
+      "input": 2,
+      "label": "miller ops[155,277) + quotient verdict",
+      "originalProgramSha256": "3dead938919132466679e1ca14a96daccb70486640fbebe46077b57c73b6059a",
+      "programSha256": "6d809785131dee6a1397b7392c50e0f50db0c24c9a9ce6e4a2e70baba4ac8845",
+      "requiredLength": 1632,
+      "gateHex": "7682770260069d",
+      "gateOffset": 1,
+      "argumentDepth": 0,
+      "registryPrefixSha256": "0bfe935e70c321c7ca3afc75ce0d0ca2f98b5422e008bb31c00c6d7f1f1c0ad6",
+      "registrySuffixSha256": "4d1d88017e076dfaffddf9cea14b79af7d24188f8d8d3670bc57113c60ffd3b0"
+    }
+  ],
+  "scope": {
+    "positiveContexts": ["steps", "extraValidProofs", "worstCaseProof"],
+    "negativeContexts": "not read or generated",
+    "proofGeneration": "not performed",
+    "payloadPolicy": "Only executable code and the coherent P2SH32 locking hash are changed; proof/public/witness/state/table/padding bytes are preserved verbatim.",
+    "admission": "HOLD: proposed bch-spec profile; this artifact is not a current-BCH admission certificate."
+  },
+  "sourceBinding": {
+    "builder": "chunked/intratx/build_vectors_residue_bls_large.mjs",
+    "exactLengthOwner": "transformChunk(..., { enforceExactInputLength: true })",
+    "sourceBaseRevision": "8eb2c5dd6b1fd88dce3cdf90acc2bb19bfa78db7",
+    "builderSha256": "6ab4a1dcf6b09e42c20976113d1ec69e0ac39e496a27daa187314fb94eab339f",
+    "transformSha256": "930fc3e48e9e994569e7f38843e563f07978f41a357d9e02aa0f1a6e5d47777d",
+    "note": "The source builder patch is independently reviewable against sourceBaseRevision; the frozen repair below is byte-pinned to this exact registered positive fixture and does not claim compiler byte reproduction. Input 1 owns the 768-byte state carrier consumed after the archived OP_DROP; input 2 owns the 1632-byte terminal state."
+  }
+}

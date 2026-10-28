@@ -329,7 +329,8 @@ Every SHA-256 evaluation by any party is a query; `OP_HASH256` is two. There are
   bound is below 2⁻²¹¹.
 
 Let `q = q_A + q_V`, `N = N₀ + q`, and let `q_β, q_α ≤ q` count the distinct `beta`- and
-`alpha`-frame inputs among the q queries. An accepting run has `q_β, q_α ≥ 1` even when
+`alpha`-frame inputs among the q queries. The distinct frame tags imply `q_β + q_α ≤ q`.
+An accepting run has `q_β, q_α ≥ 1` even when
 `q_A = 0`. A challenge or opening that the adversary never queried is evaluated by the
 verifier and counted in q_V, so there is no separate guessing term (`ε_guess = 0`).
 
@@ -454,8 +455,12 @@ redeems:
   `OP_DEFINE` of an existing identifier is an error in the 2026 VM (the binder itself invokes no
   function). In a valid transaction the sibling's own P2SH32 evaluation must also pass, so the
   pre-binder import is the sibling's genuine redeem. Every function the root
-  invokes is defined by root-executed `OP_DEFINE`s. So either the block-4 sibling is genuine (and
-  the helper is the genuine helper) or the transaction fails. This is an argument, not
+  invokes is defined by root-executed `OP_DEFINE`s. `OP_INVOKE` shares the caller's data
+  stack and altstack: this is not a claim that arbitrary imported code preserves caller state.
+  The accepted path relies on the genuine PIC helper's reviewed ABI, its immediate verdict
+  check, and the binder's dependence only on introspection plus its literal digest.
+  So either the block-4 sibling is genuine (and the helper is the genuine helper) or the
+  transaction fails. This is an argument, not
   binder-first code. Two independent reviews (2026-10-27) accepted it after
   checking the binder span in the bytes of all 13 roots.
 

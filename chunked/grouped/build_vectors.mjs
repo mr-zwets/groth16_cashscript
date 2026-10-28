@@ -268,6 +268,9 @@ function groupedCfg(specs, i, lo, hi, groupIdx, G) {
   const isFirst = i === lo, isLast = i === hi;
   const covInHash = isFirst && groupIdx > 0;
   const epilogueMode = isLast && groupIdx < G - 1 ? 'covout' : undefined;
+  // Cross-group hashes and same-group fixed-offset readers must authenticate
+  // the complete physical frame, not merely the parsed prefix.
+  const enforceExactInputLength = specs[i].enforceExactInputLength !== false;
   let forward = null;
   if (!epilogueMode && specs[i].role !== 'terminal') {
     if (specs[i].role === 'within') { const outLen = specs[i].outLimbs.length * W; forward = { cmpExpr: null, nextFullInLen: outLen, skip: 0, cmpLen: outLen }; }
@@ -287,7 +290,7 @@ function groupedCfg(specs, i, lo, hi, groupIdx, G) {
       length: binding.length,
     };
   });
-  return { covInHash, epilogueMode, forward, externalBindings };
+  return { covInHash, epilogueMode, forward, externalBindings, enforceExactInputLength };
 }
 
 const RESCHED = process.env.RESCHEDULE !== 'off';
@@ -302,6 +305,7 @@ const cfgKey = (spec, cfg) => [
   cfg.covInHash ? 'ci' : '',
   cfg.epilogueMode ?? '',
   cfg.nextLockingHash ?? '',
+  cfg.enforceExactInputLength ? 'exact' : 'prefix',
   JSON.stringify(cfg.forward),
   JSON.stringify(cfg.externalBindings),
 ].join('|');
@@ -312,6 +316,7 @@ function compileChunk(spec, cfg) {
     const t = transformChunk(readFileSync(spec.file, 'utf8'), {
       W, prime: PRIME, forward: cfg.forward, covInHash: cfg.covInHash,
       epilogueMode: cfg.epilogueMode, nextLockingHash: cfg.nextLockingHash,
+      enforceExactInputLength: cfg.enforceExactInputLength,
       externalBindings: cfg.externalBindings,
     });
     let resched, raw;

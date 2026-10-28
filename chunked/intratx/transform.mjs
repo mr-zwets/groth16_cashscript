@@ -343,8 +343,9 @@ export function transformChunk(src, cfg) {
     const nm = inNames[p];
     const width = inWidths[p];
     if (p === maxUsed) {
-      // last limb to read: if it's the very last in the blob, `cur` IS that limb.
-      prologue.push(p === inNames.length - 1 ? `        int ${nm} = int(${cur});` : `        int ${nm} = int(${cur}.split(${width})[0]);`);
+      // Only an exact frame makes the remaining bytes equal to the final limb.
+      // Prefix-mode callers must still parse the declared width.
+      prologue.push(p === inNames.length - 1 && cfg.enforceExactInputLength ? `        int ${nm} = int(${cur});` : `        int ${nm} = int(${cur}.split(${width})[0]);`);
     } else if (used[p]) {
       prologue.push(`        bytes hh${p}, bytes rr${p} = ${cur}.split(${width}); int ${nm} = int(hh${p});`);
       cur = `rr${p}`;
