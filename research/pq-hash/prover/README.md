@@ -55,7 +55,7 @@ Measured on 2026-10-28 (24-core x86-64, Python 3.14, numpy 2.5). The canonical p
 | C128 | CONJ | 15 | 2 | 41,936, 42,032 | 41,748 | 41,750 ± 410 (39,248 / 42,544 / 42,832) | 3,344 | 12,480 | 26,160 | 50,864 | 63 |
 
 What this shows:
-- **The design's byte model is confirmed.** The Monte Carlo means equal the calculator's dedup expectations within 0.03%. Every measured proof lies inside the Monte Carlo range. The headline numbers hold: **P100 ≈ 50.0 KB and P128 ≈ 91.5 KB**, provable in the Johnson regime.
+- **The design's byte model is confirmed.** The Monte Carlo means equal the calculator's dedup expectations within 0.03%. Every measured proof lies inside the Monte Carlo range. The headline numbers hold: **P100 ≈ 50.0 KB and P128 ≈ 91.5 KB**, provable in the Johnson regime (classical λ, conditional on the open item below).
 - **Proof size varies with the indices: σ ≈ 0.4 KB (P100) and 0.7 KB (P128).** Layouts must be sized for a high percentile, not the mean.
   - P128's p99 is 92,976 B and its maximum over 20k samples is 93,808 B. That is +1.5 KB and +2.3 KB over the expectation the SPEC used for the single-TXv5-input fit (95.6 KB unlocking, ≈ 4.3 KB spare under the 100,000 B transaction).
   - So the code budget for P128 layout (b) is about 6 KB at p99, not 8 KB. Build should confirm it with measured code size and treat the rare large-proof tail explicitly: re-grind with the next nonce if needed. That keeps the proof valid and only changes the indices.
@@ -76,6 +76,9 @@ What this shows:
 
 Notes and caveats:
 - **No zero-knowledge** (SPEC 1.2). Soundness numbers are the design's. The open item stays open: the per-round Fiat-Shamir commit errors against ePrint 2023/1071 are for the Analysis phase.
+  - Until it is closed, "provable" is conditional on that check.
+  - P128's margins are thin: 0.31 bits on the commit rounds and 0.19 bits on the query round. P100 has about 24 bits of commit margin.
+  - All λ are classical. Indicative quantum levels: BHT collisions on the h-byte digests are about 67 bits at h = 25 (P100) and about 85 bits at h = 32 (P128), and Grover roughly halves the grinding and per-round terms (SPEC §4.5, design branch b53135f).
 - C100's commit round comes out at 99.99999 bits, shown as 100.0 after the calculator's 2-decimal rounding. It is a conjectured comparison set in any case.
 - U128g (per-round commit grinding) and B128 (sensitivity only) are not built.
 - Duplicate query indices occur (sampling with replacement). The verifiers require the duplicated leaves to agree.
