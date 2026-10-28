@@ -1,0 +1,107 @@
+{
+ "redeemBytes": 6470,
+ "redeemSha256": "6db610c9de1499032584dc976b109fc1b59c47e88beaf5aaa11ee736266e225a",
+ "lockingHex": "aa20e92e77dfb8ff259c51fb1d5f6d10ca25b746008af44234ba0780387da6368bec87",
+ "lockingSha256": "d85d0d716fa97fc7d567f850320a84f4ba6cd58e86804c550c8873f10861cc3c",
+ "witness": {
+  "WS": 6978,
+  "WQ_fixture0": 3648,
+  "nq_fixture0": 114,
+  "NQ_MAX": 132
+ },
+ "unlockingBytes_fixture0": 17105,
+ "fixture0": {
+  "consensus": {
+   "opCost": 32021353,
+   "budget": 21684000
+  },
+  "standard": {
+   "opCost": 32056297,
+   "budget": 21684000
+  }
+ },
+ "sections": {
+  "init": 0,
+  "transcript": 86,
+  "parse+checks": 373,
+  "powers": 464,
+  "gls-tables": 1120,
+  "loop-setup": 503,
+  "loop": 1175,
+  "terminal": 1078,
+  "final": 155,
+  "cleanup": 7
+ },
+ "functions": {
+  "P": 33,
+  "RD": 14,
+  "EV": 46,
+  "TM": 111,
+  "TA": 78,
+  "G1C": 18,
+  "BADD": 594,
+  "DADD": 585
+ },
+ "prologue": 1509,
+ "schedule": {
+  "events": 65,
+  "digits": "0-101000-10-1000-1010-100-100000100-10100-10000-101000-10-1001000-100-10101000",
+  "states": 33,
+  "bounds": [
+   2,
+   4,
+   6,
+   8,
+   10,
+   12,
+   14,
+   16,
+   18,
+   20,
+   22,
+   24,
+   26,
+   28,
+   30,
+   32,
+   34,
+   36,
+   38,
+   40,
+   42,
+   44,
+   46,
+   48,
+   50,
+   52,
+   54,
+   56,
+   58,
+   60,
+   62,
+   64,
+   65
+  ],
+  "identities": 34
+ },
+ "degreeBound": {
+  "chunkDegPmax": 270,
+  "degDmax": 275,
+  "degQmax": 263,
+  "NQ_MAX": 132,
+  "chunksWithAddFirst": [
+   20,
+   26,
+   34,
+   50,
+   54
+  ],
+  "szDegree": 275,
+  "batchDegreeInRho": 33
+ },
+ "facts": {
+  "g2Cofactor": "21888242871839275222246405745257275088844257914179612981679871602714643921549",
+  "gcdNormCofactor": "1",
+  "lambdaOverR": "479095176016622842441988045216678740802490611077830385734835461768408136080710527913838926422556221801736192429704607292331370270163904428626529743670357"
+ }
+}
