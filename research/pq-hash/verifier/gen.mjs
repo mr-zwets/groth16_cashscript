@@ -47,14 +47,14 @@ export class PB {
   let(expr, name) { const nm = name ?? fresh('v'); this.prog.push([nm, expr]); return nm; }
   red(expr, name) { return this.let(R(expr), name); }
   chk(expr) { this.prog.push([null, expr]); }
-  call(id, args, nout) { const outs = Array.from({length: nout}, () => fresh('f')); this.prog.push([outs, call(id, args.map(ex))]); return outs; }
-  mul(A, B) { return this.fn ? this.call(this.fn.MULE, [...A, ...B], this.e) : mulE(this.e, A, B).map((x) => this.red(x)); }
-  sq(A) { return this.fn ? this.call(this.fn.SQE, A, this.e) : sqE(this.e, A).map((x) => this.red(x)); }
-  mulF(A, s) { return this.fn ? this.call(this.fn.MULF, [...A, s], this.e) : A.map((a) => this.red(mul(ex(a), ex(s)))); }
+  call(id, args, nout, out) { const outs = out ?? Array.from({length: nout}, () => fresh('f')); this.prog.push([outs, call(id, args.map(ex))]); return outs; }
+  mul(A, B, out) { return this.fn ? this.call(this.fn.MULE, [...A, ...B], this.e, out) : mulE(this.e, A, B).map((x, i) => this.red(x, out?.[i])); }
+  sq(A, out) { return this.fn ? this.call(this.fn.SQE, A, this.e, out) : sqE(this.e, A).map((x, i) => this.red(x, out?.[i])); }
+  mulF(A, s, out) { return this.fn ? this.call(this.fn.MULF, [...A, s], this.e, out) : A.map((a, i) => this.red(mul(ex(a), ex(s)), out?.[i])); }
   mm(a, b) { return this.fn ? this.call(this.fn.MM, [a, b], 1)[0] : this.red(mul(ex(a), ex(b))); }
-  add(A, B) { return A.map((a, i) => this.red(add(ex(a), ex(B[i])))); }
+  add(A, B, out) { return this.fn?.ADDE ? this.call(this.fn.ADDE, [...A, ...B], this.e, out) : A.map((a, i) => this.red(add(ex(a), ex(B[i])), out?.[i])); }
   // A - B for B < 2^64 (raw or canonical): + 2p keeps the dividend positive
-  sub(A, B) { return A.map((a, i) => this.red(add(sub(ex(a), ex(B[i])), K(2n * P)))); }
+  sub(A, B, out) { return this.fn?.SUBE ? this.call(this.fn.SUBE, [...A, ...B], this.e, out) : A.map((a, i) => this.red(add(sub(ex(a), ex(B[i])), K(2n * P)), out?.[i])); }
   subBase0(A, c) { return [this.red(add(sub(ex(A[0]), ex(c)), K(2n * P))), ...A.slice(1)]; }
   pow2k(x, k) { for (let i = 0; i < k; i++) x = this.mm(x, x); return x; }
 }
@@ -88,16 +88,18 @@ export function buildB(prm, statement, opts = {}) {
   { const b = new PB(e); mulE(e, names('a', e), names('b', e)).forEach((x, i) => b.red(x, 'c' + i)); F.MULE = defFn('MULE', slpFn([...names('a', e), ...names('b', e)], b.prog, names('c', e))); }
   { const b = new PB(e); sqE(e, names('a', e)).forEach((x, i) => b.red(x, 'c' + i)); F.SQE = defFn('SQE', slpFn(names('a', e), b.prog, names('c', e))); }
   { const b = new PB(e); names('a', e).forEach((x, i) => b.red(mul(V(x), V('s')), 'c' + i)); F.MULF = defFn('MULF', slpFn([...names('a', e), 's'], b.prog, names('c', e))); }
+  { const b = new PB(e); names('a', e).forEach((x, i) => b.red(add(V(x), V('b' + i)), 'c' + i)); F.ADDE = defFn('ADDE', slpFn([...names('a', e), ...names('b', e)], b.prog, names('c', e))); }
+  { const b = new PB(e); names('a', e).forEach((x, i) => b.red(add(sub(V(x), V('b' + i)), K(2n * P)), 'c' + i)); F.SUBE = defFn('SUBE', slpFn([...names('a', e), ...names('b', e)], b.prog, names('c', e))); }
   const Ecode = e === 3
     ? [B0, 'CAT', 'BIN2NUM', 'DUP', P, 'MOD', 'SWAP', P, 'DIV', 'DUP', P, 'MOD', 'SWAP', P, 'DIV', P, 'MOD']
     : [B0, 'CAT', 'BIN2NUM', 'DUP', P, 'MOD', 'SWAP', P, 'DIV', P, 'MOD'];
   F.E = defFn('E', asm(Ecode));
   // PAIR: u + v + g (u - v) for u, v < 2^64, g canonical
   {
-    const b = new PB(e);
-    const d = Array.from({length: e}, (_, c) => add(sub(V('u' + c), V('v' + c)), K(2n * P)));
-    const gd = mulE(e, names('g', e), d);
-    for (let c = 0; c < e; c++) b.red(add(add(V('u' + c), V('v' + c)), gd[c]), 'o' + c);
+    const b = new PB(e, F);
+    const d = Array.from({length: e}, (_, c) => b.let(add(sub(V('u' + c), V('v' + c)), K(2n * P))));
+    const gd = b.mul(names('g', e), d);
+    for (let c = 0; c < e; c++) b.red(add(add(V('u' + c), V('v' + c)), V(gd[c])), 'o' + c);
     F.PAIR = defFn('PAIR', slpFn([...names('u', e), ...names('v', e), ...names('g', e)], b.prog, names('o', e)));
   }
   // NA: norm and adjugate of (x - zz) for base-field x, from the per-proof constants of zz
@@ -119,13 +121,13 @@ export function buildB(prm, statement, opts = {}) {
   const deepArgs = ['X', 'Y', ...names('H', e), ...names('J', e), ...names('a', e), 'n1', ...names('b', e), 'n2',
     ...[1, 2, 3, 4, 5].flatMap((j) => names(`g${j}_`, e)), ...names('C', e), ...names('D', e)];
   {
-    const b = new PB(e);
-    const i1 = names('a', e).map((x) => b.red(mul(V(x), V('n1')))), i2 = names('b', e).map((x) => b.red(mul(V(x), V('n2'))));
-    const p4 = mulE(e, names('g4_', e), names('H', e)), p5 = mulE(e, names('g5_', e), names('J', e));
-    const nn = Array.from({length: e}, (_, c) => b.let(sum(mul(V('g1_' + c), V('X')), mul(V('g2_' + c), V('Y')), p4[c], p5[c], sub(K(P), V('C' + c)))));
-    const mm = Array.from({length: e}, (_, c) => b.let(add(mul(V('g3_' + c), V('X')), sub(K(P), V('D' + c)))));
-    const t1 = mulE(e, nn, i1), t2 = mulE(e, mm, i2);
-    t1.forEach((x, c) => b.red(add(x, t2[c]), 'f' + c));
+    const b = new PB(e, F);
+    const i1 = b.mulF(names('a', e), 'n1'), i2 = b.mulF(names('b', e), 'n2');
+    const p4 = b.mul(names('g4_', e), names('H', e)), p5 = b.mul(names('g5_', e), names('J', e));
+    const nn = Array.from({length: e}, (_, c) => b.red(sum(mul(V('g1_' + c), V('X')), mul(V('g2_' + c), V('Y')), V(p4[c]), V(p5[c]), sub(K(P), V('C' + c)))));
+    const mm = Array.from({length: e}, (_, c) => b.red(add(mul(V('g3_' + c), V('X')), sub(K(P), V('D' + c)))));
+    const t1 = b.mul(nn, i1), t2 = b.mul(mm, i2);
+    b.add(t1, t2, names('f', e));
     F.DEEPPT = defFn('DEEPPT', slpFn(deepArgs, b.prog, names('f', e)));
   }
   // HORN: acc' = acc * YG + unpack(P) (P packs e slots of SLOT bits)
@@ -146,19 +148,38 @@ export function buildB(prm, statement, opts = {}) {
   // PARSE8: a 64-byte chunk -> 8 values (8-byte LE, unsigned; first value deepest)
   F.PARSE8 = defFn('PARSE8', asm(Array.from({length: 7}, () => [8, 'SPLIT', 'SWAP', B0, 'CAT', 'BIN2NUM', 'SWAP']), B0, 'CAT', 'BIN2NUM'));
 
+  // FOLD<a>: binary fold of a coset of a values with x0^-1 = X and beta^(2^l) (l < log2 a): pairs (j, j + half),
+  // g = beta^(2^l) x_j^-1; returns the unscaled fold (a times the folded value)
+  const foldArgs = (ai) => [...Array.from({length: ai}, (_, j) => names(`v${j}_`, e)).flat(), 'X', ...Array.from({length: Math.log2(ai)}, (_, l) => names(`b${l}_`, e)).flat()];
+  for (const ai of new Set(a)) {
+    const b = new PB(e, F);
+    const wai = invp(rou(ai));
+    let cur = Array.from({length: ai}, (_, j) => names(`v${j}_`, e)), X = 'X';
+    for (let l = 0; cur.length > 1; l++) {
+      if (l > 0) X = b.mm(X, X);
+      const half = cur.length / 2, nxt = [];
+      for (let j = 0; j < half; j++) {
+        const xj = j === 0 ? X : b.mm(X, K(powp(wai, BigInt(j << l))));
+        const g = b.mulF(names(`b${l}_`, e), xj);
+        nxt.push(b.call(F.PAIR, [...cur[j], ...cur[j + half], ...g], e, cur.length === 2 ? names('o', e) : undefined));
+      }
+      cur = nxt;
+    }
+    F['FOLD' + ai] = defFn('FOLD' + ai, slpFn(foldArgs(ai), b.prog, names('o', e)));
+  }
+
   // ---------------- initial stack ----------------
   const init = [];
   trees.forEach((_, ti) => { for (let i = 0; i < s; i++) init.push(`R${ti}_${i}`); });
   for (let q = 0; q < s; q++) init.push(`L${q}`);
   const rF = Array.from({length: r - 1}, (_, i) => 'rF' + (i + 1));
-  const pt = ['ST', 'rT', 'rC', 'OOD', ...rF, 'FIN', 'NONCE'];
+  const pt = ['rT', 'rC', 'OOD', ...rF, 'FIN', 'NONCE'];   // the statement is baked into the code
   init.push(...pt);
   const S = new Stk(init);
   S.emit('DEPTH', init.length, 'NUMEQUALVERIFY');
   mark(S, 'entry');
 
   // ---------------- phase 1: transcript ----------------
-  S.roll('ST'); S.raw([statement, 'EQUALVERIFY'], 1);
   const t0 = sha(prm.TAG, statement);
   const absorb = (prev, item, keepItem, len) => {
     if (keepItem) S.pick(item); else S.roll(item);
@@ -201,7 +222,7 @@ export function buildB(prm, statement, opts = {}) {
     const ood = ['oX', 'oY', 'oW', 'oA', 'oB'].flatMap((x) => names(x, e));
     S.raw([...Array.from({length: ood.length - 1}, () => [8, 'SPLIT', 'SWAP', B0, 'CAT', 'BIN2NUM', 'SWAP']), B0, 'CAT', 'BIN2NUM'], 1, ood);
     const b = new PB(e, F);
-    const [X, Y, W, A, Bv] = ['oX', 'oY', 'oW', 'oA', 'oB'].map((x) => names(x, e).map((nm) => b.red(V(nm))));
+    const [X, Y, W, A, Bv] = ['oX', 'oY', 'oW', 'oA', 'oB'].map((x) => names(x, e));   // raw (< 2^64): every consumer accepts raw inputs
     const n = BigInt(prm.n), wl = powp(prm.wn, n - 1n);
     let zz = names('z', e);
     for (let i = 0; i < 13; i++) zz = b.sq(zz);
@@ -222,15 +243,15 @@ export function buildB(prm, statement, opts = {}) {
     lhs.forEach((x, i) => b.chk(chk('NUMEQUALVERIFY', V(x), V(rhs[i]))));
     // DEEP constants at z: C1 = g1 X + g2 Y + g4 H0 + g5 H1, C2 = g3 X(wz)
     const p1 = b.mul(gam(1), X), p2 = b.mul(gam(2), Y), p4 = b.mul(gam(4), A), p5 = b.mul(gam(5), Bv);
-    p1.forEach((x, i) => b.red(sum(V(x), V(p2[i]), V(p4[i]), V(p5[i])), 'dC1_' + i));
-    b.mul(gam(3), W).forEach((x, i) => b.red(V(x), 'dC2_' + i));
+    b.add(b.add(p1, p2), b.add(p4, p5), names('dC1_', e));
+    b.mul(gam(3), W, names('dC2_', e));
     // norm/adjugate constants of (x - z) and (x - wz) for base-field x
     for (const [zi, zs] of [[0, names('z', e).map(V)], [1, names('z', e).map((x) => mul(V(x), K(prm.wn)))]]) {
       const zc = zs.map((x) => b.red(x));
       const pfx = `dz${zi}_`;
       b.red(sub(K(P), V(zc[0])), pfx + 'm0');
       if (e === 3) {
-        b.red(V(zc[1]), pfx + 'z1'); b.red(V(zc[2]), pfx + 'z2');
+        b.let(V(zc[1]), pfx + 'z1'); b.let(V(zc[2]), pfx + 'z2');
         b.red(mul(mul(V(zc[1]), V(zc[2])), K(P - 7n)), pfx + 'K0');
         b.red(mul(mul(V(zc[2]), V(zc[2])), K(7)), pfx + 'K1');
         b.red(mul(V(zc[1]), V(zc[1])), pfx + 'K2');
@@ -238,7 +259,7 @@ export function buildB(prm, statement, opts = {}) {
         const z2c = b.red(mul(mul(V(zc[2]), V(zc[2])), V(zc[2]))), z1c = b.red(mul(mul(V(zc[1]), V(zc[1])), V(zc[1])));
         b.red(add(mul(V(z2c), K(P - 49n)), mul(V(z1c), K(P - 7n))), pfx + 'cB');
       } else {
-        b.red(V(zc[1]), pfx + 'z1');
+        b.let(V(zc[1]), pfx + 'z1');
         b.red(mul(mul(V(zc[1]), V(zc[1])), K(P - 7n)), pfx + 'cN');
       }
     }
@@ -246,11 +267,11 @@ export function buildB(prm, statement, opts = {}) {
     for (let i = 0; i < r; i++) {
       let bp = names(`be${i}_`, e);
       for (let l = 0; (1 << l) < a[i]; l++) {
-        if (l > 0) bp = b.sq(bp);
-        bp.forEach((x, c) => b.red(V(x), `bp${i}_${l}_${c}`));
+        if (l > 0) bp = b.sq(bp, names(`bp${i}_${l}_`, e));
+        else { bp.forEach((x, c) => b.let(V(x), `bp${i}_${l}_${c}`)); bp = names(`bp${i}_0_`, e); }
       }
     }
-    compileSlp(S, b.prog, {keep: [1, 2, 3, 4, 5].flatMap(gam)});
+    compileSlp(S, b.prog, {keep: [...[1, 2, 3, 4, 5].flatMap(gam), ...b.prog.flatMap(([n]) => (Array.isArray(n) ? n : [n])).filter((n) => typeof n === 'string' && n.startsWith('bp'))]});
     for (const x of [...S.st]) if (/^(al\d_\d|z\d|be\d_\d|o[XYWAB]\d)$/.test(x)) S.drop(x);
   }
   // everything the query function reads must sit above the index list
@@ -356,12 +377,17 @@ export function buildB(prm, statement, opts = {}) {
     for (let j = 0; j < k0; j++) vals.push('tX' + j, 'tY' + j);
     for (let j = 0; j < k0; j++) vals.push(...names(`cA${j}_`, e), ...names(`cB${j}_`, e));
     for (let i = 1; i < r; i++) for (let j = 0; j < a[i]; j++) vals.push(...names(`v${i}_${j}_`, e));
-    for (let c = 0; c < nch; c++) { Q.roll('ch' + c); Q.raw([F.PARSE8, 'INVOKE'], 1, vals.slice(8 * c, 8 * c + 8)); }
+    const chOrder = [];
+    { let c = (16 * k0 + 2 * e8 * k0) / 64; const lay = [];
+      for (let i = 1; i < r; i++) { const n = a[i] * e8 / 64; lay.push(Array.from({length: n}, (_, x) => c + x)); c += n; }
+      for (let x = 0; x < (16 * k0 + 2 * e8 * k0) / 64; x++) chOrder.push(x);
+      for (let i = r - 2; i >= 0; i--) chOrder.push(...lay[i]); }
+    for (const c of chOrder) { Q.roll('ch' + c); Q.raw([F.PARSE8, 'INVOKE'], 1, vals.slice(8 * c, 8 * c + 8)); }
     mark(Q, 'q-parse');
     // DEEP: norms/adjugates, one Montgomery batch with the hinted inverse T, then f0 at the k0 coset points
     const b = new PB(e, F);
     const w0 = rou(k0);
-    const xs = Array.from({length: k0}, (_, j) => (j === 0 ? 'x0' : b.red(mul(V('x0'), K(powp(w0, j))))));
+    const xs = Array.from({length: k0}, (_, j) => (j === 0 ? 'x0' : b.mm('x0', K(powp(w0, j)))));
     const dz = (zi) => (e === 3 ? ['m0', 'z1', 'z2', 'K0', 'K1', 'K2', 'cA', 'cB'] : ['m0', 'cN']).map((x) => `dz${zi}_` + x);
     const na = xs.map((x) => [0, 1].map((zi) => { const o = b.call(F.NA, [x, ...dz(zi)], e === 3 ? 4 : 2); return {N: o[0], adj: e === 3 ? o.slice(1) : [o[1], `dz${zi}_z1`]}; }));
     const E = [...na.flatMap(([u, v]) => [u.N, v.N]), 'x0'];
@@ -376,21 +402,7 @@ export function buildB(prm, statement, opts = {}) {
     const consts = [...[1, 2, 3, 4, 5].flatMap(gam), ...names('dC1_', e), ...names('dC2_', e)];
     const f0 = xs.map((_, j) => b.call(F.DEEPPT, ['tX' + j, 'tY' + j, ...names(`cA${j}_`, e), ...names(`cB${j}_`, e),
       ...na[j][0].adj, inv[2 * j], ...na[j][1].adj, inv[2 * j + 1], ...consts], e));
-    // binary fold i of `cur` (list of extension operands) with x^-1 = X: pairs (j, j + half), g = beta^(2^l) x_j^-1
-    const foldB = (bb, i, cur, X) => {
-      const wai = invp(rou(a[i]));
-      for (let l = 0; cur.length > 1; l++) {
-        if (l > 0) X = bb.mm(X, X);
-        const half = cur.length / 2, nxt = [];
-        for (let j = 0; j < half; j++) {
-          const xj = j === 0 ? X : bb.red(mul(V(X), K(powp(wai, BigInt(j << l)))));
-          const g = bb.mulF(names(`bp${i}_${l}_`, e), xj);
-          nxt.push(bb.call(F.PAIR, [...cur[j], ...cur[j + half], ...g], e));
-        }
-        cur = nxt;
-      }
-      return cur[0];
-    };
+    const foldB = (bb, i, cur, X) => bb.call(F['FOLD' + a[i]], [...cur.flat(), X, ...Array.from({length: Math.log2(a[i])}, (_, l) => names(`bp${i}_${l}_`, e)).flat()], e);
     let Fv = foldB(b, 0, f0, x0inv);
     const keepC = () => Q.st.filter((x) => /^(bp\d|ga|dC|dz)/.test(x));
     compileSlp(Q, b.prog, {keep: [...keepC(), 'x0', x0inv]});
@@ -440,7 +452,7 @@ export function buildB(prm, statement, opts = {}) {
         Q.pick('Y' + G);
         Q.raw([F.HORN, 'INVOKE'], e + 2, names('acc', e));
       }
-      for (let k = 1; k <= G; k++) Q.drop('Y' + k);
+      Q.raw([...Array(e).fill('TOALTSTACK'), ...Array(G >> 1).fill('2DROP'), ...(G & 1 ? ['DROP'] : []), ...Array(e).fill('FROMALTSTACK')], G + e, names('acc', e));
       const cb = new PB(e);
       names('acc', e).forEach((x, c) => cb.chk(chk('NUMEQUALVERIFY', R(mul(V(x), K(a[r - 1]))), V(Fv[c]))));
       compileSlp(Q, cb.prog);
@@ -460,8 +472,7 @@ export function buildB(prm, statement, opts = {}) {
   // ---------------- cleanup ----------------
   {
     if (S.st.some((x) => /^(R\d|L\d|idx)/.test(x))) throw new Error('unconsumed witness items');
-    const n = S.st.length;
-    S.raw([Array.from({length: n >> 1}, () => '2DROP'), ...(n & 1 ? ['DROP'] : [])], n);
+    S.raw(['BEGIN', 'DROP', 'DEPTH', 'NOT', 'UNTIL'], S.st.length);
     S.push(1);
   }
   mark(S, 'end');

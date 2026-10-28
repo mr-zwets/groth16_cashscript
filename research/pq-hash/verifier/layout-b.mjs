@@ -24,7 +24,7 @@ export function program(prm, statement, opts = {}) {
 
 // witness items in push order (bottom first), matching gen.mjs `init`
 export function witnessItems(prm, enc) {
-  return [...enc.records.flat(), ...enc.leafBlobs, ...enc.pt];
+  return [...enc.records.flat(), ...enc.leafBlobs, ...enc.pt.slice(1)];   // statement baked into the code
 }
 
 export function spendB(prm, statement, proof, opts = {}, mutate) {
