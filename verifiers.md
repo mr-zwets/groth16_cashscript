@@ -152,8 +152,9 @@ the transaction's own payloads. The G2 walk, slope checks, ψ terminal relation,
   (the argument is in [chunked/bls12-381/README.md](chunked/bls12-381/README.md), sections 1-6; reviewed 2026-10-27).
   `bch-groth16-bls12381-singleton-fs` has the same relations, degrees and transcript, so the same
   bound applies with its own counts: fewer than `2^22` setup hashes (only the GT window trees) and
-  1,104 verifier SHA-256 per spend (see [BLS_QSPLIT_TAIL22_STATUS.md](BLS_QSPLIT_TAIL22_STATUS.md)) — STARK-class, but a **new assumption** the
-  unconditional entries do not make. It is therefore filed under this separate name
+  1,104 verifier SHA-256 per spend (see [BLS_QSPLIT_TAIL22_STATUS.md](BLS_QSPLIT_TAIL22_STATUS.md)).
+  This bound is STARK-class, but a **new assumption** the unconditional entries do not make.
+  `-intratx-fs` is therefore filed under this separate name
   rather than as a successor to `-intratx-residue` / `-grouped-residue`.
 - A and C are graded **cofactor-equivalent**: on-curve is enforced and the pairing verdict
   binds their prime-order projections; as in `-singleton-minop` (which has the ψ G2 check only), alternate cofactor encodings of the same valid proof also spend. No

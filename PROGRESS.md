@@ -30,3 +30,6 @@ Base: origin/main be3dc66.
   difference is pre-existing compiler drift (e.g. vkx BN 879 vs 964 B), not this change.
   Default resolution checked: from the main checkout layout all three depths resolve to
   verifier.cash/zk-verifier-bench/.
+
+## Finalize
+- Applied the reviews' non-blocking wording fixes: the sentence split in verifiers.md, "bare as benchmarked" (P2SH32 adds 1 setup and 2 verifier hashes), a clause on the flat affine PIC factors, and fixed-shape loops for q_V.

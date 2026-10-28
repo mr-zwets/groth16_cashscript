@@ -247,18 +247,22 @@ this table listed before predate that build.
 universal maximum relation degree 137 asserted in `measure_fs_singleton.mjs`), one 132-coefficient
 quotient, and the same transcript frames: 22 leaves (737-byte statement and the 21 block payloads,
 exact lengths), 23 nodes, `beta`, the one-leaf `qroot` and `alpha`. So the argument of
-[chunked/bls12-381/README.md](chunked/bls12-381/README.md) section 5 applies unchanged, with
+[chunked/bls12-381/README.md](chunked/bls12-381/README.md) section 5 applies, with
 `ε_SZ = (23·q_β + 160·q_α)/2^256` and `ε_binding = 3·N(N−1)/2^257`, `N = N₀ + q`. Only the query
-accounting differs:
+accounting differs. (The singleton's PIC factors are the flat affine `1+u·W` of the v4
+`BLSGTF1` records rather than the projective `D'+N'·W` of README steps 1 and 4; they are
+trivially nonzero, have degree ≤ 5 and are modelled as `factor` in `segmentDegreeCeiling`, so
+the degree bounds above are unchanged.)
 - **Setup N₀ < 2^22**: the 32 GT window trees (at most 2^16 leaves and 2^16−1 nodes each, tag
   `BLSGTF1`). The 32 window roots are literal constants of the program, so there are no batch
   commitments; the fixed Miller data is in the program, so there is no fixed-blob hash; the
-  locking is bare, so there is no P2SH32 or sibling digest. Section 6 (composition across inputs)
+  locking is bare as benchmarked, so there is no P2SH32 or sibling digest (a P2SH32 deployment
+  adds one setup and two verifier hashes, which does not change the stated bounds). Section 6 (composition across inputs)
   does not apply: the program is one input and uses no introspection.
 - **Verifier q_V = 1,104 per spend**: 48 transcript hashes, 32 GT leaf hashes and 1,024 GT path
   hashes (the compiled program evaluates two SHA-256 per level, 32 × 16 × 2). This was counted with
-  an instrumented libauth VM on the shipped locking and the committed fixture; the count does not
-  depend on the fixture.
+  an instrumented libauth VM on the shipped locking and the committed fixture; every loop and
+  tree is fixed-shape, so the count does not depend on the fixture.
 
 With no adversary queries the bound is below 2^-211; q ≤ 2^64 gives less than 2^-126.
 
