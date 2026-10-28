@@ -173,31 +173,49 @@ export const affineLine = (xP, yP, lam, c) => F12.create({c0: Fp6.create({c0: {c
 // polynomial of the line l0 yP + l1 xP X + l3 X^3 (l's in Fp2, Phi-mapped)
 export const linePoly = (xP, yP, l0, l1, l3) => { const o = Array(10).fill(0n); const [a, b, c] = [Phi(l0), Phi(l1), Phi(l3)];
   for (let i = 0; i < 7; i++) { o[i] = mod(o[i] + yP * a[i]); o[i + 1] = mod(o[i + 1] + xP * b[i]); o[i + 3] = mod(o[i + 3] + c[i]); } return o; };
+// ---------------- on-chain G2 formulas (B and, in dproj, delta) (homogeneous projective over Fp2) ----------------
+// doubling (scaled CLN): B=Y^2, C=Z^2, E=3b'C, F=3E, H=2YZ; X3=2XY(B-F), Y3=(B+F)^2-12E^2, Z3=4BH
+// line (H, -3X^2, B-E) = 2YZ * (affine tangent line); Z3 = 8Y^3 Z (Z = 0 absorbing; Z3 != 0 => H != 0)
+export const projDbl = ([X, Y, Z]) => {
+  const B = F2.sqr(Y), C = F2.sqr(Z), E = F2.mul(B3, C), Fv = F2.mul(E, f2(3n, 0n)), H = F2.mul(F2.mul(Y, Z), f2(2n, 0n));
+  const X3 = F2.mul(F2.mul(F2.mul(X, Y), f2(2n, 0n)), F2.sub(B, Fv));
+  const Y3 = F2.sub(F2.sqr(F2.add(B, Fv)), F2.mul(F2.sqr(E), f2(12n, 0n)));
+  const Z3 = F2.mul(F2.mul(B, H), f2(4n, 0n));
+  return {T: [X3, Y3, Z3], line: [H, F2.neg(F2.mul(F2.sqr(X), f2(3n, 0n))), F2.sub(B, E)]};
+};
+// mixed addition with affine Q: theta=Y-yq Z, lam=X-xq Z, D=lam^2, E=lam D, Fv=Z theta^2, G=X D, H=E+Fv-2G;
+// X3=lam H, Y3=theta(G-H)-Y E, Z3=Z E; line (lam, -theta, theta xq - lam yq) = lam * (affine chord line); Z3 = Z lam^3
+export const projAdd = ([X, Y, Z], [xq, yq]) => {
+  const th = F2.sub(Y, F2.mul(yq, Z)), la = F2.sub(X, F2.mul(xq, Z));
+  const D = F2.sqr(la), E = F2.mul(la, D), Fv = F2.mul(Z, F2.sqr(th)), G = F2.mul(X, D), H = F2.sub(F2.add(E, Fv), F2.add(G, G));
+  return {T: [F2.mul(la, H), F2.sub(F2.mul(th, F2.sub(G, H)), F2.mul(Y, E)), F2.mul(Z, E)],
+    line: [la, F2.neg(th), F2.sub(F2.mul(th, xq), F2.mul(la, yq))]};
+};
+
 export const VKC = (() => {
   const V = vkPoints();
-  // delta trajectory: lambda_j for the 86 loop lines (65 doublings, 21 additions with +-delta), then the
-  // first Frobenius line (T + psi(delta)) as lambda_86 (it is the loop's last "next lambda"), and the second
-  // Frobenius line (T' - psi^2(delta)) baked as (lambda, c).
-  const d = V.delta.toAffine(); let T = V.delta; const lams = [];
-  const slopeDbl = (Ta) => F2.div(F2.mul(f2(3n, 0n), F2.sqr(Ta.x)), F2.add(Ta.y, Ta.y));
-  const slopeAdd = (Ta, Qa) => { assert.ok(!F2.eql(Ta.x, Qa.x)); return F2.div(F2.sub(Qa.y, Ta.y), F2.sub(Qa.x, Ta.x)); };
-  for (let e = 0; e < NE; e++) {
-    lams.push(slopeDbl(T.toAffine())); T = T.double();
-    if (DIGITS[e]) { const Q = DIGITS[e] < 0 ? V.delta.negate() : V.delta; lams.push(slopeAdd(T.toAffine(), Q.toAffine())); T = T.add(Q); }
-  }
-  assert.equal(lams.length, NE + NADD);
+  // delta trajectory (dproj): computed ON-CHAIN as a homogeneous projective walk with the same doubling and
+  // mixed-addition formulas as B (projDbl/projAdd below). delta is a baked VK constant, so the whole trajectory
+  // is deterministic; this build-time check replaces the old slope-pile assertion. For all 88 steps (65 doublings,
+  // 21 additions with +-delta, the two Frobenius additions with psi(delta) and -psi^2(delta)) it asserts against
+  // noble: (X/Z, Y/Z) is the true point, Z != 0, the line's leading coefficient (H = 2YZ, resp. lambda') is
+  // nonzero, and the projective line equals that coefficient times the affine tangent/chord line (1, -lam, lam xT - yT).
+  const d = V.delta.toAffine();
   const [p1x, p1y] = psiK(1, d.x, d.y), [p2x, p2y] = psiK(2, d.x, d.y);
   const Q1 = bn254.G2.Point.fromAffine({x: p1x, y: p1y}), Q2 = bn254.G2.Point.fromAffine({x: p2x, y: F2.neg(p2y)});
-  const Ta = T.toAffine(); lams.push(slopeAdd(Ta, Q1.toAffine())); T = T.add(Q1);
-  const T2 = T.toAffine(); const lamF2 = slopeAdd(T2, Q2.toAffine()); const cF2 = F2.sub(F2.mul(lamF2, T2.x), T2.y);
-  const c0 = F2.sub(F2.mul(lams[0], d.x), d.y);
-  // the script's delta recursion (reads lambda_j at step j): state (x_j, c_{j-1}, lambda_{j-1}), start (x_delta, y_delta, 0);
-  // c_j = (lambda_{j-1} + lambda_j) x_j - c_{j-1}; x_{j+1} = lambda_j^2 - x_j - s_j. Assert every line equals the true chord/tangent.
-  { const all = [...lams, lamF2]; let x = d.x, c = d.y, l = F2.ZERO, Tt = V.delta, j = 0;
-    const check = (Ttrue) => { const ta = Ttrue.toAffine(); assert.ok(F2.eql(x, ta.x), 'delta x_j'); const cj = F2.sub(F2.mul(F2.add(l, all[j]), x), c); assert.ok(F2.eql(cj, F2.sub(F2.mul(all[j], ta.x), ta.y)), 'delta c_j'); return cj; };
-    const step = (s) => { const cj = check(Tt); const nx = F2.sub(F2.sub(F2.sqr(all[j]), x), s); c = cj; l = all[j]; x = nx; j++; };
-    for (let e = 0; e < NE; e++) { step(x); Tt = Tt.double(); if (DIGITS[e]) { step(d.x); Tt = Tt.add(DIGITS[e] < 0 ? V.delta.negate() : V.delta); } }
-    step(p1x); Tt = Tt.add(Q1); check(Tt); assert.equal(j, 87); }
+  { let T = [d.x, d.y, F2.ONE], Tt = V.delta, steps = 0;
+    const aff = ([X, Y, Z]) => { assert.ok(!F2.is0(Z), 'delta walk: Z = 0'); const zi = F2.inv(Z); return [F2.mul(X, zi), F2.mul(Y, zi)]; };
+    const chk = (o, Tprev, lam) => { const [l0, l1, l3] = o.line; const ta = Tprev.toAffine();
+      assert.ok(!F2.is0(l0), 'delta line: leading coefficient 0');
+      assert.ok(F2.eql(l1, F2.mul(l0, F2.neg(lam))) && F2.eql(l3, F2.mul(l0, F2.sub(F2.mul(lam, ta.x), ta.y))), 'delta line != l0 * affine line'); steps++; };
+    const slopeDbl = (Ta) => F2.div(F2.mul(f2(3n, 0n), F2.sqr(Ta.x)), F2.add(Ta.y, Ta.y));
+    const slopeAdd = (Ta, Qa) => { assert.ok(!F2.eql(Ta.x, Qa.x)); return F2.div(F2.sub(Qa.y, Ta.y), F2.sub(Qa.x, Ta.x)); };
+    const dbl = () => { const o = projDbl(T); chk(o, Tt, slopeDbl(Tt.toAffine())); T = o.T; Tt = Tt.double(); const [x, y] = aff(T), ta = Tt.toAffine(); assert.ok(F2.eql(x, ta.x) && F2.eql(y, ta.y), 'delta walk dbl'); };
+    const add = (Qp, q) => { const o = projAdd(T, q); chk(o, Tt, slopeAdd(Tt.toAffine(), Qp.toAffine())); T = o.T; Tt = Tt.add(Qp); const [x, y] = aff(T), ta = Tt.toAffine(); assert.ok(F2.eql(x, ta.x) && F2.eql(y, ta.y), 'delta walk add'); };
+    for (let e = 0; e < NE; e++) { dbl(); if (DIGITS[e]) add(DIGITS[e] < 0 ? V.delta.negate() : V.delta, [d.x, DIGITS[e] < 0 ? F2.neg(d.y) : d.y]); }
+    add(Q1, [p1x, p1y]); add(Q2, [p2x, F2.neg(p2y)]); assert.equal(steps, 88);
+    // the Miller-loop endpoint (6x+2)delta + psi(delta) - psi^2(delta) == -psi^3(delta) (delta in G2)
+    const [p3x, p3y] = psiK(3, d.x, d.y); const [x, y] = aff(T); assert.ok(F2.eql(x, p3x) && F2.eql(y, F2.neg(p3y)), 'delta endpoint'); }
   // pairing Miller values used as GT-GLS factors and the constant
   const m = (P, Q) => bn254.pairing(P, Q, false);
   const mIC = V.ic.map((P) => m(P, V.gamma));
@@ -209,7 +227,7 @@ export const VKC = (() => {
   let corr = F12.ONE; for (const k of [1, 2]) for (let i = 0; i < 4; i++) corr = F12.mul(corr, F12.frobeniusMap(mIC[k], i));
   corr = F12.conjugate(F12.pow(corr, GLS_OFFSET)); // conj = inverse up to Fp6 (same class); exponent -2^64
   const Rconst = monicRep(F12.mul(mConst, corr));
-  return {deltaAff: d, deltaPsi: {x: p1x, y: p1y}, lams, deltaStart: {x: d.x, c: c0}, frob2: {lam: lamF2, c: cF2}, mIC, mConst, R, Rconst, deltaEnd: T};
+  return {deltaAff: d, deltaPsi: {x: p1x, y: p1y}, deltaPsi2neg: {x: p2x, y: F2.neg(p2y)}, mIC, mConst, R, Rconst};
 })();
 // polynomial of the GLS factor (k, i) with sign s (0: +, 1: -): R_{k,i}(+-X), R_{k,2/3} = R_{k,0/1}(eta X)
 export const glsFactorPoly = (k, i) => { let f = VKC.R[k][i % 2]; if (i >= 2) f = psubst(f, ETA); return f; };

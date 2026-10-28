@@ -30,24 +30,9 @@ export const rdle = (b, o = 0, n = 32) => { let v = 0n; for (let i = n - 1; i >=
 export const sha = (...parts) => createHash('sha256').update(Buffer.concat(parts)).digest();
 export const toFp = (h) => rdle(h) % p;                  // unsigned LE (BIN2NUM(h || 0x00)) mod p
 
-// ---------------- on-chain B formulas (homogeneous projective over Fp2) ----------------
-// doubling (scaled CLN): B=Y^2, C=Z^2, E=3b'C, F=3E, H=2YZ; X3=2XY(B-F), Y3=(B+F)^2-12E^2, Z3=4BH
-// line (H, -3X^2, B-E) = 2YZ * (affine tangent line); Z3 = 8Y^3 Z (Z = 0 absorbing; Z3 != 0 => H != 0)
-export const projDbl = ([X, Y, Z]) => {
-  const B = F2.sqr(Y), C = F2.sqr(Z), E = F2.mul(B3, C), Fv = F2.mul(E, f2(3n, 0n)), H = F2.mul(F2.mul(Y, Z), f2(2n, 0n));
-  const X3 = F2.mul(F2.mul(F2.mul(X, Y), f2(2n, 0n)), F2.sub(B, Fv));
-  const Y3 = F2.sub(F2.sqr(F2.add(B, Fv)), F2.mul(F2.sqr(E), f2(12n, 0n)));
-  const Z3 = F2.mul(F2.mul(B, H), f2(4n, 0n));
-  return {T: [X3, Y3, Z3], line: [H, F2.neg(F2.mul(F2.sqr(X), f2(3n, 0n))), F2.sub(B, E)]};
-};
-// mixed addition with affine Q: theta=Y-yq Z, lam=X-xq Z, D=lam^2, E=lam D, Fv=Z theta^2, G=X D, H=E+Fv-2G;
-// X3=lam H, Y3=theta(G-H)-Y E, Z3=Z E; line (lam, -theta, theta xq - lam yq) = lam * (affine chord line); Z3 = Z lam^3
-export const projAdd = ([X, Y, Z], [xq, yq]) => {
-  const th = F2.sub(Y, F2.mul(yq, Z)), la = F2.sub(X, F2.mul(xq, Z));
-  const D = F2.sqr(la), E = F2.mul(la, D), Fv = F2.mul(Z, F2.sqr(th)), G = F2.mul(X, D), H = F2.sub(F2.add(E, Fv), F2.add(G, G));
-  return {T: [F2.mul(la, H), F2.sub(F2.mul(th, F2.sub(G, H)), F2.mul(Y, E)), F2.mul(Z, E)],
-    line: [la, F2.neg(th), F2.sub(F2.mul(th, xq), F2.mul(la, yq))]};
-};
+// on-chain G2 formulas: projDbl / projAdd live in math.mjs (shared with the build-time delta-walk check)
+export {projDbl, projAdd} from './math.mjs';
+import {projDbl, projAdd} from './math.mjs';
 
 // ---------------- the event schedule as polynomials (shared by prover and tests) ----------------
 // statement -> list of per-event factor polynomials (without the c factor) and terminal factors
@@ -55,34 +40,28 @@ export function factorSchedule(st) {
   const {xA, yA, xB, yB, xC, yC, N} = st; // N[k][e] nibble (bit i = bit 64-e of u_{k,i})
   const yP0 = mod(-yA);
   let T = [xB, yB, F2.ONE]; const Bq = [xB, yB], Bneg = [xB, F2.neg(yB)];
-  // delta state
-  let dx = VKC.deltaStart.x, dc = VKC.deltaStart.c; let j = 0; const lam = VKC.lams; const dAff = VKC.deltaAff;
-  const dline = () => linePoly(xC, yC, F2.ONE, F2.neg(lam[j]), dc);
-  const dstep = (isAdd) => { // x_{j+1} = lam_j^2 - x_j - s, c_{j+1} = (lam_j + lam_{j+1}) x_{j+1} - c_j
-    const s = isAdd ? dAff.x : dx; const nx = F2.sub(F2.sub(F2.sqr(lam[j]), dx), s);
-    dc = F2.sub(F2.mul(F2.add(lam[j], lam[j + 1]), nx), dc); dx = nx; j++;
-  };
+  // delta: projective walk from the baked affine delta (same formulas as B), lines at P = C
+  const dAff = VKC.deltaAff; let Td = [dAff.x, dAff.y, F2.ONE]; const dPos = [dAff.x, dAff.y], dNeg = [dAff.x, F2.neg(dAff.y)];
   const tbl = (k, n) => { let poly = [1n]; for (let i = 0; i < 4; i++) if ((n >> i) & 1) poly = pmul(poly, glsFactorPoly(k, i)); return poly; };
   const events = [];
   for (let e = 0; e < NE; e++) {
     const fs = [];
     let o = projDbl(T); fs.push(linePoly(xA, yP0, ...o.line)); T = o.T;
-    fs.push(dline()); dstep(false);
+    o = projDbl(Td); fs.push(linePoly(xC, yC, ...o.line)); Td = o.T;
     if (DIGITS[e]) {
       o = projAdd(T, DIGITS[e] < 0 ? Bneg : Bq); fs.push(linePoly(xA, yP0, ...o.line)); T = o.T;
-      fs.push(dline()); dstep(true);
+      o = projAdd(Td, DIGITS[e] < 0 ? dNeg : dPos); fs.push(linePoly(xC, yC, ...o.line)); Td = o.T;
     }
     fs.push(tbl(0, N[0][e]), tbl(1, N[1][e]));
     events.push({fs, cSign: DIGITS[e]});
   }
-  assert.equal(j, NE + NADD);
   // terminal: B + psi(B), + (-psi^2(B)); delta Frobenius lines (tracked line 1, baked line 2)
   const [p1x, p1y] = psiK(1, xB, yB), [p2x, p2y] = psiK(2, xB, yB), [p3x, p3y] = psiK(3, xB, yB);
   const term = [];
   let o = projAdd(T, [p1x, p1y]); term.push(linePoly(xA, yP0, ...o.line)); T = o.T;
   o = projAdd(T, [p2x, F2.neg(p2y)]); term.push(linePoly(xA, yP0, ...o.line)); T = o.T;
-  term.push(dline());
-  term.push(linePoly(xC, yC, F2.ONE, F2.neg(VKC.frob2.lam), VKC.frob2.c));
+  o = projAdd(Td, [VKC.deltaPsi.x, VKC.deltaPsi.y]); term.push(linePoly(xC, yC, ...o.line)); Td = o.T;
+  o = projAdd(Td, [VKC.deltaPsi2neg.x, VKC.deltaPsi2neg.y]); term.push(linePoly(xC, yC, ...o.line));
   term.push(VKC.Rconst);
   // endpoint: T == -psi^3(B) projectively, Z_T != 0
   const [X, Y, Z] = T;

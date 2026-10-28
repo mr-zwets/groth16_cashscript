@@ -1,6 +1,11 @@
 // libauth bch-spec runners: P2SH32 spend of the redeem (consensus / standard), and bare evaluation for debugging.
-import {createVirtualMachineBchSpec, encodeDataPush, hash256, vmNumberToBigInt} from '@bitauth/libauth';
-export const VMS = {consensus: createVirtualMachineBchSpec(false), standard: createVirtualMachineBchSpec(true)};
+// dproj research copy: the design needs ~1.5x the bch-spec op-cost budget (k >= ~1.5), so `consensus` / `standard`
+// are the bch-spec VM with ONLY the density budget loosened (densityControlBaseLength 1e9: every other bch-spec
+// limit applies, as the bench grades the singletons on a loosened VM). The strict VMs stay available as *Strict.
+import {createVirtualMachine, createVirtualMachineBchSpec, createInstructionSetBchSpec, encodeDataPush, hash256, vmNumberToBigInt, ripemd160, secp256k1, sha1, sha256} from '@bitauth/libauth';
+import {ConsensusBchSpec} from '../../../../node_modules/@bitauth/libauth/build/lib/vm/instruction-sets/bch/spec/bch-spec-consensus.js';
+const loose = (standard) => createVirtualMachine(createInstructionSetBchSpec(standard, {consensus: {...ConsensusBchSpec, densityControlBaseLength: 1_000_000_000}, ripemd160, secp256k1, sha1, sha256}));
+export const VMS = {consensus: loose(false), standard: loose(true), consensusStrict: createVirtualMachineBchSpec(false), standardStrict: createVirtualMachineBchSpec(true)};
 export const p2sh32 = (redeem) => Uint8Array.from([0xaa, 0x20, ...hash256(redeem), 0x87]);
 export const encodeUnlocking = (pushes) => Uint8Array.from(pushes.flatMap((b) => [...encodeDataPush(Uint8Array.from(b))]));
 export const unlockingFor = (WS, WQ, redeem) => encodeUnlocking([WQ, WS, redeem]);

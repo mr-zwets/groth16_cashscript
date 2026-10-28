@@ -9,10 +9,13 @@ const ITERS = Number(process.env.SCHED_ITERS ?? 4000);
 const F2c = (a) => [a.c0, a.c1];
 
 // ---------------- kernels (DAGs over named stack items) ----------------
-// B projective doubling + line at +-z + F^2 accumulation. env: yP yPt xz3 xz3t z3 z3t
-export function kBDbl() {
+// G2 projective doubling + line at +-z + accumulation (F^2 * L for B, F * L for delta). env (B): yP yPt xz3 xz3t z3 z3t
+// (dproj) the same kernel walks delta with P = C: env yC yCt cz3 cz3t, state DX0..DZ1, sq = false
+const B_DBL_ENV = {yP: 'yP', yPt: 'yPt', xz3: 'xz3', xz3t: 'xz3t', st: ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1']};
+export const D_DBL_ENV = {yP: 'yC', yPt: 'yCt', xz3: 'cz3', xz3t: 'cz3t', st: ['DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1']};
+export function kBDbl(V = B_DBL_ENV, sq = true) {
   const k = new Kernel(); const I = (n) => k.in(n), E = (n) => k.env(n), m = (x) => k.mod(x), mul = (a, b) => k.mul(a, b), add = (a, b) => k.add(a, b), sub = (a, b) => k.sub(a, b);
-  const [X0, X1, Y0, Y1, Z0, Z1] = ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1'].map(I);
+  const [X0, X1, Y0, Y1, Z0, Z1] = V.st.map(I);
   const [b0, b1] = [E('b30'), E('b31')];
   const B0 = m(mul(add(Y0, Y1), sub(Y0, Y1))), B1 = m(mul(add(Y0, Y0), Y1));
   const C0 = m(mul(add(Z0, Z1), sub(Z0, Z1))), C1 = m(mul(add(Z0, Z0), Z1));
@@ -30,16 +33,19 @@ export function kBDbl() {
   const B40 = k.small(B0, 4), B41 = k.small(B1, 4);
   const Z30 = m(sub(mul(B40, H0), mul(B41, H1))), Z31 = m(add(mul(B40, H1), mul(B41, H0)));
   const X20 = mul(add(X0, X1), sub(X0, X1)), X21 = mul(add(X0, X0), X1);
-  const o = m(k.sum(mul(E('xz3'), X20), mul(E('xz3t'), X21), mul(E('z3'), sub(E0, B0)), mul(E('z3t'), sub(E1, B1))));
-  const e = m(add(mul(E('yP'), H0), mul(E('yPt'), H1)));
+  const o = m(k.sum(mul(E(V.xz3), X20), mul(E(V.xz3t), X21), mul(E('z3'), sub(E0, B0)), mul(E('z3t'), sub(E1, B1))));
+  const e = m(add(mul(E(V.yP), H0), mul(E(V.yPt), H1)));
   const Fp = I('Fp'), Fm = I('Fm');
-  k.output(X30, X31, Y30, Y31, Z30, Z31, m(mul(mul(Fp, Fp), sub(e, o))), m(mul(mul(Fm, Fm), add(e, o))));
+  k.output(X30, X31, Y30, Y31, Z30, Z31, m(mul(sq ? mul(Fp, Fp) : Fp, sub(e, o))), m(mul(sq ? mul(Fm, Fm) : Fm, add(e, o))));
   return k;
 }
-// B projective mixed addition with (xq, yq) + line + accumulation * (cp, cm). env: yP yPt xz xzt z3 z3t
-export function kBAdd() {
+// G2 projective mixed addition with (xq, yq) + line + accumulation * (cp, cm). env (B): yP yPt xz xzt z3 z3t
+// (dproj) delta: P = C (env yC yCt cz czt), state DX0..DZ1, no c factor
+const B_ADD_ENV = {yP: 'yP', yPt: 'yPt', xz: 'xz', xzt: 'xzt', st: ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1'], c: true};
+export const D_ADD_ENV = {yP: 'yC', yPt: 'yCt', xz: 'cz', xzt: 'czt', st: ['DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1'], c: false};
+export function kBAdd(V = B_ADD_ENV) {
   const k = new Kernel(); const I = (n) => k.in(n), E = (n) => k.env(n), m = (x) => k.mod(x), mul = (a, b) => k.mul(a, b), add = (a, b) => k.add(a, b), sub = (a, b) => k.sub(a, b);
-  const [X0, X1, Y0, Y1, Z0, Z1, xq0, xq1, yq0, yq1] = ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'xq0', 'xq1', 'yq0', 'yq1'].map(I);
+  const [X0, X1, Y0, Y1, Z0, Z1, xq0, xq1, yq0, yq1] = [...V.st, 'xq0', 'xq1', 'yq0', 'yq1'].map(I);
   const fm = (a0, a1, b0, b1) => { const u0 = mul(a0, b0), u1 = mul(a1, b1), u2 = mul(add(a0, a1), add(b0, b1)); return [sub(u0, u1), sub(sub(u2, u0), u1)]; };
   const fs = (a0, a1, b0, b1) => [sub(mul(a0, b0), mul(a1, b1)), add(mul(a0, b1), mul(a1, b0))];
   const [qz0, qz1] = fs(yq0, yq1, Z0, Z1); const th0 = m(sub(Y0, qz0)), th1 = m(sub(Y1, qz1));
@@ -54,22 +60,10 @@ export function kBAdd() {
   const [a0, a1] = fs(th0, th1, sub(G0, H0), sub(G1, H1)), [b0, b1] = fs(Y0, Y1, E0, E1);
   const [z30, z31] = fm(Z0, Z1, E0, E1);
   const [tx0, tx1] = fs(th0, th1, xq0, xq1), [ly0, ly1] = fs(la0, la1, yq0, yq1);
-  const o = m(sub(add(mul(E('z3'), sub(tx0, ly0)), mul(E('z3t'), sub(tx1, ly1))), add(mul(E('xz'), th0), mul(E('xzt'), th1))));
-  const e = m(add(mul(E('yP'), la0), mul(E('yPt'), la1)));
-  k.output(m(x30), m(x31), m(sub(a0, b0)), m(sub(a1, b1)), m(z30), m(z31), m(mul(mul(I('Fp'), add(e, o)), I('cp'))), m(mul(mul(I('Fm'), sub(e, o)), I('cm'))));
-  return k;
-}
-// delta step j: n = lambda_j (read), c_j = (lambda_{j-1} + lambda_j) x_j - c_{j-1}, line (1, -lambda_j, c_j) at C,
-// x_{j+1} = lambda_j^2 - x_j - s. env: yC cz czt z3 z3t
-export function kDStep() {
-  const k = new Kernel(); const I = (n) => k.in(n), E = (n) => k.env(n), m = (x) => k.mod(x), mul = (a, b) => k.mul(a, b), add = (a, b) => k.add(a, b), sub = (a, b) => k.sub(a, b);
-  const [x0, x1, c0, c1, l0, l1, n0, n1, s0, s1] = ['dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'n0', 'n1', 's0', 's1'].map(I);
-  const a0 = add(l0, n0), a1 = add(l1, n1);
-  const u0 = mul(a0, x0), u1 = mul(a1, x1), u2 = mul(add(a0, a1), add(x0, x1));
-  const nc0 = m(sub(sub(u0, u1), c0)), nc1 = m(sub(sub(sub(u2, u0), u1), c1));
-  const o = m(sub(add(mul(E('z3'), nc0), mul(E('z3t'), nc1)), add(mul(E('cz'), n0), mul(E('czt'), n1))));
-  const nx0 = m(sub(sub(mul(add(n0, n1), sub(n0, n1)), x0), s0)), nx1 = m(sub(sub(mul(add(n0, n0), n1), x1), s1));
-  k.output(nx0, nx1, nc0, nc1, n0, n1, m(mul(I('Fp'), add(E('yC'), o))), m(mul(I('Fm'), sub(E('yC'), o))));
+  const o = m(sub(add(mul(E('z3'), sub(tx0, ly0)), mul(E('z3t'), sub(tx1, ly1))), add(mul(E(V.xz), th0), mul(E(V.xzt), th1))));
+  const e = m(add(mul(E(V.yP), la0), mul(E(V.yPt), la1)));
+  const accP = mul(I('Fp'), add(e, o)), accM = mul(I('Fm'), sub(e, o));
+  k.output(m(x30), m(x31), m(sub(a0, b0)), m(sub(a1, b1)), m(z30), m(z31), m(V.c ? mul(accP, I('cp')) : accP), m(V.c ? mul(accM, I('cm')) : accM));
   return k;
 }
 // monic degree-6 evaluation at +-x: (Ev + Od, Ev - Od) from s0..s5 and x..x6 (all consumed)
@@ -88,10 +82,10 @@ function kTable(mult) {
 
 // ---------------- program ----------------
 // Layout during the event loop (bottom -> top):
-//   main: [Dp (pile of 11 delta-slope pieces) | setup/terminal env | GT-GLS tables | hot env | loop state]
+//   main: [setup/terminal env | GT-GLS tables | hot env | loop state]
 //   alt:  [WQ | WSp (pile of state pieces) | WSr (current state piece) | R]
 // The loop-state order is the fixed point of the event body (computed by iterating the generator), so the
-// loop needs no re-arrangement; bound functions (BADD, DSTEP) see one identical layout at every call site.
+// loop needs no re-arrangement; bound functions (BADD, DADD) see one identical layout at every call site.
 export function buildRedeem({stop} = {}) {
   let L0 = null;
   for (let attempt = 0; attempt < 8; attempt++) {
@@ -99,7 +93,6 @@ export function buildRedeem({stop} = {}) {
   }
   throw new Error('loop layout did not converge');
 }
-const D_PIECE = 8; // delta slopes per pile piece (64 B each)
 const WS_PIECE = 4; // states per altstack piece (192 B each)
 function gen(L0guess, stop) {
   const a = new Asm(['WQ', 'WS']);
@@ -116,20 +109,12 @@ function gen(L0guess, stop) {
   a.defLocal('TA', 4, 16, (s) => s.kernel(kTable(false), Array.from({length: 16}, (_, i) => 'T' + (15 - i)), {iters: ITERS}));
   a.defLocal('G1C', 2, 0, (s) => { const k = new Kernel(); const x = k.in('in0'), y = k.in('in1'); k.output(k.mod(k.sub(k.mul(y, y), k.add(k.mul(k.mul(x, x), x), k.c(3n))))); s.kernel(k, ['d'], {iters: 200}); s.op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1); });
   a.defBound('BADD', (s) => s.kernel(kBAdd(), ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'Fp', 'Fm'], {iters: ITERS}));
-  a.defBound('DSTEP', (s) => {
-    s.roll('D').emit(OP.SIZE); s.st.push('dsz'); s.op(OP.NOT, 1, 'dempty').ifElse((t) => { t.drop('D').pileTake('Dp', 'D'); });
-    s.push(64).op(OP.SPLIT, 2, 'lb', 'D').roll('lb').push(32).op(OP.SPLIT, 2, 'w0', 'w1');
-    s.op(OP.BIN2NUM, 1, 'n1').roll('w0').op(OP.BIN2NUM, 1, 'n0'); // baked slopes: < p < 2^254, so the LE word is a nonnegative number
-    s.kernel(kDStep(), ['dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'Fp', 'Fm'], {iters: ITERS});
-  });
+  a.defBound('DADD', (s) => s.kernel(kBAdd(D_ADD_ENV), ['DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1', 'Fp', 'Fm'], {iters: ITERS}));
   section('init');
 
   // ---- 1. layout pin; WQ to the altstack; the delta-slope pile at the bottom; transcript and challenges ----
   a.emit(OP.DEPTH, ...pushNum(2), OP.NUMEQUALVERIFY); // exactly two witness items (with clean stack: layout pinned)
   a.roll('WQ').pick('WQ', 'WQc').roll('WQ').toAlt();  // alt: [WQ]
-  const dlams = [...VKC.lams, VKC.frob2.lam]; assert.equal(dlams.length, 88); assert.equal(dlams.length % D_PIECE, 0);
-  const pieces = []; for (let i = 0; i < dlams.length; i += D_PIECE) pieces.push(Buffer.concat(dlams.slice(i, i + D_PIECE).flatMap((l) => [le32(l.c0), le32(l.c1)])));
-  a.pushPile('Dp', pieces.reverse()); // the first piece on top
   a.roll('WS').roll('WQc');
   a.pick('WS').emit(OP.SIZE); a.st.push('sz'); a.push(WS_SIZE).op(OP.NUMEQUALVERIFY, 2).drop();
   a.pushBytes(TAG, 'tag').pick('WS').op(OP.CAT, 2, 'tw').op(OP.SHA256, 1, 'h0');
@@ -209,22 +194,23 @@ function gen(L0guess, stop) {
     const t = k.sub(k.env('z6'), k.c(9n)), z3 = k.env('z3'), z = k.env('z');
     const yP = k.neg(k.in('yA')); const xz = m(mul(k.in('xA'), z)), cz = m(mul(k.in('xC'), z));
     const xzt = m(mul(xz, t));
-    k.output(m(mul(z3, t)), yP, m(mul(yP, t)), xz, xzt, k.small(xz, 3), k.small(xzt, 3), cz, m(mul(cz, t)));
-    a.kernel(k, ['z3t', 'yP', 'yPt', 'xz', 'xzt', 'xz3', 'xz3t', 'cz', 'czt'], {iters: 500}); }
+    const czt = m(mul(cz, t));
+    k.output(m(mul(z3, t)), yP, m(mul(yP, t)), xz, xzt, k.small(xz, 3), k.small(xzt, 3), cz, czt, m(mul(k.env('yC'), t)), k.small(cz, 3), k.small(czt, 3));
+    a.kernel(k, ['z3t', 'yP', 'yPt', 'xz', 'xzt', 'xz3', 'xz3t', 'cz', 'czt', 'yCt', 'cz3', 'cz3t'], {iters: 500}); }
   a.pick('yB0').op(OP.NEGATE, 1, 'nyB0').pick('yB1').op(OP.NEGATE, 1, 'nyB1');
   // GLS/digit group lives on the altstack between events: alt = [WQ, WSp, WSr, R, SCH, N0, N1, acc0, acc1, d]
   a.pushBytes(Buffer.from(DIGITS.slice(1).map((d) => (d < 0 ? 0x81 : d)).concat([0])), 'SCH').toAlt('SCH').toAlt('N0').toAlt('N1');
   a.push(0, 'acc0').toAlt().push(0, 'acc1').toAlt().push(DIGITS[0], 'd').toAlt();
   a.pick('xB0', 'X0').pick('xB1', 'X1').pick('yB0', 'Y0').pick('yB1', 'Y1').push(1, 'Z0').push(0, 'Z1');
-  a.push(VKC.deltaAff.x.c0, 'xd0').push(VKC.deltaAff.x.c1, 'xd1');
-  a.push(0, 'D').pick('xd0', 'dx0').pick('xd1', 'dx1').push(VKC.deltaAff.y.c0, 'dc0').push(VKC.deltaAff.y.c1, 'dc1').push(0, 'dl0').push(0, 'dl1');
+  a.push(VKC.deltaAff.x.c0, 'xd0').push(VKC.deltaAff.x.c1, 'xd1').push(VKC.deltaAff.y.c0, 'yd0').push(VKC.deltaAff.y.c1, 'yd1');
+  a.pick('xd0', 'DX0').pick('xd1', 'DX1').pick('yd0', 'DY0').pick('yd1', 'DY1').push(1, 'DZ0').push(0, 'DZ1');
   a.pick('Scm', 'Fp').pick('Scp', 'Fm');
-  const HOT = ['xd0', 'xd1', 'xB0', 'xB1', 'yB0', 'yB1', 'nyB0', 'nyB1', 'Scp', 'Scm', 'yC', 'cz', 'czt', 'b30', 'b31', 'z3t', 'yP', 'yPt', 'xz', 'xzt', 'xz3', 'xz3t', 'z3', 'p'];
-  const STATE = ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'D', 'dx0', 'dx1', 'dc0', 'dc1', 'dl0', 'dl1', 'Fp', 'Fm']; // fixed point of the event body
+  const HOT = ['xd0', 'xd1', 'yd0', 'yd1', 'yCt', 'cz3', 'cz3t', 'xB0', 'xB1', 'yB0', 'yB1', 'nyB0', 'nyB1', 'Scp', 'Scm', 'yC', 'cz', 'czt', 'b30', 'b31', 'z3t', 'yP', 'yPt', 'xz', 'xzt', 'xz3', 'xz3t', 'z3', 'p'];
+  const STATE = ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1', 'Fp', 'Fm']; // fixed point of the event body
   const moved = new Set([...HOT, ...STATE]);
   const L0 = L0guess ?? [...a.st.filter((x) => !moved.has(x)), ...HOT, ...STATE];
   a.arrangeAll(L0);
-  a.piles.set('Dp', null); a.piles.set('WSp', null); // pile sizes vary inside the loop
+  a.piles.set('WSp', null); // pile sizes vary inside the loop
   section('loop-setup');
   STOP('preloop');
 
@@ -235,12 +221,16 @@ function gen(L0guess, stop) {
   };
   a.loop((s) => {
     s.mark('bdbl'); s.kernel(kBDbl(), ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1', 'Fp', 'Fm'], {iters: ITERS});
-    s.mark('dstep').pick('dx0', 's0').pick('dx1', 's1').invoke('DSTEP');
+    s.mark('ddbl'); s.kernel(kBDbl(D_DBL_ENV, false), ['DX0', 'DX1', 'DY0', 'DY1', 'DZ0', 'DZ1', 'Fp', 'Fm'], {iters: ITERS});
     s.mark('add'); s.peekAlt('dt').ifElse((t) => {
       t.peekAlt('dt').push(0).op(OP.LESSTHAN, 2, 'neg').ifElse(
         (u) => { u.pick('xB0', 'xq0').pick('xB1', 'xq1').pick('nyB0', 'yq0').pick('nyB1', 'yq1').pick('Scp', 'cp').pick('Scm', 'cm'); },
         (u) => { u.pick('xB0', 'xq0').pick('xB1', 'xq1').pick('yB0', 'yq0').pick('yB1', 'yq1').pick('Scm', 'cp').pick('Scp', 'cm'); });
-      t.invoke('BADD'); t.pick('xd0', 's0').pick('xd1', 's1').invoke('DSTEP');
+      t.invoke('BADD');
+      // delta mixed addition with d_e * delta = (x_delta, d_e y_delta), d_e = +-1 (the current digit)
+      t.pick('xd0', 'xq0').pick('xd1', 'xq1').peekAlt('dg');
+      { const k = new Kernel(); const g = k.in('dg'); k.output(k.mul(k.env('yd0'), g), k.mul(k.env('yd1'), g)); t.kernel(k, ['yq0', 'yq1'], {iters: 50}); }
+      t.invoke('DADD');
     });
     // GLS/digit group out of the altstack; next digit (SCH holds the digits of events 1..64 and a dummy)
     s.mark('digit'); for (const n of ['d', 'acc1', 'acc0', 'N1', 'N0', 'SCH']) s.fromAlt(n);
@@ -282,12 +272,13 @@ function gen(L0guess, stop) {
   const psiKernel = () => { const k = new Kernel(); const [x0, x1, y0, y1, g20, g21, g30, g31] = ['xB0', 'xB1', 'yB0', 'yB1', 'g20', 'g21', 'g30', 'g31'].map((n) => k.env(n)); return {k, px: conjMul(k, x0, x1, g20, g21), py: conjMul(k, y0, y1, g30, g31)}; };
   { const {k, px, py} = psiKernel(); k.output(...px, ...py); a.kernel(k, ['xq0', 'xq1', 'yq0', 'yq1'], {iters: 300}); }
   a.push(1, 'cp').push(1, 'cm').invoke('BADD');
-  { const k = new Kernel(); k.output(...conjMul(k, k.env('xd0'), k.env('xd1'), k.env('g20'), k.env('g21'))); a.kernel(k, ['s0', 's1'], {iters: 100}); } // x of psi(delta)
-  a.invoke('DSTEP');
+  { const k = new Kernel(); k.output(...conjMul(k, k.env('xd0'), k.env('xd1'), k.env('g20'), k.env('g21')), ...conjMul(k, k.env('yd0'), k.env('yd1'), k.env('g30'), k.env('g31')));
+    a.kernel(k, ['xq0', 'xq1', 'yq0', 'yq1'], {iters: 200}); } // psi(delta)
+  a.invoke('DADD');
   { const k = new Kernel(); k.output(k.mod(k.mul(k.env('xB0'), k.env('om'))), k.mod(k.mul(k.env('xB1'), k.env('om')))); a.kernel(k, ['xq0', 'xq1'], {iters: 50}); }
   a.pick('yB0', 'yq0').pick('yB1', 'yq1').push(1, 'cp').push(1, 'cm').invoke('BADD');
-  a.pick('dx0', 's0').pick('dx1', 's1').invoke('DSTEP'); // s is irrelevant for the last line
-  a.roll('D').op(OP.SIZE, 1, 'D', 'dl').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1).drop('D'); a.pileDone('Dp'); // all 88 delta slopes consumed
+  { const k = new Kernel(); k.output(k.mod(k.mul(k.env('xd0'), k.env('om'))), k.mod(k.mul(k.env('xd1'), k.env('om')))); a.kernel(k, ['xq0', 'xq1'], {iters: 50}); }
+  a.pick('yd0', 'yq0').pick('yd1', 'yq1').invoke('DADD'); // -psi^2(delta) = (omega x_delta, y_delta)
   // endpoint: (X : Y : Z) == -psi^3(B) = (omega px, py), Z != 0  (exact G2 membership; no exceptional step)
   { const {k, px, py} = psiKernel(); const [X0, X1, Y0, Y1, Z0, Z1] = ['X0', 'X1', 'Y0', 'Y1', 'Z0', 'Z1'].map((n) => k.in(n));
     const fs = (a0, a1, b0, b1) => [k.sub(k.mul(a0, b0), k.mul(a1, b1)), k.add(k.mul(a0, b1), k.mul(a1, b0))];
