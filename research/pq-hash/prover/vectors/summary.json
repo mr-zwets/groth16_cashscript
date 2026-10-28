@@ -1,0 +1,771 @@
+{
+ "P128": {
+  "params": {
+   "name": "P128",
+   "pid": 2,
+   "regime": "JB",
+   "label": "provable, Johnson (BCIKS20 Thm 8.3, m=4), F_p^3, h=32",
+   "e": 3,
+   "n": 65536,
+   "N": 2097152,
+   "log_blowup": 5,
+   "arities": [
+    4,
+    8,
+    8
+   ],
+   "layer_sizes": [
+    2097152,
+    524288,
+    65536,
+    8192
+   ],
+   "log_final_degree": 8,
+   "final_coeffs": 256,
+   "queries": 43,
+   "grinding_bits": 28,
+   "m": 4,
+   "digest_bytes": 32,
+   "trees": [
+    {
+     "name": "trace",
+     "tag": 1,
+     "depth": 19,
+     "leaf_bytes": 64,
+     "arity": 4
+    },
+    {
+     "name": "comp",
+     "tag": 2,
+     "depth": 19,
+     "leaf_bytes": 192,
+     "arity": 4
+    },
+    {
+     "name": "fri1",
+     "tag": 3,
+     "depth": 16,
+     "leaf_bytes": 192,
+     "arity": 8
+    },
+    {
+     "name": "fri2",
+     "tag": 4,
+     "depth": 13,
+     "leaf_bytes": 192,
+     "arity": 8
+    }
+   ],
+   "pt_bytes": 6416,
+   "tag_hex": "76657269666965722e636173682f70712d686173682f76310221c0aa73ecd7a263c7ab2fe559d7279871107b65642f289f55dae890e2198082",
+   "soundness": {
+    "rounds": {
+     "ali": 185.33,
+     "deep": 160.59,
+     "batch+folds": 128.31,
+     "query": 128.19
+    },
+    "lam_iop": 128.19,
+    "lam": 128,
+    "limited_by": "digest"
+   },
+   "expected_proof_bytes": {
+    "total": 91468,
+    "pt": 6416,
+    "leaves": 27520,
+    "siblings": 57532
+   }
+  },
+  "expected_design": {
+   "total": 91468,
+   "pt": 6416,
+   "leaves": 27520,
+   "siblings": 57532
+  },
+  "measured": [
+   {
+    "k": 0,
+    "proof_bytes": 88752,
+    "sections": {
+     "pt": 6416,
+     "leaves": 27520,
+     "siblings": {
+      "trace": 16800,
+      "comp": 16800,
+      "fri1": 12832,
+      "fri2": 8384
+     },
+     "siblings_total": 54816,
+     "plain_paths_total": 126128
+    },
+    "nonce": 229158663,
+    "prover_seconds": 19.1,
+    "duplicate_indices": 0
+   },
+   {
+    "k": 1,
+    "proof_bytes": 90736,
+    "sections": {
+     "pt": 6416,
+     "leaves": 27520,
+     "siblings": {
+      "trace": 17472,
+      "comp": 17472,
+      "fri1": 13024,
+      "fri2": 8832
+     },
+     "siblings_total": 56800,
+     "plain_paths_total": 126128
+    },
+    "nonce": 274214376,
+    "prover_seconds": 19.2,
+    "duplicate_indices": 0
+   },
+   {
+    "k": 2,
+    "proof_bytes": 91952,
+    "sections": {
+     "pt": 6416,
+     "leaves": 27520,
+     "siblings": {
+      "trace": 17792,
+      "comp": 17792,
+      "fri1": 13408,
+      "fri2": 9024
+     },
+     "siblings_total": 58016,
+     "plain_paths_total": 126128
+    },
+    "nonce": 342837603,
+    "prover_seconds": 21.5,
+    "duplicate_indices": 0
+   },
+   {
+    "k": 3,
+    "proof_bytes": 92240,
+    "sections": {
+     "pt": 6416,
+     "leaves": 27520,
+     "siblings": {
+      "trace": 17632,
+      "comp": 17632,
+      "fri1": 13664,
+      "fri2": 9376
+     },
+     "siblings_total": 58304,
+     "plain_paths_total": 126128
+    },
+    "nonce": 216159542,
+    "prover_seconds": 17.6,
+    "duplicate_indices": 0
+   }
+  ],
+  "measured_mean": 90920,
+  "measured_min": 88752,
+  "measured_max": 92240,
+  "monte_carlo": {
+   "samples": 20000,
+   "mean": 91469.2,
+   "stdev": 728.9,
+   "min": 86992,
+   "p01": 89616,
+   "p50": 91536,
+   "p99": 92976,
+   "max": 93808
+  },
+  "tamper_cases": 20
+ },
+ "P100": {
+  "params": {
+   "name": "P100",
+   "pid": 1,
+   "regime": "JB",
+   "label": "provable, Johnson (BCIKS20 Thm 8.3), F_p^3, h=25",
+   "e": 3,
+   "n": 65536,
+   "N": 8388608,
+   "log_blowup": 7,
+   "arities": [
+    4,
+    8,
+    8
+   ],
+   "layer_sizes": [
+    8388608,
+    2097152,
+    262144,
+    32768
+   ],
+   "log_final_degree": 8,
+   "final_coeffs": 256,
+   "queries": 22,
+   "grinding_bits": 28,
+   "m": 3,
+   "digest_bytes": 25,
+   "trees": [
+    {
+     "name": "trace",
+     "tag": 1,
+     "depth": 21,
+     "leaf_bytes": 64,
+     "arity": 4
+    },
+    {
+     "name": "comp",
+     "tag": 2,
+     "depth": 21,
+     "leaf_bytes": 192,
+     "arity": 4
+    },
+    {
+     "name": "fri1",
+     "tag": 3,
+     "depth": 18,
+     "leaf_bytes": 192,
+     "arity": 8
+    },
+    {
+     "name": "fri2",
+     "tag": 4,
+     "depth": 15,
+     "leaf_bytes": 192,
+     "arity": 8
+    }
+   ],
+   "pt_bytes": 6388,
+   "tag_hex": "76657269666965722e636173682f70712d686173682f76310181bb9247259853682058d86bb6685265205c6add545c311b61ca5c12e2778c4f",
+   "soundness": {
+    "rounds": {
+     "ali": 184.69,
+     "deep": 157.37,
+     "batch+folds": 123.85,
+     "query": 100.11
+    },
+    "lam_iop": 100.11,
+    "lam": 100,
+    "limited_by": "digest"
+   },
+   "expected_proof_bytes": {
+    "total": 50022,
+    "pt": 6388,
+    "leaves": 14080,
+    "siblings": 29554
+   }
+  },
+  "expected_design": {
+   "total": 50022,
+   "pt": 6388,
+   "leaves": 14080,
+   "siblings": 29554
+  },
+  "measured": [
+   {
+    "k": 0,
+    "proof_bytes": 49718,
+    "sections": {
+     "pt": 6388,
+     "leaves": 14080,
+     "siblings": {
+      "trace": 8550,
+      "comp": 8550,
+      "fri1": 7025,
+      "fri2": 5125
+     },
+     "siblings_total": 29250,
+     "plain_paths_total": 61718
+    },
+    "nonce": 237217319,
+    "prover_seconds": 77.9,
+    "duplicate_indices": 0
+   },
+   {
+    "k": 1,
+    "proof_bytes": 49618,
+    "sections": {
+     "pt": 6388,
+     "leaves": 14080,
+     "siblings": {
+      "trace": 8400,
+      "comp": 8400,
+      "fri1": 7175,
+      "fri2": 5175
+     },
+     "siblings_total": 29150,
+     "plain_paths_total": 61718
+    },
+    "nonce": 142935358,
+    "prover_seconds": 61.8,
+    "duplicate_indices": 0
+   },
+   {
+    "k": 2,
+    "proof_bytes": 49093,
+    "sections": {
+     "pt": 6388,
+     "leaves": 14080,
+     "siblings": {
+      "trace": 8350,
+      "comp": 8350,
+      "fri1": 6600,
+      "fri2": 5325
+     },
+     "siblings_total": 28625,
+     "plain_paths_total": 61718
+    },
+    "nonce": 64606555,
+    "prover_seconds": 59.3,
+    "duplicate_indices": 0
+   },
+   {
+    "k": 3,
+    "proof_bytes": 50618,
+    "sections": {
+     "pt": 6388,
+     "leaves": 14080,
+     "siblings": {
+      "trace": 8825,
+      "comp": 8825,
+      "fri1": 7000,
+      "fri2": 5500
+     },
+     "siblings_total": 30150,
+     "plain_paths_total": 61718
+    },
+    "nonce": 279093702,
+    "prover_seconds": 65.9,
+    "duplicate_indices": 0
+   }
+  ],
+  "measured_mean": 49761.8,
+  "measured_min": 49093,
+  "measured_max": 50618,
+  "monte_carlo": {
+   "samples": 20000,
+   "mean": 50022.1,
+   "stdev": 407.3,
+   "min": 47643,
+   "p01": 48893,
+   "p50": 50068,
+   "p99": 50793,
+   "max": 51293
+  },
+  "tamper_cases": 20
+ },
+ "U100": {
+  "params": {
+   "name": "U100",
+   "pid": 3,
+   "regime": "UDR",
+   "label": "comparison: provable, unique decoding, F_p^2",
+   "e": 2,
+   "n": 65536,
+   "N": 1048576,
+   "log_blowup": 4,
+   "arities": [
+    4,
+    8,
+    8
+   ],
+   "layer_sizes": [
+    1048576,
+    262144,
+    32768,
+    4096
+   ],
+   "log_final_degree": 8,
+   "final_coeffs": 256,
+   "queries": 79,
+   "grinding_bits": 28,
+   "m": 3,
+   "digest_bytes": 25,
+   "trees": [
+    {
+     "name": "trace",
+     "tag": 1,
+     "depth": 18,
+     "leaf_bytes": 64,
+     "arity": 4
+    },
+    {
+     "name": "comp",
+     "tag": 2,
+     "depth": 18,
+     "leaf_bytes": 128,
+     "arity": 4
+    },
+    {
+     "name": "fri1",
+     "tag": 3,
+     "depth": 15,
+     "leaf_bytes": 128,
+     "arity": 8
+    },
+    {
+     "name": "fri2",
+     "tag": 4,
+     "depth": 12,
+     "leaf_bytes": 128,
+     "arity": 8
+    }
+   ],
+   "pt_bytes": 4300,
+   "tag_hex": "76657269666965722e636173682f70712d686173682f763103b1f038ea624c44e83cdbc822a9b0690ea2e6ba3eabedabd19df50b9646a65248",
+   "soundness": {
+    "rounds": {
+     "ali": 126.42,
+     "deep": 106.87,
+     "batch": 108.0,
+     "fold1": 108.42,
+     "fold2": 110.19,
+     "fold3": 113.19,
+     "query": 100.09
+    },
+    "lam_iop": 100.09,
+    "lam": 100,
+    "limited_by": "digest"
+   },
+   "expected_proof_bytes": {
+    "total": 107423,
+    "pt": 4300,
+    "leaves": 35392,
+    "siblings": 67731
+   }
+  },
+  "expected_design": {
+   "total": 107423,
+   "pt": 4300,
+   "leaves": 35392,
+   "siblings": 67731
+  },
+  "measured": [
+   {
+    "k": 0,
+    "proof_bytes": 106967,
+    "sections": {
+     "pt": 4300,
+     "leaves": 35392,
+     "siblings": {
+      "trace": 20950,
+      "comp": 20950,
+      "fri1": 15775,
+      "fri2": 9600
+     },
+     "siblings_total": 67275,
+     "plain_paths_total": 164117
+    },
+    "nonce": 14371460,
+    "prover_seconds": 4.3,
+    "duplicate_indices": 0
+   },
+   {
+    "k": 1,
+    "proof_bytes": 105892,
+    "sections": {
+     "pt": 4300,
+     "leaves": 35392,
+     "siblings": {
+      "trace": 21150,
+      "comp": 21150,
+      "fri1": 15325,
+      "fri2": 8575
+     },
+     "siblings_total": 66200,
+     "plain_paths_total": 164117
+    },
+    "nonce": 144982767,
+    "prover_seconds": 8.1,
+    "duplicate_indices": 0
+   }
+  ],
+  "measured_mean": 106429.5,
+  "measured_min": 105892,
+  "measured_max": 106967,
+  "monte_carlo": {
+   "samples": 20000,
+   "mean": 107430.0,
+   "stdev": 772.6,
+   "min": 103517,
+   "p01": 105467,
+   "p50": 107467,
+   "p99": 109067,
+   "max": 109842
+  },
+  "tamper_cases": 20
+ },
+ "C100": {
+  "params": {
+   "name": "C100",
+   "pid": 4,
+   "regime": "CONJ",
+   "label": "comparison: CONJECTURED (ethSTARK-style), F_p^2",
+   "e": 2,
+   "n": 65536,
+   "N": 8388608,
+   "log_blowup": 7,
+   "arities": [
+    8,
+    16,
+    8
+   ],
+   "layer_sizes": [
+    8388608,
+    1048576,
+    65536,
+    8192
+   ],
+   "log_final_degree": 6,
+   "final_coeffs": 64,
+   "queries": 11,
+   "grinding_bits": 28,
+   "m": 3,
+   "digest_bytes": 25,
+   "trees": [
+    {
+     "name": "trace",
+     "tag": 1,
+     "depth": 20,
+     "leaf_bytes": 128,
+     "arity": 8
+    },
+    {
+     "name": "comp",
+     "tag": 2,
+     "depth": 20,
+     "leaf_bytes": 256,
+     "arity": 8
+    },
+    {
+     "name": "fri1",
+     "tag": 3,
+     "depth": 16,
+     "leaf_bytes": 256,
+     "arity": 16
+    },
+    {
+     "name": "fri2",
+     "tag": 4,
+     "depth": 13,
+     "leaf_bytes": 128,
+     "arity": 8
+    }
+   ],
+   "pt_bytes": 1228,
+   "tag_hex": "76657269666965722e636173682f70712d686173682f763104318e585eacb1a72299a5587ecc6cb93e0af795d5b8a1f7af465fc0f4e032df44",
+   "soundness": {
+    "rounds": {
+     "ali": 126.0,
+     "deep": 103.98,
+     "batch+folds": 100.0,
+     "query": 105
+    },
+    "lam_iop": 100.0,
+    "lam": 100.0,
+    "limited_by": "batch+folds"
+   },
+   "expected_proof_bytes": {
+    "total": 23940,
+    "pt": 1228,
+    "leaves": 8448,
+    "siblings": 14264
+   }
+  },
+  "expected_design": {
+   "total": 23940,
+   "pt": 1228,
+   "leaves": 8448,
+   "siblings": 14264
+  },
+  "measured": [
+   {
+    "k": 0,
+    "proof_bytes": 24326,
+    "sections": {
+     "pt": 1228,
+     "leaves": 8448,
+     "siblings": {
+      "trace": 4450,
+      "comp": 4450,
+      "fri1": 3200,
+      "fri2": 2550
+     },
+     "siblings_total": 14650,
+     "plain_paths_total": 28651
+    },
+    "nonce": 87188151,
+    "prover_seconds": 40.5,
+    "duplicate_indices": 0
+   },
+   {
+    "k": 1,
+    "proof_bytes": 23851,
+    "sections": {
+     "pt": 1228,
+     "leaves": 8448,
+     "siblings": {
+      "trace": 4375,
+      "comp": 4375,
+      "fri1": 3125,
+      "fri2": 2300
+     },
+     "siblings_total": 14175,
+     "plain_paths_total": 28651
+    },
+    "nonce": 138897716,
+    "prover_seconds": 42.2,
+    "duplicate_indices": 0
+   }
+  ],
+  "measured_mean": 24088.5,
+  "measured_min": 23851,
+  "measured_max": 24326,
+  "monte_carlo": {
+   "samples": 20000,
+   "mean": 23936.8,
+   "stdev": 270.3,
+   "min": 22376,
+   "p01": 23176,
+   "p50": 23976,
+   "p99": 24426,
+   "max": 24676
+  },
+  "tamper_cases": 20
+ },
+ "C128": {
+  "params": {
+   "name": "C128",
+   "pid": 5,
+   "regime": "CONJ",
+   "label": "comparison: CONJECTURED, F_p^3",
+   "e": 3,
+   "n": 65536,
+   "N": 8388608,
+   "log_blowup": 7,
+   "arities": [
+    4,
+    16,
+    8
+   ],
+   "layer_sizes": [
+    8388608,
+    2097152,
+    131072,
+    16384
+   ],
+   "log_final_degree": 7,
+   "final_coeffs": 128,
+   "queries": 15,
+   "grinding_bits": 28,
+   "m": 3,
+   "digest_bytes": 32,
+   "trees": [
+    {
+     "name": "trace",
+     "tag": 1,
+     "depth": 21,
+     "leaf_bytes": 64,
+     "arity": 4
+    },
+    {
+     "name": "comp",
+     "tag": 2,
+     "depth": 21,
+     "leaf_bytes": 192,
+     "arity": 4
+    },
+    {
+     "name": "fri1",
+     "tag": 3,
+     "depth": 17,
+     "leaf_bytes": 384,
+     "arity": 16
+    },
+    {
+     "name": "fri2",
+     "tag": 4,
+     "depth": 14,
+     "leaf_bytes": 192,
+     "arity": 8
+    }
+   ],
+   "pt_bytes": 3344,
+   "tag_hex": "76657269666965722e636173682f70712d686173682f763105a92400433705b602354d3cedd6973f29cd4cb82f88fd44aaa81426f84b29ad29",
+   "soundness": {
+    "rounds": {
+     "ali": 190.0,
+     "deep": 167.98,
+     "batch+folds": 164.19,
+     "query": 133
+    },
+    "lam_iop": 133,
+    "lam": 128,
+    "limited_by": "digest"
+   },
+   "expected_proof_bytes": {
+    "total": 41748,
+    "pt": 3344,
+    "leaves": 12480,
+    "siblings": 25924
+   }
+  },
+  "expected_design": {
+   "total": 41748,
+   "pt": 3344,
+   "leaves": 12480,
+   "siblings": 25924
+  },
+  "measured": [
+   {
+    "k": 0,
+    "proof_bytes": 41936,
+    "sections": {
+     "pt": 3344,
+     "leaves": 12480,
+     "siblings": {
+      "trace": 7808,
+      "comp": 7808,
+      "fri1": 5984,
+      "fri2": 4512
+     },
+     "siblings_total": 26112,
+     "plain_paths_total": 50864
+    },
+    "nonce": 175978379,
+    "prover_seconds": 62.7,
+    "duplicate_indices": 0
+   },
+   {
+    "k": 1,
+    "proof_bytes": 42032,
+    "sections": {
+     "pt": 3344,
+     "leaves": 12480,
+     "siblings": {
+      "trace": 7712,
+      "comp": 7712,
+      "fri1": 6208,
+      "fri2": 4576
+     },
+     "siblings_total": 26208,
+     "plain_paths_total": 50864
+    },
+    "nonce": 202199132,
+    "prover_seconds": 64.0,
+    "duplicate_indices": 0
+   }
+  ],
+  "measured_mean": 41984,
+  "measured_min": 41936,
+  "measured_max": 42032,
+  "monte_carlo": {
+   "samples": 20000,
+   "mean": 41749.7,
+   "stdev": 410.3,
+   "min": 39248,
+   "p01": 40624,
+   "p50": 41776,
+   "p99": 42544,
+   "max": 42832
+  },
+  "tamper_cases": 20
+ }
+}
