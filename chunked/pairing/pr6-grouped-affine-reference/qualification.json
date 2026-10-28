@@ -1,0 +1,76 @@
+{
+  "schema": "verifier.cash/pr6-grouped-affine-reference/v1",
+  "status": "QUALIFIED_ADDITIVE_PUBLIC_COMPONENT_REFERENCE",
+  "scope": "Two existing repaired grouped affine CashScript programs and their compiled bytecode. This is a component reference, not a registry entry, score, verifier admission, proof fixture, or producer claim.",
+  "source": {
+    "originalPublishedHead": "0b5b2240cbb2f723a87dce2f43b92fc6f38e4b4d",
+    "patchedGeneratorSha256": "c80b81a733b302f338a1a5a1b4b6ef2074515979a99eeaef03975527fc58848b",
+    "currentHelperRevision": "76f85727b1b91688b981239d5f7bbcc8cdf66330",
+    "currentHelperSha256": "2f600f06f3e80d59648b068676893b8f272bb67fbcc3bd7b802982a6049affc2",
+    "repairPatch": {
+      "file": "exact-repair.patch",
+      "bytes": 1128,
+      "sha256": "a0740df23ecf4e3c7d3d56a8c481406d43219c3418192d5a159e0c6ed35f19e7"
+    },
+    "cash": [
+      {
+        "file": "repaired-generic-affine-0.cash",
+        "window": "[0,21)",
+        "sha256": "9319c93c02a1a9f70c658cf92f95b0addbda4dbededaa74bca5b42d5426c9560",
+        "bytes": 7040,
+        "abi": "spend(bytes inBlob)"
+      },
+      {
+        "file": "repaired-generic-affine-1.cash",
+        "window": "[21,43)",
+        "sha256": "4da51bc2b3bd53b74f5552b8d96c2f927951cb124a79f6a0767151f45de3dc0b",
+        "bytes": 6832,
+        "abi": "spend(int zInv, bytes glvTable, bytes inBlob)"
+      }
+    ]
+  },
+  "compiler": {
+    "head": "1c707c1dbf87396b30ba5e0704b1db44475ce893",
+    "package": "cashc",
+    "version": "0.14.0-next.1",
+    "entrySha256": "2ebf0b95e78a2b7dc12c4778a1ee2fcac258aa3244d9f3a6871d8000b2b3e6fc",
+    "fixedFlags": {
+      "compileString": {
+        "rescheduleStacks": true
+      },
+      "programPrefix": "75",
+      "environment": {
+        "RESCHEDULE": "on"
+      },
+      "co8": false
+    },
+    "priorReceipt": {
+      "status": "PASS",
+      "planSha256": "b8eb11f47c87eac25759c95ff057197b2b3cf8f22e27412c89b920ec00727ff8",
+      "receiptSha256": "b1c401ec6f796f7e692d6c819945740325b6c8dcc648ed4cd84b051786f67702"
+    }
+  },
+  "programs": [
+    {
+      "file": "repaired-generic-affine-0.hex",
+      "sha256": "976d70be87b1f3f52076eda7cf38e6f53c299480a81c44fc19dec9886d3c521f",
+      "bytes": 2244
+    },
+    {
+      "file": "repaired-generic-affine-1.hex",
+      "sha256": "d807841a5ae74baa0347348e53402968b42eb24ec437ed83345007b40980dc3d",
+      "bytes": 2179
+    }
+  ],
+  "proofBoundary": {
+    "proofBytes": false,
+    "witnessBytes": false,
+    "archivedVmClaim": false,
+    "fullGroth16Claim": false,
+    "registryOrScoreChange": false,
+    "statement": "The files expose only an isolated grouped affine vk_x component. They do not establish a complete Groth16 verifier, proof/witness validity, producer completeness, transaction admission, or resource feasibility."
+  },
+  "reproduction": "Run verify.mjs with the actual benchmark artifact-directory argument. Run rebuild.mjs with the exact historical compiler checkout and the same artifact directory; neither command creates proof/witness fixtures.",
+  "artifactRepository": "mr-zwets/zk-verifier-bench",
+  "artifactDirectory": "artifacts/pr6-grouped-affine-reference"
+}

@@ -1,0 +1,69 @@
+{
+  "schema": "verifier.cash/pr6-grouped-affine-mathematical-scope/v1",
+  "component": "grouped four-scalar GLV affine vk_x two-window reference",
+  "theorem": {
+    "statement": "Under the stated exact ABI, ordered two-window graph, canonical BN254 group interfaces, scalar decomposition, table identities, and successor byte channel, every finite corrected component result is the canonical affine point T = IC0 + n0*IC1 + n1*IC2.",
+    "finiteDomain": "T must be nonneutral (Z != 0). The neutral case T = O is outside the affine output domain because the inverse predicate is unsatisfiable.",
+    "equalCase": "If the raw final IC0 mixed-add result has icy == 0, the exact repair doubles the original post-loop accumulator (rX,rY,rZ), preserving the finite S = IC0 case.",
+    "inverse": "For finite T, the canonical inverse 1 <= zInv < P exists. Accepted signed zInv values are interpreted by exact field remainder semantics; no zInv < P assumption is made for soundness.",
+    "limits": "This is a finite-domain component theorem conditional on the supplied interfaces. It is not a proof of the complete Groth16 verifier, a producer, archived proof execution, whole-transaction admission, or resource policy."
+  },
+  "fixedParameters": {
+    "fieldPrimeP": "21888242871839275222246405745257275088696311157297823662689037894645226208583",
+    "groupOrderR": "21888242871839275222246405745257275088548364400416034343698204186575808495617",
+    "lambda": "4407920970296243842393367215006156084916469457145843978461",
+    "beta": "2203960485148121921418603742825762020974279258880205651966",
+    "IC0": [
+      "15723390722547469201346605927630336729729463607293657950235977012003655267936",
+      "14617976463853845616027311884626760527376622737858716767193455441349641383825"
+    ],
+    "IC1": [
+      "9269869340829791644953940526610795845982127221382366381974052273854848284744",
+      "12340830433822638848259976740304056841548514693917037023437897137808450264577"
+    ],
+    "IC2": [
+      "6442706084407552401539720969529928260622245802604045626376932056434206076947",
+      "13805589277496019078136496656829548863642318729315912795941464570275337353000"
+    ],
+    "tableSha256": "4dedc6a77ffe1f14a1faa12a533a2975e8d7304c8e740a82d8a5c9c41e490028",
+    "tableMeaning": "45 affine entries for g = 0,1,2 and digit 1..15, summing shifted powers 2^(43g) of IC1, phi(IC1), IC2, phi(IC2), with phi(x,y) = (beta*x,y)."
+  },
+  "abi": {
+    "firstWindow": {
+      "window": "[0,21)",
+      "entry": "repaired-generic-affine-0.cash",
+      "call": "spend(bytes inBlob)",
+      "inBlobBytes": 132,
+      "tableInput": 1,
+      "tableOffset": 233
+    },
+    "finalWindow": {
+      "window": "[21,43)",
+      "entry": "repaired-generic-affine-1.cash",
+      "call": "spend(int zInv, bytes glvTable, bytes inBlob)",
+      "inBlobBytes": 228,
+      "tableBytes": 2880,
+      "outputBytes": 64
+    },
+    "successor": {
+      "payloadBytes": 704,
+      "coordinateOffset": 384,
+      "coordinateBytes": 64
+    },
+    "executionPrefix": {
+      "hex": "75",
+      "meaning": "Drops one extra top stack padding item before the compiled CashScript parameter ABI; exact argument order and minimal framing are required."
+    }
+  },
+  "graphPremises": [
+    "The two programs execute in order [0,21) then [21,43) with the first output supplied to the final program's inBlob.",
+    "The first program reads the shared GLV table from input 1 unlocking bytecode at offset 233; the final program receives the same table through its explicit bytes parameter.",
+    "The final program adds fixed IC0, applies the actual icy == 0 repair branch, enforces zInv*Z == 1 modulo P, normalizes X/Y, and binds the 64-byte affine output to the selected successor payload channel.",
+    "Canonical scalar and point ranges, exact-Z remainder equations, table identities, and successor state ownership are external premises of this component reference."
+  ],
+  "proofBoundary": [
+    "No proof A/B/C, witness, archived proof fixture, or VM execution is included.",
+    "No generator, planner, prover, compiler, optimization, registry, result, or score files are changed.",
+    "No claim is made about the published head; the old published head remains separately negative."
+  ]
+}

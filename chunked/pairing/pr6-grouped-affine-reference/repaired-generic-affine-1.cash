@@ -1,0 +1,70 @@
+pragma cashscript ^0.14.0;
+// GLV vk_x chunk: 4-scalar Straus window [21,43), first=false final=true.
+function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+function sqrFp(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+function jacDouble(int x, int y, int z) returns (int, int, int) {
+    int a = (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; int b = (y * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; int c = (b * b) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    int d = (4 * x * b) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    int e = (a * 3) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; int f = (e * e) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    int nx = (f - 2 * d + 43776485743678550444492811490514550177392622314595647325378075789290452417166) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    int ny = ((d - nx + 21888242871839275222246405745257275088696311157297823662689037894645226208583) * e + 175105942974714201777971245962058200709570489258382589301512303157161809668664 - c * 8) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    int nz = (2 * y * z) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+    return nx, ny, nz;
+}
+function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int, int) {
+    int rx = bX; int ry = bY; int rz = 1;
+    if (aZ != 0) {
+        int z1z1 = (aZ * aZ) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int u2 = (bX * z1z1) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int s2 = (z1z1 * aZ * bY) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int h = (u2 + 21888242871839275222246405745257275088696311157297823662689037894645226208583 - aX) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; int hh = (h * h) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; int hhh = (h * hh) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int rr = (s2 + 21888242871839275222246405745257275088696311157297823662689037894645226208583 - aY) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; int vv = (hh * aX) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int anx = (rr * rr + 65664728615517825666739217235771825266088933471893470988067113683935678625749 - hhh - 2 * vv) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int ayhhh = (aY * hhh) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int any = ((vv - anx + 21888242871839275222246405745257275088696311157297823662689037894645226208583) * rr + 21888242871839275222246405745257275088696311157297823662689037894645226208583 - ayhhh) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        int anz = (aZ * h) % 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        rx = anx; ry = any; rz = anz;
+    }
+    return rx, ry, rz;
+}
+contract VkxGlvChunk() {
+    function spend(int zInv, bytes glvTable, bytes inBlob) {
+        require(inBlob.length == 228);
+        bytes hh0, bytes rr0 = inBlob.split(32); int rX = int(hh0);
+        bytes hh1, bytes rr1 = rr0.split(32); int rY = int(hh1);
+        bytes hh2, bytes rr2 = rr1.split(32); int rZ = int(hh2);
+        bytes rr3 = rr2.split(32)[1];
+        bytes rr4 = rr3.split(32)[1];
+        bytes hh5, bytes rr5 = rr4.split(17); int k10 = int(hh5);
+        bytes hh6, bytes rr6 = rr5.split(17); int k20 = int(hh6);
+        bytes hh7, bytes rr7 = rr6.split(17); int k11 = int(hh7);
+        int k21 = int(rr7);
+        require(sha256(glvTable) == 0x4dedc6a77ffe1f14a1faa12a533a2975e8d7304c8e740a82d8a5c9c41e490028);
+        bytes glvTable0, bytes glvTableTail = glvTable.split(960);
+        bytes glvTable43, bytes glvTable86 = glvTableTail.split(960);
+        for (int k = 0; k < 22; k = k + 1) {
+            int i = 21 - k;
+            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }
+            int idx = (k10 >> i) % 2 + 2 * ((k20 >> i) % 2) + 4 * ((k11 >> i) % 2) + 8 * ((k21 >> i) % 2);
+            int aX = 0; int aY = 0;
+            if (idx != 0) { bytes ent = glvTable0.split((idx - 1) * 64)[1].split(64)[0]; aX = int(ent.split(32)[0]); aY = int(ent.split(32)[1]); }
+            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); if (ay == 0) { (ax, ay, az) = jacDouble(rX, rY, rZ); } rX = ax; rY = ay; rZ = az; }
+            int idx43 = (k10 >> (i + 43)) % 2 + 2 * ((k20 >> (i + 43)) % 2) + 4 * ((k11 >> (i + 43)) % 2) + 8 * ((k21 >> (i + 43)) % 2);
+            int aX43 = 0; int aY43 = 0;
+            if (idx43 != 0) { bytes ent43 = glvTable43.split((idx43 - 1) * 64)[1].split(64)[0]; aX43 = int(ent43.split(32)[0]); aY43 = int(ent43.split(32)[1]); }
+            if (aX43 != 0) { (int ax43, int ay43, int az43) = jacAddAffine(rX, rY, rZ, aX43, aY43); if (ay43 == 0) { (ax43, ay43, az43) = jacDouble(rX, rY, rZ); } rX = ax43; rY = ay43; rZ = az43; }
+            int idx86 = (k10 >> (i + 86)) % 2 + 2 * ((k20 >> (i + 86)) % 2) + 4 * ((k11 >> (i + 86)) % 2) + 8 * ((k21 >> (i + 86)) % 2);
+            int aX86 = 0; int aY86 = 0;
+            if (idx86 != 0) { bytes ent86 = glvTable86.split((idx86 - 1) * 64)[1].split(64)[0]; aX86 = int(ent86.split(32)[0]); aY86 = int(ent86.split(32)[1]); }
+            if (aX86 != 0) { (int ax86, int ay86, int az86) = jacAddAffine(rX, rY, rZ, aX86, aY86); if (ay86 == 0) { (ax86, ay86, az86) = jacDouble(rX, rY, rZ); } rX = ax86; rY = ay86; rZ = az86; }
+        }
+        (int icx, int icy, int icz) = jacAddAffine(rX, rY, rZ, 15723390722547469201346605927630336729729463607293657950235977012003655267936, 14617976463853845616027311884626760527376622737858716767193455441349641383825);
+        if (icy == 0) { (icx, icy, icz) = jacDouble(rX, rY, rZ); }
+        require(mulFp(icz, zInv) == 1);
+        int zInv2 = sqrFp(zInv); int zInv3 = mulFp(zInv2, zInv);
+        int vkxX = mulFp(icx, zInv2);
+        int vkxY = mulFp(icy, zInv3);
+        bytes outBlob = toPaddedBytes(vkxX, 32) + toPaddedBytes(vkxY, 32);
+        require(outBlob == tx.inputs[this.activeInputIndex + 1].unlockingBytecode.split(451)[0].split(387)[1]);
+    }
+}
