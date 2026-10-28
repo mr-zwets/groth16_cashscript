@@ -5,7 +5,7 @@ pragma cashscript ^0.14.0;
 // runs on-chain G2 arithmetic; e(alpha,beta) baked as its torus coordinate, (vk_x,gamma)/(C,delta)
 // lines baked; QUOTIENT-TORUS residue final-exp (lambda=p+|x|): 6-limb root u ([c]=[1+u*W]),
 // 2-Fp6-product c-folds, terminal [fF]=[frob(c,1)] cross-product with [0:0] rejected; G2 subgroup
-// check psi(B)==[-x]B FUSED into the Miller tail (reuses R_B=[|x|]B); no G1 subgroup checks
+// check psi(B)==[x]B=-[|x|]B FUSED into the Miller tail (reuses R_B=[|x|]B); no G1 subgroup checks
 // (redundant given B in G2 — see header); GLV vk_x. Large by design — bytes are not this
 // variant's axis; needs the cashc fork large-contract compile fix.
 // Regenerate: node gen_singleton_minop.mjs.
