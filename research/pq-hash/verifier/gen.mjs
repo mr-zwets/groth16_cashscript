@@ -598,7 +598,7 @@ export function buildB(prm, statement, opts = {}) {
     // (which takes its leaf blobs from the bottom while the Merkle phase PICKs them at fixed depth from the top). With
     // DEPTH fixed after every tree, each tree consumes exactly nRec pushes and the query phase sees exactly L0..L(s-1),
     // the items the Merkle phase authenticated.
-    if ((opts.depthPin ?? 'tree') === 'tree' || ti === trees.length - 1) S.emit('DEPTH', S.st.length, 'NUMEQUALVERIFY');
+    S.emit('DEPTH', S.st.length, 'NUMEQUALVERIFY');
   });
   for (const x of roots) S.drop(x);
   mark(S, 'merkle');
