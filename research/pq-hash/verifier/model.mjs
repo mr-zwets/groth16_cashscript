@@ -367,5 +367,8 @@ export function encodeA(prm, proof) {
       for (let l = 0; l < tree.depth; l++, k >>= 1) paths[q].push(can.map.get(`${l}:${k ^ 1}`) ?? new Uint8Array(prm.h));
     });
   }
-  return {...enc, paths: paths.map((p) => cat(...p))};
+  const pathBlobs = paths.map((p) => cat(...p));
+  // bytes after the last multiproof (a malformed proof) ride at the end of the last path blob: the script rejects them
+  if (o < proof.length) pathBlobs[pathBlobs.length - 1] = cat(pathBlobs[pathBlobs.length - 1], proof.subarray(o));
+  return {...enc, paths: pathBlobs};
 }
