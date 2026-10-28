@@ -8,8 +8,12 @@
 // See archive/cashc-optimization-roadmap.md items 6-7 for the measured numbers and verdicts.
 import { readFileSync } from 'node:fs';
 import { parse } from './asm.mjs';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+// zk-verifier-bench checkout (vector inputs/outputs): VERIFIER_DIR, default the sibling checkout.
+const VERIFIER_DIR = process.env.VERIFIER_DIR ?? fileURLToPath(new URL('../../../../zk-verifier-bench/', import.meta.url));
 
-const VEC = process.argv[2] ?? 'C:/Users/mathi/Desktop/verifier/src/bch/groth16-singleton-opcode-optimized-vectors.json';
+const VEC = process.argv[2] ?? join(VERIFIER_DIR, 'src/bch/groth16-singleton-opcode-optimized-vectors.json');
 const vec = JSON.parse(readFileSync(VEC, 'utf8'));
 const hexToBin = (h) => Uint8Array.from(h.match(/../g).map((b) => parseInt(b, 16)));
 const artifact = hexToBin(vec.lockingOK ?? vec.locking);

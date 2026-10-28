@@ -9,7 +9,7 @@
 //     correction w vanishes in the quotient (no w witness, no c*cInv==1 gate);
 //   - ONE batched c^-|x|-fused Miller (UNROLLED): only (-A,B) runs on-chain G2
 //     arithmetic; e(alpha,beta) baked as a torus constant; (vk_x,gamma)/(C,delta) lines baked;
-//   - G2 subgroup check psi(B) == [-x]B, FUSED into the Miller tail: the loop already
+//   - G2 subgroup check psi(B) == [x]B = -[|x|]B (x < 0), FUSED into the Miller tail: the loop already
 //     walks R_B to [|x|]B, so the membership test reuses it (no separate 64-step walk);
 //   - NO G1 subgroup checks on A,C: redundant for soundness. A,C are only paired against
 //     order-r G2 elements (B — checked — and the VK's delta), so any cofactor component
@@ -266,7 +266,7 @@ function emitMinOp() {
   L.push('// runs on-chain G2 arithmetic; e(alpha,beta) baked as its torus coordinate, (vk_x,gamma)/(C,delta)');
   L.push('// lines baked; QUOTIENT-TORUS residue final-exp (lambda=p+|x|): 6-limb root u ([c]=[1+u*W]),');
   L.push('// 2-Fp6-product c-folds, terminal [fF]=[frob(c,1)] cross-product with [0:0] rejected; G2 subgroup');
-  L.push('// check psi(B)==[-x]B FUSED into the Miller tail (reuses R_B=[|x|]B); no G1 subgroup checks');
+  L.push('// check psi(B)==[x]B=-[|x|]B FUSED into the Miller tail (reuses R_B=[|x|]B); no G1 subgroup checks');
   L.push('// (redundant given B in G2 — see header); GLV vk_x. Large by design — bytes are not this');
   L.push('// variant\'s axis; needs the cashc fork large-contract compile fix.');
   L.push('// Regenerate: node gen_singleton_minop.mjs.');

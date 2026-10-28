@@ -231,11 +231,40 @@ projective GT payloads described above were not integrated into this singleton.
 
 | Measurement | Result |
 | --- | ---: |
-| Locking bytes | 61,147 |
-| Unlocking bytes (witness pushes) | 63,005 |
-| Maximum op-cost across the ten fixtures | 60,575,949 |
-| Committed-fixture op-cost | 58,690,636 |
+| Locking bytes | 53,825 |
+| Unlocking bytes (witness pushes) | 49,949 |
+| Maximum op-cost across the ten fixtures | 40,107,855 |
+| Committed-fixture op-cost | 38,716,391 |
 | Previous unconditional op-cost oracle (`-minop`) | 149.2M |
+| FS-PIT bound (SHA-256 random-oracle model) | `(23·q_β + 160·q_α)/2^256 + 3·N(N−1)/2^257` |
+
+The measurements are those of the shipped benchmark vectors (`FS_FIXED_VK=program`,
+`FS_RESCHEDULE=on`, rebuilt byte-exact at `4c98712` by the 2026-10-27 reviews). The 61,147 B / 60.6M figures
+this table listed before predate that build.
+
+**Soundness bound.** The singleton checks the same 24 relations as the transaction (24
+`absorbRelation` calls, β exponents 0..23), with the same degree model (`segmentDegreeCeiling`,
+universal maximum relation degree 137 asserted in `measure_fs_singleton.mjs`), one 132-coefficient
+quotient, and the same transcript frames: 22 leaves (737-byte statement and the 21 block payloads,
+exact lengths), 23 nodes, `beta`, the one-leaf `qroot` and `alpha`. So the argument of
+[chunked/bls12-381/README.md](chunked/bls12-381/README.md) section 5 applies, with
+`ε_SZ = (23·q_β + 160·q_α)/2^256` and `ε_binding = 3·N(N−1)/2^257`, `N = N₀ + q`. Only the query
+accounting differs. (The singleton's PIC factors are the flat affine `1+u·W` of the v4
+`BLSGTF1` records rather than the projective `D'+N'·W` of README steps 1 and 4; they are
+trivially nonzero, have degree ≤ 5 and are modelled as `factor` in `segmentDegreeCeiling`, so
+the degree bounds above are unchanged.)
+- **Setup N₀ < 2^22**: the 32 GT window trees (at most 2^16 leaves and 2^16−1 nodes each, tag
+  `BLSGTF1`). The 32 window roots are literal constants of the program, so there are no batch
+  commitments; the fixed Miller data is in the program, so there is no fixed-blob hash; the
+  locking is bare as benchmarked, so there is no P2SH32 or sibling digest (a P2SH32 deployment
+  adds one setup and two verifier hashes, which does not change the stated bounds). Section 6 (composition across inputs)
+  does not apply: the program is one input and uses no introspection.
+- **Verifier q_V = 1,104 per spend**: 48 transcript hashes, 32 GT leaf hashes and 1,024 GT path
+  hashes (the compiled program evaluates two SHA-256 per level, 32 × 16 × 2). This was counted with
+  an instrumented libauth VM on the shipped locking and the committed fixture; every loop and
+  tree is fixed-shape, so the count does not depend on the fixture.
+
+With no adversary queries the bound is below 2^-211; q ≤ 2^64 gives less than 2^-126.
 
 All ten fixtures produce one identical contract (proof-independent script), and
 twelve changed-field mutations per fixture (statement, proof points, residue
@@ -248,8 +277,8 @@ RPA_PROOF_FIXTURE=committed node chunked/bls12-381/measure_fs_singleton.mjs
 
 `chunked/bls12-381/export_fs_singleton_vectors.mjs` runs the full corpus and
 writes the zk-verifier-bench vector file
-(`../verifier/src/bch/groth16-bls12381-singleton-fs-vectors.json`, sha256
-`3421cd9e805e27d0bd2ae6513039f775b229489587fffc90033a86fceeca7f3e`).
+(`../verifier/src/bch/groth16-bls12381-singleton-fs-vectors.json`; the shipped file has sha256
+`854d00846d649d95ad5b1442833ce51c3a0bfc683a9133171479a677d1203e38`).
 
 ## Reproduction
 

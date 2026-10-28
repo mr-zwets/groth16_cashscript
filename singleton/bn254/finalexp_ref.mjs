@@ -7,6 +7,10 @@
 import { readFileSync } from 'node:fs';
 
 import { bn254 } from '@noble/curves/bn254.js';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+// zk-verifier-bench checkout (vector inputs/outputs): VERIFIER_DIR, default the sibling checkout.
+const VERIFIER_DIR = process.env.VERIFIER_DIR ?? fileURLToPath(new URL('../../../zk-verifier-bench/', import.meta.url));
 const { Fp2, Fp12 } = bn254.fields;
 
 const BN_X = 4965661367192848881n;
@@ -76,7 +80,7 @@ const a = Fp12.fromBigTwelve(Array.from({ length: 12 }, (_, i) => BigInt(7 + i *
 console.log('finalExp(random) == noble :', Fp12.eql(finalExp(a), Fp12.finalExponentiate(a)));
 
 // ---- end-to-end on the committed instance: finalExp(miller) == 1 (valid), != 1 (invalid) ----
-const vec = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/checkpoints/pairing-vectors.json', 'utf8'));
+const vec = JSON.parse(readFileSync(join(VERIFIER_DIR, 'src/checkpoints/pairing-vectors.json'), 'utf8'));
 const g1 = (o) => bn254.G1.Point.fromAffine({ x: BigInt(o.x), y: BigInt(o.y) });
 const g2 = (o) => bn254.G2.Point.fromAffine({
   x: Fp2.fromBigTuple([BigInt(o.x.c0), BigInt(o.x.c1)]),

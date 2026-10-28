@@ -161,7 +161,7 @@ contract Groth16Verify() {
         // The walk ends at R = (X:Y:Z) = [|x|]B unless some step was exceptional, which leaves
         // Z = 0 (absorbing); e.g. an order-13 B collapses at the NAF prefix 13. Require Z != 0
         // (Rza, Rzb are canonical, so their sum is 0 only when both are), then check
-        // psi(B) == [-x]B = -[|x|]B projectively: X == psi(B).x * Z and Y == -psi(B).y * Z.
+        // psi(B) == [x]B = -[|x|]B (x < 0) projectively: X == psi(B).x * Z and Y == -psi(B).y * Z.
         // psi(B) == [x]B holds exactly for B in G2 (x the BLS12-381 seed; see
         // psi-subgroup-degeneracy.md). g2psi is lib/G2Check.cash's psi endomorphism.
         if (Bxa != 0 || Bxb != 0 || Bya != 0 || Byb != 0) {
