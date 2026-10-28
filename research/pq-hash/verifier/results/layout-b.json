@@ -4,17 +4,17 @@
   "vector": "C100-0.json",
   "proofBytes": 24326,
   "queries": 11,
-  "redeemBytes": 6042,
-  "witnessBytes": 24786,
-  "unlockingBytes": 30831,
-  "txBytes": 30918,
-  "opStd": 15803572,
-  "opCons": 15681972,
-  "opBchnAdjusted": 15686253,
-  "opBchnAdjustedStd": 15807853,
-  "defineBodyBytes": 4281,
-  "hashIterations": 950,
-  "instructions": 123747,
+  "redeemBytes": 5598,
+  "witnessBytes": 24736,
+  "unlockingBytes": 30337,
+  "txBytes": 30424,
+  "opStd": 16005078,
+  "opCons": 15884374,
+  "opBchnAdjusted": 15888443,
+  "opBchnAdjustedStd": 16009147,
+  "defineBodyBytes": 4069,
+  "hashIterations": 943,
+  "instructions": 123437,
   "accepted": {
    "loose": true,
    "specStd": true,
@@ -24,38 +24,38 @@
    "bch2026Std": false
   },
   "errors": {
-   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 30831 bytes."
+   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 30337 bytes."
   },
-  "specBudget": 32664800,
-  "txv5Budget": 24697600,
+  "specBudget": 32269600,
+  "txv5Budget": 24302400,
   "txv5Pad": {
    "padBytes": 2,
-   "unlockingBytes": 30833,
-   "txBytes": 30920,
+   "unlockingBytes": 30339,
+   "txBytes": 30426,
    "std": true,
    "cons": true,
-   "opStd": 15803773
+   "opStd": 16005279
   },
   "fitsStandardTx": true,
-  "specPct": 48.4,
-  "txv5Pct": 64
+  "specPct": 49.6,
+  "txv5Pct": 65.9
  },
  {
   "set": "C100",
   "vector": "C100-1.json",
   "proofBytes": 23851,
   "queries": 11,
-  "redeemBytes": 6041,
-  "witnessBytes": 24334,
-  "unlockingBytes": 30378,
-  "txBytes": 30465,
-  "opStd": 15769750,
-  "opCons": 15650582,
-  "opBchnAdjusted": 15654863,
-  "opBchnAdjustedStd": 15774031,
-  "defineBodyBytes": 4281,
-  "hashIterations": 931,
-  "instructions": 123532,
+  "redeemBytes": 5598,
+  "witnessBytes": 24287,
+  "unlockingBytes": 29888,
+  "txBytes": 29975,
+  "opStd": 15969895,
+  "opCons": 15851623,
+  "opBchnAdjusted": 15855692,
+  "opBchnAdjustedStd": 15973964,
+  "defineBodyBytes": 4069,
+  "hashIterations": 924,
+  "instructions": 123222,
   "accepted": {
    "loose": true,
    "specStd": true,
@@ -65,38 +65,38 @@
    "bch2026Std": false
   },
   "errors": {
-   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 30378 bytes."
+   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 29888 bytes."
   },
-  "specBudget": 32302400,
-  "txv5Budget": 24335200,
+  "specBudget": 31910400,
+  "txv5Budget": 23943200,
   "txv5Pad": {
    "padBytes": 2,
-   "unlockingBytes": 30380,
-   "txBytes": 30467,
+   "unlockingBytes": 29890,
+   "txBytes": 29977,
    "std": true,
    "cons": true,
-   "opStd": 15769951
+   "opStd": 15970096
   },
   "fitsStandardTx": true,
-  "specPct": 48.8,
-  "txv5Pct": 64.8
+  "specPct": 50,
+  "txv5Pct": 66.7
  },
  {
   "set": "C128",
   "vector": "C128-0.json",
   "proofBytes": 41936,
   "queries": 15,
-  "redeemBytes": 7039,
-  "witnessBytes": 42617,
-  "unlockingBytes": 49659,
-  "txBytes": 49746,
-  "opStd": 26292504,
-  "opCons": 26010904,
-  "opBchnAdjusted": 26015840,
-  "opBchnAdjustedStd": 26297440,
-  "defineBodyBytes": 4936,
-  "hashIterations": 2200,
-  "instructions": 197846,
+  "redeemBytes": 6425,
+  "witnessBytes": 42534,
+  "unlockingBytes": 48962,
+  "txBytes": 49049,
+  "opStd": 26663208,
+  "opCons": 26382888,
+  "opBchnAdjusted": 26387478,
+  "opBchnAdjustedStd": 26667798,
+  "defineBodyBytes": 4590,
+  "hashIterations": 2190,
+  "instructions": 197153,
   "accepted": {
    "loose": true,
    "specStd": true,
@@ -106,38 +106,38 @@
    "bch2026Std": false
   },
   "errors": {
-   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 49659 bytes."
+   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 48962 bytes."
   },
-  "specBudget": 47727200,
-  "txv5Budget": 39760000,
+  "specBudget": 47169600,
+  "txv5Budget": 39202400,
   "txv5Pad": {
    "padBytes": 2,
-   "unlockingBytes": 49661,
-   "txBytes": 49748,
+   "unlockingBytes": 48964,
+   "txBytes": 49051,
    "std": true,
    "cons": true,
-   "opStd": 26292705
+   "opStd": 26663409
   },
   "fitsStandardTx": true,
-  "specPct": 55.1,
-  "txv5Pct": 66.1
+  "specPct": 56.5,
+  "txv5Pct": 68
  },
  {
   "set": "C128",
   "vector": "C128-1.json",
   "proofBytes": 42032,
   "queries": 15,
-  "redeemBytes": 7038,
-  "witnessBytes": 42701,
-  "unlockingBytes": 49742,
-  "txBytes": 49829,
-  "opStd": 26275760,
-  "opCons": 25993392,
-  "opBchnAdjusted": 25998328,
-  "opBchnAdjustedStd": 26280696,
-  "defineBodyBytes": 4936,
-  "hashIterations": 2206,
-  "instructions": 197669,
+  "redeemBytes": 6425,
+  "witnessBytes": 42618,
+  "unlockingBytes": 49046,
+  "txBytes": 49133,
+  "opStd": 26641681,
+  "opCons": 26360593,
+  "opBchnAdjusted": 26365183,
+  "opBchnAdjustedStd": 26646271,
+  "defineBodyBytes": 4590,
+  "hashIterations": 2196,
+  "instructions": 196976,
   "accepted": {
    "loose": true,
    "specStd": true,
@@ -147,38 +147,38 @@
    "bch2026Std": false
   },
   "errors": {
-   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 49742 bytes."
+   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 49046 bytes."
   },
-  "specBudget": 47793600,
-  "txv5Budget": 39826400,
+  "specBudget": 47236800,
+  "txv5Budget": 39269600,
   "txv5Pad": {
    "padBytes": 2,
-   "unlockingBytes": 49744,
-   "txBytes": 49831,
+   "unlockingBytes": 49048,
+   "txBytes": 49135,
    "std": true,
    "cons": true,
-   "opStd": 26275961
+   "opStd": 26641882
   },
   "fitsStandardTx": true,
-  "specPct": 55,
-  "txv5Pct": 66
+  "specPct": 56.4,
+  "txv5Pct": 67.8
  },
  {
   "set": "P100",
   "vector": "P100-0.json",
   "proofBytes": 49718,
   "queries": 22,
-  "redeemBytes": 6477,
-  "witnessBytes": 50719,
-  "unlockingBytes": 57199,
-  "txBytes": 57286,
-  "opStd": 38161697,
-  "opCons": 37930145,
-  "opBchnAdjusted": 37934502,
-  "opBchnAdjustedStd": 38166054,
-  "defineBodyBytes": 4357,
-  "hashIterations": 1809,
-  "instructions": 281833,
+  "redeemBytes": 5949,
+  "witnessBytes": 50603,
+  "unlockingBytes": 56555,
+  "txBytes": 56642,
+  "opStd": 38727198,
+  "opCons": 38496670,
+  "opBchnAdjusted": 38500771,
+  "opBchnAdjustedStd": 38731299,
+  "defineBodyBytes": 4101,
+  "hashIterations": 1801,
+  "instructions": 281785,
   "accepted": {
    "loose": true,
    "specStd": true,
@@ -188,21 +188,144 @@
    "bch2026Std": false
   },
   "errors": {
-   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 57199 bytes."
+   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 56555 bytes."
   },
-  "specBudget": 53759200,
-  "txv5Budget": 45792000,
+  "specBudget": 53244000,
+  "txv5Budget": 45276800,
   "txv5Pad": {
    "padBytes": 2,
-   "unlockingBytes": 57201,
-   "txBytes": 57288,
+   "unlockingBytes": 56557,
+   "txBytes": 56644,
    "std": true,
    "cons": true,
-   "opStd": 38161898
+   "opStd": 38727399
   },
   "fitsStandardTx": true,
-  "specPct": 71,
-  "txv5Pct": 83.3
+  "specPct": 72.7,
+  "txv5Pct": 85.5
+ },
+ {
+  "set": "P100",
+  "vector": "P100-1.json",
+  "proofBytes": 49618,
+  "queries": 22,
+  "redeemBytes": 5949,
+  "witnessBytes": 50497,
+  "unlockingBytes": 56449,
+  "txBytes": 56536,
+  "opStd": 38655691,
+  "opCons": 38425803,
+  "opBchnAdjusted": 38429904,
+  "opBchnAdjustedStd": 38659792,
+  "defineBodyBytes": 4101,
+  "hashIterations": 1796,
+  "instructions": 281196,
+  "accepted": {
+   "loose": true,
+   "specStd": true,
+   "specCons": true,
+   "txv5Std": true,
+   "txv5Cons": true,
+   "bch2026Std": false
+  },
+  "errors": {
+   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 56449 bytes."
+  },
+  "specBudget": 53159200,
+  "txv5Budget": 45192000,
+  "txv5Pad": {
+   "padBytes": 2,
+   "unlockingBytes": 56451,
+   "txBytes": 56538,
+   "std": true,
+   "cons": true,
+   "opStd": 38655892
+  },
+  "fitsStandardTx": true,
+  "specPct": 72.7,
+  "txv5Pct": 85.5
+ },
+ {
+  "set": "P100",
+  "vector": "P100-2.json",
+  "proofBytes": 49093,
+  "queries": 22,
+  "redeemBytes": 5949,
+  "witnessBytes": 49959,
+  "unlockingBytes": 55911,
+  "txBytes": 55998,
+  "opStd": 38540262,
+  "opCons": 38312934,
+  "opBchnAdjusted": 38317035,
+  "opBchnAdjustedStd": 38544363,
+  "defineBodyBytes": 4101,
+  "hashIterations": 1776,
+  "instructions": 280695,
+  "accepted": {
+   "loose": true,
+   "specStd": true,
+   "specCons": true,
+   "txv5Std": true,
+   "txv5Cons": true,
+   "bch2026Std": false
+  },
+  "errors": {
+   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 55911 bytes."
+  },
+  "specBudget": 52728800,
+  "txv5Budget": 44761600,
+  "txv5Pad": {
+   "padBytes": 2,
+   "unlockingBytes": 55913,
+   "txBytes": 56000,
+   "std": true,
+   "cons": true,
+   "opStd": 38540463
+  },
+  "fitsStandardTx": true,
+  "specPct": 73.1,
+  "txv5Pct": 86.1
+ },
+ {
+  "set": "P100",
+  "vector": "P100-3.json",
+  "proofBytes": 50618,
+  "queries": 22,
+  "redeemBytes": 5949,
+  "witnessBytes": 51468,
+  "unlockingBytes": 57420,
+  "txBytes": 57507,
+  "opStd": 38816827,
+  "opCons": 38581691,
+  "opBchnAdjusted": 38585792,
+  "opBchnAdjustedStd": 38820928,
+  "defineBodyBytes": 4101,
+  "hashIterations": 1837,
+  "instructions": 282088,
+  "accepted": {
+   "loose": true,
+   "specStd": true,
+   "specCons": true,
+   "txv5Std": true,
+   "txv5Cons": true,
+   "bch2026Std": false
+  },
+  "errors": {
+   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 57420 bytes."
+  },
+  "specBudget": 53936000,
+  "txv5Budget": 45968800,
+  "txv5Pad": {
+   "padBytes": 2,
+   "unlockingBytes": 57422,
+   "txBytes": 57509,
+   "std": true,
+   "cons": true,
+   "opStd": 38817028
+  },
+  "fitsStandardTx": true,
+  "specPct": 72,
+  "txv5Pct": 84.4
  },
  {
   "set": "P128",
@@ -373,17 +496,17 @@
   "vector": "U100-0.json",
   "proofBytes": 106967,
   "queries": 79,
-  "redeemBytes": 4982,
-  "witnessBytes": 110238,
-  "unlockingBytes": 115223,
-  "txBytes": 115312,
-  "opStd": 91123244,
-  "opCons": 90596140,
-  "opBchnAdjusted": 90599263,
-  "opBchnAdjustedStd": 91126367,
-  "defineBodyBytes": 3123,
-  "hashIterations": 4118,
-  "instructions": 698277,
+  "redeemBytes": 4586,
+  "witnessBytes": 109972,
+  "unlockingBytes": 114561,
+  "txBytes": 114650,
+  "opStd": 92098373,
+  "opCons": 91572037,
+  "opBchnAdjusted": 91575001,
+  "opBchnAdjustedStd": 92101337,
+  "defineBodyBytes": 2964,
+  "hashIterations": 4112,
+  "instructions": 699104,
   "accepted": {
    "loose": true,
    "specStd": false,
@@ -393,42 +516,42 @@
    "bch2026Std": false
   },
   "errors": {
-   "specStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 115223 bytes.",
-   "txv5Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 115223 bytes.",
-   "txv5Cons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 115223 bytes.",
-   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 115223 bytes."
+   "specStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 114561 bytes.",
+   "txv5Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 114561 bytes.",
+   "txv5Cons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 114561 bytes.",
+   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 114561 bytes."
   },
-  "specBudget": 100178400,
-  "txv5Budget": 92211200,
+  "specBudget": 99648800,
+  "txv5Budget": 91681600,
   "txv5Pad": {
-   "unbudgetedError": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 115225 bytes.",
+   "unbudgetedError": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 114563 bytes.",
    "padBytes": 2,
-   "unlockingBytes": 115225,
-   "txBytes": 115314,
+   "unlockingBytes": 114563,
+   "txBytes": 114652,
    "std": false,
    "cons": false,
    "opStd": 0
   },
   "fitsStandardTx": false,
-  "specPct": 91,
-  "txv5Pct": 98.8
+  "specPct": 92.4,
+  "txv5Pct": 100.5
  },
  {
   "set": "U100",
   "vector": "U100-1.json",
   "proofBytes": 105892,
   "queries": 79,
-  "redeemBytes": 4981,
-  "witnessBytes": 109144,
-  "unlockingBytes": 114128,
-  "txBytes": 114217,
-  "opStd": 90979242,
-  "opCons": 90457770,
-  "opBchnAdjusted": 90460893,
-  "opBchnAdjustedStd": 90982365,
-  "defineBodyBytes": 3123,
-  "hashIterations": 4074,
-  "instructions": 697308,
+  "redeemBytes": 4586,
+  "witnessBytes": 108863,
+  "unlockingBytes": 113452,
+  "txBytes": 113541,
+  "opStd": 91956617,
+  "opCons": 91435913,
+  "opBchnAdjusted": 91438877,
+  "opBchnAdjustedStd": 91959581,
+  "defineBodyBytes": 2964,
+  "hashIterations": 4068,
+  "instructions": 698135,
   "accepted": {
    "loose": true,
    "specStd": false,
@@ -438,24 +561,24 @@
    "bch2026Std": false
   },
   "errors": {
-   "specStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 114128 bytes.",
-   "txv5Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 114128 bytes.",
-   "txv5Cons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 114128 bytes.",
-   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 114128 bytes."
+   "specStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 113452 bytes.",
+   "txv5Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 113452 bytes.",
+   "txv5Cons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 113452 bytes.",
+   "bch2026Std": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 113452 bytes."
   },
-  "specBudget": 99302400,
-  "txv5Budget": 91335200,
+  "specBudget": 98761600,
+  "txv5Budget": 90794400,
   "txv5Pad": {
-   "unbudgetedError": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 114130 bytes.",
+   "unbudgetedError": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 100000 bytes. Unlocking bytecode length: 113454 bytes.",
    "padBytes": 2,
-   "unlockingBytes": 114130,
-   "txBytes": 114219,
+   "unlockingBytes": 113454,
+   "txBytes": 113543,
    "std": false,
    "cons": false,
    "opStd": 0
   },
   "fitsStandardTx": false,
-  "specPct": 91.6,
-  "txv5Pct": 99.6
+  "specPct": 93.1,
+  "txv5Pct": 101.3
  }
 ]
