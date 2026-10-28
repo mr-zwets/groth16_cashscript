@@ -9,6 +9,10 @@
 import { readFileSync } from 'node:fs';
 
 import { bn254 } from '@noble/curves/bn254.js';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+// zk-verifier-bench checkout (vector inputs/outputs): VERIFIER_DIR, default the sibling checkout.
+const VERIFIER_DIR = process.env.VERIFIER_DIR ?? fileURLToPath(new URL('../../../zk-verifier-bench/', import.meta.url));
 const { Fp, Fp2, Fp6, Fp12 } = bn254.fields;
 
 // ---- constants (extracted from noble) ----
@@ -136,7 +140,7 @@ const g2 = (o) => bn254.G2.Point.fromAffine({
 }
 
 // 4-pair Groth16 boundary on the committed instance
-const vec = JSON.parse(readFileSync('C:/Users/mathi/Desktop/verifier/src/checkpoints/pairing-vectors.json', 'utf8'));
+const vec = JSON.parse(readFileSync(join(VERIFIER_DIR, 'src/checkpoints/pairing-vectors.json'), 'utf8'));
 const vk = { alpha: g1(vec.vk.alpha), beta: g2(vec.vk.beta), gamma: g2(vec.vk.gamma), delta: g2(vec.vk.delta), ic: vec.vk.ic.map(g1) };
 const proof = { a: g1(vec.proof.a), b: g2(vec.proof.b), c: g1(vec.proof.c) };
 const inputs = vec.publicInputs.map(BigInt);

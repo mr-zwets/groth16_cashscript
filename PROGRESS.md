@@ -15,3 +15,18 @@ Base: origin/main be3dc66.
   changes vector bytes); lib/G2Check.cash:4,7 (correct there: it defines x = 0xd201000000010000 = |x|);
   lib/lazy/Bls12381LazyG.cash:33 (library; not in the task list).
   Minop C:/ paths: already fixed on main in 4d49c82 (BN minop scripts use VERIFIER_DIR; BLS minop already did).
+- [x] 3 C:/ paths in the 13 remaining scripts -> join(VERIFIER_DIR, ...), with
+  VERIFIER_DIR = process.env.VERIFIER_DIR ?? <script dir>/../../../zk-verifier-bench/ (sibling checkout;
+  ../../../../ for recompiler/outline_spike.mjs). Existing OUT / argv[2] overrides kept. Same env var as the
+  minop fix (4d49c82), plus a script-relative default.
+  Files: chunked/{rescheduler/census, shamir/build_vectors, twoloop/build_vectors}.mjs,
+  singleton/bls12-381/{build_vectors, build_vectors_vkx}.mjs, singleton/bn254/{build_vectors (2 paths),
+  build_vectors_vkx, finalexp, finalexp_ref, groth16, miller4, miller_ref, recompiler/outline_spike}.mjs.
+  Checks (VERIFIER_DIR = scratch copy of bench d01ae89 src/, cashc dab3f89f): node --check all 13; every
+  script run to completion, exit 0 (finalexp/miller4/groth16 PASS, refs true, census/outline print).
+  Byte-identical vs bench: pairing-singleton-vectors.json (BN), pairing-bls12381-singleton-vectors.json.
+  vkx-singleton, vkx-bls12381-singleton, vkx-chunked, vkx-chunked-shamir differ from bench under this compiler,
+  but the HEAD script (path redirected via OUT or sed) writes the same bytes as the new script: the
+  difference is pre-existing compiler drift (e.g. vkx BN 879 vs 964 B), not this change.
+  Default resolution checked: from the main checkout layout all three depths resolve to
+  verifier.cash/zk-verifier-bench/.

@@ -34,6 +34,8 @@ import {
 } from '@bitauth/libauth';
 
 const here = dirname(fileURLToPath(import.meta.url));
+// zk-verifier-bench checkout (vector inputs/outputs): VERIFIER_DIR, default the sibling checkout.
+const VERIFIER_DIR = process.env.VERIFIER_DIR ?? fileURLToPath(new URL('../../../zk-verifier-bench/', import.meta.url));
 const CASHC = fileURLToPath(import.meta.resolve('cashc/dist/cashc-cli.js'));
 // Chunk contracts + manifest are generated (gitignored); run `node gen_chunks.mjs` first.
 const GEN = join(here, 'generated');
@@ -130,6 +132,6 @@ console.log('---');
 console.log(`chunks=${manifest.numChunks} K=${manifest.K} | total op-cost ${totalOp.toLocaleString()} | max/step ${maxOp.toLocaleString()} (budget ${STANDARD_BUDGET.toLocaleString()})`);
 console.log(`max lock ${maxLock}B max unlock ${maxUnlock}B | allLooseAccept=${allAccept} allRealAccept=${allReal} allFit=${allFit}`);
 
-const outPath = process.env.OUT || 'C:/Users/mathi/Desktop/verifier/src/bch/vkx-chunked-vectors.json';
+const outPath = process.env.OUT || join(VERIFIER_DIR, 'src/bch/vkx-chunked-vectors.json');
 writeFileSync(outPath, JSON.stringify(out, null, 2));
 console.log('wrote', outPath);

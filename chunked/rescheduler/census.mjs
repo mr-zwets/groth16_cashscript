@@ -7,8 +7,12 @@
 //   node chunked/rescheduler/census.mjs [path-to-vectors.json]
 import { readFileSync } from 'node:fs';
 import { parse } from '../../singleton/bn254/recompiler/asm.mjs';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+// zk-verifier-bench checkout (vector inputs/outputs): VERIFIER_DIR, default the sibling checkout.
+const VERIFIER_DIR = process.env.VERIFIER_DIR ?? fileURLToPath(new URL('../../../zk-verifier-bench/', import.meta.url));
 
-const VECTORS = process.argv[2] ?? 'C:/Users/mathi/Desktop/verifier/src/bch/groth16-grouped-residue-vectors.json';
+const VECTORS = process.argv[2] ?? join(VERIFIER_DIR, 'src/bch/groth16-grouped-residue-vectors.json');
 const vec = JSON.parse(readFileSync(VECTORS, 'utf8'));
 
 const hexToBin = (hex) => Uint8Array.from(hex.match(/../g).map((b) => parseInt(b, 16)));
