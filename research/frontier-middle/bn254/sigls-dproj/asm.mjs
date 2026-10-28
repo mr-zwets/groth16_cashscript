@@ -162,6 +162,7 @@ export class Asm {
   // outs: names given to the outputs, which end on top in order.
   kernel(K, outs, {iters = 3000, seed = 1} = {}) {
     assert.equal(outs.length, K.outs.length);
+    assert.equal(new Set(K.outs).size, K.outs.length, 'kernel: duplicate output node (the scheduler would misorder it)');
     const res = scheduleKernel(this, K, iters, seed);
     if (process.env.DEBUG_K) console.error('kernel', outs.join(',').slice(0, 40), 'est op', res.cost, 'bytes', res.code.length);
     this.emit(...res.code); this.st = res.st; // outputs on top with internal ids
