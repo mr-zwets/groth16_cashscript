@@ -306,7 +306,9 @@ def statement_input(k):
 
 
 # ================================================================ prover
-def prove(p, x_in, log=print, workers=None):
+def prove(p, x_in, log=print, workers=None, final_tweak=False):
+    """final_tweak=True adds 1 to final coefficient 0 (c0) AFTER the honest computation and then
+    continues honestly (grind, open): a rejection-test proof whose only defect is the final layer."""
     t_start = time.time()
     E = Ext(p.e)
     e = p.e
@@ -441,6 +443,8 @@ def prove(p, x_in, log=print, workers=None):
     for c in fc:
         assert not c[D:].any(), 'final layer degree too high'
     final = [tuple(int(fc[k][i]) for k in range(e)) for i in range(D)]
+    if final_tweak:
+        final[0] = ((final[0][0] + 1) % P,) + final[0][1:]
     final_b = b''.join(enc_ext(c) for c in final)
     T.absorb(final_b, f't{3 + r}')
     tick('final poly')

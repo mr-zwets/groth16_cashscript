@@ -6,5 +6,6 @@ Spec: work/pq-hash/design/SPEC.md (zk-verifier-bench wip/pq-hash-design c3497a1)
 - [x] pqfield / pqparams / pqproto / verifier / prover (numpy) written; small-n round trip e=2,3 OK
 - [ ] full-size proofs per set, timings
 - [ ] gen_vectors.py + tampered vectors
-- [ ] test_soundness.py
-- [ ] SERIALIZATION.md, README.md
+- [x] test_soundness.py (14 tests, cross-checks design calculator) + test_roundtrip.py
+- [x] SERIALIZATION.md  - [ ] README.md
+- [x] verify.mjs independent JS verifier, agrees on P128

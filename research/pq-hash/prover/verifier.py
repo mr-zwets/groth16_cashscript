@@ -198,6 +198,8 @@ def fold(E, vals, beta, x0, a):
 
 
 def apply_tamper(proof, tamper):
+    if 'proof_hex' in tamper:
+        return bytes.fromhex(tamper['proof_hex'])
     b = bytearray(proof)
     for patch in tamper.get('patches', []):
         o = patch['offset']
@@ -221,11 +223,12 @@ def main(paths):
         p = SETS[v['params']['name']]
         proof = bytes.fromhex(v['proof'])
         st = (int(v['statement']['x_in']), int(v['statement']['y_out']))
-        ok, why, _ = verify(p, proof)
+        ok, why, _ = verify(p, proof, st)
         print(f"{path}: valid proof ({len(proof)} B): {'ACCEPT' if ok else 'REJECT ' + why}")
         bad += not ok
         for t in v.get('tampered', []):
-            ok, why, _ = verify(p, apply_tamper(proof, t), st if t.get('bind_statement') else None)
+            want = tuple(int(x) for x in t['want_statement']) if 'want_statement' in t else None
+            ok, why, _ = verify(p, apply_tamper(proof, t), want)
             exp = t['expect_reason_prefix']
             good = (not ok) and why.startswith(exp)
             print(f"   tamper {t['name']:<28} {'REJECT' if not ok else 'ACCEPT'}: {why}   [{'ok' if good else 'UNEXPECTED'}]")
