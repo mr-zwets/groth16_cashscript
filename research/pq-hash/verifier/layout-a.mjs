@@ -55,7 +55,8 @@ export function witnessesA(prm, plan, pg, enc, pads = {}) {
 export function txsA(prm, plan, pg, wit) {
   const lock = pg.locking, R = pg.redeem;
   const CAT = plan.thread?.category;
-  const tok = (cap, commitment = new Uint8Array(0)) => ({amount: 0n, category: CAT, nft: {capability: cap, commitment}});
+  // libauth's token.category is in user-facing (reversed) byte order; the VM pushes the internal order (= plan's bytes)
+  const tok = (cap, commitment = new Uint8Array(0)) => ({amount: 0n, category: Uint8Array.from(CAT).reverse(), nft: {capability: cap, commitment}});
   return wit.map((inputs, t) => {
     const unl = inputs.map((items) => pushes([...items, R]));
     const sourceOutputs = unl.map((_, i) => ({lockingBytecode: lock, valueSatoshis: 10_000n, ...(CAT && i === 0 ? {token: t === 0 ? tok('minting') : tok('none', plan.thread.commitment)} : {})}));
