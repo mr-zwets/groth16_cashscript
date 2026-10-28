@@ -149,7 +149,10 @@ the transaction's own payloads. The G2 walk, slope checks, ψ terminal relation,
   counts every SHA-256 query by the adversary and the verifier (so it is nonzero with no
   adversary queries), `q_β, q_α` the beta/alpha queries among them, and `N = q + N₀` adds the
   fewer than `2^22 + 2^7` setup hashes behind the deployed anchors
-  (the argument is in [chunked/bls12-381/README.md](chunked/bls12-381/README.md), sections 1-6; reviewed 2026-10-27) — STARK-class, but a **new assumption** the
+  (the argument is in [chunked/bls12-381/README.md](chunked/bls12-381/README.md), sections 1-6; reviewed 2026-10-27).
+  `bch-groth16-bls12381-singleton-fs` has the same relations, degrees and transcript, so the same
+  bound applies with its own counts: fewer than `2^22` setup hashes (only the GT window trees) and
+  1,104 verifier SHA-256 per spend (see [BLS_QSPLIT_TAIL22_STATUS.md](BLS_QSPLIT_TAIL22_STATUS.md)) — STARK-class, but a **new assumption** the
   unconditional entries do not make. It is therefore filed under this separate name
   rather than as a successor to `-intratx-residue` / `-grouped-residue`.
 - A and C are graded **cofactor-equivalent**: on-curve is enforced and the pairing verdict
