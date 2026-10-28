@@ -1,17 +1,27 @@
 # Track 2 (frontier middle), BN254 research builds: T1 sigls-dproj and T2 rolled-residue
 
-**Research artifacts. These are not ranked entries.** Neither design is registered in the bench, results.json or the
-registry, and neither has had an independent review. Both compose techniques that are already reviewed (see each
-soundness section). Sources are on branch `wip/frontier-middle-build-bn254` of groth16_cashscript. The bench
-measurement glue is on the same branch name in zk-verifier-bench, under `research/frontier-middle/bn254/`
-(`measure.ts`, the vector files and `results.json`). It runs the harness's own `benchmark()` on Implementation objects
-that are never added to `REGISTRY`.
+Both designs compose techniques that are already reviewed (see each soundness section). Each had two Track 2 reviews
+(soundness; measurement reproduction), both **pass** with minor findings only; the minor items are fixed or documented
+below (see "Review follow-ups"). They are bench entries:
+
+| design | bench id | VM target |
+|---|---|---|
+| T1 sigls-dproj (shared kernels) | `bch-groth16-sound-si-gls-dproj` | bch-spec (proposed 100 kB scripts), needs ≈ 1.6× its op budget |
+| T2 rolled-residue | `bch-groth16-singleton-rolled-residue` | bch-2026 sizes, over the op budget (like the singletons) |
+| T2 byte-lean variant (`T2_SQR=mulc`) | `bch-groth16-singleton-rolled-residue-mulc` | same |
+
+T2 and its mulc variant are both registered because both are points of the bytes vs op-cost Pareto frontier: mulc is
+smaller (9,116 B vs 9,776 B) and plain T2 is cheaper (130.3M vs 147.4M), so neither dominates the other. The T1 inline
+variant (17,203 B / 32.0M) is not registered. The Track 2 measurement glue that produced the tables below is in
+zk-verifier-bench `research/frontier-middle/bn254/` (`measure.ts`, the vector files and `results.json`).
 
 ## Results (bench harness, libauth 3.1.0-next.8)
 
 Bytes are the harness score: locking + unlocking + tx overhead. Op-cost comes from the harness's loosened BCH 2026 VM.
 "BCHN" adds the executed OP_DEFINE body bytes, which BCHN charges and libauth does not (Track 1). The worst case is the
 bench's dense-input proof. E_k = max(bytes, op/(800k) − 41·inputs), computed on the worst proof with BCHN-adjusted op-cost.
+All op-cost figures are consensus mode, as the harness reports every entry; standard (relay) mode charges about 0.1% more
+for hashing (T1 33,350,908, T2 130,319,043 on the committed proof), and for a relay-policy k that figure binds.
 
 | design | bytes | op (committed) | BCHN-adj. | worst proof (BCHN) | in | gates | k_min bch-2026 / bch-spec |
 |---|--:|--:|--:|--:|--:|---|--:|
@@ -19,6 +29,19 @@ bench's dense-input proof. E_k = max(bytes, op/(800k) − 41·inputs), computed 
 | T1 inline variant (`DPROJ_SHARED=0`) | 17,203 | 32,021,353 | 32,022,832 | 32,039,485 | 1 | 4/4, 15/15, 0/9 | 2.36 / 1.48 |
 | **T2** rolled-residue (default) | **9,776** | 130,300,611 | 130,303,393 | 139,083,823 | 1 | 4/4, 6/6, 0/9 | 17.9 / 8.8 |
 | T2 byte-lean variant (`T2_SQR=mulc`) | 9,116 | 147,416,156 | 147,419,350 | 156,206,071 | 1 | 4/4, 6/6, 0/9 | 21.6 / 10.3 |
+
+**k_min is a maximum over the bench proofs only.** Over the 59-case T1 sweep the binding cases need more: the
+minimum-degree witness (shortest unlocking) needs k = 2.73 on the bch-2026 base and the liveness-extreme case needs
+k = 1.63 on the bch-spec base (BCHN-adjusted; 163.18% of its bch-spec budget in the sweep log), against 2.56 / 1.57 for
+the bench proofs. Read the T1 requirement as **k ≥ 2.73 (bch-2026 base) / 1.63 (bch-spec base)**; the T1 inline variant
+moves the same way. E_k at k ≥ 2 is barely affected, because op/(800k) does not depend on the unlocking length. The T2
+sweep (18 cases) stays within the bench worst case, so T2's 17.9 / 21.6 hold.
+
+**The T1 "bch-2026 base" k is a density figure only.** T1's unlocking (16,473 B for fixture 0) is over the 10,000 B
+BCH 2026 unlocking cap, so T1 is valid only with bch-spec script caps; its bch-2026-base k_min means "bch-spec sizes with
+a bch-2026-style density". Today's SI-GLS baseline has the same property, so the E_k comparison is like for like. T2's
+claim to fit BCH 2026 is exact: redeem 9,128 B, unlocking 9,678 B, every push under 10,000 B, and the strict 2026 VM
+fails it only on op-cost density.
 
 Effective size E_k in KB. "Today" is the best reviewed BN254 entry at each k, from the model.
 
@@ -33,6 +56,10 @@ Effective size E_k in KB. "Today" is the best reviewed BN254 entry at each k, fr
 
 At k = 10 on the committed proof, T2's E10 is 16.2 KB (−26%). On the dense worst-case proof it is 17.3 KB, so T1 is
 the better design at k = 10.
+
+T1's bytes follow the harness convention (fixture-0 bytes, 16,571, as for the reviewed SI-GLS row). The unlocking
+grows with n_q: the max-degree witness (n_q 132) has a 17,049 B unlocking, about 17,147 B scored, so T1's E5..E100 is
+16.6 KB on fixture 0 and up to 17.1 KB in the worst case, i.e. about −22% rather than −24% against today.
 
 **Gap to the model** (`work/frontier-middle/model`, 4601c4a):
 
@@ -70,7 +97,10 @@ projective walk of the baked δ point.
 
 Everything else is byte-for-byte the reviewed design: the transcript, 2-event chunks, 33 monic states, GT-GLS vk_x,
 residue root, endpoint check and layout pins. **The witness WS is identical to the reviewed entry's for the same proof**
-(checked for fixture 0), and n_q is unchanged.
+(checked for all 5 bench proofs), and n_q is unchanged. **WQ changes.** The projective δ lines are Fp2 multiples of
+the affine ones, so the chunk polynomials D_k and their quotients change while their classes do not. This is expected
+and sound: WQ is still the last field of z's preimage, hashed before z, under the unchanged degree cap NQ_MAX = 132
+(re-derived in `build.mjs`).
 
 Redeem: 5,838 B (reviewed: 11,182 B). The unlocking for fixture 0 is 16,473 B.
 
@@ -98,6 +128,12 @@ Redeem: 5,838 B (reviewed: 11,182 B). The unlocking for fixture 0 is 16,473 B.
    - Multiplying by the constant c = 1 is the identity.
    - Squaring F before the B doubling gives the same F²·L_B.
    - The value-level verifier `verifyValues` (now on projective δ lines) accepts.
+6. **Script/model equivalence of the δ lines.** The build-time check in item 2 validates the JS model of the δ walk
+   (`projDbl`/`projAdd` in `math.mjs`); the script runs the walk through the shared DBL/ADD kernels with the cz/cz3/yCt
+   environment remap. The two agree because the δ lines are fixed polynomials (δ is a VK constant, the walk does not
+   depend on the input): if the script's δ line at some step differed from the model's, the honest chunk identity at
+   the random z would fail with probability ≥ 1 − deg/p, and the 4 bench proofs plus 59 sweep proofs are all accepted.
+   This is the same standard the reviewed entry applies to its on-chain B formulas.
 
 **Checks:**
 - `node build.mjs` (deterministic, twice);
@@ -106,8 +142,8 @@ Redeem: 5,838 B (reviewed: 11,182 B). The unlocking for fixture 0 is 16,473 B.
   the liveness extreme, the lowest-n_q statements, a lattice-shifted GLS witness and 40 random proofs;
 - in the bench: 4/4 proofs, the existing 15 invalid classes rejected, and the public-input gate rejecting 9/9.
 
-The strict bch-spec VM rejects T1 only for op-cost density (k ≥ 1.57 needed). `redteam.mjs` is the unchanged reviewed
-suite. It was not run: this task only allowed the existing invalid vectors.
+The strict bch-spec VM rejects T1 only for op-cost density (k ≥ 1.63 needed over the sweep, 1.57 over the bench
+proofs). `redteam.mjs` is the unchanged reviewed suite. It was not run: only the existing invalid vectors are used.
 
 ## T2: rolled-residue (`rolled-residue/`)
 
@@ -153,6 +189,11 @@ It saves 660 B and costs 17M.
    the exactly computed F, so it yields [f′] = [c]^λ for f′ = Miller(−A,B)·Miller(vk_x,γ)·Miller(C,δ)·m_αβ. The
    reviewed SI-GLS residue argument (also minop's quotient-torus terminal) then gives FE(f′) = 1, which is the Groth16
    equation. The check is deterministic, so no error term is added.
+
+   **The baked m_αβ and the pairing exponent.** `math.mjs` asserts FE(MAB) = e(α, β) for the baked monic
+   representative itself (not only for noble's raw Miller value), and e(α, β) ≠ 1. The script's Miller normalization
+   gives FE = e(·,·)^s for some fixed s; `prove()` asserts FE(f) = 1 for every honest proof with f built from MAB and the
+   script-mirror lines, and since e(α, β) ≠ 1 honest acceptance pins s ≡ 1 mod r and [MAB] = [m_αβ].
 2. **P ≠ 0.** This matters because an all-zero P would pass, so every factor is shown nonzero in the field Fp12:
    - S_c(±X), S_c(ηX) and m_αβ are monic of degree 6;
    - each line polynomial has constant/X⁶ part y_P·Φ(ℓ0), with ℓ0 ≠ 0 and y_P ≠ 0;
@@ -170,10 +211,26 @@ It saves 660 B and costs 17M.
      every swept special input was accepted.
 5. **Canonical encoding.** DEPTH == 1, SIZE(W) == 544, unsigned 32-byte LE words, and a consensus clean stack.
 
-**Arithmetic correctness (tested, not machine-proved).** The new kernels are the sparse and monic polynomial
-multipliers mod M, the squaring, the line-coefficient extraction and the Jacobian G1 formulas.
-- `debug2.mjs` and `debug3.mjs` check them against a noble Fp12 mirror: all 12 coefficients of F after the loop, all
-  three walk states, and F at the terminal stages, matched exactly.
+**Arithmetic correctness (tested, with a stated probabilistic guarantee).** The new kernels are the sparse and monic
+polynomial multipliers mod M (with the reduction reduceM inside them), the squaring, the GLUE, the G2 doubling/addition
+with their line-coefficient extraction, ψ, the Jacobian G1 formulas, and the Frobenius / S_c(ηX) / c-fold coefficient
+kernels.
+- **Per-kernel differential test** (`kerneltest.mjs`, output in `kerneltest.log`). Each kernel is a fixed integer
+  polynomial map followed by reductions mod p, with no data-dependent branches. The test compiles every kernel alone
+  with the redeem's assembler and scheduler, runs it on the VM at independent uniform random inputs in [0, p), and
+  compares the outputs mod p with references computed independently of the kernel DAG: noble's Fp12 products in the
+  polynomial basis, `projDbl`/`projAdd` + `linePoly` on noble Fp2 and, on curve points, noble's G2/G1 group law (with
+  the line equal to a nonzero Fp2 multiple of the affine line), the literal EFD dbl-2009-l / madd-2007-bl formulas, and
+  `psubst`/`pneg`/`frob1Monic`/FROB/ETA for the coefficient kernels (the c-fold as its degree-1 map in the digit d, and
+  as S_c(−dX) at d = ±1). By Schwartz–Zippel, if any output polynomial differed from its reference map mod p, one
+  agreement at a uniform point would happen with probability at most deg/p < 2⁻²⁴⁵; the test requires agreement at
+  every one of 32 trials per kernel. The remaining inline kernels are equality checks (curve/twist equations, Z·zInv,
+  the endpoint) and environment set-up, covered by the whole-run tests below.
+- `debug2.mjs` and `debug3.mjs` check the whole run against a noble Fp12 mirror: all 12 coefficients of F after the
+  loop, all three walk states, and F at the terminal stages, matched exactly.
+- **Limb bounds are a liveness matter, not a soundness one.** BCH arithmetic is exact bignum arithmetic, so an
+  intermediate that outgrew the VM number limit would make the script fail (reject), never produce a wrong residue,
+  and every guard tests a value mod p or a canonical LESSTHAN. There is no machine-checked limb-bound proof.
 - Every value is reduced into (−p, p) before it feeds a product, so the largest intermediate is about 70 B, far below
   the 10,000 B VM number limit.
 - Acceptance and rejection:
@@ -189,18 +246,39 @@ multipliers mod M, the squaring, the line-coefficient extraction and the Jacobia
 3. vk_x is a non-GLV Straus. This saves bytes (no GLV table or decomposition) and costs about 11M of op.
 4. There is no recompiler outlining pass, and no δ-slope-pile flag.
 
+## Review follow-ups (fix round, 2026-10-28)
+
+The two Track 2 reviews (soundness; measurement reproduction) passed with minor findings only. Handled here:
+- T2 per-kernel random-point differential tests: `rolled-residue/kerneltest.mjs` (see "Arithmetic correctness"); the
+  limb-bound item is restated as liveness-only.
+- FE(MAB) = e(α, β) asserted in `rolled-residue/math.mjs`, with the exponent-pinning sentence in T2 soundness item 1.
+- T1 script/model δ-line equivalence: T1 soundness item 6. WQ changing in T1: the T1 design paragraph.
+- k_min over the sweep (2.73 / 1.63), the worst-witness T1 bytes (17.1 KB, −22%), T1's need for bch-spec script caps
+  and the consensus vs standard op-cost: notes under the results tables.
+- `sigls-dproj/mint.mjs` VERIFIER_DIR default fixed (see "Reproduce").
+- Not done, by design: T2 guard-coverage negative vectors (n = r, +p aliases, off-curve points, a non-G2 twist point,
+  a wrong zInv, a size off by one). The reviewer found every guard correct by reading the code and called this coverage
+  hygiene, not a known gap; constructing new attack inputs is out of scope, so rejection is shown with the existing
+  invalid classes only. The research measurement glue's mixed per-proof key names (`bchSpecStrict` / `strictVm`, in
+  zk-verifier-bench `research/frontier-middle/bn254/results.json`) are left as they are; the registered entries are
+  measured by the harness itself.
+
 ## Reproduce
 
-Run with this repository's dependencies. `VERIFIER_DIR` points at a zk-verifier-bench checkout; the default is the
-sibling `../bench` worktree.
+Run with this repository's dependencies. `VERIFIER_DIR` points at a zk-verifier-bench checkout (it supplies
+`src/checkpoints/pairing-vectors.json`); the default, in both `sigls-dproj/mint.mjs` and `rolled-residue/math.mjs`, is the
+sibling of this repository's checkout: `../zk-verifier-bench` (side-by-side clones) or `../bench` (the
+`work/<task>/{src,bench}` worktree layout), whichever has the file.
 
 ```sh
 cd sigls-dproj && node build.mjs && node export.mjs vectors.json && node profile.mjs && SWEEP_N=40 SWEEP_SPARSE=4 node sweep.mjs sweep.json
 DPROJ_SHARED=0 node build.mjs     # inline variant (restore with node build.mjs)
 cd ../rolled-residue && node build.mjs && node export.mjs vectors.json && node profile.mjs && node sweep.mjs sweep.json
+node kerneltest.mjs 32            # per-kernel differential test (kerneltest.log)
 T2_SQR=mulc node build.mjs        # byte-lean variant (restore with node build.mjs)
-# bench worktree: copy the vectors to research/frontier-middle/bn254/<id>-vectors.json, then
-pnpm exec tsx research/frontier-middle/bn254/measure.ts
+# bench: the vectors are src/bch/groth16-sound-si-gls-dproj-vectors.json, groth16-singleton-rolled-residue-vectors.json
+# and groth16-singleton-rolled-residue-mulc-vectors.json (byte-identical to export.mjs); then
+pnpm benchmark si-gls-dproj rolled-residue
 ```
 
 Redeem sha256: T1 `980482d4…1125` (5,838 B), T2 `95297900…758f` (9,128 B). Both builds are deterministic.

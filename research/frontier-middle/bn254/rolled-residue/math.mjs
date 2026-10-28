@@ -2,12 +2,15 @@
 // the VK of the BN plain / opcode-optimized / minop singletons), asserted against noble. The generic field, tower,
 // Frobenius, psi, NAF and residue facts are the reviewed SI-GLS ones (../sigls-dproj/math.mjs, asserted there).
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {existsSync, readFileSync} from 'node:fs';
 import {bn254} from '@noble/curves/bn254.js';
-import {p, r, mod, F2, F12, f2, DIGITS, NE, ETA, GAMMA1, PSI, psiK, projDbl, projAdd, monicRep, linePoly, B_TWIST} from '../sigls-dproj/math.mjs';
+import {p, r, mod, F2, F12, f2, DIGITS, NE, ETA, GAMMA1, PSI, psiK, projDbl, projAdd, monicRep, linePoly, fromPoly, B_TWIST} from '../sigls-dproj/math.mjs';
 export * from '../sigls-dproj/math.mjs';
 
-export const VDIR = process.env.VERIFIER_DIR ?? new URL('../../../../../bench', import.meta.url).pathname;
+// VERIFIER_DIR: a zk-verifier-bench checkout. Default: the sibling of this repository's checkout, as zk-verifier-bench/
+// (side-by-side clones) or bench/ (the work/<task>/{src,bench} worktree layout), whichever has the vectors.
+const REPO_PARENT = new URL('../../../../../', import.meta.url).pathname;
+export const VDIR = process.env.VERIFIER_DIR ?? (['zk-verifier-bench', 'bench'].map((d) => REPO_PARENT + d).find((d) => existsSync(d + '/src/checkpoints/pairing-vectors.json')) ?? REPO_PARENT + 'zk-verifier-bench');
 export const VEC = JSON.parse(readFileSync(VDIR + '/src/checkpoints/pairing-vectors.json', 'utf8'));
 export const g1 = (x) => bn254.G1.Point.fromAffine({x: BigInt(x.x), y: BigInt(x.y)});
 export const g2 = (x) => bn254.G2.Point.fromAffine({x: {c0: BigInt(x.x.c0), c1: BigInt(x.x.c1)}, y: {c0: BigInt(x.y.c0), c1: BigInt(x.y.c1)}});
@@ -41,6 +44,12 @@ export const VKC = (() => {
   // e(alpha, beta) as a baked monic class representative of the Miller value (FE(m) = e(alpha, beta))
   const mAB = bn254.pairing(VK.alpha, VK.beta, false); const MAB = monicRep(mAB);
   assert.ok(F12.eql(F12.finalExponentiate(mAB), bn254.pairing(VK.alpha, VK.beta)));
+  // the BAKED representative itself: FE(MAB) = e(alpha, beta) (review item; MAB and mAB differ by an Fp6* factor, which
+  // the final exponentiation kills since (p^6 - 1) | (p^12 - 1)/r). e(alpha, beta) != 1, so honest acceptance (prove()
+  // asserts FE(f) = 1 for every honest proof, f built with MAB and the script-mirror lines) pins the script's pairing
+  // exponent to 1 (README, T2 soundness item 1).
+  assert.ok(F12.eql(F12.finalExponentiate(fromPoly(MAB)), bn254.pairing(VK.alpha, VK.beta)), 'FE(MAB) = e(alpha, beta)');
+  assert.ok(!F12.eql(bn254.pairing(VK.alpha, VK.beta), F12.ONE), 'e(alpha, beta) != 1');
   // vk_x start point: Q0 = 2^-254 IC0, so 254 doublings of the Straus accumulator land on IC0
   const inv2k = bn254.fields.Fr.inv(bn254.fields.Fr.pow(2n, BigInt(NBITS)));
   const Q0 = VK.ic[0].multiply(inv2k); assert.ok(Q0.multiply(bn254.fields.Fr.pow(2n, BigInt(NBITS))).equals(VK.ic[0]));

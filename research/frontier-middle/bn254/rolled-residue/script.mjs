@@ -117,6 +117,41 @@ export function kJAdd() {
   return k.output(X3, m(sub(mul(Rm, sub(V, X3)), k.small(mul(Y, J), 2))), m(k.small(mul(Z, H), 2)));
 }
 
+// ---------------- coefficient kernels of the c-folds and the terminal (Frobenius / S_c(eta X)) ----------------
+// constants: psi = (gamma1^2, gamma1^3), Frobenius coefficients alpha_j / beta_j = Phi(gamma1^j), eta, omega = eta - 1
+export const CONSTS_OUT = ['g20', 'g21', 'g30', 'g31', 'al1', 'be1', 'al2', 'al3', 'al4', 'be4', 'al5', 'be5', 'eta', 'om'];
+export function kConsts() {
+  const k = new Kernel(); const m = (x) => k.mod(x); const g = [[k.c(GAMMA1.c0), k.c(GAMMA1.c1)]];
+  const fm = (a0, a1, b0, b1) => [m(k.sub(k.mul(a0, b0), k.mul(a1, b1))), m(k.add(k.mul(a0, b1), k.mul(a1, b0)))];
+  for (let j = 2; j <= 5; j++) g.push(fm(...g[j - 2], ...g[0]));
+  const eta = k.c(ETA);
+  // beta_2 = g21 and beta_3 = g31 are the same nodes as psi's constants: output once, alias below (BE)
+  return k.output(...g[1], ...g[2], ...g.flatMap(([g0, g1], i) => [m(k.sub(g0, k.small(g1, 9))), ...(i === 1 || i === 2 ? [] : [g1])]), eta, k.sub(eta, k.c(1n)));
+}
+export const BE = {1: 'be1', 2: 'g21', 3: 'g31', 4: 'be4', 5: 'be5'};
+export const G6 = ['G0', 'G1', 'G2', 'G3', 'G4', 'G5'];
+// c-fold at an addition event: d = +1 -> S_c(-X) (c^-1), d = -1 -> S_c(X) (c): G_j = (-d)^j s_j (input dg = d; env sc0..sc5)
+export function kCfold() {
+  const k = new Kernel(); const nd = k.neg(k.in('dg'));
+  return k.output(k.env('sc0'), k.mul(k.env('sc1'), nd), k.env('sc2'), k.mul(k.env('sc3'), nd), k.env('sc4'), k.mul(k.env('sc5'), nd));
+}
+// S_c(eta X) ([c^(p^2)]) without its X^6 term: G_j = s_j eta^j, eta^(0..5) = 1, eta, om, -1, -eta, -om (env sc0..sc5, eta, om)
+export function kScEta() {
+  const k = new Kernel(); const s = [0, 1, 2, 3, 4, 5].map((j) => k.env('sc' + j)), e = k.env('eta'), o = k.env('om'), m = (x) => k.mod(x);
+  return k.output(s[0], m(k.mul(s[1], e)), m(k.mul(s[2], o)), k.neg(s[3]), k.neg(m(k.mul(s[4], e))), k.neg(m(k.mul(s[5], o))));
+}
+// residue factors: Fr1 = Frob(S_c) = A + X^6 B with A = (s0 + 18, s_j al_j), B = (-1, s_j be_j); outputs A0..A5, B0..B5 of
+// sigma(Fr1)(X) = Fr1(-X) (factor (-1)^j) and a1..a5, b1..b5 of sigma(Fr1(eta X)) (factor (-eta)^j = 1, -eta, om, 1, -eta, om);
+// the j = 0 coefficients are shared by both factors (output once, copied by the caller). env sc0..sc5, al_j, be_j, eta, om
+export const RESIDUE_OUT = ['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'B0', 'B1', 'B2', 'B3', 'B4', 'B5', 'a1', 'a2', 'a3', 'a4', 'a5', 'b1', 'b2', 'b3', 'b4', 'b5'];
+export function kResidueAB() {
+  const k = new Kernel(); const s = [0, 1, 2, 3, 4, 5].map((j) => k.env('sc' + j)), m = (x) => k.mod(x), E = (n) => k.env(n);
+  const A = [k.add(s[0], k.c(18n)), ...[1, 2, 3, 4, 5].map((j) => m(k.mul(s[j], E('al' + j))))], B = [k.c(-1n), ...[1, 2, 3, 4, 5].map((j) => m(k.mul(s[j], E(BE[j]))))];
+  const sg = (x, j) => (j % 2 ? k.neg(x) : x);
+  const ne = k.neg(E('eta')), f2c = [null, ne, E('om'), null, ne, E('om')]; const tw = (x, j) => (f2c[j] ? m(k.mul(x, f2c[j])) : x);
+  return k.output(...A.map(sg), ...B.map(sg), ...A.slice(1).map((x, i) => tw(x, i + 1)), ...B.slice(1).map((x, i) => tw(x, i + 1)));
+}
+
 // ---------------- local-function call convention ----------------
 // arguments go on top under the function's own input names: consumed items are rolled, everything else picked.
 const CONSUMED = /^(F\d+|[BGD][XYZ][01]|L\d|xq[01]?|yq[01]?|G\d|U\d+|V\d+|px[01]|py[01])$/;
@@ -221,14 +256,7 @@ function gen(Lg, stop) {
   STOP('vkx');
 
   // ---- 3. constants: psi = (gamma1^2, gamma1^3), Frobenius coefficients alpha_j/beta_j = Phi(gamma1^j), omega = eta^2 = eta - 1 ----
-  { const k = new Kernel(); const m = (x) => k.mod(x); const g = [[k.c(GAMMA1.c0), k.c(GAMMA1.c1)]];
-    const fm = (a0, a1, b0, b1) => [m(k.sub(k.mul(a0, b0), k.mul(a1, b1))), m(k.add(k.mul(a0, b1), k.mul(a1, b0)))];
-    for (let j = 2; j <= 5; j++) g.push(fm(...g[j - 2], ...g[0]));
-    const eta = k.c(ETA);
-    // beta_2 = g21 and beta_3 = g31 are the same nodes as psi's constants: output once, alias below
-    k.output(...g[1], ...g[2], ...g.flatMap(([g0, g1], i) => [m(k.sub(g0, k.small(g1, 9))), ...(i === 1 || i === 2 ? [] : [g1])]), eta, k.sub(eta, k.c(1n)));
-    a.kernel(k, ['g20', 'g21', 'g30', 'g31', 'al1', 'be1', 'al2', 'al3', 'al4', 'be4', 'al5', 'be5', 'eta', 'om'], {iters: 800}); }
-  const BE = {1: 'be1', 2: 'g21', 3: 'g31', 4: 'be4', 5: 'be5'};
+  a.kernel(kConsts(), CONSTS_OUT, {iters: 800});
   // pair environments: B with P = -A, gamma with P = vk_x, delta with P = C; walks start at the affine points
   { const k = new Kernel(); const neg3 = (x) => k.mul(x, k.c(-3n));
     k.output(neg3(k.env('xA')), k.neg(k.env('yA')), k.neg(k.env('xA')), neg3(k.env('xV')), k.neg(k.env('xV')), neg3(k.env('xC')), k.neg(k.env('xC')));
@@ -258,8 +286,7 @@ function gen(Lg, stop) {
           t.pick(x0, 'xq0').pick(x1, 'xq1').pick('d', 'dg'); { const k = new Kernel(); const g = k.in('dg'); k.output(k.mul(k.env(y0), g), k.mul(k.env(y1), g)); t.kernel(k, ['yq0', 'yq1'], {iters: 50}); }
           addQ(t, w); }
         // c-fold: d = +1 -> S_c(-X) (c^-1), d = -1 -> S_c(X) (c): G_j = (-d)^j s_j
-        { const k = new Kernel(); const nd = k.neg(k.in('dg')); k.output(k.env('sc0'), k.mul(k.env('sc1'), nd), k.env('sc2'), k.mul(k.env('sc3'), nd), k.env('sc4'), k.mul(k.env('sc5'), nd));
-          t.pick('d', 'dg'); t.kernel(k, ['G0', 'G1', 'G2', 'G3', 'G4', 'G5'], {iters: 100}); }
+        t.pick('d', 'dg'); t.kernel(kCfold(), G6, {iters: 100});
         mulc(t);
       });
       s.drop('d'); s.pick('SCH').op(OP.SIZE, 1, 'SCH_', 'n').op(OP.NIP, 2, 'n').op(OP.NOT, 1, 'done');
@@ -291,20 +318,13 @@ function gen(Lg, stop) {
   STOP('termlines');
   // F *= m_alpha_beta (baked monic class rep) * S_c(eta X) ([c^(p^2)]): G_j = s_j eta^j, eta^(0..5) = 1, eta, om, -1, -eta, -om
   for (let j = 0; j < 6; j++) a.push(VKC.MAB[j], 'G' + j); mulc(a);
-  { const k = new Kernel(); const s = [0, 1, 2, 3, 4, 5].map((j) => k.env('sc' + j)), e = k.env('eta'), o = k.env('om'), m = (x) => k.mod(x);
-    k.output(s[0], m(k.mul(s[1], e)), m(k.mul(s[2], o)), k.neg(s[3]), k.neg(m(k.mul(s[4], e))), k.neg(m(k.mul(s[5], o)))); a.kernel(k, ['G0', 'G1', 'G2', 'G3', 'G4', 'G5'], {iters: 200}); }
+  a.kernel(kScEta(), G6, {iters: 200});
   mulc(a);
   STOP('pfin');
   // residue: odd part of F * sigma(Fr1(X)) * sigma(Fr1(eta X)) == 0, Fr1 = Frob(S_c) = A + X^6 B with
   // A = (s0 + 18, s_j al_j), B = (-1, s_j be_j); sigma(Fr1)(X) = Fr1(-X): factor (-1)^j; sigma(Fr1(eta X)): factor (-eta)^j = 1, -eta, om, 1, -eta, om
-  { const k = new Kernel(); const s = [0, 1, 2, 3, 4, 5].map((j) => k.env('sc' + j)), m = (x) => k.mod(x), E = (n) => k.env(n);
-    const A = [k.add(s[0], k.c(18n)), ...[1, 2, 3, 4, 5].map((j) => m(k.mul(s[j], E('al' + j))))], B = [k.c(-1n), ...[1, 2, 3, 4, 5].map((j) => m(k.mul(s[j], E(BE[j]))))];
-    const sg = (x, j) => (j % 2 ? k.neg(x) : x);
-    const ne = k.neg(E('eta')), f2c = [null, ne, E('om'), null, ne, E('om')]; const tw = (x, j) => (f2c[j] ? m(k.mul(x, f2c[j])) : x);
-    // j = 0 coefficients are shared by both factors: output once, copied below
-    k.output(...A.map(sg), ...B.map(sg), ...A.slice(1).map((x, i) => tw(x, i + 1)), ...B.slice(1).map((x, i) => tw(x, i + 1)));
-    a.kernel(k, ['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'B0', 'B1', 'B2', 'B3', 'B4', 'B5', 'a1', 'a2', 'a3', 'a4', 'a5', 'b1', 'b2', 'b3', 'b4', 'b5'], {iters: 1500});
-    a.pick('A0', 'a0').pick('B0', 'b0'); }
+  a.kernel(kResidueAB(), RESIDUE_OUT, {iters: 1500});
+  a.pick('A0', 'a0').pick('B0', 'b0');
   mul12(a, false, FN);
   STOP('p1');
   for (let j = 0; j < 6; j++) { a.rename('a' + j, 'A' + j); a.rename('b' + j, 'B' + j); }

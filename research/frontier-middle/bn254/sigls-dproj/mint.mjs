@@ -2,10 +2,13 @@
 // scalars (VERIFIER_DIR/src/checkpoints/pairing-vectors.json); the trapdoor is checked against the fixture VK.
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
-import {readFileSync} from 'node:fs';
+import {existsSync, readFileSync} from 'node:fs';
 import {bn254} from '@noble/curves/bn254.js';
 import {FIXTURES, r, PI, GLS_OFFSET, g1, g2} from './math.mjs';
-const VDIR = process.env.VERIFIER_DIR ?? new URL('../../../../zk-verifier-bench', import.meta.url).pathname;
+// VERIFIER_DIR: a zk-verifier-bench checkout. Default: the sibling of this repository's checkout, as zk-verifier-bench/
+// (side-by-side clones) or bench/ (the work/<task>/{src,bench} worktree layout), whichever has the vectors.
+const REPO_PARENT = new URL('../../../../../', import.meta.url).pathname;
+const VDIR = process.env.VERIFIER_DIR ?? (['zk-verifier-bench', 'bench'].map((d) => REPO_PARENT + d).find((d) => existsSync(d + '/src/checkpoints/pairing-vectors.json')) ?? REPO_PARENT + 'zk-verifier-bench');
 const s = JSON.parse(readFileSync(VDIR + '/src/checkpoints/pairing-vectors.json')).scalars;
 const modr = (x) => ((x % r) + r) % r, inv = (x) => bn254.fields.Fr.inv(modr(x));
 const G1 = bn254.G1.Point.BASE, G2 = bn254.G2.Point.BASE;
