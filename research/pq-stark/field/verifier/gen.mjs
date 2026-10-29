@@ -89,7 +89,8 @@ export function makeCtx(prm, opts = {}) {
   // final polynomial: 'gpd' = group-packed dot product (Track 5 field), 'grp' = Track 4 packed groups + Horner
   const FP = opts.fp ?? 'gpd';
   const FOLD = opts.fold ?? 'pk';   // 'pk': packed fold values, PAIRK (Track 5); 'rot': PAIRP; 'pair': Track 4
-  const DEEP = opts.deep ?? 'pk';    // 'pk': DPK, packed DEEP numerators from packed gamma columns (Track 5); 'pt': Track 4 DEEPPT   // 'rot': PAIRP with packed rotation columns of beta (Track 5); 'pair': Track 4 MULF + PAIR
+  const DEEP = opts.deep ?? 'pk';
+  const XTAB = opts.xtab ?? true;    // x0 = 7 w^idx from runtime 4-bit window tables on the stack (Track 5) instead of XPOW    // 'pk': DPK, packed DEEP numerators from packed gamma columns (Track 5); 'pt': Track 4 DEEPPT   // 'rot': PAIRP with packed rotation columns of beta (Track 5); 'pair': Track 4 MULF + PAIR
   const GH = Math.min(opts.gpdH ?? 8, D), GG = D / GH;   // gpd: H groups packed per integer, GG terms per query
   if (FP === 'gpd' && !Number.isInteger(GG)) throw new Error('gpd: D not a multiple of H');
   const SLOT = 136;                       // packed slot width: sums of 32 products of 64-bit values are < 2^133
@@ -103,7 +104,7 @@ export function makeCtx(prm, opts = {}) {
 
   const gam = (j) => names(`ga${j}_`, e);
   const dzOut = e === 3 ? ['m0', 'z1', 'z2', 'K0', 'K1', 'K2', 'cA', 'cB'] : ['m0', 'z1', 'cN'];
-  return {prm, opts, e, s, h, r, a, D, sizes, trees, e8, G, SLOT, fns, defFn, sizes_, mark, trunc, F, gam, dzOut, FP, GH, GG, FOLD, DEEP};
+  return {prm, opts, e, s, h, r, a, D, sizes, trees, e8, G, SLOT, fns, defFn, sizes_, mark, trunc, F, gam, dzOut, FP, GH, GG, FOLD, DEEP, XTAB};
 }
 
 export function defineShared(c) {
@@ -193,7 +194,7 @@ export function defineShared(c) {
   F.POWS = defFn('POWS', asm('DUP', G - 1, 'TOALTSTACK', 'BEGIN', 'DUP', 2, 'PICK', 'MUL', P, 'MOD', 'SWAP', 'FROMALTSTACK', '1SUB', 'DUP', 'TOALTSTACK', 'NOT', 'UNTIL', 'FROMALTSTACK', 'DROP', 'DROP'));
   }
   // XPOW: v -> 7 * w_N^v (square and multiply over the bits of v)
-  if (opts.fast) {
+  if (c.XTAB) { /* no XPOW */ } else if (opts.fast) {
     const w = rou(sizes[0]), bits = Math.log2(sizes[1]), windows = Math.ceil(bits / 4);
     const tables = Array.from({length: windows}, (_, k) => cat(...Array.from({length: 16}, (_, j) => le8((k === 0 ? 7n : 1n) * powp(w, BigInt(j) << BigInt(4 * k)) % P))));
     F.XPOW = defFn('XPOW', asm(
@@ -436,6 +437,14 @@ export function emitLiftTables(c, S, bottomIdx, keepBelow) {
   // everything the query function reads must sit above the index list
   if (bottomIdx) { const lo = S.st.indexOf(bottomIdx); for (const x of S.st.slice(0, lo)) if (!keepBelow.test(x)) S.roll(x); }
   // runtime-indexed tables per distinct arity a_i (i >= 1): Wp<a>_<j> = w_a^j, Wn<a>_<j> = w_a^-j (loops)
+  // x0 tables (XTAB): XT<k>_<j> = (k = 0 ? 7 : 1) * w^(j 16^k), w = w_N0, windows k over the bits of an index < N1
+  if (c.XTAB) {
+    const w = rou(sizes[0]), nw = Math.ceil(Math.log2(sizes[1]) / 4);
+    for (let k = 0; k < nw; k++) {
+      const ck = powp(w, 1n << BigInt(4 * k));
+      S.raw([k === 0 ? 7 : 1, 15, 'BEGIN', 'OVER', ck, 'MUL', P, 'MOD', 'SWAP', '1SUB', 'DUP', 'NOT', 'UNTIL', 'DROP'], 0, Array.from({length: 16}, (_, j) => `XT${k}_${j}`));
+    }
+  }
   const arities = [...new Set(a.slice(1))];
   for (const ai of arities) {
     for (const [nm, w] of [['Wp', rou(ai)], ['Wn', invp(rou(ai))]]) {
@@ -579,7 +588,21 @@ export function emitQuery(c, Q) {
   const {prm, opts, e, s, h, r, a, D, sizes, trees, e8, G, SLOT, fns, defFn, mark, trunc, F, gam, dzOut} = c;
   void prm; void opts; void s; void h; void r; void D; void trees; void e8; void G; void SLOT; void fns; void mark; void trunc; void gam; void dzOut; void sizes;
   const k0 = a[0];
-  Q.pick('idx'); Q.raw([F.XPOW, 'INVOKE'], 1, ['x0']);
+  if (c.XTAB) {
+    // x0 = prod_k XT<k>[nibble_k(idx)] mod p; [x v] -> per window: v & 15 picks the table entry, v >>= 4
+    const nw = Math.ceil(Math.log2(sizes[1]) / 4);
+    Q.pick('idx', 'v');
+    for (let k = 0; k < nw; k++) {
+      const last = k === nw - 1;
+      if (!last) Q.raw(['DUP'], 0, ['n']);
+      const d = Q.depth(`XT${k}_0`) - 1;     // depth at the OP_PICK (the nibble is consumed)
+      Q.raw([...(last ? [] : [16, 'MOD']), d, 'SWAP', 'SUB', 'PICK'], 1, ['t']);
+      // now [.. (x) v t] (not last) or [.. (x) t] (last)
+      if (k === 0) { if (last) { Q.rename('t', 'x0'); break; } Q.raw(['SWAP', 4, 'RSHIFTNUM'], 2, ['x', 'v']); continue; }
+      if (last) { Q.raw(['MUL', P, 'MOD'], 2, ['x0']); break; }
+      Q.raw(['ROT', 'MUL', P, 'MOD', 'SWAP', 4, 'RSHIFTNUM'], 3, ['x', 'v']);
+    }
+  } else { Q.pick('idx'); Q.raw([F.XPOW, 'INVOKE'], 1, ['x0']); }
   for (let i = 1; i < r; i++) { Q.pick('idx'); Q.raw([...(i > 1 ? [sizes[i], 'MOD'] : []), Math.log2(sizes[i + 1]), 'RSHIFTNUM'], 1, ['sl' + i]); }
   Q.drop('idx');
   mark(Q, 'q-entry');
