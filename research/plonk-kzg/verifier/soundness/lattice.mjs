@@ -47,8 +47,11 @@ assert.ok(dot(b1, b1) > 2n * B * B, 'shortest vector too short: injectivity fail
 out.lattice = {
   v1: b1.map(String), v2: b2.map(String), v1ComponentBits: b1.map(bits), v2ComponentBits: b2.map(bits),
   log2_lambda1: log2(dot(b1, b1)) / 2, log2_lambda2: log2(dot(b2, b2)) / 2, log2_maxDifferenceNorm: log2(2n * B * B) / 2,
-  log2_minkowskiBound: (log2(r) + Math.log2(4 / Math.sqrt(3))) / 2,
+  cosAngle: Number(dot(b1, b2)) / Math.sqrt(Number(dot(b1, b1)) * Number(dot(b2, b2))), log2_sqrt_r: log2(r) / 2,
+  log2_hermiteBound: (log2(r) + Math.log2(2 / Math.sqrt(3))) / 2, // lambda1^2 <= (2/sqrt 3) det
+  log2_minkowskiBound: (log2(r) + Math.log2(4 / Math.PI)) / 2,      // lambda1^2 <= (4/pi) det
 };
+assert.ok(out.lattice.log2_lambda1 <= out.lattice.log2_hermiteBound);
 
 // 3. t' range
 assert.ok(1n << 128n < r);

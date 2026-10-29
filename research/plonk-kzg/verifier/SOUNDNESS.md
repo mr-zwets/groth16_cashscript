@@ -21,9 +21,12 @@ File references are to this directory: `plonk.mjs` (value-level verifier), `scri
   [τ]_2 = τ·[1]_2. τ exists as a fixed constant; nobody needs to know it for the argument.
 - φ(x, y) = (β·x, y) is the G1 endomorphism with φ = [λ], λ² + λ + 1 ≡ 0 (mod r). The pair (β, λ) is the one in
   `math.mjs:138-146` (re-checked by the script).
+- **Scope.** The VK has no BSB22 commitments (`Qcp` empty, no `api.Commit`), and k ≥ 1 public inputs is the tested
+  case. The references are gnark v0.16.4 and gnark-crypto v0.21.1-0.20260913224755-1409fe592052.
 - H = SHA-256. Q is the total number of H evaluations, including those made while checking the adversary's output.
-- `LE(b)` / `BE(b)` is the unsigned integer of the bytes b, read little- / big-endian. In script this is
-  `SPLIT`, then `CAT 0x00`, then `BIN2NUM`, which gives exactly the unsigned value.
+- `LE(b)` / `BE(b)` is the unsigned integer of the bytes b, read little- / big-endian. In script, the LE path is
+  `SPLIT`, then `CAT 0x00`, then `BIN2NUM`, which gives exactly the unsigned value. The BE path (`DBP`/`DBR`, `BMR`)
+  first applies `REVERSEBYTES`, then does the same (`script.mjs:83, :89`; `multi.mjs:77, :82`).
 
 **Hash inputs, exactly as implemented.** "PROOF" is the 768-byte proof, in the FORMAT.md layout. "X[0..64)" is Λ' as
 gnark raw bytes (BE x ‖ BE y).
@@ -73,9 +76,16 @@ in `BatchVerifyMultiPoints`. Here π̃ is π with `ClaimedValues[0] := r0`. Equi
 
 - **A1 (ROM).** SHA-256 is a random oracle. This also covers HASH256 in P2SH32.
 - **A2 (PLONK).** ε_PLONK(Q) is the probability that a Q-query adversary outputs (x, π̃), gnark-valid, with x ∉ L_vk.
-  - It is bounded by PLONK's soundness theorem (Gabizon–Williamson–Ciobotaru 2019) in the AGM under q-DLOG, with
-    Fiat–Shamir in the ROM, as implemented by gnark. A gnark-valid proof passes the batched check for every
-    batching scalar, so a false gnark-valid proof also breaks the verifier that theorem analyses.
+  - This is an **assumption about gnark's Fiat–Shamir instantiation**, not a consequence proved here. That
+    instantiation has three parts:
+    - the transcript γ, β, α, ζ;
+    - the verifier-recomputed opening r0 of the linearised polynomial, in place of a proof value;
+    - v from gnark-crypto `kzg.deriveGamma`, which binds ζ, the six digests and the six claimed values (plus z̄).
+  - It differs in these details from the protocol analysed by Gabizon–Williamson–Ciobotaru, "PLONK" (IACR ePrint
+    2019/953, latest version). That paper proves soundness in the AGM under q-DLOG, with Fiat–Shamir in the ROM. It
+    is supporting evidence for A2, not a proof of it.
+  - A gnark-valid proof passes the batched check for every batching scalar. So A2 concerns exactly the proofs that
+    satisfy both KZG equations.
   - For knowledge soundness, read "x ∉ L_vk" as "the AGM extractor fails".
   - Its non-computational terms are Q·O(n)/r. For n ≤ 2^28 that is roughly Q·2^-220. This order of magnitude is not
     re-derived here.
@@ -98,7 +108,20 @@ in `BatchVerifyMultiPoints`. Here π̃ is π with `ClaimedValues[0] := r0`. Equi
   - `OP_INPUTBYTECODE(i)` returns input i's unlocking bytecode.
   - libauth 3.1.0-next.8 was checked. A BCHN node was not run.
 - **A6 (SI, cited).** This is the SI-GLS argument (`chunked/bn254/sound-si-gls/README.md`, "Soundness argument")
-  instantiated with two fixed G2 chains (both "δ-chains", ℓ0 = 1). Fix the input of q_h0. This fixes P*, P_R, S_c and
+  instantiated with two fixed G2 chains (both "δ-chains"). The cited argument needs four conditions; this fork meets
+  them as follows.
+  - **P* and P_R are affine G1 points with y ≠ 0.** They are finite and affine by A4 (every MSM ends in an affine add or
+    a checked conversion). y ≠ 0 because G1 has odd order, so it has no 2-torsion.
+  - **Every line factor is a nonzero polynomial.** Both chains are baked δ-chains. Their lines are
+    `linePoly(x_P, y_P, 1, −λ_j, c_j)` (`si.mjs:29`, `math.mjs:134-135`), i.e. y_P·Φ(1) + x_P·X·Φ(−λ_j) + X³·Φ(c_j).
+    The y_P coefficient is 1; SI-GLS's README calls it ℓ0. Its degree-0 coefficient is y_P ≠ 0.
+  - **The terminal W is nonzero.** W = Fr1(X)·Fr1(ηX), with Fr1 = `frob1Monic(S_c)`, whose X⁶ coefficient is −1
+    (`math.mjs:92`, `si.mjs:57`). A product of nonzero polynomials is nonzero. The states are monic of degree 6.
+  - **The degree and the quotient cap** come from this build's schedule (`si.mjs:18-21`), as listed below. The cap is
+    enforced: exactly 60 words in the chain (size pinned in `multi.mjs:229`), 1–60 words in the single-input build
+    (`script.mjs:293-296`). Every word is < p.
+
+  Fix the input of q_h0. This fixes P*, P_R, S_c and
   S_1..S_33. If FE(Miller(P*, [1]_2)·Miller(P_R, [τ]_2)) ≠ 1, the SI checks pass with probability at most
   1.134·(33 + 132)/p ≈ 2^-246.05 over (ρ, z), for any WQ of at most 60 words:
   - 34 identities;
@@ -112,8 +135,12 @@ Let Bad be the union of three events:
 - **B1:** two distinct queries have outputs that are congruent mod r. Equal outputs are a special case.
 - **B2:** a query's output, or its residue mod r, equals a digest field of an earlier query. The fields are γRaw, βRaw,
   αRaw, BE32(ζ), vRaw, uRaw, h0 and ρRaw, at most 2 per query and located by its length.
-- **B3:** some query returns the HASH256 value of the redeem R, or the SHA-256 constant of C0, C1, TF or a DS slice, on
-  an input other than the intended one. These are second preimages of at most 8 fixed targets.
+- **B3:** some query hits one of 7 fixed targets on an input other than the intended one. These are second preimages:
+  - for the P2SH32 hash, two targets: a query on an input ≠ R that returns SHA256(R) (the inner hash), and a query on
+    an input ≠ SHA256(R) that returns HASH256(R) (the outer hash);
+  - the SHA-256 constants of C0, C1 and TF, and of the two DS slices.
+  
+  Bounding by 8 targets leaves slack.
 
 Each residue mod r has probability at most ⌈2^256/r⌉/2^256 = 6/2^256. Hence:
 - Pr[B1] ≤ 3Q²·2^-256;
@@ -159,8 +186,9 @@ negligible probability and affects completeness only.
 - L has basis (r, 0), (−λ, 1) and determinant r. Lagrange–Gauss reduction (script) gives the reduced basis
   - v1 = (147946756881789319000765030803803410728, −9931322734385697763),
   - v2 = (9931322734385697763, 147946756881789319010696353538189108491),
-  with 127/64-bit components and ‖v1‖ = ‖v2‖ ≈ 2^126.80. The lattice is hexagonal because λ is a cube root of unity.
-  The Minkowski bound is 2^127.40.
+  with 127/64-bit components and ‖v1‖ ≈ ‖v2‖ ≈ √r ≈ 2^126.80. The norms are not exactly equal.
+  - The basis is nearly orthogonal: cos ∠(v1, v2) ≈ −4.5·10^-39.
+  - For comparison, the general bounds on λ1 are Hermite √(2r/√3) = 2^126.90 and Minkowski √(4r/π) = 2^126.97.
 - v1 of a Lagrange-reduced basis is a shortest nonzero vector, so λ1(L) ≈ 2^126.80.
 - But ‖(a, b)‖ < √2·2^64 = 2^64.5 < λ1(L). Contradiction. ∎
 
@@ -225,8 +253,12 @@ A6 holds for either rule.
        hash-checked).
    - By A5 the unlocking is a sequence of minimal pushes, whose stack items are, in order, the nf fixed pushes, the
      slope pieces, FILL and the redeem.
-   - A minimal push of L ≥ 2 bytes has a unique header h(L): 1 byte if L ≤ 75, 2 if L ≤ 255, 3 if L ≤ 65,535. Every
-     fixed push has L ≥ 32.
+   - A minimal push of L bytes has a unique encoding whenever L = 0 or L ≥ 2:
+     - L = 0 is `OP_0`, h = 1;
+     - otherwise h(L) is 1 byte if L ≤ 75, 2 if L ≤ 255, 3 if L ≤ 65,535.
+     
+     Every fixed push has L ≥ 32, except PI when k = 0, which is empty and pushed as `OP_0`. So the encoding of every
+     fixed push is fixed by its size. Only L = 1 could have two encodings, through `OP_1..OP_16`.
    - So fixed push n of role i occupies exactly the bytes [off_n, off_n + L_n) of input i's unlocking bytecode, with
      off_n = Σ_{m<n}(h(L_m) + L_m) + h(L_n). This is `offsetOf`, `:66`.
 

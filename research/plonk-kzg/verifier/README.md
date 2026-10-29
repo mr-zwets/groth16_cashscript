@@ -195,8 +195,9 @@ exponentiation, is 12.3M. The transcript and the Fr work are negligible.
 - **Not verified:**
   - formula correctness is tested, not proved;
   - the soundness argument ([SOUNDNESS.md](SOUNDNESS.md)) is a paper proof that assumes formula correctness. Its
-    bound is ε_PLONK + Q·2^-128 + Q·2^-246 + Q²·2^-252 for Q hash queries. It found no unenforced step; one remote read
-    (`multi.mjs:372-373`) skips the push-header check, which the argument does not need;
+    bound is ε_PLONK + Q·2^-128 + Q·2^-246 + Q²·2^-252 for Q hash queries. It found no unenforced step. Three remote reads skip
+    the push-header check: ST's read of the Wζω slice of TV (`multi.mjs:372-373`), and the two hash-checked C0/C1 loads
+    of the redeem (`:301`). The argument does not need header checks (SOUNDNESS.md §7);
   - no BCHN node run;
   - BCHN-adjusted figures are computed by adding DEFINE body bytes. In the chain this is +21.7k per input, which the 64 B
     FILL slack (51k op) covers.
