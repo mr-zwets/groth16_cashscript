@@ -20,7 +20,7 @@ var scalarOffsets = []int{384, 416, 448, 480, 512, 608}
 
 func g1Raw(p *curve.G1Affine) []byte { b := p.RawBytes(); return b[:] }
 func g2Raw(p *curve.G2Affine) []byte { b := p.RawBytes(); return b[:] }
-func frRaw(e *fr.Element) []byte    { b := e.Bytes(); return b[:] }
+func frRaw(e *fr.Element) []byte     { b := e.Bytes(); return b[:] }
 
 // encodeVK: see FORMAT.md "Verifying key" (944 bytes).
 func encodeVK(vk *plonkbn254.VerifyingKey) []byte {

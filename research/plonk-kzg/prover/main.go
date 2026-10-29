@@ -146,6 +146,7 @@ func merkleDef() circuitDef {
 type validProof struct {
 	PublicInputs []string `json:"publicInputs"`
 	Proof        string   `json:"proof"`
+	LinOpening   string   `json:"linOpening"`
 	ProveMillis  int64    `json:"proveMillis"`
 }
 
@@ -199,8 +200,9 @@ func runCircuit(c circuitDef, nProofs int, rng *rand.Rand, out string) *srsInfo 
 			"g1Points":  len(canonical.(*kzgbn254.SRS).Pk.G1),
 		},
 		Notes: map[string]string{
-			"proofs":   "gnark's prover blinds with crypto/rand, so re-running gives different (equally valid) proofs",
-			"tampered": "expect is the reference verdict; gnark is gnark's own Verify on the same tampered struct, or n/a for byte-level encodings gnark's structs cannot hold",
+			"linOpening": "ClaimedValues[0] of gnark's proof struct (opening of the linearised polynomial at zeta); not part of the 768-byte proof, the verifier recomputes it (verify.mjs cross-checks it equals r0)",
+			"proofs":     "gnark's prover blinds with crypto/rand, so re-running gives different (equally valid) proofs",
+			"tampered":   "expect is the reference verdict; gnark is gnark's own Verify on the same tampered struct, or n/a for byte-level encodings gnark's structs cannot hold",
 		},
 	}
 	vkHex := encodeVK(vk)
@@ -223,7 +225,8 @@ func runCircuit(c circuitDef, nProofs int, rng *rand.Rand, out string) *srsInfo 
 		checkPub(pw, pub)
 		proofs = append(proofs, p)
 		pubs = append(pubs, pub)
-		vf.Valid = append(vf.Valid, validProof{PublicInputs: hexFrs(pub), Proof: hex.EncodeToString(p.MarshalSolidity()), ProveMillis: ms})
+		vf.Valid = append(vf.Valid, validProof{PublicInputs: hexFrs(pub), Proof: hex.EncodeToString(p.MarshalSolidity()),
+			LinOpening: hex.EncodeToString(frRaw(&p.BatchedProof.ClaimedValues[0])), ProveMillis: ms})
 	}
 	vf.Tampered = makeTampered(vk, proofs, pubs)
 	rejected := 0

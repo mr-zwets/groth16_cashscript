@@ -19,16 +19,17 @@ const G2 = bn254.G2.Point;
 const Fp12 = bn254.fields.Fp12;
 
 // ---- operation counter (PROTOCOL.md counts are printed from here) ----
-const C = { g1Mul: 0, g1MulFixedBase: 0, g1MulProofBase: 0, g1Add: 0, frInv: 0, frExpSquarings: 0, sha256: [], pairings: 0, onCurve: 0 };
-const resetCounts = () => { Object.assign(C, { g1Mul: 0, g1MulFixedBase: 0, g1MulProofBase: 0, g1Add: 0, frInv: 0, frExpSquarings: 0, sha256: [], pairings: 0, onCurve: 0 }); };
+let counting = true;
+const C = { frMul: 0, g1Mul: 0, g1MulFixedBase: 0, g1MulProofBase: 0, g1Add: 0, frInv: 0, frExpSquarings: 0, sha256: [], pairings: 0, onCurve: 0 };
+const resetCounts = () => { Object.assign(C, { frMul: 0, g1Mul: 0, g1MulFixedBase: 0, g1MulProofBase: 0, g1Add: 0, frInv: 0, frExpSquarings: 0, sha256: [], pairings: 0, onCurve: 0 }); };
 
 // ---- Fr ----
 const md = (a) => ((a % R) + R) % R;
 const add = (a, b) => md(a + b);
 const sub = (a, b) => md(a - b);
-const mul = (a, b) => md(a * b);
+const mul = (a, b) => { if (counting) C.frMul++; return md(a * b); };
 const powR = (a, e, count = true) => { let r = 1n, b = md(a); while (e > 0n) { if (e & 1n) r = mul(r, b); b = mul(b, b); e >>= 1n; if (count) C.frExpSquarings++; } return r; };
-const inv = (a) => { if (md(a) === 0n) throw new Error('inverse of zero'); C.frInv++; return powR(a, R - 2n, false); };
+const inv = (a) => { if (md(a) === 0n) throw new Error('inverse of zero'); C.frInv++; counting = false; const x = powR(a, R - 2n, false); counting = true; return x; };
 
 // ---- bytes ----
 const hexToBytes = (h) => Uint8Array.from(Buffer.from(h, 'hex'));
@@ -198,7 +199,8 @@ if (args[0] === '--trace') {
   for (const f of files) {
     const d = load(f); const vk = parseVK(d.vk.hex);
     let acc = 0, rej = 0; const reasons = {};
-    for (const p of d.valid) { total++; const r = tryVerify(vk, p.proof, p.publicInputs); if (r.ok) acc++; else { bad++; console.log(`UNEXPECTED reject ${f} valid: ${r.reason}`); } }
+    for (const p of d.valid) { total++; let r0; const r = (() => { try { return { ok: verify(vk, p.proof, p.publicInputs, (o) => { if (o.r0 !== undefined) r0 = o.r0; }) }; } catch (err) { return { ok: false, reason: err.message }; } })();
+      if (p.linOpening && r0 !== BigInt('0x' + p.linOpening)) { bad++; console.log(`UNEXPECTED ${f}: recomputed r0 differs from gnark's ClaimedValues[0]`); } if (r.ok) acc++; else { bad++; console.log(`UNEXPECTED reject ${f} valid: ${r.reason}`); } }
     for (const p of d.tampered) {
       total++; const r = tryVerify(vk, p.proof, p.publicInputs);
       if (r.ok) { bad++; console.log(`UNEXPECTED accept ${f} ${p.name}`); } else { rej++; const k = r.reason.replace(/^(L|R|O|H\d|Z|Wzeta|WzetaOmega|public input \d|l|r|o|s1|s2|z\(zeta\*omega\))(:| >=)/, '<x>$2'); reasons[k] = (reasons[k] ?? 0) + 1; }

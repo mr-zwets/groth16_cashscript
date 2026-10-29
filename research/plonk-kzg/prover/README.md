@@ -1,0 +1,124 @@
+# plonk-kzg prover: gnark PLONK (KZG, BN254, SHA-256) proofs for a CashVM verifier
+
+Track 6, Prover phase. This is research, not a leaderboard entry.
+
+This module produces gnark PLONK proofs in a form a CashVM verifier can check. It also contains an independent
+JS reference verifier, which is the spec the on-chain verifier will follow.
+- Prover: gnark **v0.16.4** with gnark-crypto **v0.21.1-0.20260913224755-1409fe592052**. This is the exact
+  pseudo-version gnark v0.16.4 requires; both are pinned in `go.mod`.
+- Backend: PLONK over BN254 with KZG commitments, `plonk.Setup / Prove / Verify`, default options.
+- Fiat-Shamir: gnark's defaults, `ChallengeHash = KZGFoldingHash = sha256`. Every hash is a plain padded
+  SHA-256 of a byte string, so `OP_SHA256` computes all of them.
+- No BSB22 / `Commit` custom-gate commitments: neither circuit needs them, and `main.go` refuses a VK that has any.
+
+Files:
+- The byte format is in [FORMAT.md](FORMAT.md).
+- The verifier, step by step, with operation counts, is in [PROTOCOL.md](PROTOCOL.md).
+- The reference verifier is [verify.mjs](verify.mjs).
+
+## Result in one paragraph
+
+gnark's stock PLONK verifier, with its SHA-256 transcript, is reproduced exactly by an independent BigInt
+verifier.
+
+Checked on 164 cases:
+- **All 10 valid proofs are accepted** (5 per circuit). On each one, the recomputed linearised opening equals
+  gnark's own `ClaimedValues[0]`.
+- **All 154 tampered variants are rejected**.
+- gnark's own `Verify` also rejects all 75 tampered variants its structs can represent.
+
+Shape of the verifier:
+- A proof is **768 bytes**: 9 G1 points and 6 scalars, in gnark's `MarshalSolidity` layout.
+- One verification costs **19 G1 scalar multiplications** (8 with fixed bases), **1 Fr inversion**,
+  **6 SHA-256 calls** (37 blocks) and **one 2-pairing product whose G2 points are both fixed SRS constants**.
+- This is the same for both circuits (n = 2^3 and n = 2^14), so the cost is essentially independent of
+  circuit size.
+
+Universality:
+- The two circuits share one SRS.
+- The verifier needs only `[1]_1`, `[1]_2` and `[τ]_2` from it. Everything else in a VK is derived from the
+  circuit by `plonk.Setup`, which uses no secret.
+
+## Circuits
+
+| name | public inputs | statement | constraints | n | prove (4 threads) |
+|---|---|---|---:|---:|---:|
+| `mul2` | `n0, n1` | knows a, b with `a·b = n0` and `a+b = n1` | 4 | 2^3 | ~2 ms |
+| `merkle16` | `root, nullifierHash, context` | `nullifierHash = MiMC(nullifier)`; the leaf `MiMC(nullifier, trapdoor)` is in the depth-16 MiMC Merkle tree with root `root`; `context` is bound as a public input | 15,110 | 2^14 | ~205 ms |
+
+**mul2 and the Groth16 fixtures.** The bench's Groth16 fixtures prove no circuit:
+- Their VK is built from known scalars, and each proof is solved in the exponent
+  (`zk-verifier-bench/docs/proof-generality.md`, `src/checkpoints/gen-pairing-vectors.ts`).
+- They only fix the interface: two public inputs `n0, n1`, any values.
+- `mul2` is the closest real statement with that interface. The two public inputs are arbitrary field
+  elements, and the statement holds because the prover knows a and b.
+- What matters for the verifier is the shape (k = 2 public inputs, a tiny circuit), and that is the same.
+- A Groth16 VK from the bench cannot be reused: PLONK keys are a different object.
+
+**merkle16** is the application-shaped circuit:
+- It is Semaphore/Tornado-shaped membership with a nullifier, using gnark's `std/hash/mimc` (MiMC-BN254,
+  Miyaguchi-Preneel) as the SNARK-friendly hash.
+- A covenant would keep `root` in its state and record `nullifierHash` to prevent double use.
+- It would set `context` to a hash of the spending transaction's outputs, reduced mod r, so that a proof cannot
+  be replayed in another transaction.
+- `context` has no constraint of its own. In PLONK a public input is bound by the PI(X) term of the gate
+  identity, and the `pi.2.*` tampered vectors confirm the binding.
+
+## SRS
+
+The vectors use a test SRS with a public toxic value: `τ = SHA256(seed) mod r`, through gnark's
+`unsafekzg.WithToxicSeed`. **Anyone can forge proofs for these VKs.** FORMAT.md "SRS" covers two things:
+- How a deployment loads a public ceremony (Aztec Ignition, or the perpetual powers of tau) instead.
+- The circuit-size limit: `n ≤ 2^26` with Ignition's 100.8M powers, and the field cap of `n ≤ 2^28`.
+
+Loading a ceremony was not exercised here.
+
+## Vectors
+
+| | mul2 | merkle16 |
+|---|---:|---:|
+| VK bytes | 944 | 944 |
+| proof bytes | 768 | 768 |
+| public input bytes | 64 | 96 |
+| valid proofs | 5 | 5 |
+| tampered | 76 | 78 |
+| tampered also checked by gnark Verify | 37 | 38 |
+
+- Files: `vectors/mul2.json` and `vectors/merkle16.json`.
+- The tamper classes cover every proof point (another valid point, its negation, the identity, off curve,
+  `x+p`, `y+p`), every scalar (`+1`, `+r`), every public input (`+1`, `+r`, swapped), mix-and-match proofs, and
+  wrong lengths. FORMAT.md lists them.
+- How `verify.mjs` rejected them, for both circuits together:
+  - 57 by the pairing check
+  - 18 identity points
+  - 18 off-curve points
+  - 36 non-canonical coordinates
+  - 17 values ≥ r
+  - 8 by size
+
+## Build and regenerate
+
+```
+./gen-vectors.sh            # GOMAXPROCS=4 nice go run . ; nice node verify.mjs
+npm install                 # once: @noble/curves 2.2.0 for verify.mjs
+node verify.mjs             # check all vectors: OK: 164 cases, 0 unexpected
+node verify.mjs --counts    # operation counts of one verification per circuit
+node verify.mjs --trace mul2 0   # challenges and intermediate values
+```
+
+- The VKs are byte-identical across runs.
+- The proofs differ, because gnark blinds with `crypto/rand`.
+- The whole run takes a few seconds with 4 threads.
+
+## Limitations and open points
+
+- **u is not pinned by the vectors.** The multi-point batching challenge follows gnark's Solidity template.
+  gnark's Go verifier uses a random u, and the verdict on a valid proof does not depend on u. The derivation
+  was taken from the template text and not executed against an EVM. A CashVM verifier is free to choose any
+  binding derivation of u. γ, β, α, ζ and v, by contrast, are pinned: a wrong value rejects the valid vectors.
+- **Deviations from gnark's Go verifier** (PROTOCOL.md): proof points equal to the identity are rejected, and
+  encodings are strict.
+- **Test SRS only.** No ceremony file was converted.
+- **Soundness rests on PLONK and KZG** under the q-SDH/AGM assumptions, with gnark's transcript. This track
+  only claims that `verify.mjs` reproduces gnark's verifier and rejects the tampered set.
+- **snarkjs** PLONK uses Keccak. Emulating Keccak on CashVM was not measured; see the end of PROTOCOL.md.
