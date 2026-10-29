@@ -111,5 +111,236 @@
     "d1429a5f0cd711b0c3ef64c43dcab7ea694b62d798b5f265cb335db19ed1deb4",
     "b36c9995d68a4da3bc846ca0a071657d5063df17437a1ead0657dbe0b058a0e4",
     "6226366bfa420281047ec540fb190a930b1ba385f2063acc3e1c88c827ebe561"
+  ],
+  "tampered": [
+    {
+      "name": "trace root",
+      "patch": [
+        {
+          "at": 1,
+          "hex": "74"
+        }
+      ]
+    },
+    {
+      "name": "quotient root",
+      "patch": [
+        {
+          "at": 33,
+          "hex": "91"
+        }
+      ]
+    },
+    {
+      "name": "first FRI commit-phase root",
+      "patch": [
+        {
+          "at": 233,
+          "hex": "c6"
+        }
+      ]
+    },
+    {
+      "name": "last FRI commit-phase root",
+      "patch": [
+        {
+          "at": 297,
+          "hex": "27"
+        }
+      ]
+    },
+    {
+      "name": "OOD trace_local[0]",
+      "patch": [
+        {
+          "at": 65,
+          "hex": "77"
+        }
+      ]
+    },
+    {
+      "name": "OOD trace_next[0]",
+      "patch": [
+        {
+          "at": 113,
+          "hex": "d3"
+        }
+      ]
+    },
+    {
+      "name": "OOD quotient chunk 0",
+      "patch": [
+        {
+          "at": 161,
+          "hex": "e0"
+        }
+      ]
+    },
+    {
+      "name": "final polynomial coeff 0 (PoW breaks)",
+      "patch": [
+        {
+          "at": 329,
+          "hex": "df"
+        }
+      ]
+    },
+    {
+      "name": "query PoW witness + 1",
+      "patch": [
+        {
+          "at": 3401,
+          "hex": "fc"
+        }
+      ]
+    },
+    {
+      "name": "input leaf trace q0[0]",
+      "patch": [
+        {
+          "at": 3409,
+          "hex": "c0"
+        }
+      ]
+    },
+    {
+      "name": "input leaf trace q29[last]",
+      "patch": [
+        {
+          "at": 3881,
+          "hex": "7a"
+        }
+      ]
+    },
+    {
+      "name": "input leaf quotient q0[0]",
+      "patch": [
+        {
+          "at": 18355,
+          "hex": "50"
+        }
+      ]
+    },
+    {
+      "name": "input leaf quotient q29[last]",
+      "patch": [
+        {
+          "at": 19067,
+          "hex": "38"
+        }
+      ]
+    },
+    {
+      "name": "input sibling (first)",
+      "patch": [
+        {
+          "at": 3891,
+          "hex": "35"
+        }
+      ]
+    },
+    {
+      "name": "input sibling (last)",
+      "patch": [
+        {
+          "at": 33509,
+          "hex": "ab"
+        }
+      ]
+    },
+    {
+      "name": "FRI sibling value (first)",
+      "patch": [
+        {
+          "at": 33541,
+          "hex": "4e"
+        }
+      ]
+    },
+    {
+      "name": "FRI sibling value (last)",
+      "patch": [
+        {
+          "at": 68945,
+          "hex": "88"
+        }
+      ]
+    },
+    {
+      "name": "FRI Merkle sibling (first)",
+      "patch": [
+        {
+          "at": 38583,
+          "hex": "dd"
+        }
+      ]
+    },
+    {
+      "name": "FRI Merkle sibling (last)",
+      "patch": [
+        {
+          "at": 74747,
+          "hex": "f1"
+        }
+      ]
+    },
+    {
+      "name": "non-canonical field element (0xff..ff in final polynomial)",
+      "patch": [
+        {
+          "at": 329,
+          "hex": "ffffffffffffffff"
+        }
+      ]
+    },
+    {
+      "name": "degree_bits + 1",
+      "patch": [
+        {
+          "at": 0,
+          "hex": "11"
+        }
+      ]
+    },
+    {
+      "name": "truncated by one byte",
+      "truncate": 74778
+    },
+    {
+      "name": "one trailing byte",
+      "insert": {
+        "at": 74779,
+        "hex": "00"
+      }
+    },
+    {
+      "name": "extra sibling digest in first multiproof (count + 1)",
+      "patch": [
+        {
+          "at": 3889,
+          "hex": "c501"
+        }
+      ],
+      "insert": {
+        "at": 18355,
+        "hex": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    },
+    {
+      "name": "public output + 1 (different statement)",
+      "public_values": [
+        "0",
+        "1",
+        "942242361288758571"
+      ]
+    },
+    {
+      "name": "public input + 1 (different statement)",
+      "public_values": [
+        "1",
+        "1",
+        "942242361288758570"
+      ]
+    }
   ]
 }
