@@ -23,23 +23,23 @@ const WS_PIECE = 4;
 // ---------------- kernels ----------------
 const ops = (k) => ({I: (n) => k.in(n), E: (n) => k.env(n), m: (x) => k.mod(x), mul: (a, b) => k.mul(a, b), add: (a, b) => k.add(a, b), sub: (a, b) => k.sub(a, b)});
 // affine add with witnessed slope l: l (x2 - x1) == y2 - y1, x2 != x1
-function kAffAdd() { const k = new Kernel(); const {I, m, mul, sub} = ops(k); const [x1, y1, x2, y2, l] = ['in0', 'in1', 'in2', 'in3', 'l'].map(I);
+export function kAffAdd() { const k = new Kernel(); const {I, m, mul, sub} = ops(k); const [x1, y1, x2, y2, l] = ['in0', 'in1', 'in2', 'in3', 'l'].map(I);
   const x3 = m(sub(sub(mul(l, l), x1), x2)); return k.output(x3, m(sub(mul(l, sub(x1, x3)), y1)), m(sub(mul(l, sub(x2, x1)), sub(y2, y1))), m(sub(x2, x1))); }
 // affine doubling with witnessed slope l: 2 y l == 3 x^2 (y != 0 on G1)
-function kAffDbl() { const k = new Kernel(); const {I, m, mul, sub} = ops(k); const [x, y, l] = ['in0', 'in1', 'l'].map(I);
+export function kAffDbl() { const k = new Kernel(); const {I, m, mul, sub} = ops(k); const [x, y, l] = ['in0', 'in1', 'l'].map(I);
   const x3 = m(sub(mul(l, l), k.small(x, 2))); return k.output(x3, m(sub(mul(l, sub(x, x3)), y)), m(sub(k.small(mul(y, l), 2), k.small(mul(x, x), 3)))); }
 // Jacobian doubling (dbl-2009-l) and mixed addition (madd-2007-bl); Z = 0 is absorbing (exceptional cases end at Z = 0)
-function kJDbl() { const k = new Kernel(); const {I, m, mul, add, sub} = ops(k); const [X, Y, Z] = ['in0', 'in1', 'in2'].map(I);
+export function kJDbl() { const k = new Kernel(); const {I, m, mul, add, sub} = ops(k); const [X, Y, Z] = ['in0', 'in1', 'in2'].map(I);
   const A = m(mul(X, X)), B = m(mul(Y, Y)), C = m(mul(B, B)); const xb = add(X, B); const D = m(k.small(sub(sub(mul(xb, xb), A), C), 2));
   const E = k.small(A, 3); const F = m(mul(E, E)); const X3 = m(sub(F, add(D, D)));
   return k.output(X3, m(sub(mul(E, sub(D, X3)), k.small(C, 8))), m(k.small(mul(Y, Z), 2))); }
-function kJMAdd() { const k = new Kernel(); const {I, m, mul, add, sub} = ops(k); const [X1, Y1, Z1, x2, y2] = ['in0', 'in1', 'in2', 'in3', 'in4'].map(I);
+export function kJMAdd() { const k = new Kernel(); const {I, m, mul, add, sub} = ops(k); const [X1, Y1, Z1, x2, y2] = ['in0', 'in1', 'in2', 'in3', 'in4'].map(I);
   const Z1Z1 = m(mul(Z1, Z1)); const U2 = m(mul(x2, Z1Z1)); const S2 = m(mul(mul(y2, Z1), Z1Z1));
   const H = m(sub(U2, X1)); const HH = m(mul(H, H)); const I4 = k.small(HH, 4); const J = m(mul(H, I4));
   const rr = k.small(sub(S2, Y1), 2); const V = m(mul(X1, I4)); const X3 = m(sub(sub(mul(rr, rr), J), add(V, V)));
   const zh = add(Z1, H); return k.output(X3, m(sub(mul(rr, sub(V, X3)), k.small(mul(Y1, J), 2))), m(sub(sub(mul(zh, zh), Z1Z1), HH))); }
 // Jacobian -> affine with witnessed zi: Z zi == 1
-function kConv() { const k = new Kernel(); const {I, m, mul, sub} = ops(k); const [X, Y, Z, zi] = ['in0', 'in1', 'in2', 'in3'].map(I);
+export function kConv() { const k = new Kernel(); const {I, m, mul, sub} = ops(k); const [X, Y, Z, zi] = ['in0', 'in1', 'in2', 'in3'].map(I);
   const z2 = m(mul(zi, zi)); return k.output(m(mul(X, z2)), m(mul(Y, m(mul(z2, zi)))), m(sub(mul(Z, zi), k.c(1n)))); }
 // KZG event: both fixed chains (state x, c, l; slope n; x-shift s), lines at P* (chain a) and P_right (chain b), F update
 function chainPart(k, t) {
@@ -52,13 +52,13 @@ function chainPart(k, t) {
   return {state: [nx0, nx1, nc0, nc1, n0, n1], Lp: add(E(nm('y')), o), Lm: sub(E(nm('y')), o)};
 }
 export const EV_OUTS = ['dx0a', 'dx1a', 'dc0a', 'dc1a', 'dl0a', 'dl1a', 'dx0b', 'dx1b', 'dc0b', 'dc1b', 'dl0b', 'dl1b', 'Fp', 'Fm'];
-function kEvent(dbl) {
+export function kEvent(dbl) {
   const k = new Kernel(); const {I, m, mul} = ops(k); const a = chainPart(k, 'a'), b = chainPart(k, 'b'); const Fp = I('Fp'), Fm = I('Fm');
   const fp = dbl ? m(mul(m(mul(mul(Fp, Fp), a.Lp)), b.Lp)) : m(mul(m(mul(mul(Fp, a.Lp), b.Lp)), I('cp')));
   const fm = dbl ? m(mul(m(mul(mul(Fm, Fm), a.Lm)), b.Lm)) : m(mul(m(mul(mul(Fm, a.Lm), b.Lm)), I('cm')));
   return k.output(...a.state, ...b.state, fp, fm);
 }
-function kEval() { const k = new Kernel(); const s = [0, 1, 2, 3, 4, 5].map((i) => k.in('in' + i)); const x = [6, 7, 8, 9, 10, 11].map((i) => k.in('in' + i));
+export function kEval() { const k = new Kernel(); const s = [0, 1, 2, 3, 4, 5].map((i) => k.in('in' + i)); const x = [6, 7, 8, 9, 10, 11].map((i) => k.in('in' + i));
   const ev = k.mod(k.sum(s[0], k.mul(s[2], x[1]), k.mul(s[4], x[3]), x[5])); const od = k.mod(k.sum(k.mul(s[1], x[0]), k.mul(s[3], x[2]), k.mul(s[5], x[4])));
   return k.output(k.add(ev, od), k.sub(ev, od)); }
 
