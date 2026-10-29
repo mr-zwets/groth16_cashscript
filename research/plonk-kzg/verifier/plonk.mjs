@@ -46,7 +46,7 @@ export const W = 5, TBL = 16, NW = 51, NWR = 14; // window bits, table entries (
 export const baseNames = (vk) => [...['Ql', 'Qr', 'Qm', 'Qo', 'Qk', 'S3', 'S1', 'S2'].filter((nm) => vk.pt[nm]), 'G', 'L', 'R', 'O', 'Z', 'H0', 'H1', 'H2', 'Wz', 'Lam', 'Wzw', 'phiWzw'];
 export const PROOF_PTS = {L: 0, R: 64, O: 128, H0: 192, H1: 256, H2: 320, Z: 544, Wz: 640, Wzw: 704};
 export const recode = (s, nw) => { assert.ok(s >= 0n); const d = []; for (let i = 0; i < nw; i++) { let x = Number(s & 31n); if (x >= 16) x -= 32; d.push(x); s = (s - BigInt(x)) >> 5n; } assert.equal(s, 0n, 'recoding overflow'); return d; };
-export const corr = (nw) => OFFSET.multiply(mod(-(1n << BigInt(W * (nw - 1))), r)); // added after the loop
+export const corr = (nw) => OFFSET.multiply(mod(-(1n << BigInt(W * nw)), r)); // added after the loop (every window starts with W doublings)
 
 // ---------------- the verifier (value level), with the witness it needs ----------------
 // opts.lam: override the Lambda' witness (affine [x, y]); returns {accept, ...} or throws Reject
@@ -136,7 +136,7 @@ export function msmWitness(vk, V, {J = 0, JR = 0} = {}) {
     let A = aff(OFFSET), Jc = jw > 0 ? [...aff(OFFSET), 1n] : null;
     for (let i = nw - 1; i >= 0; i--) {
       const jac = i >= nw - jw;
-      if (i < nw - 1) for (let k = 0; k < W; k++) { if (jac) Jc = jdbl(Jc); else A = dbl(A); }
+      for (let k = 0; k < W; k++) { if (jac) Jc = jdbl(Jc); else A = dbl(A); }
       for (let q = bIdx.length - 1; q >= 0; q--) { const d = dig[q][i]; if (!d) continue; let [x, y] = T[bIdx[q]][Math.abs(d) - 1]; if (d < 0) y = mod(-y);
         if (jac) Jc = jmadd(Jc, [x, y]); else A = add(A, [x, y]); }
       if (jac && i === nw - jw) { const zi = inv(Jc[2]); inverses.push(zi); A = [mod(Jc[0] * zi * zi), mod(Jc[1] * zi * zi * zi)]; } // the script checks Z zi == 1

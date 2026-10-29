@@ -1,5 +1,6 @@
 // Copied from chunked/bn254/sound-si-gls/asm.mjs (reviewed). Changes for Track 6: extra opcodes
-// (REVERSEBYTES, introspection) and a function-id limit of 120.
+// (REVERSEBYTES, introspection), a function-id limit of 120, roll() across a sized pile (symbolic index fix), invokeBytes(), and a 'modr' kernel node (reduction by the stack item
+// named 'r', for the PLONK scalar field).
 // Symbolic-stack assembler for the bch-spec VM, with a scheduling arithmetic-kernel compiler.
 //
 // Every stack item has a name; PICK/ROLL depths are computed from names, so code is position-exact
@@ -71,7 +72,7 @@ export class Asm {
   top(k = 0) { return this.st[this.st.length - 1 - k]; }
   // ---- stack moves ----
   pick(name, as) { const d = this.depth(name); if (d === 0) this.emit(OP.DUP); else if (d === 1) this.emit(OP.OVER); else this.emit(...pushNum(d), OP.PICK); this.st.push(as ?? name); return this; }
-  roll(name) { const d = this.depth(name); if (d === 1) this.emit(OP.SWAP); else if (d === 2) this.emit(OP.ROT); else if (d > 2) this.emit(...pushNum(d), OP.ROLL); this.st.splice(this.st.length - 1 - d, 1); this.st.push(name); return this; }
+  roll(name) { const d = this.depth(name), i = this.idx(name); if (d === 1) this.emit(OP.SWAP); else if (d === 2) this.emit(OP.ROT); else if (d > 2) this.emit(...pushNum(d), OP.ROLL); this.st.splice(i, 1); this.st.push(name); return this; } // fix: symbolic index (piles may sit above the item)
   drop(name) { if (name !== undefined) { const d = this.depth(name); if (d === 1) { this.emit(OP.NIP); this.st.splice(this.st.length - 2, 1); return this; } if (d > 0) this.roll(name); } this.emit(OP.DROP); this.st.pop(); return this; }
   rename(name, as) { if (as === undefined) { this.st[this.st.length - 1] = name; return this; } this.st[this.idx(name)] = as; return this; }
   push(v, name) { this.emit(...pushNum(v)); this.st.push(name ?? this.fresh('c')); return this; }
@@ -156,6 +157,8 @@ export class Asm {
     }
     return this;
   }
+  // bytes that invoke a LOCAL function (compiled on first use), for hand-written raw code; the symbolic stack is untouched
+  invokeBytes(name) { const f = this.ctx.funcs.get(name); assert.ok(f && f.kind === 'local', 'local function ' + name); if (f.id === null) { f.id = this.ctx.nextId++; f.code = this.compileLocal(f); this.ctx.defs.push(f); } return [...pushNum(f.id), OP.INVOKE]; }
   // prologue that defines every function used (in id order); function bodies may invoke other functions
   prologue() { const out = []; for (const f of [...this.ctx.defs].sort((a, b) => a.id - b.id)) out.push(...pushData(f.code), ...pushNum(f.id), OP.DEFINE); return out; }
   bytes() { return Uint8Array.from(this.code); }
@@ -186,6 +189,7 @@ export class Kernel {
   sub(a, b) { return this.node('sub', [a, b]); }
   mul(a, b) { return this.node('mul', [a, b]); }
   mod(a) { return this.node('mod', [a]); }
+  modr(a) { return this.node('modr', [a]); }
   neg(a) { return this.node('neg', [a]); }
   mm(a, b) { return this.mod(this.mul(a, b)); }
   small(a, k) { return k === 1 ? a : k === 2 ? this.add(a, a) : this.mul(a, this.c(k)); }
@@ -196,7 +200,7 @@ export class Kernel {
     for (const n of this.nodes) {
       const a = n.args.map((x) => v[x]);
       v[n.id] = n.op === 'ref' ? BigInt(vals(n)) : n.op === 'const' ? n.value : n.op === 'add' ? a[0] + a[1] : n.op === 'sub' ? a[0] - a[1]
-        : n.op === 'mul' ? a[0] * a[1] : n.op === 'neg' ? -a[0] : a[0] % P;
+        : n.op === 'mul' ? a[0] * a[1] : n.op === 'neg' ? -a[0] : n.op === 'modr' ? a[0] % 21888242871839275222246405745257275088548364400416034343698204186575808495617n : a[0] % P;
     }
     return v;
   }
@@ -246,6 +250,7 @@ function scheduleKernel(asm, K, iters, seed) {
     for (const id of order) {
       const n = N[id];
       if (n.op === 'const') { em(...pushNum(n.value)); cost += 100 + lens[id]; st.push(id); continue; }
+      if (n.op === 'modr') { fetch(n.args[0]); const d = depthOf('r'); if (d === 0) em(OP.DUP); else if (d === 1) em(OP.OVER); else { em(...pushNum(d), OP.PICK); cost += 101; } cost += 132; st.push('r'); em(OP.MOD); cost += 100 + lenOf(n.args[0]) * 32 + 2 * lens[id]; st.pop(); st.pop(); st.push(id); continue; }
       if (n.op === 'mod') { fetch(n.args[0]); fetchP(); em(OP.MOD); cost += 100 + lenOf(n.args[0]) * 32 + 2 * lens[id]; st.pop(); st.pop(); st.push(id); continue; }
       if (n.op === 'neg') { fetch(n.args[0]); em(OP.NEGATE); cost += 100 + 2 * lens[id]; st.pop(); st.push(id); continue; }
       let [a, b] = n.args;
