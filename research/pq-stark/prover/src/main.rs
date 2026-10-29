@@ -172,7 +172,14 @@ fn cmd_prove(args: &[String]) {
         }
     });
     assert!(back.is_ok(), "round trip failed: {back:?}");
-    let pis_u: Vec<u64> = pis.iter().map(|x| x.as_canonical_u64()).collect();
+    let seps = match (set.ext, air.as_str()) {
+        (2, "fib") => sets::separators::<EF2, _>(&FibAir, &set, &shape, degree_bits),
+        (2, _) => sets::separators::<EF2, _>(&MimcAir::new(), &set, &shape, degree_bits),
+        (_, "fib") => sets::separators::<EF3, _>(&FibAir, &set, &shape, degree_bits),
+        _ => sets::separators::<EF3, _>(&MimcAir::new(), &set, &shape, degree_bits),
+    };
+    let estimates = sets::estimates(&set, &air, log_n);
+    let pis_u: Vec<String> = pis.iter().map(|x| x.as_canonical_u64().to_string()).collect();
     let v = json!({
         "format": "p3s-v1",
         "plonky3_rev": sets::PLONKY3_REV,
@@ -183,6 +190,8 @@ fn cmd_prove(args: &[String]) {
         "sizes": sizes,
         "prove_ms": run.prove_ms, "rust_verify_ms": run.verify_ms,
         "rust_verify": "accepted",
+        "plonky3_security_estimates": estimates,
+        "debug_separators": seps,
         "transcript_hash_inputs": run.transcript.iter().map(|b| hex(b)).collect::<Vec<_>>(),
     });
     std::fs::write(&out, serde_json::to_string_pretty(&v).unwrap()).unwrap();
@@ -222,7 +231,7 @@ fn cmd_check(args: &[String]) {
         for (name, ph, pv, expect) in cases {
             use p3_field::PrimeCharacteristicRing;
             let pis: Vec<Val> =
-                pv.as_array().unwrap().iter().map(|x| Val::from_u64(x.as_u64().unwrap())).collect();
+                pv.as_array().unwrap().iter().map(|x| Val::from_u64(x.as_str().unwrap().parse().unwrap())).collect();
             let bytes = unhex(&ph);
             let r = with_cfg!(&set, seed, |c| {
                 match air.as_str() {

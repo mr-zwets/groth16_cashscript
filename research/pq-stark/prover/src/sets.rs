@@ -154,3 +154,57 @@ pub fn print_sets() {
         std::fs::write(path, serde_json::to_string_pretty(&out).unwrap()).unwrap();
     }
 }
+
+/// Fiat-Shamir domain separators of the three nested transcripts (uni-stark, PCS, FRI), as Plonky3
+/// builds them for this proof shape: rendered pattern (alternate Display), pattern hash (Keccak-256
+/// of the rendering) and the full seed byte string absorbed into the challenger.
+pub fn separators<EF: p3_field::ExtensionField<Val>, A: p3_air::BaseAir<Val>>(
+    air: &A,
+    s: &FriSet,
+    shape: &Shape,
+    degree_bits: usize,
+) -> Value {
+    use p3_challenger::fs::DomainSeparator;
+    use p3_fri::{FriShape, PcsShape};
+    use p3_uni_stark::StarkShape;
+    let zk = s.zk as usize;
+    let stark = StarkShape::new::<Val, A>(air, 0, degree_bits, degree_bits - zk, shape.num_chunks, s.zk, 0);
+    // claimed evaluation counts: rounds [random], trace, quotient; per matrix, per point: values
+    let rc = shape.rc;
+    let mut counts = Vec::new();
+    if s.zk {
+        counts.push(vec![vec![s.ext + rc]]);
+    }
+    counts.push(vec![vec![shape.width + rc; 2]]);
+    counts.push(vec![vec![s.ext + rc]; shape.num_chunks]);
+    let pcs = PcsShape { claimed_evaluation_counts: counts, batch_pow_bits: s.batch_pow_bits };
+    let params = p3_fri::FriParameters {
+        log_blowup: s.log_blowup,
+        log_final_poly_len: s.log_final_poly_len,
+        max_log_arity: s.max_log_arity,
+        num_queries: s.num_queries,
+        batch_proof_of_work_bits: s.batch_pow_bits,
+        commit_proof_of_work_bits: s.commit_pow_bits,
+        query_proof_of_work_bits: s.query_pow_bits,
+        mmcs: (),
+    };
+    let fri = FriShape::with_schedule(&params, shape.log_arities.clone(), degree_bits + s.log_blowup);
+    fn one<U: p3_challenger::fs::Unit>(ds: &DomainSeparator<U>) -> Value {
+        let mut seed = Vec::new();
+        seed.extend_from_slice(ds.protocol_id());
+        seed.extend_from_slice(&ds.pattern().pattern_hash());
+        seed.extend_from_slice(&(ds.instance_label().len() as u32).to_be_bytes());
+        seed.extend_from_slice(ds.instance_label());
+        seed.push(0x80);
+        serde_json::json!({
+            "pattern": format!("{:#}", ds.pattern()),
+            "pattern_hash": ds.pattern().pattern_hash().iter().map(|b| format!("{b:02x}")).collect::<String>(),
+            "seed": seed.iter().map(|b| format!("{b:02x}")).collect::<String>(),
+        })
+    }
+    serde_json::json!({
+        "stark": one(&stark.domain_separator::<Val, EF>()),
+        "pcs": one(&pcs.domain_separator::<Val, EF>()),
+        "fri": one(&fri.domain_separator::<Val, EF>()),
+    })
+}
