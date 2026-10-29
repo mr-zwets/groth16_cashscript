@@ -19,7 +19,7 @@ export const VMS = {
 };
 export const p2sh32 = (redeem) => Uint8Array.from([0xaa, 0x20, ...hash256(redeem), 0x87]);
 export const encodeUnlocking = (pushes) => Uint8Array.from(pushes.flatMap((b) => [...encodeDataPush(Uint8Array.from(b))]));
-const program = (inputs, outputs, inputIndex) => ({inputIndex, sourceOutputs: inputs.map((i) => ({lockingBytecode: i.locking, valueSatoshis: 10_000n})),
+const program = (inputs, outputs, inputIndex) => ({inputIndex, sourceOutputs: inputs.map((i) => ({lockingBytecode: i.locking, valueSatoshis: 100_000n})),
   transaction: {version: 2, locktime: 0, inputs: inputs.map((i, k) => ({outpointIndex: k, outpointTransactionHash: new Uint8Array(32).fill(k + 1), sequenceNumber: 0, unlockingBytecode: i.unlocking})),
     outputs: outputs ?? [{lockingBytecode: Uint8Array.of(0x6a), valueSatoshis: 1000n}]}});
 // spend every input of a transaction; returns per-input results
@@ -28,6 +28,8 @@ export function spendTx(regime, mode, inputs, outputs) {
   return inputs.map((inp, k) => { const prog = program(inputs, outputs, k); const st = vm.evaluate(prog); const ok = vm.verify({sourceOutputs: prog.sourceOutputs, transaction: prog.transaction});
     return {accepted: ok === true && !st.error, error: st.error ?? (ok === true ? null : String(ok)), opCost: st.metrics.operationCost, budget: (VMS[regime].base + inp.unlocking.length) * 800, unlockingLen: inp.unlocking.length, metrics: st.metrics}; });
 }
+// whole-transaction verdict only (fast: libauth stops at the first failing input)
+export function verifyTx(regime, mode, inputs, outputs) { const vm = VMS[regime][mode]; const prog = program(inputs, outputs, 0); const ok = vm.verify({sourceOutputs: prog.sourceOutputs, transaction: prog.transaction}); return {accepted: ok === true, error: ok === true ? null : String(ok)}; }
 export const spend = (regime, mode, locking, unlocking) => spendTx(regime, mode, [{locking, unlocking}])[0];
 // bare evaluation of `code` after the pushes (debugging): returns the final state
 export function bare(regime, code, pushes, mode = 'consensus') { const vm = VMS[regime][mode]; const st = vm.evaluate(program([{locking: Uint8Array.from(code), unlocking: encodeUnlocking(pushes)}], null, 0)); return {error: st.error, opCost: st.metrics.operationCost, stack: st.stack, alt: st.alternateStack, ip: st.ip}; }

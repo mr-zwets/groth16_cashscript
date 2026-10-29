@@ -11,10 +11,10 @@ export function chainTx(vk, plan, built, pushes, fills) {
   const locking = p2sh32(built.redeem);
   return pushes.map((ps, i) => ({locking, unlocking: encodeUnlocking([...ps, Buffer.alloc(fills?.[i] ?? 0), built.redeem])}));
 }
-export function sizeFills(vk, plan, built, pushes) {
+export function sizeFills(vk, plan, built, pushes, {strict = true} = {}) {
   const tx0 = chainTx(vk, plan, built, pushes);
   const free = spendTx('free', 'standard', tx0);
-  return free.map((x, i) => { if (x.error && !/budget|density/.test(x.error)) throw new Error(`input ${i} (${plan.roles[i].kind}): ${x.error}`);
+  return free.map((x, i) => { if (strict && x.error && !/budget|density/.test(x.error)) throw new Error(`input ${i} (${plan.roles[i].kind}): ${x.error}`);
     const need = Math.ceil(x.opCost / 800) - 41 - tx0[i].unlocking.length; return need > 0 ? need + 64 : 0; });
 }
 if (import.meta.url === `file://${process.argv[1]}`) {

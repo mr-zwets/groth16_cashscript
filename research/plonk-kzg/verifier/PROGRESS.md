@@ -5,7 +5,6 @@
 - [x] script.mjs single input; asm fixes: roll() across a sized pile (symbolic index), mod-r kernel node, invokeBytes
 - [x] accepted: mul2 + merkle16 on bch-spec (J=13) and TXv5 (J=8, minimal pad)
 - [x] digit extraction by OP_RSHIFTNUM on s' = s + sum 16*32^i (no recoding loop): -3.9M op
-- [ ] full test suites (results/test-*.json) running
-- [ ] multi-input (today): roles R0 statement+code, TV (variable tables published + collinearity-checked), TF (fixed
-      tables, hash-authenticated), M1..M4 (MSM windows, acc handover), SI1/SI2 (events split, WS/WQ hosted)
-- [ ] README, results/summary.json
+- [x] full test suites single + chain: all pass
+- [x] multi-input (today): 10-input chain accepted, both circuits
+- [x] README, results/summary.json

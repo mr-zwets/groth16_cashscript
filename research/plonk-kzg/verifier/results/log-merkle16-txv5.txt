@@ -1,8 +1,0 @@
-valid 0: accepted op 57853036 / 57904800, unlocking 72340
-valid 1: accepted op 57796602 / 57848800, unlocking 72270
-valid 2: accepted op 57602422 / 57730400, unlocking 72122
-valid 3: accepted op 57794532 / 57845600, unlocking 72266
-valid 4: accepted op 57636109 / 57704800, unlocking 72090
-tampered: 78/78 rejected
-manipulations: 28/28 rejected
-OK: 0 unexpected
