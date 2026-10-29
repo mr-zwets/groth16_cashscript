@@ -734,7 +734,15 @@ export function emitQuery(c, Q) {
   mark(Q, 'q-layers');
   // final polynomial: y = xb^(a_{r-1}); y^1..y^G; per group a packed dot product (GRP), then Horner over groups
   if (c.FP === 'gpd') emitFinalGpd(c, Q, xb, Fv);
-  else {
+  else emitFinalGrp(c, Q, xb, Fv);
+  mark(Q, 'q-final');
+}
+
+
+// Track 4 final polynomial (fp 'grp'): y^1..y^G, per group a packed dot product (GRP), Horner over groups (HORN)
+export function emitFinalGrp(c, Q, xb, Fv) {
+  const {opts, e, r, a, D, G, defFn, F} = c;
+  {
     const bb = new PB(e, F);
     const y = bb.pow2k(xb, Math.log2(a[r - 1]));
     compileSlp(Q, bb.prog);
@@ -766,11 +774,9 @@ export function emitQuery(c, Q) {
     names('acc', e).forEach((x, c) => cb.chk(chk('NUMEQUALVERIFY', R(mul(V(x), K(a[r - 1]))), V(Fv[c]))));
     compileSlp(Q, cb.prog);
   }
-  mark(Q, 'q-final');
 }
 
-
-function emitFinalGpd(c, Q, xb, Fv) {
+export function emitFinalGpd(c, Q, xb, Fv) {
   const {e, r, a, F, GH, GG, defFn, opts} = c;
   const bb = new PB(e, F);
   const y = bb.pow2k(xb, Math.log2(a[r - 1]));
