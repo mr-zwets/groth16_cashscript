@@ -32,15 +32,16 @@ The protocol is suitable, at a size cost against Track 4's hand-rolled DEEP-ALI:
 - With Plonky3's larger arity, larger blowup and PoW knobs, a 128-bit (Plonky3 proven-LDR estimator)
   MiMC proof is **78.4 KB**, smaller than Track 4's 91.5 KB P128.
 
-ZK costs +44% to +70%.
+ZK costs +44% to +70%. Zero knowledge is by Plonky3's construction (ePrint 2024/1037), not proven here; see the ZK
+section for the conditions.
 
 ## Build and regenerate
 
 ```
 cargo build --release                 # Rust 2024 edition, pinned Plonky3 git deps
 ./gen-vectors.sh                      # prove all sets, add tampered cases, check with JS and Plonky3
-node verify.mjs vectors/*.json        # -> js verify: 1159 cases, 0 unexpected
-./target/release/pq-stark-prover check vectors/*.json   # -> rust check: 1159 cases, 0 unexpected
+node verify.mjs vectors/{fib,mimc}-*.json        # -> js verify: 1159 cases, 0 unexpected (vectors/*.json also matches summary/stats/estimates.json and crashes)
+./target/release/pq-stark-prover check vectors/{fib,mimc}-*.json   # -> rust check: 1159 cases, 0 unexpected
 ./target/release/pq-stark-prover sets  # Plonky3's security estimators per set
 ```
 
@@ -72,20 +73,25 @@ Sources:
 - LDR: proven, list-decoding regime (Johnson bound, per-round).
 - UDR: proven, unique decoding.
 
-The Soundness phase's own per-round bound is in its handoff. The S-sets below are its picks. All sets
+The column `λ (bound)` is the Soundness phase's per-round bound for each vector's exact parameters and AIR shape
+(zk-verifier-bench `wip/pq-stark-verifier` `research/pq-stark/verifier/security.json`, fib / mimc). Every set here
+batches with powers of one challenge, so that bound rests on the Soundness phase's **powers-batching adaptation,
+which is not published** (sketch in `research/pq-stark/soundness/SOUNDNESS.md` §2.1). Where Plonky3's LDR estimator
+and the bound differ, the bound is the figure to quote: **P128 is 126.3 (fib) / 125.9 (mimc), not 128**, and its ZK
+variants 123.2-124.2. The S-sets below are the Soundness phase's picks. All sets
 use SHA-256 digests of 32 bytes unless `h` says otherwise.
 
-| set | D | blowup | queries | PoW (query/commit/batch) | arity | final len | h | conj / LDR bits | fib | mimc |
-|---|---|---|---|---|---|---|---|---|--:|--:|
-| C100 | 2 | 2^3 | 27 | 21/0/0 | 8 | 32 | 32 | 100 / 61 | 56,693 | 56,893 |
-| C100h | 2 | 2^3 | 27 | 21/0/0 | 8 | 32 | 25 | 100 / 61 | 46,686 | 47,498 |
-| C128 | 3 | 2^3 | 36 | 22/0/0 | 8 | 32 | 32 | 128 / 75 | 79,677 | 81,717 |
-| P100 (Track 4 shape) | 3 | 2^7 | 22 | 28/0/0 | 8 | 32 | 25 | 100 / 100 | 58,259 | 58,183 |
-| P128 (Track 4 shape) | 3 | 2^5 | 43 | 28/0/0 | 8 | 32 | 32 | 128 / 128 | 108,213 | 110,765 |
-| S100 | 3 | 2^5 | 30 | 27/0/0 | 8 | 128 | 32 | 128 / 101 | 74,779 | 76,019 |
-| S100b | 3 | 2^8 | 19 | 25/0/0 | 16 | 256 | 32 | 128 / 100 | 59,809 | 60,793 |
-| **S128** | 3 | 2^8 | 26 | 26/15/23 | 16 | 256 | 32 | 128 / 128 | 78,337 | **78,393** |
-| S128b | 3 | 2^5 | 41 | 28/7/14 | 8 | 128 | 32 | 128 / 128 | 97,659 | 99,795 |
+| set | D | blowup | queries | PoW (query/commit/batch) | arity | final len | h | conj / LDR bits (Plonky3) | λ (bound) fib / mimc | fib | mimc |
+|---|---|---|---|---|---|---|---|---|---|--:|--:|
+| C100 | 2 | 2^3 | 27 | 21/0/0 | 8 | 32 | 32 | 100 / 61 | 59.8 / 59.6 | 56,693 | 56,893 |
+| C100h | 2 | 2^3 | 27 | 21/0/0 | 8 | 32 | 25 | 100 / 61 | 59.8 / 59.6 | 46,686 | 47,498 |
+| C128 | 3 | 2^3 | 36 | 22/0/0 | 8 | 32 | 32 | 128 / 75 | 74.9 / 74.9 | 79,677 | 81,717 |
+| P100 (Track 4 shape) | 3 | 2^7 | 22 | 28/0/0 | 8 | 32 | 25 | 100 / 100 | 100 / 100 | 58,259 | 58,183 |
+| P128 (Track 4 shape) | 3 | 2^5 | 43 | 28/0/0 | 8 | 32 | 32 | 128 / 128 | **126.3 / 125.9** | 108,213 | 110,765 |
+| S100 | 3 | 2^5 | 30 | 27/0/0 | 8 | 128 | 32 | 128 / 101 | 101.1 / 101.1 | 74,779 | 76,019 |
+| S100b | 3 | 2^8 | 19 | 25/0/0 | 16 | 256 | 32 | 128 / 100 | 100.3 / 100.3 | 59,809 | 60,793 |
+| **S128** | 3 | 2^8 | 26 | 26/15/23 | 16 | 256 | 32 | 128 / 128 | 128 / 128 | 78,337 | **78,393** |
+| S128b | 3 | 2^5 | 41 | 28/7/14 | 8 | 128 | 32 | 128 / 128 | 128 / 128 | 97,659 | 99,795 |
 
 Notes on the table:
 - `C*` are "conjectured" sets, for comparison only.
@@ -115,7 +121,25 @@ In ZK mode:
 
 Two variants were measured:
 - `-zk`: Plonky3's test defaults, rc = 4 and s = 4.
-- `-zkmin`: the smallest that keeps the hiding argument, rc = D and s = 2 (a 128-bit salt).
+- `-zkmin`: the smallest that Plonky3's own hiding checks accept, rc = D and s = 2 (a 2-element, ~128-bit salt).
+
+**Basis of the ZK claim: by Plonky3's construction, not proven here.** The tests show that ZK proofs verify. They do
+not show zero knowledge. The construction is Haböck and Al Kindi, *A note on adding zero-knowledge to STARKs*,
+ePrint 2024/1037 (§4.2, randomized trace and quotient chunks), as implemented in `p3-fri` `HidingFriPcs` and
+`p3-merkle-tree` `MerkleTreeHidingMmcs` at 0d80373. The conditions it needs, and how each ZK set meets them:
+- **Masking budget per committed matrix** (Plonky3 `HidingFriPcs::hiding_budget`, enforced by the prover and the
+  verifier): mask height ≥ 2·(D·#points + Q). The mask height is n = 2^16 (the randomized trace has 2n rows, n of them
+  random). The trace is opened at 2 points (ζ, ζg), the quotient chunks and the random polynomial at 1. The worst
+  case among the vectors is P128 (Q = 43, D = 3): 2·(3·2 + 43) = 98 ≤ 65,536. Every ZK set meets it by a wide margin.
+- **Random codewords:** rc ≥ D, so the extension-field batching of the openings is masked. zkmin has rc = D
+  (2 for C100, 3 otherwise); `-zk` has rc = 4.
+- **Salt entropy:** the hiding MMCS needs salt bits ≥ the target security. s = 2 Goldilocks elements give
+  2·log2(p) ≈ 128 bits (s = 4 in `-zk`). The FRI-layer trees use the same salted MMCS.
+- **FRI layer openings.** Plonky3's budget counts Q per matrix. We did not check on our own that this count also
+  covers the arity-sibling openings in every FRI layer. We rely on the 2024/1037 analysis and on Plonky3's design.
+- **Fresh randomness:** the hiding RNG must come from unpredictable entropy. **The committed vectors use a fixed
+  `StdRng` seed (1000 + k) so that they can be reproduced, so these particular proofs hide nothing.** They are test
+  vectors for size and verification. A real deployment must seed from the OS.
 
 | set | fib plain -> zkmin (zk) | mimc plain -> zkmin (zk) |
 |---|---|---|
