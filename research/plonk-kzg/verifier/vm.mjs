@@ -13,6 +13,8 @@ const txv5 = (standard) => createVirtualMachine(createInstructionSetBch2026(stan
 export const VMS = {
   spec: {consensus: createVirtualMachineBchSpec(false), standard: createVirtualMachineBchSpec(true), base: 10_000},
   txv5: {consensus: txv5(false), standard: txv5(true), base: 41},
+  free: {consensus: createVirtualMachine(createInstructionSetBch2026(false, {consensus: {...consensusTxv5, densityControlBaseLength: 1e9}, ripemd160, secp256k1, sha1, sha256})),
+    standard: createVirtualMachine(createInstructionSetBch2026(true, {consensus: {...consensusTxv5, densityControlBaseLength: 1e9}, ripemd160, secp256k1, sha1, sha256})), base: 1e9},
   bch2026: {consensus: createVirtualMachineBch2026(false), standard: createVirtualMachineBch2026(true), base: 41},
 };
 export const p2sh32 = (redeem) => Uint8Array.from([0xaa, 0x20, ...hash256(redeem), 0x87]);

@@ -12,10 +12,11 @@ import assert from 'node:assert/strict';
 import {Asm, Kernel, OP, pushNum, pushData} from './asm.mjs';
 import {p, r, mod, ETA, GAMMA1, DIGITS, NE, GLV, OFFSET, aff} from './math.mjs';
 import {W, TBL, NW, NWR, baseNames, corr, le32, PROOF_PTS} from './plonk.mjs';
+export const digitOffset = (nw) => { let c = 0n; for (let i = 0; i < nw; i++) c += 16n << BigInt(5 * i); return c; };
 import {TAG, WS_SIZE, NQ_MAX, NSTATES, chains} from './si.mjs';
 
 const ITERS = Number(process.env.SCHED_ITERS ?? 2500);
-export const SL_PIECE = 16; // slopes per stream piece (512 B)
+export const SL_PIECE = 8; // slopes per stream piece (256 B)
 export const D_PIECE = 4;   // chain steps per pile piece (4 x 128 B)
 const WS_PIECE = 4;
 
@@ -178,7 +179,8 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
   a.roll('ub').push(8).op(OP.SPLIT, 2, 'b2', 'ub').roll('b2').pushBytes([0]).op(OP.CAT, 2, 'b').op(OP.BIN2NUM, 1, 'u2');
   a.roll('ub').pushBytes([0]).op(OP.CAT, 2, 'b').op(OP.BIN2NUM, 1, 'tp');
   section('v-u');
-  // ---- 6. Fr block 2: the MSM scalars (plan B), canonical in [0, r) ----
+  // ---- 6. Fr block 2: the MSM scalars (plan B), canonical in [0, r), plus the digit offset C ----
+  a.push(digitOffset(NW), 'Cdig');
   { const kk = new Kernel(); const E = (n) => kk.env(n), M = (x) => kk.modr(x), mul = (x, y) => kk.mul(x, y), add = (x, y) => kk.add(x, y), sub = (x, y) => kk.sub(x, y), c = (v) => kk.c(v);
     const canon = (x) => M(add(M(x), E('r')));
     const v = E('v'), tp = E('tp'), u = M(add(E('u1'), mul(c(GLV.lambda), E('u2')))), nt = sub(c(0n), tp);
@@ -188,22 +190,15 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
     const S = {Ql: mul(nt, E('l')), Qr: mul(nt, E('rr')), Qm: mul(nt, M(mul(E('l'), E('rr')))), Qo: mul(nt, E('o')), Qk: nt, S3: mul(nt, E('s1c')), Z: add(mul(nt, E('s2c')), u),
       H0: mul(tp, zh), H1: mul(tp, zz), H2: mul(tp, M(mul(zz, zn2))), Lam: add(c(1n), tp), L: v, R: vs[2], O: vs[3], S1: vs[4], S2: vs[5],
       G: sub(c(0n), add(e, M(mul(u, E('zu'))))), Wz: E('zeta'), Wzw: mul(M(mul(u, E('zeta'))), c(vk.omega))};
-    kk.output(...names.slice(0, nbm).map((nm) => canon(S[nm])));
+    kk.output(...names.slice(0, nbm).map((nm) => kk.add(canon(S[nm]), E('Cdig'))));
     a.kernel(kk, names.slice(0, nbm).map((nm) => 'sc_' + nm), {iters: 3000}); }
   section('fr2');
   STOP('fr2');
 
-  // ---- 7. signed base-32 recoding of the scalar queue into one digit string (byte = d + 16, MSB window first) ----
-  const recode = (n, nw, out) => {
-    a.pushBytes([], out);
-    a.emit(OP.BEGIN, ...pushNum(n), OP.ROLL, OP.DUP, ...pushNum(32), OP.MOD, ...pushNum(16), OP.ADD, ...pushNum(32), OP.MOD, OP.TUCK, OP.SUB, ...pushNum(16), OP.ADD,
-      ...pushNum(32), OP.DIV, OP.ROT, OP.ROT, OP.TRUE, OP.NUM2BIN, OP.SWAP, OP.CAT, OP.SIZE, ...pushNum(n * nw), OP.NUMEQUAL, OP.UNTIL);
-    const q = a.st.splice(a.st.length - 1 - n, n); a.st.splice(a.st.length - 1, 0, ...q); // symbolic: the queue keeps its names (all now 0)
-    for (let i = 0; i < n; i++) { a.emit(OP.SWAP, OP.NOT, OP.VERIFY); a.st.splice(a.st.length - 2, 1); } // every scalar fully consumed
-  };
-  a.arrange(names.slice(0, nbm).map((nm) => 'sc_' + nm)); recode(nbm, NW, 'ROWS');
-  a.pick('u1').pick('u2'); recode(2, NWR, 'ROWSR');
-  section('recode');
+  // ---- 7. digits: s' = s + C, C = sum_{i<nw} 16 * 32^i; the signed digit of window i is ((s' >> 5i) & 31) - 16 ----
+  a.drop('Cdig').arrange(names.slice(0, nbm).map((nm) => 'sc_' + nm));
+  a.pick('u1').push(digitOffset(NWR)).op(OP.ADD, 2, 'scR_0').pick('u2').push(digitOffset(NWR)).op(OP.ADD, 2, 'scR_1');
+  section('digits');
   STOP('recode');
 
   // ---- 8. tables: T[b][k] = k B_b (k = 1..16), affine with witnessed slopes; phi table from the Wzw table ----
@@ -232,17 +227,20 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
 
   // ---- 9. MSM loops (Straus over shared doublings; signed digits; zero digits skipped) ----
   // tables at bd = 32 (NB - 1 - b) below the top of TB; entry k of table b: x at depth(TB) + bd + 2 (16 - k) + 1
-  const msm = (rows, bdStart, bdEnd, nw, jw, ziName, accName) => {
-    const X = (jac) => (jac ? ['aX', 'aY', 'aZ'] : ['ax', 'ay']);
-    const windowLoop = (jac, untilRows) => a.loop((s) => {
+  const msm = (scal, bdStart, bdEnd, nw, jw, ziName, accName) => {
+    const X = (jac) => (jac ? ['aX', 'aY', 'aZ'] : ['ax', 'ay']); const nb = (bdEnd - bdStart) / 32;
+    const windowLoop = (jac, shStop) => a.loop((s) => {
       for (let i = 0; i < W; i++) { s.arrange(X(jac)); s.invoke(jac ? 'JDBL' : 'DBL', X(jac)); }
       s.push(bdStart, 'bd');
       s.loop((t) => {
-        t.roll(rows).push(1).op(OP.SPLIT, 2, 'db', rows).roll('db').op(OP.BIN2NUM, 1, 'b').push(16).op(OP.SUB, 2, 'd');
+        // scalar of this base: scal[q] with q = nb - 1 - (bd - bdStart) / 32 (the block is ordered q = 0 .. nb-1, top = nb-1)
+        t.pick('bd', 'j').push(5).op(OP.RSHIFTNUM, 2, 'j');
+        const D = t.depth(scal[nb - 1]); t.push(D - 1 - bdStart / 32).op(OP.ADD, 2, 'dep'); t.emit(OP.PICK); t.st[t.st.length - 1] = 'sv';
+        t.pick('sh').op(OP.RSHIFTNUM, 2, 'sv').push(32).op(OP.MOD, 2, 'b').push(16).op(OP.SUB, 2, 'd');
         t.pick('d').op(OP.ZERONOTEQUAL, 1, 'nz').ifElse((u) => {
           u.pick('d').push(0).op(OP.LESSTHAN, 2, 'neg').roll('d').op(OP.ABS, 1, 'k');
           u.emit(OP.DUP, OP.ADD); u.st[u.st.length - 1] = 'k2'; u.pick('bd').op(OP.SWAP, 2, 'bd_', 'k2').op(OP.SUB, 2, 'off');
-          const dTB = u.depth('TB'); u.push(dTB + 2 * TBL + 1).op(OP.ADD, 2, 'dep'); // depth of x after 'dep' is popped
+          const dTB = u.depth('TB'); u.push(dTB + 2 * TBL + 1).op(OP.ADD, 2, 'dep');
           u.emit(OP.DUP, OP.PICK, OP.SWAP, OP.SUB1, OP.PICK); u.st.splice(u.st.length - 1, 1, 'tx', 'ty');
           u.roll('neg').ifElse((v) => { v.invoke('P', ['p']).roll('ty').op(OP.SUB, 2, 'ty'); });
           u.arrange([...X(jac), 'tx', 'ty']).invoke(jac ? 'JMADD' : 'ADD', X(jac));
@@ -250,23 +248,23 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
         t.roll('bd').push(32).op(OP.ADD, 2, 'bd').pick('bd').push(bdEnd).op(OP.NUMEQUAL, 2, 'done');
       });
       s.drop('bd');
-      s.pick(rows, 'rc').op(OP.SIZE, 1, 'rc', 'sz').op(OP.NIP, 2, 'sz').push(untilRows).op(OP.NUMEQUAL, 2, 'done');
+      s.roll('sh').push(5).op(OP.SUB, 2, 'sh').pick('sh').push(shStop).op(OP.NUMEQUAL, 2, 'done');
     });
-    const nb = (bdEnd - bdStart) / 32;
+    a.arrange(scal); a.push(W * (nw - 1), 'sh');
     const off = aff(OFFSET);
-    if (jw > 0) { a.push(off[0], 'aX').push(off[1], 'aY').push(1, 'aZ'); windowLoop(true, nb * (nw - jw)); a.roll(ziName).arrange(['aX', 'aY', 'aZ', ziName]).invoke('CONV', ['ax', 'ay']); }
+    if (jw > 0) { a.push(off[0], 'aX').push(off[1], 'aY').push(1, 'aZ'); windowLoop(true, W * (nw - jw - 1)); a.roll(ziName).arrange(['aX', 'aY', 'aZ', ziName]).invoke('CONV', ['ax', 'ay']); }
     else a.push(off[0], 'ax').push(off[1], 'ay');
-    if (jw < nw) windowLoop(false, 0);
-    a.roll(rows).op(OP.SIZE, 1, rows, 'sz').op(OP.NIP, 2, 'sz').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1); // rows fully consumed
+    if (jw < nw) windowLoop(false, -W);
+    a.drop('sh'); for (const n of scal) a.drop(n);
     const cr = aff(corr(nw)); a.push(cr[0], 'cx').push(cr[1], 'cy').arrange(['ax', 'ay', 'cx', 'cy']).invoke('ADD', [accName + 'x', accName + 'y']);
   };
-  a.roll('ROWSR'); msm('ROWSR', 0, 64, NWR, JR, 'ziR', 'PR0');
+  msm(['scR_0', 'scR_1'], 0, 64, NWR, JR, 'ziR', 'PR0');
   STOP('msmR0');
   a.pick('Wzx').pick('Wzy').arrange(['PR0x', 'PR0y', 'Wzx', 'Wzy']).invoke('ADD', ['PRx', 'PRy0']);
   a.invoke('P', ['p']).roll('PRy0').op(OP.SUB, 2, 'PRy');
   section('msm-right');
   STOP('msmR');
-  a.roll('ROWS'); msm('ROWS', 32, 32 * NB, NW, J, 'ziL', 'PL');
+  msm(names.slice(0, nbm).map((nm) => 'sc_' + nm), 32, 32 * NB, NW, J, 'ziL', 'PL');
   // the slope stream is fully consumed: current piece empty, next is the empty sentinel
   a.emit(OP.FROMALT, OP.SIZE, OP.NOT, OP.VERIFY, OP.DROP, OP.FROMALT, OP.SIZE, OP.NOT, OP.VERIFY, OP.DROP); a.alt.pop();
   section('msm-left');
@@ -277,6 +275,7 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
   const code = Uint8Array.from([...a.prologue(), ...a.code]);
   info.marks = a.marks.map((m) => ({name: m.name, off: m.off + a.prologue().length}));
   info.prologue = a.prologue().length; info.funcs = Object.fromEntries([...a.ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [n, f.code.length]));
+  info.funcCode = Object.fromEntries([...a.ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [n, Uint8Array.from(f.code)]));
   return {redeem: code, info};
 }
 
