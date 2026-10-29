@@ -125,13 +125,13 @@ AIR × set × ZK variant, both regimes, and the per-phase profile. Selected rows
 | set | proof B | security | (b) one 100 KB input: op-cost std / BCHN-adj., % of budget | (a) today: txs / inputs / total B |
 |---|--:|---|---|---|
 | S128 | 78,393 | 128 | 33.87M / 33.35M, 47.9% | 2 / 17 / 123,452 |
-| S128b | 99,795 | 128 | does not fit (110,711 B unlocking) | 2 / 25 / 166,343 |
+| S128b | 99,795 | 128 | does not fit (110,710 B unlocking) | 2 / 25 / 166,343 |
 | S100 | 76,019 | 101.1 | 30.58M / 30.02M, 44.3% | 2 / 19 / 127,870 |
 | S100b | 60,793 | 100.3 | 25.64M / 25.24M, 45.5% | 1 / 12 / 83,515 |
 | P100 (h = 25) | 58,183 | 100 | 23.83M / 23.53M, 43.5% | 1 / 13 / 85,649 |
 | P128 | 110,765 | 125.9 | does not fit (122,057 B) | 2 / 26 / 185,338 |
 | C100 (D = 2) | 56,893 | conj. 100 | 19.96M / 19.51M, 38.6% | 1 / 11 / 93,794 |
-| fib S128z (ZK) | 112,501 | 128 | does not fit (126,184 B) | 3 / 35 / 234,553 |
+| fib S128z (ZK) | 112,501 | 128 | does not fit (126,183 B) | 3 / 35 / 234,553 |
 | fib S100z (ZK) | 85,853 | 100.2 | 29.42M / 28.83M, 37.0% | 2 / 25 / 136,556 |
 
 Comparison with the Track 4 format (Track 5 field phase, same CashVM techniques, P128 at 91.5 KB, 128.19 bits):
