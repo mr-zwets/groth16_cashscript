@@ -1,0 +1,11 @@
+{
+  "name": "plonk-kzg-reference-verifier",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "verify": "node verify.mjs"
+  },
+  "dependencies": {
+    "@noble/curves": "2.2.0"
+  }
+}
