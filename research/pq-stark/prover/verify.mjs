@@ -11,7 +11,12 @@ import { readFileSync } from 'node:fs';
 
 // ------------------------------------------------------------------------- Goldilocks
 export const P = 0xffffffff00000001n;
-const sha = (b) => createHash('sha256').update(b).digest();
+export const STATS = { on: false };
+const iters = (len) => 1 + Math.floor((len + 8) / 64); // SHA-256 compression calls (CashVM hash iterations)
+const sha = (b, tag = 'other') => {
+  if (STATS.on) { const t = (STATS[tag] ??= { calls: 0, bytes: 0, iterations: 0 }); t.calls++; t.bytes += b.length; t.iterations += iters(b.length); }
+  return createHash('sha256').update(b).digest();
+};
 const md = (a) => { a %= P; return a < 0n ? a + P : a; };
 const pw = (b, e) => { let r = 1n; b = md(b); e = BigInt(e); while (e > 0n) { if (e & 1n) r = r * b % P; b = b * b % P; e >>= 1n; } return r; };
 const inv = (a) => { if (md(a) === 0n) throw new V('inverse of zero'); return pw(a, P - 2n); };
@@ -38,6 +43,7 @@ export function extField(D) {
   F.neg = (a) => a.map((x) => md(-x));
   F.smul = (a, k) => a.map((x) => x * k % P);
   F.mul = (a, b) => {
+    if (STATS.on) STATS.ext_mul = (STATS.ext_mul ?? 0) + 1;
     const c = Array(2 * D - 1).fill(0n);
     for (let i = 0; i < D; i++) for (let j = 0; j < D; j++) c[i + j] += a[i] * b[j];
     if (D === 2) return [md(c[0] + 7n * c[2]), md(c[1])];
@@ -48,7 +54,7 @@ export function extField(D) {
   F.isZero = (a) => a.every((x) => md(x) === 0n);
   F.pow = (a, e) => { let r = F.one(); let b = a; e = BigInt(e); while (e > 0n) { if (e & 1n) r = F.mul(r, b); b = F.mul(b, b); e >>= 1n; } return r; };
   const ORDER = P ** BigInt(D);
-  F.inv = (a) => { if (F.isZero(a)) throw new V('ext inverse of zero'); return F.pow(a, ORDER - 2n); };
+  F.inv = (a) => { if (STATS.on) STATS.ext_inv = (STATS.ext_inv ?? 0) + 1; if (F.isZero(a)) throw new V('ext inverse of zero'); return F.pow(a, ORDER - 2n); };
   F.div = (a, b) => F.mul(a, F.inv(b));
   // u^k basis element
   F.basis = (k) => { const e = F.zero(); e[k] = 1n; return e; };
@@ -96,7 +102,7 @@ class Challenger {
   flush() {
     const input = Buffer.from(this.inb);
     if (this.log) this.log.push(input.toString('hex'));
-    const d = sha(input);
+    const d = sha(input, 'transcript');
     this.inb = [...d]; this.outb = [...d];
   }
   byte() { if (this.outb.length === 0) this.flush(); return this.outb.pop(); }
@@ -257,14 +263,14 @@ export function parse(buf, vk) {
 
 // ------------------------------------------------------------------------- Merkle multiproof (Plonky3 pruned frontier, binary, cap height 0)
 function merkleVerify(root, logH, indices, leaves, sibs, what, h) {
-  const hs = (b) => sha(b).subarray(0, h); // Merkle digests: SHA-256 truncated to h bytes (h = 32: untruncated)
+  const hs = (b, t) => sha(b, t).subarray(0, h); // Merkle digests: SHA-256 truncated to h bytes (h = 32: untruncated)
   const byIdx = new Map();
   indices.forEach((idx, q) => {
     if (idx >= 2 ** logH) throw new V(`${what}: index out of range`);
     const prev = byIdx.get(idx);
     if (prev) { if (!prev.equals(leaves[q])) throw new V(`${what}: inconsistent duplicate opening`); } else byIdx.set(idx, leaves[q]);
   });
-  let nodes = [...byIdx.keys()].sort((a, b) => a - b).map((idx) => ({ idx, d: hs(byIdx.get(idx)) }));
+  let nodes = [...byIdx.keys()].sort((a, b) => a - b).map((idx) => ({ idx, d: hs(byIdx.get(idx), 'merkle_leaf') }));
   let cur = 0;
   for (let level = 0; level < logH; level++) {
     const next = [];
@@ -275,7 +281,7 @@ function merkleVerify(root, logH, indices, leaves, sibs, what, h) {
         if (m < nodes.length && nodes[m].idx === start + pos) inp.push(nodes[m++].d);
         else { if (cur >= sibs.length) throw new V(`${what}: too few siblings`); inp.push(sibs[cur++]); }
       }
-      next.push({ idx: parent, d: hs(Buffer.concat(inp)) }); i = m;
+      next.push({ idx: parent, d: hs(Buffer.concat(inp), 'merkle_node') }); i = m;
     }
     nodes = next;
   }
@@ -485,6 +491,18 @@ function check(v, file, trace) {
 
 if (import.meta.url === `file://${process.argv[1]}`) {
   const args = process.argv.slice(2); const trace = args.includes('--trace');
+  if (args.includes('--stats')) {
+    // per valid proof: hash calls / bytes / SHA-256 iterations by role, extension-field multiplications and
+    // inversions done by this (unoptimised) reference verifier
+    const out = {};
+    for (const f of args.filter((a) => !a.startsWith('--'))) {
+      const v = JSON.parse(readFileSync(f, 'utf8'));
+      for (const k of Object.keys(STATS)) if (k !== 'on') delete STATS[k];
+      STATS.on = true; verify(vkFromVector(v), v.public_values.map(BigInt), Buffer.from(v.proof_hex, 'hex')); STATS.on = false;
+      out[f.split('/').pop()] = Object.fromEntries(Object.entries(STATS).filter(([k]) => k !== 'on'));
+    }
+    console.log(JSON.stringify(out, null, 1)); process.exit(0);
+  }
   let total = 0; let bad = 0;
   for (const f of args.filter((a) => !a.startsWith('--'))) { const [t, b] = check(JSON.parse(readFileSync(f, 'utf8')), f, trace); total += t; bad += b; }
   console.log(`js verify: ${total} cases, ${bad} unexpected`);

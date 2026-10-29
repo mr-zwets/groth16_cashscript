@@ -1,0 +1,249 @@
+{
+ "mimc-C100-0.json": {
+  "transcript": {
+   "calls": 15,
+   "bytes": 1992,
+   "iterations": 41
+  },
+  "ext_mul": 30652,
+  "merkle_leaf": {
+   "calls": 161,
+   "bytes": 13544,
+   "iterations": 349
+  },
+  "merkle_node": {
+   "calls": 1534,
+   "bytes": 98176,
+   "iterations": 3068
+  },
+  "ext_inv": 111
+ },
+ "mimc-C100h-0.json": {
+  "transcript": {
+   "calls": 15,
+   "bytes": 1950,
+   "iterations": 41
+  },
+  "ext_mul": 30652,
+  "merkle_leaf": {
+   "calls": 161,
+   "bytes": 13544,
+   "iterations": 349
+  },
+  "merkle_node": {
+   "calls": 1546,
+   "bytes": 77300,
+   "iterations": 1546
+  },
+  "ext_inv": 111
+ },
+ "mimc-C100-zk-0.json": {
+  "transcript": {
+   "calls": 15,
+   "bytes": 3064,
+   "iterations": 57
+  },
+  "ext_mul": 75463,
+  "merkle_leaf": {
+   "calls": 188,
+   "bytes": 38936,
+   "iterations": 726
+  },
+  "merkle_node": {
+   "calls": 2090,
+   "bytes": 133760,
+   "iterations": 4180
+  },
+  "ext_inv": 300
+ },
+ "mimc-C100-zkmin-0.json": {
+  "transcript": {
+   "calls": 15,
+   "bytes": 2712,
+   "iterations": 52
+  },
+  "ext_mul": 75419,
+  "merkle_leaf": {
+   "calls": 187,
+   "bytes": 28440,
+   "iterations": 588
+  },
+  "merkle_node": {
+   "calls": 2084,
+   "bytes": 133376,
+   "iterations": 4168
+  },
+  "ext_inv": 300
+ },
+ "mimc-C128-0.json": {
+  "transcript": {
+   "calls": 18,
+   "bytes": 2472,
+   "iterations": 50
+  },
+  "ext_mul": 54706,
+  "merkle_leaf": {
+   "calls": 215,
+   "bytes": 26688,
+   "iterations": 574
+  },
+  "merkle_node": {
+   "calls": 1994,
+   "bytes": 127616,
+   "iterations": 3988
+  },
+  "ext_inv": 147
+ },
+ "mimc-C128-zk-0.json": {
+  "transcript": {
+   "calls": 18,
+   "bytes": 4176,
+   "iterations": 76
+  },
+  "ext_mul": 138273,
+  "merkle_leaf": {
+   "calls": 251,
+   "bytes": 63712,
+   "iterations": 1148
+  },
+  "merkle_node": {
+   "calls": 2751,
+   "bytes": 176064,
+   "iterations": 5502
+  },
+  "ext_inv": 399
+ },
+ "mimc-C128-zkmin-0.json": {
+  "transcript": {
+   "calls": 18,
+   "bytes": 3912,
+   "iterations": 72
+  },
+  "ext_mul": 138251,
+  "merkle_leaf": {
+   "calls": 247,
+   "bytes": 51952,
+   "iterations": 1024
+  },
+  "merkle_node": {
+   "calls": 2615,
+   "bytes": 167360,
+   "iterations": 5230
+  },
+  "ext_inv": 399
+ },
+ "mimc-P100-0.json": {
+  "transcript": {
+   "calls": 14,
+   "bytes": 2302,
+   "iterations": 46
+  },
+  "ext_mul": 33874,
+  "merkle_leaf": {
+   "calls": 132,
+   "bytes": 16368,
+   "iterations": 352
+  },
+  "merkle_node": {
+   "calls": 1834,
+   "bytes": 91700,
+   "iterations": 1834
+  },
+  "ext_inv": 91
+ },
+ "mimc-P100-zk-0.json": {
+  "transcript": {
+   "calls": 14,
+   "bytes": 4048,
+   "iterations": 72
+  },
+  "ext_mul": 85409,
+  "merkle_leaf": {
+   "calls": 154,
+   "bytes": 39072,
+   "iterations": 704
+  },
+  "merkle_node": {
+   "calls": 2364,
+   "bytes": 151296,
+   "iterations": 4728
+  },
+  "ext_inv": 245
+ },
+ "mimc-P100-zkmin-0.json": {
+  "transcript": {
+   "calls": 14,
+   "bytes": 3784,
+   "iterations": 68
+  },
+  "ext_mul": 85387,
+  "merkle_leaf": {
+   "calls": 154,
+   "bytes": 32384,
+   "iterations": 638
+  },
+  "merkle_node": {
+   "calls": 2329,
+   "bytes": 149056,
+   "iterations": 4658
+  },
+  "ext_inv": 245
+ },
+ "mimc-P128-0.json": {
+  "transcript": {
+   "calls": 19,
+   "bytes": 2504,
+   "iterations": 51
+  },
+  "ext_mul": 65122,
+  "merkle_leaf": {
+   "calls": 258,
+   "bytes": 31992,
+   "iterations": 688
+  },
+  "merkle_node": {
+   "calls": 2803,
+   "bytes": 179392,
+   "iterations": 5606
+  },
+  "ext_inv": 175
+ },
+ "mimc-P128-zk-0.json": {
+  "transcript": {
+   "calls": 19,
+   "bytes": 4208,
+   "iterations": 77
+  },
+  "ext_mul": 164705,
+  "merkle_leaf": {
+   "calls": 301,
+   "bytes": 76368,
+   "iterations": 1376
+  },
+  "merkle_node": {
+   "calls": 3841,
+   "bytes": 245824,
+   "iterations": 7682
+  },
+  "ext_inv": 476
+ },
+ "mimc-P128-zkmin-0.json": {
+  "transcript": {
+   "calls": 19,
+   "bytes": 3944,
+   "iterations": 73
+  },
+  "ext_mul": 164683,
+  "merkle_leaf": {
+   "calls": 301,
+   "bytes": 63296,
+   "iterations": 1247
+  },
+  "merkle_node": {
+   "calls": 3834,
+   "bytes": 245376,
+   "iterations": 7668
+  },
+  "ext_inv": 476
+ }
+}

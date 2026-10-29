@@ -15,8 +15,17 @@ for air in fib mimc; do
     fi
   done
 done
+# the Soundness phase's Plonky3 parameter picks (SOUNDNESS.md section 5)
+for air in fib mimc; do
+  for set in S100 S100b S128 S128b; do
+    $B prove --air $air --log-n 16 --set $set --out vectors/$air-$set-0.json
+  done
+  for set in S100z S128z; do
+    $B prove --air $air --log-n 16 --set $set --zkmin --out vectors/$air-$set-zkmin-0.json
+  done
+done
 # a second statement per set (size variance; valid only)
-for set in C100 C100h C128 P100 P128; do
+for set in C100 C100h C128 P100 P128 S100 S100b S128 S128b; do
   $B prove --air mimc --log-n 16 --set $set --k 1 --out vectors/mimc-$set-1.json
 done
 $B sets vectors/estimates.json > /dev/null

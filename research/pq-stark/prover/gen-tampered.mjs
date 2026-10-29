@@ -31,6 +31,8 @@ function cases(v) {
   if (vk.zk) { inc('OOD random polynomial', ood[2 * vk.width * D + vk.C * D * D]); inc('OOD random-codeword opening (last)', ood[ood.length - 1]); }
   inc('final polynomial coeff 0 (PoW breaks)', S.final[0]);
   if (vk.qpow) inc('query PoW witness + 1', S.pow[S.pow.length - 1]);
+  if (vk.bpow) inc('batch PoW witness + 1', S.pow[0]);
+  if (vk.cpow) inc('commit PoW witness (round 0) + 1', S.pow[vk.bpow ? 1 : 0]);
   // honest re-grind: final polynomial coeff + 1 with a valid query PoW, so only the FRI checks can catch it
   if (vk.qpow <= MAX_REGRIND_BITS) {
     const b = Buffer.from(buf); const fo = S.final[0][0];

@@ -34,6 +34,12 @@ fn mk(name: &str, ext: usize, lb: usize, q: usize, qpow: usize, arity: usize, lf
     }
 }
 
+fn pw(mut s: FriSet, commit_pow: usize, batch_pow: usize) -> FriSet {
+    s.commit_pow_bits = commit_pow;
+    s.batch_pow_bits = batch_pow;
+    s
+}
+
 pub fn all() -> Vec<FriSet> {
     let h25 = |mut s: FriSet| {
         s.digest = 25;
@@ -48,8 +54,19 @@ pub fn all() -> Vec<FriSet> {
         // Plonky3's proven (list-decoding) estimator gives 100 and 128 bits for these
         h25(mk("P100", 3, 7, 22, 28, 3, 5)),
         mk("P128", 3, 5, 43, 28, 3, 5),
+        // Soundness-phase picks (wip/pq-stark-soundness 6ac98c3, SOUNDNESS.md section 5; per-round
+        // Johnson-bound analysis, e = 3, 32-byte digests). Their e = 3 is a binomial u^3 - 7 patch;
+        // here it is Plonky3's stock cubic trinomial x^3 - x - 1 (same q = p^3).
+        pw(mk("S100", 3, 5, 30, 27, 3, 7), 0, 0),
+        pw(mk("S100b", 3, 8, 19, 25, 4, 8), 0, 0),
+        pw(mk("S128", 3, 8, 26, 26, 4, 8), 15, 23),
+        pw(mk("S128b", 3, 5, 41, 28, 3, 7), 7, 14),
+        // their ZK rows (HidingFriPcs, num_random_codewords = e): run with --zkmin
+        pw(mk("S100z", 3, 8, 19, 25, 4, 6), 0, 3),
+        pw(mk("S128z", 3, 8, 26, 27, 3, 8), 13, 22),
         // tiny set for fast tests (not secure)
         mk("TOY", 2, 2, 4, 2, 2, 1),
+        pw(mk("TOYPOW", 3, 2, 4, 3, 2, 1), 2, 2),
     ]
 }
 
