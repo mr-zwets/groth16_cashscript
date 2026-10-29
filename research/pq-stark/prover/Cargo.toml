@@ -1,0 +1,30 @@
+[package]
+name = "pq-stark-prover"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "verifier.cash Track 5 research: Plonky3 uni-stark proofs with SHA-256 over Goldilocks, serialized for a CashVM verifier"
+
+# Plonky3 pinned to one exact commit (2026-10-26, "fix(stark): report a constraint read of an undeclared next-row column (#2585)").
+[dependencies]
+p3-air = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-challenger = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-commit = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-dft = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-field = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-fri = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-goldilocks = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-matrix = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-merkle-tree = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-sha256 = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-symmetric = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-security = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-uni-stark = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82", features = ["parallel"] }
+p3-maybe-rayon = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82", features = ["parallel"] }
+rand = { version = "0.10", features = ["std_rng"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.11"
+
+[profile.release]
+debug = false
