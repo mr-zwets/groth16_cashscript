@@ -154,6 +154,7 @@ export function transcript(vk, pr, pis) {
   const f = H(d, pr.FIN);
   pp = vk.qpow ? pow(f, pr.QPOW, vk.qpow) : new Pop(f); pp.log = t.hashes;
   t.idx = Array.from({length: vk.Q}, () => pp.low(vk.logH));
+  t.G = pp.d;
   return t;
 }
 
@@ -308,6 +309,7 @@ export function canonicalTree(h, depth, leaves, sibs) {
   let cur = 0;
   for (let level = 0; level < depth; level++) {
     const next = [];
+    for (const nd of nodes) map.set(`${level}:${nd.k}`, nd.d);   // every known node (full paths for layout a)
     for (let i = 0; i < nodes.length;) {
       const parent = Math.floor(nodes[i].k / 2), start = 2 * parent, inp = []; let m = i;
       for (let p = 0; p < 2; p++) {
@@ -403,9 +405,10 @@ export function encodeB(vk, buf, pis, opts = {}) {
   out.records = vk.trees.map((tr, ti) => {
     const recs = idx.map((i, q) => ({q, leaf: i >>> tr.shift, digest: dig[q]?.[ti] ?? Buffer.alloc(h)}));
     const can = canonicalTree(h, tr.depth, recs.map((x) => [x.leaf, x.digest]), sibLists[ti]);
+    (out.maps ??= [])[ti] = can.map;
     const lp = lifoPrograms(h, tr.depth, recs, can.map);
     const progs = lp.programs.map((p) => p.bytes);
-    if (can.leftover.length) progs[progs.length - 1] = Buffer.concat([progs[progs.length - 1], ...can.leftover]);
+    if (can.leftover.length) { progs[progs.length - 1] = Buffer.concat([progs[progs.length - 1], ...can.leftover]); out.leftover = (out.leftover ?? 0) + can.leftover.length; }
     return progs;
   });
   if (pr.trailing.length) { const lr = out.records[out.records.length - 1]; lr[lr.length - 1] = Buffer.concat([lr[lr.length - 1], pr.trailing]); }
@@ -429,4 +432,19 @@ export function verifyModel(vk, buf, pis) {
     });
     return {ok: true, enc};
   } catch (e) { if (!(e instanceof Reject)) throw e; return {ok: false, reason: e.message, enc}; }
+}
+
+// ---- layout (a) witness: per query the blob L_q (as layout b) and the full authentication paths of every tree,
+// read from the node map of the proof's own multiproof (missing nodes: zero digests) ----
+export function encodeA(vk, buf, pis) {
+  const enc = encodeB(vk, buf, pis);
+  // the layout (a) witness carries full paths, not the pruned multiproof: bytes the multiproof does not consume
+  // cannot reach the script, so a byte string that is not a well-formed p3s-v1 proof is refused here
+  // (flagged, not thrown: the test sweep reports whether the script itself rejects; production encoders refuse)
+  enc.malformed = enc.pr.trailing.length ? `${enc.pr.trailing.length} trailing byte(s)` : enc.leftover ? `${enc.leftover} unused sibling digest(s) for the transcript's indices` : null;
+  const idx = enc.t ? enc.t.idx : Array(vk.Q).fill(0);
+  enc.paths = idx.map((i) => Buffer.concat(vk.trees.flatMap((tr, ti) => Array.from({length: tr.depth}, (_, l) => enc.maps[ti].get(`${l}:${((i >>> tr.shift) >>> l) ^ 1}`) ?? Buffer.alloc(vk.h)))));
+  // G: the final transcript digest (thread commitment for two-transaction plans)
+  enc.G = enc.t ? enc.t.G : Buffer.alloc(32);
+  return enc;
 }
