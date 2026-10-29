@@ -409,7 +409,7 @@ export function encodeB(vk, buf, pis, opts = {}) {
     return progs;
   });
   if (pr.trailing.length) { const lr = out.records[out.records.length - 1]; lr[lr.length - 1] = Buffer.concat([lr[lr.length - 1], pr.trailing]); }
-  out.PT = {ROOTS: pr.ROOTS, OOD: pr.OOD, BPOW: pr.BPOW, FROOTS: pr.FROOTS, CPOW: pr.CPOW, FIN: pr.FIN, QPOW: pr.QPOW};
+  out.PT = {ROOTS: Buffer.concat([Buffer.from([pr.header]), pr.ROOTS]), OOD: pr.OOD, BPOW: pr.BPOW, FROOTS: pr.FROOTS, CPOW: pr.CPOW, FIN: pr.FIN, QPOW: pr.QPOW};
   out.headerOk = pr.header === vk.degreeBits;
   return out;
 }

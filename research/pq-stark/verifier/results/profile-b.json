@@ -1,0 +1,90 @@
+[
+ {
+  "vector": "fib-S128-0.json",
+  "air": "fib",
+  "set": "S128",
+  "Q": 26,
+  "opStd": 33404879,
+  "phases": {
+   "entry": 143508,
+   "transcript": 171879,
+   "air-start": 23901,
+   "air-generic-a": 178060,
+   "air-specific": 131177,
+   "air-generic-b": 26794,
+   "deep-consts": 232229,
+   "tables": 230171,
+   "unpack": 1102832,
+   "q-x": 340483,
+   "q-deep": 2078715,
+   "q-folds": 13126617,
+   "q-final": 7171449,
+   "queries": 501,
+   "merkle": 8435034,
+   "end": 11429,
+   "cleanup": 100
+  },
+  "perQuery": {
+   "q-x": 13096,
+   "q-deep": 79951,
+   "q-folds": 504870,
+   "q-final": 275825
+  },
+  "queryTotal": 873742,
+  "airSpecific": {
+   "opCost": 131177,
+   "pctOfTotal": 0.39,
+   "codeBytes": 332,
+   "airBlockCodeBytes": 650,
+   "redeemBytes": 7933,
+   "pctOfRedeem": 4.2,
+   "constraintSteps": 19
+  },
+  "merkle": 8435034,
+  "merklePct": 25.3
+ },
+ {
+  "vector": "mimc-S128-0.json",
+  "air": "mimc",
+  "set": "S128",
+  "Q": 26,
+  "opStd": 33867266,
+  "phases": {
+   "entry": 147604,
+   "transcript": 172534,
+   "air-start": 42820,
+   "air-generic-a": 178198,
+   "air-specific": 259790,
+   "air-generic-b": 72046,
+   "deep-consts": 367806,
+   "tables": 230459,
+   "unpack": 1102836,
+   "q-x": 341993,
+   "q-deep": 2313642,
+   "q-folds": 13131826,
+   "q-final": 7190911,
+   "queries": 501,
+   "merkle": 8302771,
+   "end": 11429,
+   "cleanup": 100
+  },
+  "perQuery": {
+   "q-x": 13154,
+   "q-deep": 88986,
+   "q-folds": 505070,
+   "q-final": 276574
+  },
+  "queryTotal": 883784,
+  "airSpecific": {
+   "opCost": 259790,
+   "pctOfTotal": 0.77,
+   "codeBytes": 664,
+   "airBlockCodeBytes": 1216,
+   "redeemBytes": 8909,
+   "pctOfRedeem": 7.5,
+   "constraintSteps": 40
+  },
+  "merkle": 8302771,
+  "merklePct": 24.5
+ }
+]
