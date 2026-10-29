@@ -1,3 +1,24 @@
+# Track 5 field-cost copy of the pq-hash verifier (branch wip/pq-stark-field)
+
+This folder is a copy of the Track 4 verifier (`../../../pq-hash/verifier`). Its generator cuts the field-arithmetic op-cost. The proofs, the Merkle checks and the soundness argument are unchanged: it consumes the same Track 4 vectors, and the rejection suites (`test-b.mjs`, `test-a.mjs`) pass unchanged. **Research only, not a leaderboard entry.** The written report is in zk-verifier-bench `wip/pq-stark-field`, `research/pq-stark/field/REPORT.md`.
+
+`gen.mjs` takes mode switches through `makeCtx(prm, opts)` / `buildB(prm, statement, opts)`. The default is the Track 5 build.
+
+| switch | Track 5 default | Track 4 legacy | what |
+|---|---|---|---|
+| `fp` | `'gpd'` | `'grp'` | final polynomial: group-packed dot product. H = 8 groups of coefficients are packed into one integer, so one OP_MUL per y-power multiplies 8 groups × e coefficients; Horner over the groups is done on the packed sums (`HG`) |
+| `fold` | `'pk'` | `'pair'` | folds: F_p^3 values packed in 26-byte slots (`PKL`); a pair folds with packed rotation columns of beta (`PAIRK`); one unpack-and-reduce per fold (`UR`). `'rot'` is the intermediate (`PAIRP`, unpacked values) |
+| `deep` | `'pk'` | `'pt'` | DEEP numerators from packed gamma columns, lazy f0, packed output that feeds the first fold directly (`DPK`) |
+| `xtab` | `true` | `false` | x0 = 7·w^idx as a product of 5 entries of 4-bit window tables that are built on the stack once per proof (no per-query square-and-multiply) |
+
+`{fp: 'grp', fold: 'pair', deep: 'pt', xtab: false}` reproduces Track 4 byte for byte (P128-0: 71,541,117 op-cost, 5,945 B redeem).
+
+Results (P128-0, layout b, one input): op-cost 71.54M → **50.05M** (−30.0%), with 64.9% of the base-41 budget under TXv5 rules (Track 4: 90%). Per query: 1,403k → 894k. P100-0: 38.73M → 27.86M (−28.1%). Proof bytes are unchanged, and the redeem is 30 B smaller at P128 and 34 B larger at P100. Under today's standard rules (layout a) the input count does not change (P128: 19 inputs / 2 txs; P100: 10 / 1): query inputs are byte-bound (3 queries per 10,000 B input) and now sit at 81% of their op-cost budget. Tools: `fnprof.mjs` (inclusive op-cost per function), `profile-b.mjs` (per phase; `results/profile-b.json`).
+
+The Track 4 README follows. Its file list and running instructions apply here unchanged (vectors: `../../../pq-hash/prover/vectors`).
+
+---
+
 # pq-hash on-chain verifier (CashVM, BCH 2026)
 
 This folder holds the on-chain verifier for the pq-hash track: a SHA-256 DEEP-FRI STARK over Goldilocks (SPEC.md, zk-verifier-bench `wip/pq-hash-design` c3497a1). It consumes the prover's vectors (`../prover/vectors`, branch `wip/pq-hash-prover`) and builds the verifier in two layouts:

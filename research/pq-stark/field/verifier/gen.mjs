@@ -88,9 +88,12 @@ export function makeCtx(prm, opts = {}) {
   const G = Math.min(opts.group ?? 32, D);
   // final polynomial: 'gpd' = group-packed dot product (Track 5 field), 'grp' = Track 4 packed groups + Horner
   const FP = opts.fp ?? 'gpd';
-  const FOLD = opts.fold ?? 'pk';   // 'pk': packed fold values, PAIRK (Track 5); 'rot': PAIRP; 'pair': Track 4
+  // fold: 'pk' = packed fold values, PAIRK (Track 5); 'rot' = PAIRP with packed rotation columns of beta; 'pair' = Track 4 MULF + PAIR
+  const FOLD = opts.fold ?? 'pk';
+  // deep: 'pk' = DPK, packed DEEP numerators from packed gamma columns (Track 5); 'pt' = Track 4 DEEPPT
   const DEEP = opts.deep ?? 'pk';
-  const XTAB = opts.xtab ?? true;    // x0 = 7 w^idx from runtime 4-bit window tables on the stack (Track 5) instead of XPOW    // 'pk': DPK, packed DEEP numerators from packed gamma columns (Track 5); 'pt': Track 4 DEEPPT   // 'rot': PAIRP with packed rotation columns of beta (Track 5); 'pair': Track 4 MULF + PAIR
+  // xtab: x0 = 7 w^idx from runtime 4-bit window tables on the stack (Track 5) instead of XPOW
+  const XTAB = opts.xtab ?? true;
   const GH = Math.min(opts.gpdH ?? 8, D), GG = D / GH;   // gpd: H groups packed per integer, GG terms per query
   if (FP === 'gpd' && !Number.isInteger(GG)) throw new Error('gpd: D not a multiple of H');
   const SLOT = 136;                       // packed slot width: sums of 32 products of 64-bit values are < 2^133

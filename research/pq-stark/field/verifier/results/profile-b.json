@@ -1,0 +1,366 @@
+[
+ {
+  "set": "C100",
+  "vector": "C100-0.json",
+  "opStdWithMarkers": 12324575,
+  "markers": 65,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 66163,
+   "transcript": 82807,
+   "air-0": 202094,
+   "air-1": 41208,
+   "air-2": 8248,
+   "air-3": 43794,
+   "air+consts": 154283,
+   "merkle": 2953698,
+   "unpack": 192553
+  },
+  "perQuery": {
+   "q-entry": 10928,
+   "q-parse": 91442,
+   "q-deep": 374699,
+   "q-layers": 223833,
+   "q-final": 72181
+  },
+  "queriesTotal": 8503911,
+  "cleanup": 100
+ },
+ {
+  "set": "C100",
+  "vector": "C100-1.json",
+  "opStdWithMarkers": 12293267,
+  "markers": 65,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 65713,
+   "transcript": 82903,
+   "air-0": 201925,
+   "air-1": 41246,
+   "air-2": 8333,
+   "air-3": 43763,
+   "air+consts": 154283,
+   "merkle": 2916391,
+   "unpack": 192554
+  },
+  "perQuery": {
+   "q-entry": 10897,
+   "q-parse": 91443,
+   "q-deep": 375266,
+   "q-layers": 223892,
+   "q-final": 72170
+  },
+  "queriesTotal": 8510340,
+  "cleanup": 100
+ },
+ {
+  "set": "C128",
+  "vector": "C128-0.json",
+  "opStdWithMarkers": 19626196,
+  "markers": 85,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 89276,
+   "transcript": 117004,
+   "air-0": 395711,
+   "air-1": 81799,
+   "air-2": 26988,
+   "air-3": 95958,
+   "air+consts": 173674,
+   "merkle": 4295183,
+   "unpack": 527785
+  },
+  "perQuery": {
+   "q-entry": 12712,
+   "q-parse": 99661,
+   "q-deep": 317944,
+   "q-layers": 323322,
+   "q-final": 161542
+  },
+  "queriesTotal": 13727716,
+  "cleanup": 100
+ },
+ {
+  "set": "C128",
+  "vector": "C128-1.json",
+  "opStdWithMarkers": 19612136,
+  "markers": 85,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 89360,
+   "transcript": 116965,
+   "air-0": 396463,
+   "air-1": 81980,
+   "air-2": 27034,
+   "air-3": 96229,
+   "air+consts": 173674,
+   "merkle": 4275584,
+   "unpack": 527787
+  },
+  "perQuery": {
+   "q-entry": 12665,
+   "q-parse": 99660,
+   "q-deep": 317942,
+   "q-layers": 323947,
+   "q-final": 161250
+  },
+  "queriesTotal": 13731958,
+  "cleanup": 100
+ },
+ {
+  "set": "P100",
+  "vector": "P100-0.json",
+  "opStdWithMarkers": 27873446,
+  "markers": 120,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 97306,
+   "transcript": 148811,
+   "air-0": 396438,
+   "air-1": 81852,
+   "air-2": 27003,
+   "air-3": 83043,
+   "air+consts": 135838,
+   "merkle": 6018783,
+   "unpack": 1083320
+  },
+  "perQuery": {
+   "q-entry": 12460,
+   "q-parse": 74991,
+   "q-deep": 317657,
+   "q-layers": 218836,
+   "q-final": 271969
+  },
+  "queriesTotal": 19710088,
+  "cleanup": 100
+ },
+ {
+  "set": "P100",
+  "vector": "P100-1.json",
+  "opStdWithMarkers": 27851953,
+  "markers": 120,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 97201,
+   "transcript": 148657,
+   "air-0": 396696,
+   "air-1": 81896,
+   "air-2": 27000,
+   "air-3": 82980,
+   "air+consts": 135838,
+   "merkle": 6005733,
+   "unpack": 1083320
+  },
+  "perQuery": {
+   "q-entry": 12440,
+   "q-parse": 74993,
+   "q-deep": 317386,
+   "q-layers": 218627,
+   "q-final": 272085
+  },
+  "queriesTotal": 19701668,
+  "cleanup": 100
+ },
+ {
+  "set": "P100",
+  "vector": "P100-2.json",
+  "opStdWithMarkers": 27727207,
+  "markers": 120,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 96662,
+   "transcript": 148768,
+   "air-0": 395614,
+   "air-1": 81869,
+   "air-2": 26819,
+   "air-3": 83092,
+   "air+consts": 135838,
+   "merkle": 5887767,
+   "unpack": 1083318
+  },
+  "perQuery": {
+   "q-entry": 12457,
+   "q-parse": 74993,
+   "q-deep": 317347,
+   "q-layers": 218835,
+   "q-final": 271664
+  },
+  "queriesTotal": 19696496,
+  "cleanup": 100
+ },
+ {
+  "set": "P100",
+  "vector": "P100-3.json",
+  "opStdWithMarkers": 27999607,
+  "markers": 120,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 98171,
+   "transcript": 148818,
+   "air-0": 396223,
+   "air-1": 81698,
+   "air-2": 27203,
+   "air-3": 83152,
+   "air+consts": 135838,
+   "merkle": 6142489,
+   "unpack": 1083324
+  },
+  "perQuery": {
+   "q-entry": 12432,
+   "q-parse": 74992,
+   "q-deep": 317779,
+   "q-layers": 218603,
+   "q-final": 272182
+  },
+  "queriesTotal": 19711727,
+  "cleanup": 100
+ },
+ {
+  "set": "P128",
+  "vector": "P128-0.json",
+  "opStdWithMarkers": 50076299,
+  "markers": 225,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 142914,
+   "transcript": 198337,
+   "air-0": 395498,
+   "air-1": 81973,
+   "air-2": 27066,
+   "air-3": 83473,
+   "air+consts": 115478,
+   "merkle": 9407441,
+   "unpack": 1083325
+  },
+  "perQuery": {
+   "q-entry": 10799,
+   "q-parse": 74992,
+   "q-deep": 317811,
+   "q-layers": 218747,
+   "q-final": 271738
+  },
+  "queriesTotal": 38445762,
+  "cleanup": 100
+ },
+ {
+  "set": "P128",
+  "vector": "P128-1.json",
+  "opStdWithMarkers": 50377702,
+  "markers": 225,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 144917,
+   "transcript": 198169,
+   "air-0": 395591,
+   "air-1": 82175,
+   "air-2": 27056,
+   "air-3": 83222,
+   "air+consts": 115478,
+   "merkle": 9720217,
+   "unpack": 1083323
+  },
+  "perQuery": {
+   "q-entry": 10782,
+   "q-parse": 74992,
+   "q-deep": 317694,
+   "q-layers": 218753,
+   "q-final": 271559
+  },
+  "queriesTotal": 38432522,
+  "cleanup": 100
+ },
+ {
+  "set": "P128",
+  "vector": "P128-2.json",
+  "opStdWithMarkers": 50496309,
+  "markers": 225,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 146110,
+   "transcript": 198399,
+   "air-0": 396849,
+   "air-1": 82260,
+   "air-2": 26957,
+   "air-3": 83359,
+   "air+consts": 115478,
+   "merkle": 9813521,
+   "unpack": 1083326
+  },
+  "perQuery": {
+   "q-entry": 10806,
+   "q-parse": 74992,
+   "q-deep": 317698,
+   "q-layers": 218726,
+   "q-final": 272081
+  },
+  "queriesTotal": 38455018,
+  "cleanup": 100
+ },
+ {
+  "set": "P128",
+  "vector": "P128-3.json",
+  "opStdWithMarkers": 50529221,
+  "markers": 225,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 146421,
+   "transcript": 198383,
+   "air-0": 396451,
+   "air-1": 82133,
+   "air-2": 27159,
+   "air-3": 83238,
+   "air+consts": 115478,
+   "merkle": 9865796,
+   "unpack": 1083331
+  },
+  "perQuery": {
+   "q-entry": 10815,
+   "q-parse": 74992,
+   "q-deep": 317562,
+   "q-layers": 218772,
+   "q-final": 271714
+  },
+  "queriesTotal": 38435799,
+  "cleanup": 100
+ },
+ {
+  "set": "U100",
+  "vector": "U100-0.json",
+  "opStdWithMarkers": 63583415,
+  "markers": 405,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 166543,
+   "transcript": 258636,
+   "air-0": 202311,
+   "air-1": 42074,
+   "air-2": 8490,
+   "air-3": 33552,
+   "air+consts": 116252,
+   "merkle": 14988488,
+   "unpack": 797614
+  },
+  "perQuery": {
+   "q-entry": 10628,
+   "q-parse": 53234,
+   "q-deep": 183299,
+   "q-layers": 151913,
+   "q-final": 194148
+  },
+  "queriesTotal": 46864463,
+  "cleanup": 100
+ },
+ {
+  "set": "U100",
+  "vector": "U100-1.json",
+  "opStdWithMarkers": 63409428,
+  "markers": 405,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 165446,
+   "transcript": 258708,
+   "air-0": 202637,
+   "air-1": 41748,
+   "air-2": 8393,
+   "air-3": 33575,
+   "air+consts": 116252,
+   "merkle": 14852241,
+   "unpack": 797606
+  },
+  "perQuery": {
+   "q-entry": 10649,
+   "q-parse": 53233,
+   "q-deep": 182663,
+   "q-layers": 151911,
+   "q-final": 194302
+  },
+  "queriesTotal": 46827830,
+  "cleanup": 100
+ }
+]
