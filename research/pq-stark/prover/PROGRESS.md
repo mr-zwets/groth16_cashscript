@@ -23,3 +23,9 @@
 - Bake the three separator seeds as constants.
 - Use the trinomial cubic.
 - Pick a set from the Soundness handoff (S128 is the smallest 128-bit candidate, at 78.4 KB).
+
+## Fix round (review findings), 2026-10-29
+- README: λ (Soundness bound) column per set from security.json; P128 is 126.3 / 125.9 (ZK 123-124), not 128.
+- README: ZK basis stated (ePrint 2024/1037 + HidingFriPcs/MerkleTreeHidingMmcs), per-set counting conditions;
+  labelled "by Plonky3's construction, not proven here"; vectors use a fixed StdRng seed, so they hide nothing.
+- README: documented glob fixed to vectors/{fib,mimc}-*.json (re-run: 1159 cases, 0 unexpected, 9.7 s, nice 19).
