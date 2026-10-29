@@ -12,7 +12,9 @@ function cases(v) {
   const buf = Buffer.from(v.proof_hex, 'hex');
   const pr = parse(buf, vk);
   const S = pr.sec; const out = [];
-  const mk = (name, f) => { const b = Buffer.from(buf); f(b); out.push({ name, proof_hex: b.toString('hex') }); };
+  // same-length edits are stored as overwrite patches against the valid proof bytes
+  const patch = (b) => { const p = []; for (let i = 0; i < b.length; i++) if (b[i] !== buf[i]) { let j = i; while (j < b.length && b[j] !== buf[j]) j++; p.push({ at: i, hex: b.subarray(i, j).toString('hex') }); i = j; } return p; };
+  const mk = (name, f) => { const b = Buffer.from(buf); f(b); out.push({ name, patch: patch(b) }); };
   const flip = (name, [o]) => mk(name, (b) => { b[o] ^= 0x01; });
   const inc = (name, [o]) => mk(name, (b) => { b.writeBigUInt64LE((b.readBigUInt64LE(o) + 1n) % P, o); });
   const roots = S.roots; const nr = vk.zk ? 3 : 2;
@@ -37,7 +39,7 @@ function cases(v) {
     verify(vk, v.public_values.map(BigInt), b, { atQueryPow: (ch) => {
       for (let w = 0n; ; w++) { const c = ch.clone(); if (c.pow(vk.qpow, w)) { b.writeBigUInt64LE(w, wOff); return; } }
     } });
-    out.push({ name: 'final polynomial coeff 0 + 1, query PoW re-ground', proof_hex: b.toString('hex') });
+    out.push({ name: 'final polynomial coeff 0 + 1, query PoW re-ground', patch: patch(b) });
   }
   // input leaves: batches in claim order
   let k = 0;
@@ -58,12 +60,12 @@ function cases(v) {
   // encoding
   mk('non-canonical field element (0xff..ff in final polynomial)', (b) => { b.writeBigUInt64LE((1n << 64n) - 1n, S.final[0][0]); });
   mk('degree_bits + 1', (b) => { b[0] += 1; });
-  out.push({ name: 'truncated by one byte', proof_hex: buf.subarray(0, buf.length - 1).toString('hex') });
-  out.push({ name: 'one trailing byte', proof_hex: Buffer.concat([buf, Buffer.from([0])]).toString('hex') });
+  out.push({ name: 'truncated by one byte', truncate: buf.length - 1 });
+  out.push({ name: 'one trailing byte', insert: { at: buf.length, hex: '00' } });
   { // an extra (zero) digest in the first multiproof, with its count raised to match
     const [co] = S.counts[0]; const n = buf.readUInt16LE(co); const end = co + 2 + 32 * n;
-    const b = Buffer.concat([buf.subarray(0, end), Buffer.alloc(32), buf.subarray(end)]); b.writeUInt16LE(n + 1, co);
-    out.push({ name: 'extra sibling digest in first multiproof (count + 1)', proof_hex: b.toString('hex') });
+    const cnt = Buffer.alloc(2); cnt.writeUInt16LE(n + 1);
+    out.push({ name: 'extra sibling digest in first multiproof (count + 1)', patch: [{ at: co, hex: cnt.toString('hex') }], insert: { at: end, hex: '00'.repeat(vk.h) } });
   }
   // statement
   const pis = [...v.public_values]; pis[pis.length - 1] = ((BigInt(pis[pis.length - 1]) + 1n) % P).toString();

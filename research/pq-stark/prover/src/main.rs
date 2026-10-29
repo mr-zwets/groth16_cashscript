@@ -51,8 +51,9 @@ fn shape_for(set: &FriSet, width: usize, num_chunks: usize, log_lde: usize) -> S
         opens_next: true,
         num_chunks,
         zk: set.zk,
-        salt: if set.zk { SALT } else { 0 },
+        salt: if set.zk { set.salt } else { 0 },
         rc,
+        digest: set.digest,
         log_arities: las,
         num_queries: set.num_queries,
         final_poly_len: 1 << set.log_final_poly_len,
@@ -74,12 +75,16 @@ struct Run {
 macro_rules! with_cfg {
     ($set:expr, $seed:expr, |$c:ident| $body:expr) => {{
         let set: &FriSet = $set;
-        match (set.ext, set.zk) {
-            (2, false) => { let $c = make_cfg::<EF2>(set); $body }
-            (3, false) => { let $c = make_cfg::<EF3>(set); $body }
-            (2, true) => { let $c = make_hcfg::<EF2>(set, $seed); $body }
-            (3, true) => { let $c = make_hcfg::<EF3>(set, $seed); $body }
-            _ => panic!("ext must be 2 or 3"),
+        match (set.ext, set.zk, if set.zk { set.salt } else { set.digest }) {
+            (2, false, 32) => { let $c = make_cfg::<EF2>(set); $body }
+            (3, false, 32) => { let $c = make_cfg::<EF3>(set); $body }
+            (2, false, 25) => { let $c = make_tcfg::<EF2, 25>(set); $body }
+            (3, false, 25) => { let $c = make_tcfg::<EF3, 25>(set); $body }
+            (2, true, 4) => { let $c = make_hcfg::<EF2, 4>(set, $seed); $body }
+            (3, true, 4) => { let $c = make_hcfg::<EF3, 4>(set, $seed); $body }
+            (2, true, 2) => { let $c = make_hcfg::<EF2, 2>(set, $seed); $body }
+            (3, true, 2) => { let $c = make_hcfg::<EF3, 2>(set, $seed); $body }
+            _ => panic!("ext 2|3; zk: salt 2|4 (digest 32); plain: digest 32|25"),
         }
     }};
 }
@@ -122,6 +127,25 @@ macro_rules! check_bytes {
     }};
 }
 
+/// tampered case = valid bytes + overwrite patches, then an optional insertion, then an optional truncation
+fn apply_tamper(valid: &[u8], t: &Value) -> Vec<u8> {
+    let mut b = valid.to_vec();
+    for p in t["patch"].as_array().into_iter().flatten() {
+        let at = p["at"].as_u64().unwrap() as usize;
+        let h = unhex(p["hex"].as_str().unwrap());
+        b[at..at + h.len()].copy_from_slice(&h);
+    }
+    if let Some(ins) = t.get("insert") {
+        let at = ins["at"].as_u64().unwrap() as usize;
+        let h = unhex(ins["hex"].as_str().unwrap());
+        b.splice(at..at, h);
+    }
+    if let Some(n) = t.get("truncate") {
+        b.truncate(n.as_u64().unwrap() as usize);
+    }
+    b
+}
+
 fn arg(args: &[String], k: &str) -> Option<String> {
     args.iter().position(|a| a == k).map(|i| args[i + 1].clone())
 }
@@ -141,9 +165,19 @@ fn cmd_prove(args: &[String]) {
     let log_n: usize = arg(args, "--log-n").expect("--log-n").parse().unwrap();
     let k: u8 = arg(args, "--k").map(|s| s.parse().unwrap()).unwrap_or(0);
     let mut set = sets::get(&arg(args, "--set").expect("--set"));
-    if args.iter().any(|a| a == "--zk") {
+    // --zk: Plonky3's hiding PCS with its test defaults (4 random codewords, 4-element salts);
+    // --zkmin: the smallest allowed (random codewords = extension degree, 2-element = 128-bit salts).
+    // The hiding MMCS here uses full 32-byte digests.
+    if args.iter().any(|a| a == "--zk" || a == "--zkmin") {
         set.zk = true;
-        set.name.push_str("-zk");
+        set.digest = 32;
+        if args.iter().any(|a| a == "--zkmin") {
+            set.num_random_codewords = set.ext;
+            set.salt = 2;
+            set.name.push_str("-zkmin");
+        } else {
+            set.name.push_str("-zk");
+        }
     }
     let out = arg(args, "--out").expect("--out");
     let seed = 1000 + k as u64;
@@ -222,7 +256,7 @@ fn cmd_check(args: &[String]) {
             for c in t {
                 cases.push((
                     c["name"].as_str().unwrap().to_string(),
-                    c.get("proof_hex").unwrap_or(&v["proof_hex"]).as_str().unwrap().to_string(),
+                    hex(&apply_tamper(&unhex(v["proof_hex"].as_str().unwrap()), c)),
                     c.get("public_values").cloned().unwrap_or(v["public_values"].clone()),
                     false,
                 ));
@@ -264,6 +298,12 @@ fn main() {
         Some("prove") => cmd_prove(&args[2..]),
         Some("check") => cmd_check(&args[2..]),
         Some("sets") => sets::print_sets(),
+        Some("estimate") => {
+            // estimate SET AIR LOGN [--zk]
+            let mut s = sets::get(&args[2]);
+            s.zk = args.iter().any(|a| a == "--zk");
+            println!("{}", sets::estimates(&s, &args[3], args[4].parse().unwrap()));
+        }
         _ => {
             eprintln!("usage: prove|check|sets");
             std::process::exit(2);

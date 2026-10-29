@@ -209,7 +209,7 @@ export function makeVk(air, logN, set, numChunks) {
   claims.push([{ points: 2, values: A.width + rc, width: A.width + rc }]);
   claims.push(Array.from({ length: numChunks }, () => ({ points: 1, values: D + rc, width: D + rc })));
   return {
-    air, A, logN, n: 1 << logN, zk, D, rc, salt: zk ? 4 : 0, degreeBits, logH, logFinal, logArities,
+    air, A, logN, n: 1 << logN, zk, D, rc, salt: zk ? set.salt : 0, h: set.digest ?? 32, degreeBits, logH, logFinal, logArities,
     width: A.width, numPublic: A.numPublic, numPeriodic: A.periodic.length, C: numChunks, claims,
     L: 1 << set.log_final_poly_len, Q: set.num_queries, logBlowup: set.log_blowup, maxLogArity: set.max_log_arity,
     bpow: set.batch_pow_bits, cpow: set.commit_pow_bits, qpow: set.query_pow_bits, opow: 0,
@@ -222,11 +222,12 @@ export function parse(buf, vk) {
   const take = (n, s) => { if (o + n > buf.length) throw new V('truncated'); const b = buf.subarray(o, o + n); (sec[s] ??= []).push([o, n]); o += n; return b; };
   const base = (s) => { const v = take(8, s).readBigUInt64LE(); if (v >= P) throw new V('non-canonical field element'); return v; };
   const ext = (s) => Array.from({ length: vk.D }, () => base(s));
-  const digests = (s) => { const n = take(2, 'counts').readUInt16LE(); return Array.from({ length: n }, () => Buffer.from(take(32, s))); };
+  const H = vk.h;
+  const digests = (s) => { const n = take(2, 'counts').readUInt16LE(); return Array.from({ length: n }, () => Buffer.from(take(H, s))); };
   const pr = { sec };
   pr.degreeBits = take(1, 'header')[0];
-  pr.traceRoot = Buffer.from(take(32, 'roots')); pr.quotRoot = Buffer.from(take(32, 'roots'));
-  if (vk.zk) pr.randRoot = Buffer.from(take(32, 'roots'));
+  pr.traceRoot = Buffer.from(take(H, 'roots')); pr.quotRoot = Buffer.from(take(H, 'roots'));
+  if (vk.zk) pr.randRoot = Buffer.from(take(H, 'roots'));
   pr.traceLocal = Array.from({ length: vk.width }, () => ext('ood'));
   pr.traceNext = Array.from({ length: vk.width }, () => ext('ood'));
   pr.chunks = Array.from({ length: vk.C }, () => Array.from({ length: vk.D }, () => ext('ood')));
@@ -236,7 +237,7 @@ export function parse(buf, vk) {
     pr.randOpen = vk.claims.map((round) => round.map((m) => Array.from({ length: m.points }, () => Array.from({ length: vk.rc }, () => ext('ood')))));
   }
   pr.batchPow = vk.bpow ? base('pow') : 0n;
-  pr.friRoots = vk.logArities.map(() => Buffer.from(take(32, 'roots')));
+  pr.friRoots = vk.logArities.map(() => Buffer.from(take(H, 'roots')));
   pr.commitPow = vk.logArities.map(() => (vk.cpow ? base('pow') : 0n));
   pr.finalPoly = Array.from({ length: vk.L }, () => ext('final'));
   pr.queryPow = vk.qpow ? base('pow') : 0n;
@@ -255,14 +256,15 @@ export function parse(buf, vk) {
 }
 
 // ------------------------------------------------------------------------- Merkle multiproof (Plonky3 pruned frontier, binary, cap height 0)
-function merkleVerify(root, logH, indices, leaves, sibs, what) {
+function merkleVerify(root, logH, indices, leaves, sibs, what, h) {
+  const hs = (b) => sha(b).subarray(0, h); // Merkle digests: SHA-256 truncated to h bytes (h = 32: untruncated)
   const byIdx = new Map();
   indices.forEach((idx, q) => {
     if (idx >= 2 ** logH) throw new V(`${what}: index out of range`);
     const prev = byIdx.get(idx);
     if (prev) { if (!prev.equals(leaves[q])) throw new V(`${what}: inconsistent duplicate opening`); } else byIdx.set(idx, leaves[q]);
   });
-  let nodes = [...byIdx.keys()].sort((a, b) => a - b).map((idx) => ({ idx, d: sha(byIdx.get(idx)) }));
+  let nodes = [...byIdx.keys()].sort((a, b) => a - b).map((idx) => ({ idx, d: hs(byIdx.get(idx)) }));
   let cur = 0;
   for (let level = 0; level < logH; level++) {
     const next = [];
@@ -273,7 +275,7 @@ function merkleVerify(root, logH, indices, leaves, sibs, what) {
         if (m < nodes.length && nodes[m].idx === start + pos) inp.push(nodes[m++].d);
         else { if (cur >= sibs.length) throw new V(`${what}: too few siblings`); inp.push(sibs[cur++]); }
       }
-      next.push({ idx: parent, d: sha(Buffer.concat(inp)) }); i = m;
+      next.push({ idx: parent, d: hs(Buffer.concat(inp)) }); i = m;
     }
     nodes = next;
   }
@@ -340,7 +342,7 @@ export function verify(vk, pis, buf, opts = {}) {
     const inp = pr.inputs[b];
     const leaves = idx.map((_, q) => Buffer.concat(round.flatMap((m, mi) => [
       ...inp.rows[q][mi].map(le64), ...(vk.zk ? inp.salts[q][mi].map(le64) : [])])));
-    merkleVerify(roots[b], vk.logH, idx, leaves, inp.sibs, `input batch ${b}`);
+    merkleVerify(roots[b], vk.logH, idx, leaves, inp.sibs, `input batch ${b}`, vk.h);
   });
 
   // ---- reduced openings (DEEP quotients batched with powers of alphaP; one ladder: all heights equal)
@@ -390,7 +392,7 @@ export function verify(vk, pis, buf, opts = {}) {
   vk.logArities.forEach((la, r) => {
     h -= la;
     const leaves = groupRows[r].map((ev, q) => Buffer.concat([...ev.flatMap((e) => e.map(le64)), ...(vk.zk ? pr.fri[r].salts[q].map(le64) : [])]));
-    merkleVerify(pr.friRoots[r], h, groupIdx[r], leaves, pr.fri[r].sibs, `fri round ${r}`);
+    merkleVerify(pr.friRoots[r], h, groupIdx[r], leaves, pr.fri[r].sibs, `fri round ${r}`, vk.h);
   });
 
   // ---- quotient recomposition at zeta
@@ -441,6 +443,14 @@ function periodicAt(F, col, z, logN) {
 }
 
 // ------------------------------------------------------------------------- CLI
+// tampered case = valid proof bytes + overwrite patches, then an optional insertion, then an optional truncation
+export function applyTamper(hex, t) {
+  let b = Buffer.from(hex, 'hex');
+  for (const p of t.patch ?? []) Buffer.from(p.hex, 'hex').copy(b, p.at);
+  if (t.insert) b = Buffer.concat([b.subarray(0, t.insert.at), Buffer.from(t.insert.hex, 'hex'), b.subarray(t.insert.at)]);
+  if (t.truncate !== undefined) b = b.subarray(0, t.truncate);
+  return b.toString('hex');
+}
 export function vkFromVector(v) {
   return makeVk(v.air, v.log_n, v.set, v.shape.num_chunks);
 }
@@ -451,7 +461,7 @@ function check(v, file, trace) {
   const ok = JSON.stringify(vk.logArities) === JSON.stringify(s.log_arities) && vk.Q === s.num_queries && vk.L === s.final_poly_len
     && vk.width === s.width && vk.zk === s.zk && JSON.stringify(vk.claims.map((r) => r.map((m) => m.width))) === JSON.stringify(s.batch_widths);
   if (!ok) throw new Error(`${file}: derived shape differs from the prover's`);
-  const cases = [{ name: 'valid', hex: v.proof_hex, pis: v.public_values, expect: true }, ...(v.tampered ?? []).map((t) => ({ name: t.name, hex: t.proof_hex ?? v.proof_hex, pis: t.public_values ?? v.public_values, expect: false }))];
+  const cases = [{ name: 'valid', hex: v.proof_hex, pis: v.public_values, expect: true }, ...(v.tampered ?? []).map((t) => ({ name: t.name, hex: applyTamper(v.proof_hex, t), pis: t.public_values ?? v.public_values, expect: false }))];
   let bad = 0;
   for (const c of cases) {
     let res; const log = [];

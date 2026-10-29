@@ -29,17 +29,25 @@ fn mk(name: &str, ext: usize, lb: usize, q: usize, qpow: usize, arity: usize, lf
         query_pow_bits: qpow,
         zk: false,
         num_random_codewords: 4,
+        salt: 4,
+        digest: 32,
     }
 }
 
 pub fn all() -> Vec<FriSet> {
+    let h25 = |mut s: FriSet| {
+        s.digest = 25;
+        s
+    };
     vec![
-        // conjectured ("random words"/ethSTARK-style) ~100 and ~128 bits: lb*q + qpow
-        mk("C100", 2, 3, 27, 19, 3, 3),
-        mk("C128", 3, 3, 36, 20, 3, 3),
-        // Track 4's provable-regime FRI shapes (rho, queries, 28-bit query grinding), deg-3 field
-        mk("T4P100", 3, 7, 22, 28, 3, 5),
-        mk("T4P128", 3, 5, 43, 28, 3, 5),
+        // conjectured regime: Plonky3's own estimator (ePrint 2025/2010 "random words") >= 100 / 128
+        mk("C100", 2, 3, 27, 21, 3, 5),
+        h25(mk("C100h", 2, 3, 27, 21, 3, 5)),
+        mk("C128", 3, 3, 36, 22, 3, 5),
+        // Track 4's provable-regime FRI shapes (rho, queries, 28-bit query grinding, digest bytes);
+        // Plonky3's proven (list-decoding) estimator gives 100 and 128 bits for these
+        h25(mk("P100", 3, 7, 22, 28, 3, 5)),
+        mk("P128", 3, 5, 43, 28, 3, 5),
         // tiny set for fast tests (not secure)
         mk("TOY", 2, 2, 4, 2, 2, 1),
     ]
@@ -62,6 +70,8 @@ pub fn get(name: &str) -> FriSet {
             "lf" => s.log_final_poly_len = v,
             "ext" => s.ext = v,
             "rc" => s.num_random_codewords = v,
+            "salt" => s.salt = v,
+            "h" => s.digest = v,
             _ => panic!("override {k}"),
         }
     }
@@ -83,6 +93,8 @@ pub fn from_json(v: &Value) -> FriSet {
         query_pow_bits: u("query_pow_bits"),
         zk: v["zk"].as_bool().unwrap(),
         num_random_codewords: u("num_random_codewords"),
+        salt: u("salt"),
+        digest: u("digest"),
     }
 }
 
@@ -116,7 +128,7 @@ pub fn estimates(s: &FriSet, air: &str, log_n: usize) -> Value {
     macro_rules! p {
         ($ef:ty, $a:expr) => {
             StarkSecurityParams::from_air::<Val, $ef, _>(
-                regime(s), $a, layout, dom, modbits, 128, 2, openings, grinding,
+                regime(s), $a, layout, dom, modbits, 4 * s.digest, 2, openings, grinding,
             )
         };
     }

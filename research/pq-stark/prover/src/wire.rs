@@ -18,6 +18,7 @@ pub struct Shape {
     pub zk: bool,             // hiding PCS: random commitment + random opened values + salts
     pub salt: usize,          // salt elements per leaf (zk only)
     pub rc: usize,            // hiding PCS random codewords per committed matrix (zk only)
+    pub digest: usize,        // Merkle digest bytes
     pub log_arities: Vec<usize>,
     pub num_queries: usize,
     pub final_poly_len: usize,
@@ -48,6 +49,7 @@ pub struct Sizes {
 struct W<'a> {
     out: &'a mut Vec<u8>,
     sizes: &'a mut Sizes,
+    h: usize,
 }
 
 fn u64v(v: &Value) -> u64 {
@@ -91,7 +93,7 @@ impl W<'_> {
         self.raw(&(l.len() as u16).to_le_bytes(), |s| &mut s.counts);
         for d in l {
             let d = digest(d);
-            assert_eq!(d.len(), 32);
+            assert_eq!(d.len(), self.h);
             self.raw(&d, bucket);
         }
     }
@@ -101,7 +103,7 @@ impl W<'_> {
 pub fn encode(p: &Value, s: &Shape) -> (Vec<u8>, Sizes) {
     let mut out = Vec::new();
     let mut sizes = Sizes::default();
-    let mut w = W { out: &mut out, sizes: &mut sizes };
+    let mut w = W { out: &mut out, sizes: &mut sizes, h: s.digest };
     let d = s.ext;
     let degree_bits = u64v(&p["degree_bits"]);
     assert!(degree_bits < 64);
@@ -291,11 +293,12 @@ fn input_parts(b: &Value, zk: bool) -> (&Value, &Value) {
 /// Decode a p3s-v1 byte string back into Plonky3's serde tree. Returns Err on any malformed input
 /// (short, trailing bytes, non-canonical field element, wrong digest count field).
 pub fn decode(bytes: &[u8], s: &Shape) -> Result<Value, String> {
-    let mut r = R { b: bytes, i: 0 };
+    let mut r = R { b: bytes, i: 0, h: s.digest };
     let d = s.ext;
     let degree_bits = r.byte()? as u64;
     let cap = |r: &mut R| -> Result<Value, String> {
-        Ok(json!({"cap": [r.take(32)?.to_vec()], "_marker": null}))
+        let h = r.h;
+        Ok(json!({"cap": [r.take(h)?.to_vec()], "_marker": null}))
     };
     let trace = cap(&mut r)?;
     let quot = cap(&mut r)?;
@@ -422,6 +425,7 @@ pub fn decode(bytes: &[u8], s: &Shape) -> Result<Value, String> {
 struct R<'a> {
     b: &'a [u8],
     i: usize,
+    h: usize,
 }
 
 impl<'a> R<'a> {
@@ -451,7 +455,8 @@ impl<'a> R<'a> {
         let n = u16::from_le_bytes(self.take(2)?.try_into().unwrap()) as usize;
         let mut v = Vec::with_capacity(n);
         for _ in 0..n {
-            v.push(json!(self.take(32)?.to_vec()));
+            let h = self.h;
+            v.push(json!(self.take(h)?.to_vec()));
         }
         Ok(Value::Array(v))
     }

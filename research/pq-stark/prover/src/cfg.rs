@@ -53,11 +53,52 @@ impl CryptographicHasher<u8, [u8; 32]> for TapSha256 {
     }
 }
 
+/// SHA-256 truncated to its first N bytes (Merkle digests of N bytes; collision security 4N bits).
+#[derive(Copy, Clone, Debug, Default)]
+pub struct TruncSha256<const N: usize>;
+
+impl<const N: usize> CryptographicHasher<u8, [u8; N]> for TruncSha256<N> {
+    fn hash_iter<I>(&self, input: I) -> [u8; N]
+    where
+        I: IntoIterator<Item = u8>,
+    {
+        let d = Sha256.hash_iter(input);
+        core::array::from_fn(|i| d[i])
+    }
+}
+
 pub type FieldHash = SerializingHasher<Sha256>;
 pub type Compress = CompressionFunctionFromHasher<Sha256, 2, 32>;
 pub type ValMmcs = MerkleTreeMmcs<Val, u8, FieldHash, Compress, 2, 32>;
 pub type Challenger = SerializingChallenger64<Val, HashChallenger<u8, TapSha256, 32>>;
 pub type Dft = Radix2DitParallel<Val>;
+
+pub type TValMmcs<const H: usize> = MerkleTreeMmcs<
+    Val,
+    u8,
+    SerializingHasher<TruncSha256<H>>,
+    CompressionFunctionFromHasher<TruncSha256<H>, 2, H>,
+    2,
+    H,
+>;
+pub type TPcs<EF, const H: usize> =
+    TwoAdicFriPcs<Val, Dft, TValMmcs<H>, ExtensionMmcs<Val, EF, TValMmcs<H>>>;
+pub type TCfg<EF, const H: usize> = StarkConfig<TPcs<EF, H>, EF, Challenger>;
+
+pub fn make_tcfg<EF, const H: usize>(s: &FriSet) -> TCfg<EF, H>
+where
+    EF: p3_field::ExtensionField<Val>,
+{
+    assert_eq!(s.digest, H);
+    let val_mmcs = TValMmcs::<H>::new(
+        SerializingHasher::new(TruncSha256::<H>),
+        CompressionFunctionFromHasher::new(TruncSha256::<H>),
+        0,
+    );
+    let ch_mmcs = ExtensionMmcs::<Val, EF, TValMmcs<H>>::new(val_mmcs.clone());
+    let pcs = TPcs::<EF, H>::new(Dft::default(), val_mmcs, fri_params(s, ch_mmcs));
+    TCfg::<EF, H>::new(pcs, challenger())
+}
 
 pub type EF2 = BinomialExtensionField<Val, 2>;
 pub type EF3 = CubicTrinomialExtensionField<Val>;
@@ -65,11 +106,11 @@ pub type EF3 = CubicTrinomialExtensionField<Val>;
 pub type Pcs<EF> = TwoAdicFriPcs<Val, Dft, ValMmcs, ExtensionMmcs<Val, EF, ValMmcs>>;
 pub type Cfg<EF> = StarkConfig<Pcs<EF>, EF, Challenger>;
 
-/// Hiding MMCS: every leaf gets SALT random base elements appended before hashing.
-pub const SALT: usize = 4;
-pub type HValMmcs = MerkleTreeHidingMmcs<Val, u8, FieldHash, Compress, StdRng, 2, 32, SALT>;
-pub type HPcs<EF> = HidingFriPcs<Val, Dft, HValMmcs, ExtensionMmcs<Val, EF, HValMmcs>, StdRng>;
-pub type HCfg<EF> = StarkConfig<HPcs<EF>, EF, Challenger>;
+/// Hiding MMCS: every leaf gets S random base elements (the salt) appended before hashing.
+pub type HValMmcs<const S: usize> = MerkleTreeHidingMmcs<Val, u8, FieldHash, Compress, StdRng, 2, 32, S>;
+pub type HPcs<EF, const S: usize> =
+    HidingFriPcs<Val, Dft, HValMmcs<S>, ExtensionMmcs<Val, EF, HValMmcs<S>>, StdRng>;
+pub type HCfg<EF, const S: usize> = StarkConfig<HPcs<EF, S>, EF, Challenger>;
 
 #[derive(Clone, Debug, serde::Serialize)]
 pub struct FriSet {
@@ -84,6 +125,9 @@ pub struct FriSet {
     pub query_pow_bits: usize,
     pub zk: bool,
     pub num_random_codewords: usize,
+    pub salt: usize,
+    /// Merkle digest bytes (32 = full SHA-256; 25 = truncated, non-ZK only)
+    pub digest: usize,
 }
 
 pub fn challenger() -> Challenger {
@@ -113,24 +157,25 @@ where
     Cfg::<EF>::new(pcs, challenger())
 }
 
-pub fn make_hcfg<EF>(s: &FriSet, seed: u64) -> HCfg<EF>
+pub fn make_hcfg<EF, const S: usize>(s: &FriSet, seed: u64) -> HCfg<EF, S>
 where
     EF: p3_field::ExtensionField<Val>,
 {
     use rand::SeedableRng;
-    let val_mmcs = HValMmcs::new(
+    assert_eq!(s.salt, S);
+    let val_mmcs = HValMmcs::<S>::new(
         FieldHash::new(Sha256),
         Compress::new(Sha256),
         0,
         StdRng::seed_from_u64(seed ^ 0x5a5a_0001),
     );
-    let ch_mmcs = ExtensionMmcs::<Val, EF, HValMmcs>::new(val_mmcs.clone());
-    let pcs = HPcs::<EF>::new(
+    let ch_mmcs = ExtensionMmcs::<Val, EF, HValMmcs<S>>::new(val_mmcs.clone());
+    let pcs = HPcs::<EF, S>::new(
         Dft::default(),
         val_mmcs,
         fri_params(s, ch_mmcs),
         s.num_random_codewords,
         StdRng::seed_from_u64(seed ^ 0x5a5a_0002),
     );
-    HCfg::<EF>::new(pcs, challenger())
+    HCfg::<EF, S>::new(pcs, challenger())
 }
