@@ -86,6 +86,12 @@ export function makeCtx(prm, opts = {}) {
   const {e, s, h, r, a, D, sizes, trees} = prm;
   const e8 = 8 * e;
   const G = Math.min(opts.group ?? 32, D);
+  // final polynomial: 'gpd' = group-packed dot product (Track 5 field), 'grp' = Track 4 packed groups + Horner
+  const FP = opts.fp ?? 'gpd';
+  const FOLD = opts.fold ?? 'rot';
+  const DEEP = opts.deep ?? 'pk';    // 'pk': DPK, packed DEEP numerators from packed gamma columns (Track 5); 'pt': Track 4 DEEPPT   // 'rot': PAIRP with packed rotation columns of beta (Track 5); 'pair': Track 4 MULF + PAIR
+  const GH = Math.min(opts.gpdH ?? 8, D), GG = D / GH;   // gpd: H groups packed per integer, GG terms per query
+  if (FP === 'gpd' && !Number.isInteger(GG)) throw new Error('gpd: D not a multiple of H');
   const SLOT = 136;                       // packed slot width: sums of 32 products of 64-bit values are < 2^133
   const fns = new Map();
   let nextId = 16;
@@ -97,7 +103,7 @@ export function makeCtx(prm, opts = {}) {
 
   const gam = (j) => names(`ga${j}_`, e);
   const dzOut = e === 3 ? ['m0', 'z1', 'z2', 'K0', 'K1', 'K2', 'cA', 'cB'] : ['m0', 'z1', 'cN'];
-  return {prm, opts, e, s, h, r, a, D, sizes, trees, e8, G, SLOT, fns, defFn, sizes_, mark, trunc, F, gam, dzOut};
+  return {prm, opts, e, s, h, r, a, D, sizes, trees, e8, G, SLOT, fns, defFn, sizes_, mark, trunc, F, gam, dzOut, FP, GH, GG, FOLD, DEEP};
 }
 
 export function defineShared(c) {
@@ -107,7 +113,7 @@ export function defineShared(c) {
   F.MM = defFn('MM', asm('MUL', P, 'MOD'));
   { const b = new PB(e); mulE(e, names('a', e), names('b', e)).forEach((x, i) => b.red(x, 'c' + i)); F.MULE = defFn('MULE', slpFn([...names('a', e), ...names('b', e)], b.prog, names('c', e))); }
   { const b = new PB(e); sqE(e, names('a', e)).forEach((x, i) => b.red(x, 'c' + i)); F.SQE = defFn('SQE', slpFn(names('a', e), b.prog, names('c', e))); }
-  { const b = new PB(e); names('a', e).forEach((x, i) => b.red(mul(V(x), V('s')), 'c' + i)); F.MULF = defFn('MULF', slpFn([...names('a', e), 's'], b.prog, names('c', e))); }
+  if (c.FOLD === 'pair' || c.DEEP === 'pt') { const b = new PB(e); names('a', e).forEach((x, i) => b.red(mul(V(x), V('s')), 'c' + i)); F.MULF = defFn('MULF', slpFn([...names('a', e), 's'], b.prog, names('c', e))); }
   { const b = new PB(e); names('a', e).forEach((x, i) => b.red(add(V(x), V('b' + i)), 'c' + i)); F.ADDE = defFn('ADDE', slpFn([...names('a', e), ...names('b', e)], b.prog, names('c', e))); }
   { const b = new PB(e); names('a', e).forEach((x, i) => b.red(add(sub(V(x), V('b' + i)), K(2n * P)), 'c' + i)); F.SUBE = defFn('SUBE', slpFn([...names('a', e), ...names('b', e)], b.prog, names('c', e))); }
   F.ADDC = defFn('ADDC', asm('ADD', P, 'MOD'));
@@ -117,6 +123,7 @@ export function defineShared(c) {
     ? [B0, 'CAT', 'BIN2NUM', 'DUP', P, 'MOD', 'SWAP', P, 'DIV', 'DUP', P, 'MOD', 'SWAP', P, 'DIV', P, 'MOD']
     : [B0, 'CAT', 'BIN2NUM', 'DUP', P, 'MOD', 'SWAP', P, 'DIV', P, 'MOD'];
   F.E = defFn('E', asm(Ecode));
+  if (c.FOLD === 'pair') {
   // PAIR: u + v + g (u - v) for u, v < 2^64, g canonical
   if (opts.fast) {   // lazy inline (one OP_MOD per output coefficient): bigger, cheaper
     const b = new PB(e);
@@ -130,6 +137,7 @@ export function defineShared(c) {
     const gd = b.mul(names('g', e), d);
     for (let c = 0; c < e; c++) b.red(add(add(V('u' + c), V('v' + c)), V(gd[c])), 'o' + c);
     F.PAIR = defFn('PAIR', slpFn([...names('g', e), ...names('u', e), ...names('v', e)], b.prog, names('o', e)));
+  }
   }
   // NA: norm and adjugate of (x - zz) for base-field x, from the per-proof constants of zz
   const naArgs = e === 3 ? ['x', 'm0', 'z1', 'z2', 'K0', 'K1', 'K2', 'cA', 'cB'] : ['x', 'm0', 'cN'];
@@ -146,6 +154,7 @@ export function defineShared(c) {
       F.NA = defFn('NA', slpFn(naArgs, b.prog, ['N', 'a0']));
     }
   }
+  if (c.DEEP === 'pt') {
   // DEEPPT: f0(x) = n * a1 n1 + m * a2 n2, n = g1 X + g2 Y + g4 H0 + g5 H1 - C1, m = g3 X - C2
   const deepArgs = ['X', 'Y', ...names('H', e), ...names('J', e), ...names('a', e), 'n1', ...names('b', e), 'n2',
     ...[1, 2, 3, 4, 5].flatMap((j) => names(`g${j}_`, e)), ...names('C', e), ...names('D', e)];
@@ -168,6 +177,8 @@ export function defineShared(c) {
     b.add(t1, t2, names('f', e));
     F.DEEPPT = defFn('DEEPPT', slpFn(deepArgs, b.prog, names('f', e)));
   }
+  }
+  if (c.FP === 'grp') {
   // HORN: acc' = acc * YG + unpack(P) (P packs e slots of SLOT bits)
   F.HORN = defFn('HORN', localFn([...names('a', e), 'P', 'Y'], (st) => {
     st.roll('P');
@@ -180,6 +191,7 @@ export function defineShared(c) {
   }));
   // POWS: y -> y^1 .. y^G (loop, counter on the altstack)
   F.POWS = defFn('POWS', asm('DUP', G - 1, 'TOALTSTACK', 'BEGIN', 'DUP', 2, 'PICK', 'MUL', P, 'MOD', 'SWAP', 'FROMALTSTACK', '1SUB', 'DUP', 'TOALTSTACK', 'NOT', 'UNTIL', 'FROMALTSTACK', 'DROP', 'DROP'));
+  }
   // XPOW: v -> 7 * w_N^v (square and multiply over the bits of v)
   if (opts.fast) {
     const w = rou(sizes[0]), bits = Math.log2(sizes[1]), windows = Math.ceil(bits / 4);
@@ -213,6 +225,19 @@ export function defineShared(c) {
     }
     F.DZ = defFn('DZ', slpFn([...names('y', e), 'w'], b.prog, dzOut));
   }
+  // PAIRP (folds 'rot'): o = u + v + beta x^-1 (u - v) with beta given by its packed rotation columns R_k:
+  //   w_k = (u_k - v_k + 2p) x^-1 mod p;  T = sum_k w_k R_k (packed, slots < 3 * 2^64 * 7p < 2^133);
+  //   o_k = (slot_k(T) + u_k + v_k) mod p   (slots read by NUM2BIN + byte splits)
+  if (c.FOLD === 'rot' || c.DEEP === 'pk') {
+    const cb = new PB(e); rotColumns(e, names('b', e)).forEach((x, k) => cb.let(x, 'R' + k));
+    F.COLS = defFn('COLS', slpFn(names('b', e), cb.prog, names('R', e)));
+  }
+  if (c.FOLD === 'rot') F.PAIRP = defFn('PAIRP', pairpBody(e));
+  if (c.DEEP === 'pk') {
+    const pb = new PB(e); pb.let(rotColumns(e, names('b', e))[0], 'R0');
+    F.PACK = defFn('PACK', slpFn(names('b', e), pb.prog, ['R0']));
+    F.DPK = defFn('DPK', dpkBody(e));
+  }
   // FOLD<a>: binary fold of a coset of a values with x0^-1 = X and beta^(2^l) (l < log2 a): pairs (j, j + half),
   // g = beta^(2^l) x_j^-1; returns the unscaled fold (a times the folded value)
   const foldArgs = (ai) => [...Array.from({length: ai}, (_, j) => names(`v${j}_`, e)).flat(), ...Array.from({length: Math.log2(ai)}, (_, l) => names(`b${l}_`, e)).flat(), 'X'];
@@ -224,8 +249,11 @@ export function defineShared(c) {
     const nxt = [];
     for (let j = 0; j < half; j++) {
       const xj = j === 0 ? 'X' : b.mm('X', K(powp(wai, BigInt(j))));
-      const g = b.mulF(names('b0_', e), xj);
-      nxt.push(b.call(F.PAIR, [...g, ...names(`v${j}_`, e), ...names(`v${j + half}_`, e)], e, ai === 2 ? names('o', e) : undefined));
+      if (c.FOLD === 'rot') nxt.push(b.call(F.PAIRP, [...names('b0_', e), xj, ...names(`v${j}_`, e), ...names(`v${j + half}_`, e)], e, ai === 2 ? names('o', e) : undefined));
+      else {
+        const g = b.mulF(names('b0_', e), xj);
+        nxt.push(b.call(F.PAIR, [...g, ...names(`v${j}_`, e), ...names(`v${j + half}_`, e)], e, ai === 2 ? names('o', e) : undefined));
+      }
     }
     if (ai > 2) { const X2 = b.mm('X', 'X'); b.call(F['FOLD' + half], [...nxt.flat(), ...Array.from({length: Math.log2(ai) - 1}, (_, l) => names(`b${l + 1}_`, e)).flat(), X2], e, names('o', e)); }
     F['FOLD' + ai] = defFn('FOLD' + ai, slpFn(foldArgs(ai), b.prog, names('o', e)));
@@ -344,23 +372,34 @@ export function emitAirConsts(c, S, statement, {withAir = true, withConsts = tru
     const p1 = b.mul(gam(1), X), p2 = b.mul(gam(2), Y), p4 = b.mul(gam(4), A), p5 = b.mul(gam(5), Bv);
     b.add(b.add(p1, p2), b.add(p4, p5), names('dC1_', e));
     b.mul(gam(3), W, names('dC2_', e));
+    if (c.DEEP === 'pk') {
+      // packed DEEP constants: dG1..3 = pack(gamma_1..3), dR4_k, dR5_k = rotation columns of gamma_4, gamma_5,
+      // dN1 = pack(p - C1), dN2 = pack(p - C2)
+      for (const j of [1, 2, 3]) b.call(F.PACK, gam(j), 1, ['dG' + j]);
+      b.call(F.COLS, gam(4), e, names('dR4_', e)); b.call(F.COLS, gam(5), e, names('dR5_', e));
+      for (const j of [1, 2]) b.call(F.PACK, names(`dC${j}_`, e).map((x) => b.let(sub(K(P), V(x)))), 1, ['dN' + j]);
+    }
     const cut2 = b.prog.length;
     // norm/adjugate constants of (x - z) and (x - wz) for base-field x (function DZ, scale 1 and w_n)
     for (const [zi, w] of [[0, 1n], [1, prm.wn]]) b.call(F.DZ, [...names('z', e), w], dzOut.length, dzOut.map((x) => `dz${zi}_` + x));
     const cut3 = b.prog.length;
-    // beta powers bp<i>_<l>_<c> = beta_i^(2^l)
+    // beta powers bp<i>_<l>_<c> = beta_i^(2^l); with folds 'rot' (Track 5) the items bp<i>_<l>_<k> hold instead the packed
+    // rotation columns of beta_i^(2^l): column k = beta * u^k as a packed integer (SB-byte slots), so that
+    // beta * w = sum_k w_k * column_k (e OP_MULs, no reduction until the caller unpacks)
     for (let i = 0; i < r; i++) {
       let bp = names(`be${i}_`, e);
       for (let l = 0; (1 << l) < a[i]; l++) {
-        if (l > 0) bp = b.sq(bp, names(`bp${i}_${l}_`, e));
-        else { bp.forEach((x, c) => b.let(V(x), `bp${i}_${l}_${c}`)); bp = names(`bp${i}_0_`, e); }
+        const out = c.FOLD === 'rot' ? names(`bq${i}_${l}_`, e) : names(`bp${i}_${l}_`, e);
+        if (l > 0) bp = b.sq(bp, out);
+        else { bp.forEach((x, k) => b.let(V(x), out[k])); bp = out; }
+        if (c.FOLD === 'rot') b.call(F.COLS, bp, e, names(`bp${i}_${l}_`, e));
       }
     }
     if (!withConsts) { b.prog.length = cut1; }
-    const keepAll = [...[1, 2, 3, 4, 5].flatMap(gam), ...b.prog.flatMap(([n]) => (Array.isArray(n) ? n : [n])).filter((n) => typeof n === 'string' && n.startsWith('bp'))];
+    const keepAll = [...(c.DEEP === 'pk' ? [] : [1, 2, 3, 4, 5].flatMap(gam)), ...b.prog.flatMap(([n]) => (Array.isArray(n) ? n : [n])).filter((n) => typeof n === 'string' && /^(bp|dG|dR|dN)/.test(n))];
     compileSections(S, b.prog, withConsts ? [cut1, cut2, cut3] : [], withConsts ? keepAll : [], (k) => mark(S, 'air-' + k));
     for (const x of [...S.st]) if (/^(al\d_\d|z\d|be\d_\d|o[XYWAB]\d)$/.test(x)) S.drop(x);
-    if (!withConsts) for (const x of [...S.st]) if (/^(ga\d_\d|dC\d_\d|dz\d_|bp\d)/.test(x)) S.drop(x);
+    if (!withConsts) for (const x of [...S.st]) if (/^(ga\d_\d|dC\d_\d|dz\d_|bp\d|dG|dR|dN)/.test(x)) S.drop(x);
   }
 }
 
@@ -380,8 +419,93 @@ export function emitLiftTables(c, S, bottomIdx, keepBelow) {
 
 }
 
+
+// ---- packed extension helpers (Track 5 field cost) ----
+const SHIFT = (k) => 1n << BigInt(8 * SB * k);
+// packed rotation columns of b (names, canonical): column k = b * u^k in F_p[u]/(u^e - 7), slot j at 2^(8 SB j)
+export function rotColumns(e, bn) {
+  const B = bn.map((x) => V(x));
+  const cols = [];
+  for (let k = 0; k < e; k++) {
+    // b * u^k: coefficient j is b_{j-k} for j >= k, 7 b_{j-k+e} for j < k
+    const terms = [];
+    for (let j = 0; j < e; j++) { const src = j - k; const t = src >= 0 ? B[src] : mul(B[src + e], K(7)); terms.push(j === 0 ? t : mul(t, K(SHIFT(j)))); }
+    cols.push(sum(...terms));
+  }
+  return cols;
+}
+// unpack a packed value (non-negative slots < 2^(8 SB - 1)) into e numbers, slot 0 deepest
+export const unpackCode = (e) => [SB * e, 'NUM2BIN', ...Array(e - 1).fill([SB, 'SPLIT']), ...Array.from({length: e}, () => [e - 1, 'ROLL', 'BIN2NUM'])].flat();
+function pairpBody(e) {
+  const st = new Stk([...names('R', e), 'xi', ...names('u', e), ...names('v', e)]);
+  const b = new PB(e);
+  for (let k = 0; k < e; k++) b.red(mul(add(sub(V('u' + k), V('v' + k)), K(2n * P)), V('xi')), 'w' + k);
+  b.let(sum(...Array.from({length: e}, (_, k) => mul(V('w' + k), V('R' + k)))), 'T');
+  compileSlp(st, b.prog, {keep: [...names('u', e), ...names('v', e)]});
+  st.roll('T');
+  st.raw(unpackCode(e), 1, names('t', e));
+  const b2 = new PB(e);
+  for (let k = 0; k < e; k++) b2.red(add(add(V('t' + k), V('u' + k)), V('v' + k)), 'o' + k);
+  compileSlp(st, b2.prog);
+  st.arrange(names('o', e));
+  return st.bytes();
+}
+
+// DPK (DEEP 'pk'): f0(x) from X, Y (F_p), H0, H1 (F_p^e), adj(x - z), 1/N(x - z), adj(x - wz), 1/N(x - wz) and the packed
+// per-proof constants. Numerators as packed dot products (one OP_MUL per base value, no reduction):
+//   P1 = X G1 + Y G2 + sum_k H0_k R4_k + sum_k H1_k R5_k + pack(p - C1)   (= gamma1 X + gamma2 Y + gamma4 H0 + gamma5 H1 - C1)
+//   P2 = X G3 + pack(p - C2)                                             (= gamma3 X - C2)
+// slots < 8 * 2^64 * 7p + p < 2^135; then f0 = (P1 adj1) n1 + (P2 adj2) n2, lazy, one OP_MOD per coefficient.
+function dpkBody(e) {
+  const args = ['X', 'Y', ...names('H', e), ...names('J', e), ...names('a', e), 'n1', ...names('b', e), 'n2', 'G1', 'G2', ...names('R', e), ...names('S', e), 'N1', 'G3', 'N2'];
+  const st = new Stk(args);
+  const b = new PB(e);
+  b.let(sum(mul(V('X'), V('G1')), mul(V('Y'), V('G2')), ...names('H', e).map((x, k) => mul(V(x), V('R' + k))), ...names('J', e).map((x, k) => mul(V(x), V('S' + k))), V('N1')), 'P1');
+  b.let(add(mul(V('X'), V('G3')), V('N2')), 'P2');
+  compileSlp(st, b.prog, {keep: []});
+  st.roll('P1'); st.raw(unpackCode(e), 1, names('m', e));
+  st.roll('P2'); st.raw(unpackCode(e), 1, names('q', e));
+  const b2 = new PB(e);
+  const s1 = mulE(e, names('m', e), names('a', e)), s2 = mulE(e, names('q', e), names('b', e));
+  for (let k = 0; k < e; k++) b2.red(add(mul(s1[k], V('n1')), mul(s2[k], V('n2'))), 'f' + k);
+  compileSlp(st, b2.prog);
+  st.arrange(names('f', e));
+  return st.bytes();
+}
+
+// ---- final polynomial, group-packed dot product (Track 5 field cost) ----
+// The D coefficients C_i (F_p^e) are regrouped once per proof into GG = D/GH packed integers
+//   P_k = sum_{m < GH} sum_{c < e} C_{k + GG m, c} * 2^(8 SB (e m + c)),   SB = 17-byte slots,
+// so that per query f(y) = sum_m y^(GG m) S_m with S_m = sum_{k < GG} C_{k + GG m} y^k, and the GG products P_k * y^k
+// (one OP_MUL each, 64-bit multiplier) compute all GH group sums of all e components at once. Slot sums stay below
+// GG * 2^128 <= 2^134 < 2^136. Per query: GG - 1 powers, GG - 1 MUL/ADD terms, one byte split of the accumulator into
+// e GH slots, and GH - 1 Horner steps in y^GG.
+const SB = 17;
+export function emitUnpackGpd(c, S) {
+  const {e, e8, D, defFn, GG} = c;
+  const Z = new Uint8Array(SB - 8);
+  // one coefficient (e x 8 B) -> e slots of SB bytes
+  const expand = e === 3
+    ? [8, 'SPLIT', 8, 'SPLIT', Z, 'CAT', 'SWAP', Z, 'CAT', 'SWAP', 'CAT', 'SWAP', Z, 'CAT', 'SWAP', 'CAT']
+    : [8, 'SPLIT', Z, 'CAT', 'SWAP', Z, 'CAT', 'SWAP', 'CAT'];
+  const Pn = Array.from({length: GG}, (_, k) => 'P' + k);
+  // GG empty accumulators
+  S.raw([GG, 'BEGIN', 0, 'SWAP', '1SUB', 'DUP', 'NOT', 'UNTIL', 'DROP'], 0, Pn);
+  S.roll('FIN');
+  // per coefficient i (k = i mod GG): split it off, expand, append to P_k (the deepest accumulator; the list rotates)
+  // (two loops: FIN is first cut into chunks of CH coefficients, so that no split pushes the long remainder per coefficient)
+  const CH = Math.min(16, D);
+  S.raw(['BEGIN', CH * e8, 'SPLIT', 'SWAP',
+    'BEGIN', e8, 'SPLIT', 'SWAP', ...expand, GG + 2, 'ROLL', 'SWAP', 'CAT', 'ROT', 'ROT', 'SIZE', 'NOT', 'UNTIL', 'DROP',
+    'SIZE', 'NOT', 'UNTIL', 'DROP'], GG + 1, Pn);
+  // D is a multiple of GG, so the order is back to P_0 .. P_{GG-1}; minimally encode each (rotating again)
+  S.raw([GG, 'TOALTSTACK', 'BEGIN', GG - 1, 'ROLL', 'BIN2NUM', 'FROMALTSTACK', '1SUB', 'DUP', 'TOALTSTACK', 'NOT', 'UNTIL', 'FROMALTSTACK', 'DROP'], GG, Pn);
+  void defFn; void D;
+}
+
 // final polynomial: FIN -> packed coefficients C0..C{D-1} (C0 deepest)
 export function emitUnpack(c, S) {
+  if (c.FP === 'gpd') return emitUnpackGpd(c, S);
   const {prm, opts, e, s, h, r, a, D, sizes, trees, e8, G, SLOT, fns, defFn, mark, trunc, F, gam, dzOut} = c;
   void prm; void opts; void s; void h; void r; void D; void trees; void e8; void G; void SLOT; void fns; void mark; void trunc; void gam; void dzOut; void sizes;
   {
@@ -441,11 +565,13 @@ export function emitQuery(c, Q) {
   inv[0] = Tm;
   const x0inv = inv[E.length - 1];
   const consts = [...[1, 2, 3, 4, 5].flatMap(gam), ...names('dC1_', e), ...names('dC2_', e)];
-  const f0 = xs.map((_, j) => b.call(F.DEEPPT, ['tX' + j, 'tY' + j, ...names(`cA${j}_`, e), ...names(`cB${j}_`, e),
-    ...na[j][0].adj, inv[2 * j], ...na[j][1].adj, inv[2 * j + 1], ...consts], e));
+  const pkc = ['dG1', 'dG2', ...names('dR4_', e), ...names('dR5_', e), 'dN1', 'dG3', 'dN2'];
+  const f0 = xs.map((_, j) => (c.DEEP === 'pk'
+    ? b.call(F.DPK, ['tX' + j, 'tY' + j, ...names(`cA${j}_`, e), ...names(`cB${j}_`, e), ...na[j][0].adj, inv[2 * j], ...na[j][1].adj, inv[2 * j + 1], ...pkc], e)
+    : b.call(F.DEEPPT, ['tX' + j, 'tY' + j, ...names(`cA${j}_`, e), ...names(`cB${j}_`, e), ...na[j][0].adj, inv[2 * j], ...na[j][1].adj, inv[2 * j + 1], ...consts], e)));
   const foldB = (bb, i, cur, X) => bb.call(F['FOLD' + a[i]], [...cur.flat(), ...Array.from({length: Math.log2(a[i])}, (_, l) => names(`bp${i}_${l}_`, e)).flat(), X], e);
   let Fv = foldB(b, 0, f0, x0inv);
-  const keepC = () => Q.st.filter((x) => /^(bp\d|ga|dC|dz)/.test(x));
+  const keepC = () => Q.st.filter((x) => /^(bp\d|ga|dC|dz|dG|dR|dN)/.test(x));
   compileSlp(Q, b.prog, {keep: [...keepC(), 'x0', x0inv]});
   mark(Q, 'q-deep');
   // runtime pick: element `slot` of a list whose first element is `first` and stride `stride`
@@ -498,7 +624,8 @@ export function emitQuery(c, Q) {
   Q.drop(xinv);   // the last layer's x^-1 is not needed
   mark(Q, 'q-layers');
   // final polynomial: y = xb^(a_{r-1}); y^1..y^G; per group a packed dot product (GRP), then Horner over groups
-  {
+  if (c.FP === 'gpd') emitFinalGpd(c, Q, xb, Fv);
+  else {
     const bb = new PB(e, F);
     const y = bb.pow2k(xb, Math.log2(a[r - 1]));
     compileSlp(Q, bb.prog);
@@ -531,6 +658,57 @@ export function emitQuery(c, Q) {
     compileSlp(Q, cb.prog);
   }
   mark(Q, 'q-final');
+}
+
+
+function emitFinalGpd(c, Q, xb, Fv) {
+  const {e, r, a, F, GH, GG, defFn, opts} = c;
+  const bb = new PB(e, F);
+  const y = bb.pow2k(xb, Math.log2(a[r - 1]));
+  compileSlp(Q, bb.prog);
+  Q.roll(y);
+  // powers y^1 .. y^GG: [y^1 .. y^k, y] -> [y^1 .. y^k+1, y]
+  const Yn = Array.from({length: GG}, (_, k) => 'Y' + (k + 1));
+  if (GG > 1) {
+    const step = ['2DUP', 'MUL', P, 'MOD', 'SWAP'];
+    if (opts.inlinePow) Q.raw(['DUP', ...Array(GG - 1).fill(step), 'DROP'], 1, Yn);
+    else {
+      F.PW ??= defFn('PW', asm(step));
+      Q.raw(['DUP', ...Array(GG - 1).fill([F.PW, 'INVOKE']), 'DROP'], 1, Yn);
+    }
+  } else Q.rename(y, 'Y1');
+  Q.raw(['TOALTSTACK'], 1);                 // y^GG
+  Q.pick('P0', 'acc');
+  for (let k = GG - 1; k >= 1; k--) { Q.roll('Y' + k); Q.pick('P' + k); Q.raw(['MUL', 'ADD'], 3, ['acc']); }
+  // split the accumulator into e GH slots s_0 .. (s_0 deepest), the top group becomes r
+  const nsl = e * GH;
+  const sl = Array.from({length: nsl}, (_, j) => 's' + j);
+  Q.roll('acc');
+  Q.raw([SB * nsl, 'NUM2BIN', ...Array(nsl - 1).fill([SB, 'SPLIT'])], 1, sl);
+  Q.raw(Array.from({length: e}, () => [e - 1, 'ROLL', 'BIN2NUM']).flat(), e, names('r', e));
+  Q.raw(['FROMALTSTACK'], 0, ['YG']);
+  if (GH > 1) {
+    // HG: [s_m (e raw slots) r (e) YG] -> [r' (e) YG], r' = r YG + s_m mod p
+    if (!F.HG) {
+      const st = new Stk([...names('t', e), ...names('r', e), 'YG']);
+      for (let k = 0; k < e; k++) { st.roll('t' + k); st.raw(['BIN2NUM'], 1, ['u' + k]); }
+      const b = new PB(e);
+      for (let k = 0; k < e; k++) b.red(add(mul(V('r' + k), V('YG')), V('u' + k)), 'o' + k);
+      compileSlp(st, b.prog, {keep: ['YG']});
+      st.arrange([...names('o', e), 'YG']);
+      F.HG = defFn('HG', st.bytes());
+    }
+    for (let m = GH - 2; m >= 0; m--) {
+      const grp = sl.slice(e * m, e * m + e);
+      const stray = Q.st.slice(Q.st.indexOf(grp[e - 1]) + 1).filter((x) => ![...names('r', e), 'YG'].includes(x));
+      if (stray.length) throw new Error('HG: items above the group ' + stray);
+      Q.raw([F.HG, 'INVOKE'], 2 * e + 1, [...names('r', e), 'YG']);
+    }
+  }
+  Q.drop('YG');
+  const cb = new PB(e);
+  names('r', e).forEach((x, k) => cb.chk(chk('NUMEQUALVERIFY', R(mul(V(x), K(a[r - 1]))), V(Fv[k]))));
+  compileSlp(Q, cb.prog);
 }
 
 export function buildB(prm, statement, opts = {}) {
