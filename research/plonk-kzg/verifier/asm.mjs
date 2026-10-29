@@ -149,7 +149,7 @@ export class Asm {
       this.st.splice(this.st.length - f.nIn, f.nIn); const o = outs ?? Array.from({length: f.nOut}, () => this.fresh('o')); assert.equal(o.length, f.nOut); this.st.push(...o);
     } else {
       // every item the body touches must sit at the same position; untouched items are carried through
-      assert.equal(this.st.length, f.entry.length, `bound function ${name}: stack height differs`); this.sameCtx(f.entryCtx, 'bound function ' + name);
+      assert.equal(this.st.length, f.entry.length, `bound function ${name}: stack height differs: ${this.st.slice(-8).join(',')} vs ${f.entry.slice(-8).join(',')}`); this.sameCtx(f.entryCtx, 'bound function ' + name);
       for (const t of f.touched) if (f.entry.includes(t) || this.st.includes(t)) assert.equal(this.st.lastIndexOf(t), f.entry.lastIndexOf(t), `bound function ${name}: '${t}' at a different position`);
       const E2 = this.st; this.st = f.exit.map((n) => (f.touched.has(n) || !f.entry.includes(n) ? n : E2[f.entry.lastIndexOf(n)]));
       if (this.touched) for (const t of f.touched) this.touched.add(t);
