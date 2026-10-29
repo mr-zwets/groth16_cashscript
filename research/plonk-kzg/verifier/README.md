@@ -175,7 +175,9 @@ exponentiation, is 12.3M. The transcript and the Fr work are negligible.
 - **GT folding of the fixed bases was not built.** The design's recommended variant, worth about 6 KB, is open.
 - **t' is a plain 128-bit value, not t1 + λt2.** Λ' gets the small scalar `1 + t'`, and the lin terms get `−t'`. The t'-fold
   argument: if Λ' ≠ Λ, then `P* = P_left + (1+t')(Λ'−Λ)` passes for at most one t' mod r, an error of 2^-128 per hash query.
-  - It needs a written review, like the u batching.
+  - The written argument for both is [SOUNDNESS.md](SOUNDNESS.md) (Lemmas 1–2; the lattice numbers are checked by
+    `soundness/lattice.mjs`). It also covers the chain (Lemma 3) and gives the total bound. It is not independently
+    reviewed.
   - Both substitutions are verifier-side only. Valid gnark proofs are accepted, and every tampered vector is rejected.
 - **No GLV in the main MSM.** With 18–19 bases, GLV saves only the 127 doublings and doubles the tables, which would exceed
   the 1,000-item stack. GLV is used only for u.
@@ -192,6 +194,9 @@ exponentiation, is 12.3M. The transcript and the Fr work are negligible.
   - in the chain, an input's own unlocking size is not pinned beyond push sizes and DEPTH.
 - **Not verified:**
   - formula correctness is tested, not proved;
+  - the soundness argument ([SOUNDNESS.md](SOUNDNESS.md)) is a paper proof that assumes formula correctness. Its
+    bound is ε_PLONK + Q·2^-128 + Q·2^-246 + Q²·2^-252 for Q hash queries. It found no unenforced step; one remote read
+    (`multi.mjs:372-373`) skips the push-header check, which the argument does not need;
   - no BCHN node run;
   - BCHN-adjusted figures are computed by adding DEFINE body bytes. In the chain this is +21.7k per input, which the 64 B
     FILL slack (51k op) covers.
@@ -214,6 +219,7 @@ node profile.mjs mul2 13                # per-phase op-cost
 nice node test.mjs mul2 spec 13         # -> results/test-mul2-spec.json  (also: merkle16, txv5 8)
 nice node chaintest.mjs mul2            # -> results/chain-mul2.json      (about 25 min per circuit)
 node summary.mjs                        # -> results/summary.json
+node soundness/lattice.mjs              # numbers behind SOUNDNESS.md (GLV lattice, ranges, bound)
 ```
 
 ## Files
@@ -228,3 +234,4 @@ node summary.mjs                        # -> results/summary.json
 | `multi.mjs`, `chain.mjs` | today's multi-input chain: plan, roles, witness, FILL sizing |
 | `test.mjs`, `chaintest.mjs`, `profile.mjs`, `summary.mjs`, `vm.mjs` | tests, profile, summary, VM runners |
 | `results/` | test-*.json, chain-*.json, summary.json |
+| `SOUNDNESS.md`, `soundness/lattice.mjs` | soundness argument for the t'-fold, the u batching and the chain; its numeric checks |
