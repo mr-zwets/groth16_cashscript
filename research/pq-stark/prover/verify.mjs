@@ -290,7 +290,7 @@ function merkleVerify(root, logH, indices, leaves, sibs, what, h) {
 }
 
 // ------------------------------------------------------------------------- the verifier
-export { V, Challenger, le64 };
+export { V, Challenger, le64, separators };
 export function verify(vk, pis, buf, opts = {}) {
   const F = extField(vk.D); const D = vk.D;
   for (const x of pis) if (x >= P) throw new V('non-canonical public value');
