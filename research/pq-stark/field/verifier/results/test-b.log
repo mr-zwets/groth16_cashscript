@@ -1,4 +1,4 @@
-../prover/vectors/C100-0.json: std ACCEPT cons ACCEPT op 16006309 unl 30354
+../../../pq-hash/prover/vectors/C100-0.json: std ACCEPT cons ACCEPT op 12318055 unl 30133
    sibling_trace_first          REJECT Program failed an OP_VERIFY operation. [after air+consts]
    sibling_fri2_last            REJECT Program failed an OP_VERIFY operation. [after air+consts]
    opened_trace_value           REJECT Program failed an OP_VERIFY operation. [after air+consts]
@@ -37,8 +37,8 @@
    records_repacked_filler_L0   REJECT Program failed an OP_VERIFY operation. [after air+consts]
    records_repacked_filler_zero REJECT Program failed an OP_VERIFY operation. [after air+consts]
    records_shifted_between_trees REJECT Program failed an OP_VERIFY operation. [after air+consts]
-../prover/vectors/C100-1.json: std ACCEPT cons ACCEPT op 15971126 unl 29905
-../prover/vectors/C128-0.json: std ACCEPT cons ACCEPT op 26664448 unl 48982
+../../../pq-hash/prover/vectors/C100-1.json: std ACCEPT cons ACCEPT op 12286747 unl 29684
+../../../pq-hash/prover/vectors/C128-0.json: std ACCEPT cons ACCEPT op 19617676 unl 48832
    sibling_trace_first          REJECT Program failed an OP_VERIFY operation. [after air+consts]
    sibling_fri2_last            REJECT Program failed an OP_VERIFY operation. [after air+consts]
    opened_trace_value           REJECT Program failed an OP_VERIFY operation. [after air+consts]
@@ -63,7 +63,7 @@
    record_sigma_dup             REJECT Program failed an OP_VERIFY operation. [after air+consts]
    record_order_swap            REJECT Program failed an OP_VERIFY operation. [after air+consts]
    record_trailing_byte         REJECT Program called an OP_SPLIT operation with an invalid index. stack item [after air+consts]
-   record_op_flip_to_park       REJECT Tried to read from an invalid stack index. Current stack depth: 188; r [after air+consts]
+   record_op_flip_to_park       REJECT Tried to read from an invalid stack index. Current stack depth: 274; r [after air+consts]
    record_bad_opcode            REJECT Program failed an OP_VERIFY operation. [after air+consts]
    record_sibling_flip          REJECT Program failed an OP_VERIFY operation. [after air+consts]
    T_hint_flip                  REJECT Program failed an OP_VERIFY operation. [query 0 after q-parse]
@@ -77,8 +77,8 @@
    records_repacked_filler_L0   REJECT Program failed an OP_VERIFY operation. [after air+consts]
    records_repacked_filler_zero REJECT Program failed an OP_VERIFY operation. [after air+consts]
    records_shifted_between_trees REJECT Program failed an OP_VERIFY operation. [after air+consts]
-../prover/vectors/C128-1.json: std ACCEPT cons ACCEPT op 26642921 unl 49066
-../prover/vectors/P100-0.json: std ACCEPT cons ACCEPT op 38728435 unl 56574
+../../../pq-hash/prover/vectors/C128-1.json: std ACCEPT cons ACCEPT op 19603616 unl 48916
+../../../pq-hash/prover/vectors/P100-0.json: std ACCEPT cons ACCEPT op 27861234 unl 56608
    sibling_trace_first          REJECT Program failed an OP_VERIFY operation. [after air+consts]
    sibling_fri2_last            REJECT Program failed an OP_VERIFY operation. [after air+consts]
    opened_trace_value           REJECT Program failed an OP_VERIFY operation. [after air+consts]
@@ -117,10 +117,10 @@
    records_repacked_filler_L0   REJECT Program failed an OP_VERIFY operation. [after air+consts]
    records_repacked_filler_zero REJECT Program failed an OP_VERIFY operation. [after air+consts]
    records_shifted_between_trees REJECT Program failed an OP_VERIFY operation. [after air+consts]
-../prover/vectors/P100-1.json: std ACCEPT cons ACCEPT op 38656928 unl 56468
-../prover/vectors/P100-2.json: std ACCEPT cons ACCEPT op 38541499 unl 55930
-../prover/vectors/P100-3.json: std ACCEPT cons ACCEPT op 38818064 unl 57439
-../prover/vectors/P128-0.json: std ACCEPT cons ACCEPT op 71541117 unl 96383
+../../../pq-hash/prover/vectors/P100-1.json: std ACCEPT cons ACCEPT op 27839741 unl 56502
+../../../pq-hash/prover/vectors/P100-2.json: std ACCEPT cons ACCEPT op 27714995 unl 55964
+../../../pq-hash/prover/vectors/P100-3.json: std ACCEPT cons ACCEPT op 27987395 unl 57473
+../../../pq-hash/prover/vectors/P128-0.json: std ACCEPT cons ACCEPT op 50053779 unl 96353
    sibling_trace_first          REJECT Program failed an OP_VERIFY operation. [after air+consts]
    sibling_fri2_last            REJECT Program failed an OP_VERIFY operation. [after air+consts]
    opened_trace_value           REJECT Program failed an OP_VERIFY operation. [after air+consts]
@@ -159,10 +159,10 @@
    records_repacked_filler_L0   REJECT Program failed an OP_VERIFY operation. [after air+consts]
    records_repacked_filler_zero REJECT Program failed an OP_VERIFY operation. [after air+consts]
    records_shifted_between_trees REJECT Program failed an OP_VERIFY operation. [after air+consts]
-../prover/vectors/P128-1.json: std ACCEPT cons ACCEPT op 71818471 unl 98385
-../prover/vectors/P128-2.json: std ACCEPT cons ACCEPT op 71953471 unl 99580
-../prover/vectors/P128-3.json: std ACCEPT cons ACCEPT op 72002598 unl 99892
-../prover/vectors/U100-0.json: std ACCEPT cons ACCEPT op 92099805 unl 114581
+../../../pq-hash/prover/vectors/P128-1.json: std ACCEPT cons ACCEPT op 50355182 unl 98355
+../../../pq-hash/prover/vectors/P128-2.json: std ACCEPT cons ACCEPT op 50473789 unl 99550
+../../../pq-hash/prover/vectors/P128-3.json: std ACCEPT cons ACCEPT op 50506701 unl 99862
+../../../pq-hash/prover/vectors/U100-0.json: std ACCEPT cons ACCEPT op 63542895 unl 114559
    sibling_trace_first          REJECT Program failed an OP_VERIFY operation. [after air+consts]
    sibling_fri2_last            REJECT Program failed an OP_VERIFY operation. [after air+consts]
    opened_trace_value           REJECT Program failed an OP_VERIFY operation. [after air+consts]
@@ -201,5 +201,5 @@
    records_repacked_filler_L0   REJECT Program failed an OP_VERIFY operation. [after air+consts]
    records_repacked_filler_zero REJECT Program failed an OP_VERIFY operation. [after air+consts]
    records_shifted_between_trees REJECT Program failed an OP_VERIFY operation. [after air+consts]
-../prover/vectors/U100-1.json: std ACCEPT cons ACCEPT op 91958049 unl 113472
+../../../pq-hash/prover/vectors/U100-1.json: std ACCEPT cons ACCEPT op 63368908 unl 113450
 all as expected

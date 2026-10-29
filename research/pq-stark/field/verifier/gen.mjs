@@ -240,9 +240,8 @@ export function defineShared(c) {
     F.PAIRK = defFn('PAIRK', pairkBody(e));
     F.UR = defFn('UR', asm(unpackCode(e, SK, true)));          // packed (SK) -> e canonical values
     const Z = new Uint8Array(SK - 8);
-    const expand = e === 3
-      ? [8, 'SPLIT', 8, 'SPLIT', B0, 'CAT', 'SWAP', Z, 'CAT', 'SWAP', 'CAT', 'SWAP', Z, 'CAT', 'SWAP', 'CAT']
-      : [8, 'SPLIT', B0, 'CAT', 'SWAP', Z, 'CAT', 'SWAP', 'CAT'];
+    // insert the zero gaps: c0 ‖ Z ‖ c1 ‖ Z ‖ c2 ‖ 00 (the last byte keeps the number non-negative)
+    const expand = [...Array.from({length: e - 1}, (_, k) => [8 + k * SK, 'SPLIT', Z, 'SWAP', 'CAT', 'CAT']).flat(), B0, 'CAT'];
     // PKL: a block of n values (e x 8 B each) -> n packed values (first deepest)
     F.PKL = defFn('PKL', asm('BEGIN', e8, 'SPLIT', 'SWAP', ...expand, 'BIN2NUM', 'SWAP', 'SIZE', 'NOT', 'UNTIL', 'DROP'));
   }
