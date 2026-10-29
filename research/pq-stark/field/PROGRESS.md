@@ -13,3 +13,4 @@ Query 0 opcode histogram: instructions are ~72% of op-cost; stack fetches (depth
 - fold 'rot' (PAIRP, packed rotation columns of beta): q-layers 347k -> 273k, PAIRP 13.1k vs PAIR 15.5k.
 - deep 'pk' (DPK, packed numerators from packed gamma columns): q-deep 438k -> 325k.
 - P128-0 now 54.22M (from 71.54M), redeem 5,855 B (-90 B). fnprof.mjs gives per-function inclusive op-cost.
+- fold 'pk' (packed fold values in 26-byte slots, PAIRK 9.5k/pair, FOLD8 87.7k vs 134k Track 4): P128-0 51.89M, redeem 5,688 B. test-b: 38/38 as expected. grade-a P100-0: pad 6,337 -> 780 B (71,024 B total); P128-0: QRY inputs 79.5% (was 92%), 151,915 B.
