@@ -2,51 +2,51 @@
 
 | vector | security (bits, regime) | proof B | unlocking B | redeem B | op-cost std | BCHN-adj. | % of base-41 budget | TXv5 std/cons | bch-spec % |
 |---|---|--:|--:|--:|--:|--:|--:|---|--:|
-| fib-C100-0 | conjectured 100 only (proven JB 59.77) | 56,693 | 63,794 | 5,708 | 19.60M | 19.15M | 38.4% | accepted | 33.2% |
-| fib-C100-zk-0 | conjectured 100 only (proven JB 58.81) | 89,943 | 100,587 | 9,017 | 26.14M | 25.52M | (32.5%) | does not fit 100 KB | - |
-| fib-C100-zkmin-0 | conjectured 100 only (proven JB 58.81) | 81,111 | 90,749 | 8,054 | 24.85M | 24.26M | 34.2% | accepted | 30.8% |
-| fib-C100h-0 | conjectured 100 only (proven JB 59.77) | 46,686 | 53,834 | 5,762 | 19.45M | 19.20M | 45.1% | accepted | 38.1% |
-| fib-C128-0 | conjectured 128 only (proven JB 74.93) | 79,677 | 89,381 | 7,870 | 32.92M | 32.33M | 46% | accepted | 41.4% |
-| fib-C128-zk-0 | conjectured 128 only (proven JB 74.93) | 127,839 | 142,698 | 12,706 | 43.89M | 43.06M | (38.4%) | does not fit 100 KB | - |
-| fib-C128-zkmin-0 | conjectured 128 only (proven JB 74.93) | 121,431 | 135,602 | 12,040 | 43.14M | 42.30M | (39.8%) | does not fit 100 KB | - |
-| fib-P100-0 | 100 JB (proven, Soundness bound) | 58,259 | 67,446 | 8,026 | 23.36M | 23.06M | 43.3% | accepted | 37.7% |
-| fib-P100-zk-0 | 103.7 JB (proven, Soundness bound) | 102,127 | 116,255 | 12,800 | 31.34M | 30.63M | (33.7%) | does not fit 100 KB | - |
-| fib-P100-zkmin-0 | 103.7 JB (proven, Soundness bound) | 98,055 | 111,546 | 12,140 | 30.84M | 30.13M | (34.5%) | does not fit 100 KB | - |
-| fib-P128-0 | 126.31 JB (below 128; Plonky3 LDR estimator 128) | 108,213 | 118,498 | 8,011 | 41.02M | 40.21M | (43.3%) | does not fit 100 KB | - |
-| fib-P128-zk-0 | 123.91 JB (below 128; Plonky3 LDR estimator 128) | 165,943 | 181,269 | 12,732 | 53.83M | 52.72M | (37.1%) | does not fit 100 KB | - |
-| fib-P128-zkmin-0 | 124.15 JB (below 128; Plonky3 LDR estimator 128) | 158,751 | 173,371 | 12,066 | 53.00M | 51.89M | (38.2%) | does not fit 100 KB | - |
-| fib-S100-0 | 101.11 JB (proven, Soundness bound) | 74,779 | 84,021 | 7,865 | 29.81M | 29.26M | 44.3% | accepted | 39.6% |
-| fib-S100b-0 | 100.32 JB (proven, Soundness bound) | 59,809 | 68,376 | 7,823 | 24.97M | 24.58M | 45.6% | accepted | 39.8% |
-| fib-S100z-zkmin-0 | 100.21 JB (proven, Soundness bound) | 85,853 | 99,347 | 12,461 | 29.34M | 28.75M | 36.9% | accepted | 33.5% |
-| fib-S128-0 | 128 JB (proven, Soundness bound) | 78,337 | 87,283 | 7,906 | 33.33M | 32.81M | 47.7% | accepted | 42.8% |
-| fib-S128b-0 | 128 JB (proven, Soundness bound) | 97,659 | 107,559 | 7,977 | 39.71M | 38.99M | (46.1%) | does not fit 100 KB | - |
-| fib-S128z-zkmin-0 | 128.0 JB (proven, Soundness bound) | 112,501 | 126,155 | 12,221 | 38.38M | 37.59M | (38%) | does not fit 100 KB | - |
-| mimc-C100-0 | conjectured 100 only (proven JB 59.6) | 56,893 | 64,627 | 6,358 | 19.85M | 19.40M | 38.4% | accepted | 33.3% |
-| mimc-C100-1 | conjectured 100 only (proven JB 59.6) | 57,021 | 64,775 | 6,357 | 19.90M | 19.45M | 38.4% | accepted | 33.3% |
-| mimc-C100-zk-0 | conjectured 100 only (proven JB 58.67) | 100,303 | 115,253 | 13,347 | 28.80M | 28.14M | (31.2%) | does not fit 100 KB | - |
-| mimc-C100-zkmin-0 | conjectured 100 only (proven JB 58.81) | 89,423 | 102,861 | 11,856 | 26.99M | 26.35M | (32.8%) | does not fit 100 KB | - |
-| mimc-C100h-0 | conjectured 100 only (proven JB 59.6) | 47,498 | 55,289 | 6,412 | 19.78M | 19.52M | 44.7% | accepted | 37.9% |
-| mimc-C100h-1 | conjectured 100 only (proven JB 59.6) | 46,498 | 54,296 | 6,411 | 19.64M | 19.39M | 45.2% | accepted | 38.2% |
-| mimc-C128-0 | conjectured 128 only (proven JB 74.93) | 81,717 | 92,407 | 8,862 | 33.70M | 33.10M | 45.6% | accepted | 41.1% |
-| mimc-C128-1 | conjectured 128 only (proven JB 74.93) | 78,613 | 89,287 | 8,861 | 33.27M | 32.69M | 46.6% | accepted | 41.9% |
-| mimc-C128-zk-0 | conjectured 128 only (proven JB 74.93) | 143,567 | 164,295 | 18,572 | 49.17M | 48.28M | (37.4%) | does not fit 100 KB | - |
-| mimc-C128-zkmin-0 | conjectured 128 only (proven JB 74.93) | 128,135 | 147,775 | 17,507 | 46.99M | 46.14M | (39.7%) | does not fit 100 KB | - |
-| mimc-P100-0 | 100 JB (proven, Soundness bound) | 58,183 | 68,352 | 9,006 | 23.74M | 23.44M | 43.4% | accepted | 37.9% |
-| mimc-P100-1 | 100 JB (proven, Soundness bound) | 57,733 | 67,915 | 9,005 | 23.70M | 23.40M | 43.6% | accepted | 38% |
-| mimc-P100-zk-0 | 103.59 JB (proven, Soundness bound) | 110,767 | 130,760 | 18,669 | 35.14M | 34.40M | (33.6%) | does not fit 100 KB | - |
-| mimc-P100-zkmin-0 | 103.59 JB (proven, Soundness bound) | 102,695 | 121,620 | 17,595 | 33.85M | 33.13M | (34.8%) | does not fit 100 KB | - |
-| mimc-P128-0 | 125.94 JB (below 128; Plonky3 LDR estimator 128) | 110,765 | 122,029 | 9,009 | 41.87M | 41.05M | (42.9%) | does not fit 100 KB | - |
-| mimc-P128-1 | 125.94 JB (below 128; Plonky3 LDR estimator 128) | 108,397 | 119,668 | 9,008 | 41.61M | 40.81M | (43.5%) | does not fit 100 KB | - |
-| mimc-P128-zk-0 | 123.19 JB (below 128; Plonky3 LDR estimator 128) | 188,607 | 209,737 | 18,589 | 60.22M | 59.02M | (35.9%) | does not fit 100 KB | - |
-| mimc-P128-zkmin-0 | 123.41 JB (below 128; Plonky3 LDR estimator 128) | 175,047 | 195,146 | 17,524 | 58.39M | 57.21M | (37.4%) | does not fit 100 KB | - |
-| mimc-S100-0 | 101.11 JB (proven, Soundness bound) | 76,019 | 86,242 | 8,842 | 30.47M | 29.92M | 44.1% | accepted | 39.6% |
-| mimc-S100-1 | 101.11 JB (proven, Soundness bound) | 76,179 | 86,436 | 8,841 | 30.52M | 29.96M | 44.1% | accepted | 39.6% |
-| mimc-S100b-0 | 100.25 JB (proven, Soundness bound) | 60,793 | 70,363 | 8,799 | 25.59M | 25.19M | 45.4% | accepted | 39.8% |
-| mimc-S100b-1 | 100.25 JB (proven, Soundness bound) | 60,153 | 69,684 | 8,798 | 25.40M | 25.00M | 45.5% | accepted | 39.8% |
-| mimc-S128-0 | 128 JB (proven, Soundness bound) | 78,393 | 88,314 | 8,882 | 33.79M | 33.27M | 47.8% | accepted | 43% |
-| mimc-S128-1 | 128 JB (proven, Soundness bound) | 80,185 | 90,099 | 8,881 | 34.04M | 33.50M | 47.2% | accepted | 42.5% |
-| mimc-S128b-0 | 128 JB (proven, Soundness bound) | 99,795 | 110,683 | 8,966 | 40.47M | 39.74M | (45.7%) | does not fit 100 KB | - |
-| mimc-S128b-1 | 128 JB (proven, Soundness bound) | 101,811 | 112,679 | 8,965 | 40.73M | 39.99M | (45.2%) | does not fit 100 KB | - |
+| fib-C100-0 | conjectured 100 only (proven JB 59.77) | 56,693 | 63,822 | 5,735 | 19.71M | 19.26M | 38.6% | accepted | 33.4% |
+| fib-C100-zk-0 | conjectured 100 only (proven JB 58.81) | 89,943 | 100,616 | 9,045 | 26.27M | 25.65M | (32.6%) | does not fit 100 KB | - |
+| fib-C100-zkmin-0 | conjectured 100 only (proven JB 58.81) | 81,111 | 90,778 | 8,082 | 24.98M | 24.38M | 34.4% | accepted | 31% |
+| fib-C100h-0 | conjectured 100 only (proven JB 59.77) | 46,686 | 53,862 | 5,789 | 19.56M | 19.31M | 45.4% | accepted | 38.3% |
+| fib-C128-0 | conjectured 128 only (proven JB 74.93) | 79,677 | 89,409 | 7,897 | 33.07M | 32.47M | 46.2% | accepted | 41.6% |
+| fib-C128-zk-0 | conjectured 128 only (proven JB 74.93) | 127,839 | 142,727 | 12,734 | 44.06M | 43.22M | (38.6%) | does not fit 100 KB | - |
+| fib-C128-zkmin-0 | conjectured 128 only (proven JB 74.93) | 121,431 | 135,631 | 12,068 | 43.31M | 42.47M | (39.9%) | does not fit 100 KB | - |
+| fib-P100-0 | 100 JB (proven, Soundness bound) | 58,259 | 67,474 | 8,053 | 23.45M | 23.15M | 43.4% | accepted | 37.8% |
+| fib-P100-zk-0 | 103.7 JB (proven, Soundness bound) | 102,127 | 116,284 | 12,828 | 31.44M | 30.73M | (33.8%) | does not fit 100 KB | - |
+| fib-P100-zkmin-0 | 103.7 JB (proven, Soundness bound) | 98,055 | 111,575 | 12,168 | 30.94M | 30.24M | (34.7%) | does not fit 100 KB | - |
+| fib-P128-0 | 126.31 JB (below 128; Plonky3 LDR estimator 128) | 108,213 | 118,526 | 8,038 | 41.20M | 40.38M | (43.4%) | does not fit 100 KB | - |
+| fib-P128-zk-0 | 123.91 JB (below 128; Plonky3 LDR estimator 128) | 165,943 | 181,298 | 12,760 | 54.03M | 52.92M | (37.2%) | does not fit 100 KB | - |
+| fib-P128-zkmin-0 | 124.15 JB (below 128; Plonky3 LDR estimator 128) | 158,751 | 173,400 | 12,094 | 53.20M | 52.09M | (38.3%) | does not fit 100 KB | - |
+| fib-S100-0 | 101.11 JB (proven, Soundness bound) | 74,779 | 84,049 | 7,892 | 29.92M | 29.36M | 44.5% | accepted | 39.8% |
+| fib-S100b-0 | 100.32 JB (proven, Soundness bound) | 59,809 | 68,405 | 7,851 | 25.03M | 24.63M | 45.7% | accepted | 39.9% |
+| fib-S100z-zkmin-0 | 100.21 JB (proven, Soundness bound) | 85,853 | 99,376 | 12,489 | 29.42M | 28.83M | 37% | accepted | 33.6% |
+| fib-S128-0 | 128 JB (proven, Soundness bound) | 78,337 | 87,311 | 7,933 | 33.40M | 32.88M | 47.8% | accepted | 42.9% |
+| fib-S128b-0 | 128 JB (proven, Soundness bound) | 97,659 | 107,586 | 8,003 | 39.86M | 39.13M | (46.3%) | does not fit 100 KB | - |
+| fib-S128z-zkmin-0 | 128.0 JB (proven, Soundness bound) | 112,501 | 126,183 | 12,248 | 38.49M | 37.69M | (38.1%) | does not fit 100 KB | - |
+| mimc-C100-0 | conjectured 100 only (proven JB 59.6) | 56,893 | 64,655 | 6,385 | 19.96M | 19.51M | 38.6% | accepted | 33.4% |
+| mimc-C100-1 | conjectured 100 only (proven JB 59.6) | 57,021 | 64,803 | 6,384 | 20.01M | 19.56M | 38.6% | accepted | 33.4% |
+| mimc-C100-zk-0 | conjectured 100 only (proven JB 58.67) | 100,303 | 115,282 | 13,375 | 28.92M | 28.26M | (31.4%) | does not fit 100 KB | - |
+| mimc-C100-zkmin-0 | conjectured 100 only (proven JB 58.81) | 89,423 | 102,890 | 11,884 | 27.12M | 26.48M | (32.9%) | does not fit 100 KB | - |
+| mimc-C100h-0 | conjectured 100 only (proven JB 59.6) | 47,498 | 55,317 | 6,439 | 19.89M | 19.63M | 44.9% | accepted | 38.1% |
+| mimc-C100h-1 | conjectured 100 only (proven JB 59.6) | 46,498 | 54,324 | 6,438 | 19.75M | 19.50M | 45.4% | accepted | 38.4% |
+| mimc-C128-0 | conjectured 128 only (proven JB 74.93) | 81,717 | 92,435 | 8,889 | 33.85M | 33.24M | 45.8% | accepted | 41.3% |
+| mimc-C128-1 | conjectured 128 only (proven JB 74.93) | 78,613 | 89,315 | 8,888 | 33.42M | 32.84M | 46.7% | accepted | 42.1% |
+| mimc-C128-zk-0 | conjectured 128 only (proven JB 74.93) | 143,567 | 164,324 | 18,600 | 49.34M | 48.44M | (37.5%) | does not fit 100 KB | - |
+| mimc-C128-zkmin-0 | conjectured 128 only (proven JB 74.93) | 128,135 | 147,804 | 17,535 | 47.15M | 46.31M | (39.9%) | does not fit 100 KB | - |
+| mimc-P100-0 | 100 JB (proven, Soundness bound) | 58,183 | 68,380 | 9,033 | 23.83M | 23.53M | 43.5% | accepted | 38% |
+| mimc-P100-1 | 100 JB (proven, Soundness bound) | 57,733 | 67,943 | 9,032 | 23.79M | 23.49M | 43.7% | accepted | 38.2% |
+| mimc-P100-zk-0 | 103.59 JB (proven, Soundness bound) | 110,767 | 130,789 | 18,697 | 35.24M | 34.50M | (33.7%) | does not fit 100 KB | - |
+| mimc-P100-zkmin-0 | 103.59 JB (proven, Soundness bound) | 102,695 | 121,649 | 17,623 | 33.95M | 33.24M | (34.9%) | does not fit 100 KB | - |
+| mimc-P128-0 | 125.94 JB (below 128; Plonky3 LDR estimator 128) | 110,765 | 122,057 | 9,036 | 42.05M | 41.22M | (43%) | does not fit 100 KB | - |
+| mimc-P128-1 | 125.94 JB (below 128; Plonky3 LDR estimator 128) | 108,397 | 119,696 | 9,035 | 41.79M | 40.98M | (43.6%) | does not fit 100 KB | - |
+| mimc-P128-zk-0 | 123.19 JB (below 128; Plonky3 LDR estimator 128) | 188,607 | 209,766 | 18,617 | 60.42M | 59.22M | (36%) | does not fit 100 KB | - |
+| mimc-P128-zkmin-0 | 123.41 JB (below 128; Plonky3 LDR estimator 128) | 175,047 | 195,175 | 17,552 | 58.60M | 57.41M | (37.5%) | does not fit 100 KB | - |
+| mimc-S100-0 | 101.11 JB (proven, Soundness bound) | 76,019 | 86,270 | 8,869 | 30.58M | 30.02M | 44.3% | accepted | 39.7% |
+| mimc-S100-1 | 101.11 JB (proven, Soundness bound) | 76,179 | 86,464 | 8,868 | 30.62M | 30.06M | 44.2% | accepted | 39.7% |
+| mimc-S100b-0 | 100.25 JB (proven, Soundness bound) | 60,793 | 70,392 | 8,827 | 25.64M | 25.24M | 45.5% | accepted | 39.9% |
+| mimc-S100b-1 | 100.25 JB (proven, Soundness bound) | 60,153 | 69,713 | 8,826 | 25.45M | 25.06M | 45.6% | accepted | 39.9% |
+| mimc-S128-0 | 128 JB (proven, Soundness bound) | 78,393 | 88,342 | 8,909 | 33.87M | 33.35M | 47.9% | accepted | 43% |
+| mimc-S128-1 | 128 JB (proven, Soundness bound) | 80,185 | 90,127 | 8,908 | 34.11M | 33.58M | 47.3% | accepted | 42.6% |
+| mimc-S128b-0 | 128 JB (proven, Soundness bound) | 99,795 | 110,710 | 8,992 | 40.62M | 39.89M | (45.8%) | does not fit 100 KB | - |
+| mimc-S128b-1 | 128 JB (proven, Soundness bound) | 101,811 | 112,706 | 8,991 | 40.88M | 40.13M | (45.3%) | does not fit 100 KB | - |
 
 ### Layout (a): today's standard rules (10,000 B unlocking per input, 100,000 B per transaction, base 41)
 

@@ -17,15 +17,15 @@ and the zero-knowledge (HidingFriPcs) variants.
 - **Every tampered vector is rejected,** and so is every witness manipulation:
   - Layout (b): `test-b` ran 2,302 cases (45 valid, 1,114 tampered proofs, 1,143 witness manipulations). All
     verdicts were as expected. Most manipulations keep the item count and size.
-  - Layout (a): `test-a` ran on 8 representative vectors (see `results/test-a.log`). One honest caveat is below.
+  - Layout (a): `test-a` ran 417 cases on 8 representative vectors (see `results/test-a.log`), 0 unexpected. One honest caveat is below.
 - **The best 128-bit set is S128** (mimc, 78,393 B proof):
   - Security: 128.17 bits λ_IOP under the Soundness phase's per-round bound (Johnson regime, m = 10). That is
     λ = 128 under the usual digest convention, and 127.21 under the strict reading.
-  - Layout (b): 33.8M op-cost, **47.8% of the base-41 budget** of one 88.3 KB input. Track 5 field P128
+  - Layout (b): 33.87M op-cost, **47.9% of the base-41 budget** of one 88.3 KB input. Track 5 field P128
     (Track 4 format, 92 KB) was 50.05M, 64.9%.
   - Layout (a), today's standard rules: **2 transactions, 17 inputs, 123,452 B.** Track 5 field P128 needed 19
     inputs and 150,891 B.
-- **At about 100 bits, S100b** (mimc, 60.8 KB proof, 100.25 bits) costs 25.6M in one input (45%). Under today's
+- **At about 100 bits, S100b** (mimc, 60.8 KB proof, 100.25 bits) costs 25.64M in one input (45.5%). Under today's
   rules it takes **1 transaction, 12 inputs, 83.5 KB.**
 - **AIR-specific code is small.** The constraint evaluation generated from `air.mjs` costs **0.13M op-cost (fib)
   and 0.26M (mimc)**. That is 0.2-1.1% of the total, and 330 B / 660 B of code (4% / 7.5% of the redeem).
@@ -124,21 +124,21 @@ AIR × set × ZK variant, both regimes, and the per-phase profile. Selected rows
 
 | set | proof B | security | (b) one 100 KB input: op-cost std / BCHN-adj., % of budget | (a) today: txs / inputs / total B |
 |---|--:|---|---|---|
-| S128 | 78,393 | 128 | 33.79M / 33.27M, 47.8% | 2 / 17 / 123,452 |
-| S128b | 99,795 | 128 | does not fit (110,683 B unlocking) | 2 / 25 / 166,343 |
-| S100 | 76,019 | 101.1 | 30.47M / 29.92M, 44.1% | 2 / 19 / 127,870 |
-| S100b | 60,793 | 100.3 | 25.59M / 25.19M, 45.4% | 1 / 12 / 83,515 |
-| P100 (h = 25) | 58,183 | 100 | 23.74M / 23.44M, 43.4% | 1 / 13 / 85,649 |
-| P128 | 110,765 | 125.9 | does not fit (122,029 B) | 2 / 26 / 185,338 |
-| C100 (D = 2) | 56,893 | conj. 100 | 19.85M / 19.40M, 38.4% | 1 / 11 / 93,794 |
-| fib S128z (ZK) | 112,501 | 128 | does not fit (126,155 B) | 3 / 35 / 234,553 |
-| fib S100z (ZK) | 85,853 | 100.2 | 29.34M / 28.75M, 36.9% | 2 / 25 / 136,556 |
+| S128 | 78,393 | 128 | 33.87M / 33.35M, 47.9% | 2 / 17 / 123,452 |
+| S128b | 99,795 | 128 | does not fit (110,711 B unlocking) | 2 / 25 / 166,343 |
+| S100 | 76,019 | 101.1 | 30.58M / 30.02M, 44.3% | 2 / 19 / 127,870 |
+| S100b | 60,793 | 100.3 | 25.64M / 25.24M, 45.5% | 1 / 12 / 83,515 |
+| P100 (h = 25) | 58,183 | 100 | 23.83M / 23.53M, 43.5% | 1 / 13 / 85,649 |
+| P128 | 110,765 | 125.9 | does not fit (122,057 B) | 2 / 26 / 185,338 |
+| C100 (D = 2) | 56,893 | conj. 100 | 19.96M / 19.51M, 38.6% | 1 / 11 / 93,794 |
+| fib S128z (ZK) | 112,501 | 128 | does not fit (126,184 B) | 3 / 35 / 234,553 |
+| fib S100z (ZK) | 85,853 | 100.2 | 29.42M / 28.83M, 37.0% | 2 / 25 / 136,556 |
 
 Comparison with the Track 4 format (Track 5 field phase, same CashVM techniques, P128 at 91.5 KB, 128.19 bits):
 
 | | Track 5 field P128 (Track 4 format) | this phase, Plonky3 S128 (mimc) |
 |---|---|---|
-| (b) op-cost / share of budget | 50.05M / 64.9% | 33.79M / 47.8% |
+| (b) op-cost / share of budget | 50.05M / 64.9% | 33.87M / 47.9% |
 | (a) today | 19 inputs, 2 txs, 150,891 B | 17 inputs, 2 txs, 123,452 B |
 
 The win comes from Plonky3's parameter knobs: blowup 2^8, arity 16, 26 queries, and PoW on commit and batch. It does
