@@ -1,0 +1,28 @@
+[
+ {
+  "set": "P128",
+  "vector": "P128-0.json",
+  "opStdWithMarkers": 71563637,
+  "markers": 225,
+  "phases": {
+   "witness pushes, redeem hash, OP_DEFINEs": 143408,
+   "transcript": 198337,
+   "air-0": 395498,
+   "air-1": 58570,
+   "air-2": 27096,
+   "air-3": 38261,
+   "air+consts": 22790,
+   "merkle": 9400496,
+   "unpack": 762640
+  },
+  "perQuery": {
+   "q-entry": 55523,
+   "q-parse": 68791,
+   "q-deep": 453988,
+   "q-layers": 347390,
+   "q-final": 478019
+  },
+  "queriesTotal": 60359601,
+  "cleanup": 100
+ }
+]
