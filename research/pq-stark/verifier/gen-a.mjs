@@ -39,16 +39,27 @@ export function buildA(vk, pis, plan, opts = {}) {
   const rootSrc = vk.trees.map((tr) => (tr.kind === 'fri' ? ['FROOTS', tr.r * h] : ['ROOTS', (vk.zk ? [2, 0, 1][tr.b] : tr.b) * h]));
   const headerCheck = (S) => { S.roll('ROOTS'); S.raw([1, 'SPLIT', 'SWAP', Uint8Array.of(vk.degreeBits), 'EQUALVERIFY'], 1, ['ROOTS']); };
 
+  // outline a phase into a defined function: compiled on [__B, ...region] (the region = the names on top it may
+  // touch); the caller's region is replaced by the function's result (items below the region are never reached)
+  const outline = (S, name, region, emit) => {
+    const at = S.st.length - region.length;
+    if (S.st.slice(at).join('|') !== region.join('|')) throw new Error(`${name}: region is not on top`);
+    const sub = new Stk(['__B', ...region]);
+    emit(sub);
+    if (sub.st[0] !== '__B' || sub.st.filter((x) => x === '__B').length !== 1) throw new Error(`${name} reaches below its region`);
+    const id = F[name] ?? (F[name] = defFn(name, sub.bytes()));
+    S.raw([id, 'INVOKE'], region.length, sub.st.slice(1));
+  };
+  const trn = (S) => outline(S, 'TRN', [...ptOrder], (X) => { headerCheck(X); g.transcript(X, {pow: true, keepG: !!thread}); });
+
   // ---- HEAD: own pushes PT (+ a zero pad) ----
   const headFor = (kind) => {
     const S = new Stk([...ptOrder, 'PAD']);
     S.emit('DEPTH', ptOrder.length + 1, 'NUMEQUALVERIFY');
     S.raw(['SIZE', 0, 'SWAP', 'NUM2BIN', 'EQUALVERIFY'], 1);
     for (const x of ptOrder) { S.pick(x); S.raw(['SIZE', 'NIP', ptLen[x], 'NUMEQUALVERIFY'], 1); }
-    headerCheck(S);
-    g.transcript(S, {pow: true, keepG: !!thread});
-    g.parseOOD(S);
-    g.air(S);
+    trn(S);
+    outline(S, 'AIRF', [...S.st], (X) => { g.parseOOD(X); g.air(X); });
     if (thread) {
       const CAT = thread.category;
       const commit = (k) => { S.pick('G'); S.raw([TTAG, 'SWAP', 'CAT', Uint8Array.of(k), 'CAT', 'SHA256', Uint8Array.of(k), 'SWAP', 'CAT'], 1, ['TD']); };
@@ -83,12 +94,9 @@ export function buildA(vk, pis, plan, opts = {}) {
     S.raw([0, 'INPUTBYTECODE'], 0, ['HU']);
     for (const x of ptOrder) { const hd = hdrOf(ptLen[x]); S.raw([hd.length, 'SPLIT', 'SWAP', hd, 'EQUALVERIFY', ptLen[x], 'SPLIT'], 1, [x, 'HU']); }
     S.drop('HU');   // the rest is HEAD's pad and R (HEAD pins its own layout)
-    headerCheck(S);
-    g.transcript(S, {pow: false});
-    g.parseOOD(S);
-    for (let k = 0; k < D; k++) S.drop('al' + k);
-    g.consts(S);
-    g.unpack(S);
+    trn(S);
+    if (thread) S.drop('G');
+    outline(S, 'CNS', S.st.slice(S.st.indexOf('hi') + 1), (X) => { g.parseOOD(X); for (let k = 0; k < D; k++) X.drop('al' + k); g.consts(X); g.unpack(X); });
     S.roll('hi'); S.roll('lo'); S.rename('lo', 'q');
     const QA = S.clone();
     { QA.pick('q'); const d = QA.depth('idx' + (Q - 1)) - 1 + Q - 1; QA.raw([d, 'SWAP', 'SUB', 'PICK'], 1, ['idx']); }
@@ -136,16 +144,20 @@ export function buildA(vk, pis, plan, opts = {}) {
     'BEGIN', 'DUP', 'UTXOBYTECODE', 2, 'PICK', 'EQUALVERIFY', '1SUB', 'DUP', 0, 'LESSTHAN', 'UNTIL', '2DROP',
     100, 'MUL', 'INPUTINDEX', 'ADD', ROLE_BASE, 'ADD', 'INVOKE');
   const defs = [...fns.values()].map((f) => asm(f.body, f.id, 'DEFINE'));
-  const LIM = 10_000;
+  const LIM = 10_000 - 3 - (60 * nc + 3) - 8;   // the CODE input's unlocking holds the blob push and R
+  // balanced: every CODE input runs R, which hashes all blobs, so a tiny blob's input would lack the hash-iteration
+  // allowance (0.5 per byte); fill each blob up to the mean size (at most LIM)
+  const total = defs.reduce((a, d) => a + d.length, 0) + dispatch.length;
+  const target = Math.min(LIM, Math.ceil(total / nc) + 400);
   const blobs = Array.from({length: nc}, () => []);
   let bi = 0, used = 0;
   for (const d of defs) {
-    if (used + d.length > (bi === nc - 1 ? LIM - dispatch.length : LIM)) { bi++; used = 0; if (bi >= nc) throw new Error(`code does not fit ${nc} blob(s) of ${LIM} B`); }
+    if (used + d.length > (bi === nc - 1 ? LIM - dispatch.length : target)) { bi++; used = 0; if (bi >= nc) throw new Error(`code does not fit ${nc} blob(s) of ${LIM} B`); }
     blobs[bi].push(d); used += d.length;
   }
   blobs[nc - 1].push(dispatch);
   const code = blobs.map((b) => Uint8Array.from(b.flatMap((x) => [...x])));
-  if (code.some((c) => c.length > LIM || c.length === 0)) throw new Error('code blob sizes ' + code.map((c) => c.length));
+  if (code.some((c) => c.length > LIM || c.length === 0)) throw new Error('code does not fit: blob sizes ' + code.map((c) => c.length));
   const redeem = asm(
     code.map((c, i) => { const hd = hdrOf(c.length); return [i + 1, 'INPUTBYTECODE', hd.length, 'SPLIT', 'SWAP', hd, 'EQUALVERIFY', c.length, 'SPLIT', 'DROP', 'DUP', 'SHA256', sha(c), 'EQUALVERIFY', ID_CODE + i + 1, 'DEFINE']; }),
     code.map((_, i) => [ID_CODE + i + 1, 'INVOKE']));

@@ -49,7 +49,7 @@ mut('qry: path byte (input tree)', (w) => { Q0(w)[1] = flip(Q0(w)[1], 100); retu
 mut('qry: path byte (last FRI tree)', (w) => { Q0(w)[1] = flip(Q0(w)[1], -5); return w; });
 mut('qry: hint T', (w) => { Q0(w)[0] = flip(Q0(w)[0], -1); return w; });
 mut('qry: two QRY inputs swapped', (w) => { [w[0][q0], w[0][q0 + 1]] = [w[0][q0 + 1], w[0][q0]]; return w; });
-mut('qry: queries swapped inside an input', (w) => { const a = Q0(w); [a[0], a[2]] = [a[2], a[0]]; [a[1], a[3]] = [a[3], a[1]]; return w; });
+if (plan.txs[0].qry[0][1] - plan.txs[0].qry[0][0] > 1) mut('qry: queries swapped inside an input', (w) => { const a = Q0(w); [a[0], a[2]] = [a[2], a[0]]; [a[1], a[3]] = [a[3], a[1]]; return w; });
 mut('qry: L and path swapped', (w) => { const a = Q0(w); [a[0], a[1]] = [a[1], a[0]]; return w; });
 mut('qry: input missing', (w) => { w[0].splice(q0 + 1, 1); return w; });
 mut('qry: extra input', (w) => { w[0].push(w[0][q0]); return w; });

@@ -1,0 +1,520 @@
+fib-C128-zk-0.json       tx 3 inputs 27 bytes 224170 (74902 + 74634 + 74634) pad 0 code 6676+6046 R 118 | op 102968410 bchn 101638943 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  2261 pad    0 op  1196655 / 1841600 66.8% it 269/1151 ok
+   tx0 in 1 CODE       unl  6799 pad    0 op   145204 / 5472000 3.1% it 203/3420 ok
+   tx0 in 2 CODE       unl  6169 pad    0 op   144574 / 4968000 3.4% it 203/3105 ok
+   tx0 in 3 QRY 0-2    unl  9829 pad    0 op  5402292 / 7896000 69.6% it 759/4935 ok
+   tx0 in 4 QRY 2-4    unl  9829 pad    0 op  5400370 / 7896000 69.6% it 759/4935 ok
+   tx0 in 5 QRY 4-6    unl  9829 pad    0 op  5396753 / 7896000 69.6% it 759/4935 ok
+   tx0 in 6 QRY 6-8    unl  9829 pad    0 op  5395298 / 7896000 69.6% it 759/4935 ok
+   tx0 in 7 QRY 8-10   unl  9829 pad    0 op  5398727 / 7896000 69.6% it 759/4935 ok
+   tx0 in 8 QRY 10-12  unl  9829 pad    0 op  5399535 / 7896000 69.6% it 759/4935 ok
+   tx1 in 0 HEAD       unl  2261 pad    0 op  1198042 / 1841600 66.9% it 268/1151 ok
+   tx1 in 1 CODE       unl  6799 pad    0 op   145274 / 5472000 3.1% it 203/3420 ok
+   tx1 in 2 CODE       unl  6169 pad    0 op   144644 / 4968000 3.4% it 203/3105 ok
+   tx1 in 3 QRY 12-14  unl  9829 pad    0 op  5402007 / 7896000 69.6% it 759/4935 ok
+   tx1 in 4 QRY 14-16  unl  9829 pad    0 op  5395644 / 7896000 69.6% it 759/4935 ok
+   tx1 in 5 QRY 16-18  unl  9829 pad    0 op  5400234 / 7896000 69.6% it 759/4935 ok
+   tx1 in 6 QRY 18-20  unl  9829 pad    0 op  5398353 / 7896000 69.6% it 759/4935 ok
+   tx1 in 7 QRY 20-22  unl  9829 pad    0 op  5400409 / 7896000 69.6% it 759/4935 ok
+   tx1 in 8 QRY 22-24  unl  9829 pad    0 op  5400835 / 7896000 69.6% it 759/4935 ok
+   tx2 in 0 HEAD       unl  2261 pad    0 op  1198046 / 1841600 66.9% it 268/1151 ok
+   tx2 in 1 CODE       unl  6799 pad    0 op   145278 / 5472000 3.1% it 203/3420 ok
+   tx2 in 2 CODE       unl  6169 pad    0 op   144648 / 4968000 3.4% it 203/3105 ok
+   tx2 in 3 QRY 24-26  unl  9829 pad    0 op  5399252 / 7896000 69.6% it 759/4935 ok
+   tx2 in 4 QRY 26-28  unl  9829 pad    0 op  5396760 / 7896000 69.6% it 759/4935 ok
+   tx2 in 5 QRY 28-30  unl  9829 pad    0 op  5401778 / 7896000 69.6% it 759/4935 ok
+   tx2 in 6 QRY 30-32  unl  9829 pad    0 op  5394153 / 7896000 69.5% it 759/4935 ok
+   tx2 in 7 QRY 32-34  unl  9829 pad    0 op  5396088 / 7896000 69.6% it 759/4935 ok
+   tx2 in 8 QRY 34-36  unl  9829 pad    0 op  5398090 / 7896000 69.6% it 759/4935 ok
+fib-C128-zkmin-0.json    tx 3 inputs 27 bytes 214258 (71598 + 71330 + 71330) pad 0 code 6420+5662 R 118 | op 97550395 bchn 96233600 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  2093 pad    0 op  1137833 / 1707200 68.6% it 256/1067 ok
+   tx0 in 1 CODE       unl  6543 pad    0 op   139828 / 5267200 3.1% it 193/3292 ok
+   tx0 in 2 CODE       unl  5785 pad    0 op   139070 / 4660800 3.5% it 193/2913 ok
+   tx0 in 3 QRY 0-2    unl  9413 pad    0 op  5112229 / 7563200 68.9% it 744/4727 ok
+   tx0 in 4 QRY 2-4    unl  9413 pad    0 op  5112997 / 7563200 68.9% it 744/4727 ok
+   tx0 in 5 QRY 4-6    unl  9413 pad    0 op  5111505 / 7563200 68.8% it 744/4727 ok
+   tx0 in 6 QRY 6-8    unl  9413 pad    0 op  5111106 / 7563200 68.8% it 744/4727 ok
+   tx0 in 7 QRY 8-10   unl  9413 pad    0 op  5111001 / 7563200 68.8% it 744/4727 ok
+   tx0 in 8 QRY 10-12  unl  9413 pad    0 op  5112576 / 7563200 68.9% it 744/4727 ok
+   tx1 in 0 HEAD       unl  2093 pad    0 op  1139221 / 1707200 68.6% it 255/1067 ok
+   tx1 in 1 CODE       unl  6543 pad    0 op   139898 / 5267200 3.1% it 193/3292 ok
+   tx1 in 2 CODE       unl  5785 pad    0 op   139140 / 4660800 3.5% it 193/2913 ok
+   tx1 in 3 QRY 12-14  unl  9413 pad    0 op  5114490 / 7563200 68.9% it 744/4727 ok
+   tx1 in 4 QRY 14-16  unl  9413 pad    0 op  5111023 / 7563200 68.8% it 744/4727 ok
+   tx1 in 5 QRY 16-18  unl  9413 pad    0 op  5112463 / 7563200 68.9% it 744/4727 ok
+   tx1 in 6 QRY 18-20  unl  9413 pad    0 op  5108516 / 7563200 68.8% it 744/4727 ok
+   tx1 in 7 QRY 20-22  unl  9413 pad    0 op  5109175 / 7563200 68.8% it 744/4727 ok
+   tx1 in 8 QRY 22-24  unl  9413 pad    0 op  5108032 / 7563200 68.8% it 744/4727 ok
+   tx2 in 0 HEAD       unl  2093 pad    0 op  1139225 / 1707200 68.6% it 255/1067 ok
+   tx2 in 1 CODE       unl  6543 pad    0 op   139902 / 5267200 3.1% it 193/3292 ok
+   tx2 in 2 CODE       unl  5785 pad    0 op   139144 / 4660800 3.5% it 193/2913 ok
+   tx2 in 3 QRY 24-26  unl  9413 pad    0 op  5109105 / 7563200 68.8% it 744/4727 ok
+   tx2 in 4 QRY 26-28  unl  9413 pad    0 op  5106384 / 7563200 68.8% it 744/4727 ok
+   tx2 in 5 QRY 28-30  unl  9413 pad    0 op  5107635 / 7563200 68.8% it 744/4727 ok
+   tx2 in 6 QRY 30-32  unl  9413 pad    0 op  5108781 / 7563200 68.8% it 744/4727 ok
+   tx2 in 7 QRY 32-34  unl  9413 pad    0 op  5106074 / 7563200 68.8% it 744/4727 ok
+   tx2 in 8 QRY 34-36  unl  9413 pad    0 op  5107247 / 7563200 68.8% it 744/4727 ok
+fib-P100-zk-0.json       tx 2 inputs 30 bytes 162866 (81511 + 81355) pad 0 code 2145+4539+5886 R 177 | op 97128904 bchn 96058496 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  2320 pad    0 op  1158497 / 1888800 63.1% it 264/1180 ok
+   tx0 in 1 CODE       unl  2327 pad    0 op   149581 / 1894400 9.3% it 203/1184 ok
+   tx0 in 2 CODE       unl  4721 pad    0 op   151975 / 3809600 4.7% it 203/2381 ok
+   tx0 in 3 CODE       unl  6068 pad    0 op   153322 / 4887200 3.7% it 203/3054 ok
+   tx0 in 4 QRY 0-1    unl  5930 pad    0 op  4217980 / 4776800 89.8% it 565/2985 ok
+   tx0 in 5 QRY 1-2    unl  5930 pad    0 op  4220376 / 4776800 89.9% it 565/2985 ok
+   tx0 in 6 QRY 2-3    unl  5930 pad    0 op  4218606 / 4776800 89.8% it 565/2985 ok
+   tx0 in 7 QRY 3-4    unl  5930 pad    0 op  4219793 / 4776800 89.9% it 565/2985 ok
+   tx0 in 8 QRY 4-5    unl  5930 pad    0 op  4220103 / 4776800 89.9% it 565/2985 ok
+   tx0 in 9 QRY 5-6    unl  5930 pad    0 op  4219423 / 4776800 89.8% it 565/2985 ok
+   tx0 in10 QRY 6-7    unl  5930 pad    0 op  4218601 / 4776800 89.8% it 565/2985 ok
+   tx0 in11 QRY 7-8    unl  5930 pad    0 op  4219428 / 4776800 89.8% it 565/2985 ok
+   tx0 in12 QRY 8-9    unl  5930 pad    0 op  4217805 / 4776800 89.8% it 565/2985 ok
+   tx0 in13 QRY 9-10   unl  5930 pad    0 op  4219072 / 4776800 89.8% it 565/2985 ok
+   tx0 in14 QRY 10-11  unl  5930 pad    0 op  4220407 / 4776800 89.9% it 565/2985 ok
+   tx1 in 0 HEAD       unl  2320 pad    0 op  1167462 / 1888800 63.6% it 264/1180 ok
+   tx1 in 1 CODE       unl  2327 pad    0 op   149651 / 1894400 9.3% it 203/1184 ok
+   tx1 in 2 CODE       unl  4721 pad    0 op   152045 / 3809600 4.7% it 203/2381 ok
+   tx1 in 3 CODE       unl  6068 pad    0 op   153392 / 4887200 3.7% it 203/3054 ok
+   tx1 in 4 QRY 11-12  unl  5930 pad    0 op  4218292 / 4776800 89.8% it 565/2985 ok
+   tx1 in 5 QRY 12-13  unl  5930 pad    0 op  4219303 / 4776800 89.8% it 565/2985 ok
+   tx1 in 6 QRY 13-14  unl  5930 pad    0 op  4218818 / 4776800 89.8% it 565/2985 ok
+   tx1 in 7 QRY 14-15  unl  5930 pad    0 op  4219926 / 4776800 89.9% it 565/2985 ok
+   tx1 in 8 QRY 15-16  unl  5930 pad    0 op  4219819 / 4776800 89.9% it 565/2985 ok
+   tx1 in 9 QRY 16-17  unl  5930 pad    0 op  4218173 / 4776800 89.8% it 565/2985 ok
+   tx1 in10 QRY 17-18  unl  5930 pad    0 op  4219662 / 4776800 89.9% it 565/2985 ok
+   tx1 in11 QRY 18-19  unl  5930 pad    0 op  4218501 / 4776800 89.8% it 565/2985 ok
+   tx1 in12 QRY 19-20  unl  5930 pad    0 op  4219912 / 4776800 89.9% it 565/2985 ok
+   tx1 in13 QRY 20-21  unl  5930 pad    0 op  4219836 / 4776800 89.9% it 565/2985 ok
+   tx1 in14 QRY 21-22  unl  5930 pad    0 op  4218735 / 4776800 89.8% it 565/2985 ok
+fib-P100-zkmin-0.json    tx 2 inputs 28 bytes 154548 (77352 + 77196) pad 0 code 6344+5574 R 118 | op 90609011 bchn 89559771 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  2093 pad    0 op  1094637 / 1707200 66% it 249/1067 ok
+   tx0 in 1 CODE       unl  6467 pad    0 op   143955 / 5206400 3.2% it 191/3254 ok
+   tx0 in 2 CODE       unl  5697 pad    0 op   143185 / 4590400 3.7% it 191/2869 ok
+   tx0 in 3 QRY 0-1    unl  5663 pad    0 op  3945299 / 4563200 88% it 549/2852 ok
+   tx0 in 4 QRY 1-2    unl  5663 pad    0 op  3944614 / 4563200 88% it 549/2852 ok
+   tx0 in 5 QRY 2-3    unl  5663 pad    0 op  3944310 / 4563200 88% it 549/2852 ok
+   tx0 in 6 QRY 3-4    unl  5663 pad    0 op  3944779 / 4563200 88% it 549/2852 ok
+   tx0 in 7 QRY 4-5    unl  5663 pad    0 op  3944409 / 4563200 88% it 549/2852 ok
+   tx0 in 8 QRY 5-6    unl  5663 pad    0 op  3944575 / 4563200 88% it 549/2852 ok
+   tx0 in 9 QRY 6-7    unl  5663 pad    0 op  3945772 / 4563200 88% it 549/2852 ok
+   tx0 in10 QRY 7-8    unl  5663 pad    0 op  3942566 / 4563200 87.9% it 549/2852 ok
+   tx0 in11 QRY 8-9    unl  5663 pad    0 op  3945024 / 4563200 88% it 549/2852 ok
+   tx0 in12 QRY 9-10   unl  5663 pad    0 op  3945496 / 4563200 88% it 549/2852 ok
+   tx0 in13 QRY 10-11  unl  5663 pad    0 op  3944465 / 4563200 88% it 549/2852 ok
+   tx1 in 0 HEAD       unl  2093 pad    0 op  1102797 / 1707200 66.5% it 249/1067 ok
+   tx1 in 1 CODE       unl  6467 pad    0 op   144025 / 5206400 3.2% it 191/3254 ok
+   tx1 in 2 CODE       unl  5697 pad    0 op   143255 / 4590400 3.7% it 191/2869 ok
+   tx1 in 3 QRY 11-12  unl  5663 pad    0 op  3944482 / 4563200 88% it 549/2852 ok
+   tx1 in 4 QRY 12-13  unl  5663 pad    0 op  3945673 / 4563200 88% it 549/2852 ok
+   tx1 in 5 QRY 13-14  unl  5663 pad    0 op  3945211 / 4563200 88% it 549/2852 ok
+   tx1 in 6 QRY 14-15  unl  5663 pad    0 op  3944595 / 4563200 88% it 549/2852 ok
+   tx1 in 7 QRY 15-16  unl  5663 pad    0 op  3945200 / 4563200 88% it 549/2852 ok
+   tx1 in 8 QRY 16-17  unl  5663 pad    0 op  3944782 / 4563200 88% it 549/2852 ok
+   tx1 in 9 QRY 17-18  unl  5663 pad    0 op  3945306 / 4563200 88% it 549/2852 ok
+   tx1 in10 QRY 18-19  unl  5663 pad    0 op  3945268 / 4563200 88% it 549/2852 ok
+   tx1 in11 QRY 19-20  unl  5663 pad    0 op  3945614 / 4563200 88% it 549/2852 ok
+   tx1 in12 QRY 20-21  unl  5663 pad    0 op  3944916 / 4563200 88% it 549/2852 ok
+   tx1 in13 QRY 21-22  unl  5663 pad    0 op  3945561 / 4563200 88% it 549/2852 ok
+fib-P128-zk-0.json       tx 3 inputs 52 bytes 286114 (99263 + 93430 + 93421) pad 3638 code 6868+6161 R 118 | op 183054015 bchn 181109699 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  2261 pad    0 op  1238402 / 1841600 69.2% it 275/1151 ok
+   tx0 in 1 CODE       unl  6991 pad    0 op   164843 / 5625600 3.4% it 208/3516 ok
+   tx0 in 2 CODE       unl  6284 pad    0 op   164136 / 5060000 3.8% it 208/3162 ok
+   tx0 in 3 QRY 0-1    unl  5510 pad   86 op  4103273 / 4440800 94% it 547/2775 ok
+   tx0 in 4 QRY 1-2    unl  5510 pad   86 op  4103559 / 4440800 94% it 547/2775 ok
+   tx0 in 5 QRY 2-3    unl  5508 pad   84 op  4102031 / 4439200 94% it 547/2774 ok
+   tx0 in 6 QRY 3-4    unl  5508 pad   84 op  4101907 / 4439200 94% it 547/2774 ok
+   tx0 in 7 QRY 4-5    unl  5511 pad   87 op  4104017 / 4441600 94% it 547/2776 ok
+   tx0 in 8 QRY 5-6    unl  5511 pad   87 op  4103833 / 4441600 94% it 547/2776 ok
+   tx0 in 9 QRY 6-7    unl  5511 pad   87 op  4103868 / 4441600 94% it 547/2776 ok
+   tx0 in10 QRY 7-8    unl  5509 pad   85 op  4102999 / 4440000 94% it 547/2775 ok
+   tx0 in11 QRY 8-9    unl  5509 pad   85 op  4102856 / 4440000 94% it 547/2775 ok
+   tx0 in12 QRY 9-10   unl  5512 pad   88 op  4104607 / 4442400 94% it 547/2776 ok
+   tx0 in13 QRY 10-11  unl  5509 pad   85 op  4102979 / 4440000 94% it 547/2775 ok
+   tx0 in14 QRY 11-12  unl  5510 pad   86 op  4103316 / 4440800 94% it 547/2775 ok
+   tx0 in15 QRY 12-13  unl  5505 pad   81 op  4099686 / 4436800 94% it 547/2773 ok
+   tx0 in16 QRY 13-14  unl  5508 pad   84 op  4101870 / 4439200 94% it 547/2774 ok
+   tx0 in17 QRY 14-15  unl  5510 pad   86 op  4103491 / 4440800 94% it 547/2775 ok
+   tx1 in 0 HEAD       unl  2261 pad    0 op  1245153 / 1841600 69.5% it 274/1151 ok
+   tx1 in 1 CODE       unl  6991 pad    0 op   163837 / 5625600 3.4% it 208/3516 ok
+   tx1 in 2 CODE       unl  6284 pad    0 op   163130 / 5060000 3.8% it 208/3162 ok
+   tx1 in 3 QRY 15-16  unl  5509 pad   85 op  4102277 / 4440000 94% it 547/2775 ok
+   tx1 in 4 QRY 16-17  unl  5509 pad   85 op  4102682 / 4440000 94% it 547/2775 ok
+   tx1 in 5 QRY 17-18  unl  5507 pad   83 op  4100803 / 4438400 94% it 547/2774 ok
+   tx1 in 6 QRY 18-19  unl  5508 pad   84 op  4101513 / 4439200 94% it 547/2774 ok
+   tx1 in 7 QRY 19-20  unl  5509 pad   85 op  4102349 / 4440000 94% it 547/2775 ok
+   tx1 in 8 QRY 20-21  unl  5509 pad   85 op  4102292 / 4440000 94% it 547/2775 ok
+   tx1 in 9 QRY 21-22  unl  5507 pad   83 op  4101455 / 4438400 94% it 547/2774 ok
+   tx1 in10 QRY 22-23  unl  5509 pad   85 op  4102803 / 4440000 94% it 547/2775 ok
+   tx1 in11 QRY 23-24  unl  5508 pad   84 op  4101897 / 4439200 94% it 547/2774 ok
+   tx1 in12 QRY 24-25  unl  5507 pad   83 op  4100872 / 4438400 94% it 547/2774 ok
+   tx1 in13 QRY 25-26  unl  5509 pad   85 op  4102281 / 4440000 94% it 547/2775 ok
+   tx1 in14 QRY 26-27  unl  5508 pad   84 op  4101554 / 4439200 94% it 547/2774 ok
+   tx1 in15 QRY 27-28  unl  5510 pad   86 op  4103469 / 4440800 94% it 547/2775 ok
+   tx1 in16 QRY 28-29  unl  5510 pad   86 op  4103317 / 4440800 94% it 547/2775 ok
+   tx2 in 0 HEAD       unl  2261 pad    0 op  1245157 / 1841600 69.5% it 274/1151 ok
+   tx2 in 1 CODE       unl  6991 pad    0 op   163841 / 5625600 3.4% it 208/3516 ok
+   tx2 in 2 CODE       unl  6284 pad    0 op   163134 / 5060000 3.8% it 208/3162 ok
+   tx2 in 3 QRY 29-30  unl  5507 pad   83 op  4101069 / 4438400 94% it 547/2774 ok
+   tx2 in 4 QRY 30-31  unl  5508 pad   84 op  4101625 / 4439200 94% it 547/2774 ok
+   tx2 in 5 QRY 31-32  unl  5507 pad   83 op  4100929 / 4438400 94% it 547/2774 ok
+   tx2 in 6 QRY 32-33  unl  5509 pad   85 op  4102414 / 4440000 94% it 547/2775 ok
+   tx2 in 7 QRY 33-34  unl  5505 pad   81 op  4099785 / 4436800 94% it 547/2773 ok
+   tx2 in 8 QRY 34-35  unl  5506 pad   82 op  4100105 / 4437600 94% it 547/2773 ok
+   tx2 in 9 QRY 35-36  unl  5508 pad   84 op  4101694 / 4439200 94% it 547/2774 ok
+   tx2 in10 QRY 36-37  unl  5508 pad   84 op  4102113 / 4439200 94% it 547/2774 ok
+   tx2 in11 QRY 37-38  unl  5509 pad   85 op  4102965 / 4440000 94% it 547/2775 ok
+   tx2 in12 QRY 38-39  unl  5509 pad   85 op  4102469 / 4440000 94% it 547/2775 ok
+   tx2 in13 QRY 39-40  unl  5507 pad   83 op  4100964 / 4438400 94% it 547/2774 ok
+   tx2 in14 QRY 40-41  unl  5509 pad   85 op  4102913 / 4440000 94% it 547/2775 ok
+   tx2 in15 QRY 41-42  unl  5508 pad   84 op  4101535 / 4439200 94% it 547/2774 ok
+   tx2 in16 QRY 42-43  unl  5510 pad   86 op  4103630 / 4440800 94% it 547/2775 ok
+fib-P128-zkmin-0.json    tx 3 inputs 52 bytes 271065 (94039 + 88513 + 88513) pad 0 code 6430+5959 R 118 | op 171347774 bchn 169426626 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  2093 pad    0 op  1179870 / 1707200 71.1% it 262/1067 ok
+   tx0 in 1 CODE       unl  6553 pad    0 op   159285 / 5275200 3.5% it 198/3297 ok
+   tx0 in 2 CODE       unl  6082 pad    0 op   158814 / 4898400 3.8% it 198/3061 ok
+   tx0 in 3 QRY 0-1    unl  5215 pad    0 op  3835965 / 4204800 92.9% it 533/2628 ok
+   tx0 in 4 QRY 1-2    unl  5215 pad    0 op  3836124 / 4204800 92.9% it 533/2628 ok
+   tx0 in 5 QRY 2-3    unl  5215 pad    0 op  3834539 / 4204800 92.8% it 533/2628 ok
+   tx0 in 6 QRY 3-4    unl  5215 pad    0 op  3836689 / 4204800 92.9% it 533/2628 ok
+   tx0 in 7 QRY 4-5    unl  5215 pad    0 op  3836742 / 4204800 92.9% it 533/2628 ok
+   tx0 in 8 QRY 5-6    unl  5215 pad    0 op  3836275 / 4204800 92.9% it 533/2628 ok
+   tx0 in 9 QRY 6-7    unl  5215 pad    0 op  3835284 / 4204800 92.8% it 533/2628 ok
+   tx0 in10 QRY 7-8    unl  5215 pad    0 op  3836450 / 4204800 92.9% it 533/2628 ok
+   tx0 in11 QRY 8-9    unl  5215 pad    0 op  3835843 / 4204800 92.8% it 533/2628 ok
+   tx0 in12 QRY 9-10   unl  5215 pad    0 op  3836072 / 4204800 92.9% it 533/2628 ok
+   tx0 in13 QRY 10-11  unl  5215 pad    0 op  3835759 / 4204800 92.8% it 533/2628 ok
+   tx0 in14 QRY 11-12  unl  5215 pad    0 op  3836593 / 4204800 92.9% it 533/2628 ok
+   tx0 in15 QRY 12-13  unl  5215 pad    0 op  3836487 / 4204800 92.9% it 533/2628 ok
+   tx0 in16 QRY 13-14  unl  5215 pad    0 op  3836556 / 4204800 92.9% it 533/2628 ok
+   tx0 in17 QRY 14-15  unl  5215 pad    0 op  3836618 / 4204800 92.9% it 533/2628 ok
+   tx1 in 0 HEAD       unl  2093 pad    0 op  1186622 / 1707200 71.5% it 261/1067 ok
+   tx1 in 1 CODE       unl  6553 pad    0 op   158279 / 5275200 3.5% it 198/3297 ok
+   tx1 in 2 CODE       unl  6082 pad    0 op   157808 / 4898400 3.7% it 198/3061 ok
+   tx1 in 3 QRY 15-16  unl  5215 pad    0 op  3834929 / 4204800 92.8% it 533/2628 ok
+   tx1 in 4 QRY 16-17  unl  5215 pad    0 op  3836134 / 4204800 92.9% it 533/2628 ok
+   tx1 in 5 QRY 17-18  unl  5215 pad    0 op  3834570 / 4204800 92.8% it 533/2628 ok
+   tx1 in 6 QRY 18-19  unl  5215 pad    0 op  3836449 / 4204800 92.9% it 533/2628 ok
+   tx1 in 7 QRY 19-20  unl  5215 pad    0 op  3834315 / 4204800 92.8% it 533/2628 ok
+   tx1 in 8 QRY 20-21  unl  5215 pad    0 op  3835742 / 4204800 92.8% it 533/2628 ok
+   tx1 in 9 QRY 21-22  unl  5215 pad    0 op  3835474 / 4204800 92.8% it 533/2628 ok
+   tx1 in10 QRY 22-23  unl  5215 pad    0 op  3836070 / 4204800 92.9% it 533/2628 ok
+   tx1 in11 QRY 23-24  unl  5215 pad    0 op  3835674 / 4204800 92.8% it 533/2628 ok
+   tx1 in12 QRY 24-25  unl  5215 pad    0 op  3832064 / 4204800 92.8% it 533/2628 ok
+   tx1 in13 QRY 25-26  unl  5215 pad    0 op  3835248 / 4204800 92.8% it 533/2628 ok
+   tx1 in14 QRY 26-27  unl  5215 pad    0 op  3834839 / 4204800 92.8% it 533/2628 ok
+   tx1 in15 QRY 27-28  unl  5215 pad    0 op  3834410 / 4204800 92.8% it 533/2628 ok
+   tx1 in16 QRY 28-29  unl  5215 pad    0 op  3835861 / 4204800 92.8% it 533/2628 ok
+   tx2 in 0 HEAD       unl  2093 pad    0 op  1186626 / 1707200 71.5% it 261/1067 ok
+   tx2 in 1 CODE       unl  6553 pad    0 op   158283 / 5275200 3.5% it 198/3297 ok
+   tx2 in 2 CODE       unl  6082 pad    0 op   157812 / 4898400 3.7% it 198/3061 ok
+   tx2 in 3 QRY 29-30  unl  5215 pad    0 op  3833016 / 4204800 92.8% it 533/2628 ok
+   tx2 in 4 QRY 30-31  unl  5215 pad    0 op  3834579 / 4204800 92.8% it 533/2628 ok
+   tx2 in 5 QRY 31-32  unl  5215 pad    0 op  3834148 / 4204800 92.8% it 533/2628 ok
+   tx2 in 6 QRY 32-33  unl  5215 pad    0 op  3833693 / 4204800 92.8% it 533/2628 ok
+   tx2 in 7 QRY 33-34  unl  5215 pad    0 op  3836283 / 4204800 92.9% it 533/2628 ok
+   tx2 in 8 QRY 34-35  unl  5215 pad    0 op  3835534 / 4204800 92.8% it 533/2628 ok
+   tx2 in 9 QRY 35-36  unl  5215 pad    0 op  3833840 / 4204800 92.8% it 533/2628 ok
+   tx2 in10 QRY 36-37  unl  5215 pad    0 op  3834244 / 4204800 92.8% it 533/2628 ok
+   tx2 in11 QRY 37-38  unl  5215 pad    0 op  3836884 / 4204800 92.9% it 533/2628 ok
+   tx2 in12 QRY 38-39  unl  5215 pad    0 op  3835587 / 4204800 92.8% it 533/2628 ok
+   tx2 in13 QRY 39-40  unl  5215 pad    0 op  3834458 / 4204800 92.8% it 533/2628 ok
+   tx2 in14 QRY 40-41  unl  5215 pad    0 op  3836181 / 4204800 92.9% it 533/2628 ok
+   tx2 in15 QRY 41-42  unl  5215 pad    0 op  3835347 / 4204800 92.8% it 533/2628 ok
+   tx2 in16 QRY 42-43  unl  5215 pad    0 op  3835658 / 4204800 92.8% it 533/2628 ok
+fib-S100z-zkmin-0.json   tx 2 inputs 25 bytes 136556 (71142 + 65414) pad 102 code 6155+5974 R 118 | op 81704455 bchn 80818436 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  2838 pad    0 op  1080780 / 2303200 48.4% it 262/1439 ok
+   tx0 in 1 CODE       unl  6278 pad    0 op   143772 / 5055200 3.3% it 194/3159 ok
+   tx0 in 2 CODE       unl  6097 pad    0 op   143591 / 4910400 3.4% it 194/3069 ok
+   tx0 in 3 QRY 0-1    unl  5516 pad    5 op  4108930 / 4445600 94% it 542/2778 ok
+   tx0 in 4 QRY 1-2    unl  5517 pad    6 op  4110214 / 4446400 94% it 542/2779 ok
+   tx0 in 5 QRY 2-3    unl  5516 pad    5 op  4109189 / 4445600 94% it 542/2778 ok
+   tx0 in 6 QRY 3-4    unl  5518 pad    7 op  4110928 / 4447200 94% it 542/2779 ok
+   tx0 in 7 QRY 4-5    unl  5516 pad    5 op  4109385 / 4445600 94% it 542/2778 ok
+   tx0 in 8 QRY 5-6    unl  5517 pad    6 op  4109523 / 4446400 94% it 542/2779 ok
+   tx0 in 9 QRY 6-7    unl  5517 pad    6 op  4109974 / 4446400 94% it 542/2779 ok
+   tx0 in10 QRY 7-8    unl  5517 pad    6 op  4110085 / 4446400 94% it 542/2779 ok
+   tx0 in11 QRY 8-9    unl  5518 pad    7 op  4110532 / 4447200 94% it 542/2779 ok
+   tx0 in12 QRY 9-10   unl  5518 pad    7 op  4110266 / 4447200 94% it 542/2779 ok
+   tx1 in 0 HEAD       unl  2838 pad    0 op  1086254 / 2303200 48.6% it 262/1439 ok
+   tx1 in 1 CODE       unl  6278 pad    0 op   142766 / 5055200 3.3% it 194/3159 ok
+   tx1 in 2 CODE       unl  6097 pad    0 op   142585 / 4910400 3.4% it 194/3069 ok
+   tx1 in 3 QRY 10-11  unl  5516 pad    5 op  4109198 / 4445600 94% it 542/2778 ok
+   tx1 in 4 QRY 11-12  unl  5516 pad    5 op  4109135 / 4445600 94% it 542/2778 ok
+   tx1 in 5 QRY 12-13  unl  5516 pad    5 op  4108951 / 4445600 94% it 542/2778 ok
+   tx1 in 6 QRY 13-14  unl  5513 pad    2 op  4106817 / 4443200 94% it 542/2777 ok
+   tx1 in 7 QRY 14-15  unl  5517 pad    6 op  4109507 / 4446400 94% it 542/2779 ok
+   tx1 in 8 QRY 15-16  unl  5515 pad    4 op  4108703 / 4444800 94% it 542/2778 ok
+   tx1 in 9 QRY 16-17  unl  5515 pad    4 op  4108269 / 4444800 94% it 542/2778 ok
+   tx1 in10 QRY 17-18  unl  5516 pad    5 op  4108905 / 4445600 94% it 542/2778 ok
+   tx1 in11 QRY 18-19  unl  5517 pad    6 op  4110177 / 4446400 94% it 542/2779 ok
+fib-S128z-zkmin-0.json   tx 3 inputs 35 bytes 234553 (80591 + 80331 + 73631) pad 35206 code 6429+5830 R 118 | op 134426596 bchn 132910351 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  7471 pad    0 op  1143362 / 6009600 19.8% it 342/3756 ok
+   tx0 in 1 CODE       unl  6552 pad    0 op   146832 / 5274400 3.3% it 196/3296 ok
+   tx0 in 2 CODE       unl  5953 pad    0 op   146233 / 4795200 3.6% it 196/2997 ok
+   tx0 in 3 QRY 0-1    unl  6646 pad 1357 op  4947944 / 5349600 94% it 625/3343 ok
+   tx0 in 4 QRY 1-2    unl  6645 pad 1356 op  4947450 / 5348800 94% it 625/3343 ok
+   tx0 in 5 QRY 2-3    unl  6640 pad 1351 op  4944055 / 5344800 94% it 625/3340 ok
+   tx0 in 6 QRY 3-4    unl  6639 pad 1350 op  4943040 / 5344000 94% it 625/3340 ok
+   tx0 in 7 QRY 4-5    unl  6643 pad 1354 op  4945895 / 5347200 94% it 625/3342 ok
+   tx0 in 8 QRY 5-6    unl  6645 pad 1356 op  4947154 / 5348800 94% it 625/3343 ok
+   tx0 in 9 QRY 6-7    unl  6642 pad 1353 op  4945425 / 5346400 94% it 625/3341 ok
+   tx0 in10 QRY 7-8    unl  6642 pad 1353 op  4944869 / 5346400 94% it 625/3341 ok
+   tx0 in11 QRY 8-9    unl  6645 pad 1356 op  4947639 / 5348800 94% it 625/3343 ok
+   tx1 in 0 HEAD       unl  7471 pad    0 op  1147165 / 6009600 19.8% it 341/3756 ok
+   tx1 in 1 CODE       unl  6552 pad    0 op   146902 / 5274400 3.3% it 196/3296 ok
+   tx1 in 2 CODE       unl  5953 pad    0 op   146303 / 4795200 3.6% it 196/2997 ok
+   tx1 in 3 QRY 9-10   unl  6644 pad 1355 op  4946824 / 5348000 94% it 625/3342 ok
+   tx1 in 4 QRY 10-11  unl  6644 pad 1355 op  4946712 / 5348000 94% it 625/3342 ok
+   tx1 in 5 QRY 11-12  unl  6644 pad 1355 op  4946903 / 5348000 94% it 625/3342 ok
+   tx1 in 6 QRY 12-13  unl  6645 pad 1356 op  4947386 / 5348800 94% it 625/3343 ok
+   tx1 in 7 QRY 13-14  unl  6643 pad 1354 op  4946000 / 5347200 94% it 625/3342 ok
+   tx1 in 8 QRY 14-15  unl  6642 pad 1353 op  4945437 / 5346400 94% it 625/3341 ok
+   tx1 in 9 QRY 15-16  unl  6644 pad 1355 op  4946795 / 5348000 94% it 625/3342 ok
+   tx1 in10 QRY 16-17  unl  6645 pad 1356 op  4947157 / 5348800 94% it 625/3343 ok
+   tx1 in11 QRY 17-18  unl  6644 pad 1355 op  4946853 / 5348000 94% it 625/3342 ok
+   tx2 in 0 HEAD       unl  7471 pad    0 op  1145288 / 6009600 19.8% it 341/3756 ok
+   tx2 in 1 CODE       unl  6552 pad    0 op   145830 / 5274400 3.2% it 196/3296 ok
+   tx2 in 2 CODE       unl  5953 pad    0 op   145231 / 4795200 3.6% it 196/2997 ok
+   tx2 in 3 QRY 18-19  unl  6641 pad 1352 op  4944741 / 5345600 94% it 625/3341 ok
+   tx2 in 4 QRY 19-20  unl  6646 pad 1357 op  4948300 / 5349600 94% it 625/3343 ok
+   tx2 in 5 QRY 20-21  unl  6642 pad 1353 op  4945495 / 5346400 94% it 625/3341 ok
+   tx2 in 6 QRY 21-22  unl  6641 pad 1352 op  4944194 / 5345600 94% it 625/3341 ok
+   tx2 in 7 QRY 22-23  unl  6644 pad 1355 op  4946770 / 5348000 94% it 625/3342 ok
+   tx2 in 8 QRY 23-24  unl  6640 pad 1351 op  4943996 / 5344800 94% it 625/3340 ok
+   tx2 in 9 QRY 24-25  unl  6641 pad 1352 op  4944519 / 5345600 94% it 625/3341 ok
+   tx2 in10 QRY 25-26  unl  6643 pad 1354 op  4945652 / 5347200 94% it 625/3342 ok
+mimc-C100-zk-0.json      tx 2 inputs 20 bytes 166192 (85633 + 80559) pad 0 code 5672+7421 R 118 | op 63779847 bchn 62792243 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  1965 pad    0 op  1215958 / 1604800 77.9% it 267/1003 ok
+   tx0 in 1 CODE       unl  5795 pad    0 op   146026 / 4668800 3.7% it 209/2918 ok
+   tx0 in 2 CODE       unl  7544 pad    0 op   147775 / 6068000 2.9% it 209/3792 ok
+   tx0 in 3 QRY 0-2    unl  9957 pad    0 op  4365267 / 7998400 55.8% it 760/4999 ok
+   tx0 in 4 QRY 2-4    unl  9957 pad    0 op  4363544 / 7998400 55.8% it 760/4999 ok
+   tx0 in 5 QRY 4-6    unl  9957 pad    0 op  4362478 / 7998400 55.8% it 760/4999 ok
+   tx0 in 6 QRY 6-8    unl  9957 pad    0 op  4356928 / 7998400 55.7% it 760/4999 ok
+   tx0 in 7 QRY 8-10   unl  9957 pad    0 op  4362542 / 7998400 55.8% it 760/4999 ok
+   tx0 in 8 QRY 10-12  unl  9957 pad    0 op  4365339 / 7998400 55.8% it 760/4999 ok
+   tx0 in 9 QRY 12-14  unl  9957 pad    0 op  4364152 / 7998400 55.8% it 760/4999 ok
+   tx1 in 0 HEAD       unl  1965 pad    0 op  1220898 / 1604800 78.2% it 267/1003 ok
+   tx1 in 1 CODE       unl  5795 pad    0 op   146096 / 4668800 3.7% it 209/2918 ok
+   tx1 in 2 CODE       unl  7544 pad    0 op   147845 / 6068000 2.9% it 209/3792 ok
+   tx1 in 3 QRY 14-16  unl  9957 pad    0 op  4363597 / 7998400 55.8% it 760/4999 ok
+   tx1 in 4 QRY 16-18  unl  9957 pad    0 op  4367091 / 7998400 55.8% it 760/4999 ok
+   tx1 in 5 QRY 18-20  unl  9957 pad    0 op  4365143 / 7998400 55.8% it 760/4999 ok
+   tx1 in 6 QRY 20-22  unl  9957 pad    0 op  4366042 / 7998400 55.8% it 760/4999 ok
+   tx1 in 7 QRY 22-24  unl  9957 pad    0 op  4366892 / 7998400 55.8% it 760/4999 ok
+   tx1 in 8 QRY 24-26  unl  9957 pad    0 op  4363080 / 7998400 55.8% it 760/4999 ok
+   tx1 in 9 QRY 26-27  unl  5039 pad    0 op  3035550 / 4064000 76.3% it 513/2540 ok
+mimc-C100-zkmin-0.json   tx 2 inputs 20 bytes 152334 (78512 + 73822) pad 0 code 4650+7050 R 118 | op 56657352 bchn 55697868 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  1613 pad    0 op  1102100 / 1323200 85.6% it 240/827 ok
+   tx0 in 1 CODE       unl  4773 pad    0 op   133845 / 3851200 4.1% it 187/2407 ok
+   tx0 in 2 CODE       unl  7173 pad    0 op   136245 / 5771200 2.8% it 187/3607 ok
+   tx0 in 3 QRY 0-2    unl  9189 pad    0 op  3871753 / 7384000 53.7% it 723/4615 ok
+   tx0 in 4 QRY 2-4    unl  9189 pad    0 op  3876468 / 7384000 53.8% it 723/4615 ok
+   tx0 in 5 QRY 4-6    unl  9189 pad    0 op  3872506 / 7384000 53.7% it 723/4615 ok
+   tx0 in 6 QRY 6-8    unl  9189 pad    0 op  3866582 / 7384000 53.6% it 723/4615 ok
+   tx0 in 7 QRY 8-10   unl  9189 pad    0 op  3873075 / 7384000 53.7% it 723/4615 ok
+   tx0 in 8 QRY 10-12  unl  9189 pad    0 op  3873496 / 7384000 53.7% it 723/4615 ok
+   tx0 in 9 QRY 12-14  unl  9189 pad    0 op  3875024 / 7384000 53.7% it 723/4615 ok
+   tx1 in 0 HEAD       unl  1613 pad    0 op  1107040 / 1323200 86% it 240/827 ok
+   tx1 in 1 CODE       unl  4773 pad    0 op   133915 / 3851200 4.1% it 187/2407 ok
+   tx1 in 2 CODE       unl  7173 pad    0 op   136315 / 5771200 2.8% it 187/3607 ok
+   tx1 in 3 QRY 14-16  unl  9189 pad    0 op  3873873 / 7384000 53.7% it 723/4615 ok
+   tx1 in 4 QRY 16-18  unl  9189 pad    0 op  3874447 / 7384000 53.7% it 723/4615 ok
+   tx1 in 5 QRY 18-20  unl  9189 pad    0 op  3875230 / 7384000 53.7% it 723/4615 ok
+   tx1 in 6 QRY 20-22  unl  9189 pad    0 op  3873817 / 7384000 53.7% it 723/4615 ok
+   tx1 in 7 QRY 22-24  unl  9189 pad    0 op  3872576 / 7384000 53.7% it 723/4615 ok
+   tx1 in 8 QRY 24-26  unl  9189 pad    0 op  3872677 / 7384000 53.7% it 723/4615 ok
+   tx1 in 9 QRY 26-27  unl  4655 pad    0 op  2596884 / 3756800 70.8% it 481/2348 ok
+mimc-C128-zk-0.json      tx 4 inputs 48 bytes 342244 (85833 + 85461 + 85468 + 85482) pad 59028 code 9233+9655 R 118 | op 199226760 bchn 197631064 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  3156 pad  174 op  2354790 / 2557600 94% it 378/1598 ok
+   tx0 in 1 CODE       unl  9356 pad    0 op   206622 / 7517600 3.3% it 299/4698 ok
+   tx0 in 2 CODE       unl  9778 pad    0 op   207044 / 7855200 3.1% it 299/4909 ok
+   tx0 in 3 QRY 0-1    unl  6933 pad 1596 op  5163814 / 5579200 94% it 627/3487 ok
+   tx0 in 4 QRY 1-2    unl  6958 pad 1621 op  5182442 / 5599200 94% it 627/3499 ok
+   tx0 in 5 QRY 2-3    unl  6959 pad 1622 op  5183096 / 5600000 94% it 627/3500 ok
+   tx0 in 6 QRY 3-4    unl  6958 pad 1621 op  5182505 / 5599200 94% it 627/3499 ok
+   tx0 in 7 QRY 4-5    unl  6959 pad 1622 op  5183087 / 5600000 94% it 627/3500 ok
+   tx0 in 8 QRY 5-6    unl  6958 pad 1621 op  5182984 / 5599200 94% it 627/3499 ok
+   tx0 in 9 QRY 6-7    unl  6959 pad 1622 op  5183743 / 5600000 94% it 627/3500 ok
+   tx0 in10 QRY 7-8    unl  6959 pad 1622 op  5183472 / 5600000 94% it 627/3500 ok
+   tx0 in11 QRY 8-9    unl  6960 pad 1623 op  5183788 / 5600800 94% it 627/3500 ok
+   tx1 in 0 HEAD       unl  3157 pad  175 op  2355846 / 2558400 94% it 376/1599 ok
+   tx1 in 1 CODE       unl  9356 pad    0 op   206692 / 7517600 3.3% it 299/4698 ok
+   tx1 in 2 CODE       unl  9778 pad    0 op   207114 / 7855200 3.1% it 299/4909 ok
+   tx1 in 3 QRY 9-10   unl  6960 pad 1623 op  5184468 / 5600800 94% it 627/3500 ok
+   tx1 in 4 QRY 10-11  unl  6954 pad 1617 op  5179964 / 5596000 94% it 627/3497 ok
+   tx1 in 5 QRY 11-12  unl  6961 pad 1624 op  5184897 / 5601600 94% it 627/3501 ok
+   tx1 in 6 QRY 12-13  unl  6960 pad 1623 op  5184057 / 5600800 94% it 627/3500 ok
+   tx1 in 7 QRY 13-14  unl  6960 pad 1623 op  5183844 / 5600800 94% it 627/3500 ok
+   tx1 in 8 QRY 14-15  unl  6956 pad 1619 op  5180817 / 5597600 94% it 627/3498 ok
+   tx1 in 9 QRY 15-16  unl  6944 pad 1607 op  5172103 / 5588000 94% it 627/3492 ok
+   tx1 in10 QRY 16-17  unl  6956 pad 1619 op  5180849 / 5597600 94% it 627/3498 ok
+   tx1 in11 QRY 17-18  unl  6959 pad 1622 op  5183295 / 5600000 94% it 627/3500 ok
+   tx2 in 0 HEAD       unl  3157 pad  175 op  2355850 / 2558400 94% it 376/1599 ok
+   tx2 in 1 CODE       unl  9356 pad    0 op   206696 / 7517600 3.3% it 299/4698 ok
+   tx2 in 2 CODE       unl  9778 pad    0 op   207118 / 7855200 3.1% it 299/4909 ok
+   tx2 in 3 QRY 18-19  unl  6958 pad 1621 op  5182798 / 5599200 94% it 627/3499 ok
+   tx2 in 4 QRY 19-20  unl  6957 pad 1620 op  5181656 / 5598400 94% it 627/3499 ok
+   tx2 in 5 QRY 20-21  unl  6959 pad 1622 op  5183439 / 5600000 94% it 627/3500 ok
+   tx2 in 6 QRY 21-22  unl  6960 pad 1623 op  5184007 / 5600800 94% it 627/3500 ok
+   tx2 in 7 QRY 22-23  unl  6956 pad 1619 op  5181377 / 5597600 94% it 627/3498 ok
+   tx2 in 8 QRY 23-24  unl  6961 pad 1624 op  5184654 / 5601600 94% it 627/3501 ok
+   tx2 in 9 QRY 24-25  unl  6955 pad 1618 op  5180350 / 5596800 94% it 627/3498 ok
+   tx2 in10 QRY 25-26  unl  6950 pad 1613 op  5176389 / 5592800 94% it 627/3495 ok
+   tx2 in11 QRY 26-27  unl  6961 pad 1624 op  5185084 / 5601600 94% it 627/3501 ok
+   tx3 in 0 HEAD       unl  3157 pad  175 op  2355850 / 2558400 94% it 376/1599 ok
+   tx3 in 1 CODE       unl  9356 pad    0 op   206696 / 7517600 3.3% it 299/4698 ok
+   tx3 in 2 CODE       unl  9778 pad    0 op   207118 / 7855200 3.1% it 299/4909 ok
+   tx3 in 3 QRY 27-28  unl  6958 pad 1621 op  5182860 / 5599200 94% it 627/3499 ok
+   tx3 in 4 QRY 28-29  unl  6959 pad 1622 op  5183480 / 5600000 94% it 627/3500 ok
+   tx3 in 5 QRY 29-30  unl  6956 pad 1619 op  5180960 / 5597600 94% it 627/3498 ok
+   tx3 in 6 QRY 30-31  unl  6957 pad 1620 op  5182052 / 5598400 94% it 627/3499 ok
+   tx3 in 7 QRY 31-32  unl  6961 pad 1624 op  5184710 / 5601600 94% it 627/3501 ok
+   tx3 in 8 QRY 32-33  unl  6960 pad 1623 op  5183875 / 5600800 94% it 627/3500 ok
+   tx3 in 9 QRY 33-34  unl  6961 pad 1624 op  5185178 / 5601600 94% it 627/3501 ok
+   tx3 in10 QRY 34-35  unl  6960 pad 1623 op  5184388 / 5600800 94% it 627/3500 ok
+   tx3 in11 QRY 35-36  unl  6959 pad 1622 op  5183146 / 5600000 94% it 627/3500 ok
+mimc-C128-zkmin-0.json   tx 3 inputs 27 bytes 242468 (81000 + 80734 + 80734) pad 790 code 8410+9018 R 118 | op 121454219 bchn 120087804 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  2981 pad  262 op  2226474 / 2417600 94% it 351/1511 ok
+   tx0 in 1 CODE       unl  8533 pad    0 op   184616 / 6859200 3.2% it 277/4287 ok
+   tx0 in 2 CODE       unl  9141 pad    0 op   185224 / 7345600 3% it 277/4591 ok
+   tx0 in 3 QRY 0-2    unl  9941 pad    0 op  6242993 / 7985600 79.5% it 847/4991 ok
+   tx0 in 4 QRY 2-4    unl  9941 pad    0 op  6236990 / 7985600 79.5% it 847/4991 ok
+   tx0 in 5 QRY 4-6    unl  9941 pad    0 op  6239900 / 7985600 79.5% it 847/4991 ok
+   tx0 in 6 QRY 6-8    unl  9941 pad    0 op  6237897 / 7985600 79.5% it 847/4991 ok
+   tx0 in 7 QRY 8-10   unl  9941 pad    0 op  6237769 / 7985600 79.5% it 847/4991 ok
+   tx0 in 8 QRY 10-12  unl  9941 pad    0 op  6241786 / 7985600 79.5% it 847/4991 ok
+   tx1 in 0 HEAD       unl  2983 pad  264 op  2227865 / 2419200 93.9% it 350/1512 ok
+   tx1 in 1 CODE       unl  8533 pad    0 op   184686 / 6859200 3.2% it 277/4287 ok
+   tx1 in 2 CODE       unl  9141 pad    0 op   185294 / 7345600 3% it 277/4591 ok
+   tx1 in 3 QRY 12-14  unl  9941 pad    0 op  6239416 / 7985600 79.5% it 847/4991 ok
+   tx1 in 4 QRY 14-16  unl  9941 pad    0 op  6238093 / 7985600 79.5% it 847/4991 ok
+   tx1 in 5 QRY 16-18  unl  9941 pad    0 op  6242704 / 7985600 79.5% it 847/4991 ok
+   tx1 in 6 QRY 18-20  unl  9941 pad    0 op  6237175 / 7985600 79.5% it 847/4991 ok
+   tx1 in 7 QRY 20-22  unl  9941 pad    0 op  6238069 / 7985600 79.5% it 847/4991 ok
+   tx1 in 8 QRY 22-24  unl  9941 pad    0 op  6240723 / 7985600 79.5% it 847/4991 ok
+   tx2 in 0 HEAD       unl  2983 pad  264 op  2227869 / 2419200 93.9% it 350/1512 ok
+   tx2 in 1 CODE       unl  8533 pad    0 op   184690 / 6859200 3.2% it 277/4287 ok
+   tx2 in 2 CODE       unl  9141 pad    0 op   185298 / 7345600 3% it 277/4591 ok
+   tx2 in 3 QRY 24-26  unl  9941 pad    0 op  6238227 / 7985600 79.5% it 847/4991 ok
+   tx2 in 4 QRY 26-28  unl  9941 pad    0 op  6238420 / 7985600 79.5% it 847/4991 ok
+   tx2 in 5 QRY 28-30  unl  9941 pad    0 op  6231995 / 7985600 79.4% it 847/4991 ok
+   tx2 in 6 QRY 30-32  unl  9941 pad    0 op  6239103 / 7985600 79.5% it 847/4991 ok
+   tx2 in 7 QRY 32-34  unl  9941 pad    0 op  6239649 / 7985600 79.5% it 847/4991 ok
+   tx2 in 8 QRY 34-36  unl  9941 pad    0 op  6234879 / 7985600 79.4% it 847/4991 ok
+mimc-P100-zk-0.json      tx 3 inputs 31 bytes 228749 (81354 + 73695 + 73700) pad 24646 code 9244+9276 R 118 | op 129409828 bchn 128282541 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  3077 pad   95 op  2297065 / 2494400 94% it 368/1559 ok
+   tx0 in 1 CODE       unl  9367 pad    0 op   197502 / 7526400 3.1% it 294/4704 ok
+   tx0 in 2 CODE       unl  9399 pad    0 op   197534 / 7552000 3.1% it 294/4720 ok
+   tx0 in 3 QRY 0-1    unl  7341 pad 1108 op  5464976 / 5905600 94% it 674/3691 ok
+   tx0 in 4 QRY 1-2    unl  7341 pad 1108 op  5464951 / 5905600 94% it 674/3691 ok
+   tx0 in 5 QRY 2-3    unl  7341 pad 1108 op  5464316 / 5905600 94% it 674/3691 ok
+   tx0 in 6 QRY 3-4    unl  7339 pad 1106 op  5463475 / 5904000 94% it 674/3690 ok
+   tx0 in 7 QRY 4-5    unl  7341 pad 1108 op  5464829 / 5905600 94% it 674/3691 ok
+   tx0 in 8 QRY 5-6    unl  7341 pad 1108 op  5464955 / 5905600 94% it 674/3691 ok
+   tx0 in 9 QRY 6-7    unl  7342 pad 1109 op  5465086 / 5906400 94% it 674/3691 ok
+   tx0 in10 QRY 7-8    unl  7340 pad 1107 op  5463993 / 5904800 94% it 674/3690 ok
+   tx1 in 0 HEAD       unl  3079 pad   97 op  2298185 / 2496000 94% it 367/1560 ok
+   tx1 in 1 CODE       unl  9367 pad    0 op   196496 / 7526400 3.1% it 294/4704 ok
+   tx1 in 2 CODE       unl  9399 pad    0 op   196528 / 7552000 3.1% it 294/4720 ok
+   tx1 in 3 QRY 8-9    unl  7339 pad 1106 op  5463335 / 5904000 94% it 674/3690 ok
+   tx1 in 4 QRY 9-10   unl  7339 pad 1106 op  5462762 / 5904000 94% it 674/3690 ok
+   tx1 in 5 QRY 10-11  unl  7339 pad 1106 op  5463266 / 5904000 94% it 674/3690 ok
+   tx1 in 6 QRY 11-12  unl  7341 pad 1108 op  5464476 / 5905600 94% it 674/3691 ok
+   tx1 in 7 QRY 12-13  unl  7341 pad 1108 op  5464497 / 5905600 94% it 674/3691 ok
+   tx1 in 8 QRY 13-14  unl  7338 pad 1105 op  5462349 / 5903200 94% it 674/3689 ok
+   tx1 in 9 QRY 14-15  unl  7339 pad 1106 op  5463023 / 5904000 94% it 674/3690 ok
+   tx2 in 0 HEAD       unl  3079 pad   97 op  2298189 / 2496000 94% it 367/1560 ok
+   tx2 in 1 CODE       unl  9367 pad    0 op   196500 / 7526400 3.1% it 294/4704 ok
+   tx2 in 2 CODE       unl  9399 pad    0 op   196532 / 7552000 3.1% it 294/4720 ok
+   tx2 in 3 QRY 15-16  unl  7339 pad 1106 op  5463405 / 5904000 94% it 674/3690 ok
+   tx2 in 4 QRY 16-17  unl  7342 pad 1109 op  5465134 / 5906400 94% it 674/3691 ok
+   tx2 in 5 QRY 17-18  unl  7339 pad 1106 op  5462782 / 5904000 94% it 674/3690 ok
+   tx2 in 6 QRY 18-19  unl  7339 pad 1106 op  5463044 / 5904000 94% it 674/3690 ok
+   tx2 in 7 QRY 19-20  unl  7340 pad 1107 op  5464192 / 5904800 94% it 674/3690 ok
+   tx2 in 8 QRY 20-21  unl  7340 pad 1107 op  5463993 / 5904800 94% it 674/3690 ok
+   tx2 in 9 QRY 21-22  unl  7342 pad 1109 op  5465171 / 5906400 94% it 674/3691 ok
+mimc-P100-zkmin-0.json   tx 2 inputs 28 bytes 190224 (95181 + 95043) pad 17910 code 8412+8838 R 118 | op 116315493 bchn 115222317 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  2920 pad  202 op  2182201 / 2368800 94% it 343/1480 ok
+   tx0 in 1 CODE       unl  8535 pad    0 op   188659 / 6860800 3.3% it 274/4288 ok
+   tx0 in 2 CODE       unl  8961 pad    0 op   189085 / 7201600 3.1% it 274/4501 ok
+   tx0 in 3 QRY 0-1    unl  6723 pad  794 op  5003578 / 5411200 94% it 647/3382 ok
+   tx0 in 4 QRY 1-2    unl  6724 pad  795 op  5003953 / 5412000 94% it 647/3382 ok
+   tx0 in 5 QRY 2-3    unl  6724 pad  795 op  5004086 / 5412000 94% it 647/3382 ok
+   tx0 in 6 QRY 3-4    unl  6724 pad  795 op  5004332 / 5412000 94% it 647/3382 ok
+   tx0 in 7 QRY 4-5    unl  6724 pad  795 op  5004463 / 5412000 94% it 647/3382 ok
+   tx0 in 8 QRY 5-6    unl  6725 pad  796 op  5004501 / 5412800 94% it 647/3383 ok
+   tx0 in 9 QRY 6-7    unl  6724 pad  795 op  5004353 / 5412000 94% it 647/3382 ok
+   tx0 in10 QRY 7-8    unl  6724 pad  795 op  5004111 / 5412000 94% it 647/3382 ok
+   tx0 in11 QRY 8-9    unl  6722 pad  793 op  5002854 / 5410400 94% it 647/3381 ok
+   tx0 in12 QRY 9-10   unl  6724 pad  795 op  5004254 / 5412000 94% it 647/3382 ok
+   tx0 in13 QRY 10-11  unl  6725 pad  796 op  5004609 / 5412800 94% it 647/3383 ok
+   tx1 in 0 HEAD       unl  2931 pad  213 op  2190383 / 2377600 94% it 343/1486 ok
+   tx1 in 1 CODE       unl  8535 pad    0 op   188729 / 6860800 3.3% it 274/4288 ok
+   tx1 in 2 CODE       unl  8961 pad    0 op   189155 / 7201600 3.1% it 274/4501 ok
+   tx1 in 3 QRY 11-12  unl  6724 pad  795 op  5003999 / 5412000 94% it 647/3382 ok
+   tx1 in 4 QRY 12-13  unl  6724 pad  795 op  5004384 / 5412000 94% it 647/3382 ok
+   tx1 in 5 QRY 13-14  unl  6725 pad  796 op  5004613 / 5412800 94% it 647/3383 ok
+   tx1 in 6 QRY 14-15  unl  6725 pad  796 op  5004515 / 5412800 94% it 647/3383 ok
+   tx1 in 7 QRY 15-16  unl  6725 pad  796 op  5004718 / 5412800 94% it 647/3383 ok
+   tx1 in 8 QRY 16-17  unl  6725 pad  796 op  5004834 / 5412800 94% it 647/3383 ok
+   tx1 in 9 QRY 17-18  unl  6724 pad  795 op  5004460 / 5412000 94% it 647/3382 ok
+   tx1 in10 QRY 18-19  unl  6723 pad  794 op  5003158 / 5411200 94% it 647/3382 ok
+   tx1 in11 QRY 19-20  unl  6725 pad  796 op  5004646 / 5412800 94% it 647/3383 ok
+   tx1 in12 QRY 20-21  unl  6725 pad  796 op  5004938 / 5412800 94% it 647/3383 ok
+   tx1 in13 QRY 21-22  unl  6725 pad  796 op  5004746 / 5412800 94% it 647/3383 ok
+mimc-P128-zkmin-0.json   tx 4 inputs 55 bytes 370922 (94667 + 94304 + 94298 + 87653) pad 48586 code 8411+9557 R 118 | op 223340200 bchn 221319996 | real std+cons+verify true | standard true
+   tx0 in 0 HEAD       unl  3038 pad  319 op  2267893 / 2463200 93.9% it 361/1539 ok
+   tx0 in 1 CODE       unl  8534 pad    0 op   202660 / 6860000 3.5% it 285/4287 ok
+   tx0 in 2 CODE       unl  9680 pad    0 op   203806 / 7776800 3.1% it 285/4860 ok
+   tx0 in 3 QRY 0-1    unl  6581 pad 1100 op  4897791 / 5297600 94% it 635/3311 ok
+   tx0 in 4 QRY 1-2    unl  6581 pad 1100 op  4897933 / 5297600 94% it 635/3311 ok
+   tx0 in 5 QRY 2-3    unl  6581 pad 1100 op  4897778 / 5297600 94% it 635/3311 ok
+   tx0 in 6 QRY 3-4    unl  6580 pad 1099 op  4897170 / 5296800 94% it 635/3310 ok
+   tx0 in 7 QRY 4-5    unl  6579 pad 1098 op  4896646 / 5296000 94% it 635/3310 ok
+   tx0 in 8 QRY 5-6    unl  6581 pad 1100 op  4897749 / 5297600 94% it 635/3311 ok
+   tx0 in 9 QRY 6-7    unl  6582 pad 1101 op  4898715 / 5298400 94% it 635/3311 ok
+   tx0 in10 QRY 7-8    unl  6580 pad 1099 op  4897390 / 5296800 94% it 635/3310 ok
+   tx0 in11 QRY 8-9    unl  6583 pad 1102 op  4899233 / 5299200 94% it 635/3312 ok
+   tx0 in12 QRY 9-10   unl  6580 pad 1099 op  4897355 / 5296800 94% it 635/3310 ok
+   tx0 in13 QRY 10-11  unl  6581 pad 1100 op  4898017 / 5297600 94% it 635/3311 ok
+   tx1 in 0 HEAD       unl  3041 pad  322 op  2270563 / 2465600 94% it 359/1541 ok
+   tx1 in 1 CODE       unl  8534 pad    0 op   202730 / 6860000 3.5% it 285/4287 ok
+   tx1 in 2 CODE       unl  9680 pad    0 op   203876 / 7776800 3.1% it 285/4860 ok
+   tx1 in 3 QRY 11-12  unl  6584 pad 1103 op  4900056 / 5300000 94% it 635/3312 ok
+   tx1 in 4 QRY 12-13  unl  6582 pad 1101 op  4898834 / 5298400 94% it 635/3311 ok
+   tx1 in 5 QRY 13-14  unl  6580 pad 1099 op  4897640 / 5296800 94% it 635/3310 ok
+   tx1 in 6 QRY 14-15  unl  6583 pad 1102 op  4899488 / 5299200 94% it 635/3312 ok
+   tx1 in 7 QRY 15-16  unl  6582 pad 1101 op  4898552 / 5298400 94% it 635/3311 ok
+   tx1 in 8 QRY 16-17  unl  6583 pad 1102 op  4899371 / 5299200 94% it 635/3312 ok
+   tx1 in 9 QRY 17-18  unl  6581 pad 1100 op  4898253 / 5297600 94% it 635/3311 ok
+   tx1 in10 QRY 18-19  unl  6583 pad 1102 op  4899283 / 5299200 94% it 635/3312 ok
+   tx1 in11 QRY 19-20  unl  6583 pad 1102 op  4899407 / 5299200 94% it 635/3312 ok
+   tx1 in12 QRY 20-21  unl  6581 pad 1100 op  4897931 / 5297600 94% it 635/3311 ok
+   tx1 in13 QRY 21-22  unl  6581 pad 1100 op  4898319 / 5297600 94% it 635/3311 ok
+   tx2 in 0 HEAD       unl  3041 pad  322 op  2270567 / 2465600 94% it 359/1541 ok
+   tx2 in 1 CODE       unl  8534 pad    0 op   202734 / 6860000 3.5% it 285/4287 ok
+   tx2 in 2 CODE       unl  9680 pad    0 op   203880 / 7776800 3.1% it 285/4860 ok
+   tx2 in 3 QRY 22-23  unl  6582 pad 1101 op  4898835 / 5298400 94% it 635/3311 ok
+   tx2 in 4 QRY 23-24  unl  6581 pad 1100 op  4898330 / 5297600 94% it 635/3311 ok
+   tx2 in 5 QRY 24-25  unl  6582 pad 1101 op  4898548 / 5298400 94% it 635/3311 ok
+   tx2 in 6 QRY 25-26  unl  6583 pad 1102 op  4899429 / 5299200 94% it 635/3312 ok
+   tx2 in 7 QRY 26-27  unl  6582 pad 1101 op  4898738 / 5298400 94% it 635/3311 ok
+   tx2 in 8 QRY 27-28  unl  6581 pad 1100 op  4898377 / 5297600 94% it 635/3311 ok
+   tx2 in 9 QRY 28-29  unl  6580 pad 1099 op  4897411 / 5296800 94% it 635/3310 ok
+   tx2 in10 QRY 29-30  unl  6582 pad 1101 op  4899015 / 5298400 94% it 635/3311 ok
+   tx2 in11 QRY 30-31  unl  6581 pad 1100 op  4898285 / 5297600 94% it 635/3311 ok
+   tx2 in12 QRY 31-32  unl  6581 pad 1100 op  4898328 / 5297600 94% it 635/3311 ok
+   tx2 in13 QRY 32-33  unl  6582 pad 1101 op  4898903 / 5298400 94% it 635/3311 ok
+   tx3 in 0 HEAD       unl  3039 pad  320 op  2268682 / 2464000 93.9% it 359/1540 ok
+   tx3 in 1 CODE       unl  8534 pad    0 op   201658 / 6860000 3.5% it 285/4287 ok
+   tx3 in 2 CODE       unl  9680 pad    0 op   202804 / 7776800 3.1% it 285/4860 ok
+   tx3 in 3 QRY 33-34  unl  6581 pad 1100 op  4898082 / 5297600 94% it 635/3311 ok
+   tx3 in 4 QRY 34-35  unl  6579 pad 1098 op  4896758 / 5296000 94% it 635/3310 ok
+   tx3 in 5 QRY 35-36  unl  6579 pad 1098 op  4896638 / 5296000 94% it 635/3310 ok
+   tx3 in 6 QRY 36-37  unl  6579 pad 1098 op  4896817 / 5296000 94% it 635/3310 ok
+   tx3 in 7 QRY 37-38  unl  6580 pad 1099 op  4897030 / 5296800 94% it 635/3310 ok
+   tx3 in 8 QRY 38-39  unl  6578 pad 1097 op  4895823 / 5295200 94% it 635/3309 ok
+   tx3 in 9 QRY 39-40  unl  6581 pad 1100 op  4897952 / 5297600 94% it 635/3311 ok
+   tx3 in10 QRY 40-41  unl  6581 pad 1100 op  4898058 / 5297600 94% it 635/3311 ok
+   tx3 in11 QRY 41-42  unl  6580 pad 1099 op  4897537 / 5296800 94% it 635/3310 ok
+   tx3 in12 QRY 42-43  unl  6579 pad 1098 op  4896338 / 5296000 94% it 635/3310 ok

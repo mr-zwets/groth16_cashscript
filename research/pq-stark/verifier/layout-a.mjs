@@ -10,13 +10,13 @@ export {loadVector} from './layout-b.mjs';
 const pushLen = (n) => n + (n < 76 ? 1 : n < 256 ? 2 : 3);
 const varint = (n) => (n < 253 ? 1 : n < 65536 ? 3 : 5);
 // queries per QRY input (byte-bound: unlocking <= 10,000 B) and transactions (<= 100,000 B)
-export function makePlan(vk, {redeemBytes = 400, codeBytes = [10_000], ptBytes = 0, pathBytes, per} = {}) {
+export function makePlan(vk, {redeemBytes = 400, codeBytes = [10_000], ptBytes = 0, pathBytes, per, padPerQry = 0} = {}) {
   const qItem = pushLen(vk.qBytes) + pushLen(pathBytes);
   per ??= Math.floor((10_000 - pushLen(redeemBytes) - 1) / qItem);
   if (per < 1) throw new Error('one query does not fit a 10,000 B input');
   const inBytes = (unl) => 41 + varint(unl) + unl;
   const headIn = inBytes(ptBytes + 1 + pushLen(redeemBytes)), codeIn = codeBytes.reduce((a, c) => a + inBytes(pushLen(c) + pushLen(redeemBytes)), 0);
-  const qryIn = (n) => inBytes(n * qItem + 1 + pushLen(redeemBytes));
+  const qryIn = (n) => inBytes(n * qItem + 3 + padPerQry + pushLen(redeemBytes));
   const fixed = 4 + 4 + 3 + 3 + 3 * 45 + headIn + codeIn;     // version, locktime, counts, outputs (token outputs ~ 45-90 B)
   // queries per transaction: as many whole QRY inputs as fit next to HEAD and CODE
   const perTxInputs = Math.floor((100_000 - fixed - 200) / qryIn(per));

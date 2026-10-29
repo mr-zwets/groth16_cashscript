@@ -10,16 +10,16 @@ import {loadVector, makePlan, programA, witnessesA, txsA, evaluateTx, verifyTx, 
 
 const MARGIN = 0.94;
 const pushLen = (n) => n + (n < 76 ? 1 : n < 256 ? 2 : 3);
-export function planAndProgram(vk, pis, opts = {}) {
+export function planAndProgram(vk, pis, opts = {}, padPerQry = 0) {
   let nc = 1, plan, pg;
   for (;;) {
     try {
       const pathBytes = vk.trees.reduce((t, tr) => t + tr.depth * vk.h, 0);
-      plan = makePlan(vk, {pathBytes, codeBytes: Array(nc).fill(10_000), redeemBytes: 120 * nc, ptBytes: 0});
+      plan = makePlan(vk, {pathBytes, codeBytes: Array(nc).fill(10_000), redeemBytes: 120 * nc, ptBytes: 0, padPerQry});
       for (let it = 0; it < 4; it++) {
         pg = programA(vk, pis, plan, {...opts, codeBlobs: nc});
         const ptBytes = pg.ptOrder.reduce((a, x) => a + pushLen({FIN: vk.L * vk.e8, ROOTS: 1 + vk.nRoots * vk.h, OOD: vk.oodVals * vk.e8, BPOW: 8, FROOTS: vk.logArities.length * vk.h, CPOW: 8 * vk.logArities.length, QPOW: 8}[x]), 0);
-        const next = makePlan(vk, {pathBytes, codeBytes: pg.code.map((c) => c.length), redeemBytes: pg.redeem.length, ptBytes});
+        const next = makePlan(vk, {pathBytes, codeBytes: pg.code.map((c) => c.length), redeemBytes: pg.redeem.length, ptBytes, padPerQry});
         if (JSON.stringify(next.txs) === JSON.stringify(plan.txs)) break;
         plan = next;
       }
@@ -28,8 +28,8 @@ export function planAndProgram(vk, pis, opts = {}) {
     } catch (e) { if (!/does not fit/.test(e.message) || nc >= 4) throw e; nc++; }
   }
 }
-export function gradeA(vk, proof, pis, opts = {}) {
-  const {plan, pg} = planAndProgram(vk, pis, opts);
+export function gradeA(vk, proof, pis, opts = {}, padPerQry = 0) {
+  const {plan, pg} = planAndProgram(vk, pis, opts, padPerQry);
   const enc = encodeA(vk, proof, pis);
   const defineBytes = pg.code.reduce((a, c) => a + c.length, 0) + [...pg.fns.values()].reduce((a, f) => a + f.body.length, 0);
   const pads = {};
@@ -44,6 +44,11 @@ export function gradeA(vk, proof, pis, opts = {}) {
       if (need > r.unlocking) { pads[`${t}:${i}`] = (pads[`${t}:${i}`] ?? 0) + need - r.unlocking; changed = true; }
     }));
     if (!changed) break;
+  }
+  // padded inputs can push a transaction over 100,000 B: re-plan with the pads counted
+  if (txs.some((t) => t.txBytes > 100_000) && padPerQry < 20_000) {
+    const mx = Math.max(0, ...Object.entries(pads).filter(([k]) => Number(k.split(':')[1]) > pg.nc).map(([, x]) => x));
+    if (mx > padPerQry) return gradeA(vk, proof, pis, opts, mx + 64);
   }
   const real = txs.map((tx) => ({std: evaluateTx(tx, 'bchStd'), cons: evaluateTx(tx, 'bchCons'), verifyStd: verifyTx(tx, 'bchStd'), verifyCons: verifyTx(tx, 'bchCons')}));
   const role = (t, i) => (i === 0 ? 'HEAD' : i <= pg.nc ? 'CODE' : 'QRY ' + plan.txs[t].qry[i - 1 - pg.nc].join('-'));
