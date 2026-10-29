@@ -222,7 +222,7 @@ fn cmd_check(args: &[String]) {
             for c in t {
                 cases.push((
                     c["name"].as_str().unwrap().to_string(),
-                    c["proof_hex"].as_str().unwrap().to_string(),
+                    c.get("proof_hex").unwrap_or(&v["proof_hex"]).as_str().unwrap().to_string(),
                     c.get("public_values").cloned().unwrap_or(v["public_values"].clone()),
                     false,
                 ));

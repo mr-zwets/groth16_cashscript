@@ -89,6 +89,7 @@ export function keccak256(msg) {
 // ------------------------------------------------------------------------- Fiat-Shamir (SerializingChallenger64 over HashChallenger<u8, SHA-256>)
 class Challenger {
   constructor(log) { this.inb = []; this.outb = []; this.log = log; }
+  clone() { const c = new Challenger(null); c.inb = [...this.inb]; c.outb = [...this.outb]; return c; }
   observe(bytes) { if (bytes.length === 0) return; this.outb = []; for (const b of bytes) this.inb.push(b); }
   observeU64(v) { this.observe(le64(v)); }
   observeExt(e) { for (const c of e) this.observeU64(c); }
@@ -281,6 +282,7 @@ function merkleVerify(root, logH, indices, leaves, sibs, what) {
 }
 
 // ------------------------------------------------------------------------- the verifier
+export { V, Challenger, le64 };
 export function verify(vk, pis, buf, opts = {}) {
   const F = extField(vk.D); const D = vk.D;
   for (const x of pis) if (x >= P) throw new V('non-canonical public value');
@@ -328,6 +330,7 @@ export function verify(vk, pis, buf, opts = {}) {
     betas.push(ch.ext(D));
   }
   for (const e of pr.finalPoly) ch.observeExt(e);
+  if (opts.atQueryPow) return opts.atQueryPow(ch, pr); // test hook: re-grinding a tampered proof
   if (!ch.pow(vk.qpow, pr.queryPow)) throw new V('query PoW');
   const idx = Array.from({ length: vk.Q }, () => ch.bits(vk.logH));
 
