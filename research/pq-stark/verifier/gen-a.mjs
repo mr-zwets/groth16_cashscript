@@ -26,6 +26,14 @@ export const threadCommit = (G, k) => Buffer.concat([Buffer.from([k]), sha(TTAG,
 
 // plan: {txs: [{qry: [[lo, hi], ...]}], thread?: {category}}
 export function buildA(vk, pis, plan, opts = {}) {
+  // the QRY roles must cover every query exactly once: the tx.qry ranges, in order, partition [0, Q) with lo < hi
+  { let next = 0;
+    for (const tx of plan.txs) for (const r of tx.qry) {
+      if (!Array.isArray(r) || r.length !== 2 || !Number.isInteger(r[0]) || !Number.isInteger(r[1]) || r[0] !== next || r[1] <= r[0])
+        throw new Error(`plan: query ranges must partition [0, ${vk.Q}) in order with lo < hi; got ${JSON.stringify(r)} at ${next}`);
+      next = r[1];
+    }
+    if (next !== vk.Q) throw new Error(`plan: query ranges cover [0, ${next}), expected [0, ${vk.Q})`); }
   const g = makeGen(vk, pis, opts);
   const {D, h, Q, F, fns, defFn, trunc} = g;
   g.merkleFns();

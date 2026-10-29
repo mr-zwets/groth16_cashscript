@@ -60,10 +60,13 @@ export function gradeA(vk, proof, pis, opts = {}, padPerQry = 0) {
     txVerify: real.map((r) => ({std: r.verifyStd, cons: r.verifyCons})),
     fitsStandard: txs.every((t) => t.txBytes <= 100_000) && txs.every((t) => t.unl.every((u) => u.length <= 10_000)),
     opStdTotal: res.flat().reduce((a, r) => a + r.opCost, 0), opConsTotal: real.flatMap((r) => r.cons).reduce((a, r) => a + r.opCost, 0),
-    opBchnTotal: real.flatMap((r) => r.cons).reduce((a, r) => a + r.opCost + defineBytes, 0),
+    // BCHN-adjusted = libauth op-cost + OP_DEFINE body bytes, on the standard basis (as the field phase and the padding gate);
+    // the consensus-basis figure is kept as opBchnConsTotal
+    opBchnTotal: res.flat().reduce((a, r) => a + r.opCost + defineBytes, 0),
+    opBchnConsTotal: real.flatMap((r) => r.cons).reduce((a, r) => a + r.opCost + defineBytes, 0),
     itersTotal: res.flat().reduce((a, r) => a + r.iters, 0),
     perInputDetail: res.map((rs, t) => rs.map((r, i) => ({tx: t, input: i, role: role(t, i),
-      unlocking: r.unlocking, pad: pads[`${t}:${i}`] ?? 0, opStd: r.opCost, opCons: real[t].cons[i].opCost, opBchn: real[t].cons[i].opCost + defineBytes,
+      unlocking: r.unlocking, pad: pads[`${t}:${i}`] ?? 0, opStd: r.opCost, opCons: real[t].cons[i].opCost, opBchn: r.opCost + defineBytes, opBchnCons: real[t].cons[i].opCost + defineBytes,
       budget: r.budget, pct: +(100 * (r.opCost + defineBytes) / r.budget).toFixed(1), iters: r.iters, iterLimitStd: Math.floor(0.5 * (41 + r.unlocking)),
       std: real[t].std[i].accepted, cons: real[t].cons[i].accepted, err: real[t].std[i].error ?? real[t].cons[i].error}))),
   };

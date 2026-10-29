@@ -33,7 +33,8 @@ for (const path of process.argv.slice(2)) {
   const r = {
     vector: path.split('/').pop(), air: v.air, set: v.set.name, zk: !!v.set.zk, ext: v.set.ext, queries: vk.Q, proofBytes: proof.length,
     redeemBytes: sp.redeem.length, witnessBytes: sp.items.reduce((a, x) => a + x.length, 0), unlockingBytes: L, txBytes: L + TXOVER(L),
-    opStd: ls.opCost, opCons: lc.opCost, opBchnAdjusted: lc.opCost + bchnExtra, opBchnAdjustedStd: ls.opCost + bchnExtra, defineBodyBytes: bchnExtra,
+    // BCHN-adjusted = libauth op-cost + OP_DEFINE body bytes, on the standard basis (as layout a and the field phase); consensus basis in opBchnAdjustedCons
+    opStd: ls.opCost, opCons: lc.opCost, opBchnAdjusted: ls.opCost + bchnExtra, opBchnAdjustedStd: ls.opCost + bchnExtra, opBchnAdjustedCons: lc.opCost + bchnExtra, defineBodyBytes: bchnExtra,
     hashIterations: ls.iters, instructions: ls.instr,
     accepted: {loose: ls.accepted && lc.accepted, txv5Std: ts.accepted, txv5Cons: tc.accepted, specStd: ss.accepted, specCons: sc.accepted},
     errors: {loose: ls.error, txv5Std: ts.error, specStd: ss.error},

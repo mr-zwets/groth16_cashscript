@@ -20,3 +20,13 @@
 ## Open
 - Folds are ~57% of the per-query op-cost at arity 16; Merkle ~25-40% of the total. Not optimized further.
 - ZK mimc code needs 2-3 code blobs in layout (a).
+
+## Fix round (review findings), 2026-10-29
+- Security labels: every vector is a Plonky3 (powers-batching) proof, so no figure is "proven"; labels now say
+  "JB, powers-batching adaptation, unpublished" (security.py in zk-verifier-bench, results/security.json, tables.md, README).
+- BCHN-adjusted op-cost is now on the standard basis in grade-a and grade-b (as the field phase); consensus basis kept
+  as opBchnAdjustedCons / opBchnConsTotal / opBchnCons. grade-a (72 s) and grade-b (22 s) re-run on all 45 vectors:
+  all accepted, every other field identical.
+- buildA asserts the plan's query ranges partition [0, Q) with lo < hi (checked: overlap, gap, empty, short all throw).
+- Range checks: kept as an accepted deviation (language-level malleability, no soundness impact); README says so.
+- Ran everything single-threaded under nice 19; no Rust prover.
