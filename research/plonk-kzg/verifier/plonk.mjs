@@ -12,6 +12,7 @@ import {createHash} from 'node:crypto';
 import {readFileSync} from 'node:fs';
 import {bn254} from '@noble/curves/bn254.js';
 import {p, r, mod, inv, powm, G1, G2, F2, GLV, OFFSET, aff} from './math.mjs';
+import {FIXED_NAMES, gtConsts, nibbles} from './gt.mjs';
 
 export const PROVER_DIR = process.env.PROVER_DIR ?? new URL('../../../../prover/research/plonk-kzg/prover/', import.meta.url).pathname;
 export const loadVectors = (name) => JSON.parse(readFileSync(new URL(`./vectors/${name}.json`, import.meta.url)));
@@ -25,10 +26,10 @@ const rej = (why) => { throw new Reject(why); };
 
 // ---------------- VK (944 B, FORMAT.md of the prover track) ----------------
 export const VK_NAMES = ['S1', 'S2', 'S3', 'Ql', 'Qr', 'Qm', 'Qo', 'Qk'];
-export function parseVK(hex) {
+export function parseVK(hex, {fold = process.env.FOLD !== '0'} = {}) {
   const b = Buffer.from(hex, 'hex'); assert.equal(b.length, 944);
   const n = b.readBigUInt64BE(0), nbPublic = Number(b.readBigUInt64BE(8));
-  const vk = {n, log2n: n.toString(2).length - 1, nbPublic, omega: be(b.subarray(16, 48)), nInv: be(b.subarray(48, 80)), k: be(b.subarray(80, 112)), raw: {}, pt: {}};
+  const vk = {fold, n, log2n: n.toString(2).length - 1, nbPublic, omega: be(b.subarray(16, 48)), nInv: be(b.subarray(48, 80)), k: be(b.subarray(80, 112)), raw: {}, pt: {}};
   assert.equal(1n << BigInt(vk.log2n), n);
   VK_NAMES.forEach((nm, i) => { const s = b.subarray(112 + 64 * i, 176 + 64 * i); vk.raw[nm] = s; const x = be(s.subarray(0, 32)), y = be(s.subarray(32)); vk.pt[nm] = x === 0n && y === 0n ? null : G1.fromAffine({x, y}); });
   const g1 = G1.fromAffine({x: be(b.subarray(624, 656)), y: be(b.subarray(656, 688))}); assert.ok(g1.equals(G1.BASE));
@@ -43,7 +44,9 @@ export function parseVK(hex) {
 // ---------------- MSM schedule ----------------
 export const W = 5, TBL = 16, NW = 51, NWR = 14; // window bits, table entries (1..16), windows (main / P_right)
 // base list (index b). Qk (or any VK point) equal to infinity is dropped (circuit-specific constant).
-export const baseNames = (vk) => [...['Ql', 'Qr', 'Qm', 'Qo', 'Qk', 'S3', 'S1', 'S2'].filter((nm) => vk.pt[nm]), 'G', 'L', 'R', 'O', 'Z', 'H0', 'H1', 'H2', 'Wz', 'Lam', 'Wzw', 'phiWzw'];
+// fold (default, Track 7): the fixed bases are applied in GT (gt.mjs) and the G1 MSM runs over the variable bases only
+export const fixedNames = (vk) => FIXED_NAMES.filter((nm) => nm === 'G' || vk.pt[nm]);
+export const baseNames = (vk) => [...(vk.fold ? [] : fixedNames(vk)), 'L', 'R', 'O', 'Z', 'H0', 'H1', 'H2', 'Wz', 'Lam', 'Wzw', 'phiWzw'];
 export const PROOF_PTS = {L: 0, R: 64, O: 128, H0: 192, H1: 256, H2: 320, Z: 544, Wz: 640, Wzw: 704};
 export const recode = (s, nw) => { assert.ok(s >= 0n); const d = []; for (let i = 0; i < nw; i++) { let x = Number(s & 31n); if (x >= 16) x -= 32; d.push(x); s = (s - BigInt(x)) >> 5n; } assert.equal(s, 0n, 'recoding overflow'); return d; };
 export const corr = (nw) => OFFSET.multiply(mod(-(1n << BigInt(W * nw)), r)); // added after the loop (every window starts with W doublings)
@@ -105,11 +108,15 @@ export function verifyPlonk(vk, proofHex, pubHex, opts = {}) {
   const names = baseNames(vk);
   const ptOf = (nm) => (nm === 'G' ? G1.BASE : nm === 'Lam' ? LamW : nm === 'phiWzw' ? G1.fromAffine({x: mod(GLV.beta * aff(P.Wzw)[0]), y: aff(P.Wzw)[1]}) : P[nm] ?? vk.pt[nm]);
   const bases = names.map(ptOf);
-  const Pstar = names.slice(0, -1).reduce((a, nm, i) => a.add(bases[i].multiply(S[nm])), G1.ZERO);
+  const Pstar = names.slice(0, -1).reduce((a, nm, i) => a.add(bases[i].multiply(S[nm])), G1.ZERO); // P*_var when folded
   const Pright = P.Wz.add(P.Wzw.multiply(u)).negate();
   if (Pstar.is0() || Pright.is0()) rej('pairing input at infinity');
-  const ok = bn254.fields.Fp12.eql(bn254.pairingBatch([{g1: Pstar, g2: vk.g2}, {g1: Pright, g2: vk.g2x}]), bn254.fields.Fp12.ONE);
-  return {ok, Pstar, Pright, names, bases, S, u1, u2, tp, u, uRaw, vRaw, lamAff, invProd, pub, gamma, beta, alpha, zeta, v, r0, e, lamTrue: Lam};
+  let PstarFull = Pstar, gt = null;
+  if (vk.fold) { const fixed = fixedNames(vk), fs = fixed.map((nm) => mod(S[nm], r));
+    PstarFull = fixed.reduce((a, nm, i) => (fs[i] ? a.add((nm === 'G' ? G1.BASE : vk.pt[nm]).multiply(fs[i])) : a), Pstar);
+    gt = {G: gtConsts(vk, fixed), fixed, fs, ...nibbles(fs)}; }
+  const ok = !PstarFull.is0() && bn254.fields.Fp12.eql(bn254.pairingBatch([{g1: PstarFull, g2: vk.g2}, {g1: Pright, g2: vk.g2x}]), bn254.fields.Fp12.ONE);
+  return {ok, Pstar, PstarFull, Pright, names, bases, S, u1, u2, tp, u, uRaw, vRaw, lamAff, invProd, pub, gamma, beta, alpha, zeta, v, r0, e, lamTrue: Lam, gt};
 }
 
 // Jacobian formulas exactly as the script's kernels (EFD dbl-2009-l, madd-2007-bl); H = 0 (exceptional) is fatal here

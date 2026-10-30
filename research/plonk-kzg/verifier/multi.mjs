@@ -65,6 +65,13 @@ export function makePlan(vk, {mj = [[50, 46], [45, 45], [44, 40]], ma = [[39, 30
 }
 const offsetOf = (ro, name) => { let o = 0; for (const [n, L] of ro.fixed) { const h = hdr(L).length; if (n === name) return {off: o + h, len: L, h, hdr: hdr(L)}; o += h + L; } throw new Error('no push ' + name); };
 
+// splitTree: the top item (exactly 32 n bytes) -> n numbers (first word deepest), by a balanced SPLIT tree.
+export function splitTree(s, name, n, pre, idx = {i: 0}, unit = 32, leaf = (t, nm) => t.op(OP.BIN2NUM, 1, nm)) {
+  if (n === 1) { leaf(s, pre + idx.i++); return; }
+  const k = n >> 1; s.push(unit * k).op(OP.SPLIT, 2, name + 'L', name + 'R').op(OP.SWAP, 2, name + 'R', name + 'L');
+  splitTree(s, name + 'L', k, pre, idx, unit, leaf);
+  s.roll(name + 'R'); splitTree(s, name + 'R', n - k, pre, idx, unit, leaf);
+}
 // ---------------- program generation ----------------
 export function buildMulti(vk, plan) {
   const {names, nbm, fixed, vari, k, roles, N} = plan;
@@ -112,7 +119,10 @@ export function buildMulti(vk, plan) {
     s.roll('pc').op(OP.SIZE, 1, 'pc', 'sz').op(OP.NIP, 2, 'sz').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1);
     s.drop('px').drop('py').drop('bx').drop('by'); });
   // LD15: a 960-byte table piece -> the 30 numbers x_2, y_2, .., x_16, y_16 (LE words, range checked by the host)
-  root.defLocal('LD15', 1, 30, (s) => { for (let i = 0; i < 30; i++) s.invoke('DLN', ['v' + i, 'in0']); s.roll('in0').op(OP.SIZE, 1, 'in0', 'sz').op(OP.NIP, 2, 'sz').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1); });
+  // binary split tree: about half the op-cost of 30 sequential front splits. The words are BIN2NUM'd without the 0x00
+  // sign byte: every word is < p < 2^255 (TV: range-checked by its host with the unsigned decoding; TF: VK constants),
+  // so the high bit is clear and BIN2NUM(w) is the unsigned value. The piece must be exactly 960 bytes.
+  root.defLocal('LD15', 1, 30, (s) => { s.op(OP.SIZE, 1, 'in0', 'sz').push(960).op(OP.NUMEQUALVERIFY, 2); splitTree(s, 'in0', 30, 'v'); });
 
   const rread = (a, ix, push, name) => { const ro = roles[ix]; const {off, len, h, hdr: hd} = offsetOf(ro, push);
     a.push(ix).op(OP.INPUTBYTECODE, 1, 'ib').push(off - h).op(OP.SPLIT, 2, 'x', 'ib').drop('x').push(h).op(OP.SPLIT, 2, 'hh', 'ib').roll('hh').pushBytes(hd).op(OP.EQUALVERIFY, 2)
@@ -133,7 +143,7 @@ export function buildMulti(vk, plan) {
     // pieces, in reverse base order so that base 0's piece is on top: the PICK/ROLL depths stay small
     const order = Array.from({length: nbm}, (_, b) => b);
     const cnt = {TVb: 0, TFb: 0}; const pieceOf = order.map((b) => { const bl = FIXED.includes(names[b]) ? 'TFb' : 'TVb'; return [bl, cnt[bl]++]; });
-    for (const bl of ['TVb', 'TFb']) { for (let i = 0; i < cnt[bl]; i++) { s.roll(bl).push(960).op(OP.SPLIT, 2, `${bl}_${i}`, bl); } s.roll(bl).op(OP.SIZE, 1, bl, 'sz').op(OP.NIP, 2, 'sz').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1); }
+    for (const bl of ['TVb', 'TFb']) { s.roll(bl).op(OP.SIZE, 1, bl, 'sz').push(960 * cnt[bl]).op(OP.NUMEQUALVERIFY, 2); splitTree(s, bl, cnt[bl], `${bl}_`, {i: 0}, 960, (t, nm) => t.rename(nm)); }
     for (let b = nbm - 1; b >= 0; b--) { const [bl, i] = pieceOf[b]; s.roll(`${bl}_${i}`).rename(`${bl}_${i}`, 'pc' + b); }
     for (let b = 0; b < nbm; b++) { const nm = names[b];
       if (nm === 'G') s.push(1, 'x1').push(2, 'y1');
@@ -300,7 +310,8 @@ export function buildMulti(vk, plan) {
   const o0 = offsetOf(roles[0], 'CODE'), o1 = offsetOf(roles[plan.iC1], 'C1');
   const load = (ix, o, blob, id) => [...pushNum(ix), OP.INPUTBYTECODE, ...pushNum(o.off), OP.SPLIT, OP.NIP, ...pushNum(o.len), OP.SPLIT, OP.DROP, OP.DUP, OP.SHA256, ...pushData(sha(blob)), OP.EQUALVERIFY, ...pushNum(id), OP.DEFINE, ...pushNum(id), OP.INVOKE];
   const redeem = Buffer.from([...load(plan.iC1, o1, c1, 0), ...load(0, o0, code, 1)]);
-  return {code, c1, redeem, bodies: bodies.map((b) => b.length), funcs: Object.fromEntries([...ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [n, f.code.length]))};
+  return {code, c1, redeem, bodies: bodies.map((b) => b.length), funcs: Object.fromEntries([...ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [n, f.code.length])),
+    ids: Object.fromEntries([...ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [f.id, n])), roleBase};
 }
 
 // ---------------- ST: statement, transcript, Fr, scalars s', P_right; publishes G0 ----------------

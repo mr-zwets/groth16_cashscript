@@ -6,7 +6,7 @@ import {SL_PIECE} from './script.mjs';
 export function witnessFor(vk, proofHex, pubHex, {J = 0, JR = 0, lam} = {}) {
   const V = verifyPlonk(vk, proofHex, pubHex, lam ? {lam} : {});
   const w = msmWitness(vk, V, {J, JR});
-  const S = proveSI(chains(vk), w.Pleft, w.Pright, V.uRaw);
+  const S = proveSI(chains(vk), w.Pleft, w.Pright, V.uRaw, V.gt);
   const sl = w.slopes.map(le32); const pieces = [];
   for (let i = 0; i < sl.length; i += SL_PIECE) pieces.push(Buffer.concat(sl.slice(i, i + SL_PIECE)));
   const X = Buffer.concat([be32(V.lamAff[0]), be32(V.lamAff[1]), le32(V.invProd), ...w.inverses.map(le32)]);

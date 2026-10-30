@@ -13,7 +13,9 @@ import {Asm, Kernel, OP, pushNum, pushData} from './asm.mjs';
 import {p, r, mod, ETA, GAMMA1, DIGITS, NE, GLV, OFFSET, aff} from './math.mjs';
 import {W, TBL, NW, NWR, baseNames, corr, le32, PROOF_PTS} from './plonk.mjs';
 export const digitOffset = (nw) => { let c = 0n; for (let i = 0; i < nw; i++) c += 16n << BigInt(5 * i); return c; };
-import {TAG, WS_SIZE, NQ_MAX, NSTATES, chains} from './si.mjs';
+import {TAG, wsSize, nqMax, NSTATES, chains} from './si.mjs';
+import {fixedNames} from './plonk.mjs';
+import {gtConsts, PI_SUM_OFFSET, TB as GT_TB} from './gt.mjs';
 
 const ITERS = Number(process.env.SCHED_ITERS ?? 2500);
 export const SL_PIECE = 8; // slopes per stream piece (256 B)
@@ -72,7 +74,7 @@ export const xSize = ({J = 0, JR = 0} = {}) => 96 + (JR > 0 ? 32 : 0) + (J > 0 ?
 
 function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
   const names = baseNames(vk), NB = names.length, nbm = NB - 1, k = vk.nbPublic;
-  const CH = chains(vk);
+  const CH = chains(vk); const FX = vk.fold ? fixedNames(vk) : []; const GT = vk.fold ? gtConsts(vk, FX) : null;
   const a = new Asm(['SLb', 'WQ', 'WS', 'X', 'PI', 'PROOF', ...(pad ? ['PAD'] : [])]);
   const info = {sections: {}}; let mark = 0; const section = (name) => { info.sections[name] = (info.sections[name] ?? 0) + a.code.length - mark; mark = a.code.length; a.mark('end:' + name); };
   const STOP = (label) => { if (stop === label) throw {stopAt: label, asm: a}; };
@@ -190,8 +192,8 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
     const S = {Ql: mul(nt, E('l')), Qr: mul(nt, E('rr')), Qm: mul(nt, M(mul(E('l'), E('rr')))), Qo: mul(nt, E('o')), Qk: nt, S3: mul(nt, E('s1c')), Z: add(mul(nt, E('s2c')), u),
       H0: mul(tp, zh), H1: mul(tp, zz), H2: mul(tp, M(mul(zz, zn2))), Lam: add(c(1n), tp), L: v, R: vs[2], O: vs[3], S1: vs[4], S2: vs[5],
       G: sub(c(0n), add(e, M(mul(u, E('zu'))))), Wz: E('zeta'), Wzw: mul(M(mul(u, E('zeta'))), c(vk.omega))};
-    kk.output(...names.slice(0, nbm).map((nm) => kk.add(canon(S[nm]), E('Cdig'))));
-    a.kernel(kk, names.slice(0, nbm).map((nm) => 'sc_' + nm), {iters: 3000}); }
+    kk.output(...names.slice(0, nbm).map((nm) => kk.add(canon(S[nm]), E('Cdig'))), ...FX.map((nm) => canon(S[nm])));
+    a.kernel(kk, [...names.slice(0, nbm).map((nm) => 'sc_' + nm), ...FX.map((nm) => 'fs_' + nm)], {iters: 3000}); }
   section('fr2');
   STOP('fr2');
 
@@ -271,7 +273,7 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
   STOP('msm');
 
   // ---- 10. SI pairing check: Miller(P*, [1]_2) Miller(P_right, [x]_2) = [c]^lambda ----
-  si(a, {CH, section, STOP, L0guess, info});
+  si(a, {CH, section, STOP, L0guess, info, GT, FX});
   const code = Uint8Array.from([...a.prologue(), ...a.code]);
   info.marks = a.marks.map((m) => ({name: m.name, off: m.off + a.prologue().length}));
   info.prologue = a.prologue().length; info.funcs = Object.fromEntries([...a.ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [n, f.code.length]));
@@ -280,7 +282,8 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
 }
 
 // The SI part (fork of the SI-GLS program sections 1-8 without the B walk and the GT-GLS fold).
-function si(a, {CH, section, STOP, L0guess, info}) {
+function si(a, {CH, section, STOP, L0guess, info, GT, FX}) {
+  const m = FX.length, WS_SIZE = wsSize(m), NQ_MAX = nqMax(m);
   const le = (x) => le32(mod(x));
   // chain slope pile (both chains interleaved: 4 LE words per step), first piece on top
   const steps = []; for (let j = 0; j < 88; j++) steps.push(Buffer.concat([CH.a.lams[j], CH.b.lams[j]].flatMap((l) => [le(l.c0), le(l.c1)])));
@@ -301,6 +304,7 @@ function si(a, {CH, section, STOP, L0guess, info}) {
   a.roll('rhoRaw'); U('rhoRaw'); a.pick('p').op(OP.MOD, 2, 'rho');
   a.roll('WQ').toAlt();
   a.roll('WS'); for (let j = 0; j < 6; j++) a.invoke('DLP', ['sc' + j, 'WS']);
+  if (m) a.push(65 * m).op(OP.SPLIT, 2, 'NB', 'WS'); // the GT nibbles (event-major), hashed in h0 with the rest of WS
   { const cuts = []; for (let kk = 0; kk < NSTATES; kk += WS_PIECE) cuts.push(kk * 192);
     for (let i = cuts.length - 1; i >= 1; i--) { a.push(cuts[i]).op(OP.SPLIT, 2, 'WS', 'tail').toAlt(); a.alt.pop(); }
     a.toAlt(); a.alt.pop(); a.pushAltPile('WSp', cuts.length); }
@@ -323,6 +327,7 @@ function si(a, {CH, section, STOP, L0guess, info}) {
     const cza = m(mul(k.in('PLx'), z)), czb = m(mul(k.in('PRx'), z));
     k.output(k.in('PLy'), cza, m(mul(cza, t)), k.in('PRy'), czb, m(mul(czb, t)));
     a.kernel(k, ['ya', 'cza', 'czta', 'yb', 'czb', 'cztb'], {iters: 300}); }
+  if (m) gtTables(a, GT, m, ZP, EZP);
   a.push(CH.a.aff.x.c0, 'xqa0').push(CH.a.aff.x.c1, 'xqa1').push(CH.b.aff.x.c0, 'xqb0').push(CH.b.aff.x.c1, 'xqb1');
   a.push(0, 'D');
   for (const [t, C] of [['a', CH.a], ['b', CH.b]]) a.push(C.aff.x.c0, 'dx0' + t).push(C.aff.x.c1, 'dx1' + t).push(C.aff.y.c0, 'dc0' + t).push(C.aff.y.c1, 'dc1' + t).push(0, 'dl0' + t).push(0, 'dl1' + t);
@@ -336,6 +341,7 @@ function si(a, {CH, section, STOP, L0guess, info}) {
   };
   a.defBound('EVD', (s) => { readStep(s); s.kernel(kEvent(true), EV_OUTS, {iters: ITERS}); });
   a.defBound('EVA', (s) => { readStep(s); s.kernel(kEvent(false), EV_OUTS, {iters: ITERS}); });
+  if (m) a.defBound('GTS', (s) => gtStep(s, m));
   const HOT = ['xqa0', 'xqa1', 'xqb0', 'xqb1', 'Scp', 'Scm', 'ya', 'cza', 'czta', 'yb', 'czb', 'cztb', 'z3', 'z3t', 'p'];
   const STATE = ['D', ...EV_OUTS];
   const moved = new Set([...HOT, ...STATE]);
@@ -352,6 +358,7 @@ function si(a, {CH, section, STOP, L0guess, info}) {
       t.peekAlt('dt').push(0).op(OP.LESSTHAN, 2, 'neg').ifElse((u) => { u.pick('Scp', 'cp').pick('Scm', 'cm'); }, (u) => { u.pick('Scm', 'cp').pick('Scp', 'cm'); });
       t.pick('xqa0', 's0a').pick('xqa1', 's1a').pick('xqb0', 's0b').pick('xqb1', 's1b').invoke('EVA');
     });
+    if (m) { s.mark('gt'); s.invoke('GTS'); }
     s.mark('digit'); s.fromAlt('d').fromAlt('SCH').drop('d').roll('SCH').push(1).op(OP.SPLIT, 2, 'db', 'SCH').roll('db').op(OP.BIN2NUM, 1, 'd');
     s.mark('bnd');
     s.pick('SCH', 'SCHc').op(OP.SIZE, 1, 'SCHc', 'm').op(OP.NIP, 2, 'm').pick('m').push(2).op(OP.MOD, 2, 'odd').roll('m').op(OP.NOT, 1, 'last').op(OP.BOOLOR, 2, 'bnd');
@@ -370,12 +377,17 @@ function si(a, {CH, section, STOP, L0guess, info}) {
   section('si-loop');
   STOP('postloop');
   // ---- terminal: the two Frobenius steps of each chain (s = x(psi(Q)), then any s), times 1 ----
+  if (m) a.arrange(['D', ...EV_OUTS]); // the in-loop EVA call site sees D and the state above NB and the accumulators
   a.push(1, 'cp').push(1, 'cm').push(CH.a.psi1x.c0, 's0a').push(CH.a.psi1x.c1, 's1a').push(CH.b.psi1x.c0, 's0b').push(CH.b.psi1x.c1, 's1b').invoke('EVA');
   a.push(1, 'cp').push(1, 'cm').pick('dx0a', 's0a').pick('dx1a', 's1a').pick('dx0b', 's0b').pick('dx1b', 's1b').invoke('EVA');
   a.roll('D').op(OP.SIZE, 1, 'D', 'dl').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1).drop('D'); a.pileDone('Dp');
   // F *= S_c(+-eta z) = [c^(p^2)]
   for (let j = 0; j < 6; j++) a.pick('sc' + j); for (const n of EZP) a.pick(n); a.invoke('EV', ['ep', 'em']);
-  { const k = new Kernel(); k.output(k.mod(k.mul(k.in('Fp'), k.in('ep'))), k.mod(k.mul(k.in('Fm'), k.in('em')))); a.kernel(k, ['Fp', 'Fm'], {iters: 100}); }
+  if (m) { // the GT offset correction Rconst(+-z), and the binding (acc_i - 2^64 sum pi - s_i) mod r == 0
+    for (let j = 0; j < 6; j++) a.push(GT.Rconst[j], 'rc' + j); for (const n of ZP) a.pick(n); a.invoke('EV', ['rcp', 'rcm']);
+    { const k = new Kernel(); k.output(k.mod(k.mul(k.mod(k.mul(k.in('Fp'), k.in('ep'))), k.in('rcp'))), k.mod(k.mul(k.mod(k.mul(k.in('Fm'), k.in('em'))), k.in('rcm')))); a.kernel(k, ['Fp', 'Fm'], {iters: 200}); }
+    gtBind(a, FX); a.roll('NB').op(OP.SIZE, 1, 'NB', 'nbs').op(OP.NIP, 2, 'nbs').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1); }
+  else { const k = new Kernel(); k.output(k.mod(k.mul(k.in('Fp'), k.in('ep'))), k.mod(k.mul(k.in('Fm'), k.in('em')))); a.kernel(k, ['Fp', 'Fm'], {iters: 100}); }
   a.fromAlt('d').fromAlt('SCH').drop('d').drop('SCH');
   a.fromAlt('R').fromAlt('WSr').drop('WSr'); a.pileDone('WSp'); a.fromAlt('WQ');
   // W(+-z) = Frob(S_c)(+-z) Frob(S_c)(+-eta z);  R <- R rho + F+ W(-z) - F- W(+z)
@@ -408,4 +420,48 @@ function si(a, {CH, section, STOP, L0guess, info}) {
   a.op(OP.TOALT, 1); a.emit(OP.BEGIN, OP.DROP, OP.DEPTH, OP.NOT, OP.UNTIL, OP.FROMALT); a.st = ['result'];
   section('cleanup');
   info.L0 = L0;
+}
+
+// ---------------- GT fold (gt.mjs): tables, per-event step, binding; shared with multi.mjs ----------------
+// GT table items G_0 (top) .. G_{32m+15}: TP_0[0..15], TM_0[0..15], .., TP_{m-1}[..], TM_{m-1}[..], TB[0..15], where
+// TP_i[n] = prod_{j in n} R_{i,j}(z), TM_i[n] = the same at -z, TB[n] = sum_{j in n} pi_j (R_{i,2/3}(X) = R_{i,0/1}(eta X)).
+export function gtTables(a, GT, m, ZP, EZP) {
+  const n0 = a.st.length;
+  if (!a.ctx.funcs.has('GTB')) a.defLocal('GTB', 23, 32, (s) => { // [c0..c5, d0..d5 (R_{i,0}, R_{i,1}), z..z6, ez..ez5] -> TM15..TM0, TP15..TP0
+    const k = new Kernel(); const I = (x) => k.in('in' + x), mm = (x, y) => k.mod(k.mul(x, y));
+    const zp = [1, 2, 3, 4, 5, 6].map((e) => I(11 + e)), ep = [1, 2, 3, 4, 5].map((e) => I(17 + e)).concat([zp[5]]);
+    const ev = (c, x) => { const e0 = k.sum(I(c), k.mul(I(c + 2), x[1]), k.mul(I(c + 4), x[3]), x[5]), o0 = k.sum(k.mul(I(c + 1), x[0]), k.mul(I(c + 3), x[2]), k.mul(I(c + 5), x[4]));
+      const e1 = k.mod(e0), o1 = k.mod(o0); return [k.add(e1, o1), k.sub(e1, o1)]; }; // (R(x), R(-x)), not reduced
+    const R = [ev(0, zp), ev(6, zp), ev(0, ep), ev(6, ep)]; // R_{i,j}(+-z), j = 0..3
+    const tab = (sg) => { const T = [k.c(1n)]; for (let n = 1; n < 16; n++) { const hb = 31 - Math.clz32(n); T.push(n === 1 << hb ? k.mod(R[hb][sg]) : mm(T[n - (1 << hb)], T[1 << hb])); } return T; };
+    const TP = tab(0), TM = tab(1);
+    k.output(...TM.slice().reverse(), ...TP.slice().reverse()); s.kernel(k, Array.from({length: 32}, (_, x) => 'o' + x), {iters: 600}); });
+  for (let n = 15; n >= 0; n--) a.push(GT_TB[n], 'tb' + n);
+  for (let i = m - 1; i >= 0; i--) {
+    for (const j of [0, 1]) for (let c = 0; c < 6; c++) a.push(GT.R[i][j][c], 'rk');
+    for (const nm of [...ZP, ...EZP.slice(0, 5)]) a.pick(nm);
+    a.invoke('GTB');
+  }
+  const NG = 32 * m + 16; a.st.splice(n0); for (let x = NG - 1; x >= 0; x--) a.st.push('G_' + x); // G_0 on top (named items, not a pile: kernels reach past them)
+  for (let i = 0; i < m; i++) a.push(0, 'acc' + i);
+}
+// one event: for each folded base i, n = N_i[e] (the next byte of NB): F+ *= TP_i[n], F- *= TM_i[n], acc_i = 2 acc_i + TB[n]
+export function gtStep(s, m) {
+  s.roll('NB').push(m).op(OP.SPLIT, 2, 'ev', 'NB').op(OP.SWAP, 2, 'NB', 'ev');
+  for (let i = 0; i < m; i++) {
+    if (i) s.roll('ev');
+    s.push(1).op(OP.SPLIT, 2, 'b', 'ev').op(OP.SWAP, 2, 'ev', 'b').op(OP.BIN2NUM, 1, 'n');
+    let d = s.depth('G_0'); s.emit(OP.DUP, ...pushNum(d + 32 * i), OP.ADD, OP.PICK); s.st.push('tp');
+    d = s.depth('G_0'); s.emit(OP.OVER, ...pushNum(d + 32 * i + 16), OP.ADD, OP.PICK); s.st.push('tm');
+    s.emit(OP.ROT); s.st.splice(s.st.length - 3, 1); d = s.depth('G_0'); s.emit(...pushNum(d + 32 * m), OP.ADD, OP.PICK); s.st.push('tb');
+    s.roll('acc' + i).emit(OP.DUP, OP.ADD, OP.ADD); s.st.splice(s.st.length - 2, 2, 'acc' + i);
+    const k = new Kernel(); k.output(k.mod(k.mul(k.in('Fp'), k.in('tp'))), k.mod(k.mul(k.in('Fm'), k.in('tm')))); s.kernel(k, ['Fp', 'Fm'], {iters: 60});
+  }
+  s.drop('ev');
+}
+// binding: (acc_i - 2^64 sum_j pi_j - s_i) mod r == 0 for every folded base (s_i = 'fs_<name>', canonical < r)
+export function gtBind(a, FX, fsName = (nm) => 'fs_' + nm) {
+  a.invoke('R', ['r']);
+  FX.forEach((nm, i) => { a.roll(fsName(nm)); const k = new Kernel(); k.output(k.modr(k.sub(k.sub(k.in('acc' + i), k.c(PI_SUM_OFFSET)), k.in(fsName(nm))))); a.kernel(k, ['bnd'], {iters: 50}); a.op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1); });
+  a.drop('r');
 }
