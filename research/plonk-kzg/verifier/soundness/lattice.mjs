@@ -10,7 +10,8 @@ import assert from 'node:assert/strict';
 import {p, r, mod, GLV, G1} from '../math.mjs';
 import {NW, NWR} from '../plonk.mjs';
 import {digitOffset} from '../script.mjs';
-import {NQ_MAX, NSTATES, K_IDS, chunkDegP, TERM_DEG_P} from '../si.mjs';
+import {NQ_MAX, NSTATES, K_IDS, chunkDegP, TERM_DEG_P, nqMax} from '../si.mjs';
+import {PI as GT_PI, GLS_OFFSET, glsDecompose} from '../gt.mjs';
 
 const bits = (x) => (x < 0n ? -x : x).toString(2).length;
 const log2 = (x) => { const b = bits(x); return b <= 60 ? Math.log2(Number(x)) : b - 60 + Math.log2(Number(x >> BigInt(b - 60))); };
@@ -77,8 +78,16 @@ const log2Bad = Math.log2((perResidue / 2) + 2 * perResidue) - 256; // pairwise 
 out.si = {NQ_MAX, K_IDS, maxDegD: degD, degQM, degSI, biasP, log2_perQuery: log2eSI};
 out.bias = {ceil_2_256_over_r: perResidue, biasR, ceil_2_256_over_p: Number(ceilDiv(T, p)), biasP};
 out.bad = {log2_perQsquared: log2Bad};
+// 6. Track 7 GT fold (Lemma 4): degrees with m folded bases (up to 4 monic degree-6 factors per base and event), the SI
+//    term with them, and the GT decomposition range: Babai gives |e| < 2^64, so u = e + 2^64 has 65 bits (65 events)
+out.gtFold = {};
+for (const m of [8, 9]) { const dD = Math.max(...Array.from({length: NSTATES}, (_, k) => chunkDegP(k, m) + 6)); const nq = nqMax(m); const deg = Math.max(dD, 2 * nq - 1 + 12);
+  out.gtFold['m' + m] = {NQ: nq, maxDegD: dD, degSI: deg, log2_perQuery: Math.log2(biasP * ((K_IDS - 1) + deg)) - log2(p)}; }
+for (const n of [0n, 1n, r - 1n, (r - 1n) / 2n, 0x1234567890abcdefn * (r / 0x1000000000000000n)]) glsDecompose(n).forEach((e) => assert.ok(e > -GLS_OFFSET && e < GLS_OFFSET));
+assert.equal(mod(GT_PI[1] ** 4n - GT_PI[1] ** 2n + 1n, r), 0n, 'p is a primitive 12th root of unity mod r (Phi_12(p) = 0)');
+const log2eSIfold = out.gtFold.m9.log2_perQuery;
 const Q = 64;
-const terms = {kzgBatch_tprime: Q - 128, si: Q + log2eSI, bad: 2 * Q + log2Bad, hashTargets: Q + Math.log2(8) - 256};
+const terms = {kzgBatch_tprime: Q - 128, si: Q + Math.max(log2eSI, log2eSIfold), bad: 2 * Q + log2Bad, hashTargets: Q + Math.log2(9) - 256};
 const total = Math.log2(Object.values(terms).reduce((a, x) => a + 2 ** x, 0));
 out.totalForQ2e64 = {log2_terms: terms, log2_total_excluding_epsPLONK: total};
 console.log(JSON.stringify(out, null, 1));

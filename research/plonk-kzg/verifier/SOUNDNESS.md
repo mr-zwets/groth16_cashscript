@@ -1,10 +1,27 @@
-# Soundness of the Track 6 verifier-side changes
+# Soundness of the Track 6 / Track 7 verifier-side changes
 
-Status: **a written argument, not independently reviewed, not machine-checked.** It covers the three places where this
+Status: **a written argument, not independently reviewed, not machine-checked.** It covers the places where this
 verifier departs from gnark v0.16.4's `plonk.Verify`:
 1. the t'-fold of the witnessed linearised commitment Λ';
 2. the batching scalar u = u1 + λ·u2;
-3. the today's-rules chain (`multi.mjs`).
+3. the today's-rules chain (`multi.mjs`), Lemma 3, rewritten for Track 7's hand-overs;
+4. **Track 7:** the GT fold of the fixed MSM bases (`gt.mjs`), Lemma 4, with the A6 changes it needs.
+
+**Track 7 changes in one place** (2026-10-30, branch `wip/plonk-usable-msm`):
+- The fixed bases B_i ∈ {Ql, Qr, Qm, Qo, Qk, S3, S1, S2, [1]_1} (8 for mul2, 9 for merkle16) leave the G1 MSM. The MSM
+  computes P*_var over the 10 variable bases only. Their scalars s_i are applied in GT, inside the SI pairing check
+  (Lemma 4).
+- The SI identities gain per-event monic factors and one terminal factor. The degree cap grows from 60 to 348 / 384
+  quotient words (A6). The GT nibbles NB are part of WS, so h0 hashes them, and every nibble byte must be < 16.
+- Chain: ST also computes h0, ρ, z, the quotient Horner value QZ and (mul2) the GT binding, and publishes ρ, z and QZ
+  (and, for merkle16, the s_i) in G0.
+  - WQ = WQa ‖ WQb is split over two inputs; WQb is a variable-size push.
+  - One SI role publishes GZ (the 8m values R_{i,j}(±z)), checked against its own computation.
+  - The code is three hash-checked blobs.
+  - The fixed-base table TF is gone.
+  - Lemma 3 is rewritten below.
+- The FOLD=0 build (`parseVK(hex, {fold: false})`) is the Track 6 design. For it, the Track 6 text of Lemma 3 (kept
+  below the Track 7 version) applies unchanged, apart from the LOADT decoding note in the Track 7 step 6.
 
 Everything else reduces to gnark PLONK soundness. The numbers below are checked by
 [`soundness/lattice.mjs`](soundness/lattice.mjs) (`node soundness/lattice.mjs`).
@@ -121,6 +138,23 @@ in `BatchVerifyMultiPoints`. Here π̃ is π with `ClaimedValues[0] := r0`. Equi
     enforced: exactly 60 words in the chain (size pinned in `multi.mjs:229`), 1–60 words in the single-input build
     (`script.mjs:293-296`). Every word is < p.
 
+  - **Track 7 (fold, default):**
+    - P* above is P*_var, the variable-base MSM; it is finite and affine by the same argument.
+    - Each event's factor list gains G_e = Π_i Π_{j ∈ N_i[e]} R_{i,j}(X). R_{i,0}, R_{i,1} are baked monic degree-6
+      polynomials, and R_{i,2/3}(X) = R_{i,0/1}(ηX) are monic too, since η⁶ = 1. The terminal gains the monic Rconst(X).
+      All of these are nonzero.
+    - The schedule degree (`si.mjs` `chunkDegP(k, m)`, `nqMax(m)`, with up to 4 factors of degree 6 per base and event)
+      gives max deg D_k = 708 / 780 and NQ = 348 / 384 for m = 8 / 9.
+    - The cap is enforced:
+      - single input: 1–NQ words with a nonzero leading word (`script.mjs` si);
+      - chain: ST checks 256 ≤ |WQb| ≤ 32·NQ − 4096 and |WQb| ≡ 0 (mod 128), so |WQa ‖ WQb| ≤ 32·NQ (`stTranscript`).
+    - The error term becomes 1.134·(33 + 780)/p ≈ 2^-243.75 for m = 9 (2^-243.88 for m = 8; `soundness/lattice.mjs`).
+    - The nibbles are in WS, hence in q_h0's input, so every factor is fixed before ρ and z.
+    - Every nibble byte is checked to be in [0, 15] before it selects a factor: `gtNibCheck`, on the whole NB; in the
+      chain this is the binder's read of ST's WS, and every SI role's lookups use the same bytes (Lemma 3 step 3). So
+      the table entry picked is exactly TP_i[n] = Π_{j∈n} R_{i,j}(z) (resp. TM_i[n] at −z). This check was missing in
+      the first Track 7 build and was found while writing this section (§7).
+
   Fix the input of q_h0. This fixes P*, P_R, S_c and
   S_1..S_33. If FE(Miller(P*, [1]_2)·Miller(P_R, [τ]_2)) ≠ 1, the SI checks pass with probability at most
   1.134·(33 + 132)/p ≈ 2^-246.05 over (ρ, z), for any WQ of at most 60 words:
@@ -221,7 +255,131 @@ Q·2^-128.
 Our batching therefore replaces gnark's batching error (1/r for a uniform scalar) by 2^-128 per hash query. KZG's own
 binding is used only inside A2.
 
+## 4b. Lemma 4 (Track 7): the GT fold of the fixed bases
+
+Notation:
+- The folded bases are B_1..B_m. e_i = e(B_i, [1]_2) ∈ μ_r, and m_i = Miller(B_i, [1]_2), so FE(m_i) = e_i
+  (asserted for every base in `gtConsts`).
+- π_j = p^j mod r, for j = 0..3.
+- s_i ∈ [0, r) is the plan-B MSM scalar of B_i (§0). It is computed on chain exactly as the unfolded build computes it,
+  in `fr2` (single) or ST's scalar kernel (chain).
+
+The verifier, after A6, has established [f'] = [c]^λ in G = Fp12*/Fp6*, where
+
+  f' = Miller(P*_var, [1]_2) · Miller(P_R, [τ]_2) · Rconst · Π_{e=0..64} Π_i Π_{j ∈ N_i[e]} R_{i,j}^{2^{64−e}}.
+
+The factor of event e is raised to 2^{64−e} because each of the remaining 64 − e events squares F once, and the
+terminal factors are not squared. It has also checked the binding
+
+  (B)  acc_i − 2^64·Σ_j π_j − s_i ≡ 0 (mod r),   with acc_i = Σ_e 2^{64−e}·TB[N_i[e]] = Σ_j u_{i,j} π_j,
+
+where u_{i,j} = Σ_e bit_j(N_i[e])·2^{64−e} ∈ [0, 2^65) and TB[n] = Σ_{j∈n} π_j. acc_i is computed by `gtBindLoop`, or
+in the single-input loop by `gtStep`, from the same range-checked nibble bytes that select the factors.
+
+**Lemma 4.** Then e(P*_var + Σ_i s_i·B_i, [1]_2) · e(P_R, [τ]_2) = 1. This is (E) for P* = P*_var + Σ_i s_i B_i, which
+is the unfolded build's P* (same scalars, same bases).
+
+*Proof.*
+- [f'] = [c]^λ gives FE(f') = 1 (A6, residue step).
+- FE kills Fp6*, so only classes matter.
+- By construction (asserted against noble in `gtConsts`):
+  - [R_{i,0}] = [m_i] and [R_{i,1}] = [Frob(m_i)];
+  - [R_{i,2}] = [Frob²(m_i)] and [R_{i,3}] = [Frob³(m_i)], because Frob² acts on these polynomials as X ↦ ηX;
+  - [Rconst] = [Π_{i,j} Frob^j(m_i)^{−2^64}].
+- Frob^j is a field automorphism that commutes with FE, and FE(m_i) ∈ μ_r. So FE(Frob^j(m_i)) = e_i^{p^j} = e_i^{π_j}.
+- Hence FE(f') = e(P*_var,[1]_2) · e(P_R,[τ]_2) · Π_i e_i^{n_i}, with n_i = Σ_j u_{i,j} π_j − 2^64·Σ_j π_j.
+- By (B), n_i ≡ s_i (mod r), so e_i^{n_i} = e(s_i·B_i, [1]_2). Bilinearity gives the claim. ∎
+
+Remarks.
+- (B) is exact mod r, so any nibble string whose u's satisfy it works: the decomposition is malleable (lattice
+  shifts within range), with no soundness effect. glsDecompose's Babai rounding is only how the honest prover finds
+  one: |e| < 2^64, so u fits 65 bits (`soundness/lattice.mjs` §6; the column-sum bound is asserted in `gt.mjs`).
+- Without the nibble range check, a byte ≥ 16 (or ≥ 0x80, negative after BIN2NUM) would make the factor and TB
+  lookups read other stack items. The factor applied and the term added to acc_i would then not correspond to the
+  same bits, and (B) would no longer pin n_i. Because [1]_1 is one of the folded bases (its discrete log is known), a
+  free n_G would absorb any error in (E). The range check closes this.
+- Lemmas 1–2 and the Corollary of §4 are unchanged: they are statements about (E) and the transcript, which Lemma 4
+  restores.
+
 ## 5. Lemma 3: the today's-rules chain implies the single-input checks
+
+*Track 7 version (default, folded build).* Role names: input 0 = MJ (code C0, MSM windows 50..41, Jacobian), input 1 =
+ST, input 2 = MJ (host of TV, windows 40..37), inputs 3–5 = MA (windows 36..0, affine), inputs 6–9 = SI (events
+0–16, 16–34, 34–52, 52–65 + terminal). Input 6 hosts GZ and C1, input 7 hosts C2, input 8 hosts WQa, input 9 hosts WQb.
+The windows, event cuts and blob hosts come from `plans.json`; `makePlan` asserts that windows and events are
+contiguous and cover everything once.
+
+**Lemma 3 (Track 7).** Assume ¬B3. Then the single-input verifier's value-level checks hold on the one value set
+(x = PI, π = PROOF, Λ' = X[0,64), inverse = X[64,96), WS (s^c ‖ NB ‖ states), WQ = WQa ‖ WQb). Its challenges,
+scalars, P*_var, P_R, nibbles and binding are those of §0, §2 and Lemma 4, and the SI final identity holds for them.
+The WQ length rule differs from single input: leading zero words are allowed, and the size is a multiple of 4 words
+(≥ 136 words). A6 needs only the cap.
+
+*Proof.* Steps 1–3 are as in Track 6, with these changes:
+
+1. **Code.** R loads C1 (input 6), C2 (input 7) and C0 (input 0) at fixed offsets. It checks their SHA-256 against
+   constants, then defines and invokes them (`buildMulti`, `load`). The graph pin is the shared function PIN
+   (TXINPUTCOUNT = 10, every UTXOBYTECODE = own). By ¬B3 the executed code is the built code. C0 dispatches on
+   INPUTINDEX.
+2. **Layout.**
+   - As in Track 6, every fixed push has its planned size, except the code pushes and WQb.
+   - Each blob is the last fixed push of its host and is hash-checked. No role code embeds an offset that depends on a
+     blob's size.
+   - WQb is the last fixed push of input 9. Its size is not pinned by its host. Nothing after it is read remotely
+     (`offsetOf` throws on such a read).
+   - Its encoding is still unique: ST requires 256 ≤ L ≤ 65,535, so the minimal push is PUSHDATA2, 0x4d ‖ LE16(L).
+     ST reads that header (`rreadVar`: byte 0x4d checked, then L bytes), so it gets exactly input 9's stack item.
+3. **Remote reads.** `rread` as before. ST's read of the Wζω slice of TV is still not header-checked (§7). New reads:
+   - WQa (ST), GZ (`GZD`), WS and G0 (SI roles): all by `rread`;
+   - WQb by `rreadVar`.
+4. **ST** runs Track 6's steps on its own pushes, and in addition (`stTranscript`):
+   - reads WQa ‖ WQb and checks the WQ size rule;
+   - computes h0 = SHA256(TAG ‖ uRaw ‖ WS), ρ and z (z ≠ 0) byte-exactly as q_h0, q_ρ, q_z of §0;
+   - computes QZ = Σ_w q_w·z^{2(n−1−w)} over WQ's words (each < p, `DLP`);
+   - (bindST, mul2) runs `gtNibCheck`, `gtBindLoop` and `gtBind` on NB = WS[192, 192 + 65m) and its own s_i.
+   
+   It requires G0 = uRaw ‖ LE32(s'_q)_{q ∈ var} ‖ ENC(P_R) ‖ ENC(ρ) ‖ ENC(z) ‖ ENC(QZ) [‖ LE32(s_i)_i, merkle16].
+5. **Readers of G0:**
+   - the MSM roles get s'_q;
+   - the SI roles get P_R, ρ and z (`siPre`);
+   - the last SI role also gets QZ, and for merkle16 the s_i, decoded < r (`DLR`).
+   
+   These are ST's computed values (step 3, ENC injective). So every SI role uses §0's ρ and z.
+6. **Tables.**
+   - TV is unchanged, checked by its host with the unsigned decoding (< p).
+   - LOADT now decodes the published pieces with a SPLIT tree and BIN2NUM(w) without the 0x00 sign byte.
+     - Every TV word is < p < 2^255, so its high bit is 0 and BIN2NUM(w) equals the host's unsigned value.
+     - The tree consumes exactly 960·count bytes (size check), and every leaf is 32 bytes.
+     - TF does not exist in the folded build.
+   - GZ: its host computes R_{i,j}(±z) from the baked R coefficients (`GTZ`/`GTV`) and requires GZ = ENC of these
+     8m values.
+     - The other SI roles decode GZ. Its words are < p because they equal ENC outputs, so BIN2NUM without the sign
+       byte is exact.
+     - Every SI role builds TP_i/TM_i from them (`GTT`/`GTP`) and TB from π_1..π_3 (`TBC`).
+7. **Hand-over.**
+   - As in Track 6 (ENC, byte-exact HAND, `DLP` < p).
+   - SI → SI hands over P*_var, both chain states, F± and R; the GT accumulators are not handed over.
+8. **The MSM** is Track 6's over the variable bases, with these differences:
+   - Role 0 runs Jacobian windows 50..41, role 2 runs 40..37. Role 3 converts with ZI, roles 3–5 are affine, and role 5
+     adds the correction.
+   - The point handed to role 6 is the single-input program's P*_var (A4).
+9. **SI.**
+   - Every SI role:
+     - takes ρ and z from G0 (step 5) and WS from ST;
+     - checks its DS slice by SHA-256;
+     - builds EVS from its constant schedule bytes and its NB slice WS[192 + m·e0, 192 + m·e1) (`EVSB`). Each Miller
+       record takes m nibble bytes, terminal records take none, and both strings must be consumed exactly.
+   - SIL keeps WSs, R and EVS on the altstack. Per event it runs the doubling, the optional addition and `gtStep` on
+     the event's m bytes (F+ ·= TP_i[n], F− ·= TM_i[n]), then the boundary. D, EVS and WSs are checked empty at the end.
+   - The cuts are at chunk boundaries and hand over (step 7).
+   - The last role:
+     - runs the two terminal steps, F ·= S_c(±ηz)·Rconst(±z) and the W step;
+     - (merkle16) runs the nibble check and binding on NB from WS with the s_i from G0;
+     - checks the final identity R ≡ z·QZ·M(z) with ST's QZ, which is exactly the single-input Horner value (step 4).
+   - So the SI computation and the binding are the single-input ones, split at chunk boundaries. Together with
+     Lemma 4 this gives (E). ∎
+
+*Track 6 version (FOLD=0 reference build), kept for reference:*
 
 Let T be a transaction that is valid under A5, and one of whose inputs spends a UTXO locked by P2SH32(R), with R the
 redeem built by `buildMulti`. Write (G0, X, PI, PROOF, WS) for input 1's (ST's) first five pushes and WQ for input 8's
@@ -325,6 +483,10 @@ A6 holds for either rule.
   Pr[accepted ∧ x ∉ L_vk] ≤ ε_PLONK(Q) + Q·2^-128 + Q·1.134·165/p + 15Q²·2^-256 + 8Q·2^-256
                           ≈ ε_PLONK(Q) + Q·2^-128 + Q·2^-246.05 + Q²·2^-252.09 (+ 8Q·2^-256).
 
+  Track 7 (folded build): the SI term becomes Q·1.134·(33 + 780)/p ≈ Q·2^-243.75. Lemma 4 is inserted after A6. B3
+  has 9 targets: the 2 P2SH32 hashes, C0, C1, C2 and the 4 DS slices; TF is gone. The bound is otherwise unchanged:
+  ≈ ε_PLONK(Q) + Q·2^-128 + Q·2^-243.75 + Q²·2^-252.09 (+ 9Q·2^-256), still ≈ 2^-64 beyond ε_PLONK for Q ≤ 2^64.
+
 *Proof.*
 - Discard Bad (Lemma 0 and B3).
 - For the chain, Lemma 3 gives the single-input checks on one value set.
@@ -339,6 +501,23 @@ BN254's own discrete-log security (about 100–110 bits), so this step is not th
 has no B3 targets except R, and the same bound applies.
 
 ## 7. What the code does not do as the sketches say (no soundness gap found)
+
+- **Track 7: a gap found and closed while writing Lemma 4.** The first folded build did not range-check the nibble
+  bytes; see the remark after Lemma 4. `gtNibCheck` (NB & 0x0f…0f == NB) is now run on the whole NB:
+  - in the single-input program, right after NB is split off WS;
+  - in the chain, in the binder (ST for mul2, the last SI role for merkle16), whose read of ST's WS covers every byte
+    any SI role uses.
+  
+  Tests: nibble byte 0x10 and 0x81 manipulations are rejected (single input and chain). They are rejected anyway,
+  since h0 changes; the check is what the argument relies on.
+- **Track 7: assembler.** `Asm.arrange` kept an already-placed prefix even when other items sat above it. It then left
+  those items between the prefix and the rolled names.
+  - Fixed in this fork's `asm.mjs`.
+  - Every Track 6 build is byte-identical with the fix: single spec and 100 KB, chain C0/C1, both circuits.
+  - The reviewed `chunked/bn254/sound-si-gls/asm.mjs` and `bn-native-sound/asm.mjs` contain the same pattern. They
+    were not changed here; whether their builds are affected was not checked.
+- **Track 7: WQb is not size-checked by its host.** ST checks the size rule on the bytes it reads, which are exactly
+  the host's stack item (Lemma 3 step 2).
 
 - **ST's read of the Wζω table is not header-checked.** It reads TV at `off + 960·vi` with no header check
   (`multi.mjs:372-373`). The redeem's C0/C1 loads do not check headers either (`:301`). The sketch says every remote
