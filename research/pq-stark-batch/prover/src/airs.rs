@@ -505,8 +505,21 @@ pub fn stmt_case(name: &str, shift: usize) -> Case {
     use crate::stmt::*;
     assert_eq!(shift, 0, "statement AIRs have fixed heights");
     let parts: Vec<&str> = name.split('@').collect();
-    assert_eq!(parts.len(), 3, "m1@LEAF@WSEED");
-    let w = witness(parts[1].parse().expect("leaf index"), parts[2].parse().expect("witness seed"));
+    assert!(parts.len() == 3 || parts.len() == 4, "m1@LEAF@WSEED[@CTXHASH]");
+    let mut w = witness(parts[1].parse().expect("leaf index"), parts[2].parse().expect("witness seed"));
+    // S4: optional 4th part = SHA-256 of the spending transaction's serialized outputs (64 hex chars);
+    // CTX_k = little-endian integer of hash bytes [7k, 7k+7) (AIR-SPEC §3.1), replacing the seeded CTX
+    if parts.len() == 4 {
+        let h: Vec<u8> = (0..32).map(|i| u8::from_str_radix(&parts[3][2 * i..2 * i + 2], 16).expect("ctx hash hex")).collect();
+        assert_eq!(parts[3].len(), 64, "ctx hash: 32 bytes hex");
+        w.ctx = core::array::from_fn(|k| {
+            let mut v = 0u64;
+            for i in (0..7).rev() {
+                v = (v << 8) | h[7 * k + i] as u64;
+            }
+            <crate::cfg::Val as p3_field::PrimeCharacteristicRing>::from_u64(v)
+        });
+    }
     let pv = public_values(&w);
     match parts[0] {
         "m1" => Case {

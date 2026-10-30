@@ -142,7 +142,7 @@ function separator(name, steps, chunks) {
   return { pattern, seed: Buffer.concat([id, keccak256(Buffer.from(pattern)), be32(label.length), label, Buffer.from([0x80])]) };
 }
 // batch-stark/src/transcript.rs BatchShape::domain_separator
-function batchSeparator(vk) {
+export function batchSeparator(vk) {
   const st = [];
   for (const _ of vk.inst) st.push(at('Message', 'degree_bits', 'Scalar', TE));
   st.push(at('Message', 'main_commitment', 'Scalar', 'Opaque'));
@@ -162,7 +162,7 @@ function batchSeparator(vk) {
   return separator('p3-batch-stark', st, chunks);
 }
 // fri/src/pcs_transcript.rs PcsShape::domain_separator
-function pcsSeparator(vk, counts) {
+export function pcsSeparator(vk, counts) {
   const st = [];
   for (const r of counts) for (const m of r) for (const w of m) st.push(at('Message', 'claimed_evaluations', `Fixed(${w})`, TE));
   if (vk.bpow) st.push(at('Pow', 'batch_pow', `Fixed(${vk.bpow})`, TB));
@@ -172,7 +172,7 @@ function pcsSeparator(vk, counts) {
   return separator('p3-fri-pcs', st, chunks);
 }
 // fri/src/transcript.rs FriShape::domain_separator
-function friSeparator(vk) {
+export function friSeparator(vk) {
   const st = [];
   for (const _ of vk.logArities) {
     st.push(at('Message', 'commit_phase_commitment', 'Scalar', 'Opaque'));
