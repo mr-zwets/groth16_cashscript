@@ -9,7 +9,10 @@ JS reference verifier, which is the spec the on-chain verifier will follow.
 - Backend: PLONK over BN254 with KZG commitments, `plonk.Setup / Prove / Verify`, default options.
 - Fiat-Shamir: gnark's defaults, `ChallengeHash = KZGFoldingHash = sha256`. Every hash is a plain padded
   SHA-256 of a byte string, so `OP_SHA256` computes all of them.
-- No BSB22 / `Commit` custom-gate commitments: neither circuit needs them, and `main.go` refuses a VK that has any.
+- BSB22 / `Commit` custom-gate commitments (Track 7): `mul2` and `merkle16` have none. `range64` and `merkle16rc`
+  use gnark's `std/rangecheck`, which calls `api.Commit` once, so they have exactly one. `main.go` asserts the
+  expected count per circuit. The verifier delta is PROTOCOL.md "BSB22 commitments" and the layout FORMAT.md
+  "BSB22 commitments" (format `v2-bsb22`).
 
 Files:
 - The byte format is in [FORMAT.md](FORMAT.md).
@@ -38,6 +41,26 @@ Universality:
 - The two circuits share one SRS.
 - The verifier needs only `[1]_1`, `[1]_2` and `[τ]_2` from it. Everything else in a VK is derived from the
   circuit by `plonk.Setup`, which uses no secret.
+
+## BSB22 commitments (Track 7)
+
+Two circuits with one commitment each (`std/rangecheck`, 64-bit check):
+
+| name | public inputs | statement | constraints | n | VK | proof | valid | tampered (gnark-checked) |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| `range64` | `n0` | `a·a = n0`, `0 ≤ a < 2^64` | 129 | 2^8 | 1,024 B | 864 B | 5 | 86 (44) |
+| `merkle16rc` | `root, nullifierHash, context` | merkle16 with a private 64-bit amount in the leaf | 15,680 | 2^14 | 1,024 B | 864 B | 5 | 91 (47) |
+
+- `verify.mjs` accepts all 10 valid proofs and rejects all 177 tampered ones. On every valid proof the recomputed
+  `r0` equals gnark's `ClaimedValues[0]`, and the JS hash-to-field equals the value gnark-crypto's
+  `hash_to_field` gives in Go (`bsb22Hash`).
+- gnark's own `Verify` rejects all 91 tampered variants its structs can represent (it panics the generator
+  otherwise).
+- Cost of one commitment: +2 G1 scalar multiplications (one fixed base Qcp, one proof base Bsb22), +1 on-curve
+  check, +3 SHA-256 calls (8 blocks: the hash-to-field 5, the larger γ, α and v 3), one more Lagrange
+  denominator in the same batched inversion, +96 proof bytes.
+- `-circuits range64,merkle16rc` builds only these; each circuit then has its own witness stream, while
+  `mul2,merkle16` (the default) keep the v1 shared stream so their keys regenerate byte for byte.
 
 ## Circuits
 
@@ -106,9 +129,10 @@ The vectors use the **Aztec Ignition** ceremony (176 participants, then sealed b
 ## Build and regenerate
 
 ```
-./gen-vectors.sh            # ceremony download+checks, go run . -srs ..., node verify.mjs (SRS_CACHE=dir)
+./gen-vectors.sh            # ceremony download+checks, go run . -srs ... (both runs), node verify.mjs (SRS_CACHE=dir)
+GOMAXPROCS=4 nice go run . -srs srs-cache/ignition_bn254_65539.srs -circuits range64,merkle16rc -out vectors   # the BSB22 vectors only
 npm install                 # once: @noble/curves 2.2.0 for verify.mjs
-node verify.mjs             # check all vectors: OK: 164 cases, 0 unexpected
+node verify.mjs             # check all vectors: OK: 351 cases, 0 unexpected (164 v1 + 187 BSB22)
 node verify.mjs --counts    # operation counts of one verification per circuit
 node verify.mjs --trace mul2 0   # challenges and intermediate values
 ```

@@ -1,0 +1,374 @@
+{
+ "circuit": "merkle16rc",
+ "m": 1,
+ "vm": "free (libauth BCH 2026 rules, no limits on items, bytecode or density), consensus mode",
+ "plans": {
+  "10 inputs (Track 6 default)": {
+   "roles": "MJ,ST,MJ,MJ,MA,MA,MA,MA,SI,SI",
+   "TV": 10560,
+   "TF": 9600,
+   "G0": 768,
+   "C0": 8114,
+   "C1": 3608,
+   "cases": [
+    {
+     "name": "valid 0",
+     "accepted": true,
+     "asExpected": true,
+     "txBytes": 102018,
+     "opCost": 78196200,
+     "unlocking": [
+      10283,
+      8502,
+      10766,
+      10181,
+      10334,
+      10635,
+      10804,
+      10827,
+      9466,
+      9770
+     ]
+    },
+    {
+     "name": "valid 1",
+     "accepted": true,
+     "asExpected": true,
+     "txBytes": 101933,
+     "opCost": 78125759,
+     "unlocking": [
+      10215,
+      8502,
+      10766,
+      10246,
+      10473,
+      10690,
+      10747,
+      10608,
+      9466,
+      9770
+     ]
+    },
+    {
+     "name": "valid 2",
+     "accepted": true,
+     "asExpected": true,
+     "txBytes": 102138,
+     "opCost": 78146510,
+     "unlocking": [
+      10160,
+      8502,
+      10766,
+      10431,
+      10497,
+      10606,
+      10743,
+      10746,
+      9467,
+      9770
+     ]
+    },
+    {
+     "name": "valid 3",
+     "accepted": true,
+     "asExpected": true,
+     "txBytes": 102173,
+     "opCost": 78279842,
+     "unlocking": [
+      10344,
+      8502,
+      10766,
+      10436,
+      10501,
+      10604,
+      10614,
+      10721,
+      9465,
+      9770
+     ]
+    },
+    {
+     "name": "valid 4",
+     "accepted": true,
+     "asExpected": true,
+     "txBytes": 102180,
+     "opCost": 78325282,
+     "unlocking": [
+      10279,
+      8502,
+      10766,
+      10186,
+      10553,
+      10686,
+      10746,
+      10776,
+      9466,
+      9770
+     ]
+    },
+    {
+     "name": "point.Bsb22_0.plusG",
+     "accepted": false,
+     "asExpected": true,
+     "txBytes": 102132,
+     "opCost": 78328328,
+     "unlocking": [
+      10158,
+      8502,
+      10766,
+      10305,
+      10581,
+      10664,
+      10747,
+      10722,
+      9467,
+      9770
+     ]
+    },
+    {
+     "name": "point.Bsb22_0.negated",
+     "accepted": false,
+     "asExpected": true,
+     "txBytes": 102260,
+     "opCost": 78239854,
+     "unlocking": [
+      10345,
+      8502,
+      10766,
+      10307,
+      10552,
+      10608,
+      10800,
+      10693,
+      9467,
+      9770
+     ]
+    },
+    {
+     "name": "scalar.qcp0_zeta.plus1",
+     "accepted": false,
+     "asExpected": true,
+     "txBytes": 102174,
+     "opCost": 78316861,
+     "unlocking": [
+      10282,
+      8502,
+      10766,
+      10307,
+      10446,
+      10637,
+      10774,
+      10773,
+      9467,
+      9770
+     ]
+    },
+    {
+     "name": "bsb22.commitment-from-proof1",
+     "accepted": false,
+     "asExpected": true,
+     "txBytes": 101303,
+     "opCost": 77654683,
+     "unlocking": [
+      10032,
+      8502,
+      10766,
+      9995,
+      10420,
+      10523,
+      10745,
+      10636,
+      9464,
+      9770
+     ]
+    },
+    {
+     "name": "bsb22.commitment-and-qcp-from-proof1",
+     "accepted": false,
+     "asExpected": true,
+     "txBytes": 101983,
+     "opCost": 78111330,
+     "unlocking": [
+      10338,
+      8502,
+      10766,
+      10062,
+      10499,
+      10689,
+      10774,
+      10666,
+      9467,
+      9770
+     ]
+    },
+    {
+     "name": "bsb22.commitment-doubled",
+     "accepted": false,
+     "asExpected": true,
+     "txBytes": 101631,
+     "opCost": 77879033,
+     "unlocking": [
+      10157,
+      8502,
+      10766,
+      10243,
+      10366,
+      10526,
+      10638,
+      10746,
+      9467,
+      9770
+     ]
+    },
+    {
+     "name": "bsb22.commitment-minusG",
+     "accepted": false,
+     "asExpected": true,
+     "txBytes": 101675,
+     "opCost": 77952942,
+     "unlocking": [
+      10098,
+      8502,
+      10766,
+      10185,
+      10419,
+      10584,
+      10687,
+      10748,
+      9466,
+      9770
+     ]
+    },
+    {
+     "name": "bsb22.qcp-zeta-zero",
+     "accepted": false,
+     "asExpected": true,
+     "txBytes": 100424,
+     "opCost": 76747819,
+     "unlocking": [
+      9968,
+      8502,
+      10766,
+      9995,
+      10172,
+      10414,
+      10473,
+      10447,
+      9467,
+      9770
+     ]
+    }
+   ]
+  },
+  "11 inputs (5 MA roles)": {
+   "roles": "MJ,ST,MJ,MJ,MA,MA,MA,MA,MA,SI,SI",
+   "TV": 10560,
+   "TF": 9600,
+   "G0": 768,
+   "C0": 8477,
+   "C1": 3608,
+   "cases": [
+    {
+     "name": "valid 0",
+     "accepted": true,
+     "asExpected": true,
+     "txBytes": 103760,
+     "opCost": 78665747,
+     "unlocking": [
+      8585,
+      8502,
+      10766,
+      9806,
+      8596,
+      8839,
+      9035,
+      9935,
+      9962,
+      9471,
+      9770
+     ]
+    },
+    {
+     "name": "valid 1",
+     "accepted": true,
+     "asExpected": true,
+     "txBytes": 103706,
+     "opCost": 78569028,
+     "unlocking": [
+      8585,
+      8502,
+      10766,
+      9806,
+      8760,
+      8813,
+      9089,
+      9880,
+      9772,
+      9470,
+      9770
+     ]
+    },
+    {
+     "name": "valid 2",
+     "accepted": true,
+     "asExpected": true,
+     "txBytes": 103836,
+     "opCost": 78529580,
+     "unlocking": [
+      8585,
+      8502,
+      10766,
+      9806,
+      8866,
+      8838,
+      8952,
+      9904,
+      9883,
+      9471,
+      9770
+     ]
+    },
+    {
+     "name": "valid 3",
+     "accepted": true,
+     "asExpected": true,
+     "txBytes": 103791,
+     "opCost": 78657735,
+     "unlocking": [
+      8697,
+      8502,
+      10766,
+      9806,
+      8868,
+      8811,
+      9006,
+      9718,
+      9884,
+      9470,
+      9770
+     ]
+    },
+    {
+     "name": "valid 4",
+     "accepted": true,
+     "asExpected": true,
+     "txBytes": 104085,
+     "opCost": 78742089,
+     "unlocking": [
+      8693,
+      8502,
+      10766,
+      9806,
+      8843,
+      8890,
+      9060,
+      9879,
+      9912,
+      9471,
+      9770
+     ]
+    }
+   ]
+  }
+ }
+}

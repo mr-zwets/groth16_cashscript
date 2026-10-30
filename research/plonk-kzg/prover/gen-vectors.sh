@@ -8,5 +8,6 @@ LOG=${SRS_LOG:-16}
 POINTS=$(( (1 << LOG) + 3 ))
 GOMAXPROCS=4 nice go run ./ceremony -cache "$CACHE" -log "$LOG"
 GOMAXPROCS=4 nice go run . -srs "$CACHE/ignition_bn254_$POINTS.srs" -out vectors -proofs 5
+GOMAXPROCS=4 nice go run . -srs "$CACHE/ignition_bn254_$POINTS.srs" -out vectors -proofs 5 -circuits range64,merkle16rc   # BSB22 commitments (v2-bsb22)
 nice node verify.mjs
 # then copy vectors/*.json to ../verifier/vectors/ and run there: SRS_CACHE=$CACHE node srs-check.mjs

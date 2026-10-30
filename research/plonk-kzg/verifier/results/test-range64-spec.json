@@ -1,0 +1,784 @@
+{
+ "circuit": "range64",
+ "regime": "spec",
+ "J": 13,
+ "JR": 0,
+ "redeemBytes": 18373,
+ "valid": [
+  {
+   "i": 0,
+   "ref": true,
+   "consensus": {
+    "accepted": true,
+    "error": null,
+    "opCost": 64933485,
+    "budget": 65771200,
+    "unlocking": 72214
+   },
+   "standard": {
+    "accepted": true,
+    "error": null,
+    "opCost": 64993133,
+    "budget": 65771200,
+    "unlocking": 72214
+   },
+   "pad": 0,
+   "slopes": 1370,
+   "nq": 60,
+   "proofBytes": 864,
+   "piBytes": 32
+  },
+  {
+   "i": 1,
+   "ref": true,
+   "consensus": {
+    "accepted": true,
+    "error": null,
+    "opCost": 64517288,
+    "budget": 65512000,
+    "unlocking": 71890
+   },
+   "standard": {
+    "accepted": true,
+    "error": null,
+    "opCost": 64576936,
+    "budget": 65512000,
+    "unlocking": 71890
+   },
+   "pad": 0,
+   "slopes": 1360,
+   "nq": 60,
+   "proofBytes": 864,
+   "piBytes": 32
+  },
+  {
+   "i": 2,
+   "ref": true,
+   "consensus": {
+    "accepted": true,
+    "error": null,
+    "opCost": 64874980,
+    "budget": 65641600,
+    "unlocking": 72052
+   },
+   "standard": {
+    "accepted": true,
+    "error": null,
+    "opCost": 64934628,
+    "budget": 65641600,
+    "unlocking": 72052
+   },
+   "pad": 0,
+   "slopes": 1365,
+   "nq": 60,
+   "proofBytes": 864,
+   "piBytes": 32
+  },
+  {
+   "i": 3,
+   "ref": true,
+   "consensus": {
+    "accepted": true,
+    "error": null,
+    "opCost": 64925974,
+    "budget": 65692800,
+    "unlocking": 72116
+   },
+   "standard": {
+    "accepted": true,
+    "error": null,
+    "opCost": 64985622,
+    "budget": 65692800,
+    "unlocking": 72116
+   },
+   "pad": 0,
+   "slopes": 1367,
+   "nq": 60,
+   "proofBytes": 864,
+   "piBytes": 32
+  },
+  {
+   "i": 4,
+   "ref": true,
+   "consensus": {
+    "accepted": true,
+    "error": null,
+    "opCost": 64917081,
+    "budget": 65692800,
+    "unlocking": 72116
+   },
+   "standard": {
+    "accepted": true,
+    "error": null,
+    "opCost": 64976729,
+    "budget": 65692800,
+    "unlocking": 72116
+   },
+   "pad": 0,
+   "slopes": 1367,
+   "nq": 60,
+   "proofBytes": 864,
+   "piBytes": 32
+  }
+ ],
+ "tampered": [
+  {
+   "name": "point.L.plusG",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.L.negated",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.L.infinity",
+   "how": "reused:L not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.R.plusG",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.R.negated",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.R.infinity",
+   "how": "reused:R not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.O.plusG",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.O.negated",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.O.infinity",
+   "how": "reused:O not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H0.plusG",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.H0.negated",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.H0.infinity",
+   "how": "reused:H0 not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H1.plusG",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.H1.negated",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.H1.infinity",
+   "how": "reused:H1 not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H2.plusG",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.H2.negated",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.H2.infinity",
+   "how": "reused:H2 not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Z.plusG",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.Z.negated",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.Z.infinity",
+   "how": "reused:Z not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Wzeta.plusG",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.Wzeta.negated",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.Wzeta.infinity",
+   "how": "reused:Wz not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.WzetaOmega.plusG",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.WzetaOmega.negated",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.WzetaOmega.infinity",
+   "how": "reused:Wzw not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Bsb22_0.plusG",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.Bsb22_0.negated",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.Bsb22_0.infinity",
+   "how": "reused:Bsb22_0 not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "scalar.l_zeta.plus1",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "scalar.r_zeta.plus1",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "scalar.o_zeta.plus1",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "scalar.s1_zeta.plus1",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "scalar.s2_zeta.plus1",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "scalar.z_zetaOmega.plus1",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "scalar.qcp0_zeta.plus1",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "pi.0.plus1",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "mix.proof1-with-pi0",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "bsb22.commitment-from-proof1",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "bsb22.commitment-and-qcp-from-proof1",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "bsb22.commitment-doubled",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "bsb22.commitment-minusG",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "bsb22.qcp-zeta-zero",
+   "how": "adaptive",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "point.L.offCurve",
+   "how": "reused:L not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.L.xPlusP",
+   "how": "reused:L coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.L.yPlusP",
+   "how": "reused:L coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.R.offCurve",
+   "how": "reused:R not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.R.xPlusP",
+   "how": "reused:R coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.R.yPlusP",
+   "how": "reused:R coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.O.offCurve",
+   "how": "reused:O not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.O.xPlusP",
+   "how": "reused:O coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.O.yPlusP",
+   "how": "reused:O coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H0.offCurve",
+   "how": "reused:H0 not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H0.xPlusP",
+   "how": "reused:H0 coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H0.yPlusP",
+   "how": "reused:H0 coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H1.offCurve",
+   "how": "reused:H1 not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H1.xPlusP",
+   "how": "reused:H1 coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H1.yPlusP",
+   "how": "reused:H1 coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H2.offCurve",
+   "how": "reused:H2 not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H2.xPlusP",
+   "how": "reused:H2 coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.H2.yPlusP",
+   "how": "reused:H2 coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Z.offCurve",
+   "how": "reused:Z not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Z.xPlusP",
+   "how": "reused:Z coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Z.yPlusP",
+   "how": "reused:Z coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Wzeta.offCurve",
+   "how": "reused:Wz not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Wzeta.xPlusP",
+   "how": "reused:Wz coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Wzeta.yPlusP",
+   "how": "reused:Wz coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.WzetaOmega.offCurve",
+   "how": "reused:Wzw not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.WzetaOmega.xPlusP",
+   "how": "reused:Wzw coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.WzetaOmega.yPlusP",
+   "how": "reused:Wzw coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Bsb22_0.offCurve",
+   "how": "reused:Bsb22_0 not on curve",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Bsb22_0.xPlusP",
+   "how": "reused:Bsb22_0 coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "point.Bsb22_0.yPlusP",
+   "how": "reused:Bsb22_0 coordinate >= p",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "scalar.l_zeta.plusR",
+   "how": "reused:scalar >= r",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "scalar.r_zeta.plusR",
+   "how": "reused:scalar >= r",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "scalar.o_zeta.plusR",
+   "how": "reused:scalar >= r",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "scalar.s1_zeta.plusR",
+   "how": "reused:scalar >= r",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "scalar.s2_zeta.plusR",
+   "how": "reused:scalar >= r",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "scalar.z_zetaOmega.plusR",
+   "how": "reused:scalar >= r",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "scalar.qcp0_zeta.plusR",
+   "how": "reused:scalar >= r",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "pi.0.plusR",
+   "how": "reused:public input >= r",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "size.truncated",
+   "how": "reused:proof length",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "size.extended",
+   "how": "reused:proof length",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "pi.count.dropLast",
+   "how": "reused:public input count",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "pi.count.extraZero",
+   "how": "reused:public input count",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  }
+ ],
+ "manipulations": [
+  {
+   "name": "slope bit flip (first piece)",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "slope bit flip (middle piece)",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "slope + p alias",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "two slope pieces swapped",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "last slope piece dropped",
+   "rejected": true,
+   "error": "Program called an OP_SPLIT operation with an invalid index. stack item length: 0; requested split index: 32."
+  },
+  {
+   "name": "extra slope piece",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "empty slope piece inserted",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "slope piece of 31 bytes appended",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "X: Lambda' x + 1",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "X: batch inverse + r (alias)",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "X: batch inverse * 2",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "X: Jacobian zi * 2",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WS: residue root word + 1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "WS: state word bit flip",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "WS: state word + p alias",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WS: truncated by 32",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WQ: word bit flip",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "WQ: leading zero word",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WQ: extra trailing word",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WQ: empty",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WQ and WS swapped",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "PROOF and PI swapped",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "extra push on top",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "adaptive: Lambda' = 2 Lambda",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "adaptive: Lambda' = Lambda + G",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "adaptive: Lambda' = -Lambda",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "adaptive: proof 1 with the public inputs of proof 0",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "redeem byte flipped",
+   "rejected": true
+  }
+ ],
+ "unexpected": 0
+}

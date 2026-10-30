@@ -3,6 +3,7 @@ package main
 import (
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/std/hash/mimc"
+	"github.com/consensys/gnark/std/rangecheck"
 )
 
 // MulCircuit mirrors the shape of the bench's Groth16 fixtures: exactly two public inputs (n0, n1).
@@ -74,5 +75,61 @@ func (c *MerkleCircuit) Define(api frontend.API) error {
 
 	// Context needs no constraint to be bound: a PLONK public input fixes its wire through the PI(X)
 	// term of the gate identity (the tampered-Context vectors check this).
+	return nil
+}
+
+// MerkleRangeCircuit is merkle16 with a private 64-bit amount in the leaf, checked by gnark's std/rangecheck
+// gadget. On the PLONK (scs) builder rangecheck uses the log-derivative lookup argument, which calls
+// api.Commit once, so the circuit has exactly one BSB22 commitment (vk.Qcp has length 1).
+//
+// Public inputs (3): Root, NullifierHash, Context, as in merkle16.
+// Private: nullifier, trapdoor, amount, the sibling path and the index bits. leaf = MiMC(nullifier, trapdoor, amount),
+// with 0 <= amount < 2^64 (a confidential-note shape: the amount is hidden but bounded).
+type MerkleRangeCircuit struct {
+	Root          frontend.Variable `gnark:",public"`
+	NullifierHash frontend.Variable `gnark:",public"`
+	Context       frontend.Variable `gnark:",public"`
+	Nullifier     frontend.Variable
+	Trapdoor      frontend.Variable
+	Amount        frontend.Variable
+	Path          [MerkleDepth]frontend.Variable
+	Index         [MerkleDepth]frontend.Variable
+}
+
+func (c *MerkleRangeCircuit) Define(api frontend.API) error {
+	h, err := mimc.NewMiMC(api)
+	if err != nil {
+		return err
+	}
+	h.Write(c.Nullifier)
+	api.AssertIsEqual(h.Sum(), c.NullifierHash)
+
+	rangecheck.New(api).Check(c.Amount, 64)
+
+	h.Reset()
+	h.Write(c.Nullifier, c.Trapdoor, c.Amount)
+	cur := h.Sum()
+	for i := 0; i < MerkleDepth; i++ {
+		api.AssertIsBoolean(c.Index[i])
+		left := api.Select(c.Index[i], c.Path[i], cur)
+		right := api.Select(c.Index[i], cur, c.Path[i])
+		h.Reset()
+		h.Write(left, right)
+		cur = h.Sum()
+	}
+	api.AssertIsEqual(cur, c.Root)
+	return nil
+}
+
+// Range64Circuit is the smallest circuit with one BSB22 commitment: public n0, private a with a*a == n0 and
+// 0 <= a < 2^64 (rangecheck gadget). It is a quick debugging target for the commitment path.
+type Range64Circuit struct {
+	N0 frontend.Variable `gnark:",public"`
+	A  frontend.Variable
+}
+
+func (c *Range64Circuit) Define(api frontend.API) error {
+	api.AssertIsEqual(api.Mul(c.A, c.A), c.N0)
+	rangecheck.New(api).Check(c.A, 64)
 	return nil
 }

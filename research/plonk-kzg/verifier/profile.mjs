@@ -6,7 +6,7 @@ import {buildRedeem} from './script.mjs';
 import {witnessFor, pushesOf} from './witness.mjs';
 import {bare} from './vm.mjs';
 
-export const PHASES = [['decode', 'statement decode + curve checks'], ['transcript', 'gnark transcript (gamma..zeta)'], ['fr1', 'Fr block 1 (PI, lin, inverse check)'],
+export const PHASES = [['decode', 'statement decode + curve checks'], ['transcript', 'gnark transcript (gamma..zeta)'], ['htf', 'BSB22 hash-to-field (3 SHA-256 per commitment)'], ['fr1', 'Fr block 1 (PI, lin, inverse check)'],
   ['fr2', 'v, u, t\' and the MSM scalars'], ['recode', 'signed-digit recoding'], ['tables', 'MSM tables (affine, witnessed slopes)'], ['msmR0', 'P_right MSM'], ['msm', 'P* MSM (+ Wz add)'],
   ['preloop', 'SI transcript, z powers, setup'], ['postloop', 'Miller events (65, two fixed chains) + boundaries'], [null, 'terminal, quotient, final identity']];
 export function profile(vk, wt, {J = 0, JR = 0, mode = 'standard'} = {}) {
