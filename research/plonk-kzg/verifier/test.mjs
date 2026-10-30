@@ -70,7 +70,9 @@ edit('X: batch inverse * 2', (P) => { const b = P[idx.X]; const v = BigInt('0x' 
 if (J > 0 || JR > 0) edit('X: Jacobian zi * 2', (P) => { const b = P[idx.X]; const o = b.length - 32; const v = BigInt('0x' + Buffer.from(b.subarray(o)).reverse().toString('hex')); le32(mod(2n * v)).copy(b, o); return P; });
 edit('WS: residue root word + 1', (P) => { flip(P[idx.WS], 0); return P; });
 edit('WS: state word bit flip', (P) => { flip(P[idx.WS], 1000); return P; });
-edit('WS: state word + p alias', (P) => { const b = P[idx.WS]; const v = BigInt('0x' + Buffer.from(b.subarray(192, 224)).reverse().toString('hex')); if (v + p < 1n << 256n) le32(v + p).copy(b, 192); return P; });
+const so = 192 + (base.V.gt ? 65 * base.V.gt.fixed.length : 0); // first state word (after s^c and the GT nibbles)
+edit('WS: state word + p alias', (P) => { const b = P[idx.WS]; const v = BigInt('0x' + Buffer.from(b.subarray(so, so + 32)).reverse().toString('hex')); if (v + p < 1n << 256n) le32(v + p).copy(b, so); return P; });
+if (base.V.gt) { edit('WS: GT nibble byte xor 1', (P) => { flip(P[idx.WS], 192 + 7); return P; }); edit('WS: GT nibble byte = 16', (P) => { P[idx.WS][192 + 3] = 16; return P; }); edit('WS: GT nibble byte = 0x81', (P) => { P[idx.WS][192 + 5] = 0x81; return P; }); }
 edit('WS: truncated by 32', (P) => { P[idx.WS] = P[idx.WS].subarray(0, P[idx.WS].length - 32); return P; });
 edit('WQ: word bit flip', (P) => { flip(P[idx.WQ], 40); return P; });
 edit('WQ: leading zero word', (P) => { P[idx.WQ] = Buffer.concat([Buffer.alloc(32), P[idx.WQ]]); return P; });
@@ -85,6 +87,9 @@ for (const [nm, f] of [['adaptive: Lambda\' = 2 Lambda', (L) => L.double()], ['a
   const wt = witnessFor(vk, pr.proof, pr.publicInputs, {J, JR, lam: aff(f(V.lamTrue))}); if (wt.accept) fail('reference accepts ' + nm);
   M.push({name: nm, pushes: pushesOf(wt)});
 }
+// adaptive (GT fold): the nibbles of a folded base encode s + 1, every other witness part rebuilt (states, quotient)
+if (base.V.gt) for (const i of [0, base.V.gt.fixed.length - 1]) { const pr = d.valid[0]; const wt = witnessFor(vk, pr.proof, pr.publicInputs, {J, JR, fsDelta: [i, 1n]});
+  if (wt.accept) fail('reference accepts nibbles for s + 1'); M.push({name: `adaptive: nibbles of folded base ${i} encode s + 1`, pushes: pushesOf(wt)}); }
 // adaptive: a proof for other public inputs (statement swap) with a fully rebuilt witness
 { const pr = d.valid[1]; const wt = witnessFor(vk, pr.proof, d.valid[0].publicInputs, {J, JR}); M.push({name: 'adaptive: proof 1 with the public inputs of proof 0', pushes: pushesOf(wt)}); }
 for (const m of M) {

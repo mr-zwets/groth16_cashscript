@@ -8,10 +8,10 @@ import {loadVectors, parseVK} from './plonk.mjs';
 import {buildRedeem} from './script.mjs';
 import {witnessFor} from './witness.mjs';
 import {profile} from './profile.mjs';
-import {makePlan, buildMulti} from './multi.mjs';
+import {makePlan, buildMulti, planOpts} from './multi.mjs';
 import {chains} from './si.mjs';
 
-const J = {spec: 13, txv5: 8};
+const J = {spec: 23, txv5: 14}; // Track 7 (fold): from sweep.mjs
 const R = (f) => JSON.parse(readFileSync(new URL('./results/' + f, import.meta.url)));
 const score = (unl, n) => unl + 35 * n + 63 + 43 * (n - 1);
 const out = {date: '2026-10-29', gnark: 'v0.16.4', gnarkCrypto: 'v0.21.1-0.20260913224755-1409fe592052', regimes: {}, profile: {}, bytes: {}, groth16: {
@@ -41,9 +41,9 @@ for (const c of ['mul2', 'merkle16']) {
   }
   const cf = `chain-${c}.json`;
   if (existsSync(new URL('./results/' + cf, import.meta.url))) {
-    const t = R(cf); const plan = makePlan(vk); const built = buildMulti(vk, plan);
+    const t = R(cf); const plan = makePlan(vk, planOpts(vk, c)); const built = buildMulti(vk, plan);
     // every input defines C1 and C0 (functions 0, 1) and then every function inside them
-    const defBytes = built.code.length + built.c1.length + Object.values(built.funcs).reduce((a, b) => a + b, 0) + built.bodies.reduce((a, b) => a + b, 0);
+    const defBytes = built.defBytes;
     const v = t.valid;
     out.regimes[`${c}/today (multi-input)`] = {inputs: v[0].inputs, transactions: 1, roles: v[0].perInput.map((x) => x.role).join(','), proofBytes: 768, publicInputBytes: 32 * vk.nbPublic,
       codeBlobs: t.codeBytes, redeemBytes: t.redeemBytes, unlocking: v.map((x) => x.unlocking), txBytes: v.map((x) => x.txBytes), score: v.map((x) => score(x.unlocking, x.inputs)),

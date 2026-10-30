@@ -1,7 +1,155 @@
-# Track 6: a CashVM verifier for gnark PLONK/KZG proofs (BN254, SHA-256 transcript)
+# Tracks 6 and 7: a CashVM verifier for gnark PLONK/KZG proofs (BN254, SHA-256 transcript)
 
-Date: 2026-10-29. Status: **research, built and measured; not a leaderboard entry.** Nothing in REGISTRY, results.json,
+Status: **research, built and measured; not a leaderboard entry.** Nothing in REGISTRY, results.json,
 score-history.json or the website changed. Not independently reviewed.
+
+- **Track 7** (2026-10-30, branch `wip/plonk-usable-msm`): chain hand-over redesign plus GT folding of the fixed MSM
+  bases. It is the default build. See the next section.
+- **Track 6** (2026-10-29): the first build, without GT folding. It is still built with `FOLD=0`. Its text follows
+  further below, unchanged; its numbers are for that build.
+
+## Track 7: GT fold and the chain hand-over (default build)
+
+### Results (score = unlocking + 35 B locking per input + tx overhead; 5 valid proofs per circuit)
+
+| circuit / regime | inputs | score (B) | Track 6 score | change | op-cost (libauth std) | worst margin (BCHN-adj.) |
+|---|--:|--:|--:|--:|--:|--:|
+| mul2 / bch-spec (J = 23) | 1 | 59,480–59,995 | 66,290–66,549 | −10.0% | 53.28–53.67M | 3.53% |
+| mul2 / 100 KB input (J = 14, padded) | 1 | 63,497–63,948 | 69,757–69,919 | −8.8% | 50.37–50.70M | pad per proof |
+| mul2 / today, standard | 10 (1 tx) | 81,882–82,035 (tx 81.6 KB) | 92,845–93,095 | −11.8% | 64.01–64.44M | FILL BCHN-sized |
+| merkle16 / bch-spec (J = 23) | 1 | 60,790–61,785 | 68,494–68,655 | −10.6% | 54.71–55.10M | 3.26% |
+| merkle16 / 100 KB input (J = 14) | 1 | 64,896–65,801 | 72,188–72,438 | −9.6% | 51.82–52.16M | pad per proof |
+| merkle16 / today, standard | 10 (1 tx) | 84,476–84,754 (tx 84.1 KB) | 95,637–95,985 | −11.7% | 66.10–66.36M | FILL BCHN-sized |
+
+**Tests** (`results/test-*.json`, `results/chain-*.json`), all in consensus and standard mode:
+
+| | single input (bch-spec and 100 KB) | today's chain |
+|---|---|---|
+| valid proofs | 5/5 per circuit and regime | 5/5 per circuit |
+| tampered vectors | 76/76 (mul2), 78/78 (merkle16) | 76/76, 78/78 |
+| witness manipulations | 33/33 | 32/32 (mul2), 33/33 (merkle16) |
+
+New manipulations:
+- GT nibble flips, including out-of-range bytes 0x10 and 0x81;
+- adaptive "nibbles of a folded base encode s + 1", with a re-witnessed SI;
+- G0's ρ, z, QZ and s_i words;
+- GZ, WQa, and WQb with a wrong size.
+
+- **Without the fold** (`FOLD=0`), with only the hand-over changes (LOADT tree, SIL altstack, shared PIN): 88,640 B
+  (mul2) / 91,364 B (merkle16) unlocking, against 92,295 / 95,185 for Track 6 (proof 0). So about 3.7 KB of the chain gain is
+  the hand-over work and about 7.5 KB is the fold.
+
+**Tampered vectors are now 154 in total over both circuits.** That is the same set Track 6 used: its "154/154" is
+the sum over both circuits.
+
+### What changed
+
+1. **Measured first** with a function-level profiler (`fprof.mjs`, `chainprof.mjs`), on the Track 6 chain, mul2:
+   - MSM table reload (LOADT): 1.055M op per MSM input;
+   - TV check: 4.1M;
+   - window-loop overhead: about 6.8k op per (window, base);
+   - unit costs: affine add 19.6k op + 32 B, affine doubling 19.8k + 32 B, Jacobian madd 47k, Jacobian doubling 34.8k;
+   - ROLL / PICK / FROMALT cost includes the moved item's length, and ROLL also its depth.
+2. **Hand-over alternatives** (the task's list), measured with these kernels:
+   - **Disjoint base subsets per input, hand over a partial sum: negative.** Each extra subset needs its own 255
+     doublings, at least 8.2 KB-equivalent (affine 255 × 32 B, or Jacobian 255 × 34.8k = 8.9M). A shared-doubling MSM
+     input pays about 1.3 KB of hand-over overhead.
+   - **Recompute tables locally: negative.** 270 slope additions per input is 5.3M + 8.6 KB, against 0.65–1.05M for
+     reading them.
+   - **Fixed-base tables as redeem constants: negative.** They would be paid in every input. In a code blob they cost
+     the same bytes as the published TF, and every input hashes the blob. GT folding then removed TF altogether.
+   - **Cheaper reading of the published tables: kept.** LOADT splits each table with a balanced SPLIT tree and skips
+     the 0x00 sign byte for host-checked words: 1.055M → 0.649M per MSM input. On the Track 6 chain alone this gives
+     92,295 → 89,259 B (mul2, proof 0).
+3. **GT fold of the fixed bases** (`gt.mjs`; Lemma 4 in SOUNDNESS.md). It applies the SI-GLS GT-GLS technique:
+   - The 8 (mul2) / 9 (merkle16) fixed bases leave the G1 MSM. Each scalar s_i is split as Σ_j u_{i,j} π_j (4 × 65
+     bits; Babai on the GLS lattice).
+   - Per Miller event, F± is multiplied by TP_i/TM_i[nibble] (subset products of the baked monic classes R_{i,j}).
+   - Rconst cancels the 2^64 offset, and an exact binding mod r ties the nibbles to s_i.
+   - **Deviation from the design: 2-event chunks are kept** (33 states). The design proposed 1-event chunks. The
+     quotient cap grows instead: 60 → 348 / 384 words; honest n_q is 225–267.
+     - Measured cost: 1-event chunks add 32 states (+6.1 KB) and 32 boundaries. 2-event chunks add about 5.6 KB of
+       honest WQ and no op.
+   - Measured on the single input, the G1 side alone is −19.5 KB: without the fixed bases, mul2 at bch-spec drops from
+     66.4 KB to about 46.9 KB (an invalid build used only to measure). The SI side costs about 9 KB back:
+     - 0.19M of tables per base;
+     - about 10.8k op per base and event;
+     - +170 quotient words;
+     - 3.2 KB of R constants.
+     
+     Net −6.8 to −7.4 KB per regime.
+4. **Chain restructuring** around the fold:
+   - ST also computes h0, ρ, z, the quotient Horner value QZ and (mul2) the binding, and publishes ρ, z, QZ [, s_i] in
+     G0. The SI roles no longer hash WS or WQ.
+   - WQ = WQa (4,096 B, fixed) ‖ WQb (variable, PUSHDATA2) is split over two SI inputs.
+   - One SI role publishes GZ = R_{i,j}(±z) (8m words), checked against its own computation. The other roles build
+     their subset tables from it: 0.95M per role instead of 1.48M.
+   - SIL keeps WSs, R and an interleaved schedule/nibble string on the altstack, so the kernels never reorder the main
+     stack: −0.3M per SI role.
+   - The code is three hash-checked blobs (C0 in input 0, C1/C2 in SI inputs), with shared PIN, GZD, TBC and BND
+     functions.
+   - FILL sizing iterates on the filled transaction, since remote reads see FILLs, and includes BCHN's DEFINE body
+     bytes. So every input is BCHN-safe by construction.
+   - Roles: MJ(50..41, C0) · ST · MJ(40..37, TV) · MA(36..24, 23..12, 11..0) · SI(0–16 + GZ + C1, 16–34 + C2,
+     34–52 + WQa, 52–65 + WQb). `plans.json` holds the tuned plan per circuit.
+
+### Changed hand-over values (chain)
+
+| value | Track 6 | Track 7 |
+|---|---|---|
+| G0 (ST → all) | uRaw ‖ s'_q (18–19 bases) ‖ P_R | uRaw ‖ s'_q (10 variable bases) ‖ P_R ‖ ρ ‖ z ‖ QZ [‖ s_i of the folded bases, merkle16] |
+| TF (fixed-base tables) | published in input 3, SHA-256-checked | removed |
+| TV | unchanged | unchanged; read with a SPLIT tree, no sign byte |
+| WS (ST) | s^c ‖ 33 states | s^c ‖ NB (65 m nibble bytes, each < 16) ‖ 33 states |
+| WQ | 60 words fixed, in input 8 | WQa (4,096 B, input 8) ‖ WQb (variable, input 9); read and size-checked by ST |
+| GZ (new) | – | 8m words R_{i,j}(±z), published by input 6, checked there, read by inputs 7–9 |
+| SI → SI HAND | P*, chain states, F±, R | P*_var, chain states, F±, R (same layout) |
+| code | C0 + C1 | C0 + C1 + C2 |
+
+### Soundness changes (SOUNDNESS.md)
+
+- **A6** gains the GT factors: they are monic and fixed by q_h0 through NB in WS. The degree cap is 348 / 384 words,
+  and the error is 2^-243.75.
+- **New Lemma 4:** under A6 and the binding, (E) holds for P*_var + Σ s_i B_i.
+- **Lemma 3 is rewritten** for the hand-overs above. B3 now has 9 targets.
+- **A gap found while writing Lemma 4, and fixed:** the first fold build did not range-check the nibble bytes. An
+  out-of-range byte would decouple the factor lookup from the binding. Since [1]_1 is a folded base, that could absorb
+  any error in (E). The check `NB & 0x0f…0f == NB` is now in both builds.
+- **An assembler bug was fixed:** `arrange()` kept a prefix with foreign items above it. Track 6 builds are
+  byte-identical with the fix. The same pattern exists in the reviewed `sound-si-gls` and `bn-native-sound` assemblers;
+  it was not checked whether their builds are affected.
+
+### Open / honest negatives (Track 7)
+
+- **The chain is still above the design model.** The design estimated 66.0 KB over 7 inputs; the chain lands at
+  81.9 / 84.5 KB over 10 inputs.
+  - Every SI role rebuilds the GT subset tables: 0.95M each, 4 roles.
+  - The SI part needs 4 inputs.
+  - The code is 17 KB, of which 3.2–3.6 KB are R constants.
+- **Liveness is tested on 5 proofs per circuit.**
+  - bch-spec margins are 3.3–3.5% at J = 23.
+  - Chain inputs are FILL-sized per proof, but data-bound inputs have only the slack of their own data.
+  - The honest n_q varies (225–267), and the cap leaves headroom.
+- **Not changed:** the unsafe test SRS, BSB22 commitments, snarkjs.
+- **Malleability (no soundness effect):** WQ leading zero words in the chain, and the choice of a lattice-equivalent
+  nibble decomposition.
+
+### Reproduce (Track 7)
+
+```sh
+node single.mjs mul2 spec 23            # bch-spec;  node single.mjs merkle16 txv5 14   (100 KB input)
+node chain.mjs merkle16                 # today's rules, tuned plan from plans.json
+node plan.mjs mul2                      # per-input data / op / need (planning aid); PLAN='{...}' to try plans
+node chainprof.mjs mul2                 # function-level op-cost per input (OPF=<fn> for its opcode mix)
+nice node sweep.mjs mul2 spec 21 23 25  # J sweep with the worst BCHN-adjusted margin
+nice node test.mjs mul2 spec 23; nice node test.mjs mul2 txv5 14; nice node chaintest.mjs mul2
+FOLD=0 node chain.mjs mul2              # the Track 6 design (no fold), with the Track 7 LOADT / SIL / PIN changes
+node soundness/lattice.mjs              # incl. the GT-fold degrees and error terms
+```
+
+---
+
+# Track 6 (FOLD=0 build), 2026-10-29
 
 Proofs come from gnark **v0.16.4** with gnark-crypto **v0.21.1-0.20260913224755-1409fe592052** (prover track,
 `wip/plonk-kzg-prover`). The design is `zk-verifier-bench` `research/plonk-kzg/DESIGN.md` (`wip/plonk-kzg-design`). This
@@ -210,6 +358,8 @@ exponentiation, is 12.3M. The transcript and the Fr work are negligible.
 
 ## Reproduce
 
+Track 6 numbers need `FOLD=0` now (the fold is the default); `results/` holds the Track 7 runs.
+
 ```sh
 # node_modules: symlink to a zk-verifier-bench pnpm install (@bitauth/libauth 3.1.0-next.8, @noble/curves 2.2.0)
 # vectors/ is a copy of the prover track's vectors (wip/plonk-kzg-prover research/plonk-kzg/prover/vectors)
@@ -236,3 +386,6 @@ node soundness/lattice.mjs              # numbers behind SOUNDNESS.md (GLV latti
 | `test.mjs`, `chaintest.mjs`, `profile.mjs`, `summary.mjs`, `vm.mjs` | tests, profile, summary, VM runners |
 | `results/` | test-*.json, chain-*.json, summary.json |
 | `SOUNDNESS.md`, `soundness/lattice.mjs` | soundness argument for the t'-fold, the u batching and the chain; its numeric checks |
+| `gt.mjs` (Track 7) | GT fold: Miller-value class representatives R_{i,j}, Rconst, GLS decomposition, nibbles, value check |
+| `plans.json`, `plan.mjs` (Track 7) | tuned chain plans; per-input data / op / need |
+| `fprof.mjs`, `chainprof.mjs`, `sweep.mjs` (Track 7) | function-level op-cost profiler; single-input J sweep |
