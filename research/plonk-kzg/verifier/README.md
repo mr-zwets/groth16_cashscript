@@ -167,8 +167,12 @@ exponentiation, is 12.3M. The transcript and the Fr work are negligible.
 
 - **Witness** (mul2, J = 13): slopes about 38.6 KB, WS 6,528, WQ 1,920, X 128, proof 768, PI 64.
 - **Today's regime** adds the TF blob (7,680 / 8,640 B), a per-circuit constant.
-- **Proving key (SRS).** The vectors use gnark's unsafe test SRS. A deployment would bake a ceremony's `[x]_2`, for example
-  Aztec Ignition.
+- **Proving key (SRS).** Since Track 7 (`wip/plonk-usable-srs`) the vectors use the Aztec Ignition ceremony (prover
+  FORMAT.md "SRS"). So the baked `[x]_2` and its 88 chain slopes are Ignition's, shared by every circuit on it.
+  `srs-check.mjs` checks every VK's `[1]_1`, `[1]_2` and `[x]_2` against the ceremony value. It also checks that the
+  slope pieces derived from that value are in each single-input redeem, and that the SI slice hashes are in the chain
+  scripts, with a control point that must be absent. Only the values of the per-circuit VK points changed; the sizes
+  did not.
 
 ## Deviations from the design, and honest negatives
 
@@ -220,6 +224,7 @@ node profile.mjs mul2 13                # per-phase op-cost
 nice node test.mjs mul2 spec 13         # -> results/test-mul2-spec.json  (also: merkle16, txv5 8)
 nice node chaintest.mjs mul2            # -> results/chain-mul2.json      (about 25 min per circuit)
 node summary.mjs                        # -> results/summary.json
+SRS_CACHE=dir node srs-check.mjs        # baked SRS constants = Aztec Ignition ([x]_2 from the pinned/downloaded manifest)
 node soundness/lattice.mjs              # numbers behind SOUNDNESS.md (GLV lattice, ranges, bound)
 ```
 

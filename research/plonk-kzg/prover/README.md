@@ -66,12 +66,19 @@ Universality:
 
 ## SRS
 
-The vectors use a test SRS with a public toxic value: `τ = SHA256(seed) mod r`, through gnark's
-`unsafekzg.WithToxicSeed`. **Anyone can forge proofs for these VKs.** FORMAT.md "SRS" covers two things:
-- How a deployment loads a public ceremony (Aztec Ignition, or the perpetual powers of tau) instead.
-- The circuit-size limit: `n ≤ 2^26` with Ignition's 100.8M powers, and the field cap of `n ≤ 2^28`.
-
-Loading a ceremony was not exercised here.
+The vectors use the **Aztec Ignition** ceremony (176 participants, then sealed by Aztec), not a test SRS
+(Track 7, branch `wip/plonk-usable-srs`). Details, URLs and hashes are in FORMAT.md "SRS".
+- `ceremony/main.go` downloads only byte ranges (about 13 MB for `n ≤ 2^16`), and verifies:
+  - the pinned `[x]_2`: the manifest's `crs.t2`, which is also barretenberg's hardcoded G2 point;
+  - the first-power chain over all 176 contributions and the seal;
+  - the pairing consistency of every G1 power it uses, as one random linear combination.
+- It writes a gnark-crypto `kzg.SRS` with 65,539 points (sha256 `ee63bf8e…edbb85`). `main.go -srs FILE` builds the
+  keys from it.
+- **Circuit-size cap**: `n ≤ 2^16` with the committed settings, `n ≤ 2^22` with `-log 22` (one transcript file is
+  read), and `n ≤ 2^26` for the whole ceremony.
+- The verifier's SRS constants (`[1]_1`, `[1]_2`, `[x]_2`, and the `[x]_2` Miller-chain slopes the scripts bake)
+  are checked against the ceremony by `../verifier/srs-check.mjs`.
+- The old test SRS (public toxic value) is still available as `go run . -unsafe-test-srs`.
 
 ## Vectors
 
@@ -99,7 +106,7 @@ Loading a ceremony was not exercised here.
 ## Build and regenerate
 
 ```
-./gen-vectors.sh            # GOMAXPROCS=4 nice go run . ; nice node verify.mjs
+./gen-vectors.sh            # ceremony download+checks, go run . -srs ..., node verify.mjs (SRS_CACHE=dir)
 npm install                 # once: @noble/curves 2.2.0 for verify.mjs
 node verify.mjs             # check all vectors: OK: 164 cases, 0 unexpected
 node verify.mjs --counts    # operation counts of one verification per circuit
@@ -118,7 +125,8 @@ node verify.mjs --trace mul2 0   # challenges and intermediate values
   binding derivation of u. γ, β, α, ζ and v, by contrast, are pinned: a wrong value rejects the valid vectors.
 - **Deviations from gnark's Go verifier** (PROTOCOL.md): proof points equal to the identity are rejected, and
   encodings are strict.
-- **Test SRS only.** No ceremony file was converted.
+- **Ceremony SRS, partly verified.** Only the parts the verifier relies on were checked: the final `[x]_2` chain and
+  the powers used. The full 100.8M-point transcripts, their checksums and the participants' signatures were not.
 - **Soundness rests on PLONK and KZG** under the q-SDH/AGM assumptions, with gnark's transcript. This track
   only claims that `verify.mjs` reproduces gnark's verifier and rejects the tampered set.
 - **snarkjs** PLONK uses Keccak. Emulating Keccak on CashVM was not measured; see the end of PROTOCOL.md.
