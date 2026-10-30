@@ -1,9 +1,11 @@
 // Command prover builds gnark PLONK (KZG, BN254) proofs for two circuits and writes JSON vectors in the
 // byte format of FORMAT.md: a VK, several valid proofs per circuit, and tampered variants.
 //
-//	GOMAXPROCS=4 nice go run . -out vectors -proofs 5
+//	GOMAXPROCS=4 nice go run ./ceremony -cache srs-cache -log 16   # once: Aztec Ignition SRS, verified
+//	GOMAXPROCS=4 nice go run . -srs srs-cache/ignition_bn254_65539.srs -out vectors -proofs 5
 //
-// The SRS is a TEST (unsafe) SRS with a known toxic value, see FORMAT.md "SRS".
+// The SRS is the Aztec Ignition ceremony's (FORMAT.md "SRS"). -unsafe-test-srs restores the old test SRS with a
+// public toxic value.
 package main
 
 import (
@@ -17,19 +19,18 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/consensys/gnark/backend/witness"
+
 	"github.com/consensys/gnark-crypto/ecc"
 	curve "github.com/consensys/gnark-crypto/ecc/bn254"
 	"github.com/consensys/gnark-crypto/ecc/bn254/fr"
 	nmimc "github.com/consensys/gnark-crypto/ecc/bn254/fr/mimc"
-	kzgbn254 "github.com/consensys/gnark-crypto/ecc/bn254/kzg"
 	"github.com/consensys/gnark/backend/plonk"
 	plonkbn254 "github.com/consensys/gnark/backend/plonk/bn254"
-	"github.com/consensys/gnark/backend/witness"
 	"github.com/consensys/gnark/constraint"
 	"github.com/consensys/gnark/frontend"
 	"github.com/consensys/gnark/frontend/cs/scs"
 	"github.com/consensys/gnark/logger"
-	"github.com/consensys/gnark/test/unsafekzg"
 )
 
 const (
@@ -49,8 +50,16 @@ func main() {
 	out := flag.String("out", "vectors", "output directory")
 	nProofs := flag.Int("proofs", 5, "valid proofs per circuit")
 	seed := flag.Uint64("seed", 20261029, "witness seed (gnark's blinding randomness is not seeded)")
+	srsPath := flag.String("srs", "", "ceremony SRS file written by ./ceremony (gnark-crypto kzg.SRS)")
+	unsafeTest := flag.Bool("unsafe-test-srs", false, "use the old unsafe test SRS (public toxic value) instead")
 	flag.Parse()
 	logger.Disable()
+	if (*srsPath == "") == !*unsafeTest {
+		panic("give exactly one of -srs FILE or -unsafe-test-srs")
+	}
+	if *srsPath != "" {
+		ceremonySRS = loadSRS(*srsPath)
+	}
 	must(os.MkdirAll(*out, 0o755))
 	rng := rand.New(rand.NewPCG(*seed, 0x706c6f6e6b))
 
@@ -175,8 +184,7 @@ type vectorsFile struct {
 func runCircuit(c circuitDef, nProofs int, rng *rand.Rand, out string) *srsInfo {
 	ccs, err := frontend.Compile(ecc.BN254.ScalarField(), scs.NewBuilder, c.circuit)
 	must(err)
-	canonical, lagrange, err := unsafekzg.NewSRS(ccs, unsafekzg.WithToxicSeed([]byte(toxicSeed)))
-	must(err)
+	canonical, lagrange, srsMeta := circuitSRS(ccs)
 	pkI, vkI, err := plonk.Setup(ccs, canonical, lagrange)
 	must(err)
 	vk := vkI.(*plonkbn254.VerifyingKey)
@@ -193,12 +201,7 @@ func runCircuit(c circuitDef, nProofs int, rng *rand.Rand, out string) *srsInfo 
 			"nbConstraints": sccs.GetNbConstraints(), "nbPublic": vk.NbPublicVariables,
 			"domainSize": vk.Size, "bsb22Commitments": 0,
 		},
-		SRS: map[string]any{
-			"unsafe":    true,
-			"toxicSeed": toxicSeed,
-			"note":      "unsafekzg.WithToxicSeed: tau is derived from the seed, so anyone can forge proofs; test vectors only",
-			"g1Points":  len(canonical.(*kzgbn254.SRS).Pk.G1),
-		},
+		SRS: srsMeta,
 		Notes: map[string]string{
 			"linOpening": "ClaimedValues[0] of gnark's proof struct (opening of the linearised polynomial at zeta); not part of the 768-byte proof, the verifier recomputes it (verify.mjs cross-checks it equals r0)",
 			"proofs":     "gnark's prover blinds with crypto/rand, so re-running gives different (equally valid) proofs",

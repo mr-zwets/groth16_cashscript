@@ -106,8 +106,9 @@ in `BatchVerifyMultiPoints`. Here π̃ is π with `ClaimedValues[0] := r0`. Equi
   - For knowledge soundness, read "x ∉ L_vk" as "the AGM extractor fails".
   - Its non-computational terms are Q·O(n)/r. For n ≤ 2^28 that is roughly Q·2^-220. This order of magnitude is not
     re-derived here.
-- **A3 (SRS).** [τ]_2 = τ·[1]_2 for a τ unknown to the adversary, i.e. an honest ceremony. The vectors' test SRS violates
-  this on purpose: there τ is public.
+- **A3 (SRS).** [τ]_2 = τ·[1]_2 for a τ unknown to the adversary, i.e. an honest ceremony. The vectors now use Aztec Ignition
+  (176 contributions plus a seal; one honest contributor suffices). The first vectors used a test SRS with public τ,
+  which violated this on purpose. The load checks are in the prover's FORMAT.md "SRS".
 - **A4 (implementation).** The arithmetic kernels compute the field formulas written in `script.mjs` / `multi.mjs`.
   The baked constants (VK points, TF blob, both G2 line chains, the SI schedule) equal their definitions; the build
   asserts them against noble. This is tested, not proved (README "Not verified"). Given A4, the curve operations are
