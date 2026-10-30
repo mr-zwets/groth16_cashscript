@@ -1,7 +1,7 @@
 // Compile every chunkNN.cash, build per-chunk PADDED (locking, unlocking)
 // vectors, and measure op-cost + size on the real & loosened BCH 2026 VMs.
 // Writes src/bch/vkx-chunked-shamir-vectors.json into the verifier repo for the
-// bch-vkx-chunked benchmark entry.
+// bch-vkx-chunked-shamir benchmark entry.
 //
 // PADDING MECHANISM (`unused` modifier): each chunk's spend() ends with a trailing
 //   `bytes unused zeroPadding` arg the unlocker fills with zero bytes to buy the real-VM

@@ -1,7 +1,7 @@
 // Compile every chunkNN.cash, build per-chunk PADDED (locking, unlocking)
 // vectors, and measure op-cost + size on the real & loosened BCH 2026 VMs.
-// Writes src/bch/vkx-chunked-vectors.json into the verifier repo for the
-// bch-vkx-chunked benchmark entry.
+// Writes src/bch/vkx-chunked-twoloop-vectors.json into the verifier repo for the
+// bch-vkx-chunked-twoloop benchmark entry.
 //
 // PADDING MECHANISM (`unused` modifier): each chunk's spend() ends with a trailing
 //   `bytes unused zeroPadding` arg the unlocker fills with zero bytes to buy the real-VM
@@ -132,6 +132,6 @@ console.log('---');
 console.log(`chunks=${manifest.numChunks} K=${manifest.K} | total op-cost ${totalOp.toLocaleString()} | max/step ${maxOp.toLocaleString()} (budget ${STANDARD_BUDGET.toLocaleString()})`);
 console.log(`max lock ${maxLock}B max unlock ${maxUnlock}B | allLooseAccept=${allAccept} allRealAccept=${allReal} allFit=${allFit}`);
 
-const outPath = process.env.OUT || join(VERIFIER_DIR, 'src/bch/vkx-chunked-vectors.json');
+const outPath = process.env.OUT || join(VERIFIER_DIR, 'src/bch/vkx-chunked-twoloop-vectors.json');
 writeFileSync(outPath, JSON.stringify(out, null, 2));
 console.log('wrote', outPath);

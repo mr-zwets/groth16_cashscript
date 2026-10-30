@@ -159,11 +159,14 @@ compiler it was last regenerated with:
   singletons (plain, opcode-optimized, minop), both pairing singletons,
   `bch-vkx-chunked-twoloop`, `-intratx-pairfold5-densless-msm` and its `-spec` twin, both
   `-intratx-residue-large` spec entries and `bch-groth16-bls12381-grouped-residue`. Every one
-  shrank and kept every gate result.
+  shrank and kept every gate result. Also on co-8 since 2026-10-30 (bench `wip/housekeeping`):
+  `bch-vkx-singleton`, `bch-vkx-bls12381-singleton` and `bch-vkx-chunked-shamir`, whose
+  co-2 files did not match a rebuild (the builds are deterministic; the committed files were
+  stale). Every gate result unchanged.
 - **`compiler-optimizations-2`** (2026-07-23, bench `082da7c`), not yet regenerated: the
   plain chunked / covenant-residue / grouped / intra-tx families on both curves, the
   pairing chunked and intra-tx milestones, `bch-groth16-bls12381-singleton-fs`, and the
-  `vkx` singleton / covenant / shamir entries.
+  `vkx` covenant entries.
 - **Older than co-2**: `bch-groth16-grouped-residue` and `bch-groth16-intratx-residue`,
   kept deliberately at the co-2 switch (the first plan overflowed its per-input caps under
   the new compiler; the second scored worse and its relay certificate pins the old
