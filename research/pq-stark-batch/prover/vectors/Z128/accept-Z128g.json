@@ -1,0 +1,111 @@
+{
+  "all_ok": true,
+  "cases": [
+    {
+      "bytes": 53554,
+      "case": "single_instance",
+      "file": "/home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/Z128/single_instance-Z128g.json",
+      "log_arities": [
+        2
+      ],
+      "log_heights": [
+        6
+      ],
+      "ok": true,
+      "prove_ms": 894,
+      "rust_verify_ms": 3,
+      "seed2_bytes_differ": true,
+      "tamper_sweep": {
+        "cases": 54,
+        "unexpected_accepts": []
+      },
+      "transcript_hash_inputs": 14
+    },
+    {
+      "bytes": 87324,
+      "case": "three_instances_mixed_sizes",
+      "file": "/home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/Z128/three_instances_mixed_sizes-Z128g.json",
+      "log_arities": [
+        1,
+        2
+      ],
+      "log_heights": [
+        7,
+        6,
+        6
+      ],
+      "ok": true,
+      "prove_ms": 470,
+      "rust_verify_ms": 3,
+      "seed2_bytes_differ": true,
+      "tamper_sweep": {
+        "cases": 65,
+        "unexpected_accepts": []
+      },
+      "transcript_hash_inputs": 16
+    },
+    {
+      "bytes": 63938,
+      "case": "mixed_preprocessed",
+      "file": "/home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/Z128/mixed_preprocessed-Z128g.json",
+      "log_arities": [
+        2
+      ],
+      "log_heights": [
+        6,
+        6
+      ],
+      "ok": true,
+      "prove_ms": 252,
+      "rust_verify_ms": 2,
+      "seed2_bytes_differ": true,
+      "tamper_sweep": {
+        "cases": 56,
+        "unexpected_accepts": []
+      },
+      "transcript_hash_inputs": 14
+    },
+    {
+      "bytes": 84436,
+      "case": "both_lookups_zk",
+      "file": "/home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/Z128/both_lookups_zk-Z128g.json",
+      "log_arities": [
+        2
+      ],
+      "log_heights": [
+        6,
+        6
+      ],
+      "ok": true,
+      "prove_ms": 131,
+      "rust_verify_ms": 2,
+      "seed2_bytes_differ": true,
+      "tamper_sweep": {
+        "cases": 68,
+        "unexpected_accepts": []
+      },
+      "transcript_hash_inputs": 16
+    },
+    {
+      "bytes": 37952,
+      "case": "periodic_air_zk",
+      "file": "/home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/Z128/periodic_air_zk-Z128g.json",
+      "log_arities": [
+        2
+      ],
+      "log_heights": [
+        6
+      ],
+      "ok": true,
+      "prove_ms": 213,
+      "rust_verify_ms": 1,
+      "seed2_bytes_differ": true,
+      "tamper_sweep": {
+        "cases": 47,
+        "unexpected_accepts": []
+      },
+      "transcript_hash_inputs": 14
+    }
+  ],
+  "set": "Z128g"
+}
