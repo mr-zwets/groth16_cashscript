@@ -360,9 +360,9 @@ function statement(a, vk, plan, call) {
     kk.output(chk, r0, s1c, s2c, M(zh), zn2); a.kernel(kk, ['chkInv', 'r0', 's1c', 's2c', 'zh', 'zn2'], {iters: 3000}); }
   a.roll('chkInv').op(OP.NOT, 1, 'q').op(OP.VERIFY, 1);
   const be32n = (n) => { a.pick(n).push(32).op(OP.NUM2BIN, 2, 'b').op(OP.REVERSEBYTES, 1, n + 'BE'); };
+  if (m > 0) a.pick('GV', 'GV2'); // a copy for the Qcp tail below (m = 0 keeps Track 6's bytes exactly)
   a.pushBytes(Buffer.from('gamma')); be32n('zeta'); a.op(OP.CAT, 2, 'h').pick('X').push(64).op(OP.SPLIT, 2, 'lam', 'x').drop('x').op(OP.CAT, 2, 'h');
   a.pick('PROOF').push(192).op(OP.SPLIT, 2, 'lro', 'x').drop('x').op(OP.CAT, 2, 'h');
-  if (m > 0) a.pick('GV', 'GV2'); // m = 0 keeps Track 6's bytes exactly
   a.roll('GV').push(5).op(OP.SPLIT, 2, 'x', 's12').drop('x').push(128).op(OP.SPLIT, 2, 's12', 'x').drop('x').op(OP.CAT, 2, 'h');
   if (m > 0) a.roll('GV2').push(5 + 512).op(OP.SPLIT, 2, 'x', 'qv').drop('x').op(OP.CAT, 2, 'h'); // digests .. S1 S2 Qcp_j (the GV tail)
   be32n('r0'); a.op(OP.CAT, 2, 'h').pick('PROOF').push(384).op(OP.SPLIT, 2, 'x', 'ev').drop('x').push(160).op(OP.SPLIT, 2, 'ev', 'x').drop('x').op(OP.CAT, 2, 'h');

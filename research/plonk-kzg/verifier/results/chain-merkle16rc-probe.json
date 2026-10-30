@@ -8,21 +8,21 @@
    "TV": 10560,
    "TF": 9600,
    "G0": 768,
-   "C0": 8116,
+   "C0": 8114,
    "C1": 3608,
    "cases": [
     {
      "name": "valid 0",
      "accepted": true,
      "asExpected": true,
-     "txBytes": 102019,
-     "opCost": 78197025,
+     "txBytes": 102018,
+     "opCost": 78196200,
      "unlocking": [
       10283,
       8502,
       10766,
       10181,
-      10335,
+      10334,
       10635,
       10804,
       10827,
@@ -35,7 +35,7 @@
      "accepted": true,
      "asExpected": true,
      "txBytes": 101933,
-     "opCost": 78126578,
+     "opCost": 78125759,
      "unlocking": [
       10215,
       8502,
@@ -53,8 +53,8 @@
      "name": "valid 2",
      "accepted": true,
      "asExpected": true,
-     "txBytes": 102139,
-     "opCost": 78147335,
+     "txBytes": 102138,
+     "opCost": 78146510,
      "unlocking": [
       10160,
       8502,
@@ -63,7 +63,7 @@
       10497,
       10606,
       10743,
-      10747,
+      10746,
       9467,
       9770
      ]
@@ -73,7 +73,7 @@
      "accepted": true,
      "asExpected": true,
      "txBytes": 102173,
-     "opCost": 78280661,
+     "opCost": 78279842,
      "unlocking": [
       10344,
       8502,
@@ -92,7 +92,7 @@
      "accepted": true,
      "asExpected": true,
      "txBytes": 102180,
-     "opCost": 78326101,
+     "opCost": 78325282,
      "unlocking": [
       10279,
       8502,
@@ -111,7 +111,7 @@
      "accepted": false,
      "asExpected": true,
      "txBytes": 102132,
-     "opCost": 78329147,
+     "opCost": 78328328,
      "unlocking": [
       10158,
       8502,
@@ -130,7 +130,7 @@
      "accepted": false,
      "asExpected": true,
      "txBytes": 102260,
-     "opCost": 78240673,
+     "opCost": 78239854,
      "unlocking": [
       10345,
       8502,
@@ -149,7 +149,7 @@
      "accepted": false,
      "asExpected": true,
      "txBytes": 102174,
-     "opCost": 78317680,
+     "opCost": 78316861,
      "unlocking": [
       10282,
       8502,
@@ -168,7 +168,7 @@
      "accepted": false,
      "asExpected": true,
      "txBytes": 101303,
-     "opCost": 77655502,
+     "opCost": 77654683,
      "unlocking": [
       10032,
       8502,
@@ -187,7 +187,7 @@
      "accepted": false,
      "asExpected": true,
      "txBytes": 101983,
-     "opCost": 78112149,
+     "opCost": 78111330,
      "unlocking": [
       10338,
       8502,
@@ -206,7 +206,7 @@
      "accepted": false,
      "asExpected": true,
      "txBytes": 101631,
-     "opCost": 77879852,
+     "opCost": 77879033,
      "unlocking": [
       10157,
       8502,
@@ -225,7 +225,7 @@
      "accepted": false,
      "asExpected": true,
      "txBytes": 101675,
-     "opCost": 77953761,
+     "opCost": 77952942,
      "unlocking": [
       10098,
       8502,
@@ -244,7 +244,7 @@
      "accepted": false,
      "asExpected": true,
      "txBytes": 100424,
-     "opCost": 76748638,
+     "opCost": 76747819,
      "unlocking": [
       9968,
       8502,
@@ -265,17 +265,17 @@
    "TV": 10560,
    "TF": 9600,
    "G0": 768,
-   "C0": 8479,
+   "C0": 8477,
    "C1": 3608,
    "cases": [
     {
      "name": "valid 0",
      "accepted": true,
      "asExpected": true,
-     "txBytes": 103762,
-     "opCost": 78666640,
+     "txBytes": 103760,
+     "opCost": 78665747,
      "unlocking": [
-      8587,
+      8585,
       8502,
       10766,
       9806,
@@ -292,10 +292,10 @@
      "name": "valid 1",
      "accepted": true,
      "asExpected": true,
-     "txBytes": 103708,
-     "opCost": 78569921,
+     "txBytes": 103706,
+     "opCost": 78569028,
      "unlocking": [
-      8587,
+      8585,
       8502,
       10766,
       9806,
@@ -312,10 +312,10 @@
      "name": "valid 2",
      "accepted": true,
      "asExpected": true,
-     "txBytes": 103838,
-     "opCost": 78530473,
+     "txBytes": 103836,
+     "opCost": 78529580,
      "unlocking": [
-      8587,
+      8585,
       8502,
       10766,
       9806,
@@ -333,7 +333,7 @@
      "accepted": true,
      "asExpected": true,
      "txBytes": 103791,
-     "opCost": 78658558,
+     "opCost": 78657735,
      "unlocking": [
       8697,
       8502,
@@ -353,7 +353,7 @@
      "accepted": true,
      "asExpected": true,
      "txBytes": 104085,
-     "opCost": 78742912,
+     "opCost": 78742089,
      "unlocking": [
       8693,
       8502,
