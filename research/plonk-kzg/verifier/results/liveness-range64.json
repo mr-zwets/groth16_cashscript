@@ -10,12 +10,12 @@
    ],
    [
     41,
-    38
+    39
    ]
   ],
   "ma": [
    [
-    37,
+    38,
     25
    ],
    [
@@ -91,11 +91,19 @@
   {
    "nq": 280,
    "ok": true,
-   "txBytes": 89550,
+   "txBytes": 89088,
    "maxInput": {
-    "role": "MJ",
-    "i": 2,
-    "unlocking": 9846
+    "role": "SI",
+    "i": 6,
+    "unlocking": 9721
+   },
+   "padded": true,
+   "finalOnly": true,
+   "lastErrorAt": {
+    "depth": 2,
+    "ip": 778,
+    "len": 795,
+    "checkAfter": false
    },
    "bad": [],
    "lastError": "Program failed an OP_VERIFY operation."
@@ -103,11 +111,19 @@
   {
    "nq": 420,
    "ok": true,
-   "txBytes": 92561,
+   "txBytes": 92090,
    "maxInput": {
-    "role": "MJ",
-    "i": 2,
-    "unlocking": 9859
+    "role": "ST",
+    "i": 1,
+    "unlocking": 9752
+   },
+   "padded": true,
+   "finalOnly": true,
+   "lastErrorAt": {
+    "depth": 2,
+    "ip": 778,
+    "len": 795,
+    "checkAfter": false
    },
    "bad": [],
    "lastError": "Program failed an OP_VERIFY operation."
@@ -171,6 +187,76 @@
   "honestMax": 345,
   "samples": 1000000,
   "samplesOverCap": 0,
-  "pOverCap": "< 3.0e-6 (0 of 1000000, 95%)"
+  "pOverCap": "< 3.0e-6 (0 of 1000000, 95%)",
+  "digitStressOk": true,
+  "worstMJHeadroom": 379
+ },
+ "digitStress": {
+  "chunk": 1,
+  "ok": true,
+  "worstMJ": {
+   "i": 0,
+   "need": 9621,
+   "unfilled": 9588,
+   "headroom": 379
+  },
+  "bad": [],
+  "perInput": [
+   {
+    "i": 0,
+    "role": "MJ",
+    "windows": "50..42",
+    "unfilled": 9588,
+    "need": 9621,
+    "fill": 97,
+    "unlocking": 9686,
+    "headroom": 379,
+    "error": null
+   },
+   {
+    "i": 2,
+    "role": "MJ",
+    "windows": "41..39",
+    "unfilled": 8898,
+    "need": 8847,
+    "fill": 0,
+    "unlocking": 8898,
+    "headroom": 1102,
+    "error": null
+   },
+   {
+    "i": 3,
+    "role": "MA",
+    "windows": "38..25",
+    "unfilled": 9043,
+    "need": 9153,
+    "fill": 174,
+    "unlocking": 9218,
+    "headroom": 847,
+    "error": null
+   },
+   {
+    "i": 4,
+    "role": "MA",
+    "windows": "24..12",
+    "unfilled": 6956,
+    "need": 7853,
+    "fill": 961,
+    "unlocking": 7919,
+    "headroom": 2147,
+    "error": null
+   },
+   {
+    "i": 5,
+    "role": "MA",
+    "windows": "11..0",
+    "unfilled": 6730,
+    "need": 7378,
+    "fill": 712,
+    "unlocking": 7444,
+    "headroom": 2622,
+    "error": null
+   }
+  ]
  }
 }

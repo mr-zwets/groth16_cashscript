@@ -6,24 +6,24 @@
   "mj": [
    [
     50,
-    41
+    42
    ],
    [
-    40,
-    37
+    41,
+    39
    ]
   ],
   "ma": [
    [
-    36,
-    24
+    38,
+    26
    ],
    [
-    23,
-    12
+    25,
+    13
    ],
    [
-    11,
+    12,
     0
    ]
   ],
@@ -48,12 +48,16 @@
   "blobs": [
    [
     6,
-    3650
+    4000
    ],
    [
     7,
-    4100
+    4400
    ]
+  ],
+  "tv2": [
+   3,
+   9
   ]
  },
  "model": [
@@ -87,11 +91,19 @@
   {
    "nq": 260,
    "ok": true,
-   "txBytes": 82598,
+   "txBytes": 83118,
    "maxInput": {
     "role": "MJ",
-    "i": 2,
-    "unlocking": 9858
+    "i": 0,
+    "unlocking": 9228
+   },
+   "padded": true,
+   "finalOnly": true,
+   "lastErrorAt": {
+    "depth": 2,
+    "ip": 734,
+    "len": 751,
+    "checkAfter": false
    },
    "bad": [],
    "lastError": "Program failed an OP_VERIFY operation."
@@ -99,11 +111,19 @@
   {
    "nq": 348,
    "ok": true,
-   "txBytes": 84119,
+   "txBytes": 84603,
    "maxInput": {
-    "role": "MJ",
-    "i": 2,
-    "unlocking": 9858
+    "role": "SI",
+    "i": 9,
+    "unlocking": 9286
+   },
+   "padded": true,
+   "finalOnly": true,
+   "lastErrorAt": {
+    "depth": 2,
+    "ip": 734,
+    "len": 751,
+    "checkAfter": false
    },
    "bad": [],
    "lastError": "Program failed an OP_VERIFY operation."
@@ -161,6 +181,76 @@
   "honestMax": 294,
   "samples": 1000000,
   "samplesOverCap": 0,
-  "pOverCap": "< 3.0e-6 (0 of 1000000, 95%)"
+  "pOverCap": "< 3.0e-6 (0 of 1000000, 95%)",
+  "digitStressOk": true,
+  "worstMJHeadroom": 772
+ },
+ "digitStress": {
+  "chunk": 1,
+  "ok": true,
+  "worstMJ": {
+   "i": 0,
+   "need": 8889,
+   "unfilled": 9228,
+   "headroom": 772
+  },
+  "bad": [],
+  "perInput": [
+   {
+    "i": 0,
+    "role": "MJ",
+    "windows": "50..42",
+    "unfilled": 9228,
+    "need": 8889,
+    "fill": 0,
+    "unlocking": 9228,
+    "headroom": 772,
+    "error": null
+   },
+   {
+    "i": 2,
+    "role": "MJ",
+    "windows": "41..39",
+    "unfilled": 8898,
+    "need": 8528,
+    "fill": 0,
+    "unlocking": 8898,
+    "headroom": 1102,
+    "error": null
+   },
+   {
+    "i": 3,
+    "role": "MA",
+    "windows": "38..26",
+    "unfilled": 7143,
+    "need": 7556,
+    "fill": 477,
+    "unlocking": 7622,
+    "headroom": 2444,
+    "error": null
+   },
+   {
+    "i": 4,
+    "role": "MA",
+    "windows": "25..13",
+    "unfilled": 6536,
+    "need": 7300,
+    "fill": 828,
+    "unlocking": 7366,
+    "headroom": 2700,
+    "error": null
+   },
+   {
+    "i": 5,
+    "role": "MA",
+    "windows": "12..0",
+    "unfilled": 6827,
+    "need": 7339,
+    "fill": 576,
+    "unlocking": 7405,
+    "headroom": 2661,
+    "error": null
+   }
+  ]
  }
 }

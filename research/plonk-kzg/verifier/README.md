@@ -24,8 +24,8 @@ WQa ‖ WQb exceeded the 10,000-byte stack item limit in ST from n_q = 310, and 
 about 340, below the honest tail of the BSB22 circuits (1M sampled proofs: max 345 / 351; 5 and 2 per million above
 340, 0.4% above 308). Changes:
 - mul2 plan without `bindST` (the binding is in the last SI role in every plan);
-- the chain quotient is three pieces WQa (4,096 B, input 8) ‖ WQb (input 9) ‖ WQc (input 4, an MA role with spare
-  op-funded bytes), never concatenated; z = H(h0 ‖ ρRaw ‖ H(WQa) ‖ H(WQb) ‖ H(WQc)) (SOUNDNESS §0, §1);
+- the chain quotient is three pieces WQa (4,096 B, input 8) ‖ WQb (input 9) ‖ WQc (input 5, the last MA role, with
+  spare op-funded bytes; input 4 for mul2 and merkle16 in the first fix round), never concatenated; z = H(h0 ‖ ρRaw ‖ H(WQa) ‖ H(WQb) ‖ H(WQc)) (SOUNDNESS §0, §1);
 - `liveness.mjs` and a `chaintest.mjs` case check that a proof with the **structural maximum** n_q (348 / 384 / 420
   / 420) fits the chain (every input ≤ 10,000 B and within its BCHN-adjusted budget, tx ≤ 100,000 B). So no honest
   proof fails on its quotient size any more; the previous caps were about 260 (mul2) and 340 (all four).
@@ -37,26 +37,51 @@ about 340, below the honest tail of the BSB22 circuits (1M sampled proofs: max 3
 Cost of the fixes (chain only; the single-input redeems and witnesses are byte-identical, so their results stand):
 mul2 +0.2 to +1.1 KB (most of it from dropping bindST), merkle16 +0.2 KB, BSB22 circuits +0.06 KB.
 
+**Re-review fixes (2026-10-30, second round).** The fixes above were re-reviewed (pass, six minor findings), and the
+minors are applied:
+- **WQc host documented right:** input 5 for the BSB22 plans (input 4 for mul2 / merkle16 in the first round); now input
+  5, the last MA role, in every plan (SOUNDNESS, this README).
+- **Digit stress and MJ headroom.** `chain.mjs` `digitStress` (run by `chaintest.mjs` and `liveness.mjs`) re-witnesses
+  every MSM role for all-nonzero digits and requires need + FILL header + slack ≤ 10,000 B per MSM input. The old plans
+  passed with 84 B to spare (merkle16 input 2). The plans now move work from the MJ inputs to the MA roles and split
+  TV in every circuit (merkle16rc also adds blob C3 in input 4); the worst MJ input keeps 772 / 539 / 379 / 339 B
+  (mul2 / merkle16 / range64 / merkle16rc) under the limit for any digit pattern (Open, below).
+- **FILL slack capped:** `sizeFills` adds min(need + 64, 10,000 − unfilled − 2) when the need fits, so the slack can
+  never take an input over the 10,000 B standard limit.
+- **n_q stress checks the failure position:** "only the final identity fails" now means the last input fails in its
+  role body with no check after the failing instruction (`vm.mjs` `errorAt`), not just "some OP_VERIFY".
+- **Per-witness pad in `test.mjs`:** every case in the 100 KB suite gets the pad its own witness needs, and a
+  standard-mode op-cost/density error is a test failure (the same rule in `chaintest.mjs`). The 3 / 10 / 37 budget
+  rejections of the first round (merkle16 / range64 / merkle16rc) are gone: every rejection is a verifier check's.
+- **Re-witnessed checks:** chain variants of "WQc / WQb extra zero word" (a leading zero word, the same polynomial, z and
+  everything after it recomputed) fail only in ST, at the size rule; "nibble = 0x10" with h0 and the SI transcript
+  recomputed (the byte picks TM_0[0] = TP_1[0] = 1, as 0 does) fails only in the binding host, before the binding loop,
+  i.e. at NIBC, in the chain and in the single input.
+
+Cost of the second round (chain only): mul2 +0.52–0.56 KB, merkle16 +0.75–0.78 KB (the MA roles carry the moved
+windows' slopes, while the data-bound MJ inputs do not shrink), range64 and merkle16rc −0.34 to −0.46 KB (their input 2
+was op-bound and filled). Single input unchanged.
+
 ### Results (score = unlocking + 35 B locking per input + tx overhead; ranges over 5 valid proofs per circuit)
 
 Every vector is on the Aztec Ignition SRS. `range64` and `merkle16rc` carry one BSB22 commitment (`std/rangecheck`).
 Op-cost is libauth standard; BCHN-adjusted adds the OP_DEFINE body bytes (single input +2,539 to +2,635 per spend;
-chain +34.4k to +38.6k per input, now also written per input in `chain-*.json`). `results/summary.json` has every value.
+chain +34.7k to +38.6k per input, now also written per input in `chain-*.json`). `results/summary.json` has every value.
 
 | circuit / regime | inputs / tx | score (B) | tx bytes | op-cost (M) | BCHN-adj. (M) | worst margin (BCHN) |
 |---|--:|--:|--:|--:|--:|--:|
 | mul2 / bch-spec, J = 23 | 1 / 1 | 59,291–60,669 | | 53.41–53.84 | 53.41–53.85 | 3.21% |
 | mul2 / one 100 KB input, J = 14 | 1 / 1 | 63,276–64,622 | | 50.50–50.90 | 50.50–50.91 | pad per proof |
-| mul2 / today, standard | 10 / 1 | 82,679–83,001 | 82,329–82,651 | 64.04–64.46 | 64.38–64.80 | 0.23% (FILL per proof) |
+| mul2 / today, standard | 10 / 1 | 83,238–83,521 | 82,888–83,171 | 63.54–63.99 | 63.89–64.34 | 0.80% (FILL per proof) |
 | merkle16 / bch-spec, J = 23 | 1 / 1 | 60,567–61,306 | | 54.49–54.94 | 54.50–54.94 | 3.33% |
 | merkle16 / one 100 KB input, J = 14 | 1 / 1 | 64,631–65,355 | | 51.61–51.97 | 51.61–51.97 | pad per proof |
-| merkle16 / today, standard | 10 / 1 | 84,588–84,783 | 84,238–84,433 | 65.66–65.98 | 66.02–66.34 | 0.05% |
+| merkle16 / today, standard | 10 / 1 | 85,369–85,537 | 85,019–85,187 | 65.17–65.51 | 65.53–65.88 | 0.00% (input 6, data-bound) |
 | range64 (BSB22) / bch-spec, J = 21 | 1 / 1 | 64,510–65,311 | | 57.49–58.02 | 57.49–58.02 | 3.43% |
 | range64 (BSB22) / one 100 KB input, J = 14 | 1 / 1 | 68,985–69,553 | | 55.09–55.55 | 55.09–55.55 | pad per proof |
-| range64 (BSB22) / today, standard | 10 / 1 | 89,620–89,962 | 89,270–89,612 | 69.81–70.16 | 70.19–70.54 | 0.33% |
+| range64 (BSB22) / today, standard | 10 / 1 | 89,259–89,500 | 88,909–89,150 | 69.45–69.78 | 69.83–70.17 | 0.41% |
 | merkle16rc (BSB22) / bch-spec, J = 21 | 1 / 1 | 64,957–65,760 | | 57.36–57.86 | 57.36–57.86 | 3.87% |
 | merkle16rc (BSB22) / one 100 KB input, J = 14 | 1 / 1 | 68,764–69,363 | | 54.91–55.39 | 54.92–55.40 | pad per proof |
-| merkle16rc (BSB22) / today, standard | 10 / 1 | 89,868–90,312 | 89,518–89,962 | 69.62–70.09 | 70.01–70.47 | 0.65% |
+| merkle16rc (BSB22) / today, standard | 10 / 1 | 89,531–89,864 | 89,181–89,514 | 69.60–69.97 | 69.98–70.36 | 0.69% |
 
 **Tests** (`results/test-*.json`, `results/chain-*.json`), consensus and standard mode, every verdict as `verify.mjs`
 (the JS reference) gives it:
@@ -65,16 +90,20 @@ chain +34.4k to +38.6k per input, now also written per input in `chain-*.json`).
 |---|---|---|---|---|
 | valid accepted (each regime) | 5/5 | 5/5 | 5/5 | 5/5 |
 | tampered rejected (each regime) | 76/76 | 78/78 | 86/86 | 91/91 (13 commitment cases) |
-| manipulations, single input (each regime) | 33/33 | 33/33 | 34/34 | 34/34 |
-| manipulations, chain | 36/36 | 36/36 | 38/38 | 38/38 |
+| manipulations, single input (each regime) | 34/34 | 34/34 | 35/35 | 35/35 |
+| manipulations, chain | 40/40 | 40/40 | 41/41 | 42/42 |
 | chain liveness: structural max n_q fits | 348 | 384 | 420 | 420 |
+| chain digit stress: worst MJ headroom (B) | 772 | 539 | 379 | 339 |
 | honest n_q (5 vectors; 1M sampled: max) | 219–258; 294 | 234–255; 315 | 258–279; 345 | 264–282; 351 |
 
 - The BSB22 circuits add an adaptive manipulation (the folded Qcp_0's nibbles encode s + 1, SI re-witnessed) and,
   in the chain, a TV2 entry flip. The review fixes add three chain manipulations (WQc word flipped, WQc wrong size,
-  128 B moved from WQb to WQc) and, for mul2, the G0 s_0 flip (its binding is no longer in ST).
+  128 B moved from WQb to WQc) and, for mul2, the G0 s_0 flip (its binding is no longer in ST). The second round
+  adds the re-witnessed WQb / WQc zero word and nibble 0x10 cases (chain), the re-witnessed nibble 0x10 (single input),
+  and, with the new plans, a TV2 entry flip for mul2 / merkle16 and a C3 byte flip for merkle16rc.
 - All 20 fresh proofs of the measurement review (5 per circuit, n_q 231–294; `cache/review-fresh-vectors/`, not
-  committed) are accepted by the chain, including the mul2 proof with n_q = 264 that the earlier build rejected.
+  committed) are accepted by the chain (re-run on the second-round plans: tx 82,989–89,540 B), including the mul2 proof
+  with n_q = 264 that the earlier build rejected.
 - `srs-check.mjs` passes for all four circuits: VK [1]_1, [1]_2, [x]_2 against the pinned and downloaded ceremony
   value; every [x]_2 slope piece in each single-input redeem and every SI slice hash in each chain; the six number
   pushes x, y of [x]_2 and x of ψ([x]_2) in both builds; a control G2 point's constants absent.
@@ -87,21 +116,22 @@ chain +34.4k to +38.6k per input, now also written per input in `chain-*.json`).
 |---|--:|--:|--:|--:|
 | mul2 bch-spec | 66,290–66,549 | msm 59,480–59,995 | 59,291–60,669 | −8.8% (max) |
 | mul2 100 KB input | 69,757–69,919 | msm 63,497–63,948 | 63,276–64,622 | −7.6% |
-| mul2 today | 92,845–93,095 | msm 81,882–82,035 | 82,679–83,001 | −10.8% |
+| mul2 today | 92,845–93,095 | msm 81,882–82,035 | 83,238–83,521 | −10.3% |
 | merkle16 bch-spec | 68,494–68,655 | msm 60,790–61,785 | 60,567–61,306 | −10.7% |
 | merkle16 100 KB input | 72,188–72,438 | msm 64,896–65,801 | 64,631–65,355 | −9.8% |
-| merkle16 today | 95,637–95,985 | msm 84,476–84,754 | 84,588–84,783 | −11.7% |
+| merkle16 today | 95,637–95,985 | msm 84,476–84,754 | 85,369–85,537 | −10.9% |
 | merkle16rc bch-spec | (unsupported) | bsb22 72,404–72,760 (J = 13) | 64,957–65,760 | −9.6% vs bsb22 |
 | merkle16rc 100 KB input | (unsupported) | bsb22 77,402–77,720 (J = 8) | 68,764–69,363 | −10.8% vs bsb22 |
-| merkle16rc today | (unsupported) | bsb22: **does not fit** (≥ 103.7 KB, relaxed VM only) | **89,868–90,312, 10 inputs, 1 standard tx** | fits |
+| merkle16rc today | (unsupported) | bsb22: **does not fit** (≥ 103.7 KB, relaxed VM only) | **89,531–89,864, 10 inputs, 1 standard tx** | fits |
 
-- mul2 and merkle16 moved only within the proof-to-proof spread against the msm branch; the SRS change does not
-  change sizes. The bch-spec margins moved to 3.21% / 3.33% (msm branch: 3.53% / 3.26%) with the Ignition proofs.
+- mul2 and merkle16 single input moved only within the proof-to-proof spread against the msm branch; the SRS change
+  does not change sizes. Their chains are 0.8–1.5 KB above the msm branch since the review fixes (the binder moved out
+  of ST, the three-piece quotient, the second round's MJ headroom). The bch-spec margins moved to 3.21% / 3.33% (msm branch: 3.53% / 3.26%) with the Ignition proofs.
 - Track 6's op-cost: 58.0–58.3M (mul2 bch-spec) and 70.6–71.0M (mul2 today); the integrated build needs 53.4–53.8M
-  and 64.0–64.5M.
+  and 63.5–64.0M.
 - **Cost of one commitment** in the integrated build (merkle16rc against merkle16, same k and n): +4.4 KB at bch-spec
   (J = 21 against 23, for the margin; at J = 23 it is +3.4 KB with a 1.4% margin), +4.0 KB in the 100 KB input,
-  +5.4–5.6 KB in the chain. Against the bsb22 branch's +3.9–4.1 KB, the commitment costs about the same: Bsb22_0
+  +4.2–4.3 KB in the chain (the second-round plans; +5.4–5.6 KB before). Against the bsb22 branch's +3.9–4.1 KB, the commitment costs about the same: Bsb22_0
   is one more variable base (≈ 1.6 KB of slopes, 2.1M op), and Qcp_0 one more folded base (65 nibble bytes, about
   10.8k op per event, about +25 honest quotient words) instead of a G1 MSM base.
 
@@ -113,12 +143,14 @@ chain +34.4k to +38.6k per input, now also written per input in `chain-*.json`).
 2. **TV/TV2 split (chain).** 11 variable bases make TV 10,560 B, over the 10,000 B push limit (the bsb22 branch's
    blocker). `makePlan({tv2: [host, n1]})` puts the first n1 bases in TV (input 2) and the rest in TV2, a fixed
    push in an MSM role (input 3, the first MA). Each host checks its own entries; LOADT reads both; ST reads Wζω's
-   table from TV2. Builds with ≤ 10 variable bases are unchanged.
-3. **BSB22 chain plans** (`plans.json`): MJ(50..42, C0) · ST · MJ(41..38, TV) · MA(37..25 + TV2, 24..12, 11..0) ·
-   SI(0–16 + GZ + C1, 16–36 + C2, 36–52 + WQa, 52–65 + WQb), with WQc in the second MA role (review fix). C0 had grown
-   to 10,684 B, so C2 takes more code (blob targets 4,100 / 5,600 since the review fix; 3,900 / 5,600 before) and
-   input 0 one window less. Per-input data and need are within 10,000 B
-   (`node plan.mjs merkle16rc`).
+   table from TV2. Since the re-review fixes mul2 and merkle16 split too (Wζω alone in TV2), so that input 2 has room.
+3. **Chain plans** (`plans.json`, since the re-review fixes): MJ(50..42, C0) · ST · MJ(41..39, TV) · MA(38..26 + ZI +
+   TV2, 25..13, 12..0 + WQc) · SI(0–16 + GZ + C1, 16–34 + C2, 34–52 + WQa, 52–65 + WQb) for mul2 / merkle16; the BSB22
+   circuits cut the MA windows 38..25 / 24..12 / 11..0 and the SI events 0–16 / 16–36 / 36–52 / 52–65, and merkle16rc
+   puts a third code blob C3 (≈ 690 B) in input 4, where it replaces FILL bytes, so input 0's C0 fits with room. WQc
+   is in input 5 (the last MA role) in every plan. Against the first fix round, input 2 runs one window less (and, for mul2 and
+   merkle16, input 0 too); the MA roles take them, having had about 2–3 KB of op-funded room each (BSB22 input 3: 1.4 KB). Per-input data and need are within
+   10,000 B (`node plan.mjs merkle16rc`), and the digit stress below holds every MJ input 339+ B under it.
 4. **BSB22 vectors regenerated on Ignition** (`go run . -srs ... -circuits range64,merkle16rc`), and
    `gen-vectors.sh` runs both prover passes with `-srs`.
 5. **J for BSB22 at bch-spec is 21.** The extra folded base costs op: J = 23 leaves 0.9% (range64) / 1.4% (merkle16rc)
@@ -130,15 +162,16 @@ chain +34.4k to +38.6k per input, now also written per input in `chain-*.json`).
 
 ### Open / honest negatives (integrated build)
 
-- **Liveness.** The quotient size is no longer a liveness limit: a proof with the structural maximum n_q fits (above).
-  What remains per proof is the op-cost spread of the MSM roles (digit patterns): the most loaded op-bound input seen
-  is input 2 (MJ, TV host) at 9,859 B (BSB22) and 9,959 B (mul2, fresh proof 0), i.e. 41 B under the limit for mul2.
-  That input's maximum is reached when all its digits are nonzero (about a quarter of proofs), so the observed values
-  should be close to its worst case, but this was not proved or stress-tested. 10 real proofs per circuit went through
-  the chain (5 committed, 5 fresh), plus the n_q stress witnesses.
-- **Margins:** single-input bch-spec 3.2–3.9%; the 100 KB pad and the chain FILL are sized per proof (0.05–0.65%
-  worst per input, by construction).
-- **Still above the design model** (66 KB): the chain is 82.7–90.3 KB.
+- **Liveness.** Neither the quotient size nor the digits are a liveness limit any more. A proof with the structural
+  maximum n_q fits (above), and so does the digit stress (`chain.mjs` `digitStress`: every 5-bit chunk of every
+  published MSM scalar s'_q = 1, digit −15 in every window, Λ' zero above window 25, every MSM role re-witnessed for those
+  digits, FILLs sized on that transaction). Under it the worst MJ input keeps **772 / 539 / 379 / 339 B** under the
+  10,000 B limit (mul2 / merkle16 / range64 / merkle16rc; input 0 in every circuit), and every MA input 810+ B. Before
+  the re-review fixes the TV host (input 2) needed up to 9,916 B under the same stress (merkle16), 84 B under the limit. 10 real proofs per circuit went through the chain (5 committed, 5 fresh).
+- **Margins:** single-input bch-spec 3.2–3.9%; the 100 KB pad and the chain FILL are sized per proof (0.00–0.80%
+  worst per input, by construction; the 0.00% is merkle16's input 6, whose pushes alone just cover its op-cost, so it
+  takes no FILL, and gets one when a proof needs more).
+- **Still above the design model** (66 KB): the chain is 83.2–89.9 KB.
 - **m ≥ 2 commitments** are built by the same code but not tested (SOUNDNESS §8: γ/v length condition for m ≥ 3).
 - **k = 0** (no public input) is rejected at build time (`parseVK`); supporting it needs the ω⁰ denominator as an extra
   batch-inverse entry.
@@ -146,7 +179,7 @@ chain +34.4k to +38.6k per input, now also written per input in `chain-*.json`).
   participants' signatures were not checked (prover FORMAT.md "SRS").
 - No BCHN node run; BCHN op-cost is modelled (DEFINE body bytes), not measured.
 - `chainprobe.mjs` and `results/chain-merkle16rc-probe.json` are the bsb22 branch's unfolded probe, kept as history.
-- `chain-*.json` `codeBytes` lists C0 and C1 only (C2 is in the plan's blob list).
+- `chain-*.json` `codeBytes` lists C0 and C1 only (C2 and merkle16rc's C3 are in the plan's blob list).
 
 ### Reproduce (integrated)
 
@@ -163,7 +196,7 @@ node plan.mjs merkle16rc                # per-input data / op / need of the chai
 node soundness/lattice.mjs
 ```
 
-Runtimes on this machine: chaintest.mjs 4–6 min per circuit; the full 12-suite matrix took about 27 min in the
+Runtimes on this machine: chaintest.mjs 4.6–6.4 min per circuit (second round); test.mjs 1.1–1.9 min per suite; the full 12-suite matrix took about 27 min in the
 measurement review; liveness.mjs about 4 min per circuit at 1M samples (most of it the sampling).
 
 ## Track 7 branch `wip/plonk-usable-msm`: GT fold and the chain hand-over
