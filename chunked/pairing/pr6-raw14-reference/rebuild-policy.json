@@ -1,0 +1,21 @@
+{
+  "schema": "source6-raw14-fixed-policy-rebuild/v2",
+  "sourceRoot": "public-source/fixed-programs",
+  "compilerOwner": "packages/cashc/src/index.ts",
+  "compilerEntry": "packages/cashc/src/index.ts",
+  "compilerPin": "public-source/compiler-pin.json",
+  "compilerHead": "1c707c1dbf87396b30ba5e0704b1db44475ce893",
+  "policy": {
+    "optimizeFor": "opcost",
+    "rescheduleStacks": true
+  },
+  "importedSourceDependencies": [
+    "public-source/singleton/bn254/lib/lazy/Bn254LazyG.cash",
+    "public-source/singleton/bn254/lib/lazy/Bn254Lazy.cash"
+  ],
+  "generatorImported": false,
+  "proverExecuted": false,
+  "vmExecuted": false,
+  "variantSweep": false,
+  "byteOptimization": false
+}

@@ -1,0 +1,69 @@
+pragma cashscript ^0.14.0;
+// GLV vk_x chunk: 4-scalar Straus window [80,118), first=false final=false.
+function addFp(int x, int y) returns (int) { return (x + y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+function subFp(int x, int y) returns (int) { return (x - y + 21888242871839275222246405745257275088696311157297823662689037894645226208583) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+function mulFp(int x, int y) returns (int) { return (x * y) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+function sqrFp(int x) returns (int) { return (x * x) % 21888242871839275222246405745257275088696311157297823662689037894645226208583; }
+function jacDouble(int x, int y, int z) returns (int, int, int) {
+    int a = sqrFp(x); int b = sqrFp(y); int c = sqrFp(b);
+    int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
+    int e = mulFp(3, a); int f = sqrFp(e);
+    int nx = subFp(f, mulFp(2, d));
+    int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
+    int nz = mulFp(2, mulFp(y, z));
+    return nx, ny, nz;
+}
+function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int, int) {
+    int rx = bX; int ry = bY; int rz = 1;
+    if (aZ != 0) {
+        int z1z1 = sqrFp(aZ);
+        int u2 = mulFp(bX, z1z1);
+        int s2 = mulFp(mulFp(bY, aZ), z1z1);
+        if (aX == u2 && aY == s2) {
+            int da = sqrFp(aX); int db = sqrFp(aY); int dc = sqrFp(db);
+            int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
+            int de = mulFp(3, da); int df = sqrFp(de);
+            int dnx = subFp(df, mulFp(2, dd));
+            int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
+            int dnz = mulFp(2, mulFp(aY, aZ));
+            rx = dnx; ry = dny; rz = dnz;
+        } else {
+            int h = subFp(u2, aX); int i2 = sqrFp(mulFp(2, h)); int jj = mulFp(h, i2);
+            int rr = mulFp(2, subFp(s2, aY)); int vv = mulFp(aX, i2);
+            int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
+            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(aY, jj)));
+            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, 1)), z1z1), 1), h);
+            rx = anx; ry = any; rz = anz;
+        }
+    }
+    return rx, ry, rz;
+}
+function select16(int idx) returns (int, int) {
+    // idx=0 keeps aX=0; every fixed affine table entry has nonzero x.
+    int aX = 0; int aY = 0;
+    if (idx != 0) {
+        bytes table = 0x48b8dd157c51e78397383c51b3c72f4a91d984e051e538ef6fe630c0638f7e14011e54aeff195f51fe6371ee9ca16a24050fc9c5e24925ec48124c7f99a9481b615c8ddc5ef8f014af7b9b7d85b3295e255821cc4b6788bb51be9e22c5b1cb08011e54aeff195f51fe6371ee9ca16a24050fc9c5e24925ec48124c7f99a9481b9ee811e63b4248a346169a9958ef27efa626dbd418f98e0d68fb61fe490d1a1346df282a1772c1ea8e66007af4c816735849b8bbd3fb2acce08de561d9a41b15137098eae21a2592ad7d84364f201684007575f2d77b50ee4cc1825a42713e0e28372428a8d310ea4b4bd53e7299ec0def2d3d1050906f5cc638999ec6af851e2b34fe68850563c7fb5107a40c203e0ee835fb98829b295526c86566b34156280cac1172c9ac1a58894d9b8db3bbb079aaaddeb897df14be3584492ec2a4e90ebc87f278149d046953f87ce0272d1c555e505f36e1d696e255c4019a15f43920dbad7c4d5173b989ed4a14bbc0ff232afc015b2e2b518a478a902134bfdd27014db9a867944fb407f86c566df0aa2f186a4a1c5a234a46ce82fd735d417def13902a9b7ded66fc63f3ced547cd6c279b82470b26c9e55224a604da2016dff629a0c56feaefd6257c218f48ea8f3802a3b5cb03e7e6fc9c4a4b35e90445f9650a28372428a8d310ea4b4bd53e7299ec0def2d3d1050906f5cc638999ec6af851e96496e39d559a827245a96ca4ad680142a1f83be16da1d37ebea1fa9bee77125468a6ae757cd37858208b2714b7f4d00bfc428e866cb1b486226f7bdc556e0041a1d1bbdc6dca6f81b7688f9114b3879d4f649eec9c9970e0300f5888d98e9210cac1172c9ac1a58894d9b8db3bbb079aaaddeb897df14be3584492ec2a4e90eaf9cbee404cc3126d75d0bc69a17f62c1355b409016897c1f4731d77af5cb2229675b3fae21e7ece135a6cd6de1858712aea416c4cd790d6007dd59cd8d6502694c77403449ad52dbebda447b2116970a71708a8f7cc627f91a9c581ebe3bf171fc658b06eb80f52417f9c291fd194896e2a447166b5e05b63679842ac9ede11b1ad4fbd9763ed7b59399d5c660e9d19feee90652c42e56d276612f3cf62d424b187c9dd336da26d79700592b2512926336e3f156a6ebfe128235c449a77130a1c4e7eb0b5fe1f09cb17862a0168753b578408eba08ce321cf6161e0d5b43517b7d2e15a292524d899fb9b20c4fd59fcda10765bed5ffd93839b57c05c6f6d0649a9e08ae13537b802cd5333046a8ca7fe83bd7b2026df0c2a7808d3a4c288163b516b664ddf05e4037dd6daddaed01db3aaa2c81e663bfaf31be8b2b0a97a21;
+        bytes ent = table.split(idx * 64)[0].split((idx - 1) * 64)[1];
+        aX = int(ent.split(32)[0]);
+        aY = int(ent.split(32)[1]);
+    }
+    return aX, aY;
+}
+contract VkxGlvChunk() {
+    function spend(int rX, int rY, int rZ, int in0, int in1, int k10, int k20, int k11, int k21, int Ax, int Ay, int Bxa, int Bxb, int Bya, int Byb, int Cx, int Cy, bytes unused zeroPadding) {
+        require(tx.inputs[this.activeInputIndex].nftCommitment == hash256(toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) + toPaddedBytes(in0, 32) + toPaddedBytes(in1, 32) + toPaddedBytes(k10, 32) + toPaddedBytes(k20, 32) + toPaddedBytes(k11, 32) + toPaddedBytes(k21, 32) + toPaddedBytes(Ax, 32) + toPaddedBytes(Ay, 32) + toPaddedBytes(Bxa, 32) + toPaddedBytes(Bxb, 32) + toPaddedBytes(Bya, 32) + toPaddedBytes(Byb, 32) + toPaddedBytes(Cx, 32) + toPaddedBytes(Cy, 32)));
+        for (int k = 0; k < 38; k = k + 1) {
+            int i = 47 - k;
+            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }
+            int idx = (k10 >> i) % 2 + 2 * ((k20 >> i) % 2) + 4 * ((k11 >> i) % 2) + 8 * ((k21 >> i) % 2);
+            (int aX, int aY) = select16(idx);
+            if (aX != 0) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }
+        }
+        require(tx.outputs[0].nftCommitment == hash256(toPaddedBytes(rX, 32) + toPaddedBytes(rY, 32) + toPaddedBytes(rZ, 32) + toPaddedBytes(in0, 32) + toPaddedBytes(in1, 32) + toPaddedBytes(k10, 32) + toPaddedBytes(k20, 32) + toPaddedBytes(k11, 32) + toPaddedBytes(k21, 32) + toPaddedBytes(Ax, 32) + toPaddedBytes(Ay, 32) + toPaddedBytes(Bxa, 32) + toPaddedBytes(Bxb, 32) + toPaddedBytes(Bya, 32) + toPaddedBytes(Byb, 32) + toPaddedBytes(Cx, 32) + toPaddedBytes(Cy, 32)));
+        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);
+        require(tx.inputs.length == 1); require(tx.outputs.length == 1);
+        require(tx.inputs[this.activeInputIndex].tokenCategory == 0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd01);
+        require(tx.outputs[0].tokenCategory == 0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd01);
+        require(hash256(tx.outputs[0].lockingBytecode) == 0x5e9c6f234584cda68893f4b43f606913262494e94dee75dce4cf375eb9e53c0f);
+    }
+}

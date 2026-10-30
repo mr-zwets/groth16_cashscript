@@ -1,0 +1,9 @@
+{
+  "schema": "source6-raw14-compiler-pin/v1",
+  "compilerOwner": "packages/cashc/src/index.ts",
+  "compilerEntry": "packages/cashc/src/index.ts",
+  "compilerHead": "1c707c1dbf87396b30ba5e0704b1db44475ce893",
+  "compilerEntrySha256": "7d9c6d0d61378e170832d696a5bca0972982d9e994928bd271441cf3136fa5b1",
+  "requiredBeforeImport": true,
+  "dependencyPolicy": "caller must supply the checkout at compilerHead; no compiler module is bundled"
+}
