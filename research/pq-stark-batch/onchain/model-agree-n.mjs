@@ -30,6 +30,9 @@ for (const f of files) {
     const r = runCase(ref, v, t, t ? null : log);
     const pis = pv(t);
     const k = t?.family ?? 'valid'; fam[k] ??= [0, 0];
+    // the statement layer fixes each instance's public-value count (VK data): another layout is refused
+    const layoutOk = (t?.public_values ?? v.public_values).every((p, i) => p.length === vk.inst[i]?.numPublic) && (t?.public_values ?? v.public_values).length === vk.inst.length;
+    if (!layoutOk) { total++; fam[k][0]++; if (r.accept) { dis++; fam[k][1]++; console.log(`DIS ${f} ${t?.name}: layout refused but ref accepts`); } continue; }
     for (const parts of splits) {
       const m = verifyModelN(vk, buf, pis, parts);
       total++; fam[k][0]++;
