@@ -34,9 +34,9 @@ const seedObs = (b) => { const out = [le8(b.length)]; for (let o = 0; o < b.leng
 // ---------------------------------------------------------------- extended verifying key
 // stmt: 'pool' (M1/M2 statement: ROOT a script constant, NF a witness item, CTX from the transaction or a witness item)
 //       or 'witness' (every public value is a witness item, each lane < p: the generic harness for the Plonky3 AIRs)
-export function vkxN(v, {stmt} = {}) {
+export function vkxN(v, {stmt, allowCap = false} = {}) {
   const b = vkFromVector(v);
-  if (b.capHeight !== 0) throw new Error('generator: Merkle cap 0 (layouts b and b2)');
+  if (b.capHeight !== 0 && !allowCap) throw new Error('generator: Merkle cap 0 (layouts b and b2)');
   if (b.opow !== 0) throw new Error('generator: ood PoW 0');
   const F = extField(D);
   const nPub = b.inst.reduce((s, I) => s + I.numPublic, 0);
@@ -143,17 +143,23 @@ export function vkxN(v, {stmt} = {}) {
   };
   blob.total = blob.trees.reduce((s, t) => s + t.groups.reduce((a, x) => a + x, 0) + t.sibs, 0) + blob.fri.reduce((s, x) => s + x, 0) + blob.hints;
   const nCaps = 2 + (b.hasLookups ? 1 : 0) + (b.zk ? 1 : 0);
+  // cap bytes per commitment (S7: Merkle cap > 0, layout a'; cap 0 gives one digest each, as before)
+  const rcap = (nm) => { const r = b.rounds.find((x) => x.name === nm); return r ? r.capLen * H32 : 0; };
+  const capB = {trace: rcap('trace'), permutation: b.hasLookups ? rcap('permutation') : 0, quotient: rcap('quotient'), random: b.zk ? rcap('random') : 0};
+  const friB = b.friCaps.map((c) => c * H32), friOff = friB.map((_, r) => friB.slice(0, r).reduce((x, y) => x + y, 0));
   const termInst = inst.filter((I) => I.numLookups > 0).map((I) => I.i);
   const ptItems = [
-    ['ROOTS', nCaps * H32], ...(b.hasLookups ? [['TERM', termInst.length * E8]] : []), ...(b.hasLookups && b.lpow ? [['LPOW', 8]] : []),
-    ['OOD', nv * E8], ...(b.bpow ? [['BPOW', 8]] : []), ['FROOTS', b.logArities.length * H32], ...(b.cpow ? [['CPOW', 8 * b.logArities.length]] : []),
+    ['ROOTS', capB.trace + capB.permutation + capB.quotient + capB.random], ...(b.hasLookups ? [['TERM', termInst.length * E8]] : []), ...(b.hasLookups && b.lpow ? [['LPOW', 8]] : []),
+    ['OOD', nv * E8], ...(b.bpow ? [['BPOW', 8]] : []), ['FROOTS', friB.reduce((x, y) => x + y, 0)], ...(b.cpow ? [['CPOW', 8 * b.logArities.length]] : []),
     ['FIN', b.L * E8], ...(b.qpow ? [['QPOW', 8]] : []),
   ];
-  const capOff = {trace: 0, permutation: b.hasLookups ? H32 : null, quotient: (b.hasLookups ? 2 : 1) * H32, random: b.zk ? (nCaps - 1) * H32 : null};
+  const capOff = {trace: 0, permutation: b.hasLookups ? capB.trace : null, quotient: capB.trace + capB.permutation, random: b.zk ? capB.trace + capB.permutation + capB.quotient : null};
+  // tree cap heights (log2 of the cap length): the full path of a query has depth - capH levels
+  trees.forEach((t) => { t.capH = Math.log2(t.kind === 'fri' ? b.friCaps[t.r] : b.rounds[t.b].capLen); });
   return {
     D, h: H32, e8: E8, F, Q: b.Q, zk: b.zk, rc: b.rc, salt: b.zk ? b.salt : 0, logH: b.logH, logFinal: b.logFinal, logArities: b.logArities, L: b.L,
     S: b.logArities.reduce((s, x) => s + x, 0), bpow: b.bpow, cpow: b.cpow, qpow: b.qpow, lpow: b.hasLookups ? b.lpow : 0, opow: 0,
-    inst, rounds: b.rounds, claims, points, heights, hp, ladder, maxLadder, numVals: nv, trees, SO, fr, rollIn, blob, ptItems, nCaps, capOff,
+    inst, rounds: b.rounds, claims, points, heights, hp, ladder, maxLadder, numVals: nv, trees, SO, fr, rollIn, blob, ptItems, nCaps, capOff, capB, friB, friOff, capHeight: b.capHeight,
     hasPre: b.hasPre, pre: b.pre, preCap: b.hasPre ? Buffer.concat(b.pre) : null, hasLookups: b.hasLookups, lookups: b.lookups, termInst,
     nPub, stmt, gH: g2(b.logH), base: b,
   };
@@ -165,7 +171,7 @@ export function lenientParseN(buf, vk) {
   const take = (n) => { const b = Buffer.alloc(n); const end = Math.min(o + n, buf.length); if (end - o < n) short = true; if (end > o) buf.copy(b, 0, o, end); o += n; return b; };
   const takeN = (n) => Array.from({length: n}, () => take(E8));
   const pr = {};
-  pr.mainCap = take(H32); pr.permCap = vk.hasLookups ? take(H32) : null; pr.quotCap = take(H32); pr.randCap = vk.zk ? take(H32) : null;
+  pr.mainCap = take(vk.capB.trace); pr.permCap = vk.hasLookups ? take(vk.capB.permutation) : null; pr.quotCap = take(vk.capB.quotient); pr.randCap = vk.zk ? take(vk.capB.random) : null;
   pr.terminals = vk.inst.map((I) => (I.numLookups ? take(E8) : null));
   pr.ood = vk.inst.map((I) => ({
     tl: takeN(I.width), tn: I.opensNext ? takeN(I.width) : null, pl: I.preWidth ? takeN(I.preWidth) : null, pn: I.preWidth && I.preNext ? takeN(I.preWidth) : null,
@@ -174,7 +180,7 @@ export function lenientParseN(buf, vk) {
   pr.LPOW = vk.hasLookups && vk.lpow ? take(8) : null;
   pr.randVals = vk.zk ? vk.rounds.map((r) => r.matrices.map((m) => Array.from({length: m.points}, () => takeN(r.rc)))) : null;
   pr.BPOW = vk.bpow ? take(8) : null;
-  pr.FROOTS = take(vk.logArities.length * H32);
+  pr.FROOTS = take(vk.friB.reduce((x, y) => x + y, 0));
   pr.CPOW = vk.cpow ? take(8 * vk.logArities.length) : null;
   pr.FIN = take(vk.L * E8);
   pr.QPOW = vk.qpow ? take(8) : null;
@@ -236,7 +242,7 @@ export function transcriptN(vk, pr, pis) {
   t.alphaP = pp.ext();
   t.betas = [];
   vk.logArities.forEach((_, r) => {
-    const x = H(pp.d, r === 0 ? vk.SO.fri : Buffer.alloc(0), pr.FROOTS.subarray(r * H32, r * H32 + H32));
+    const x = H(pp.d, r === 0 ? vk.SO.fri : Buffer.alloc(0), pr.FROOTS.subarray(vk.friOff[r], vk.friOff[r] + vk.friB[r]));
     pp = vk.cpow ? pow(x, pr.CPOW.subarray(8 * r, 8 * r + 8), vk.cpow) : new Pop(x, t.hashes);
     t.betas.push(pp.ext());
   });

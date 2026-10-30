@@ -4,7 +4,7 @@
 // serialization (ctx.mjs), then the release prover proves m1@LEAF@WSEED@CTXHASH under the given set with ZK seed
 // SEED. Writes OUTDIR/<name>.json = the prover's vector plus `s4_outputs` (the outputs, JSON-safe) and `s4_ctx`.
 // Runs the prover one at a time (RAYON_NUM_THREADS=4, nice).
-// usage: node gen-statements.mjs --bin PROVER --set Z128 --outdir DIR --count K [--first I] [--leaves 0,1073741823,...]
+// usage: node gen-statements.mjs --bin PROVER --set Z128 --outdir DIR --count K [--first I] [--leaves 0,1073741823,...] [--tag s7]
 import {execFileSync} from 'node:child_process';
 import {readFileSync, writeFileSync, mkdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
@@ -15,7 +15,7 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const bin = opt('--bin'), set = opt('--set', 'Z128'), outdir = opt('--outdir'), count = +opt('--count', 1), first = +opt('--first', 0);
 const leaves = opt('--leaves', '').split(',').filter(Boolean).map(Number);
 const stmtKind = opt('--stmt', 'm1');   // m1 (S4) or m2 (S5/S6: T_hash + T_ctl, its public values in instance 1)
-const tag = stmtKind === 'm1' ? 's4' : 's5';
+const tag = opt('--tag', stmtKind === 'm1' ? 's4' : 's5');   // S7: --tag s7 (same statements as S4, other VK)
 mkdirSync(outdir, {recursive: true});
 const h = (s) => createHash('sha256').update(s).digest();
 export const outputsFor = (k) => [{lockingBytecode: Uint8Array.from([0x76, 0xa9, 0x14, ...h(`t8s4 recipient ${k}`).subarray(0, 20), 0x88, 0xac]), valueSatoshis: 900_000n}];

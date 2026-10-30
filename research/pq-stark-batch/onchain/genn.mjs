@@ -167,7 +167,7 @@ export function makeGenN(vk, stmt, opts = {}) {
     const powCheck = (wname, bits) => { obs([wname]); S.raw([F.POP8, 'INVOKE', 1n << BigInt(bits), 'MOD', 0, 'NUMEQUALVERIFY'], 2, ['d', 'r']); };
     const capSlice = (name, out, to = null) => {   // ROOTS[off .. off + h) (or to the end)
       const off = vk.capOff[name];
-      S.pick('ROOTS'); S.raw([...(off ? [off, 'SPLIT', 'NIP'] : []), ...(to === 'end' ? [] : [h, 'SPLIT', 'DROP'])], 1, [out]);
+      S.pick('ROOTS'); S.raw([...(off ? [off, 'SPLIT', 'NIP'] : []), ...(to === 'end' ? [] : [vk.capB[name], 'SPLIT', 'DROP'])], 1, [out]);
     };
     // batch seed ‖ degree_bits ‖ main cap ‖ public values ‖ [preprocessed cap]
     S.push(vk.SO.batch, 'd'); capSlice('trace', 'x'); S.raw(['CAT'], 2, ['d']);
@@ -193,7 +193,7 @@ export function makeGenN(vk, stmt, opts = {}) {
     sampleExt('ap');
     if (vk.cpow) S.roll('CPOW');
     for (let r = 0; r < NR; r++) {
-      S.pick('FROOTS'); S.raw([...(r ? [r * h, 'SPLIT', 'NIP'] : []), ...(r < NR - 1 ? [h, 'SPLIT', 'DROP'] : [])], 1, ['fr']);
+      S.pick('FROOTS'); S.raw([...(r ? [vk.friOff[r], 'SPLIT', 'NIP'] : []), ...(r < NR - 1 ? [vk.friB[r], 'SPLIT', 'DROP'] : [])], 1, ['fr']);
       obs(r === 0 ? [vk.SO.fri, 'fr'] : ['fr']);
       if (vk.cpow) {
         if (r < NR - 1) { S.roll('CPOW'); S.raw([8, 'SPLIT', 'SWAP'], 1, ['CPOW', 'cw']); } else { S.roll('CPOW'); S.rename('CPOW', 'cw'); }
@@ -205,7 +205,7 @@ export function makeGenN(vk, stmt, opts = {}) {
     obs(['fin2']);
     if (vk.qpow) powCheck('QPOW', vk.qpow);
     S.raw([Q, 'TOALTSTACK', 'BEGIN', F.POP8, 'INVOKE', 1n << BigInt(vk.logH), 'MOD', 'ROT', 'ROT', 'FROMALTSTACK', '1SUB', 'DUP', 'TOALTSTACK', 'NOT', 'UNTIL', 'FROMALTSTACK', 'DROP'], 2, [...names('idx', Q), 'd', 'r']);
-    S.drop('r'); S.drop('d');
+    S.drop('r'); if (opts.keepG) S.rename('d', 'G'); else S.drop('d');
     mark(S, 'transcript');
   };
   // OOD values [k, k + n) -> numbers ov<k>_<c>
@@ -515,7 +515,9 @@ export function makeGenN(vk, stmt, opts = {}) {
   };
 
   // ---------------- constraint DAG interpreter (as gen.mjs; leaves now include LogUp values and ext constants) ----------------
-  function dagProgram(S, I, leafOf, {alpha: al, Dd}) {
+  // dopts.part = [lo, hi): only constraints lo .. hi-1 (S7 layout a': one range per CODE input); acc = sum over the
+  // range of up(c_i) alpha^(hi - 1 - i). Without it (layouts b, b2) the whole DAG, unchanged.
+  function dagProgram(S, I, leafOf, {alpha: al, Dd}, dopts = {}) {
     const ID = {LD: 100, LDB: 101, CK1: 102, CK8: 103, ADD: 104, SUB: 105, NEG: 106, MUL: 107, MK1: 108, MK8: 109, ADDL: 110, SUBL: 111, RSUBL: 112, MULL: 113};
     if (!fns.has('D_LD')) {
       const wrap = (body) => asm('TOALTSTACK', {raw: body}, 'FROMALTSTACK');
@@ -545,9 +547,12 @@ export function makeGenN(vk, stmt, opts = {}) {
       absOf.set(key, i); return i;
     };
     const dag = I.dag, sc = I.scale;
+    const consList = dopts.part ? dag.constraints.slice(dopts.part[0], dopts.part[1]) : dag.constraints;
+    let reach = null;
+    if (dopts.part) { reach = new Set(); const stk = consList.map((c) => c.node); while (stk.length) { const k = stk.pop(); if (reach.has(k)) continue; reach.add(k); const nd = dag.nodes[k]; if (nd.a !== undefined) stk.push(nd.a); if (nd.b !== undefined) stk.push(nd.b); } }
     const uses = new Array(dag.nodes.length).fill(0);
-    dag.nodes.forEach((nd) => { if (nd.a !== undefined) uses[nd.a]++; if (nd.b !== undefined) uses[nd.b]++; });
-    const leaves = dag.nodes.map((nd, k) => leafOf(nd, k));
+    dag.nodes.forEach((nd, k) => { if (reach && !reach.has(k)) return; if (nd.a !== undefined) uses[nd.a]++; if (nd.b !== undefined) uses[nd.b]++; });
+    const leaves = dag.nodes.map((nd, k) => (reach && !reach.has(k) ? null : leafOf(nd, k)));
     leaves.forEach((l) => { if (l?.ext) tripleAt(l.ext); });
     const iAlpha = tripleAt(al), iDd = tripleAt(Dd);
     const base0 = S.st.length;
@@ -594,7 +599,7 @@ export function makeGenN(vk, stmt, opts = {}) {
     };
     let nReg = 0;
     dag.nodes.forEach((nd, k) => { if (uses[k] > 1 && !leaves[k]) { emit(k, true); reg.set(k, base0 + 3 * nReg); nReg++; } });
-    dag.constraints.forEach((c, i) => {
+    consList.forEach((c, i) => {
       if (i) prog.push(ID.MULL, ...u16(iAlpha));
       const ic = I.maxScale === sc[c.node] ? ldIdx(c.node) : null;
       if (i && ic !== null) { prog.push(ID.ADDL, ...u16(ic)); return; }
@@ -609,7 +614,7 @@ export function makeGenN(vk, stmt, opts = {}) {
     const nDrop = S.st.length - 3 - (base0 - copies.length);
     if (S.st.slice(S.st.length - 3 - nDrop, S.st.length - 3).some((x) => !copies.includes(x) && !regNames.includes(x))) throw new Error('dag cleanup');
     S.raw(['TOALTSTACK', 'TOALTSTACK', 'TOALTSTACK', ...(nDrop ? [nDrop, 'BEGIN', 'NIP', '1SUB', 'DUP', 'NOT', 'UNTIL', 'DROP'] : []), 'FROMALTSTACK', 'FROMALTSTACK', 'FROMALTSTACK'], nDrop + 3, ['acc0', 'acc1', 'acc2']);
-    g.dagStats.push({instance: I.i, steps, progBytes: prog.length, chunks: chunks.length, registers: nReg, leafCopies: copies.length, stackAtStart: base0, maxDepth: base0 + 3 * nReg});
+    g.dagStats.push({instance: I.i, ...(dopts.part ? {part: dopts.part} : {}), steps, progBytes: prog.length, chunks: chunks.length, registers: nReg, leafCopies: copies.length, stackAtStart: base0, maxDepth: base0 + 3 * nReg});
     return {acc: ['acc0', 'acc1', 'acc2']};
   }
 
@@ -801,6 +806,7 @@ export function makeGenN(vk, stmt, opts = {}) {
     Qs.roll('kb'); Qs.raw(['TOALTSTACK'], 1);
     mark(Qs, 'q-final');
   };
+  g.dagProgram = dagProgram;
   return g;
 }
 
