@@ -6,6 +6,7 @@
 //!   pq-stark-batch-prover accept --set SET [--shift N|auto] --outdir DIR [--sweep]
 //!                                              all five DESIGN-T8 S1 cases; exit 1 on any failure
 //!   pq-stark-batch-prover sets                 print the parameter sets
+//!   pq-stark-batch-prover s2 ...               Track 8 S2 statement-AIR acceptance (src/s2.rs)
 //!
 //! Every vector is checked by decoding its bytes back into Plonky3's `BatchProof` and running
 //! Plonky3's own `verify_batch` on the decoded proof, with the transcript hash inputs recorded.
@@ -14,6 +15,7 @@ mod airs;
 mod cfg;
 mod dag;
 mod shape;
+mod stmt;
 mod wire;
 
 use std::time::Instant;
@@ -49,7 +51,32 @@ macro_rules! with_cfg {
             _ => panic!("zk salt must be 2 or 4"),
         }
     }};
+    // two configs of one type: `$c` (prover, hiding RNGs from `$seed`) and `$s` (verifying-key setup:
+    // the preprocessed commitment's salts come from `$setup_seed`)
+    ($set:expr, $seed:expr, $setup_seed:expr, |$c:ident, $s:ident| $body:expr) => {{
+        let set: &Params = $set;
+        match (set.zk, set.salt) {
+            (false, _) => { let $c = make_cfg(set); let $s = make_cfg(set); $body }
+            (true, 2) => { let $c = make_hcfg::<2>(set, $seed); let $s = make_hcfg::<2>(set, $setup_seed); $body }
+            (true, 4) => { let $c = make_hcfg::<4>(set, $seed); let $s = make_hcfg::<4>(set, $setup_seed); $body }
+            _ => panic!("zk salt must be 2 or 4"),
+        }
+    }};
 }
+
+/// Verifying-key setup seed of the Track 8 statement AIRs (M2 has preprocessed columns). The hiding MMCS
+/// salts the preprocessed commitment from `StdRng::seed_from_u64(SETUP_SEED ^ 0x5a5a_0001)`, so the
+/// commitment is recomputable by anyone from the AIR and this published seed. The prover's own salts
+/// come from a separate RNG (its `seed`; OS randomness in production), never from this one.
+pub const SETUP_SEED: u64 = 0x7438_5345_5455_5031; // "t8SETUP1"
+
+/// S1 test cases build the verifying key with the prover's config (their stored vectors depend on it);
+/// statement cases use the published setup seed.
+pub fn setup_seed_for(case_name: &str, seed: u64) -> Option<u64> {
+    if case_name.starts_with("m1@") || case_name.starts_with("m2@") { Some(SETUP_SEED) } else { let _ = seed; None }
+}
+
+mod s2;
 
 /// Smallest shift that puts every trace on a legal FRI height: log LDE > log_final + log_blowup
 /// (strict), i.e. log n + zk > log_final_poly_len.
@@ -162,12 +189,15 @@ fn run_case(case_name: &str, set: &Params, shift_arg: &str, seed: u64, sweep: bo
     let degs: Vec<usize> = c.log_heights.iter().map(|l| l + zk).collect();
     let trefs: Vec<&_> = c.traces.iter().collect();
 
-    with_cfg!(set, seed, |config| {
-        let pd = ProverData::from_airs_and_degrees(&config, &c.airs, &degs).expect("setup");
+    let setup_seed = setup_seed_for(case_name, seed);
+    with_cfg!(set, seed, setup_seed.unwrap_or(seed), |config, setup_cfg| {
+        let pd = ProverData::from_airs_and_degrees(if setup_seed.is_some() { &setup_cfg } else { &config }, &c.airs, &degs)
+            .expect("setup");
         let inst = StarkInstance::new_multiple(&c.airs, &trefs, &c.pvs);
         let t0 = Instant::now();
         let proof = prove_batch(&config, &inst, &pd).expect("prove_batch");
         let prove_ms = t0.elapsed().as_millis();
+        let peak_rss_kb = s2::vmhwm_kb();
         verify_batch(&config, &c.airs, &proof, &c.pvs, &pd.common).expect("Plonky3 rejected its own proof");
         let pj = serde_json::to_value(&proof).unwrap();
 
@@ -310,6 +340,7 @@ fn run_case(case_name: &str, set: &Params, shift_arg: &str, seed: u64, sweep: bo
             "log_heights": c.log_heights,
             "shift": shift,
             "seed": seed,
+            "setup_seed": setup_seed,
             "set": set,
             "shape": vk.shape,
             "public_values": pvs_json(&c.pvs),
@@ -318,6 +349,8 @@ fn run_case(case_name: &str, set: &Params, shift_arg: &str, seed: u64, sweep: bo
             "sizes": sizes,
             "sections": sections,
             "prove_ms": prove_ms,
+            "peak_rss_kb_after_prove": peak_rss_kb,
+            "rayon_threads": std::env::var("RAYON_NUM_THREADS").ok(),
             "rust_verify_ms": verify_ms,
             "rust_verify": if back.is_ok() { "accepted".to_string() } else { format!("REJECTED {back:?}") },
             "decode_encode_identity": same_tree,
@@ -420,8 +453,10 @@ fn cmd_check(files: &[String]) {
         let degs: Vec<usize> = c.log_heights.iter().map(|l| l + zk).collect();
         let pvs = pvs_from_json(&v["public_values"]);
         let valid = unhex(v["proof_hex"].as_str().unwrap());
-        with_cfg!(&set, seed, |config| {
-            let pd = ProverData::from_airs_and_degrees(&config, &c.airs, &degs).expect("setup");
+        let setup_seed = v.get("setup_seed").and_then(|x| x.as_u64());
+        with_cfg!(&set, seed, setup_seed.unwrap_or(seed), |config, setup_cfg| {
+            let pd = ProverData::from_airs_and_degrees(if setup_seed.is_some() { &setup_cfg } else { &config }, &c.airs, &degs)
+                .expect("setup");
             let pre_order = pd.common.preprocessed.as_ref().map(|g| g.matrix_to_instance.clone());
             let s2 = shape::derive(&set, &c.airs, &c.log_heights, &pd.common.lookups, pre_order.as_deref());
             let pc = pd.common.preprocessed.as_ref().map(|g| serde_json::to_value(&g.commitment).unwrap()).unwrap_or(Value::Null);
@@ -459,6 +494,18 @@ fn main() {
         Some("prove") => cmd_prove(&args[2..]),
         Some("accept") => cmd_accept(&args[2..]),
         Some("check") => cmd_check(&args[2..]),
+        Some("s2") => match args.get(2).map(String::as_str) {
+            Some("selftest") => s2::cmd_selftest(&args[3..]),
+            Some("mutate") => s2::cmd_mutate(&args[3..]),
+            Some("forced") => s2::cmd_forced(&args[3..]),
+            Some("pvs") => s2::cmd_pvs(&args[3..]),
+            Some("batch") => s2::cmd_batch(&args[3..]),
+            Some("witness") => s2::cmd_witness(&args[3..]),
+            _ => {
+                eprintln!("usage: s2 selftest|mutate|forced|pvs|batch|witness (see src/s2.rs)");
+                std::process::exit(2);
+            }
+        },
         Some("sets") => {
             for s in all_sets() {
                 println!("{}", serde_json::to_string(&s).unwrap());

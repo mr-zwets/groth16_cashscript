@@ -16,6 +16,7 @@ use p3_lookup::{Count, InteractionBuilder};
 use p3_matrix::dense::RowMajorMatrix;
 
 use crate::cfg::Val;
+use crate::stmt::{M1Air, TCtlAir, THashAir};
 
 #[derive(Debug, Clone, Copy)]
 pub struct FibonacciAir {
@@ -283,6 +284,10 @@ pub enum TestAir {
     Periodic(PeriodicAir),
     FibLookups(FibAirLookups),
     MulLookups(MulAirLookups),
+    /// Track 8 statement AIRs (src/stmt.rs, AIR-SPEC.md)
+    M1(M1Air),
+    THash(THashAir),
+    TCtl(TCtlAir),
 }
 
 impl TestAir {
@@ -298,6 +303,9 @@ impl TestAir {
                 a.is_local,
                 a.is_global
             ),
+            Self::M1(_) => "m1(depth=30, log_n=10)".into(),
+            Self::THash(_) => "m2.t_hash(log_n=10)".into(),
+            Self::TCtl(_) => "m2.t_ctl(log_n=7)".into(),
         }
     }
 }
@@ -310,12 +318,17 @@ impl BaseAir<Val> for TestAir {
             Self::Periodic(a) => a.width(),
             Self::FibLookups(a) => <FibonacciAir as BaseAir<Val>>::width(&a.air),
             Self::MulLookups(a) => <MulAir as BaseAir<Val>>::width(&a.mul()),
+            Self::M1(a) => a.width(),
+            Self::THash(a) => a.width(),
+            Self::TCtl(a) => a.width(),
         }
     }
     fn num_public_values(&self) -> usize {
         match self {
             Self::Fib(a) => <FibonacciAir as BaseAir<Val>>::num_public_values(a),
             Self::FibLookups(a) => <FibonacciAir as BaseAir<Val>>::num_public_values(&a.air),
+            Self::M1(a) => a.num_public_values(),
+            Self::TCtl(a) => a.num_public_values(),
             _ => 0,
         }
     }
@@ -323,25 +336,50 @@ impl BaseAir<Val> for TestAir {
         match self {
             Self::Fib(a) => a.preprocessed_trace(),
             Self::FibLookups(a) => a.air.preprocessed_trace(),
+            Self::THash(a) => a.preprocessed_trace(),
+            Self::TCtl(a) => a.preprocessed_trace(),
             _ => None,
         }
     }
     fn preprocessed_width(&self) -> usize {
         match self {
             Self::Fib(_) | Self::FibLookups(_) => 1,
+            Self::THash(a) => a.preprocessed_width(),
+            Self::TCtl(a) => a.preprocessed_width(),
             _ => 0,
         }
     }
     fn num_periodic_columns(&self) -> usize {
         match self {
             Self::Periodic(a) => a.num_periodic_columns(),
+            Self::M1(a) => a.num_periodic_columns(),
+            Self::THash(a) => a.num_periodic_columns(),
             _ => 0,
         }
     }
     fn periodic_columns(&self) -> Cow<'_, [Vec<Val>]> {
         match self {
             Self::Periodic(a) => a.periodic_columns(),
+            Self::M1(a) => a.periodic_columns(),
+            Self::THash(a) => a.periodic_columns(),
             _ => Cow::Borrowed(&[]),
+        }
+    }
+    // the statement AIRs declare exactly the next-row columns they read (AIR-SPEC); the test AIRs keep
+    // Plonky3's defaults (every column)
+    fn main_next_row_columns(&self) -> Vec<usize> {
+        match self {
+            Self::M1(a) => a.main_next_row_columns(),
+            Self::THash(a) => a.main_next_row_columns(),
+            Self::TCtl(a) => a.main_next_row_columns(),
+            _ => (0..self.width()).collect(),
+        }
+    }
+    fn preprocessed_next_row_columns(&self) -> Vec<usize> {
+        match self {
+            Self::THash(a) => a.preprocessed_next_row_columns(),
+            Self::TCtl(a) => a.preprocessed_next_row_columns(),
+            _ => (0..<Self as BaseAir<Val>>::preprocessed_width(self)).collect(),
         }
     }
 }
@@ -354,6 +392,9 @@ impl<AB: AirBuilder<F = Val> + PermutationAirBuilder + InteractionBuilder> Air<A
             Self::Periodic(a) => a.eval(builder),
             Self::FibLookups(a) => a.eval(builder),
             Self::MulLookups(a) => a.eval(builder),
+            Self::M1(a) => a.eval(builder),
+            Self::THash(a) => a.eval(builder),
+            Self::TCtl(a) => a.eval(builder),
         }
     }
 }
@@ -453,6 +494,42 @@ pub fn case(name: &str, shift: usize) -> Case {
             c.uses_lookups = true;
             c
         }
-        _ => panic!("unknown case {name}; one of {CASES:?}"),
+        _ if name.starts_with("m1@") || name.starts_with("m2@") => stmt_case(name, shift),
+        _ => panic!("unknown case {name}; one of {CASES:?} or m1@LEAF@WSEED / m2@LEAF@WSEED"),
+    }
+}
+
+/// Track 8 statement cases: `m1@<leaf index>@<witness seed>` (one table) and `m2@<leaf index>@<witness
+/// seed>` (T_hash then T_ctl, AIR-SPEC sec. 4). The witness is `stmt::witness(leaf, wseed)`.
+pub fn stmt_case(name: &str, shift: usize) -> Case {
+    use crate::stmt::*;
+    assert_eq!(shift, 0, "statement AIRs have fixed heights");
+    let parts: Vec<&str> = name.split('@').collect();
+    assert_eq!(parts.len(), 3, "m1@LEAF@WSEED");
+    let w = witness(parts[1].parse().expect("leaf index"), parts[2].parse().expect("witness seed"));
+    let pv = public_values(&w);
+    match parts[0] {
+        "m1" => Case {
+            name: name.into(),
+            airs: vec![TestAir::M1(M1Air::new())],
+            traces: vec![m1_trace(&w)],
+            pvs: vec![pv],
+            log_heights: vec![LOG_N_HASH],
+            zk_in_plonky3: true,
+            uses_lookups: false,
+        },
+        "m2" => {
+            let (th, tc) = m2_traces(&w);
+            Case {
+                name: name.into(),
+                airs: vec![TestAir::THash(THashAir::new()), TestAir::TCtl(TCtlAir)],
+                traces: vec![th, tc],
+                pvs: vec![vec![], pv],
+                log_heights: vec![LOG_N_HASH, LOG_N_CTL],
+                zk_in_plonky3: true,
+                uses_lookups: true,
+            }
+        }
+        _ => unreachable!(),
     }
 }
