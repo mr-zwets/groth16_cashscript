@@ -1,0 +1,7 @@
+model-agree-n: 17911 case runs, 0 disagreements, 5 files skipped (unsupported VK)
+families {"valid":[198,0],"cap":[594,0],"terminal":[124,0],"ood":[3294,0],"random":[1840,0],"pow":[602,0],"final":[1328,0],"row":[1656,0],"salt":[1488,0],"sibling":[1432,0],"count":[1152,0],"fri_value":[512,0],"truncate":[550,0],"extend":[334,0],"noncanon":[478,0],"statement":[1699,0],"other_vk":[598,0],"forced":[32,0]}
+skip both_lookups_zk-Z128~vk-opow=1.json: generator: ood PoW 0
+skip m1-0-Z128~vk-cap+1.json: generator: Merkle cap 0 (layouts b and b2)
+skip m1-0-Z128~vk-opow=1.json: generator: ood PoW 0
+skip m2-0-Z128g_cpow3_lpow8~vk-opow=1.json: generator: ood PoW 0
+skip three_instances_mixed_sizes-Z128g~vk-opow=1.json: generator: ood PoW 0

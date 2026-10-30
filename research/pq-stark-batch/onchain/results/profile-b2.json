@@ -1,0 +1,175 @@
+[
+ {
+  "vector": "m1-s4-0-Z128.json",
+  "QA": 12,
+  "libBytes": 19491,
+  "defineBodyBytes": 19283,
+  "inputs": [
+   {
+    "opStd": 27319237,
+    "opBchnAdjusted": 27338520,
+    "entry": 2761252,
+    "transcript": 175333,
+    "air": 7852672,
+    "consts": 4679385,
+    "queries": 8044113,
+    "perQuery": 670343,
+    "merkle": 3800567,
+    "phases": {
+     "entry": 2761252,
+     "transcript": 175333,
+     "air-start": 3199,
+     "air-shared": 109434,
+     "air0-periodic": 1238471,
+     "air0-dag": 6056618,
+     "air0-quotient": 440952,
+     "air-end": 3998,
+     "deep-points": 93992,
+     "deep-consts": 3322586,
+     "tables": 159959,
+     "unpack": 1102848,
+     "q-x": 158726,
+     "q-deep": 3103341,
+     "q-folds": 1526784,
+     "q-final": 3254761,
+     "queries": 501,
+     "merkle": 3800567,
+     "end": 5815,
+     "cleanup": 100
+    }
+   },
+   {
+    "opStd": 19772015,
+    "opBchnAdjusted": 19791298,
+    "entry": 3081898,
+    "transcript": 175301,
+    "air": 0,
+    "consts": 4684238,
+    "queries": 8046948,
+    "perQuery": 670579,
+    "merkle": 3777715,
+    "phases": {
+     "entry": 3081898,
+     "transcript": 175301,
+     "deep-points": 98845,
+     "deep-consts": 3322586,
+     "tables": 159959,
+     "unpack": 1102848,
+     "q-x": 158225,
+     "q-deep": 3104308,
+     "q-folds": 1528382,
+     "q-final": 3255532,
+     "queries": 501,
+     "merkle": 3777715,
+     "end": 5815,
+     "cleanup": 100
+    }
+   }
+  ],
+  "dag": [
+   {
+    "instance": 0,
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 328,
+    "maxDepth": 463
+   }
+  ]
+ },
+ {
+  "vector": "m2-s5-0-Z128g_cpow3_lpow8.json",
+  "QA": 9,
+  "libBytes": 27785,
+  "defineBodyBytes": 27577,
+  "inputs": [
+   {
+    "opStd": 35189105,
+    "opBchnAdjusted": 35216682,
+    "entry": 3888758,
+    "transcript": 198364,
+    "air": 10437511,
+    "consts": 8181975,
+    "queries": 8435643,
+    "perQuery": 937294,
+    "merkle": 4042142,
+    "phases": {
+     "entry": 3888758,
+     "transcript": 198364,
+     "air-start": 4149,
+     "air-shared": 181973,
+     "air0-periodic": 1233151,
+     "air0-dag": 6133770,
+     "air0-quotient": 447621,
+     "air1-periodic": 48527,
+     "air1-dag": 2178815,
+     "air1-quotient": 200607,
+     "air-end": 8898,
+     "deep-points": 135550,
+     "deep-consts": 7699734,
+     "tables": 213443,
+     "unpack": 133248,
+     "q-x": 133634,
+     "q-deep": 5323235,
+     "q-folds": 2435888,
+     "q-final": 542385,
+     "queries": 501,
+     "merkle": 4042142,
+     "end": 4612,
+     "cleanup": 100
+    }
+   },
+   {
+    "opStd": 33180090,
+    "opBchnAdjusted": 33207667,
+    "entry": 4278623,
+    "transcript": 198324,
+    "air": 0,
+    "consts": 8188400,
+    "queries": 14056718,
+    "perQuery": 937115,
+    "merkle": 6450907,
+    "phases": {
+     "entry": 4278623,
+     "transcript": 198324,
+     "deep-points": 141975,
+     "deep-consts": 7699734,
+     "tables": 213443,
+     "unpack": 133248,
+     "q-x": 222483,
+     "q-deep": 8869699,
+     "q-folds": 4058515,
+     "q-final": 905520,
+     "queries": 501,
+     "merkle": 6450907,
+     "end": 7018,
+     "cleanup": 100
+    }
+   }
+  ],
+  "dag": [
+   {
+    "instance": 0,
+    "steps": 597,
+    "progBytes": 2027,
+    "chunks": 52,
+    "registers": 42,
+    "leafCopies": 33,
+    "stackAtStart": 408,
+    "maxDepth": 534
+   },
+   {
+    "instance": 1,
+    "steps": 117,
+    "progBytes": 613,
+    "chunks": 16,
+    "registers": 3,
+    "leafCopies": 0,
+    "stackAtStart": 252,
+    "maxDepth": 261
+   }
+  ]
+ }
+]

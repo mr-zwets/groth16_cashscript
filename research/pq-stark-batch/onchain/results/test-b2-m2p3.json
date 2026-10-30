@@ -1,0 +1,137 @@
+{
+ "files": 63,
+ "cases": 8252,
+ "unexpected": 0,
+ "na": 17,
+ "refused": 39,
+ "encoderRefused": 985,
+ "families": {
+  "valid": {
+   "cases": 53,
+   "chainReject": 0,
+   "accept": 53,
+   "unexpected": 0
+  },
+  "cap": {
+   "cases": 243,
+   "chainReject": 243,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "terminal": {
+   "cases": 62,
+   "chainReject": 62,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "ood": {
+   "cases": 1404,
+   "chainReject": 1404,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "random": {
+   "cases": 791,
+   "chainReject": 791,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "pow": {
+   "cases": 202,
+   "chainReject": 202,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "final": {
+   "cases": 505,
+   "chainReject": 505,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "row": {
+   "cases": 678,
+   "chainReject": 678,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "salt": {
+   "cases": 594,
+   "chainReject": 594,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "sibling": {
+   "cases": 560,
+   "chainReject": 560,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "count": {
+   "cases": 432,
+   "chainReject": 432,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "fri_value": {
+   "cases": 187,
+   "chainReject": 187,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "truncate": {
+   "cases": 221,
+   "chainReject": 221,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "extend": {
+   "cases": 125,
+   "chainReject": 125,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "noncanon": {
+   "cases": 188,
+   "chainReject": 188,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "statement": {
+   "cases": 396,
+   "chainReject": 396,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "other_vk": {
+   "cases": 245,
+   "chainReject": 219,
+   "accept": 26,
+   "unexpected": 0
+  },
+  "layout": {
+   "cases": 1346,
+   "chainReject": 1333,
+   "accept": 13,
+   "unexpected": 0
+  },
+  "vk_variant": {
+   "cases": 13,
+   "chainReject": 13,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "forced": {
+   "cases": 7,
+   "chainReject": 7,
+   "accept": 0,
+   "unexpected": 0
+  }
+ },
+ "list": [],
+ "skippedFiles": [
+  "both_lookups_zk-Z128~vk-opow=1.json: generator: ood PoW 0",
+  "m2-0-Z128g_cpow3_lpow8~vk-opow=1.json: generator: ood PoW 0",
+  "three_instances_mixed_sizes-Z128g~vk-opow=1.json: generator: ood PoW 0"
+ ],
+ "layoutB": 3
+}

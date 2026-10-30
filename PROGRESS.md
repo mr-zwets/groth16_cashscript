@@ -147,3 +147,51 @@ Folder `research/pq-stark-batch/onchain/` (README there). Regenerate with `gen-s
   - test-ctx: 4 transactions, 0 mismatches.
   - Caveats: 59 NF + p cases are n/a (no 8-byte lane encoding); encodable non-canonical lanes are tested in the witness family. Malformed-by-length proofs are refused by the encoder. In one such case the lenient witness of a 1-byte truncation equals the valid proof's witness, and the script accepts it, correctly.
 - **For S5–S7:** extend `vkxFromVector` and `dagProgram` (ext constraints, challenges, perm values; several heights); cap > 0 is not built.
+
+## S5 + S6 - Multi-height and LogUp on chain; layout b2 for M1 and M2 (done, 2026-10-30)
+
+Folder `research/pq-stark-batch/onchain/`; the README has a "Track 8 S5 + S6" section. Regenerate with `gen-s5.sh`
+(about 1.5 h; nice, 4 threads for Rust, one node process). S4's files are unchanged.
+
+- **Generalized generator** (`modeln.mjs`, `genn.mjs`, `layoutn.mjs`). It covers:
+  - N tables and several LDE heights: per-height alpha' ladders, one inverse hint per height, FRI roll-ins;
+  - preprocessed columns (the cap is a VK constant);
+  - LogUp: lookup PoW, bus challenges, permutation columns and terminals as DAG leaves, terminal sum = 0;
+  - ext-valued constraints, and ZK on or off.
+  - VK-time asserts: strict height, hiding budget, multiplicity height bound.
+  - Cap 0 only; ood PoW is not supported.
+- **Deviation from DESIGN §7: no INJ records.** The mixed-height injection levels are walked per query inside the query
+  function, from B bottom siblings in each query's blob. The level-B node is the LIFO record leaf, and DUPM enforces
+  consistent injected rows. This costs no proof bytes.
+- **Layout b2:** two P2S inputs share one code library.
+  - Lockings are 63 B and 84 B. Input 1's loader reads input 0's unlocking with OP_INPUTBYTECODE and authenticates the
+    library by HASH256.
+  - Each main pins the input count (2), its own index and the other input's locking, as a template around H_lib (no
+    cycle).
+  - The transcript, the DEEP/FRI constants and the query function are shared.
+- **S5 acceptance, met:**
+  - Model against verify-batch: 17,911 case runs over every S3 cap-0 case file, 0 disagreements, transcripts
+    byte-identical.
+  - b2 scripts on the S3 case files: M2 and Plonky3, 63 files, 8,252 cases, 0 unexpected. The 3 PT files run in layout
+    b, because Q = 2 is too small for input 1's density budget.
+- **S6 acceptance, met:**
+  - M1 b2 on the S3 case files: 2,558 cases, 0 unexpected.
+  - Production (CTX from the transaction): 24 M1 and 8 M2 statements plus second-seed proofs, 1,030 cases, 0 unexpected,
+    including 814 layout cases.
+  - Rejected as required: mismatched proofs across the inputs, a third input, another locking on either input, a
+    tampered library, swapped inputs, and cross-input blob or record moves.
+- **Sizes, op-cost (BCHN-adjusted) and regimes:**
+  - **M1 (24 statements):**
+    - unlocking 61.9–63.6 KB + 33.3–35.2 KB; transaction 96,153–98,321 B (≤ 100,000);
+    - in0 27.2–27.4M (54% of budget), in1 19.6–19.8M (70–73%);
+    - accepted under r100, bch-spec and whole-transaction verify.
+  - **M2 (8 statements):**
+    - proof 121–125 KB; unlocking 79.8–82.4 KB + 75.8–77.4 KB; transaction 156–160 KB;
+    - about 54% of budget on each input;
+    - inputs accepted under r100 and bch-spec;
+    - the whole transaction needs the transaction size limit raised: 0/8 at 100,000 B, 8/8 at 200,000 B.
+  - Today's rules: rejected (unlocking > 10,000 B).
+- **Open:**
+  - Merkle cap > 0 is S7.
+  - The define loop's quadratic SPLIT costs 1–2M per input and could be optimized.
+  - Input 1 re-derives the DEEP/FRI constants: 4.7M (M1), 8.2M (M2).

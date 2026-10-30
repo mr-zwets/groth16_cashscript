@@ -106,7 +106,7 @@ function layoutCases(vk, fileDir, name, v) {
   // input 1 data from another proof of the same statement and VK (second ZK seed): mismatched proofs across inputs
   for (const alt of [name.replace(/\.json$/, '-seed2.json')]) {
     const p = `${fileDir}/${alt}`;
-    if (existsSync(p)) C.push({nm: `input 1 data from another proof of the same statement (${alt})`, other: p});
+    if (existsSync(p)) C.push({nm: `input 1 data from another proof of the same statement, other ZK seed (${alt})`, other: p});
   }
   void v;
   return C;
@@ -180,9 +180,12 @@ for (const f of files) {
       const QA = qaOf(vk);
       const other = spendB2(vk, stmt0, QA, Buffer.from(o.proof_hex, 'hex'), o.public_values.flat().map(BigInt), outs);
       c = chainRun(vk, stmt0, buf, base, outs, false, (a) => [a, other.items1.map((x) => Buffer.from(x))]);
-      // and the other proof alone is valid (control)
-      const ctl = chainRun(vk, stmt0, Buffer.from(o.proof_hex, 'hex'), o.public_values.flat().map(BigInt), outs, true);
-      record(file, 'layout', `control: ${lc.nm.replace('input 1 data from ', '')} verifies on its own`, true, ctl.acc, null, null, ctl.acc ? '' : String(ctl.err).slice(0, 80));
+      // and the other proof alone is valid (control) under its own VK: the Plonky3 test AIRs salt their preprocessed
+      // commitment with the prover's RNG (no published setup seed), so their second-seed proof has another VK
+      const sameVk = JSON.stringify(o.preprocessed_commitment ?? null) === JSON.stringify(v.preprocessed_commitment ?? null);
+      const vko = sameVk ? vk : vkxN(o);
+      const ctl = chainRun(vko, sameVk ? stmt0 : stmtFor(vko, o.public_values.flat().map(BigInt), {mode: vko.stmt, ctx: stmt0.ctx}), Buffer.from(o.proof_hex, 'hex'), o.public_values.flat().map(BigInt), outs, true);
+      record(file, 'layout', `control: ${lc.nm.replace('input 1 data from ', '')} verifies on its own${sameVk ? ' (same VK)' : ' (under its own VK: other preprocessed commitment)'}`, true, ctl.acc, null, null, ctl.acc ? '' : String(ctl.err).slice(0, 80));
     } else c = chainRun(vk, stmt0, buf, base, outs, false, lc.f ? (a, b) => lc.f(a.map((x) => Buffer.from(x)), b.map((x) => Buffer.from(x))) : undefined, lc.tx);
     record(file, 'layout', lc.nm, false, c.acc, null, null, c.acc ? '' : String(c.err ?? '').slice(0, 70));
   }

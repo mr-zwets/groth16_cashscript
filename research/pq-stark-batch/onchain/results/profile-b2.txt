@@ -1,0 +1,4 @@
+m1-s4-0-Z128.json input 0: op 27319237 (+19283 define bytes) = entry 2761252 + transcript 175333 + AIR 7852672 + consts 4679385 + queries 8044113 (670343/query) + Merkle 3800567
+m1-s4-0-Z128.json input 1: op 19772015 (+19283 define bytes) = entry 3081898 + transcript 175301 + AIR 0 + consts 4684238 + queries 8046948 (670579/query) + Merkle 3777715
+m2-s5-0-Z128g_cpow3_lpow8.json input 0: op 35189105 (+27577 define bytes) = entry 3888758 + transcript 198364 + AIR 10437511 + consts 8181975 + queries 8435643 (937294/query) + Merkle 4042142
+m2-s5-0-Z128g_cpow3_lpow8.json input 1: op 33180090 (+27577 define bytes) = entry 4278623 + transcript 198324 + AIR 0 + consts 8188400 + queries 14056718 (937115/query) + Merkle 6450907
