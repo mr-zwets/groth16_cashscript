@@ -29,6 +29,26 @@ OP_DEFINE an input executes.
 
 Consensus op-cost is about 0.1% below standard; both are in `results/summary.json`.
 
+**Re-run on the Aztec Ignition vectors (Track 7, `wip/plonk-usable-srs`).** `results/` now holds this run. The table above
+is Track 6's run on the test SRS.
+- The redeem sizes are byte-identical: 18,016 / 18,017 B for mul2 and 18,244 / 18,245 B for merkle16.
+- All verdicts are unchanged.
+- The new figures are within the proof-to-proof spread, because gnark blinds every proof differently:
+
+| circuit / regime | score (B) | op-cost (libauth std) | BCHN-adjusted | worst margin |
+|---|--:|--:|--:|--:|
+| mul2 / bch-spec | 66,517–67,035 | 58.38–58.86M | +1,405 | 4.18% |
+| mul2 / 100 KB input | 69,983–70,534 | 55.57–56.10M | +1,405 | pad sized per proof |
+| mul2 / today, 10 inputs | 92,987–93,614 (tx 92.6–93.3 KB) | 70.96–71.47M | +21,686 per input | 0.13% |
+| merkle16 / bch-spec | 68,559–68,623 | 60.48–60.80M | +1,405 | 3.22% |
+| merkle16 / 100 KB input | 72,188–72,569 | 57.64–57.96M | +1,405 | pad sized per proof |
+| merkle16 / today, 10 inputs | 95,670–96,062 (tx 95.3–95.7 KB) | 73.12–73.45M | +21,686 per input | 0.14% |
+
+Tests on the new vectors:
+- Valid proofs: 10/10 accepted in every regime.
+- Tampered vectors: 154/154 rejected in every regime.
+- Manipulations: 56/56 rejected single-input, 42/42 in the chain.
+
 **Tests** (`results/test-*.json`, `results/chain-*.json`):
 
 | | bch-spec | 100 KB | today |
@@ -171,8 +191,8 @@ exponentiation, is 12.3M. The transcript and the Fr work are negligible.
   FORMAT.md "SRS"). So the baked `[x]_2` and its 88 chain slopes are Ignition's, shared by every circuit on it.
   `srs-check.mjs` checks every VK's `[1]_1`, `[1]_2` and `[x]_2` against the ceremony value. It also checks that the
   slope pieces derived from that value are in each single-input redeem, and that the SI slice hashes are in the chain
-  scripts, with a control point that must be absent. Only the values of the per-circuit VK points changed; the sizes
-  did not.
+  scripts, with a control point that must be absent. Only the values of the per-circuit VK points changed. The redeem
+  sizes did not, and scores moved only within the proof-to-proof spread (see "Re-run on the Aztec Ignition vectors").
 
 ## Deviations from the design, and honest negatives
 

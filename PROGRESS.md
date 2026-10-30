@@ -6,5 +6,5 @@
 - [x] main.go -srs FILE (srs.go); -unsafe-test-srs keeps the old path
 - [x] vectors regenerated (prover + verifier copies); verify.mjs: 164 cases OK
 - [x] verifier/srs-check.mjs: baked [x]_2 constants vs ceremony, with control
-- [ ] verifier tests (test.mjs spec/txv5, chaintest, summary) re-run on the new vectors
-- [ ] docs numbers refreshed after the re-run
+- [x] verifier tests re-run on the new vectors: all verdicts unchanged, redeem sizes identical (README)
+- [x] docs updated (prover README + FORMAT SRS, verifier README re-run table, SOUNDNESS A3)
