@@ -1,4 +1,4 @@
-# pq-stark-batch prover (Track 8, stage S1)
+# pq-stark-batch prover (Track 8, stages S1 and S2)
 
 This crate is the batch-STARK prover for the Track 8 CashVM verifier. It builds Plonky3 `p3-batch-stark`
 at the pinned commit `0d803737b681774186cd283b1fd2d8e493655c82`, configured with:
@@ -131,6 +131,80 @@ case gives different bytes under a second seed.
    reproducible single-instance vectors only, and production must use OS randomness.
 8. **Effective caps** follow 2^min(cap_height, log2 of the smallest matrix in the tree). This is checked
    against Plonky3 for caps 0, 2 and 5. FRI commit-phase trees use the height after the fold.
+
+## S2: statement AIRs M1 and M2
+
+`src/stmt.rs` implements M1 and M2 from AIR-SPEC.md (bench `research/pq-stark/design-t8/`, branch
+`wip/stark-usable-design`), in its emission order:
+- **M1:** 17 columns, 11 periodic columns, 53 constraints, degree 4, 8 ZK chunks.
+- **M2:** batch order T_hash, then T_ctl.
+  - T_hash: 24 main columns plus 1 preprocessed; 40 AIR constraints plus 4 LogUp; 8 chunks.
+  - T_ctl: 13 main columns plus 5 preprocessed; 31 AIR constraints plus 4 LogUp; 4 chunks.
+  - Both tables share one global bus `P2` of width 13.
+
+They are `TestAir` variants, so shape, wire, DAG export, `prove` and `check` handle them unchanged. Case names
+are `m1@<leaf>@<witness seed>` and `m2@<leaf>@<witness seed>`. Parameter sets:
+- M1: `Z128` (cap 0) and `Z128+cap=5`;
+- M2: `Z128g+cpow=3+lpow=8` (AIR-SPEC §5).
+
+```
+CARGO_TARGET_DIR=... S2_CACHE=... AIR8_REF_DIR=<bench>/research/pq-stark/design-t8 ./gen-s2.sh
+pq-stark-batch-prover s2 selftest|mutate|forced|pvs|batch|witness ...   (src/s2.rs)
+```
+
+The full run took about 4 minutes. Its outputs are the vectors in `vectors/S2/` (leaf indices 0, 2^30 − 1 and
+0x2b1c9e37) and the reports in `vectors/S2/report/`.
+
+**Verifying-key setup seed (M2).** Under ZK, the hiding MMCS salts the preprocessed commitment.
+- Statement cases build the verifying key from a published seed: `SETUP_SEED` = 0x7438534554555031 ("t8SETUP1"),
+  drawn as `StdRng::seed_from_u64(SETUP_SEED ^ 0x5a5a_0001)`.
+- Anyone can recompute the commitment from the AIR and that seed. `check` does exactly this for every vector.
+- The prover's salts come from a separate RNG: its `seed`, which must be OS randomness in production. They are
+  never drawn from the setup RNG.
+- The S1 test cases keep their old behaviour, so their stored vectors still check: 1,538 cases, 0 unexpected,
+  re-run after S2.
+
+**S2 acceptance** (`report/summary.json`):
+
+| check | result |
+|---|---|
+| Poseidon2-Gl-8 differential test against `p3_goldilocks::default_goldilocks_poseidon2_8()` | AIR-SPEC test vector and 10,002 inputs agree |
+| honest traces through Plonky3's `check_all_constraints` (leaf 0, 2^30 − 1, random) | 0 violations, for M1 and both M2 tables |
+| bus check (exact multiset, and Plonky3's `check_lookups`) | balanced; the negative control is rejected |
+| traces against air8_ref.py | Rust traces identical cell for cell (`report/crosscheck-air8_ref.txt`) |
+| single-cell mutations (Plonky3 `DebugConstraintBuilder`, plus the bus for M2) | M1 17,408/17,408; T_hash 24,576/24,576; T_ctl 1,664/1,664 |
+| forced unsatisfying traces through `prove_batch` then `verify_batch` | 16 of 16 rejected; the honest controls are accepted |
+| wrong public values; other verifying keys | 36 of 36 and 9 of 9 rejected |
+| p3b-v1 tamper sweeps of the 9 vectors | 516 cases, 0 unexpected |
+| ZK: a second prover seed | different bytes for all 9 vectors, all verify |
+
+In `report/forced.json`, a mutation that only the bus can catch fails verification with `TerminalSumNonZero`.
+Examples are nk or r in T_ctl, which no AIR constraint covers. Every other forced case fails with
+`OodEvaluationMismatch`.
+
+**Sizes against S0's expected values** (bytes8.py). This covers the 9 vectors plus 24 + 24 + 8 random
+statements:
+
+| set | proofs | mean | range |
+|---|--:|--:|---|
+| M1 Z128 cap 0 (expected 73,434 B) | 27 | +0.11% | −2.24% … +1.69% |
+| M1 Z128 cap 5 (expected 75,967 B) | 27 | +0.13% | −1.20% … +1.83% |
+| M2 Z128-g (expected 122,993 B) | 11 | −0.19% | **−3.29%** … +1.94% |
+
+One proof falls outside ±3%: `m2-1073741823`, at 118,950 B. It is *smaller* than expected. The spread comes from
+how many Merkle siblings the random query set shares (AIR-SPEC §6 item 5). Every mean is within 0.2%.
+
+**Prover time and peak RSS.** These are fresh processes on this machine (24 cores) under nice; the spread over 3
+runs is large.
+
+| statement | 4 threads: prove ms (median) | 1 thread: prove ms (median) | peak RSS |
+|---|--:|--:|--:|
+| M1 Z128 cap 0 | 1,034 (743–1,971) | 3,842 (2,653–7,839) | 1.06 GB |
+| M1 Z128 cap 5 | 809 (767–1,051) | 3,004 (2,480–3,932) | 1.06 GB |
+| M2 Z128-g | 1,274 (875–1,277) | 6,715 (3,434–8,458) | 1.45 GB |
+
+Rust verification takes 2–5 ms. The batch medians at 4 threads are 912 ms (M1 cap 0), 1,000 ms (M1 cap 5) and
+1,346 ms (M2).
 
 ## Files
 

@@ -66,3 +66,35 @@ For S1/S2:
 - **Zero-bit PoW witnesses.** If p3b-v1 omits PoW witnesses at 0 bits, the decoder inserts 0.
 - **Size variance.** A single proof's size varies about ±2–3% around the expected value (multiproof siblings).
 - **Cross-check against S1.** bytes8 was checked against S1's 28 p3b-v1 vectors. Every deterministic section matches exactly, and the fold schedules are equal. The expected-sibling model overshoots by +1.06% on average, so it is conservative.
+
+## S2 - Statement AIRs M1 and M2 (done, 2026-10-30)
+
+Crate `research/pq-stark-batch/prover`: `src/stmt.rs` holds the AIRs, Poseidon2 and the witness/trace generator; `src/s2.rs` holds the checks. Regenerate with `gen-s2.sh` (about 4 min, nice, 4 threads). Vectors are in `vectors/S2/` and reports in `vectors/S2/report/`. README has an "S2" section.
+
+- **AIRs, from AIR-SPEC in emission order.**
+  - M1: 53 constraints, degree 4, 8 chunks.
+  - T_hash: 40 AIR + 4 LogUp constraints, 8 chunks.
+  - T_ctl: 31 AIR + 4 LogUp constraints, 4 chunks.
+  - Bus `P2` has width 13. The fold schedule is [3] for M1 and [3, 3] for M2.
+  - Next-row columns are declared exactly as the spec gives them. Preprocessed columns are opened at ζ only.
+- **Acceptance: all met, with one size caveat.**
+  - Poseidon2 differential test against p3-goldilocks: 10,002 inputs plus the test vector.
+  - `check_all_constraints` on honest traces: 0 violations, at leaf 0, leaf 2^30 − 1 and a random leaf.
+  - The Rust traces are identical to air8_ref.py's.
+  - Single-cell mutations: all caught. M1 17,408/17,408, T_hash 24,576/24,576, T_ctl 1,664/1,664. Of the T_ctl cells, 128 are caught only by the bus: nk, r and the siblings.
+  - Forced unsatisfying traces: 16 of 16 rejected by `verify_batch`. The bus-only cases fail with `TerminalSumNonZero`.
+  - Wrong public values: 36 of 36 rejected. Other verifying keys: 9 of 9 rejected.
+  - Tamper sweeps: 516 cases, 0 unexpected.
+  - A second ZK seed gives different bytes.
+- **Sizes against S0.** The means are within 0.2%: M1 cap 0 +0.11%, cap 5 +0.13%, M2 −0.19%. That is over 27, 27 and 11 proofs.
+  - **One single proof is outside ±3%:** M2 at leaf 2^30 − 1 is 118,950 B, −3.29%. It is smaller than expected; the cause is sibling-sharing luck.
+- **Prover time (4 threads, median):** M1 about 0.9–1.0 s, M2 about 1.3 s. At 1 thread: M1 3–4 s, M2 about 6.7 s.
+- **Peak RSS:** M1 1.06 GB, M2 1.45 GB.
+- **M2 VK setup seed.** The preprocessed commitment is salted by the hiding MMCS. Statement VKs therefore use a published setup seed, `SETUP_SEED` = "t8SETUP1", so anyone can recompute the root. The prover's salts come from a separate RNG.
+  - A VK built with another setup seed rejects an honest proof.
+  - The S1 vectors still check: 1,538 cases, 0 unexpected.
+- **For S3/S4/S5:**
+  - Vectors carry `dag`, `transcript_hash_inputs`, `tampered` and `setup_seed`.
+  - `s2 witness --case m1@L@W` exports the witness, NF, ROOT and the periodic columns.
+  - `s2 batch` produces more than 20 statements on demand (they are cached, not committed).
+  - Other parameter VKs reject the same proof, including PoW-bit changes, because batch-stark's domain separator and FRI bind the parameters. The generator must still pin them.

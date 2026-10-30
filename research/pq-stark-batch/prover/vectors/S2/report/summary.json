@@ -1,0 +1,404 @@
+{
+ "expected_bytes_S0": {
+  "Z128": 73434,
+  "Z128_cap5": 75967,
+  "Z128g_cpow3_lpow8": 122993
+ },
+ "tolerance": 0.03,
+ "vectors": [
+  {
+   "file": "m1-0-Z128.json",
+   "case": "m1@0@1",
+   "set": "Z128",
+   "bytes": 73136,
+   "dev_vs_S0": -0.0041,
+   "rust_verify": "accepted",
+   "tamper_cases": 48,
+   "tamper_unexpected": 0,
+   "seed2_bytes_differ": true,
+   "prove_ms": 971,
+   "log_arities": [
+    3
+   ],
+   "num_chunks": [
+    8
+   ],
+   "constraints": [
+    53
+   ]
+  },
+  {
+   "file": "m1-0-Z128_cap5.json",
+   "case": "m1@0@1",
+   "set": "Z128+cap=5",
+   "bytes": 76208,
+   "dev_vs_S0": 0.0032,
+   "rust_verify": "accepted",
+   "tamper_cases": 48,
+   "tamper_unexpected": 0,
+   "seed2_bytes_differ": true,
+   "prove_ms": 856,
+   "log_arities": [
+    3
+   ],
+   "num_chunks": [
+    8
+   ],
+   "constraints": [
+    53
+   ]
+  },
+  {
+   "file": "m1-1073741823-Z128.json",
+   "case": "m1@1073741823@2",
+   "set": "Z128",
+   "bytes": 73776,
+   "dev_vs_S0": 0.0047,
+   "rust_verify": "accepted",
+   "tamper_cases": 48,
+   "tamper_unexpected": 0,
+   "seed2_bytes_differ": true,
+   "prove_ms": 791,
+   "log_arities": [
+    3
+   ],
+   "num_chunks": [
+    8
+   ],
+   "constraints": [
+    53
+   ]
+  },
+  {
+   "file": "m1-1073741823-Z128_cap5.json",
+   "case": "m1@1073741823@2",
+   "set": "Z128+cap=5",
+   "bytes": 75568,
+   "dev_vs_S0": -0.0053,
+   "rust_verify": "accepted",
+   "tamper_cases": 48,
+   "tamper_unexpected": 0,
+   "seed2_bytes_differ": true,
+   "prove_ms": 872,
+   "log_arities": [
+    3
+   ],
+   "num_chunks": [
+    8
+   ],
+   "constraints": [
+    53
+   ]
+  },
+  {
+   "file": "m1-723295799-Z128.json",
+   "case": "m1@723295799@3",
+   "set": "Z128",
+   "bytes": 74160,
+   "dev_vs_S0": 0.0099,
+   "rust_verify": "accepted",
+   "tamper_cases": 48,
+   "tamper_unexpected": 0,
+   "seed2_bytes_differ": true,
+   "prove_ms": 948,
+   "log_arities": [
+    3
+   ],
+   "num_chunks": [
+    8
+   ],
+   "constraints": [
+    53
+   ]
+  },
+  {
+   "file": "m1-723295799-Z128_cap5.json",
+   "case": "m1@723295799@3",
+   "set": "Z128+cap=5",
+   "bytes": 75056,
+   "dev_vs_S0": -0.012,
+   "rust_verify": "accepted",
+   "tamper_cases": 48,
+   "tamper_unexpected": 0,
+   "seed2_bytes_differ": true,
+   "prove_ms": 1635,
+   "log_arities": [
+    3
+   ],
+   "num_chunks": [
+    8
+   ],
+   "constraints": [
+    53
+   ]
+  },
+  {
+   "file": "m2-0-Z128g_cpow3_lpow8.json",
+   "case": "m2@0@1",
+   "set": "Z128g+cpow=3+lpow=8",
+   "bytes": 125382,
+   "dev_vs_S0": 0.0194,
+   "rust_verify": "accepted",
+   "tamper_cases": 76,
+   "tamper_unexpected": 0,
+   "seed2_bytes_differ": true,
+   "prove_ms": 1535,
+   "log_arities": [
+    3,
+    3
+   ],
+   "num_chunks": [
+    8,
+    4
+   ],
+   "constraints": [
+    44,
+    35
+   ]
+  },
+  {
+   "file": "m2-1073741823-Z128g_cpow3_lpow8.json",
+   "case": "m2@1073741823@2",
+   "set": "Z128g+cpow=3+lpow=8",
+   "bytes": 118950,
+   "dev_vs_S0": -0.0329,
+   "rust_verify": "accepted",
+   "tamper_cases": 76,
+   "tamper_unexpected": 0,
+   "seed2_bytes_differ": true,
+   "prove_ms": 1002,
+   "log_arities": [
+    3,
+    3
+   ],
+   "num_chunks": [
+    8,
+    4
+   ],
+   "constraints": [
+    44,
+    35
+   ]
+  },
+  {
+   "file": "m2-723295799-Z128g_cpow3_lpow8.json",
+   "case": "m2@723295799@3",
+   "set": "Z128g+cpow=3+lpow=8",
+   "bytes": 123366,
+   "dev_vs_S0": 0.003,
+   "rust_verify": "accepted",
+   "tamper_cases": 76,
+   "tamper_unexpected": 0,
+   "seed2_bytes_differ": true,
+   "prove_ms": 998,
+   "log_arities": [
+    3,
+    3
+   ],
+   "num_chunks": [
+    8,
+    4
+   ],
+   "constraints": [
+    44,
+    35
+   ]
+  }
+ ],
+ "batches": {
+  "batch-m1-Z128.json": {
+   "count": 24,
+   "all_ok": true,
+   "mean_bytes": 73491,
+   "sd_bytes": 768,
+   "min": 71792.0,
+   "max": 74672.0,
+   "mean_dev_vs_S0": 0.0008,
+   "max_abs_dev_vs_S0": 0.0224,
+   "prove_ms_median": 912
+  },
+  "batch-m1-Z128_cap5.json": {
+   "count": 24,
+   "all_ok": true,
+   "mean_bytes": 76123,
+   "sd_bytes": 540,
+   "min": 75184.0,
+   "max": 77360.0,
+   "mean_dev_vs_S0": 0.002,
+   "max_abs_dev_vs_S0": 0.0183,
+   "prove_ms_median": 1000
+  },
+  "batch-m2-Z128g_cpow3_lpow8.json": {
+   "count": 8,
+   "all_ok": true,
+   "mean_bytes": 122834,
+   "sd_bytes": 1242,
+   "min": 120230.0,
+   "max": 124262.0,
+   "mean_dev_vs_S0": -0.0013,
+   "max_abs_dev_vs_S0": 0.0225,
+   "prove_ms_median": 1346
+  }
+ },
+ "bench": {
+  "m1-Z128-t1": {
+   "prove_ms": [
+    2653,
+    7839,
+    3842
+   ],
+   "peak_rss_mb": [
+    1061.1,
+    1061.5,
+    1061.4
+   ],
+   "rust_verify_ms": [
+    2,
+    2,
+    2
+   ],
+   "prove_ms_median": 3842,
+   "peak_rss_mb_max": 1061.5
+  },
+  "m1-Z128-t4": {
+   "prove_ms": [
+    743,
+    1971,
+    1034
+   ],
+   "peak_rss_mb": [
+    1061.1,
+    1061.5,
+    1061.3
+   ],
+   "rust_verify_ms": [
+    2,
+    2,
+    2
+   ],
+   "prove_ms_median": 1034,
+   "peak_rss_mb_max": 1061.5
+  },
+  "m1-Z128_cap5-t1": {
+   "prove_ms": [
+    2480,
+    3932,
+    3004
+   ],
+   "peak_rss_mb": [
+    1061.3,
+    1061.4,
+    1061.5
+   ],
+   "rust_verify_ms": [
+    2,
+    2,
+    3
+   ],
+   "prove_ms_median": 3004,
+   "peak_rss_mb_max": 1061.5
+  },
+  "m1-Z128_cap5-t4": {
+   "prove_ms": [
+    767,
+    1051,
+    809
+   ],
+   "peak_rss_mb": [
+    1061.3,
+    1061.4,
+    1061.7
+   ],
+   "rust_verify_ms": [
+    2,
+    2,
+    2
+   ],
+   "prove_ms_median": 809,
+   "peak_rss_mb_max": 1061.7
+  },
+  "m2-Z128g_cpow3_lpow8-t1": {
+   "prove_ms": [
+    6715,
+    3434,
+    8458
+   ],
+   "peak_rss_mb": [
+    1440.5,
+    1440.6,
+    1440.5
+   ],
+   "rust_verify_ms": [
+    4,
+    4,
+    4
+   ],
+   "prove_ms_median": 6715,
+   "peak_rss_mb_max": 1440.6
+  },
+  "m2-Z128g_cpow3_lpow8-t4": {
+   "prove_ms": [
+    1277,
+    1274,
+    875
+   ],
+   "peak_rss_mb": [
+    1444.6,
+    1446.5,
+    1448.6
+   ],
+   "rust_verify_ms": [
+    4,
+    4,
+    5
+   ],
+   "prove_ms_median": 1274,
+   "peak_rss_mb_max": 1448.6
+  }
+ },
+ "acceptance": {
+  "poseidon2_differential_vs_p3_goldilocks": true,
+  "check_constraints_honest_traces (leaf 0, 2^30-1, random; M1 and M2)": true,
+  "single_cell_mutation_all_caught": true,
+  "mutation_counts": {
+   "m1": "17408/17408",
+   "t_hash": "24576/24576",
+   "t_ctl": "1664/1664"
+  },
+  "forced_unsatisfying_rejected_by_verify_batch": true,
+  "wrong_public_values_and_other_vks_rejected": true,
+  "size_mean_per_set_within_3pct_of_S0": true,
+  "size_mean_dev_per_set": {
+   "Z128": {
+    "proofs": 27,
+    "mean_dev": 0.0011,
+    "min_dev": -0.0224,
+    "max_dev": 0.0169
+   },
+   "Z128_cap5": {
+    "proofs": 27,
+    "mean_dev": 0.0013,
+    "min_dev": -0.012,
+    "max_dev": 0.0183
+   },
+   "Z128g_cpow3_lpow8": {
+    "proofs": 11,
+    "mean_dev": -0.0019,
+    "min_dev": -0.0329,
+    "max_dev": 0.0194
+   }
+  },
+  "size_every_single_proof_within_3pct_of_S0": false,
+  "size_proofs_outside_3pct": [
+   {
+    "file": "m2-1073741823-Z128g_cpow3_lpow8.json",
+    "bytes": 118950,
+    "dev": -0.0329
+   }
+  ],
+  "zk_second_seed_differs": true,
+  "tamper_sweeps_zero_unexpected": true,
+  "all_vectors_verify": true,
+  "rust_check": "no FAIL lines"
+ }
+}

@@ -1,0 +1,4 @@
+trace-0.json: public values True; M1 trace identical True (17408 cells), air8_ref violations on the Rust trace 0; T_hash identical True; T_ctl identical True -> PASS
+trace-1073741823.json: public values True; M1 trace identical True (17408 cells), air8_ref violations on the Rust trace 0; T_hash identical True; T_ctl identical True -> PASS
+trace-723295799.json: public values True; M1 trace identical True (17408 cells), air8_ref violations on the Rust trace 0; T_hash identical True; T_ctl identical True -> PASS
+ALL: PASS

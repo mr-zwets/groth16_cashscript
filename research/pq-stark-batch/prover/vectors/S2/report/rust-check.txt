@@ -1,0 +1,10 @@
+ok   /home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/S2/m1-0-Z128_cap5.json valid: ACCEPT
+ok   /home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/S2/m1-0-Z128.json valid: ACCEPT
+ok   /home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/S2/m1-1073741823-Z128_cap5.json valid: ACCEPT
+ok   /home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/S2/m1-1073741823-Z128.json valid: ACCEPT
+ok   /home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/S2/m1-723295799-Z128_cap5.json valid: ACCEPT
+ok   /home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/S2/m1-723295799-Z128.json valid: ACCEPT
+ok   /home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/S2/m2-0-Z128g_cpow3_lpow8.json valid: ACCEPT
+ok   /home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/S2/m2-1073741823-Z128g_cpow3_lpow8.json valid: ACCEPT
+ok   /home/mrzwets/BCH-projects/verifier.cash/work/stark-usable/code/groth16_cashscript/research/pq-stark-batch/prover/vectors/S2/m2-723295799-Z128g_cpow3_lpow8.json valid: ACCEPT
+rust check: 516 cases, 0 unexpected
