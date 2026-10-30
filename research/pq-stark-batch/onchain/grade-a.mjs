@@ -27,8 +27,9 @@ for (const path of process.argv.slice(2)) {
       const whole = verifyTxA(tx, 'bchStd');
       const inputs = std.map((r, i) => ({role: roleOf(plan, i), std: r.accepted, cons: cons[i].accepted, spec: spec[i].accepted, err: r.error ?? cons[i].error ?? null,
         unlocking: r.unlocking, opCost: r.opCost, opBchnAdjusted: r.opCost + sp.pg.defineBytes, budget: r.budget, pct: +(100 * (r.opCost + sp.pg.defineBytes) / r.budget).toFixed(2),
+        bchnWithinBudget: Math.max(r.opCost, cons[i].opCost) + sp.pg.defineBytes <= r.budget,
         hashIters: r.iters, iterLimit: Math.floor((41 + r.unlocking) / 2)}));
-      return {tx: t, bytes: tx.txBytes, inputs: inputs.length, whole: whole === true ? true : String(whole), allStd: inputs.every((x) => x.std && x.cons), allSpec: inputs.every((x) => x.spec), detail: inputs};
+      return {tx: t, bytes: tx.txBytes, inputs: inputs.length, whole: whole === true ? true : String(whole), allStd: inputs.every((x) => x.std && x.cons && x.bchnWithinBudget), allSpec: inputs.every((x) => x.spec), detail: inputs};
     });
     const row = {vector: path.split('/').pop(), plan: pname, txs: txs.length, inputs: txs.reduce((a, t) => a + t.inputs, 0), totalBytes: txs.reduce((a, t) => a + t.bytes, 0),
       accepted: txs.every((t) => t.allStd && t.whole === true && t.bytes <= 100_000), proofBytes: v.proof_hex.length / 2,

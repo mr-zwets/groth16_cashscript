@@ -18,7 +18,7 @@
 //   p1:      TAIL (input 0's unlocking bytecode after its query data: the pushes of the items above)
 import {asm, fresh, Stk} from './lib/asm.mjs';
 import {compileSlp, V, K, op, chk, call, add, sub, mul, modp, sum, ex} from './lib/slp.mjs';
-import {mulE, sqE, mulU, PB, SK, SB} from './gen.mjs';
+import {mulE, sqE, mulU, PB, SK, SB, assertPackBounds} from './gen.mjs';
 import {P, pw, inv, g2, rev, le8, OPS} from './modeln.mjs';
 import {ctxCode} from './ctx.mjs';
 import {encodeDataPush} from '@bitauth/libauth';
@@ -77,7 +77,15 @@ export function makeGenN(vk, stmt, opts = {}) {
   const mark = (stk, label) => { marks.push([label, stk.code.length]); if (opts.markers) stk.emit('NOP'); };
   const F = {};
   const GH = vk.L >= 256 ? 8 : Math.min(4, vk.L), GG = vk.L / GH;
+  // packed-slot bounds for lanes < 2^64 (SOUNDNESS-T8 sec. 9.1): SB slots (dot products, final polynomial), MULE
+  // (17-byte slots: <= 3 products of two lanes < 2^64 per slot, D = 3 only), PAIRK (26-byte slots, <= 4 fold levels)
+  assertPackBounds('final-polynomial groups GG', GG);
+  if (D !== 3) throw new Error('generator: MULE packing is for D = 3');
+  if (vk.logArities.some((la) => la > 4)) throw new Error('generator: PAIRK slot bound holds for <= 4 fold levels per round');
   const pool = stmt.mode === 'pool';
+  if (pool) {
+    if (!Array.isArray(stmt.root) || stmt.root.length !== 4 || stmt.root.some((x) => typeof x !== 'bigint' || x < 0n || x >= P)) throw new Error('generator: ROOT must be 4 canonical elements (< p)');
+  }
   const inTrees = vk.trees.filter((t) => t.kind === 'in');
   const nH = vk.heights.length;
 
@@ -448,6 +456,7 @@ export function makeGenN(vk, stmt, opts = {}) {
     for (const hh of vk.heights) {
       const rl = []; vk.rounds.forEach((r, bi) => r.matrices.forEach((m, mi) => { if (m.logH === hh) for (let j = 0; j < m.width; j++) rl.push([bi, mi, j, m.points]); }));
       g.rowList[hh] = rl;
+      assertPackBounds(`row values at height ${hh} (dot product)`, rl.length);
       rl.forEach(([bi, mi, j, npt], ri) => {
         const ks = Array.from({length: npt}, (_, p) => Kname.get(`${bi}:${mi}:${p}:${j}`));
         S.roll(ks[0]); for (const x of ks.slice(1)) { S.roll(x); S.raw(['ADD'], 2, [ks[0]]); }
@@ -528,13 +537,13 @@ export function makeGenN(vk, stmt, opts = {}) {
       defFn('D_CK8', asm(opnd(8), 0, 0, 'FROMALTSTACK'), ID.CK8);
       const bin = (f) => { const b = new PB(D); names('a', D).forEach((x, i) => b.red(f(V(x), V('b' + i)), 'c' + i)); return slpFn([...names('a', D), ...names('b', D)], b.prog, names('c', D)); };
       defFn('D_ADD', wrap(bin((x, y) => add(x, y))), ID.ADD);
-      defFn('D_SUB', wrap(bin((x, y) => add(sub(x, y), K(P)))), ID.SUB);
-      { const b = new PB(D); names('a', D).forEach((x, i) => b.red(sub(K(P), V(x)), 'c' + i)); defFn('D_NEG', wrap(slpFn(names('a', D), b.prog, names('c', D))), ID.NEG); }
+      defFn('D_SUB', wrap(bin((x, y) => add(sub(x, y), K(2n * P)))), ID.SUB); // 2p offset: raw lanes < 2^64 < 2p (SOUNDNESS-T8 sec. 9.1)
+      { const b = new PB(D); names('a', D).forEach((x, i) => b.red(sub(K(2n * P), V(x)), 'c' + i)); defFn('D_NEG', wrap(slpFn(names('a', D), b.prog, names('c', D))), ID.NEG); }
       defFn('D_MUL', wrap(asm(F.MULE, 'INVOKE')), ID.MUL);
       const ldc = asm(opnd(2), 'DEPTH', '1SUB', 'SWAP', 'SUB', 'DUP', 'PICK', 'OVER', 'PICK', 2, 'PICK', 'PICK', 3, 'ROLL', 'DROP');
       defFn('D_ADDL', asm({raw: ldc}, {raw: bin((x, y) => add(x, y))}, 'FROMALTSTACK'), ID.ADDL);
-      defFn('D_SUBL', asm({raw: ldc}, {raw: bin((x, y) => add(sub(x, y), K(P)))}, 'FROMALTSTACK'), ID.SUBL);
-      defFn('D_RSUBL', asm({raw: ldc}, {raw: bin((x, y) => add(sub(y, x), K(P)))}, 'FROMALTSTACK'), ID.RSUBL);
+      defFn('D_SUBL', asm({raw: ldc}, {raw: bin((x, y) => add(sub(x, y), K(2n * P)))}, 'FROMALTSTACK'), ID.SUBL);
+      defFn('D_RSUBL', asm({raw: ldc}, {raw: bin((x, y) => add(sub(y, x), K(2n * P)))}, 'FROMALTSTACK'), ID.RSUBL);
       defFn('D_MULL', asm({raw: ldc}, F.MULE, 'INVOKE', 'FROMALTSTACK'), ID.MULL);
       { const b = new PB(D); names('a', D).forEach((x, i) => b.red(mul(V(x), V('k')), 'c' + i)); const body = slpFn([...names('a', D), 'k'], b.prog, names('c', D));
         defFn('D_MK1', asm(opnd(1), {raw: body}, 'FROMALTSTACK'), ID.MK1); defFn('D_MK8', asm(opnd(8), {raw: body}, 'FROMALTSTACK'), ID.MK8); }
@@ -948,6 +957,9 @@ export function lockingTemplates(tailLen) {
 }
 export function buildB2(vk, stmt, QA, opts = {}) {
   const g = makeGenN(vk, stmt, opts);
+  // Lemma 8 (ii): every tail item is >= 2 bytes, so its minimal push header is fixed by its length (no OP_0 .. OP_16
+  // or OP_1NEGATE form)
+  for (const [x, len] of g.tailItems()) if (!(len >= 2)) throw new Error(`b2: tail item ${x} of ${len} B (must be >= 2)`);
   const tailLen = g.tailItems().reduce((s, [, len]) => s + pushPrefix(len).length + len, 0);
   const T = lockingTemplates(tailLen);
   const q0 = Array.from({length: QA}, (_, q) => q), q1 = Array.from({length: vk.Q - QA}, (_, q) => QA + q);

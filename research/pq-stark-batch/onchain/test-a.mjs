@@ -35,12 +35,17 @@ const planOf = (vk) => makePlanA(vk, countsOf(vk, PLAN), HARNESS ? {ctx: 'witnes
 
 const stats = {plan: PLAN, harness: HARNESS, files: 0, cases: 0, unexpected: 0, na: 0, refused: 0, encoderOnly: 0, malformed: 0, families: {}, list: [], skippedFiles: []};
 const fam = (f) => (stats.families[f] ??= {cases: 0, chainReject: 0, accept: 0, unexpected: 0});
-function record(file, family, name, expect, chain, model, ref, extra = '') {
+// kind: undefined (the chain ran), 'notRun' (the statement layer or the generator short-circuits: no script runs, the
+// case is counted apart, not as a chain rejection), 'encoderOnly' (malformed p3b-v1 that the encoder refuses; the
+// script sees the valid proof's witness and accepts; expect relabelled to true; counted apart from the totals)
+function record(file, family, name, expect, chain, model, ref, extra = '', kind) {
   const F = fam(family); F.cases++; stats.cases++;
   const ok = chain === expect && (model === null || model === expect) && (ref === null || ref === expect);
-  if (chain) F.accept++; else F.chainReject++;
-  if (!ok) { F.unexpected++; stats.unexpected++; stats.list.push({file, family, name, expect, chain, model, ref, extra}); }
-  console.log(`${ok ? 'ok  ' : 'FAIL'} ${file} [${family}] ${name}: chain ${chain ? 'ACCEPT' : 'reject'}${model === null ? '' : ` model ${model ? 'ACCEPT' : 'reject'}`}${ref === null ? '' : ` ref ${ref ? 'ACCEPT' : 'reject'}`} ${extra}`);
+  if (kind === 'notRun') { F.notRunOnChain = (F.notRunOnChain ?? 0) + 1; stats.notRunOnChain = (stats.notRunOnChain ?? 0) + 1; }
+  else if (kind === 'encoderOnly') { F.encoderOnlyRelabel = (F.encoderOnlyRelabel ?? 0) + 1; stats.encoderOnlyRelabel = (stats.encoderOnlyRelabel ?? 0) + 1; }
+  else if (chain) F.accept++; else F.chainReject++;
+  if (!ok) { F.unexpected++; stats.unexpected++; stats.list.push({file, family, name, expect, chain, model, ref, extra, kind}); }
+  console.log(`${ok ? 'ok  ' : 'FAIL'} ${file} [${family}] ${name}: chain ${kind === 'notRun' ? 'NOT RUN (reject)' : chain ? 'ACCEPT' : 'reject'}${model === null ? '' : ` model ${model ? 'ACCEPT' : 'reject'}`}${ref === null ? '' : ` ref ${ref ? 'ACCEPT' : 'reject'}`} ${extra}`);
 }
 // the chain verdict of a plan: valid -> bchStd + bchCons on every input and whole-tx verify; reject -> loose VM
 function chainRun(vk, plan, buf, pis, outs, expectValid, {mutate, txMutate, ...o} = {}) {
@@ -174,7 +179,7 @@ for (const f of files) {
   try { vk = vkxA(v); if (vk.capHeight !== 5) throw new Error('cap height ' + vk.capHeight + " (layout a' is the cap-5 deployment)"); } catch (e) {
     const expect = v.s3_valid_expect ?? !v.s3_vk_variant;
     stats.skippedFiles.push(`${file}: ${e.message}`);
-    if (v.s3_vk_variant) record(file, 'vk_variant', `VK refused by the generator: ${e.message}`, expect, false, null, runCase(vkFromVector(v), v, null).accept);
+    if (v.s3_vk_variant) record(file, 'vk_variant', `VK refused by the generator: ${e.message}`, expect, false, null, runCase(vkFromVector(v), v, null).accept, '', 'notRun');
     else console.log(`skip ${file}: ${e.message}`);
     continue;
   }
@@ -192,12 +197,12 @@ for (const f of files) {
     const pvs = t?.public_values ?? v.public_values;
     const pv = pvs.flat().map(BigInt);
     const ref = runCase(ref0, v, t).accept;
-    if (pvs.length !== 1 || pvs[0].length !== 12) { stats.refused++; record(file, family, name, expect, false, null, ref, '(public values in another per-instance layout: refused by the statement layer)'); continue; }
+    if (pvs.length !== 1 || pvs[0].length !== 12) { stats.refused++; record(file, family, name, expect, false, null, ref, '(public values in another per-instance layout: refused by the statement layer)', 'notRun'); continue; }
     if (pv.some((x) => x < 0n || x >= M64)) { stats.na++; console.log(`n/a  ${file} [${family}] ${name}: a public value >= 2^64 has no 8-byte encoding`); continue; }
-    if (pv.slice(0, 4).some((x) => x >= P)) { stats.refused++; record(file, family, name, expect, false, null, ref, '(non-canonical ROOT: the generator refuses this statement)'); continue; }
+    if (pv.slice(0, 4).some((x) => x >= P)) { stats.refused++; record(file, family, name, expect, false, null, ref, '(non-canonical ROOT: the generator refuses this statement)', 'notRun'); continue; }
     let useOuts = outs;
     if (!HARNESS) { if (pv.slice(8, 12).some((x, k) => x !== base[8 + k])) useOuts = altOutputs(outs); }
-    else if (pv.slice(8, 12).some((x) => x >= 1n << 56n)) { record(file, family, name, expect, false, null, ref, '(CTX lane >= 2^56: not producible by the statement layer)'); continue; }
+    else if (pv.slice(8, 12).some((x) => x >= 1n << 56n)) { record(file, family, name, expect, false, null, ref, '(CTX lane >= 2^56: not producible by the statement layer)', 'notRun'); continue; }
     const pvModel = HARNESS ? pv : [...pv.slice(0, 8), ...ctxOf(useOuts).lanes];
     // malformed-by-length handling applies to tampered copies of a proof that is valid under this VK (not to the
     // stored proof of a VK-variant file, which is itself the reject case)
@@ -211,7 +216,7 @@ for (const f of files) {
       const w = chainRun(vk, plan, buf, pv, useOuts, false);
       if (same(w.sp.wit, validWit) && pv.every((x, k) => x === base[k])) {
         stats.encoderOnly++;
-        record(file, family, name, true, w.acc, null, null, `(malformed p3b-v1: ${malformed}; the encoder refuses it; the full-path witness is the valid proof's, so the script accepts it)`);
+        record(file, family, name, true, w.acc, null, null, `(malformed p3b-v1: ${malformed}; the encoder refuses it; the full-path witness is the valid proof's, so the script accepts it)`, 'encoderOnly');
         continue;
       }
       record(file, family, name, expect, w.acc, verifyModelA(vk, buf, pvModel, plan.parts).ok, ref, `(malformed: ${malformed}; encoder refuses; lenient witness rejected)`);
@@ -244,6 +249,8 @@ for (const f of files) {
   }
 }
 console.log(`test-a (plan ${PLAN}${HARNESS ? ', harness: CTX a witness item' : ', production: CTX from the final transaction'}): ${stats.files} files, ${stats.cases} cases, ${stats.unexpected} unexpected, ${stats.na} n/a, ${stats.refused} refused by the statement layer/generator, ${stats.malformed} malformed (${stats.encoderOnly} encoder-only), ${stats.skippedFiles.length} files skipped`);
+const notRunNote = () => `; ${stats.notRunOnChain ?? 0} not run on chain (short-circuit, counted as rejects: ${JSON.stringify(Object.fromEntries(Object.entries(stats.families).filter(([, x]) => x.notRunOnChain).map(([k, x]) => [k, x.notRunOnChain])))}); ${stats.encoderOnlyRelabel ?? 0} encoder-only relabels (reference rejects; script accepts the valid witness; inside the ok count)`;
+console.log(notRunNote().slice(2));
 console.log(JSON.stringify(stats.families));
 if (outFile) writeFileSync(outFile, JSON.stringify(stats, null, 1) + '\n');
 process.exit(stats.unexpected ? 1 : 0);

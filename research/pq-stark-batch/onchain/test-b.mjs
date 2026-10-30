@@ -35,12 +35,17 @@ const altOutputs = (outs) => outs.map((o, i) => (i === 0 ? {...o, valueSatoshis:
 
 const stats = {files: 0, cases: 0, unexpected: 0, na: 0, refusedByGenerator: 0, families: {}, list: [], skippedFiles: []};
 const fam = (f) => (stats.families[f] ??= {cases: 0, chainReject: 0, accept: 0, unexpected: 0, na: 0, refused: 0});
-function record(file, family, name, expect, chain, model, ref, extra = '') {
+// kind: undefined (the chain ran), 'notRun' (the statement layer or the generator short-circuits: no script runs, the
+// case is counted apart, not as a chain rejection), 'encoderOnly' (malformed p3b-v1 that the encoder refuses; the
+// script sees the valid proof's witness and accepts; expect relabelled to true; counted apart from the totals)
+function record(file, family, name, expect, chain, model, ref, extra = '', kind) {
   const F = fam(family); F.cases++; stats.cases++;
   const ok = chain === expect && (model === null || model === expect) && (ref === null || ref === expect);
-  if (chain) F.accept++; else F.chainReject++;
-  if (!ok) { F.unexpected++; stats.unexpected++; stats.list.push({file, family, name, expect, chain, model, ref, extra}); }
-  console.log(`${ok ? 'ok  ' : 'FAIL'} ${file} [${family}] ${name}: chain ${chain ? 'ACCEPT' : 'reject'}${model === null ? '' : ` model ${model ? 'ACCEPT' : 'reject'}`}${ref === null ? '' : ` ref ${ref ? 'ACCEPT' : 'reject'}`} ${extra}`);
+  if (kind === 'notRun') { F.notRunOnChain = (F.notRunOnChain ?? 0) + 1; stats.notRunOnChain = (stats.notRunOnChain ?? 0) + 1; }
+  else if (kind === 'encoderOnly') { F.encoderOnlyRelabel = (F.encoderOnlyRelabel ?? 0) + 1; stats.encoderOnlyRelabel = (stats.encoderOnlyRelabel ?? 0) + 1; }
+  else if (chain) F.accept++; else F.chainReject++;
+  if (!ok) { F.unexpected++; stats.unexpected++; stats.list.push({file, family, name, expect, chain, model, ref, extra, kind}); }
+  console.log(`${ok ? 'ok  ' : 'FAIL'} ${file} [${family}] ${name}: chain ${kind === 'notRun' ? 'NOT RUN (reject)' : chain ? 'ACCEPT' : 'reject'}${model === null ? '' : ` model ${model ? 'ACCEPT' : 'reject'}`}${ref === null ? '' : ` ref ${ref ? 'ACCEPT' : 'reject'}`} ${extra}`);
 }
 const canon = (xs) => xs.every((x) => x >= 0n && x < P);
 function chainRun(vk, root, buf, pvEnc, outs, expectValid, mutate) {
@@ -118,15 +123,15 @@ for (const f of files) {
     const buf = t ? applyTamper(v.proof_hex, t) : Buffer.from(v.proof_hex, 'hex');
     const pv = t?.public_values ? t.public_values.flat().map(BigInt) : base;
     const ref = runCase(ref0, v, t).accept;
-    if (pv.length !== 12) { record(file, family, name, expect, false, null, ref, '(public values for another instance layout: refused by the statement layer)'); continue; }
+    if (pv.length !== 12) { record(file, family, name, expect, false, null, ref, '(public values for another instance layout: refused by the statement layer)', 'notRun'); continue; }
     const root = pv.slice(0, 4), nf = pv.slice(4, 8);
-    if (!canon(root)) { fam(family).refused++; stats.refusedByGenerator++; record(file, family, name, expect, false, null, ref, '(non-canonical ROOT: the generator refuses this VK/statement)'); continue; }
+    if (!canon(root)) { fam(family).refused++; stats.refusedByGenerator++; record(file, family, name, expect, false, null, ref, '(non-canonical ROOT: the generator refuses this VK/statement)', 'notRun'); continue; }
     if (nf.some((x) => x < 0n || x >= M64)) { fam(family).na++; stats.na++; console.log(`n/a  ${file} [${family}] ${name}: NF lane >= 2^64 has no 8-byte encoding (see the nf family for encodable non-canonical lanes)`); continue; }
     // the chain's statement: CTX of the transaction (production) or the case's CTX (harness)
     let useOuts = outs;
     if (!HARNESS && pv.slice(8, 12).some((x, k) => x !== base[8 + k])) useOuts = altOutputs(outs);
     const ctxChain = HARNESS ? pv.slice(8, 12) : ctxOf(useOuts).lanes;
-    if (HARNESS && pv.slice(8, 12).some((x) => x >= 1n << 56n)) { record(file, family, name, expect, false, null, ref, '(CTX lane >= 2^56: not producible by the statement layer)'); continue; }
+    if (HARNESS && pv.slice(8, 12).some((x) => x >= 1n << 56n)) { record(file, family, name, expect, false, null, ref, '(CTX lane >= 2^56: not producible by the statement layer)', 'notRun'); continue; }
     // a byte string that is not well-formed p3b-v1 by length (truncated, trailing bytes): the production encoder
     // refuses it. The lenient encoding still goes to the chain; when it reproduces the valid proof's witness exactly
     // (a truncated zero byte), the script is right to accept it, and the case is counted as encoder-refused.
@@ -137,7 +142,7 @@ for (const f of files) {
       const same = w.length === w0.length && w.every((x, i) => Buffer.compare(x, w0[i]) === 0) && pv.every((x, k) => x === base[k]);
       if (same) {
         const c0 = chainRun(vk, root, buf, pv, useOuts, false);
-        record(file, family, name, true, c0.acc, null, null, `(malformed p3b-v1: ${malformed}; encoder refuses; its lenient witness is the valid proof's witness, so the script accepts it)`);
+        record(file, family, name, true, c0.acc, null, null, `(malformed p3b-v1: ${malformed}; encoder refuses; its lenient witness is the valid proof's witness, so the script accepts it)`, 'encoderOnly');
         continue;
       }
     }
@@ -174,6 +179,8 @@ for (const f of files) {
   }
 }
 console.log(`test-b${HARNESS ? ' (harness: CTX as a witness item)' : ''}: ${stats.files} files, ${stats.cases} cases, ${stats.unexpected} unexpected, ${stats.na} n/a, ${stats.refusedByGenerator} refused by the generator, ${stats.encoderRefused ?? 0} malformed by length (encoder refuses), ${stats.skippedFiles.length} files skipped`);
+const notRunNote = () => `; ${stats.notRunOnChain ?? 0} not run on chain (short-circuit, counted as rejects: ${JSON.stringify(Object.fromEntries(Object.entries(stats.families).filter(([, x]) => x.notRunOnChain).map(([k, x]) => [k, x.notRunOnChain])))}); ${stats.encoderOnlyRelabel ?? 0} encoder-only relabels (reference rejects; script accepts the valid witness; inside the ok count)`;
+console.log(notRunNote().slice(2));
 console.log(JSON.stringify(stats.families));
 if (outFile) writeFileSync(outFile, JSON.stringify(stats, null, 1) + '\n');
 process.exit(stats.unexpected ? 1 : 0);

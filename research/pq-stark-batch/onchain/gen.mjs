@@ -87,7 +87,11 @@ const slpFn = (args, prog, outs) => localFn(args, (s) => { compileSlp(s, prog, {
 
 // ---- packed helpers (Track 5 field cost) ----
 export const SK = 26;     // fold slots (bytes)
-export const SB = 17;     // dot-product / final-polynomial slots (bytes): sums of < 2^8 products of 64-bit values
+export const SB = 17;     // dot-product / final-polynomial slots (bytes), unpacked with the signed BIN2NUM: a slot holds
+                          // < 2^135, i.e. a sum of at most 127 products of a lane < 2^64 and a value < p < 2^64
+                          // (assert SB_TERMS at generation: row values per height, final-polynomial groups GG)
+export const SB_TERMS = 127;
+export const assertPackBounds = (what, n) => { if (!(n >= 1 && n <= SB_TERMS)) throw new Error(`generator: ${what} = ${n} terms in a ${SB}-byte packed slot (max ${SB_TERMS})`); };
 // unpack a packed value (non-negative slots) into n numbers, slot 0 deepest
 const unpackCode = (n, sb, red = false) => [sb * n, 'NUM2BIN', ...Array(n - 1).fill([sb, 'SPLIT']), ...Array.from({length: n}, () => [n - 1, 'ROLL', 'BIN2NUM', ...(red ? [P, 'MOD'] : [])])].flat();
 // packed rotation columns of b (canonical names): column k = b * u^k, slot j at 2^(8 sb j); entries < 2p (D = 3) / 7p (D = 2)
@@ -127,6 +131,7 @@ export function makeGen(vk, pis, opts = {}) {
   const trunc = h < 32 ? [h, 'SPLIT', 'DROP'] : [];
   const F = {};
   const GH = vk.L >= 256 ? 8 : Math.min(4, vk.L), GG = vk.L / GH;
+  assertPackBounds('final-polynomial groups GG', GG);
 
   // ---------------- shared functions ----------------
   F.MM = defFn('MM', asm('MUL', P, 'MOD'));
@@ -522,14 +527,14 @@ export function makeGen(vk, pis, opts = {}) {
         defFn('D_CK8', asm(opnd(8), 0, 0, 'FROMALTSTACK'), ID.CK8);
         const bin = (f) => { const b = new PB(D); names('a', D).forEach((x, i) => b.red(f(V(x), V('b' + i)), 'c' + i)); return slpFn([...names('a', D), ...names('b', D)], b.prog, names('c', D)); };
         defFn('D_ADD', wrap(bin((x, y) => add(x, y))), ID.ADD);
-        defFn('D_SUB', wrap(bin((x, y) => add(sub(x, y), K(P)))), ID.SUB);
-        { const b = new PB(D); names('a', D).forEach((x, i) => b.red(sub(K(P), V(x)), 'c' + i)); defFn('D_NEG', wrap(slpFn(names('a', D), b.prog, names('c', D))), ID.NEG); }
+        defFn('D_SUB', wrap(bin((x, y) => add(sub(x, y), K(2n * P)))), ID.SUB); // 2p offset: raw lanes < 2^64 < 2p (SOUNDNESS-T8 sec. 9.1)
+        { const b = new PB(D); names('a', D).forEach((x, i) => b.red(sub(K(2n * P), V(x)), 'c' + i)); defFn('D_NEG', wrap(slpFn(names('a', D), b.prog, names('c', D))), ID.NEG); }
         defFn('D_MUL', wrap(asm(F.MULE, 'INVOKE')), ID.MUL);
         // fused: the second operand is the triple at absolute index i (operand), the first the top triple
         const ldc = asm(opnd(2), 'DEPTH', '1SUB', 'SWAP', 'SUB', 'DUP', 'PICK', 'OVER', 'PICK', 2, 'PICK', 'PICK', 3, 'ROLL', 'DROP');
         defFn('D_ADDL', asm({raw: ldc}, {raw: bin((x, y) => add(x, y))}, 'FROMALTSTACK'), ID.ADDL);
-        defFn('D_SUBL', asm({raw: ldc}, {raw: bin((x, y) => add(sub(x, y), K(P)))}, 'FROMALTSTACK'), ID.SUBL);
-        defFn('D_RSUBL', asm({raw: ldc}, {raw: bin((x, y) => add(sub(y, x), K(P)))}, 'FROMALTSTACK'), ID.RSUBL);
+        defFn('D_SUBL', asm({raw: ldc}, {raw: bin((x, y) => add(sub(x, y), K(2n * P)))}, 'FROMALTSTACK'), ID.SUBL);
+        defFn('D_RSUBL', asm({raw: ldc}, {raw: bin((x, y) => add(sub(y, x), K(2n * P)))}, 'FROMALTSTACK'), ID.RSUBL);
         defFn('D_MULL', asm({raw: ldc}, F.MULE, 'INVOKE', 'FROMALTSTACK'), ID.MULL);
         { const b = new PB(D); names('a', D).forEach((x, i) => b.red(mul(V(x), V('k')), 'c' + i)); const body = slpFn([...names('a', D), 'k'], b.prog, names('c', D));
           defFn('D_MK1', asm(opnd(1), {raw: body}, 'FROMALTSTACK'), ID.MK1); defFn('D_MK8', asm(opnd(8), {raw: body}, 'FROMALTSTACK'), ID.MK8); }
@@ -692,6 +697,7 @@ export function makeGen(vk, pis, opts = {}) {
         b.let(V(tn), 'si0');
         // packed dot products of the row values with the alpha' columns (both points at once)
         const npt = vk.flat.some((cl) => cl.pt === 1) ? 2 : 1;
+        assertPackBounds('row values (dot product)', rowNames.length);
         b.let(sum(...rowNames.map((rn, ri) => mul(V(rn), V(`kr${ri}`)))), 'dot');
         compileSlp(Qs, b.prog, {keep: [...keepC(), 's0', 'x0', 'xo', 'si0', 'T', ...(x2 ? [x2] : []), ...N]});
         Qs.roll('dot'); Qs.raw(unpackCode(npt * D, SB, true), 1, names('dp', npt * D));

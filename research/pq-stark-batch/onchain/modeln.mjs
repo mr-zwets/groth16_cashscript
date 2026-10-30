@@ -40,13 +40,22 @@ export function vkxN(v, {stmt, allowCap = false} = {}) {
   if (b.opow !== 0) throw new Error('generator: ood PoW 0');
   const F = extField(D);
   const nPub = b.inst.reduce((s, I) => s + I.numPublic, 0);
-  stmt ??= nPub === 12 && b.inst.some((I) => I.numPublic === 12) && /^m[12]/.test(String(v.case ?? '')) ? 'pool' : 'witness';
+  // the statement mode is explicit on every production path; 'auto' (guess from the case name) is for the S3 test harness only
+  if (stmt === undefined) throw new Error("vkxN: statement mode required ('pool' | 'witness'; 'auto' only in test harnesses)");
+  if (stmt === 'auto') stmt = nPub === 12 && b.inst.some((I) => I.numPublic === 12) && /^m[12]/.test(String(v.case ?? '')) ? 'pool' : 'witness';
+  if (stmt !== 'pool' && stmt !== 'witness') throw new Error('vkxN: statement mode ' + stmt);
   // VK-time checks the per-proof verifier relies on (DESIGN-T8 §2.3, §2.4, §6.5)
   for (const I of b.inst) if (!(I.logLde > b.logFinal)) throw new Error('VK: strict FRI height rule');
   if (b.zk) for (const r of b.rounds) for (const m of r.matrices) if (2 ** b.inst[m.inst].logN < 2 * (D * m.points + b.Q)) throw new Error('VK: hiding budget');
   if (b.hasLookups) {
-    const w = b.inst.reduce((s, I) => s + BigInt((I.dag.lookups ?? []).reduce((a, l) => a + Number(l.count_weight ?? 1), 0)) * (1n << BigInt(I.logN)), 0n);
+    const w = b.inst.reduce((s, I) => s + BigInt((I.dag.lookups ?? []).reduce((a, l) => a + Number(l.count_weight ?? (() => { throw new Error('VK: lookup without count_weight (multiplicity bound)'); })()), 0)) * (1n << BigInt(I.logN)), 0n);
     if (w >= P) throw new Error('VK: multiplicity height bound (sum w h >= p)');
+  }
+  // Plonky3 check_next_row_reads (UndeclaredNextRowRead): a DAG may read row 1 only of what the VK opens at zeta g
+  for (const [i, I] of b.inst.entries()) for (const nd of I.dag.nodes) {
+    if (nd.op === 'main' && nd.row !== 0 && !I.opensNext) throw new Error(`VK: instance ${i} reads main row ${nd.row} but opens no next row`);
+    if (nd.op === 'pre' && nd.row !== 0 && !I.preNext) throw new Error(`VK: instance ${i} reads preprocessed row ${nd.row} but opens no preprocessed next row`);
+    if ((nd.op === 'main' || nd.op === 'pre') && nd.row !== 0 && nd.row !== 1) throw new Error(`VK: instance ${i} reads row offset ${nd.row}`);
   }
   // instances: AIR constants
   const inst = b.inst.map((I, i) => {

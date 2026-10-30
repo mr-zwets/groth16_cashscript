@@ -32,12 +32,17 @@ const altOutputs = (outs) => outs.map((o, i) => (i === 0 ? {...o, valueSatoshis:
 
 const stats = {files: 0, cases: 0, unexpected: 0, na: 0, refused: 0, encoderRefused: 0, families: {}, list: [], skippedFiles: [], layoutB: 0};
 const fam = (f) => (stats.families[f] ??= {cases: 0, chainReject: 0, accept: 0, unexpected: 0});
-function record(file, family, name, expect, chain, model, ref, extra = '') {
+// kind: undefined (the chain ran), 'notRun' (the statement layer or the generator short-circuits: no script runs, the
+// case is counted apart, not as a chain rejection), 'encoderOnly' (malformed p3b-v1 that the encoder refuses; the
+// script sees the valid proof's witness and accepts; expect relabelled to true; counted apart from the totals)
+function record(file, family, name, expect, chain, model, ref, extra = '', kind) {
   const F = fam(family); F.cases++; stats.cases++;
   const ok = chain === expect && (model === null || model === expect) && (ref === null || ref === expect);
-  if (chain) F.accept++; else F.chainReject++;
-  if (!ok) { F.unexpected++; stats.unexpected++; stats.list.push({file, family, name, expect, chain, model, ref, extra}); }
-  console.log(`${ok ? 'ok  ' : 'FAIL'} ${file} [${family}] ${name}: chain ${chain ? 'ACCEPT' : 'reject'}${model === null ? '' : ` model ${model ? 'ACCEPT' : 'reject'}`}${ref === null ? '' : ` ref ${ref ? 'ACCEPT' : 'reject'}`} ${extra}`);
+  if (kind === 'notRun') { F.notRunOnChain = (F.notRunOnChain ?? 0) + 1; stats.notRunOnChain = (stats.notRunOnChain ?? 0) + 1; }
+  else if (kind === 'encoderOnly') { F.encoderOnlyRelabel = (F.encoderOnlyRelabel ?? 0) + 1; stats.encoderOnlyRelabel = (stats.encoderOnlyRelabel ?? 0) + 1; }
+  else if (chain) F.accept++; else F.chainReject++;
+  if (!ok) { F.unexpected++; stats.unexpected++; stats.list.push({file, family, name, expect, chain, model, ref, extra, kind}); }
+  console.log(`${ok ? 'ok  ' : 'FAIL'} ${file} [${family}] ${name}: chain ${kind === 'notRun' ? 'NOT RUN (reject)' : chain ? 'ACCEPT' : 'reject'}${model === null ? '' : ` model ${model ? 'ACCEPT' : 'reject'}`}${ref === null ? '' : ` ref ${ref ? 'ACCEPT' : 'reject'}`} ${extra}`);
 }
 // one chain verdict: b2 (or b for tiny Q); valid runs use r100 std+cons, rejects the loose VM
 function chainRun(vk, stmt, buf, pis, outs, expectValid, mutate, txMutate) {
@@ -114,7 +119,7 @@ function layoutCases(vk, fileDir, name, v) {
 
 for (const f of files) {
   const v = readVector(f), file = f.split('/').pop(), dir = f.split('/').slice(0, -1).join('/');
-  let vk; try { vk = vkxN(v); } catch (e) { stats.skippedFiles.push(`${file}: ${e.message}`); record(file, v.s3_vk_variant ? 'vk_variant' : 'valid', `VK refused by the generator: ${e.message}`, v.s3_valid_expect ?? !v.s3_vk_variant, false, null, runCase(vkFromVector(v), v, null).accept); continue; }
+  let vk; try { vk = vkxN(v, {stmt: PROD ? 'pool' : 'auto'}); } catch (e) { stats.skippedFiles.push(`${file}: ${e.message}`); record(file, v.s3_vk_variant ? 'vk_variant' : 'valid', `VK refused by the generator: ${e.message}`, v.s3_valid_expect ?? !v.s3_vk_variant, false, null, runCase(vkFromVector(v), v, null).accept, '', 'notRun'); continue; }
   stats.files++;
   if (qaOf(vk) === null) stats.layoutB++;
   const ref0 = vkFromVector(v);
@@ -130,13 +135,13 @@ for (const f of files) {
     const pvs = t?.public_values ?? v.public_values;
     const pv = pvs.flat().map(BigInt);
     const ref = runCase(ref0, v, t).accept;
-    if (pvs.length !== vk.inst.length || pvs.some((p, i) => p.length !== vk.inst[i].numPublic)) { stats.refused++; record(file, family, name, expect, false, null, ref, '(public values in another per-instance layout: refused by the statement layer)'); continue; }
+    if (pvs.length !== vk.inst.length || pvs.some((p, i) => p.length !== vk.inst[i].numPublic)) { stats.refused++; record(file, family, name, expect, false, null, ref, '(public values in another per-instance layout: refused by the statement layer)', 'notRun'); continue; }
     if (pv.some((x) => x < 0n || x >= M64)) { stats.na++; console.log(`n/a  ${file} [${family}] ${name}: a public value >= 2^64 has no 8-byte encoding`); continue; }
     let useOuts = outs, ctxMode = 'witness';
     if (pool) {
-      if (pv.slice(0, 4).some((x) => x >= P)) { stats.refused++; record(file, family, name, expect, false, null, ref, '(non-canonical ROOT: the generator refuses this statement)'); continue; }
+      if (pv.slice(0, 4).some((x) => x >= P)) { stats.refused++; record(file, family, name, expect, false, null, ref, '(non-canonical ROOT: the generator refuses this statement)', 'notRun'); continue; }
       if (PROD) { ctxMode = 'tx'; if (pv.slice(8, 12).some((x, k) => x !== base[8 + k])) useOuts = altOutputs(outs); }
-      else if (pv.slice(8, 12).some((x) => x >= 1n << 56n)) { record(file, family, name, expect, false, null, ref, '(CTX lane >= 2^56: not producible by the statement layer)'); continue; }
+      else if (pv.slice(8, 12).some((x) => x >= 1n << 56n)) { record(file, family, name, expect, false, null, ref, '(CTX lane >= 2^56: not producible by the statement layer)', 'notRun'); continue; }
     }
     const stmt = mkStmt(pv, ctxMode);
     const pvModel = pool && PROD ? [...pv.slice(0, 8), ...ctxOf(useOuts).lanes] : pv;
@@ -149,7 +154,7 @@ for (const f of files) {
       const items = (x) => (x.layout === 'b' ? x.sp.items : [...x.sp.items0, ...x.sp.items1]);
       const a = items(w), b = items(w0);
       if (a.length === b.length && a.every((x, i) => Buffer.compare(x, b[i]) === 0) && pv.every((x, k) => x === base[k])) {
-        record(file, family, name, true, w.acc, null, null, `(malformed p3b-v1: ${malformed}; the encoder refuses it; its lenient witness is the valid proof's, so the script accepts it)`);
+        record(file, family, name, true, w.acc, null, null, `(malformed p3b-v1: ${malformed}; the encoder refuses it; its lenient witness is the valid proof's, so the script accepts it)`, 'encoderOnly');
         continue;
       }
       const model = verifyModelN(vk, buf, pvModel, parts).ok;
@@ -183,7 +188,7 @@ for (const f of files) {
       // and the other proof alone is valid (control) under its own VK: the Plonky3 test AIRs salt their preprocessed
       // commitment with the prover's RNG (no published setup seed), so their second-seed proof has another VK
       const sameVk = JSON.stringify(o.preprocessed_commitment ?? null) === JSON.stringify(v.preprocessed_commitment ?? null);
-      const vko = sameVk ? vk : vkxN(o);
+      const vko = sameVk ? vk : vkxN(o, {stmt: 'auto'});
       const ctl = chainRun(vko, sameVk ? stmt0 : stmtFor(vko, o.public_values.flat().map(BigInt), {mode: vko.stmt, ctx: stmt0.ctx}), Buffer.from(o.proof_hex, 'hex'), o.public_values.flat().map(BigInt), outs, true);
       record(file, 'layout', `control: ${lc.nm.replace('input 1 data from ', '')} verifies on its own${sameVk ? ' (same VK)' : ' (under its own VK: other preprocessed commitment)'}`, true, ctl.acc, null, null, ctl.acc ? '' : String(ctl.err).slice(0, 80));
     } else c = chainRun(vk, stmt0, buf, base, outs, false, lc.f ? (a, b) => lc.f(a.map((x) => Buffer.from(x)), b.map((x) => Buffer.from(x))) : undefined, lc.tx);
@@ -191,6 +196,8 @@ for (const f of files) {
   }
 }
 console.log(`test-b2${PROD ? ' (production: CTX from the transaction)' : ''}: ${stats.files} files (${stats.layoutB} in layout b), ${stats.cases} cases, ${stats.unexpected} unexpected, ${stats.na} n/a, ${stats.refused} refused by the statement layer/generator, ${stats.encoderRefused} malformed by length, ${stats.skippedFiles.length} VKs refused by the generator`);
+const notRunNote = () => `; ${stats.notRunOnChain ?? 0} not run on chain (short-circuit, counted as rejects: ${JSON.stringify(Object.fromEntries(Object.entries(stats.families).filter(([, x]) => x.notRunOnChain).map(([k, x]) => [k, x.notRunOnChain])))}); ${stats.encoderOnlyRelabel ?? 0} encoder-only relabels (reference rejects; script accepts the valid witness; inside the ok count)`;
+console.log(notRunNote().slice(2));
 console.log(JSON.stringify(stats.families));
 if (outFile) writeFileSync(outFile, JSON.stringify(stats, null, 1) + '\n');
 process.exit(stats.unexpected ? 1 : 0);

@@ -11,7 +11,7 @@ const outputsOf = (v) => v.s4_outputs.map((o) => ({lockingBytecode: Uint8Array.f
 const Qk = ['q-x', 'q-deep', 'q-folds', 'q-final'];
 const rows = [];
 for (const path of process.argv.slice(2)) {
-  const v = readVector(path); const vk = vkxN(v); const pis = v.public_values.flat().map(BigInt);
+  const v = readVector(path); const vk = vkxN(v, {stmt: 'pool'}); const pis = v.public_values.flat().map(BigInt);
   const QA = vk.inst.length > 1 ? 9 : 12;
   const sp = spendB2(vk, stmtFor(vk, pis, {mode: 'pool', ctx: 'tx'}), QA, Buffer.from(v.proof_hex, 'hex'), pis, outputsOf(v), {markers: true});
   const marks = sp.built.marks.map(([l]) => l);

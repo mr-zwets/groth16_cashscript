@@ -16,7 +16,7 @@ const D = 3, H32 = 32, E8 = 24;
 
 // extended verifying key for layout a' (M1 shape: one instance, one height, ZK, no lookups / preprocessed columns)
 export function vkxA(v) {
-  const vk = vkxN(v, {allowCap: true});
+  const vk = vkxN(v, {stmt: 'pool', allowCap: true});
   if (vk.inst.length !== 1 || vk.heights.length !== 1 || vk.hasLookups || vk.hasPre || !vk.zk) throw new Error("layout a': M1 shape only (one table, one height, ZK)");
   if (vk.trees.some((t) => t.B !== 0)) throw new Error("layout a': no injection");
   if (vk.stmt !== 'pool' || vk.nPub !== 12) throw new Error("layout a': the M1 statement (12 public values: ROOT, NF, CTX)");

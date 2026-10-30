@@ -36,6 +36,8 @@ for (const path of files) {
     opStd: op, opCons: R.looseCons.opCost, defineBodyBytes: defBytes, opBchnAdjusted: bchn, opBchnAdjustedCons: R.looseCons.opCost + defBytes,
     hashIterations: R.looseStd.iters, instructions: R.looseStd.instr,
     budgetR100: (41 + L) * 800, budgetSpec: (10_000 + L) * 800,
+    // BCHN counts OP_DEFINE body bytes on top of libauth's op-cost (Track 8a): gate on the adjusted value too
+    bchnWithinBudget: {r100: bchn <= (41 + L) * 800 && R.looseCons.opCost + defBytes <= (41 + L) * 800, spec: bchn <= (10_000 + L) * 800},
     pctR100: +(100 * bchn / ((41 + L) * 800)).toFixed(1), pctSpec: +(100 * bchn / ((10_000 + L) * 800)).toFixed(1),
     vsModel: {params8Pct: +(100 * (bchn / MODEL.params8 - 1)).toFixed(1), designMidPct: +(100 * (bchn / 31_000_000 - 1)).toFixed(1)},
     accepted: Object.fromEntries(Object.entries(R).map(([k, x]) => [k, x.accepted])),
@@ -47,7 +49,7 @@ for (const path of files) {
   const a = r.accepted;
   console.log(`${r.vector.padEnd(22)} proof ${r.proofBytes} unl ${L} tx ${tx} redeem ${r.redeemBytes} | op ${op} bchn ${bchn} (${r.pctR100}% r100, ${r.pctSpec}% spec; model ${r.vsModel.params8Pct >= 0 ? '+' : ''}${r.vsModel.params8Pct}%) | loose ${a.looseStd}/${a.looseCons} r100 ${a.r100Std}/${a.r100Cons} tx ${T.r100Std === true} | spec ${a.specStd}/${a.specCons} tx ${T.specStd === true} | today ${a.bchStd}/${a.bchCons}`);
 }
-const ok = rows.every((r) => r.accepted.looseStd && r.accepted.looseCons && r.accepted.r100Std && r.accepted.r100Cons && r.txVerify.r100Std === true && r.accepted.specStd && r.accepted.specCons && r.unlockingBytes <= 100_000 && r.txBytes <= 100_000);
+const ok = rows.every((r) => r.accepted.looseStd && r.accepted.looseCons && r.accepted.r100Std && r.accepted.r100Cons && r.txVerify.r100Std === true && r.accepted.specStd && r.accepted.specCons && r.bchnWithinBudget.r100 && r.bchnWithinBudget.spec && r.unlockingBytes <= 100_000 && r.txBytes <= 100_000);
 const stat = (k) => { const xs = rows.map((r) => r[k]); return {min: Math.min(...xs), max: Math.max(...xs), mean: Math.round(xs.reduce((a, x) => a + x, 0) / xs.length)}; };
 const summary = {vectors: rows.length, allAcceptedR100AndSpec: ok, proofBytes: stat('proofBytes'), unlockingBytes: stat('unlockingBytes'), txBytes: stat('txBytes'),
   redeemBytes: stat('redeemBytes'), opBchnAdjusted: stat('opBchnAdjusted'), opCons: stat('opCons'), pctR100: stat('pctR100'), pctSpec: stat('pctSpec'), model: MODEL,

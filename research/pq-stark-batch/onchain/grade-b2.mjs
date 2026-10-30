@@ -21,7 +21,7 @@ const files = args.filter((a, i) => !a.startsWith('--') && args[i - 1] !== '--ou
 const outputsOf = (v) => v.s4_outputs.map((o) => ({lockingBytecode: Uint8Array.from(Buffer.from(o.lockingBytecode, 'hex')), valueSatoshis: BigInt(o.valueSatoshis)}));
 const rows = [];
 for (const path of files) {
-  const v = readVector(path); const vk = vkxN(v);
+  const v = readVector(path); const vk = vkxN(v, {stmt: 'pool'});
   if (vk.stmt !== 'pool') throw new Error(`${path}: not a pool statement`);
   const pis = v.public_values.flat().map(BigInt);
   const QA = QAarg ?? (vk.inst.length > 1 ? 9 : 12);
@@ -34,7 +34,8 @@ for (const path of files) {
     const op = R.looseStd.opCost, bchn = op + defBytes;
     return {
       unlockingBytes: L, lockingBytes: (i ? sp.locking1 : sp.locking0).length, opStd: op, opCons: R.looseCons.opCost, opBchnAdjusted: bchn,
-      budgetR100: (41 + L) * 800, pctR100: +(100 * bchn / ((41 + L) * 800)).toFixed(1), pctSpec: +(100 * bchn / ((10_000 + L) * 800)).toFixed(1),
+      budgetR100: (41 + L) * 800, budgetSpec: (10_000 + L) * 800,
+      bchnWithinBudget: {r100: Math.max(bchn, R.looseCons.opCost + defBytes) <= (41 + L) * 800, spec: Math.max(bchn, R.looseCons.opCost + defBytes) <= (10_000 + L) * 800}, pctR100: +(100 * bchn / ((41 + L) * 800)).toFixed(1), pctSpec: +(100 * bchn / ((10_000 + L) * 800)).toFixed(1),
       hashIterations: R.looseStd.iters, accepted: Object.fromEntries(Object.entries(R).map(([k, x]) => [k, x.accepted])),
       errors: Object.fromEntries(Object.entries(R).filter(([, x]) => !x.accepted).map(([k, x]) => [k, String(x.error).slice(0, 140)])),
     };
@@ -57,8 +58,8 @@ for (const s of [...new Set(rows.map((r) => r.statement))]) {
     statements: R.length, QA: R[0].QA, proofBytes: st((r) => r.proofBytes), libBytes: st((r) => r.libBytes), unlocking0: st((r) => r.inputs[0].unlockingBytes), unlocking1: st((r) => r.inputs[1].unlockingBytes),
     txBytes: st((r) => r.txBytes), op0: st((r) => r.inputs[0].opBchnAdjusted), op1: st((r) => r.inputs[1].opBchnAdjusted), pct0: st((r) => r.inputs[0].pctR100), pct1: st((r) => r.inputs[1].pctR100),
     pctSpec0: st((r) => r.inputs[0].pctSpec), pctSpec1: st((r) => r.inputs[1].pctSpec),
-    bothInputsR100: R.every((r) => r.inputs.every((x) => x.accepted.r100Std && x.accepted.r100Cons)),
-    bothInputsSpec: R.every((r) => r.inputs.every((x) => x.accepted.specStd && x.accepted.specCons)),
+    bothInputsR100: R.every((r) => r.inputs.every((x) => x.accepted.r100Std && x.accepted.r100Cons && x.bchnWithinBudget.r100)),
+    bothInputsSpec: R.every((r) => r.inputs.every((x) => x.accepted.specStd && x.accepted.specCons && x.bchnWithinBudget.spec)),
     txVerifyR100: R.filter((r) => r.txVerify.r100Std === true).length, txVerifyR100t: R.filter((r) => r.txVerify.r100tStd === true && r.txVerify.r100tCons === true).length,
     txVerifySpec: R.filter((r) => r.txVerify.specStd === true).length, todayAccepted: R.filter((r) => r.inputs.some((x) => x.accepted.bchStd || x.accepted.bchCons)).length,
     todayErrors: [...new Set(R.flatMap((r) => r.inputs.map((x) => x.errors.bchStd)))], txErrors: [...new Set(R.map((r) => r.txVerify.r100Std).filter((x) => x !== true))],
