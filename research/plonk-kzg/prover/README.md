@@ -44,7 +44,10 @@ Universality:
 
 ## BSB22 commitments (Track 7)
 
-Two circuits with one commitment each (`std/rangecheck`, 64-bit check):
+Two circuits with one commitment each (`std/rangecheck`, 64-bit check). Since the Track 7 integration
+(`wip/plonk-usable-verifier`) they are built on the same Aztec Ignition SRS as `mul2` and `merkle16`
+(`-srs ... -circuits range64,merkle16rc`); the counts below are that run's.
+
 
 | name | public inputs | statement | constraints | n | VK | proof | valid | tampered (gnark-checked) |
 |---|---|---|---:|---:|---:|---:|---:|---:|

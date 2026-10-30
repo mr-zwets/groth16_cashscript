@@ -81,11 +81,12 @@ out.bad = {log2_perQsquared: log2Bad};
 // 6. Track 7 GT fold (Lemma 4): degrees with m folded bases (up to 4 monic degree-6 factors per base and event), the SI
 //    term with them, and the GT decomposition range: Babai gives |e| < 2^64, so u = e + 2^64 has 65 bits (65 events)
 out.gtFold = {};
-for (const m of [8, 9]) { const dD = Math.max(...Array.from({length: NSTATES}, (_, k) => chunkDegP(k, m) + 6)); const nq = nqMax(m); const deg = Math.max(dD, 2 * nq - 1 + 12);
+// m = 8, 9: v1 (Qk absent / present); 10, 11: BSB22 with one commitment (Qcp_0 folded; Qk absent / present)
+for (const m of [8, 9, 10, 11]) { const dD = Math.max(...Array.from({length: NSTATES}, (_, k) => chunkDegP(k, m) + 6)); const nq = nqMax(m); const deg = Math.max(dD, 2 * nq - 1 + 12);
   out.gtFold['m' + m] = {NQ: nq, maxDegD: dD, degSI: deg, log2_perQuery: Math.log2(biasP * ((K_IDS - 1) + deg)) - log2(p)}; }
 for (const n of [0n, 1n, r - 1n, (r - 1n) / 2n, 0x1234567890abcdefn * (r / 0x1000000000000000n)]) glsDecompose(n).forEach((e) => assert.ok(e > -GLS_OFFSET && e < GLS_OFFSET));
 assert.equal(mod(GT_PI[1] ** 4n - GT_PI[1] ** 2n + 1n, r), 0n, 'p is a primitive 12th root of unity mod r (Phi_12(p) = 0)');
-const log2eSIfold = out.gtFold.m9.log2_perQuery;
+const log2eSIfold = Math.max(...Object.values(out.gtFold).map((x) => x.log2_perQuery)); // the worst folded build
 const Q = 64;
 const terms = {kzgBatch_tprime: Q - 128, si: Q + Math.max(log2eSI, log2eSIfold), bad: 2 * Q + log2Bad, hashTargets: Q + Math.log2(9) - 256};
 const total = Math.log2(Object.values(terms).reduce((a, x) => a + 2 ** x, 0));

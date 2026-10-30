@@ -77,7 +77,7 @@ m('input dropped (last SI)', () => {}, (tx) => tx.slice(0, -1));
 for (const [nm, f] of [['adaptive: Lambda\' = 2 Lambda', (L) => L.double()], ['adaptive: Lambda\' = Lambda + G', (L) => L.add(G1.BASE)]]) {
   const pr = d.valid[0]; const V = verifyPlonk(vk, pr.proof, pr.publicInputs); const w = multiWitness(vk, plan, built, pr.proof, pr.publicInputs, {lam: aff(f(V.lamTrue))});
   if (w.accept) fail('reference accepts ' + nm); M.push([nm, w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
-if (plan.m) for (const i of [...new Set([0, ...plan.FX.flatMap((nm, x) => (nm.startsWith('Qcp') ? [x] : [])), plan.m - 1])]) { // BSB22: also each folded Qcp_j const pr = d.valid[0]; const w = multiWitness(vk, plan, built, pr.proof, pr.publicInputs, {fsDelta: [i, 1n]});
+if (plan.m) for (const i of [...new Set([0, ...plan.FX.flatMap((nm, x) => (nm.startsWith('Qcp') ? [x] : [])), plan.m - 1])]) { /* BSB22: also each folded Qcp_j */ const pr = d.valid[0]; const w = multiWitness(vk, plan, built, pr.proof, pr.publicInputs, {fsDelta: [i, 1n]});
   if (w.accept) fail('reference accepts nibbles for s + 1'); M.push([`adaptive: nibbles of folded base ${i} encode s + 1 (SI re-witnessed)`, w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
 { const w = multiWitness(vk, plan, built, d.valid[1].proof, d.valid[0].publicInputs); M.push(['adaptive: proof 1 with the public inputs of proof 0', w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
 for (const [name, ps, mutate, fills] of M) out.manipulations.push(run(name, ps, fills, mutate));
