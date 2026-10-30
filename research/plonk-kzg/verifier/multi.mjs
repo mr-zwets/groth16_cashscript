@@ -391,7 +391,9 @@ export function buildMulti(vk, plan) {
   const load = (ix, o, blob, id) => [...pushNum(ix), OP.INPUTBYTECODE, ...pushNum(o.off), OP.SPLIT, OP.NIP, ...pushNum(o.len), OP.SPLIT, OP.DROP, OP.DUP, OP.SHA256, ...pushData(sha(blob)), OP.EQUALVERIFY, ...pushNum(id), OP.DEFINE, ...pushNum(id), OP.INVOKE];
   const redeem = Buffer.from([...plan.blobs.flatMap(([ix], b) => load(ix, offsetOf(roles[ix], 'C' + (b + 1)), cb[b], b)), ...load(0, offsetOf(roles[0], 'CODE'), code, NBL)]);
   const c1 = cb[0];
-  return {code, c1, cb, redeem, bodies: bodies.map((b) => b.length), funcs: Object.fromEntries([...ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [n, f.code.length])),
+  // BCHN charges OP_DEFINE its body bytes (libauth a flat 100): every input defines C1..Ck, C0 and everything inside them
+  const defBytes = code.length + cb.reduce((a, b) => a + b.length, 0) + ctx.defs.reduce((a, f) => a + f.code.length, 0) + bodies.reduce((a, b) => a + b.length, 0);
+  return {code, c1, cb, defBytes, redeem, bodies: bodies.map((b) => b.length), funcs: Object.fromEntries([...ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [n, f.code.length])),
     ids: Object.fromEntries([...ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [f.id, n])), roleBase};
 }
 

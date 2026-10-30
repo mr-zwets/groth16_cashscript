@@ -7,5 +7,5 @@ Baseline (main, mul2 proof 0): chain 92,295 B unlocking (10 inputs); single bch-
 - [x] measured: single bch-spec without the 8 fixed bases in G1 (invalid build, cost only): 46.9 KB at J~26 (-19.5 KB).
 - [x] GT fold (gt.mjs), 2-event chunks kept (33 states), NQ cap 348 (mul2) / 384 (merkle16); honest n_q 225-267.
       single bch-spec mul2: 58,554 B at J=27 (margin 0.2%, needs J sweep).
-- [ ] chain with fold (variable WQ, GT tables per SI role, acc hand-over)
-- [ ] role planner, tests, SOUNDNESS.md
+- [x] chain with fold: mul2 score 81,882-82,035, merkle16 84,476-84,754 (all tests pass)
+- [x] plans.json, tests (single + chain), SOUNDNESS.md Lemma 4 + Lemma 3 rewrite, README Track 7 section

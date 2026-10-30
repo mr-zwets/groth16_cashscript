@@ -18,7 +18,8 @@ export function sizeFills(vk, plan, built, pushes, {strict = true} = {}) {
   for (let it = 0; it < 4; it++) {
     const tx = chainTx(vk, plan, built, pushes, fills); const free = spendTx('free', 'standard', tx); let changed = false;
     fills = free.map((x, i) => { if (strict && x.error && !/budget|density/.test(x.error)) throw new Error(`input ${i} (${plan.roles[i].kind}): ${x.error}`);
-      const need = Math.ceil(x.opCost / 800) - 41 - tx[i].unlocking.length + fills[i]; const f = need > 0 ? need + 64 : 0; // need beyond the unfilled size
+      const need = Math.ceil((x.opCost + built.defBytes) / 800) - 41 - tx[i].unlocking.length + fills[i]; // BCHN-adjusted, beyond the unfilled size
+      const f = need > 0 ? need + 64 : 0;
       if (f > fills[i]) { changed = true; return f; } return fills[i]; });
     if (!changed) break;
   }
