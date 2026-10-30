@@ -1,5 +1,7 @@
 {
- "_note": "tuned today's-rules chain plans (Track 7, GT fold); PLAN='{...}' overrides. mj/ma: MSM windows (hi, lo) per role; si: SI event ranges; blobs: [role index, target size] of the code blobs C1, C2; bindST: the GT binding in ST (else in the last SI role)",
+ "_note": "tuned today's-rules chain plans (Track 7, GT fold); PLAN='{...}' overrides. mj/ma: MSM windows (hi, lo) per role; si: SI event ranges; blobs: [role index, target size] of the code blobs C1, C2; tv2: [host role, n1] splits the variable-base tables TV (first n1 bases) / TV2 (BSB22: 11 variable bases); bindST: the GT binding in ST (else in the last SI role)",
  "mul2": {"mj": [[50, 41], [40, 37]], "ma": [[36, 24], [23, 12], [11, 0]], "si": [[0, 16], [16, 34], [34, 52], [52, 65]], "bindST": true},
- "merkle16": {"mj": [[50, 41], [40, 37]], "ma": [[36, 24], [23, 12], [11, 0]], "si": [[0, 16], [16, 34], [34, 52], [52, 65]], "blobs": [[6, 3680], [7, 4750]]}
+ "merkle16": {"mj": [[50, 41], [40, 37]], "ma": [[36, 24], [23, 12], [11, 0]], "si": [[0, 16], [16, 34], [34, 52], [52, 65]], "blobs": [[6, 3680], [7, 4750]]},
+ "merkle16rc": {"mj": [[50, 42], [41, 38]], "ma": [[37, 25], [24, 12], [11, 0]], "si": [[0, 16], [16, 36], [36, 52], [52, 65]], "blobs": [[6, 3900], [7, 5600]], "tv2": [3, 9]},
+ "range64": {"mj": [[50, 42], [41, 38]], "ma": [[37, 25], [24, 12], [11, 0]], "si": [[0, 16], [16, 36], [36, 52], [52, 65]], "blobs": [[6, 3900], [7, 5600]], "tv2": [3, 9]}
 }

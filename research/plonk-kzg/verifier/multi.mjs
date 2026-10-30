@@ -34,7 +34,7 @@ const WQ_SIZE = 32 * NQ_MAX; // fixed-size quotient (leading zero words allowed)
 
 // ---------------- the plan ----------------
 // MSM windows 50..0: MJ roles (Jacobian, no slopes) then MA roles (affine, slopes). SI events split at even cuts.
-export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, gzHost = 0, blobs, bindST = false} = {}) {
+export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, gzHost = 0, blobs, bindST = false, tv2} = {}) {
   const names = baseNames(vk), nbm = names.length - 1, k = vk.nbPublic;
   const fixed = names.slice(0, nbm).filter((n) => FIXED.includes(n)), vari = names.slice(0, nbm).filter((n) => !FIXED.includes(n));
   const FX = vk.fold ? fixedNames(vk) : [], m = FX.length; // GT-folded bases (Track 7)
@@ -51,6 +51,11 @@ export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, gzHost = 0
   ma.forEach(([hi, lo], i) => roles.push({kind: 'MA', hi, lo, conv: i === 0, corr: i === ma.length - 1}));
   si.forEach(([e0, e1], i) => roles.push({kind: 'SI', e0, e1, first: i === 0, last: i === si.length - 1, hostWQ: i === wqHost, hostWQa: i === wqaHost, hostGZ: m > 0 && i === gzHost}));
   const iC1 = roles.length - 1;
+  // TV split (BSB22: 11+ variable bases make TV larger than one 10,000-byte push): TV holds the first n1 variable bases'
+  // tables, TV2 (hosted by an MSM role, default the first MA role) the rest. tv2 = [host role index, n1].
+  if (!tv2 && 960 * vari.length > 9600) tv2 = [roles.findIndex((x) => x.kind === 'MA'), 8];
+  const n1 = tv2 ? tv2[1] : vari.length;
+  if (tv2) { assert.ok(['MJ', 'MA'].includes(roles[tv2[0]].kind) && !roles[tv2[0]].start && roles[tv2[0]].host !== 'TV', 'TV2 host: an MSM role other than input 0 and the TV host'); roles[tv2[0]].hostTV2 = true; }
   // extra code blobs C1..Ck: [role index, target size]; default: C1 in the last input (Track 6), or two SI inputs (fold)
   blobs ??= m ? [[iC1 - 3, 3400], [iC1 - 2, 4100]] : [[iC1, c1]];
   blobs.forEach(([ix], b) => { roles[ix].blob = 'C' + (b + 1); });
@@ -61,12 +66,12 @@ export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, gzHost = 0
   { let e = 0; for (const ro of roles.filter((x) => x.kind === 'SI')) { assert.equal(ro.e0, e); assert.ok(ro.e1 % 2 === 0 || ro.e1 === 65, 'SI cut at a chunk boundary'); e = ro.e1; } assert.equal(e, 65); }
   const idx = (pred) => roles.findIndex(pred);
   const NQ = nqMax(m);
-  const plan = {iC1, c1Target: c1, blobs, names, nbm, fixed, vari, FX, m, NQ, k, roles, N: roles.length, iST: 1, iTV: idx((x) => x.host === 'TV'), iTF: idx((x) => x.host === 'TF'), iWQ: idx((x) => x.hostWQ), iWQa: idx((x) => x.hostWQa), iGZ: idx((x) => x.hostGZ)};
+  const plan = {iC1, c1Target: c1, blobs, names, nbm, fixed, vari, FX, m, NQ, k, roles, N: roles.length, iST: 1, iTV: idx((x) => x.host === 'TV'), iTF: idx((x) => x.host === 'TF'), iWQ: idx((x) => x.hostWQ), iWQa: idx((x) => x.hostWQa), iGZ: idx((x) => x.hostGZ), iTV2: idx((x) => x.hostTV2), n1};
   // stSI (with the fold): ST also runs the SI transcript (h0, rho, z), the quotient Horner over WQ and the GT binding, and
   // publishes rho, z and the Horner value QZ in G0: G0 = uRaw || s'_q || P_right || rho || z || QZ
   // bindST: the GT binding in ST; else in the last SI role, with s_i published in G0 after QZ
   plan.stSI = m > 0; plan.bindST = bindST;
-  plan.G0_SIZE = plan.stSI ? 32 + 32 * nbm + 64 + 96 + (bindST ? 0 : 32 * m) : 32 + 32 * nbm + 64; plan.TV_SIZE = 960 * vari.length; plan.TF_SIZE = 960 * fixed.length;
+  plan.G0_SIZE = plan.stSI ? 32 + 32 * nbm + 64 + 96 + (bindST ? 0 : 32 * m) : 32 + 32 * nbm + 64; plan.TV_SIZE = 960 * n1; plan.TV2_SIZE = 960 * (vari.length - n1); plan.TF_SIZE = 960 * fixed.length;
   plan.WQ_VAR = m > 0; const WQA = 4096; plan.WQA = m ? WQA : 0; // with the fold the quotient cap is large (348 / 384 words): WQ is a variable-size push (PUSHDATA2, >= 256 B)
   // fixed-size pushes at the start of each unlocking (name, size); CODE size is filled in after compilation
   for (const ro of roles) {
@@ -76,6 +81,7 @@ export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, gzHost = 0
     if (ro.kind === 'MJ' && !ro.start) f.push(['HAND', 96]);
     if (ro.host === 'TV') f.push(['TV', plan.TV_SIZE]); if (ro.host === 'TF') f.push(['TF', plan.TF_SIZE]);
     if (ro.kind === 'MA') { f.push(['HAND', ro.conv ? 96 : 64]); if (ro.conv) f.push(['ZI', 32]); }
+    if (ro.hostTV2) f.push(['TV2', plan.TV2_SIZE]);
     // SI: C1's size is set after compilation (no remote offset depends on it: it comes after every remotely read push but WQ,
     // whose offset then depends on it; WQ may be variable (the last fixed push)); GZ: the GT values R_{i,j}(+-z), 8 m words
     if (ro.kind === 'SI') { f.push(['HAND', ro.first ? 64 : 17 * 32]); if (ro.hostGZ) f.push(['GZ', 256 * m]); if (ro.hostWQa) f.push(['WQa', WQA]); f.push(['DS', null]); if (ro.hostWQ) f.push(['WQ', plan.WQ_VAR ? 'var' : WQ_SIZE]); }
@@ -171,12 +177,12 @@ export function buildMulti(vk, plan) {
   const TBN = 2 * TBL * nbm;
   const SC = Array.from({length: nbm}, (_, q) => 'sc' + q);
   // LOADT: [PRF (proof 768 + 96 m B), LAMB (Lambda' 64 B BE), TVb, TFb] -> TB (tables b = 0..nbm-1, entries 1..16, x then y)
-  const TBLOBS = fixed.length ? ['TVb', 'TFb'] : ['TVb'];
+  const TBLOBS = ['TVb', ...(plan.iTV2 >= 0 ? ['TV2b'] : []), ...(fixed.length ? ['TFb'] : [])];
   fn('LOADT', ['PRF', 'LAMB', ...TBLOBS], ['TB'], [['TB', TBN]], (s) => {
     s.invoke('GV', ['GVc']);
     // pieces, in reverse base order so that base 0's piece is on top: the PICK/ROLL depths stay small
     const order = Array.from({length: nbm}, (_, b) => b);
-    const cnt = {TVb: 0, TFb: 0}; const pieceOf = order.map((b) => { const bl = FIXED.includes(names[b]) ? 'TFb' : 'TVb'; return [bl, cnt[bl]++]; });
+    const cnt = {TVb: 0, TV2b: 0, TFb: 0}; const pieceOf = order.map((b) => { const bl = FIXED.includes(names[b]) ? 'TFb' : cnt.TVb < plan.n1 ? 'TVb' : 'TV2b'; return [bl, cnt[bl]++]; });
     for (const bl of TBLOBS) { s.roll(bl).op(OP.SIZE, 1, bl, 'sz').push(960 * cnt[bl]).op(OP.NUMEQUALVERIFY, 2); splitTree(s, bl, cnt[bl], `${bl}_`, {i: 0}, 960, (t, nm) => t.rename(nm)); }
     for (let b = nbm - 1; b >= 0; b--) { const [bl, i] = pieceOf[b]; s.roll(`${bl}_${i}`).rename(`${bl}_${i}`, 'pc' + b); }
     for (let b = 0; b < nbm; b++) { const nm = names[b];
@@ -336,6 +342,7 @@ export function buildMulti(vk, plan) {
   const tables = (a, ro) => {
     rread(a, plan.iST, 'PROOF', 'PRF'); rread(a, plan.iST, 'X', 'LAMB'); a.push(64).op(OP.SPLIT, 2, 'LAMB', 'x').drop('x');
     if (ro.host === 'TV') a.pick('TV', 'TVb'); else rread(a, plan.iTV, 'TV', 'TVb');
+    if (plan.iTV2 >= 0) { if (ro.hostTV2) a.pick('TV2', 'TV2b'); else rread(a, plan.iTV2, 'TV2', 'TV2b'); }
     if (fixed.length) { if (ro.host === 'TF') a.pick('TF', 'TFb'); else rread(a, plan.iTF, 'TF', 'TFb'); }
     call(a, 'LOADT');
   };
@@ -355,7 +362,8 @@ export function buildMulti(vk, plan) {
     finish(a); bodies.push(a.code);
   }
   function mRole(a, ro, ix) {
-    if (ro.host === 'TV') tvCheck(a);
+    if (ro.host === 'TV') tvCheck(a, 'TV', vari.slice(0, plan.n1));
+    if (ro.hostTV2) tvCheck(a, 'TV2', vari.slice(plan.n1));
     if (ro.host === 'TF') a.pick('TF', 'tfh').op(OP.SHA256, 1, 'tfh').pushBytes(sha(tfBlob(vk, plan))).op(OP.EQUALVERIFY, 2);
     tables(a, ro); scalars(a);
     const jac = ro.kind === 'MJ';
@@ -368,10 +376,10 @@ export function buildMulti(vk, plan) {
     if (ro.slopes) { a.emit(OP.FROMALT, OP.SIZE, OP.NOT, OP.VERIFY, OP.DROP, OP.FROMALT, OP.SIZE, OP.NOT, OP.VERIFY, OP.DROP); a.alt.pop(); }
     handOut(a, ro, X);
   }
-  function tvCheck(a) { // TV entries 2..16 of every variable base: < p, 2B by the tangent, (k+1)B = kB + B by the chord
+  function tvCheck(a, push, bases) { // TV (TV2) entries 2..16 of its variable bases: < p, 2B by the tangent, (k+1)B = kB + B by the chord
     rread(a, plan.iST, 'PROOF', 'PRF'); rread(a, plan.iST, 'X', 'LAMB');
-    a.pick('TV', 'tv');
-    for (const nm of vari) {
+    a.pick(push, 'tv');
+    for (const nm of bases) {
       if (nm === 'Lam') a.pick('LAMB', 'vb'); else { const off = proofOff(vk, nm); a.pick('PRF', 'vb').push(off).op(OP.SPLIT, 2, 'x', 'vb').drop('x'); }
       a.invoke('DBP', ['bx', 'vb']).invoke('DBP', ['by', 'vb']).drop('vb');
       a.roll('tv').push(960).op(OP.SPLIT, 2, 'pc', 'tv').arrange(['bx', 'by', 'pc']).invoke('CHK15', []);
@@ -487,8 +495,9 @@ function statement(a, vk, plan, call, rread) {
   a.pick('uRaw', 'g0'); for (let q = 0; q < nbm; q++) a.roll('sc' + q).push(32).op(OP.NUM2BIN, 2, 'w').op(OP.CAT, 2, 'g0');
 
   // P_right = -(Wz + u1 Wzw + u2 phi(Wzw)), Jacobian over all NWR windows; Wzw's table from TV (checked in its host)
-  { const ro = plan.roles[plan.iTV]; const {off, len, h, hdr: hd} = offsetOf(ro, 'TV'); const vi = plan.vari.indexOf('Wzw');
-    a.push(plan.iTV).op(OP.INPUTBYTECODE, 1, 'ib').push(off + 960 * vi).op(OP.SPLIT, 2, 'x', 'ib').drop('x').push(960).op(OP.SPLIT, 2, 'pc', 'x').drop('x'); }
+  { const vw = plan.vari.indexOf('Wzw'), two = vw >= plan.n1, ix = two ? plan.iTV2 : plan.iTV, vi = two ? vw - plan.n1 : vw;
+    const {off} = offsetOf(plan.roles[ix], two ? 'TV2' : 'TV');
+    a.push(ix).op(OP.INPUTBYTECODE, 1, 'ib').push(off + 960 * vi).op(OP.SPLIT, 2, 'x', 'ib').drop('x').push(960).op(OP.SPLIT, 2, 'pc', 'x').drop('x'); }
   a.pick('Wzwx', 'x1').pick('Wzwy', 'y1').roll('pc').invoke('LD15', Array.from({length: 30}, (_, i) => 'e' + i));
   { const it = a.st.splice(a.st.length - 32); assert.equal(it[0], 'x1'); a.st.push('TW'); a.piles.set('TW', 32); }
   const one = [...pushNum(31), OP.PICK, ...a.invokeBytes('BETA'), OP.MUL, ...a.invokeBytes('P'), OP.MOD, ...pushNum(31), OP.PICK];
@@ -651,7 +660,7 @@ export function multiWitness(vk, plan, built, proofHex, pubHex, {lam, fsDelta} =
   const V = verifyPlonk(vk, proofHex, pubHex, lam ? {lam} : {});
   if (fsDelta) { const fs = V.gt.fs.slice(); fs[fsDelta[0]] = mod(fs[fsDelta[0]] + fsDelta[1], r); V.gt = {...V.gt, ...nibbles(fs), fs: V.gt.fs}; } // test: nibbles for a wrong scalar
   const ptOf = (nm) => V.bases[names.indexOf(nm)];
-  const TV = tableBlob(plan.vari.map(ptOf)), TF = plan.fixed.length ? tfBlob(vk, plan) : null;
+  const TV = tableBlob(plan.vari.slice(0, plan.n1).map(ptOf)), TV2 = plan.iTV2 >= 0 ? tableBlob(plan.vari.slice(plan.n1).map(ptOf)) : null, TF = plan.fixed.length ? tfBlob(vk, plan) : null;
   const sp = names.slice(0, nbm).map((nm) => V.S[nm] + digitOffset(NW));
   // P_right: Jacobian windows, madd corr, madd Wz, conv
   const T = (P) => [aff(P), ...Array.from({length: TBL - 1}, (_, i) => aff(P.multiply(BigInt(i + 2))))];
@@ -702,7 +711,7 @@ export function multiWitness(vk, plan, built, proofHex, pubHex, {lam, fsDelta} =
   // unlockings
   const X = Buffer.concat([be32(V.lamAff[0]), be32(V.lamAff[1]), le32(V.invProd), le32(ziR)]);
   const PI = Buffer.concat(pubHex.map((h) => Buffer.from(h, 'hex'))); const PROOF = Buffer.from(proofHex, 'hex');
-  const data = {CODE: built.code, G0, X, PI, PROOF, WS: S.WS, TV, TF, WQ: WQ.subarray(plan.WQA), WQa: WQ.subarray(0, plan.WQA), GZ}; built.cb.forEach((b, i) => { data['C' + (i + 1)] = b; });
+  const data = {CODE: built.code, G0, X, PI, PROOF, WS: S.WS, TV, TV2, TF, WQ: WQ.subarray(plan.WQA), WQa: WQ.subarray(0, plan.WQA), GZ}; built.cb.forEach((b, i) => { data['C' + (i + 1)] = b; });
   const pushes = roles.map((ro, ix) => {
     const fx = ro.fixed.map(([n]) => (n === 'HAND' ? hands.get(ix) : n === 'ZI' ? le32(zi) : n === 'DS' ? dsSlice(CH, ro) : data[n]));
     fx.forEach((b, i) => assert.ok(b && (ro.fixed[i][1] === null || ro.fixed[i][1] === 'var' || b.length === ro.fixed[i][1]), `role ${ix} push ${ro.fixed[i][0]}`));

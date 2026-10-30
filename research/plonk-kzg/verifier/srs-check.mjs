@@ -21,7 +21,7 @@ import {join} from 'node:path';
 import {G1, G2, F2, mod, chainConsts} from './math.mjs';
 import {parseVK, loadVectors, le32, PROVER_DIR} from './plonk.mjs';
 import {buildRedeem, D_PIECE} from './script.mjs';
-import {makePlan, buildMulti, dsSlice} from './multi.mjs';
+import {makePlan, buildMulti, dsSlice, planOpts} from './multi.mjs';
 
 const IGNITION_T2 = { // x.c0, x.c1, y.c0, y.c1
   x0: 0x0118c4d5b837bcc2bc89b5b398b5974e9f5944073b32078b7e231fec938883b0n,
@@ -50,7 +50,7 @@ const piles = (A, B) => { const steps = Array.from({length: 88}, (_, j) => stepB
 const CA = chainConsts(G2.BASE), CB = chainConsts(T2);
 const CTRL = chainConsts(G2.BASE.multiply(7n)); // control: another G2 point
 
-for (const name of ['mul2', 'merkle16']) {
+for (const name of ['mul2', 'merkle16', 'range64', 'merkle16rc']) { // v1 and BSB22 (v2-bsb22) vectors
   const V = loadVectors(name);
   const pv = join(PROVER_DIR, 'vectors', name + '.json');
   if (existsSync(pv)) ok(JSON.parse(readFileSync(pv)).vk.hex === V.vk.hex, `${name}: verifier vectors/ VK = prover track VK`);
@@ -68,8 +68,8 @@ for (const name of ['mul2', 'merkle16']) {
   ok(piles(CA, CTRL).every((x) => R.indexOf(x) < 0), `${name}: control: no slope piece of another G2 point is in it`);
 
   // today's chain: each SI role checks SHA256(its slope slice) against a baked hash
-  const plan = makePlan(vk), built = buildMulti(vk, plan);
-  const all = Buffer.concat([built.code, built.c1, built.redeem].map((x) => Buffer.from(x)));
+  const plan = makePlan(vk, planOpts(vk, name)), built = buildMulti(vk, plan);
+  const all = Buffer.concat([built.code, ...built.cb, built.redeem].map((x) => Buffer.from(x)));
   const si = plan.roles.filter((ro) => ro.kind === 'SI');
   const CH = {a: CA, b: CB}, CHc = {a: CA, b: CTRL};
   ok(si.every((ro) => all.indexOf(sha(dsSlice(CH, ro))) >= 0), `${name}: chain scripts (${all.length} B) hold SHA256 of all ${si.length} SI slope slices of the ceremony chain`);

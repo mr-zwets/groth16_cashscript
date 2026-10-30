@@ -88,7 +88,7 @@ for (const [nm, f] of [['adaptive: Lambda\' = 2 Lambda', (L) => L.double()], ['a
   M.push({name: nm, pushes: pushesOf(wt)});
 }
 // adaptive (GT fold): the nibbles of a folded base encode s + 1, every other witness part rebuilt (states, quotient)
-if (base.V.gt) for (const i of [0, base.V.gt.fixed.length - 1]) { const pr = d.valid[0]; const wt = witnessFor(vk, pr.proof, pr.publicInputs, {J, JR, fsDelta: [i, 1n]});
+if (base.V.gt) for (const i of [...new Set([0, ...base.V.gt.fixed.flatMap((nm, x) => (nm.startsWith('Qcp') ? [x] : [])), base.V.gt.fixed.length - 1])]) { // BSB22: also each folded Qcp_j const pr = d.valid[0]; const wt = witnessFor(vk, pr.proof, pr.publicInputs, {J, JR, fsDelta: [i, 1n]});
   if (wt.accept) fail('reference accepts nibbles for s + 1'); M.push({name: `adaptive: nibbles of folded base ${i} encode s + 1`, pushes: pushesOf(wt)}); }
 // adaptive: a proof for other public inputs (statement swap) with a fully rebuilt witness
 { const pr = d.valid[1]; const wt = witnessFor(vk, pr.proof, d.valid[0].publicInputs, {J, JR}); M.push({name: 'adaptive: proof 1 with the public inputs of proof 0', pushes: pushesOf(wt)}); }

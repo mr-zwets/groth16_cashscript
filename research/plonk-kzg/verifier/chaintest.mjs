@@ -47,6 +47,7 @@ m('MA hand-over word + p (alias)', (ps) => { const b = ps[iMA][fi(iMA, 'HAND')];
 m('SI hand-over R word flipped', (ps) => { const b = ps[iSI2][fi(iSI2, 'HAND')]; b[b.length - 5] ^= 4; });
 m('slope bit flip (MA)', (ps) => { ps[iMA][plan.roles[iMA].fixed.length + 2][7] ^= 1; });
 m('TV entry bit flip', (ps) => { ps[plan.iTV][fi(plan.iTV, 'TV')][500] ^= 1; });
+if (plan.iTV2 >= 0) m('TV2 entry bit flip', (ps) => { ps[plan.iTV2][fi(plan.iTV2, 'TV2')][500] ^= 1; });
 if (plan.iTF >= 0) m('TF entry bit flip', (ps) => { ps[plan.iTF][fi(plan.iTF, 'TF')][500] ^= 1; });
 m('DS (chain slopes) bit flip', (ps) => { ps[iSI2][fi(iSI2, 'DS')][100] ^= 1; });
 m('WS state bit flip', (ps) => { ps[plan.iST][fi(plan.iST, 'WS')][3000] ^= 1; });
@@ -76,7 +77,7 @@ m('input dropped (last SI)', () => {}, (tx) => tx.slice(0, -1));
 for (const [nm, f] of [['adaptive: Lambda\' = 2 Lambda', (L) => L.double()], ['adaptive: Lambda\' = Lambda + G', (L) => L.add(G1.BASE)]]) {
   const pr = d.valid[0]; const V = verifyPlonk(vk, pr.proof, pr.publicInputs); const w = multiWitness(vk, plan, built, pr.proof, pr.publicInputs, {lam: aff(f(V.lamTrue))});
   if (w.accept) fail('reference accepts ' + nm); M.push([nm, w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
-if (plan.m) for (const i of [0, plan.m - 1]) { const pr = d.valid[0]; const w = multiWitness(vk, plan, built, pr.proof, pr.publicInputs, {fsDelta: [i, 1n]});
+if (plan.m) for (const i of [...new Set([0, ...plan.FX.flatMap((nm, x) => (nm.startsWith('Qcp') ? [x] : [])), plan.m - 1])]) { // BSB22: also each folded Qcp_j const pr = d.valid[0]; const w = multiWitness(vk, plan, built, pr.proof, pr.publicInputs, {fsDelta: [i, 1n]});
   if (w.accept) fail('reference accepts nibbles for s + 1'); M.push([`adaptive: nibbles of folded base ${i} encode s + 1 (SI re-witnessed)`, w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
 { const w = multiWitness(vk, plan, built, d.valid[1].proof, d.valid[0].publicInputs); M.push(['adaptive: proof 1 with the public inputs of proof 0', w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
 for (const [name, ps, mutate, fills] of M) out.manipulations.push(run(name, ps, fills, mutate));
