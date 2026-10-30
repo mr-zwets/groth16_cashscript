@@ -1,0 +1,265 @@
+{
+ "circuit": "merkle16rc",
+ "foldedBases": 10,
+ "NQ_MAX": 420,
+ "plan": {
+  "mj": [
+   [
+    50,
+    42
+   ],
+   [
+    41,
+    39
+   ]
+  ],
+  "ma": [
+   [
+    38,
+    25
+   ],
+   [
+    24,
+    12
+   ],
+   [
+    11,
+    0
+   ]
+  ],
+  "si": [
+   [
+    0,
+    16
+   ],
+   [
+    16,
+    36
+   ],
+   [
+    36,
+    52
+   ],
+   [
+    52,
+    65
+   ]
+  ],
+  "blobs": [
+   [
+    6,
+    4100
+   ],
+   [
+    7,
+    5600
+   ],
+   [
+    4,
+    700
+   ]
+  ],
+  "tv2": [
+   3,
+   9
+  ]
+ },
+ "model": [
+  {
+   "i": 0,
+   "nq": 282,
+   "model": 282
+  },
+  {
+   "i": 1,
+   "nq": 273,
+   "model": 273
+  },
+  {
+   "i": 2,
+   "nq": 264,
+   "model": 264
+  },
+  {
+   "i": 3,
+   "nq": 267,
+   "model": 267
+  },
+  {
+   "i": 4,
+   "nq": 270,
+   "model": 270
+  }
+ ],
+ "fits": [
+  {
+   "nq": 284,
+   "ok": true,
+   "txBytes": 89341,
+   "maxInput": {
+    "role": "SI",
+    "i": 6,
+    "unlocking": 9773
+   },
+   "padded": true,
+   "finalOnly": true,
+   "lastErrorAt": {
+    "depth": 2,
+    "ip": 778,
+    "len": 795,
+    "checkAfter": false
+   },
+   "bad": [],
+   "lastError": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "nq": 420,
+   "ok": true,
+   "txBytes": 92384,
+   "maxInput": {
+    "role": "ST",
+    "i": 1,
+    "unlocking": 9847
+   },
+   "padded": true,
+   "finalOnly": true,
+   "lastErrorAt": {
+    "depth": 2,
+    "ip": 778,
+    "len": 795,
+    "checkAfter": false
+   },
+   "bad": [],
+   "lastError": "Program failed an OP_VERIFY operation."
+  }
+ ],
+ "honest": {
+  "samples": 1000000,
+  "min": 234,
+  "p50": 273,
+  "p99": 303,
+  "p999": 315,
+  "max": 351,
+  "hist": {
+   "234": 1,
+   "237": 15,
+   "240": 87,
+   "243": 460,
+   "246": 1846,
+   "249": 5777,
+   "252": 14112,
+   "255": 29273,
+   "258": 50687,
+   "261": 73861,
+   "264": 94895,
+   "267": 109669,
+   "270": 113364,
+   "273": 107823,
+   "276": 96553,
+   "279": 80532,
+   "282": 63670,
+   "285": 48615,
+   "288": 35193,
+   "291": 24964,
+   "294": 17470,
+   "297": 11560,
+   "300": 7448,
+   "303": 4930,
+   "306": 2942,
+   "309": 1762,
+   "312": 1083,
+   "315": 643,
+   "318": 362,
+   "321": 201,
+   "324": 109,
+   "327": 48,
+   "330": 21,
+   "333": 11,
+   "336": 9,
+   "339": 2,
+   "345": 1,
+   "351": 1
+  }
+ },
+ "cap": 420,
+ "summary": {
+  "nqCap": 420,
+  "nqStructuralMax": 420,
+  "honestMin": 234,
+  "honestP50": 273,
+  "honestMax": 351,
+  "samples": 1000000,
+  "samplesOverCap": 0,
+  "pOverCap": "< 3.0e-6 (0 of 1000000, 95%)",
+  "digitStressOk": true,
+  "worstMJHeadroom": 339
+ },
+ "digitStress": {
+  "chunk": 1,
+  "ok": true,
+  "worstMJ": {
+   "i": 0,
+   "need": 9661,
+   "unfilled": 9238,
+   "headroom": 339
+  },
+  "bad": [],
+  "perInput": [
+   {
+    "i": 0,
+    "role": "MJ",
+    "windows": "50..42",
+    "unfilled": 9238,
+    "need": 9661,
+    "fill": 487,
+    "unlocking": 9727,
+    "headroom": 339,
+    "error": null
+   },
+   {
+    "i": 2,
+    "role": "MJ",
+    "windows": "41..39",
+    "unfilled": 8949,
+    "need": 8888,
+    "fill": 0,
+    "unlocking": 8949,
+    "headroom": 1051,
+    "error": null
+   },
+   {
+    "i": 3,
+    "role": "MA",
+    "windows": "38..25",
+    "unfilled": 9094,
+    "need": 9190,
+    "fill": 160,
+    "unlocking": 9255,
+    "headroom": 810,
+    "error": null
+   },
+   {
+    "i": 4,
+    "role": "MA",
+    "windows": "24..12",
+    "unfilled": 7697,
+    "need": 7891,
+    "fill": 258,
+    "unlocking": 7957,
+    "headroom": 2109,
+    "error": null
+   },
+   {
+    "i": 5,
+    "role": "MA",
+    "windows": "11..0",
+    "unfilled": 6781,
+    "need": 7418,
+    "fill": 701,
+    "unlocking": 7484,
+    "headroom": 2582,
+    "error": null
+   }
+  ]
+ }
+}

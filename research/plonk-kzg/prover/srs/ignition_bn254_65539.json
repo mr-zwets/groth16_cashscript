@@ -1,0 +1,36 @@
+{
+  "barretenbergRef": "AztecProtocol/aztec-packages barretenberg/sol/src/honk/utils.sol (commit f2f4ecab), G2 point from VK",
+  "ceremony": "Aztec Ignition, MAIN IGNITION (176 participants, 2019-10-25 to 2019-12-17), sealed",
+  "chainNote": "sha256 over (bytes 0-91 || bytes 322560028-322560283) of transcript00.dat of the 176 participants in manifest order, then sealed",
+  "chainSha256": "b64d6570be125e95d8237d35036d677379d43948697be4bdb8c0d1fbc2972982",
+  "files": [
+    {
+      "range": "all",
+      "sha256": "d231a1defd9804721ded32c75dd6f956efbf61c254b3ebcec4bb6596ba9941b8",
+      "url": "https://aztec-ignition.s3.amazonaws.com/MAIN%20IGNITION/manifest.json"
+    },
+    {
+      "range": "28-4194459",
+      "sha256": "abc459a671ae1f2772b95ff1cb1ba19cae3f1dc59a937ea1163ee3e78c046401",
+      "url": "https://aztec-ignition.s3.amazonaws.com/MAIN%20IGNITION/sealed/transcript00.dat"
+    },
+    {
+      "range": "0-4194523",
+      "sha256": "5f0ebea024e05ff6481a9d4e734138c76b231276d84d0b7c5001fc067c4d08b5",
+      "url": "https://aztec-ignition.s3.amazonaws.com/MAIN%20IGNITION/monomial/transcript00.dat"
+    },
+    {
+      "range": "0-4194495",
+      "sha256": "ed09422444eb9b3aad10863ae1bd747ba7f8320ce0a3878543a20f3a74b382cb",
+      "url": "https://aztec-ignition.s3.amazonaws.com/MAIN%20IGNITION/flat/g1.dat"
+    }
+  ],
+  "g1Points": 65539,
+  "maxDomainLog2": 16,
+  "srsFile": {
+    "bytes": 2131204,
+    "format": "gnark-crypto v0.21 kzg.SRS.WriteTo (compressed points)",
+    "sha256": "ee63bf8e2f8d4c9d55eb2ceb716da116e99b170cdb51ce39b279b1b555edbb85"
+  },
+  "tau2RawEVM": "260e01b251f6f1c7e7ff4e580791dee8ea51d87a358e038b4efe30fac09383c10118c4d5b837bcc2bc89b5b398b5974e9f5944073b32078b7e231fec938883b004fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe422febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55"
+}

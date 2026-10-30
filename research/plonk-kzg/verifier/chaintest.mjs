@@ -3,13 +3,13 @@
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {loadVectors, parseVK, Reject, le32, verifyPlonk} from './plonk.mjs';
 import {p, aff, G1} from './math.mjs';
-import {makePlan, buildMulti, multiWitness} from './multi.mjs';
-import {chainTx, sizeFills, txBytes} from './chain.mjs';
+import {makePlan, buildMulti, multiWitness, planOpts} from './multi.mjs';
+import {chainTx, sizeFills, txBytes, nqStress, digitStress} from './chain.mjs';
 import {spendTx, verifyTx, p2sh32, encodeUnlocking} from './vm.mjs';
 
 const [circuit = 'mul2'] = process.argv.slice(2); const quick = process.argv.includes('--quick');
 const d = loadVectors(circuit); const vk = parseVK(d.vk.hex);
-const plan = makePlan(vk, JSON.parse(process.env.PLAN ?? '{}')); const built = buildMulti(vk, plan);
+const plan = makePlan(vk, planOpts(vk, circuit)); const built = buildMulti(vk, plan);
 const out = {circuit, plan: plan.roles.map((r) => ({kind: r.kind, hi: r.hi, lo: r.lo, e0: r.e0, e1: r.e1, host: r.host})), codeBytes: [built.code.length, built.c1.length], redeemBytes: built.redeem.length, valid: [], tampered: [], manipulations: []};
 let bad = 0; const fail = (m) => { bad++; console.log('UNEXPECTED', m); };
 const both = (tx) => ['consensus', 'standard'].map((m) => verifyTx('bch2026', m, tx));
@@ -21,11 +21,16 @@ for (const [i, pr] of (quick ? d.valid.slice(0, 1) : d.valid).entries()) {
   if (!ok || !w.accept) fail(`valid ${i}: ${v.map((x) => x.error).join(' / ')}`);
   if (i === 0) base = {w, fills, tx};
   out.valid.push({i, accepted: ok, txBytes: txBytes(tx), unlocking: tx.reduce((s, x) => s + x.unlocking.length, 0), inputs: tx.length,
-    perInput: per.map((x, k) => ({role: plan.roles[k].kind, unlocking: x.unlockingLen, fill: fills[k], opCost: x.opCost, budget: x.budget}))});
+    perInput: per.map((x, k) => ({role: plan.roles[k].kind, unlocking: x.unlockingLen, fill: fills[k], opCost: x.opCost, defBytes: built.defBytes, opCostBchn: x.opCost + built.defBytes, budget: x.budget,
+      bchnMarginPct: +(100 * (1 - (x.opCost + built.defBytes) / x.budget)).toFixed(3)})), nq: w.S.nq});
   console.log(`valid ${i}: ${ok ? 'accepted' : 'REJECTED'}, tx ${txBytes(tx)} B, op ${per.reduce((s, x) => s + x.opCost, 0)}`);
 }
+// a rejection counts only when a verifier check caused it: a standard-mode op-cost/density error (FILL too small for
+// the manipulated witness) is a test failure, not a rejection
+const BUDGET = /density|cost/i;
 const run = (name, pushes, fills, mutate) => { let tx = chainTx(vk, plan, built, pushes, fills ?? base.fills); if (mutate) tx = mutate(tx); const v = both(tx); const rej = v.every((x) => !x.accepted);
-  if (!rej) fail(name); return {name, rejected: rej, error: v[1].error?.slice(0, 160)}; };
+  if (!rej) fail(name); if (BUDGET.test(v[1].error ?? '')) fail(`${name}: rejected by the op budget, not by a check (${v[1].error.slice(0, 120)})`);
+  return {name, rejected: rej, error: v[1].error?.slice(0, 160)}; };
 // ---- tampered vectors ----
 for (const t of quick ? d.tampered.slice(0, 6) : d.tampered) {
   let ps, how, fl;
@@ -47,25 +52,71 @@ m('MA hand-over word + p (alias)', (ps) => { const b = ps[iMA][fi(iMA, 'HAND')];
 m('SI hand-over R word flipped', (ps) => { const b = ps[iSI2][fi(iSI2, 'HAND')]; b[b.length - 5] ^= 4; });
 m('slope bit flip (MA)', (ps) => { ps[iMA][plan.roles[iMA].fixed.length + 2][7] ^= 1; });
 m('TV entry bit flip', (ps) => { ps[plan.iTV][fi(plan.iTV, 'TV')][500] ^= 1; });
-m('TF entry bit flip', (ps) => { ps[plan.iTF][fi(plan.iTF, 'TF')][500] ^= 1; });
+if (plan.iTV2 >= 0) m('TV2 entry bit flip', (ps) => { ps[plan.iTV2][fi(plan.iTV2, 'TV2')][500] ^= 1; });
+if (plan.iTF >= 0) m('TF entry bit flip', (ps) => { ps[plan.iTF][fi(plan.iTF, 'TF')][500] ^= 1; });
 m('DS (chain slopes) bit flip', (ps) => { ps[iSI2][fi(iSI2, 'DS')][100] ^= 1; });
 m('WS state bit flip', (ps) => { ps[plan.iST][fi(plan.iST, 'WS')][3000] ^= 1; });
 m('WQ word bit flip', (ps) => { ps[plan.iWQ][fi(plan.iWQ, 'WQ')][1900] ^= 1; });
 m('G0 scalar bit flip', (ps) => { ps[plan.iST][fi(plan.iST, 'G0')][100] ^= 1; });
 m('code blob C0 byte flip', (ps) => { ps[0][0][2000] ^= 1; });
-m('code blob C1 byte flip', (ps) => { ps[plan.iC1][fi(plan.iC1, 'C1')][100] ^= 1; });
+plan.blobs.forEach(([ix], b) => m(`code blob C${b + 1} byte flip`, (ps) => { ps[ix][fi(ix, 'C' + (b + 1))][100] ^= 1; }));
+if (plan.m) { // Track 7: the GT fold and the moved SI transcript
+  const g0 = 32 + 32 * plan.nbm + 64; // offset of rho in G0
+  m('G0 rho word flipped', (ps) => { ps[plan.iST][fi(plan.iST, 'G0')][g0 + 3] ^= 1; });
+  m('G0 z word flipped', (ps) => { ps[plan.iST][fi(plan.iST, 'G0')][g0 + 35] ^= 1; });
+  m('G0 QZ (Horner value) flipped', (ps) => { ps[plan.iST][fi(plan.iST, 'G0')][g0 + 67] ^= 1; });
+  if (!plan.bindST) m('G0 folded scalar s_0 flipped', (ps) => { ps[plan.iST][fi(plan.iST, 'G0')][g0 + 99] ^= 1; });
+  m('WS nibble byte + 1', (ps) => { ps[plan.iST][fi(plan.iST, 'WS')][192 + 7] ^= 1; });
+  m('WS nibble byte = 0x10 (out of range)', (ps) => { ps[plan.iST][fi(plan.iST, 'WS')][192 + 3] = 0x10; });
+  m('WS nibble byte = 0x81 (negative)', (ps) => { ps[plan.iST][fi(plan.iST, 'WS')][192 + 5] = 0x81; });
+  m('GZ word flipped', (ps) => { ps[plan.iGZ][fi(plan.iGZ, 'GZ')][300] ^= 1; });
+  m('WQa word flipped', (ps) => { ps[plan.iWQa][fi(plan.iWQa, 'WQa')][4000] ^= 1; });
+  m('WQc word flipped', (ps) => { ps[plan.iWQc][fi(plan.iWQc, 'WQc')][100] ^= 1; });
+  m('WQc extra zero word (wrong size)', (ps) => { const k = fi(plan.iWQc, 'WQc'); ps[plan.iWQc][k] = Buffer.concat([Buffer.alloc(32), ps[plan.iWQc][k]]); });
+  m('WQ split moved (128 B from WQb to WQc, same polynomial bytes, different z)', (ps) => { const kb = fi(plan.iWQ, 'WQ'), kc = fi(plan.iWQc, 'WQc'); const b = ps[plan.iWQ][kb];
+    ps[plan.iWQc][kc] = Buffer.concat([b.subarray(b.length - 128), ps[plan.iWQc][kc]]); ps[plan.iWQ][kb] = b.subarray(0, b.length - 128); });
+  m('WQb extra zero word (wrong size)', (ps) => { const k = fi(plan.iWQ, 'WQ'); ps[plan.iWQ][k] = Buffer.concat([Buffer.alloc(32), ps[plan.iWQ][k]]); });
+}
 m('X: Fr inverse * 2', (ps) => { const b = ps[plan.iST][fi(plan.iST, 'X')]; b[64] ^= 2; });
 m('two MA inputs swapped', () => {}, (tx) => { const t = tx.slice(); const j = iMA, k2 = iMA + 1; [t[j], t[k2]] = [t[k2], t[j]]; return t; });
-m('nonzero FILL byte', () => {}, (tx) => tx.map((x, k) => { if (k !== iMA) return x; const pushes = []; return {...x, unlocking: (() => { const u = Buffer.from(x.unlocking); const pos = u.length - built.redeem.length - 2 - 10; u[pos] ^= 1; return u; })()}; }));
+const iFill = base.fills.indexOf(Math.max(...base.fills)); if (base.fills[iFill] < 16) fail('no input with a FILL of 16+ B for the nonzero FILL byte case');
+m(`nonzero FILL byte (input ${iFill})`, () => {}, (tx) => tx.map((x, k) => { if (k !== iFill) return x; return {...x, unlocking: (() => { const u = Buffer.from(x.unlocking); const pos = u.length - built.redeem.length - 3 - 10; u[pos] ^= 1; return u; })()}; }));
 m('extra input with the same locking', () => {}, (tx) => [...tx, tx[1]]);
 m('extra foreign input', () => {}, (tx) => [...tx, {locking: Uint8Array.of(0x51), unlocking: Uint8Array.of()}]);
 m('input dropped (last SI)', () => {}, (tx) => tx.slice(0, -1));
 for (const [nm, f] of [['adaptive: Lambda\' = 2 Lambda', (L) => L.double()], ['adaptive: Lambda\' = Lambda + G', (L) => L.add(G1.BASE)]]) {
   const pr = d.valid[0]; const V = verifyPlonk(vk, pr.proof, pr.publicInputs); const w = multiWitness(vk, plan, built, pr.proof, pr.publicInputs, {lam: aff(f(V.lamTrue))});
   if (w.accept) fail('reference accepts ' + nm); M.push([nm, w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
+if (plan.m) for (const i of [...new Set([0, ...plan.FX.flatMap((nm, x) => (nm.startsWith('Qcp') ? [x] : [])), plan.m - 1])]) { /* BSB22: also each folded Qcp_j */ const pr = d.valid[0]; const w = multiWitness(vk, plan, built, pr.proof, pr.publicInputs, {fsDelta: [i, 1n]});
+  if (w.accept) fail('reference accepts nibbles for s + 1'); M.push([`adaptive: nibbles of folded base ${i} encode s + 1 (SI re-witnessed)`, w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
 { const w = multiWitness(vk, plan, built, d.valid[1].proof, d.valid[0].publicInputs); M.push(['adaptive: proof 1 with the public inputs of proof 0', w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
 for (const [name, ps, mutate, fills] of M) out.manipulations.push(run(name, ps, fills, mutate));
+// re-witnessed: the transcript (h0 or z) and everything after it recomputed for the manipulated bytes, so that the named
+// check is the one that rejects: the only input whose own evaluation fails is the checking role, and (NIBC) it fails
+// before the GT binding loop, i.e. with less op-cost than the binding failure of 'nibbles of folded base 0 encode s + 1'
+if (plan.m) { const pr = d.valid[0]; const iSIL = plan.roles.findIndex((ro) => ro.kind === 'SI' && ro.last);
+  const own = (o) => { const w = multiWitness(vk, plan, built, pr.proof, pr.publicInputs, o); if (w.accept) fail('reference accepts ' + JSON.stringify(o));
+    const fl = sizeFills(vk, plan, built, w.pushes, {strict: false}); const tx = chainTx(vk, plan, built, w.pushes, fl);
+    return {w, fl, tx, per: spendTx('bch2026', 'standard', tx).map((x, i) => ({i, error: x.evalError, op: x.opCost})).filter((x) => x.error)}; };
+  const bindFail = own({fsDelta: [0, 1n]}).per.find((x) => x.i === iSIL)?.op;
+  const e0 = base.w.V.gt.N[0].findIndex((x) => x === 0); // an event where base 0's nibble is 0: byte 0x10 picks TM_0[0] = TP_1[0] = 1, as 0 does
+  for (const [name, o, host, before] of [['WQc extra zero word (re-witnessed: same polynomial, z recomputed; the size rule rejects)', {wqShift: 'c'}, plan.iST],
+    ['WQb extra zero word (re-witnessed: same polynomial, z recomputed; the size rule rejects)', {wqShift: 'b'}, plan.iST],
+    [`WS nibble byte = 0x10 (re-witnessed: h0 and the SI transcript recomputed, GT factors as for 0; NIBC rejects)`, {nbPatch: [e0 * plan.m, 0x10]}, iSIL, bindFail]]) {
+    const x = own(o); const r = run(name, x.w.pushes, x.fl); const f = x.per.map((y) => y.i);
+    const ok = f.length === 1 && f[0] === host && (before === undefined || x.per[0].op < before);
+    if (!ok) fail(`${name}: failing inputs ${JSON.stringify(x.per)} (expected only input ${host}${before !== undefined ? ', op < ' + before : ''})`);
+    out.manipulations.push({...r, failingInputs: x.per, expectedHost: host, ...(before !== undefined ? {bindingFailureOp: before} : {}), checkLocated: ok}); }
+}
 console.log(`manipulations: ${out.manipulations.filter((x) => x.rejected).length}/${out.manipulations.length} rejected`);
+// ---- liveness under the worst digit pattern (chain.mjs digitStress): every MSM input fits for any digits
+{ const x = digitStress(vk, plan, built, d.valid[0].proof, d.valid[0].publicInputs); out.digitStress = x;
+  if (!x.ok) fail(`digit stress: ${x.bad.join('; ')}`);
+  console.log(`digit stress: ${x.ok ? 'fits' : 'DOES NOT FIT'}, worst MJ input in${x.worstMJ.i}: need ${x.worstMJ.need} B, unfilled ${x.worstMJ.unfilled} B, headroom ${x.worstMJ.headroom} B`); }
+// ---- liveness at the structural quotient bound (fold): a proof with n_q = NQ words must still fit (chain.mjs nqStress)
+if (plan.WQ_VAR) { const x = nqStress(vk, plan, built, d.valid[0].proof, d.valid[0].publicInputs, plan.NQ); const {perInput, ...rest} = x; out.liveness = rest;
+  if (!x.ok) fail(`liveness: n_q = ${plan.NQ} does not fit: ${x.bad.join('; ')} tx ${x.txBytes}`);
+  console.log(`liveness: n_q = ${plan.NQ} (structural max) ${x.ok ? 'fits' : 'DOES NOT FIT'}, tx ${x.txBytes} B, largest input in${x.maxInput.i} ${x.maxInput.unlocking} B`); }
 out.unexpected = bad;
 mkdirSync(new URL('./results/', import.meta.url), {recursive: true});
 if (!quick) writeFileSync(new URL(`./results/chain-${circuit}.json`, import.meta.url), JSON.stringify(out, null, 1) + '\n');

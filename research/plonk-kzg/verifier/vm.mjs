@@ -26,8 +26,13 @@ const program = (inputs, outputs, inputIndex) => ({inputIndex, sourceOutputs: in
 export function spendTx(regime, mode, inputs, outputs) {
   const vm = VMS[regime][mode];
   return inputs.map((inp, k) => { const prog = program(inputs, outputs, k); const st = vm.evaluate(prog); const ok = vm.verify({sourceOutputs: prog.sourceOutputs, transaction: prog.transaction});
-    return {accepted: ok === true && !st.error, error: st.error ?? (ok === true ? null : String(ok)), opCost: st.metrics.operationCost, budget: (VMS[regime].base + inp.unlocking.length) * 800, unlockingLen: inp.unlocking.length, metrics: st.metrics}; });
+    return {accepted: ok === true && !st.error, error: st.error ?? (ok === true ? null : String(ok)), evalError: st.error ?? null, errorAt: st.error ? errorAt(st) : null, opCost: st.metrics.operationCost, budget: (VMS[regime].base + inp.unlocking.length) * 800, unlockingLen: inp.unlocking.length, metrics: st.metrics}; });
 }
+// where an evaluation failed: the function call depth (control stack frames: redeem -> C0 -> role body = 2), the
+// instruction pointer in the current bytecode (one past the failing instruction), and whether any check can still
+// follow in that bytecode (a *VERIFY opcode or an OP_INVOKE after the failing instruction)
+const CHECK_OPS = new Set([0x69, 0x88, 0x9d, 0xad, 0xaf, 0xbb, 0x8a]);
+const errorAt = (st) => ({depth: st.controlStack.length, ip: st.ip, len: st.instructions.length, checkAfter: st.instructions.slice(st.ip).some((x) => CHECK_OPS.has(x.opcode))});
 // whole-transaction verdict only (fast: libauth stops at the first failing input)
 export function verifyTx(regime, mode, inputs, outputs) { const vm = VMS[regime][mode]; const prog = program(inputs, outputs, 0); const ok = vm.verify({sourceOutputs: prog.sourceOutputs, transaction: prog.transaction}); return {accepted: ok === true, error: ok === true ? null : String(ok)}; }
 export const spend = (regime, mode, locking, unlocking) => spendTx(regime, mode, [{locking, unlocking}])[0];

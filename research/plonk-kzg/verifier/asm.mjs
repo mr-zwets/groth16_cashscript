@@ -88,6 +88,8 @@ export class Asm {
     // find largest k such that names[0..k) are, in order, directly below nothing that must move:
     let k = 0; // greedy: keep names[0..k) if they already occupy the bottom of the top-n window in order
     const win = this.st.slice(-n); while (k < n && win[k] === names[k]) k++;
+    // Track 7 fix: the kept prefix must have only items that are rolled anyway above it (else they would stay in between)
+    while (k > 0 && !win.slice(k).every((x) => names.slice(k).includes(x))) k--;
     for (let i = k; i < n; i++) this.roll(names[i]);
     return this;
   }

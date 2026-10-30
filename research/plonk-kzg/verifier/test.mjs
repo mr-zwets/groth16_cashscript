@@ -7,14 +7,16 @@
 // 3. witness manipulations of a valid proof (count-preserving ones included) are rejected.
 import assert from 'node:assert/strict';
 import {mkdirSync, writeFileSync} from 'node:fs';
-import {loadVectors, parseVK, Reject, le32, be32, verifyPlonk} from './plonk.mjs';
+import {loadVectors, parseVK, Reject, le32, be32, verifyPlonk, proofLen} from './plonk.mjs';
 import {p, r, aff, mod, G1} from './math.mjs';
 import {buildRedeem} from './script.mjs';
 import {witnessFor, pushesOf} from './witness.mjs';
 import {p2sh32, encodeUnlocking, spend} from './vm.mjs';
 import {padFor} from './single.mjs';
 
-const [circuit = 'mul2', regime = 'spec', Js = '13', JRs = '0'] = process.argv.slice(2);
+const [circuit = 'mul2', regime = 'spec', Js, JRs = '0'] = process.argv.slice(2).filter((a) => !a.startsWith('--')); // flags are not positional (--quick used to become JR)
+// J is required (no default): the Track 7 builds use J = 23 (21 for BSB22 circuits) at bch-spec and 14 for txv5, Track 6 (FOLD=0) 13 / 8
+if (!/^\d+$/.test(Js ?? '')) { console.error('usage: node test.mjs <circuit> <spec|txv5> <J> [JR] [--quick]  (Track 7: spec 23, or 21 for range64/merkle16rc; txv5 14)'); process.exit(2); }
 const quick = process.argv.includes('--quick');
 const J = Number(Js), JR = Number(JRs), pad = regime === 'txv5';
 const d = loadVectors(circuit); const vk = parseVK(d.vk.hex);
@@ -22,7 +24,9 @@ const {redeem} = buildRedeem(vk, {J, JR, pad});
 const locking = p2sh32(redeem);
 const run = (pushes, padLen) => { const u = encodeUnlocking([...pushes, ...(pad ? [Buffer.alloc(padLen ?? 1)] : []), redeem]);
   return Object.fromEntries(['consensus', 'standard'].map((m) => { const x = spend(regime, m, locking, u); return [m, {accepted: x.accepted, error: x.error, opCost: x.opCost, budget: x.budget, unlocking: u.length}]; })); };
-// pad sized for the honest op-cost of the valid witness (the TXv5 grade pads every input to its need)
+// txv5: the pad is sized per witness, for the op-cost of that witness on the unbudgeted VM (the TXv5 grade pads every
+// input to its need), so a rejection is never the budget's: a standard-mode op-cost/density error counts as a failure
+const BUDGET = /density|cost/i;
 const padNeed = (pushes) => { if (!pad) return 0; const u = encodeUnlocking([...pushes, Buffer.alloc(1), redeem]); const x = spend('free', 'standard', locking, u); return padFor(x.opCost, u.length, regime).length; };
 const out = {circuit, regime, J, JR, redeemBytes: redeem.length, valid: [], tampered: [], manipulations: []};
 let bad = 0;
@@ -34,7 +38,7 @@ for (const [i, pr] of d.valid.entries()) {
   const wt = witnessFor(vk, pr.proof, pr.publicInputs, {J, JR}); wts.push(wt);
   const pushes = pushesOf(wt); const pl = padNeed(pushes); const res = run(pushes, pl);
   const ok = res.consensus.accepted && res.standard.accepted; if (!ok || !wt.accept) fail(`valid ${i}: ${res.consensus.error} / ${res.standard.error}`);
-  out.valid.push({i, ref: wt.accept, ...res, pad: pl, slopes: wt.w.slopes.length, nq: wt.S.nq, proofBytes: 768, piBytes: 32 * vk.nbPublic});
+  out.valid.push({i, ref: wt.accept, ...res, pad: pl, slopes: wt.w.slopes.length, nq: wt.S.nq, proofBytes: proofLen(vk), piBytes: 32 * vk.nbPublic});
   console.log(`valid ${i}: ${ok ? 'accepted' : 'REJECTED'} op ${res.standard.opCost} / ${res.standard.budget}, unlocking ${res.standard.unlocking}`);
 }
 const base = wts[0]; const basePushes = pushesOf(base); const basePad = padNeed(basePushes);
@@ -45,9 +49,9 @@ for (const t of quick ? d.tampered.slice(0, 12) : d.tampered) {
   try { const wt = witnessFor(vk, t.proof, t.publicInputs, {J, JR}); if (wt.accept) fail('reference accepts tampered ' + t.name); pushes = pushesOf(wt); how = 'adaptive'; }
   catch (e) { if (!(e instanceof Reject) && !/exceptional|singular/.test(e.message)) throw e;
     pushes = basePushes.slice(); pushes[pushes.length - 1] = Buffer.from(t.proof, 'hex'); pushes[pushes.length - 2] = Buffer.concat(t.publicInputs.map((h) => Buffer.from(h, 'hex'))); how = 'reused:' + e.message; }
-  const res = run(pushes, basePad); const rej = !res.consensus.accepted && !res.standard.accepted;
-  if (!rej) fail('tampered accepted ' + t.name);
-  out.tampered.push({name: t.name, how, rejected: rej, error: res.standard.error});
+  const pl = padNeed(pushes); const res = run(pushes, pl); const rej = !res.consensus.accepted && !res.standard.accepted;
+  if (!rej) fail('tampered accepted ' + t.name); if (BUDGET.test(res.standard.error ?? '')) fail(`tampered ${t.name}: rejected by the op budget (${res.standard.error})`);
+  out.tampered.push({name: t.name, how, rejected: rej, pad: pl, error: res.standard.error});
 }
 console.log(`tampered: ${out.tampered.filter((x) => x.rejected).length}/${out.tampered.length} rejected`);
 
@@ -70,7 +74,9 @@ edit('X: batch inverse * 2', (P) => { const b = P[idx.X]; const v = BigInt('0x' 
 if (J > 0 || JR > 0) edit('X: Jacobian zi * 2', (P) => { const b = P[idx.X]; const o = b.length - 32; const v = BigInt('0x' + Buffer.from(b.subarray(o)).reverse().toString('hex')); le32(mod(2n * v)).copy(b, o); return P; });
 edit('WS: residue root word + 1', (P) => { flip(P[idx.WS], 0); return P; });
 edit('WS: state word bit flip', (P) => { flip(P[idx.WS], 1000); return P; });
-edit('WS: state word + p alias', (P) => { const b = P[idx.WS]; const v = BigInt('0x' + Buffer.from(b.subarray(192, 224)).reverse().toString('hex')); if (v + p < 1n << 256n) le32(v + p).copy(b, 192); return P; });
+const so = 192 + (base.V.gt ? 65 * base.V.gt.fixed.length : 0); // first state word (after s^c and the GT nibbles)
+edit('WS: state word + p alias', (P) => { const b = P[idx.WS]; const v = BigInt('0x' + Buffer.from(b.subarray(so, so + 32)).reverse().toString('hex')); if (v + p < 1n << 256n) le32(v + p).copy(b, so); return P; });
+if (base.V.gt) { edit('WS: GT nibble byte xor 1', (P) => { flip(P[idx.WS], 192 + 7); return P; }); edit('WS: GT nibble byte = 16', (P) => { P[idx.WS][192 + 3] = 16; return P; }); edit('WS: GT nibble byte = 0x81', (P) => { P[idx.WS][192 + 5] = 0x81; return P; }); }
 edit('WS: truncated by 32', (P) => { P[idx.WS] = P[idx.WS].subarray(0, P[idx.WS].length - 32); return P; });
 edit('WQ: word bit flip', (P) => { flip(P[idx.WQ], 40); return P; });
 edit('WQ: leading zero word', (P) => { P[idx.WQ] = Buffer.concat([Buffer.alloc(32), P[idx.WQ]]); return P; });
@@ -85,13 +91,25 @@ for (const [nm, f] of [['adaptive: Lambda\' = 2 Lambda', (L) => L.double()], ['a
   const wt = witnessFor(vk, pr.proof, pr.publicInputs, {J, JR, lam: aff(f(V.lamTrue))}); if (wt.accept) fail('reference accepts ' + nm);
   M.push({name: nm, pushes: pushesOf(wt)});
 }
+// adaptive (GT fold): the nibbles of a folded base encode s + 1, every other witness part rebuilt (states, quotient)
+if (base.V.gt) for (const i of [...new Set([0, ...base.V.gt.fixed.flatMap((nm, x) => (nm.startsWith('Qcp') ? [x] : [])), base.V.gt.fixed.length - 1])]) { /* BSB22: also each folded Qcp_j */ const pr = d.valid[0]; const wt = witnessFor(vk, pr.proof, pr.publicInputs, {J, JR, fsDelta: [i, 1n]});
+  if (wt.accept) fail('reference accepts nibbles for s + 1'); M.push({name: `adaptive: nibbles of folded base ${i} encode s + 1`, pushes: pushesOf(wt)}); }
 // adaptive: a proof for other public inputs (statement swap) with a fully rebuilt witness
 { const pr = d.valid[1]; const wt = witnessFor(vk, pr.proof, d.valid[0].publicInputs, {J, JR}); M.push({name: 'adaptive: proof 1 with the public inputs of proof 0', pushes: pushesOf(wt)}); }
+// re-witnessed (GT fold): a nibble byte 0x10 where base 0's nibble is 0, with h0 and the transcript recomputed and the GT
+// factors as for 0 (0x10 picks TM_0[0] = TP_1[0] = 1, as 0 does): NIBC rejects, before the binding loop, i.e. with less
+// op-cost than the binding failure of 'nibbles of folded base 0 encode s + 1'
+let nibRW = null;
+if (base.V.gt) { const pr = d.valid[0]; const mm = base.V.gt.fixed.length; const e0 = base.V.gt.N[0].findIndex((x) => x === 0);
+  const wt = witnessFor(vk, pr.proof, pr.publicInputs, {J, JR, nbPatch: [e0 * mm, 0x10]}); if (wt.accept) fail('reference accepts the nibble 0x10 witness');
+  nibRW = {name: 'WS: GT nibble byte = 16 (re-witnessed: h0 and the transcript recomputed, factors as for 0; NIBC rejects)', pushes: pushesOf(wt)}; M.push(nibRW); }
 for (const m of M) {
-  const res = run(m.pushes, basePad); const rej = !res.consensus.accepted && !res.standard.accepted;
-  if (!rej) fail('manipulation accepted: ' + m.name);
-  out.manipulations.push({name: m.name, rejected: rej, error: res.standard.error});
+  const pl = padNeed(m.pushes); const res = run(m.pushes, pl); const rej = !res.consensus.accepted && !res.standard.accepted;
+  if (!rej) fail('manipulation accepted: ' + m.name); if (BUDGET.test(res.standard.error ?? '')) fail(`manipulation ${m.name}: rejected by the op budget (${res.standard.error})`);
+  out.manipulations.push({name: m.name, rejected: rej, pad: pl, error: res.standard.error, opAtFailure: res.standard.opCost});
 }
+if (nibRW) { const nb = out.manipulations.find((x) => x.name === nibRW.name), bd = out.manipulations.find((x) => x.name === 'adaptive: nibbles of folded base 0 encode s + 1');
+  nb.bindingFailureOp = bd.opAtFailure; nb.checkLocated = nb.opAtFailure < bd.opAtFailure; if (!nb.checkLocated) fail(`nibble 0x10 re-witnessed: fails at op ${nb.opAtFailure}, not before the binding (${bd.opAtFailure})`); }
 // tampered redeem (P2SH32 commitment)
 { const rd = Buffer.from(redeem); rd[rd.length - 10] ^= 1; const u = encodeUnlocking([...basePushes, ...(pad ? [Buffer.alloc(basePad)] : []), rd]);
   const rej = ['consensus', 'standard'].every((m) => !spend(regime, m, locking, u).accepted); if (!rej) fail('tampered redeem accepted'); out.manipulations.push({name: 'redeem byte flipped', rejected: rej}); }

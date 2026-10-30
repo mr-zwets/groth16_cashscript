@@ -9,7 +9,10 @@ JS reference verifier, which is the spec the on-chain verifier will follow.
 - Backend: PLONK over BN254 with KZG commitments, `plonk.Setup / Prove / Verify`, default options.
 - Fiat-Shamir: gnark's defaults, `ChallengeHash = KZGFoldingHash = sha256`. Every hash is a plain padded
   SHA-256 of a byte string, so `OP_SHA256` computes all of them.
-- No BSB22 / `Commit` custom-gate commitments: neither circuit needs them, and `main.go` refuses a VK that has any.
+- BSB22 / `Commit` custom-gate commitments (Track 7): `mul2` and `merkle16` have none. `range64` and `merkle16rc`
+  use gnark's `std/rangecheck`, which calls `api.Commit` once, so they have exactly one. `main.go` asserts the
+  expected count per circuit. The verifier delta is PROTOCOL.md "BSB22 commitments" and the layout FORMAT.md
+  "BSB22 commitments" (format `v2-bsb22`).
 
 Files:
 - The byte format is in [FORMAT.md](FORMAT.md).
@@ -39,6 +42,29 @@ Universality:
 - The verifier needs only `[1]_1`, `[1]_2` and `[τ]_2` from it. Everything else in a VK is derived from the
   circuit by `plonk.Setup`, which uses no secret.
 
+## BSB22 commitments (Track 7)
+
+Two circuits with one commitment each (`std/rangecheck`, 64-bit check). Since the Track 7 integration
+(`wip/plonk-usable-verifier`) they are built on the same Aztec Ignition SRS as `mul2` and `merkle16`
+(`-srs ... -circuits range64,merkle16rc`); the counts below are that run's.
+
+
+| name | public inputs | statement | constraints | n | VK | proof | valid | tampered (gnark-checked) |
+|---|---|---|---:|---:|---:|---:|---:|---:|
+| `range64` | `n0` | `a·a = n0`, `0 ≤ a < 2^64` | 129 | 2^8 | 1,024 B | 864 B | 5 | 86 (44) |
+| `merkle16rc` | `root, nullifierHash, context` | merkle16 with a private 64-bit amount in the leaf | 15,680 | 2^14 | 1,024 B | 864 B | 5 | 91 (47) |
+
+- `verify.mjs` accepts all 10 valid proofs and rejects all 177 tampered ones. On every valid proof the recomputed
+  `r0` equals gnark's `ClaimedValues[0]`, and the JS hash-to-field equals the value gnark-crypto's
+  `hash_to_field` gives in Go (`bsb22Hash`).
+- gnark's own `Verify` rejects all 91 tampered variants its structs can represent (it panics the generator
+  otherwise).
+- Cost of one commitment: +2 G1 scalar multiplications (one fixed base Qcp, one proof base Bsb22), +1 on-curve
+  check, +3 SHA-256 calls (8 blocks: the hash-to-field 5, the larger γ, α and v 3), one more Lagrange
+  denominator in the same batched inversion, +96 proof bytes.
+- `-circuits range64,merkle16rc` builds only these; each circuit then has its own witness stream, while
+  `mul2,merkle16` (the default) keep the v1 shared stream so their keys regenerate byte for byte.
+
 ## Circuits
 
 | name | public inputs | statement | constraints | n | prove (4 threads) |
@@ -66,12 +92,19 @@ Universality:
 
 ## SRS
 
-The vectors use a test SRS with a public toxic value: `τ = SHA256(seed) mod r`, through gnark's
-`unsafekzg.WithToxicSeed`. **Anyone can forge proofs for these VKs.** FORMAT.md "SRS" covers two things:
-- How a deployment loads a public ceremony (Aztec Ignition, or the perpetual powers of tau) instead.
-- The circuit-size limit: `n ≤ 2^26` with Ignition's 100.8M powers, and the field cap of `n ≤ 2^28`.
-
-Loading a ceremony was not exercised here.
+The vectors use the **Aztec Ignition** ceremony (176 participants, then sealed by Aztec), not a test SRS
+(Track 7, branch `wip/plonk-usable-srs`). Details, URLs and hashes are in FORMAT.md "SRS".
+- `ceremony/main.go` downloads only byte ranges (about 13 MB for `n ≤ 2^16`), and verifies:
+  - the pinned `[x]_2`: the manifest's `crs.t2`, which is also barretenberg's hardcoded G2 point;
+  - the first-power chain over all 176 contributions and the seal;
+  - the pairing consistency of every G1 power it uses, as one random linear combination.
+- It writes a gnark-crypto `kzg.SRS` with 65,539 points (sha256 `ee63bf8e…edbb85`). `main.go -srs FILE` builds the
+  keys from it.
+- **Circuit-size cap**: `n ≤ 2^16` with the committed settings, `n ≤ 2^22` with `-log 22` (one transcript file is
+  read), and `n ≤ 2^26` for the whole ceremony.
+- The verifier's SRS constants (`[1]_1`, `[1]_2`, `[x]_2`, and the `[x]_2` Miller-chain slopes the scripts bake)
+  are checked against the ceremony by `../verifier/srs-check.mjs`.
+- The old test SRS (public toxic value) is still available as `go run . -unsafe-test-srs`.
 
 ## Vectors
 
@@ -99,9 +132,10 @@ Loading a ceremony was not exercised here.
 ## Build and regenerate
 
 ```
-./gen-vectors.sh            # GOMAXPROCS=4 nice go run . ; nice node verify.mjs
+./gen-vectors.sh            # ceremony download+checks, go run . -srs ... (both runs), node verify.mjs (SRS_CACHE=dir)
+GOMAXPROCS=4 nice go run . -srs srs-cache/ignition_bn254_65539.srs -circuits range64,merkle16rc -out vectors   # the BSB22 vectors only
 npm install                 # once: @noble/curves 2.2.0 for verify.mjs
-node verify.mjs             # check all vectors: OK: 164 cases, 0 unexpected
+node verify.mjs             # check all vectors: OK: 351 cases, 0 unexpected (164 v1 + 187 BSB22)
 node verify.mjs --counts    # operation counts of one verification per circuit
 node verify.mjs --trace mul2 0   # challenges and intermediate values
 ```
@@ -118,7 +152,8 @@ node verify.mjs --trace mul2 0   # challenges and intermediate values
   binding derivation of u. γ, β, α, ζ and v, by contrast, are pinned: a wrong value rejects the valid vectors.
 - **Deviations from gnark's Go verifier** (PROTOCOL.md): proof points equal to the identity are rejected, and
   encodings are strict.
-- **Test SRS only.** No ceremony file was converted.
+- **Ceremony SRS, partly verified.** Only the parts the verifier relies on were checked: the final `[x]_2` chain and
+  the powers used. The full 100.8M-point transcripts, their checksums and the participants' signatures were not.
 - **Soundness rests on PLONK and KZG** under the q-SDH/AGM assumptions, with gnark's transcript. This track
   only claims that `verify.mjs` reproduces gnark's verifier and rejects the tampered set.
 - **snarkjs** PLONK uses Keccak. Emulating Keccak on CashVM was not measured; see the end of PROTOCOL.md.

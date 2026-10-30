@@ -5,6 +5,7 @@
 import assert from 'node:assert/strict';
 import {p, mod, inv, F2, F12, DIGITS, NE, NADD, LAMBDA, N6R, ETA, chainConsts, linePoly, fromPoly, monicRep, pmul, psub, pneg, psubst, peval, pdivM, M, frob1Monic} from './math.mjs';
 import {sha, le32, le} from './plonk.mjs';
+import {eventFactors} from './gt.mjs';
 
 export const TAG = Buffer.from('PLONKKZG-SI/1');
 export const CHUNK = 2;
@@ -12,13 +13,24 @@ export const BOUNDS = (() => { const b = []; for (let e = CHUNK; e < NE; e += CH
 export const NSTATES = BOUNDS.length; // 33
 export const K_IDS = NSTATES + 1;
 export const isBoundary = (e) => BOUNDS.includes(e + 1);
-export const WS_SIZE = 192 * (1 + NSTATES); // s^c and the 33 states, 6 LE words each
-// degrees: an event multiplies two lines (9 each); an addition event two more lines and the c factor (6)
-export const eventDeg = (e) => 18 + (DIGITS[e] ? 24 : 0);
-export const chunkDegP = (k) => { let d = 6; for (let e = k ? BOUNDS[k - 1] : 0; e < BOUNDS[k]; e++) d = 2 * d + eventDeg(e); return d; };
+// WS = s^c (6 LE words) || NB (the GT nibbles, 65 m bytes, event-major; m = number of folded bases) || 33 states
+export const NB_OFF = 192;
+export const wsSize = (m) => 192 * (1 + NSTATES) + 65 * m;
+export const WS_SIZE = wsSize(0);
+// degrees: an event multiplies two lines (9 each); an addition event two more lines and the c factor (6); with the
+// GT fold, up to 4 monic degree-6 factors R_{i,j} per folded base and event (all nibbles 15 is the worst case)
+export const eventDeg = (e, m = 0) => 18 + (DIGITS[e] ? 24 : 0) + 24 * m;
+export const chunkDegP = (k, m = 0) => { let d = 6; for (let e = k ? BOUNDS[k - 1] : 0; e < BOUNDS[k]; e++) d = 2 * d + eventDeg(e, m); return d; };
 const nqOfDegD = (dD) => { const dq = (dD % 2 ? dD : dD - 1) - 12; return (dq + 1) / 2; };
-export const TERM_DEG_P = 6 + 4 * 9 + 6; // S_33, four Frobenius lines, S_c(eta X)
-export const NQ_MAX = Math.max(...Array.from({length: NSTATES}, (_, k) => nqOfDegD(chunkDegP(k) + 6)), nqOfDegD(TERM_DEG_P + 22));
+export const termDegP = (m = 0) => 6 + 4 * 9 + 6 + (m ? 6 : 0); // S_33, four Frobenius lines, S_c(eta X) [, Rconst]
+export const TERM_DEG_P = termDegP(0);
+export const nqMax = (m = 0) => Math.max(...Array.from({length: NSTATES}, (_, k) => nqOfDegD(chunkDegP(k, m) + 6)), nqOfDegD(termDegP(m) + 22));
+export const NQ_MAX = nqMax(0);
+// the structural n_q of one proof: as nqMax, with each event's GT factor count taken from the actual nibbles N[i][e]
+// (6 per set bit) instead of the all-15 worst case; liveness.mjs checks it against proveSI's n_q
+export const nqOfNibbles = (N) => { const m = N.length; const chunk = (k) => { let d = 6; for (let e = k ? BOUNDS[k - 1] : 0; e < BOUNDS[k]; e++) {
+  let f = 0; for (const Ni of N) { let x = Ni[e]; while (x) { f += x & 1; x >>= 1; } } d = 2 * d + 18 + (DIGITS[e] ? 24 : 0) + 6 * f; } return d; };
+  return Math.max(...Array.from({length: NSTATES}, (_, k) => nqOfDegD(chunk(k) + 6)), nqOfDegD(termDegP(m) + 22)); };
 
 const chainCache = new Map();
 export const chains = (vk) => { const key = vk.g2x.toHex(); if (!chainCache.has(key)) chainCache.set(key, {a: chainConsts(vk.g2), b: chainConsts(vk.g2x)}); return chainCache.get(key); };
@@ -35,8 +47,9 @@ export function factorSchedule(CH, Pa, Pb) {
   return {events, term};
 }
 
-export function proveSI(CH, Pa, Pb, uRaw) {
-  const sched = factorSchedule(CH, Pa, Pb);
+export function proveSI(CH, Pa, Pb, uRaw, gt = null) {
+  const sched = factorSchedule(CH, Pa, Pb); const m = gt ? gt.fixed.length : 0;
+  if (gt) { sched.events.forEach((ev, e) => ev.fs.push(...eventFactors(gt.G, gt.N, e))); sched.term.push(gt.G.Rconst); }
   let raw = F12.ONE;
   for (const ev of sched.events) { raw = F12.sqr(raw); for (const f of ev.fs) raw = F12.mul(raw, fromPoly(f)); }
   for (const f of sched.term) raw = F12.mul(raw, fromPoly(f));
@@ -59,12 +72,12 @@ export function proveSI(CH, Pa, Pb, uRaw) {
   for (const id of ids) { const Nn = pmul(id.P, pneg(id.W)); const D = psub(Nn, pneg(Nn)); const {q, r: rem} = pdivM(D); if (!rem.every((x) => x === 0n)) divisible = false; id.Q = q; }
   if (accept) assert.ok(divisible, 'identity not divisible by M');
   const W32 = (x) => le32(mod(x));
-  const WS = Buffer.concat([...Sc.slice(0, 6).map(W32), ...states.flatMap((s) => s.slice(0, 6).map(W32))]);
-  assert.equal(WS.length, WS_SIZE);
+  const WS = Buffer.concat([...Sc.slice(0, 6).map(W32), ...(gt ? [gt.NB] : []), ...states.flatMap((s) => s.slice(0, 6).map(W32))]);
+  assert.equal(WS.length, wsSize(m)); const NQM = nqMax(m);
   const h0 = sha(TAG, uRaw, WS), rhoRaw = sha(h0, Buffer.from('rho'));
   const rho = le(rhoRaw) % p;
-  const Qagg = Array(2 * NQ_MAX).fill(0n);
-  ids.forEach((id, k) => { const wgt = mod(rho ** BigInt(K_IDS - 1 - k)); id.Q.forEach((x, i) => { if (x) { assert.ok(i < 2 * NQ_MAX, 'Q exceeds structural bound'); Qagg[i] = mod(Qagg[i] + wgt * x); } }); });
+  const Qagg = Array(2 * NQM).fill(0n);
+  ids.forEach((id, k) => { const wgt = mod(rho ** BigInt(K_IDS - 1 - k)); id.Q.forEach((x, i) => { if (x) { assert.ok(i < 2 * NQM, 'Q exceeds structural bound'); Qagg[i] = mod(Qagg[i] + wgt * x); } }); });
   const qOdd = Qagg.filter((_, i) => i % 2 === 1);
   while (qOdd.length > 1 && qOdd.at(-1) === 0n) qOdd.pop();
   const WQ = Buffer.concat(qOdd.slice().reverse().map(W32));

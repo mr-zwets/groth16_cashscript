@@ -1,4 +1,4 @@
-// Single-input CashVM verifier for gnark v0.16.4 PLONK/KZG proofs (BN254, SHA-256 transcript, no BSB22),
+// Single-input CashVM verifier for gnark v0.16.4 PLONK/KZG proofs (BN254, SHA-256 transcript, m >= 0 BSB22 commitments),
 // generated per verifying key (the VK is baked in, as in the Groth16 entries). See README.md.
 //
 // Unlocking (bottom -> top): <SL_1> .. <SL_m> <WQ> <WS> <X> <PI> <PROOF> [<PAD>] <redeem>
@@ -6,14 +6,23 @@
 //   WQ, WS: the SI quotient and the SI states (residue root + 33 states), as in SI-GLS
 //   X     : Lambda' (64 B, gnark raw BE: hashed into v) || Fr batch inverse (32 B LE, < r) || zi_R || zi_L (32 B LE, < p,
 //           present when the P_right / P* chain starts in Jacobian)
-//   PI    : the public inputs, 32 B BE each (gnark Marshal); PROOF: 768 B (gnark MarshalSolidity layout)
+//   PI    : the public inputs, 32 B BE each (gnark Marshal); PROOF: 768 + 96 m B (gnark MarshalSolidity layout: with m BSB22
+//           commitments, m scalars qcp_j(zeta) then m points Bsb22_j follow the 768 v1 bytes)
 //   PAD   : the 100 KB regime only: an ignored push that buys op-cost budget (DROPped first)
 import assert from 'node:assert/strict';
 import {Asm, Kernel, OP, pushNum, pushData} from './asm.mjs';
 import {p, r, mod, ETA, GAMMA1, DIGITS, NE, GLV, OFFSET, aff} from './math.mjs';
-import {W, TBL, NW, NWR, baseNames, corr, le32, PROOF_PTS} from './plonk.mjs';
+import {W, TBL, NW, NWR, baseNames, corr, le32, PROOF_PTS, proofLen, bsbOff, HTF_DST} from './plonk.mjs';
 export const digitOffset = (nw) => { let c = 0n; for (let i = 0; i < nw; i++) c += 16n << BigInt(5 * i); return c; };
-import {TAG, WS_SIZE, NQ_MAX, NSTATES, chains} from './si.mjs';
+import {TAG, wsSize, nqMax, NSTATES, chains} from './si.mjs';
+import {fixedNames} from './plonk.mjs';
+import {gtConsts, PI_SUM_OFFSET, TB as GT_TB, PI as GT_PI} from './gt.mjs';
+// TB[15] .. TB[0] (TB[0] = 0 on top), TB[n] = sum_{j in n} pi_j, from the three constants pi_1..pi_3 (pi_0 = 1)
+export const pushTB = (a, pre) => { if (!a.ctx.funcs.has('TBC')) a.defLocal('TBC', 0, 16, (s) => {
+    const k = new Kernel(); const P = [k.c(1n), k.c(GT_PI[1]), k.c(GT_PI[2]), k.c(GT_PI[3])]; const T = [k.c(0n)];
+    for (let n = 1; n < 16; n++) { const hb = 31 - Math.clz32(n); T.push(n === 1 << hb ? P[hb] : k.add(T[n - (1 << hb)], P[hb])); }
+    k.output(...T.slice().reverse()); s.kernel(k, Array.from({length: 16}, (_, x) => 'o' + x), {iters: 100}); });
+  a.invoke('TBC', Array.from({length: 16}, (_, x) => pre + (15 - x))); };
 
 const ITERS = Number(process.env.SCHED_ITERS ?? 2500);
 export const SL_PIECE = 8; // slopes per stream piece (256 B)
@@ -71,8 +80,8 @@ export function buildRedeem(vk, opts = {}) {
 export const xSize = ({J = 0, JR = 0} = {}) => 96 + (JR > 0 ? 32 : 0) + (J > 0 ? 32 : 0);
 
 function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
-  const names = baseNames(vk), NB = names.length, nbm = NB - 1, k = vk.nbPublic;
-  const CH = chains(vk);
+  const names = baseNames(vk), NB = names.length, nbm = NB - 1, k = vk.nbPublic, m = vk.m;
+  const CH = chains(vk); const FX = vk.fold ? fixedNames(vk) : []; const GT = vk.fold ? gtConsts(vk, FX) : null;
   const a = new Asm(['SLb', 'WQ', 'WS', 'X', 'PI', 'PROOF', ...(pad ? ['PAD'] : [])]);
   const info = {sections: {}}; let mark = 0; const section = (name) => { info.sections[name] = (info.sections[name] ?? 0) + a.code.length - mark; mark = a.code.length; a.mark('end:' + name); };
   const STOP = (label) => { if (stop === label) throw {stopAt: label, asm: a}; };
@@ -110,7 +119,7 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
   section('layout');
 
   // ---- 2. statement: sizes, decoding, curve checks ----
-  a.pick('PROOF').op(OP.SIZE, 1, 'PROOF_', 'sz').op(OP.NIP, 2, 'sz').push(768).op(OP.NUMEQUALVERIFY, 2);
+  a.pick('PROOF').op(OP.SIZE, 1, 'PROOF_', 'sz').op(OP.NIP, 2, 'sz').push(proofLen(vk)).op(OP.NUMEQUALVERIFY, 2);
   a.pick('PI').op(OP.SIZE, 1, 'PI_', 'sz').op(OP.NIP, 2, 'sz').push(32 * k).op(OP.NUMEQUALVERIFY, 2);
   a.pick('X').op(OP.SIZE, 1, 'X_', 'sz').op(OP.NIP, 2, 'sz').push(xSize({J, JR})).op(OP.NUMEQUALVERIFY, 2);
   a.pick('PROOF', 'pb');
@@ -119,11 +128,13 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
   for (const n of ['l', 'rr', 'o', 's1', 's2']) a.invoke('DBR', [n, 'pb']);
   a.invoke('DBP', ['Zx', 'pb']).invoke('DBP', ['Zy', 'pb']).invoke('DBR', ['zu', 'pb']);
   for (const n of ['Wzx', 'Wzy', 'Wzwx', 'Wzwy']) a.invoke('DBP', [n, 'pb']);
+  for (let j = 0; j < m; j++) a.invoke('DBR', ['qcp' + j, 'pb']);
+  for (let j = 0; j < m; j++) a.invoke('DBP', ['Bsb' + j + 'x', 'pb']).invoke('DBP', ['Bsb' + j + 'y', 'pb']);
   a.drop('pb');
   a.pick('PI', 'pib'); for (let i = 0; i < k; i++) a.invoke('DBR', ['pub' + i, 'pib']); a.drop('pib');
   a.pick('X', 'xb'); a.invoke('DBP', ['Lamx', 'xb']).invoke('DBP', ['Lamy', 'xb']).invoke('DLR', ['invP', 'xb']);
   if (JR > 0) a.invoke('DLP', ['ziR', 'xb']); if (J > 0) a.invoke('DLP', ['ziL', 'xb']); a.drop('xb');
-  for (const P of ['L', 'R', 'O', 'H0', 'H1', 'H2', 'Z', 'Wz', 'Wzw', 'Lam']) a.pick(P + 'x').pick(P + 'y').invoke('G1C', []);
+  for (const P of ['L', 'R', 'O', 'H0', 'H1', 'H2', 'Z', 'Wz', 'Wzw', 'Lam', ...Array.from({length: m}, (_, j) => 'Bsb' + j)]) a.pick(P + 'x').pick(P + 'y').invoke('G1C', []);
   section('decode');
   STOP('decode');
 
@@ -131,11 +142,27 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
   const vkBytes = Buffer.concat([Buffer.from('gamma'), vk.rawAll]);
   a.pushBytes(vkBytes, 'GV').pick('GV', 'h').pick('PI').op(OP.CAT, 2, 'h').pick('PROOF').push(192).op(OP.SPLIT, 2, 'lro', 'x').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'gRaw');
   a.pushBytes(Buffer.from('beta')).pick('gRaw').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'bRaw');
-  a.pushBytes(Buffer.from('alpha')).pick('bRaw').op(OP.CAT, 2, 'h').pick('PROOF').push(544).op(OP.SPLIT, 2, 'x', 'zz').drop('x').push(64).op(OP.SPLIT, 2, 'zr', 'x').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'aRaw');
+  a.pushBytes(Buffer.from('alpha')).pick('bRaw').op(OP.CAT, 2, 'h');
+  if (m > 0) a.pick('PROOF').push(bsbOff(vk, 0)).op(OP.SPLIT, 2, 'x', 'bsb').drop('x').op(OP.CAT, 2, 'h'); // BSB22: alpha binds Bsb22_j before Z
+  a.pick('PROOF').push(544).op(OP.SPLIT, 2, 'x', 'zz').drop('x').push(64).op(OP.SPLIT, 2, 'zr', 'x').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'aRaw');
   a.pushBytes(Buffer.from('zeta')).pick('aRaw').op(OP.CAT, 2, 'h').pick('PROOF').push(192).op(OP.SPLIT, 2, 'x', 'hh').drop('x').push(192).op(OP.SPLIT, 2, 'hr', 'x').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'zRaw');
   a.roll('gRaw').invoke('BMR', ['gamma']).roll('bRaw').invoke('BMR', ['beta']).roll('aRaw').invoke('BMR', ['alpha']).roll('zRaw').invoke('BMR', ['zeta']);
   section('transcript');
   STOP('transcript');
+
+  // ---- 3b. BSB22 hash-to-field of each commitment (gnark-crypto fr.Hash: expand_message_xmd, SHA-256, DST "BSB22-Plonk",
+  //      48 bytes, BE mod r). msg = the commitment's 64 raw proof bytes, which the decoder checked canonical and on the curve.
+  { const dstp = [...HTF_DST, HTF_DST.length];
+    for (let j = 0; j < m; j++) {
+      a.push(0).push(64).op(OP.NUM2BIN, 2, 'zpad'); // Z_pad = 64 zero bytes
+      a.pick('PROOF').push(bsbOff(vk, j)).op(OP.SPLIT, 2, 'x', 'cm').drop('x').push(64).op(OP.SPLIT, 2, 'cm', 'x').drop('x').op(OP.CAT, 2, 'h');
+      a.pushBytes([0, 48, 0, ...dstp]).op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'b0');
+      a.pick('b0').pushBytes([1, ...dstp]).op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'b1');
+      a.roll('b0').pick('b1').op(OP.XOR, 2, 'bx').pushBytes([2, ...dstp]).op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'b2');
+      a.push(16).op(OP.SPLIT, 2, 'b2h', 'x').drop('x').roll('b1').roll('b2h').op(OP.CAT, 2, 'u48').invoke('BMR', ['hc' + j]);
+    } }
+  section('htf');
+  STOP('htf');
 
   // ---- 4. Fr block 1: zeta^n, batch inverse check, PI(zeta), r0 = lin, s1c, s2c, zh, zeta^(n+2) ----
   a.invoke('R', ['r']);
@@ -144,12 +171,12 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
     const zeta = E('zeta'), alpha = E('alpha'), beta = E('beta'), gamma = E('gamma');
     let zn = zeta; for (let i = 0; i < vk.log2n; i++) zn = M(mul(zn, zn));
     const zh = sub(zn, c(1n));
-    const dens = vk.omegaPow.map((w) => sub(zeta, c(w)));
-    let prod = dens[0]; for (let i = 1; i < k; i++) prod = M(mul(prod, dens[i]));
+    const dens = vk.denPow.map((w) => sub(zeta, c(w))); // k public-input points, then the m commitment points
+    let prod = dens[0]; for (let i = 1; i < dens.length; i++) prod = M(mul(prod, dens[i]));
     const invP = I('invP'); const chk = M(sub(mul(prod, invP), c(1n)));
     const invDens = dens.map((_, i) => { let x = invP; dens.forEach((d, j) => { if (j !== i) x = M(mul(x, d)); }); return x; });
     const zhn = M(mul(zh, c(vk.nInv)));
-    let pi = null; for (let i = 0; i < k; i++) { const tI = M(mul(M(mul(zhn, invDens[i])), c(vk.omegaPow[i]))); const term = mul(tI, E('pub' + i)); pi = pi ? add(pi, term) : term; }
+    let pi = null; for (let i = 0; i < k + m; i++) { const tI = M(mul(M(mul(zhn, invDens[i])), c(vk.denPow[i]))); const term = mul(tI, E(i < k ? 'pub' + i : 'hc' + (i - k))); pi = pi ? add(pi, term) : term; }
     pi = M(pi);
     const a2l1 = M(mul(M(mul(alpha, alpha)), M(mul(zhn, invDens[0]))));
     const t1 = add(add(E('l'), M(mul(beta, E('s1')))), gamma), t2 = add(add(E('rr'), M(mul(beta, E('s2')))), gamma);
@@ -171,10 +198,14 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
   a.pushBytes(Buffer.from('gamma')); be32('zeta'); a.op(OP.CAT, 2, 'h').pick('X').push(64).op(OP.SPLIT, 2, 'lam', 'x').drop('x').op(OP.CAT, 2, 'h');
   a.pick('PROOF').push(192).op(OP.SPLIT, 2, 'lro', 'x').drop('x').op(OP.CAT, 2, 'h');
   a.pick('GV', 's12').push(5).op(OP.SPLIT, 2, 'x', 's12').drop('x').push(128).op(OP.SPLIT, 2, 's12', 'x').drop('x').op(OP.CAT, 2, 'h');
+  if (m > 0) a.pick('GV', 'qv').push(5 + 512).op(OP.SPLIT, 2, 'x', 'qv').drop('x').op(OP.CAT, 2, 'h'); // BSB22: digests .. S1 S2 Qcp_j (the GV tail)
   be32('r0'); a.op(OP.CAT, 2, 'h').pick('PROOF').push(384).op(OP.SPLIT, 2, 'x', 'ev').drop('x').push(160).op(OP.SPLIT, 2, 'ev', 'x').drop('x').op(OP.CAT, 2, 'h');
+  if (m > 0) a.pick('PROOF').push(768).op(OP.SPLIT, 2, 'x', 'qe').drop('x').push(32 * m).op(OP.SPLIT, 2, 'qe', 'x').drop('x').op(OP.CAT, 2, 'h'); // claimed qcp_j(zeta)
   a.pick('PROOF').push(608).op(OP.SPLIT, 2, 'x', 'zub').drop('x').push(32).op(OP.SPLIT, 2, 'zub', 'x').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'vRaw');
   a.pick('vRaw').invoke('BMR', ['v']);
-  a.pushBytes(Buffer.from('u')).roll('vRaw').op(OP.CAT, 2, 'h').pick('PROOF').push(640).op(OP.SPLIT, 2, 'x', 'ww').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'uRaw');
+  a.pushBytes(Buffer.from('u')).roll('vRaw').op(OP.CAT, 2, 'h').pick('PROOF').push(640).op(OP.SPLIT, 2, 'x', 'ww').drop('x');
+  if (m > 0) a.push(128).op(OP.SPLIT, 2, 'ww', 'x').drop('x'); // W_zeta || W_zetaOmega only (the BSB22 fields follow them)
+  a.op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'uRaw');
   a.pick('uRaw', 'ub').push(8).op(OP.SPLIT, 2, 'b1', 'ub').roll('b1').pushBytes([0]).op(OP.CAT, 2, 'b').op(OP.BIN2NUM, 1, 'u1');
   a.roll('ub').push(8).op(OP.SPLIT, 2, 'b2', 'ub').roll('b2').pushBytes([0]).op(OP.CAT, 2, 'b').op(OP.BIN2NUM, 1, 'u2');
   a.roll('ub').pushBytes([0]).op(OP.CAT, 2, 'b').op(OP.BIN2NUM, 1, 'tp');
@@ -184,14 +215,15 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
   { const kk = new Kernel(); const E = (n) => kk.env(n), M = (x) => kk.modr(x), mul = (x, y) => kk.mul(x, y), add = (x, y) => kk.add(x, y), sub = (x, y) => kk.sub(x, y), c = (v) => kk.c(v);
     const canon = (x) => M(add(M(x), E('r')));
     const v = E('v'), tp = E('tp'), u = M(add(E('u1'), mul(c(GLV.lambda), E('u2')))), nt = sub(c(0n), tp);
-    const vs = [c(1n), v]; for (let i = 2; i < 6; i++) vs.push(M(mul(vs[i - 1], v)));
-    const e = M(kk.sum(E('r0'), mul(v, E('l')), mul(vs[2], E('rr')), mul(vs[3], E('o')), mul(vs[4], E('s1')), mul(vs[5], E('s2'))));
+    const vs = [c(1n), v]; for (let i = 2; i < 6 + m; i++) vs.push(M(mul(vs[i - 1], v)));
+    const e = M(kk.sum(E('r0'), mul(v, E('l')), mul(vs[2], E('rr')), mul(vs[3], E('o')), mul(vs[4], E('s1')), mul(vs[5], E('s2')), ...Array.from({length: m}, (_, j) => mul(vs[6 + j], E('qcp' + j)))));
     const zh = E('zh'), zn2 = E('zn2'), zz = M(mul(zh, zn2));
     const S = {Ql: mul(nt, E('l')), Qr: mul(nt, E('rr')), Qm: mul(nt, M(mul(E('l'), E('rr')))), Qo: mul(nt, E('o')), Qk: nt, S3: mul(nt, E('s1c')), Z: add(mul(nt, E('s2c')), u),
       H0: mul(tp, zh), H1: mul(tp, zz), H2: mul(tp, M(mul(zz, zn2))), Lam: add(c(1n), tp), L: v, R: vs[2], O: vs[3], S1: vs[4], S2: vs[5],
       G: sub(c(0n), add(e, M(mul(u, E('zu'))))), Wz: E('zeta'), Wzw: mul(M(mul(u, E('zeta'))), c(vk.omega))};
-    kk.output(...names.slice(0, nbm).map((nm) => kk.add(canon(S[nm]), E('Cdig'))));
-    a.kernel(kk, names.slice(0, nbm).map((nm) => 'sc_' + nm), {iters: 3000}); }
+    for (let j = 0; j < m; j++) { S['Bsb' + j] = mul(nt, E('qcp' + j)); S['Qcp' + j] = vs[6 + j]; } // lin term -t' qcp_j [Bsb22_j]; fold term v^(6+j) [Qcp_j]
+    kk.output(...names.slice(0, nbm).map((nm) => kk.add(canon(S[nm]), E('Cdig'))), ...FX.map((nm) => canon(S[nm])));
+    a.kernel(kk, [...names.slice(0, nbm).map((nm) => 'sc_' + nm), ...FX.map((nm) => 'fs_' + nm)], {iters: 3000}); }
   section('fr2');
   STOP('fr2');
 
@@ -203,9 +235,10 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
 
   // ---- 8. tables: T[b][k] = k B_b (k = 1..16), affine with witnessed slopes; phi table from the Wzw table ----
   // bases block, bottom -> top: B_{nbm-1} .. B_0 (B_0 on top; tables are built for b = 0, 1, ..)
-  const vkPt = (nm) => { const i = ['S1', 'S2', 'S3', 'Ql', 'Qr', 'Qm', 'Qo', 'Qk'].indexOf(nm); a.pick('GV', 'vb').push(5 + 64 * i).op(OP.SPLIT, 2, 'x', 'vb').drop('x').invoke('DBP', [nm + 'x', 'vb']).invoke('DBP', [nm + 'y', 'vb']).drop('vb'); };
+  const VKP = ['S1', 'S2', 'S3', 'Ql', 'Qr', 'Qm', 'Qo', 'Qk', ...vk.qcpNames]; // GV = "gamma" || these points (vk.rawAll order)
+  const vkPt = (nm) => { const i = VKP.indexOf(nm); a.pick('GV', 'vb').push(5 + 64 * i).op(OP.SPLIT, 2, 'x', 'vb').drop('x').invoke('DBP', [nm + 'x', 'vb']).invoke('DBP', [nm + 'y', 'vb']).drop('vb'); };
   for (let b = nbm - 1; b >= 0; b--) { const nm = names[b];
-    if (nm === 'G') a.push(1, 'Gx').push(2, 'Gy'); else if (['Ql', 'Qr', 'Qm', 'Qo', 'Qk', 'S1', 'S2', 'S3'].includes(nm)) vkPt(nm); else { a.pick(nm + 'x', 'b' + nm + 'x').pick(nm + 'y', 'b' + nm + 'y'); } }
+    if (nm === 'G') a.push(1, 'Gx').push(2, 'Gy'); else if (VKP.includes(nm)) vkPt(nm); else { a.pick(nm + 'x', 'b' + nm + 'x').pick(nm + 'y', 'b' + nm + 'y'); } }
   const nBelowBases = a.st.length - 2 * nbm;
   a.push(0, 'ti');
   { const body = [];
@@ -271,7 +304,7 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
   STOP('msm');
 
   // ---- 10. SI pairing check: Miller(P*, [1]_2) Miller(P_right, [x]_2) = [c]^lambda ----
-  si(a, {CH, section, STOP, L0guess, info});
+  si(a, {CH, section, STOP, L0guess, info, GT, FX});
   const code = Uint8Array.from([...a.prologue(), ...a.code]);
   info.marks = a.marks.map((m) => ({name: m.name, off: m.off + a.prologue().length}));
   info.prologue = a.prologue().length; info.funcs = Object.fromEntries([...a.ctx.funcs].filter(([, f]) => f.id !== null).map(([n, f]) => [n, f.code.length]));
@@ -280,7 +313,8 @@ function gen(vk, {J = 0, JR = 0, pad = false, stop} = {}, L0guess) {
 }
 
 // The SI part (fork of the SI-GLS program sections 1-8 without the B walk and the GT-GLS fold).
-function si(a, {CH, section, STOP, L0guess, info}) {
+function si(a, {CH, section, STOP, L0guess, info, GT, FX}) {
+  const m = FX.length, WS_SIZE = wsSize(m), NQ_MAX = nqMax(m);
   const le = (x) => le32(mod(x));
   // chain slope pile (both chains interleaved: 4 LE words per step), first piece on top
   const steps = []; for (let j = 0; j < 88; j++) steps.push(Buffer.concat([CH.a.lams[j], CH.b.lams[j]].flatMap((l) => [le(l.c0), le(l.c1)])));
@@ -301,6 +335,7 @@ function si(a, {CH, section, STOP, L0guess, info}) {
   a.roll('rhoRaw'); U('rhoRaw'); a.pick('p').op(OP.MOD, 2, 'rho');
   a.roll('WQ').toAlt();
   a.roll('WS'); for (let j = 0; j < 6; j++) a.invoke('DLP', ['sc' + j, 'WS']);
+  if (m) { a.push(65 * m).op(OP.SPLIT, 2, 'NB', 'WS'); gtNibCheck(a, 'NB', 65 * m); } // the GT nibbles (event-major, each < 16), hashed in h0 with the rest of WS
   { const cuts = []; for (let kk = 0; kk < NSTATES; kk += WS_PIECE) cuts.push(kk * 192);
     for (let i = cuts.length - 1; i >= 1; i--) { a.push(cuts[i]).op(OP.SPLIT, 2, 'WS', 'tail').toAlt(); a.alt.pop(); }
     a.toAlt(); a.alt.pop(); a.pushAltPile('WSp', cuts.length); }
@@ -323,6 +358,7 @@ function si(a, {CH, section, STOP, L0guess, info}) {
     const cza = m(mul(k.in('PLx'), z)), czb = m(mul(k.in('PRx'), z));
     k.output(k.in('PLy'), cza, m(mul(cza, t)), k.in('PRy'), czb, m(mul(czb, t)));
     a.kernel(k, ['ya', 'cza', 'czta', 'yb', 'czb', 'cztb'], {iters: 300}); }
+  if (m) gtTables(a, GT, m, ZP, EZP);
   a.push(CH.a.aff.x.c0, 'xqa0').push(CH.a.aff.x.c1, 'xqa1').push(CH.b.aff.x.c0, 'xqb0').push(CH.b.aff.x.c1, 'xqb1');
   a.push(0, 'D');
   for (const [t, C] of [['a', CH.a], ['b', CH.b]]) a.push(C.aff.x.c0, 'dx0' + t).push(C.aff.x.c1, 'dx1' + t).push(C.aff.y.c0, 'dc0' + t).push(C.aff.y.c1, 'dc1' + t).push(0, 'dl0' + t).push(0, 'dl1' + t);
@@ -336,6 +372,7 @@ function si(a, {CH, section, STOP, L0guess, info}) {
   };
   a.defBound('EVD', (s) => { readStep(s); s.kernel(kEvent(true), EV_OUTS, {iters: ITERS}); });
   a.defBound('EVA', (s) => { readStep(s); s.kernel(kEvent(false), EV_OUTS, {iters: ITERS}); });
+  if (m) a.defBound('GTS', (s) => gtStep(s, m));
   const HOT = ['xqa0', 'xqa1', 'xqb0', 'xqb1', 'Scp', 'Scm', 'ya', 'cza', 'czta', 'yb', 'czb', 'cztb', 'z3', 'z3t', 'p'];
   const STATE = ['D', ...EV_OUTS];
   const moved = new Set([...HOT, ...STATE]);
@@ -352,6 +389,7 @@ function si(a, {CH, section, STOP, L0guess, info}) {
       t.peekAlt('dt').push(0).op(OP.LESSTHAN, 2, 'neg').ifElse((u) => { u.pick('Scp', 'cp').pick('Scm', 'cm'); }, (u) => { u.pick('Scm', 'cp').pick('Scp', 'cm'); });
       t.pick('xqa0', 's0a').pick('xqa1', 's1a').pick('xqb0', 's0b').pick('xqb1', 's1b').invoke('EVA');
     });
+    if (m) { s.mark('gt'); s.invoke('GTS'); }
     s.mark('digit'); s.fromAlt('d').fromAlt('SCH').drop('d').roll('SCH').push(1).op(OP.SPLIT, 2, 'db', 'SCH').roll('db').op(OP.BIN2NUM, 1, 'd');
     s.mark('bnd');
     s.pick('SCH', 'SCHc').op(OP.SIZE, 1, 'SCHc', 'm').op(OP.NIP, 2, 'm').pick('m').push(2).op(OP.MOD, 2, 'odd').roll('m').op(OP.NOT, 1, 'last').op(OP.BOOLOR, 2, 'bnd');
@@ -370,12 +408,17 @@ function si(a, {CH, section, STOP, L0guess, info}) {
   section('si-loop');
   STOP('postloop');
   // ---- terminal: the two Frobenius steps of each chain (s = x(psi(Q)), then any s), times 1 ----
+  if (m) a.arrange(['D', ...EV_OUTS]); // the in-loop EVA call site sees D and the state above NB and the accumulators
   a.push(1, 'cp').push(1, 'cm').push(CH.a.psi1x.c0, 's0a').push(CH.a.psi1x.c1, 's1a').push(CH.b.psi1x.c0, 's0b').push(CH.b.psi1x.c1, 's1b').invoke('EVA');
   a.push(1, 'cp').push(1, 'cm').pick('dx0a', 's0a').pick('dx1a', 's1a').pick('dx0b', 's0b').pick('dx1b', 's1b').invoke('EVA');
   a.roll('D').op(OP.SIZE, 1, 'D', 'dl').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1).drop('D'); a.pileDone('Dp');
   // F *= S_c(+-eta z) = [c^(p^2)]
   for (let j = 0; j < 6; j++) a.pick('sc' + j); for (const n of EZP) a.pick(n); a.invoke('EV', ['ep', 'em']);
-  { const k = new Kernel(); k.output(k.mod(k.mul(k.in('Fp'), k.in('ep'))), k.mod(k.mul(k.in('Fm'), k.in('em')))); a.kernel(k, ['Fp', 'Fm'], {iters: 100}); }
+  if (m) { // the GT offset correction Rconst(+-z), and the binding (acc_i - 2^64 sum pi - s_i) mod r == 0
+    for (let j = 0; j < 6; j++) a.push(GT.Rconst[j], 'rc' + j); for (const n of ZP) a.pick(n); a.invoke('EV', ['rcp', 'rcm']);
+    { const k = new Kernel(); k.output(k.mod(k.mul(k.mod(k.mul(k.in('Fp'), k.in('ep'))), k.in('rcp'))), k.mod(k.mul(k.mod(k.mul(k.in('Fm'), k.in('em'))), k.in('rcm')))); a.kernel(k, ['Fp', 'Fm'], {iters: 200}); }
+    gtBind(a, FX); a.roll('NB').op(OP.SIZE, 1, 'NB', 'nbs').op(OP.NIP, 2, 'nbs').op(OP.NOT, 1, 'e').op(OP.VERIFY, 1); }
+  else { const k = new Kernel(); k.output(k.mod(k.mul(k.in('Fp'), k.in('ep'))), k.mod(k.mul(k.in('Fm'), k.in('em')))); a.kernel(k, ['Fp', 'Fm'], {iters: 100}); }
   a.fromAlt('d').fromAlt('SCH').drop('d').drop('SCH');
   a.fromAlt('R').fromAlt('WSr').drop('WSr'); a.pileDone('WSp'); a.fromAlt('WQ');
   // W(+-z) = Frob(S_c)(+-z) Frob(S_c)(+-eta z);  R <- R rho + F+ W(-z) - F- W(+z)
@@ -408,4 +451,78 @@ function si(a, {CH, section, STOP, L0guess, info}) {
   a.op(OP.TOALT, 1); a.emit(OP.BEGIN, OP.DROP, OP.DEPTH, OP.NOT, OP.UNTIL, OP.FROMALT); a.st = ['result'];
   section('cleanup');
   info.L0 = L0;
+}
+
+// ---------------- GT fold (gt.mjs): tables, per-event step, binding; shared with multi.mjs ----------------
+// GT table items G_0 (top) .. G_{32m+15}: TP_0[0..15], TM_0[0..15], .., TP_{m-1}[..], TM_{m-1}[..], TB[0..15], where
+// TP_i[n] = prod_{j in n} R_{i,j}(z), TM_i[n] = the same at -z, TB[n] = sum_{j in n} pi_j (R_{i,2/3}(X) = R_{i,0/1}(eta X)).
+export function gtTables(a, GT, m, ZP, EZP, {acc = true} = {}) {
+  const n0 = a.st.length;
+  if (!a.ctx.funcs.has('GTB')) a.defLocal('GTB', 23, 32, (s) => { // [c0..c5, d0..d5 (R_{i,0}, R_{i,1}), z..z6, ez..ez5] -> TM15..TM0, TP15..TP0
+    const k = new Kernel(); const I = (x) => k.in('in' + x), mm = (x, y) => k.mod(k.mul(x, y));
+    const zp = [1, 2, 3, 4, 5, 6].map((e) => I(11 + e)), ep = [1, 2, 3, 4, 5].map((e) => I(17 + e)).concat([zp[5]]);
+    const ev = (c, x) => { const e0 = k.sum(I(c), k.mul(I(c + 2), x[1]), k.mul(I(c + 4), x[3]), x[5]), o0 = k.sum(k.mul(I(c + 1), x[0]), k.mul(I(c + 3), x[2]), k.mul(I(c + 5), x[4]));
+      const e1 = k.mod(e0), o1 = k.mod(o0); return [k.add(e1, o1), k.sub(e1, o1)]; }; // (R(x), R(-x)), not reduced
+    const R = [ev(0, zp), ev(6, zp), ev(0, ep), ev(6, ep)]; // R_{i,j}(+-z), j = 0..3
+    const tab = (sg) => { const T = [k.c(1n)]; for (let n = 1; n < 16; n++) { const hb = 31 - Math.clz32(n); T.push(n === 1 << hb ? k.mod(R[hb][sg]) : mm(T[n - (1 << hb)], T[1 << hb])); } return T; };
+    const TP = tab(0), TM = tab(1);
+    k.output(...TM.slice().reverse(), ...TP.slice().reverse()); s.kernel(k, Array.from({length: 32}, (_, x) => 'o' + x), {iters: 600}); });
+  pushTB(a, 'tb');
+  for (let i = m - 1; i >= 0; i--) {
+    for (const j of [0, 1]) for (let c = 0; c < 6; c++) a.push(GT.R[i][j][c], 'rk');
+    for (const nm of [...ZP, ...EZP.slice(0, 5)]) a.pick(nm);
+    a.invoke('GTB');
+  }
+  const NG = 32 * m + 16; a.st.splice(n0); for (let x = NG - 1; x >= 0; x--) a.st.push('G_' + x); // G_0 on top (named items, not a pile: kernels reach past them)
+  if (acc) for (let i = 0; i < m; i++) a.push(0, 'acc' + i);
+}
+// one event: for each folded base i, n = N_i[e] (the next byte of NB): F+ *= TP_i[n], F- *= TM_i[n] [, acc_i = 2 acc_i + TB[n]]
+// nbAlt: NB is the top of the altstack (the chain's SIL); acc = false: the binding is computed after the loop (gtBindLoop)
+export function gtStep(s, m, {acc = true, nbAlt = false, evIn = false} = {}) {
+  if (evIn) { /* the event's m nibble bytes 'ev' are on top */ }
+  else if (nbAlt) { s.fromAlt('NB').push(m).op(OP.SPLIT, 2, 'ev', 'NB').toAlt('NB'); }
+  else s.roll('NB').push(m).op(OP.SPLIT, 2, 'ev', 'NB').op(OP.SWAP, 2, 'NB', 'ev');
+  for (let i = 0; i < m; i++) {
+    if (i) s.roll('ev');
+    s.push(1).op(OP.SPLIT, 2, 'b', 'ev').op(OP.SWAP, 2, 'ev', 'b').op(OP.BIN2NUM, 1, 'n');
+    let d = s.depth('G_0'); s.emit(OP.DUP, ...pushNum(d + 32 * i), OP.ADD, OP.PICK); s.st.push('tp');
+    if (acc) {
+      d = s.depth('G_0'); s.emit(OP.OVER, ...pushNum(d + 32 * i + 16), OP.ADD, OP.PICK); s.st.push('tm');
+      s.emit(OP.ROT); s.st.splice(s.st.length - 3, 1); d = s.depth('G_0'); s.emit(...pushNum(d + 32 * m), OP.ADD, OP.PICK); s.st.push('tb');
+      s.roll('acc' + i).emit(OP.DUP, OP.ADD, OP.ADD); s.st.splice(s.st.length - 2, 2, 'acc' + i);
+    } else { s.emit(OP.SWAP); s.st.splice(s.st.length - 2, 2, 'tp', 'n'); s.st.pop(); d = s.depth('G_0'); s.emit(...pushNum(d + 32 * i + 16), OP.ADD, OP.PICK); s.st.push('tm'); }
+    const k = new Kernel(); k.output(k.mod(k.mul(k.in('Fp'), k.in('tp'))), k.mod(k.mul(k.in('Fm'), k.in('tm')))); s.kernel(k, ['Fp', 'Fm'], {iters: 60});
+  }
+  s.drop('ev');
+}
+// nibble range check: every byte of NB is in [0, 15] (NB & 0x0f..0f == NB). Without it a byte >= 16 (or >= 0x80, negative
+// after BIN2NUM) would make the table PICKs read other stack items, decoupling the factors from the binding.
+export function gtNibCheck(a, name, len) {
+  if (!a.ctx.funcs.has('NIBC')) a.defLocal('NIBC', 1, 0, (s) => { s.pushBytes([0x0f], 'mk'); for (let i = 0; i < 10; i++) s.pick('mk', 'mk2').op(OP.CAT, 2, 'mk');
+    s.pick('in0', 'n').op(OP.SIZE, 1, 'n', 'ln').op(OP.NIP, 2, 'ln').op(OP.SPLIT, 2, 'mk', 'x').drop('x').pick('in0', 'n').op(OP.AND, 2, 'nm').roll('in0').op(OP.EQUALVERIFY, 2); });
+  assert.ok(len <= 1024); a.pick(name, 'nbc').invoke('NIBC', []);
+}
+// the binding accumulators from the whole nibble string NB (top item, 65 m bytes): acc_i = sum_e 2^(64-e) TB[N_i[e]]
+export function gtBindLoop(a, m) {
+  const n0 = a.st.length - 1; gtNibCheck(a, 'NB', 65 * m); a.roll('NB');
+  pushTB(a, 'tbc');
+  for (let i = 0; i < m; i++) a.push(0, 'acc' + i);
+  a.roll('NB');
+  a.loop((s) => {
+    s.push(m).op(OP.SPLIT, 2, 'ev', 'NB').op(OP.SWAP, 2, 'NB', 'ev');
+    for (let i = 0; i < m; i++) {
+      s.push(1).op(OP.SPLIT, 2, 'b', 'ev').op(OP.SWAP, 2, 'ev', 'b').op(OP.BIN2NUM, 1, 'n');
+      s.st.pop(); const d = s.depth('tbc0'); s.emit(...pushNum(d), OP.ADD, OP.PICK); s.st.push('tb');
+      s.roll('acc' + i).emit(OP.DUP, OP.ADD, OP.ADD); s.st.splice(s.st.length - 2, 2, 'acc' + i); s.roll('ev');
+    }
+    s.drop('ev').pick('NB', 'nbc').op(OP.SIZE, 1, 'nbc', 'sz').op(OP.NIP, 2, 'sz').op(OP.NOT, 1, 'done');
+  });
+  a.drop('NB'); for (let n = 0; n < 16; n++) a.drop('tbc' + n); void n0;
+}
+// binding: (acc_i - 2^64 sum_j pi_j - s_i) mod r == 0 for every folded base (s_i = 'fs_<name>', canonical < r)
+export function gtBind(a, FX, fsName = (nm) => 'fs_' + nm) {
+  a.invoke('R', ['r']);
+  a.drop('r');
+  if (!a.ctx.funcs.has('BND')) a.defLocal('BND', 2, 0, (s) => { s.invoke('R', ['r']); const k = new Kernel(); k.output(k.modr(k.sub(k.sub(k.in('in0'), k.c(PI_SUM_OFFSET)), k.in('in1')))); s.kernel(k, ['bnd'], {iters: 50}); s.drop('r').op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1); });
+  FX.forEach((nm, i) => { a.arrange(['acc' + i, fsName(nm)]).invoke('BND', []); });
 }
