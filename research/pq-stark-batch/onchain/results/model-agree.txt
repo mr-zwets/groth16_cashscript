@@ -1,0 +1,4 @@
+skip m1-0-Z128~vk-cap+1.json: S4 generator: Merkle cap 0 (layout b)
+skip m1-0-Z128~vk-opow=1.json: S4 generator: ood PoW 0
+model-agree: 3762 cases, 0 disagreements, 2 files skipped (unsupported VK)
+families {"valid":[62,0],"cap":[101,0],"ood":[472,0],"random":[251,0],"pow":[177,0],"final":[304,0],"row":[279,0],"salt":[279,0],"sibling":[284,0],"count":[260,0],"fri_value":[124,0],"truncate":[101,0],"extend":[77,0],"noncanon":[95,0],"statement":[821,0],"other_vk":[66,0],"forced":[9,0]}

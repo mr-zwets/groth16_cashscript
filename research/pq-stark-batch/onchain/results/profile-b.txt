@@ -1,0 +1,3 @@
+m1-s4-0-Z128.json: op 35976107 = queries 16091177 (670466/query; model 699732) + merkle 7050644 (model 7232172) + fixed 12834286 (model 4230000; AIR 8027858, of which DAG interpreter 5788839)
+  phases {"entry":207837,"transcript":164754,"air-start":451856,"air-generic-a":157764,"air-periodic":1191145,"air-specific":5788839,"air-generic-b":438254,"deep-consts":3159706,"tables":160031,"unpack":1102872,"q-x":318017,"q-deep":6207701,"q-folds":3055166,"q-final":6510293,"queries":501,"merkle":7050644,"end":10627,"cleanup":100}
+  code {"entry":166,"transcript":888,"air-start":27,"air-generic-a":247,"air-periodic":3505,"air-specific":2454,"air-generic-b":1724,"deep-consts":2880,"tables":122,"unpack":102,"queries":11,"merkle":1228,"end":6}

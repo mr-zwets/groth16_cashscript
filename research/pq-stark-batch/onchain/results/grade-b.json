@@ -1,0 +1,1713 @@
+{
+ "summary": {
+  "vectors": 24,
+  "allAcceptedR100AndSpec": true,
+  "proofBytes": {
+   "min": 71344,
+   "max": 74928,
+   "mean": 73573
+  },
+  "unlockingBytes": {
+   "min": 91388,
+   "max": 94968,
+   "mean": 93612
+  },
+  "txBytes": {
+   "min": 91477,
+   "max": 95057,
+   "mean": 93701
+  },
+  "redeemBytes": {
+   "min": 19024,
+   "max": 19024,
+   "mean": 19024
+  },
+  "opBchnAdjusted": {
+   "min": 35528735,
+   "max": 36043149,
+   "mean": 35833055
+  },
+  "opCons": {
+   "min": 35063101,
+   "max": 35548843,
+   "mean": 35349586
+  },
+  "pctR100": {
+   "min": 47.4,
+   "max": 48.6,
+   "mean": 48
+  },
+  "pctSpec": {
+   "min": 42.9,
+   "max": 43.8,
+   "mean": 43
+  },
+  "model": {
+   "params8": 28255740,
+   "designLow": 30000000,
+   "designHigh": 32000000
+  },
+  "todayAccepted": 0,
+  "todayErrors": [
+   "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes."
+  ]
+ },
+ "rows": [
+  {
+   "vector": "m1-s4-0-Z128.json",
+   "leaf": 0,
+   "proofBytes": 74672,
+   "redeemBytes": 19024,
+   "witnessBytes": 75440,
+   "unlockingBytes": 94696,
+   "lockingBytes": 35,
+   "txBytes": 94785,
+   "opStd": 35976086,
+   "opCons": 35489302,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35981560,
+   "opBchnAdjustedCons": 35494776,
+   "hashIterations": 3803,
+   "instructions": 214181,
+   "budgetR100": 75789600,
+   "budgetSpec": 83756800,
+   "pctR100": 47.5,
+   "pctSpec": 43,
+   "vsModel": {
+    "params8Pct": 27.3,
+    "designMidPct": 16.1
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94696 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94696 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 94696 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-10-Z128.json",
+   "leaf": 579735564,
+   "proofBytes": 73392,
+   "redeemBytes": 19024,
+   "witnessBytes": 74209,
+   "unlockingBytes": 93465,
+   "lockingBytes": 35,
+   "txBytes": 93554,
+   "opStd": 35856878,
+   "opCons": 35380334,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35862352,
+   "opBchnAdjustedCons": 35385808,
+   "hashIterations": 3723,
+   "instructions": 213866,
+   "budgetR100": 74804800,
+   "budgetSpec": 82772000,
+   "pctR100": 47.9,
+   "pctSpec": 43.3,
+   "vsModel": {
+    "params8Pct": 26.9,
+    "designMidPct": 15.7
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93465 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93465 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 93465 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-11-Z128.json",
+   "leaf": 475629803,
+   "proofBytes": 72496,
+   "redeemBytes": 19024,
+   "witnessBytes": 73311,
+   "unlockingBytes": 92567,
+   "lockingBytes": 35,
+   "txBytes": 92656,
+   "opStd": 35768803,
+   "opCons": 35299427,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35774277,
+   "opBchnAdjustedCons": 35304901,
+   "hashIterations": 3667,
+   "instructions": 213304,
+   "budgetR100": 74086400,
+   "budgetSpec": 82053600,
+   "pctR100": 48.3,
+   "pctSpec": 43.6,
+   "vsModel": {
+    "params8Pct": 26.6,
+    "designMidPct": 15.4
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 92567 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 92567 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 92567 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-12-Z128.json",
+   "leaf": 363409114,
+   "proofBytes": 72368,
+   "redeemBytes": 19024,
+   "witnessBytes": 73120,
+   "unlockingBytes": 92376,
+   "lockingBytes": 35,
+   "txBytes": 92465,
+   "opStd": 35612783,
+   "opCons": 35144431,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35618257,
+   "opBchnAdjustedCons": 35149905,
+   "hashIterations": 3659,
+   "instructions": 212581,
+   "budgetR100": 73933600,
+   "budgetSpec": 81900800,
+   "pctR100": 48.2,
+   "pctSpec": 43.5,
+   "vsModel": {
+    "params8Pct": 26.1,
+    "designMidPct": 14.9
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 92376 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 92376 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 92376 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-13-Z128.json",
+   "leaf": 1003243403,
+   "proofBytes": 73776,
+   "redeemBytes": 19024,
+   "witnessBytes": 74542,
+   "unlockingBytes": 93798,
+   "lockingBytes": 35,
+   "txBytes": 93887,
+   "opStd": 35844555,
+   "opCons": 35364939,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35850029,
+   "opBchnAdjustedCons": 35370413,
+   "hashIterations": 3747,
+   "instructions": 213593,
+   "budgetR100": 75071200,
+   "budgetSpec": 83038400,
+   "pctR100": 47.8,
+   "pctSpec": 43.2,
+   "vsModel": {
+    "params8Pct": 26.9,
+    "designMidPct": 15.6
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93798 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93798 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 93798 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-14-Z128.json",
+   "leaf": 351311477,
+   "proofBytes": 71984,
+   "redeemBytes": 19024,
+   "witnessBytes": 72753,
+   "unlockingBytes": 92009,
+   "lockingBytes": 35,
+   "txBytes": 92098,
+   "opStd": 35566621,
+   "opCons": 35101341,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35572095,
+   "opBchnAdjustedCons": 35106815,
+   "hashIterations": 3635,
+   "instructions": 212536,
+   "budgetR100": 73640000,
+   "budgetSpec": 81607200,
+   "pctR100": 48.3,
+   "pctSpec": 43.6,
+   "vsModel": {
+    "params8Pct": 25.9,
+    "designMidPct": 14.7
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 92009 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 92009 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 92009 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-15-Z128.json",
+   "leaf": 409546140,
+   "proofBytes": 73648,
+   "redeemBytes": 19024,
+   "witnessBytes": 74457,
+   "unlockingBytes": 93713,
+   "lockingBytes": 35,
+   "txBytes": 93802,
+   "opStd": 35866200,
+   "opCons": 35387608,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35871674,
+   "opBchnAdjustedCons": 35393082,
+   "hashIterations": 3739,
+   "instructions": 213944,
+   "budgetR100": 75003200,
+   "budgetSpec": 82970400,
+   "pctR100": 47.8,
+   "pctSpec": 43.2,
+   "vsModel": {
+    "params8Pct": 27,
+    "designMidPct": 15.7
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93713 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93713 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 93713 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-16-Z128.json",
+   "leaf": 274842279,
+   "proofBytes": 74928,
+   "redeemBytes": 19024,
+   "witnessBytes": 75712,
+   "unlockingBytes": 94968,
+   "lockingBytes": 35,
+   "txBytes": 95057,
+   "opStd": 36037675,
+   "opCons": 35548843,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 36043149,
+   "opBchnAdjustedCons": 35554317,
+   "hashIterations": 3819,
+   "instructions": 214433,
+   "budgetR100": 76007200,
+   "budgetSpec": 83974400,
+   "pctR100": 47.4,
+   "pctSpec": 42.9,
+   "vsModel": {
+    "params8Pct": 27.6,
+    "designMidPct": 16.3
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94968 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94968 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 94968 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-17-Z128.json",
+   "leaf": 828788435,
+   "proofBytes": 73264,
+   "redeemBytes": 19024,
+   "witnessBytes": 74036,
+   "unlockingBytes": 93292,
+   "lockingBytes": 35,
+   "txBytes": 93381,
+   "opStd": 35768713,
+   "opCons": 35293193,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35774187,
+   "opBchnAdjustedCons": 35298667,
+   "hashIterations": 3715,
+   "instructions": 213345,
+   "budgetR100": 74666400,
+   "budgetSpec": 82633600,
+   "pctR100": 47.9,
+   "pctSpec": 43.3,
+   "vsModel": {
+    "params8Pct": 26.6,
+    "designMidPct": 15.4
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93292 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93292 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 93292 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-18-Z128.json",
+   "leaf": 554943774,
+   "proofBytes": 74544,
+   "redeemBytes": 19024,
+   "witnessBytes": 75296,
+   "unlockingBytes": 94552,
+   "lockingBytes": 35,
+   "txBytes": 94641,
+   "opStd": 35900466,
+   "opCons": 35414706,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35905940,
+   "opBchnAdjustedCons": 35420180,
+   "hashIterations": 3795,
+   "instructions": 213919,
+   "budgetR100": 75674400,
+   "budgetSpec": 83641600,
+   "pctR100": 47.4,
+   "pctSpec": 42.9,
+   "vsModel": {
+    "params8Pct": 27.1,
+    "designMidPct": 15.8
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94552 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94552 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 94552 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-19-Z128.json",
+   "leaf": 102614306,
+   "proofBytes": 74544,
+   "redeemBytes": 19024,
+   "witnessBytes": 75312,
+   "unlockingBytes": 94568,
+   "lockingBytes": 35,
+   "txBytes": 94657,
+   "opStd": 35937974,
+   "opCons": 35452214,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35943448,
+   "opBchnAdjustedCons": 35457688,
+   "hashIterations": 3795,
+   "instructions": 214035,
+   "budgetR100": 75687200,
+   "budgetSpec": 83654400,
+   "pctR100": 47.5,
+   "pctSpec": 43,
+   "vsModel": {
+    "params8Pct": 27.2,
+    "designMidPct": 15.9
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94568 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94568 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 94568 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-1-Z128.json",
+   "leaf": 1073741823,
+   "proofBytes": 73008,
+   "redeemBytes": 19024,
+   "witnessBytes": 73795,
+   "unlockingBytes": 93051,
+   "lockingBytes": 35,
+   "txBytes": 93140,
+   "opStd": 35752401,
+   "opCons": 35278929,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35757875,
+   "opBchnAdjustedCons": 35284403,
+   "hashIterations": 3699,
+   "instructions": 213282,
+   "budgetR100": 74473600,
+   "budgetSpec": 82440800,
+   "pctR100": 48,
+   "pctSpec": 43.4,
+   "vsModel": {
+    "params8Pct": 26.6,
+    "designMidPct": 15.3
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93051 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93051 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 93051 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-20-Z128.json",
+   "leaf": 489178323,
+   "proofBytes": 74288,
+   "redeemBytes": 19024,
+   "witnessBytes": 75087,
+   "unlockingBytes": 94343,
+   "lockingBytes": 35,
+   "txBytes": 94432,
+   "opStd": 35921123,
+   "opCons": 35437411,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35926597,
+   "opBchnAdjustedCons": 35442885,
+   "hashIterations": 3779,
+   "instructions": 214192,
+   "budgetR100": 75507200,
+   "budgetSpec": 83474400,
+   "pctR100": 47.6,
+   "pctSpec": 43,
+   "vsModel": {
+    "params8Pct": 27.1,
+    "designMidPct": 15.9
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94343 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94343 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 94343 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-21-Z128.json",
+   "leaf": 247576500,
+   "proofBytes": 74160,
+   "redeemBytes": 19024,
+   "witnessBytes": 74937,
+   "unlockingBytes": 94193,
+   "lockingBytes": 35,
+   "txBytes": 94282,
+   "opStd": 35889460,
+   "opCons": 35406772,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35894934,
+   "opBchnAdjustedCons": 35412246,
+   "hashIterations": 3771,
+   "instructions": 213906,
+   "budgetR100": 75387200,
+   "budgetSpec": 83354400,
+   "pctR100": 47.6,
+   "pctSpec": 43.1,
+   "vsModel": {
+    "params8Pct": 27,
+    "designMidPct": 15.8
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94193 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94193 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 94193 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-22-Z128.json",
+   "leaf": 1002839952,
+   "proofBytes": 74160,
+   "redeemBytes": 19024,
+   "witnessBytes": 74983,
+   "unlockingBytes": 94239,
+   "lockingBytes": 35,
+   "txBytes": 94328,
+   "opStd": 35993677,
+   "opCons": 35510989,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35999151,
+   "opBchnAdjustedCons": 35516463,
+   "hashIterations": 3771,
+   "instructions": 214376,
+   "budgetR100": 75424000,
+   "budgetSpec": 83391200,
+   "pctR100": 47.7,
+   "pctSpec": 43.2,
+   "vsModel": {
+    "params8Pct": 27.4,
+    "designMidPct": 16.1
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94239 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94239 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 94239 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-23-Z128.json",
+   "leaf": 164839853,
+   "proofBytes": 74288,
+   "redeemBytes": 19024,
+   "witnessBytes": 75082,
+   "unlockingBytes": 94338,
+   "lockingBytes": 35,
+   "txBytes": 94427,
+   "opStd": 35952429,
+   "opCons": 35468717,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35957903,
+   "opBchnAdjustedCons": 35474191,
+   "hashIterations": 3779,
+   "instructions": 214185,
+   "budgetR100": 75503200,
+   "budgetSpec": 83470400,
+   "pctR100": 47.6,
+   "pctSpec": 43.1,
+   "vsModel": {
+    "params8Pct": 27.3,
+    "designMidPct": 16
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94338 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94338 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 94338 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-2-Z128.json",
+   "leaf": 118544758,
+   "proofBytes": 72368,
+   "redeemBytes": 19024,
+   "witnessBytes": 73164,
+   "unlockingBytes": 92420,
+   "lockingBytes": 35,
+   "txBytes": 92509,
+   "opStd": 35672653,
+   "opCons": 35204301,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35678127,
+   "opBchnAdjustedCons": 35209775,
+   "hashIterations": 3659,
+   "instructions": 212939,
+   "budgetR100": 73968800,
+   "budgetSpec": 81936000,
+   "pctR100": 48.2,
+   "pctSpec": 43.5,
+   "vsModel": {
+    "params8Pct": 26.3,
+    "designMidPct": 15.1
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 92420 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 92420 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 92420 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-3-Z128.json",
+   "leaf": 628035141,
+   "proofBytes": 71344,
+   "redeemBytes": 19024,
+   "witnessBytes": 72132,
+   "unlockingBytes": 91388,
+   "lockingBytes": 35,
+   "txBytes": 91477,
+   "opStd": 35523261,
+   "opCons": 35063101,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35528735,
+   "opBchnAdjustedCons": 35068575,
+   "hashIterations": 3595,
+   "instructions": 212311,
+   "budgetR100": 73143200,
+   "budgetSpec": 81110400,
+   "pctR100": 48.6,
+   "pctSpec": 43.8,
+   "vsModel": {
+    "params8Pct": 25.7,
+    "designMidPct": 14.6
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 91388 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 91388 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 91388 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-4-Z128.json",
+   "leaf": 630410209,
+   "proofBytes": 73264,
+   "redeemBytes": 19024,
+   "witnessBytes": 74029,
+   "unlockingBytes": 93285,
+   "lockingBytes": 35,
+   "txBytes": 93374,
+   "opStd": 35761185,
+   "opCons": 35285665,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35766659,
+   "opBchnAdjustedCons": 35291139,
+   "hashIterations": 3715,
+   "instructions": 213304,
+   "budgetR100": 74660800,
+   "budgetSpec": 82628000,
+   "pctR100": 47.9,
+   "pctSpec": 43.3,
+   "vsModel": {
+    "params8Pct": 26.6,
+    "designMidPct": 15.4
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93285 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93285 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 93285 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-5-Z128.json",
+   "leaf": 881222902,
+   "proofBytes": 73904,
+   "redeemBytes": 19024,
+   "witnessBytes": 74668,
+   "unlockingBytes": 93924,
+   "lockingBytes": 35,
+   "txBytes": 94013,
+   "opStd": 35880954,
+   "opCons": 35400314,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35886428,
+   "opBchnAdjustedCons": 35405788,
+   "hashIterations": 3755,
+   "instructions": 213653,
+   "budgetR100": 75172000,
+   "budgetSpec": 83139200,
+   "pctR100": 47.7,
+   "pctSpec": 43.2,
+   "vsModel": {
+    "params8Pct": 27,
+    "designMidPct": 15.8
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93924 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93924 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 93924 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-6-Z128.json",
+   "leaf": 721462115,
+   "proofBytes": 73520,
+   "redeemBytes": 19024,
+   "witnessBytes": 74305,
+   "unlockingBytes": 93561,
+   "lockingBytes": 35,
+   "txBytes": 93650,
+   "opStd": 35821818,
+   "opCons": 35344250,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35827292,
+   "opBchnAdjustedCons": 35349724,
+   "hashIterations": 3731,
+   "instructions": 213546,
+   "budgetR100": 74881600,
+   "budgetSpec": 82848800,
+   "pctR100": 47.8,
+   "pctSpec": 43.2,
+   "vsModel": {
+    "params8Pct": 26.8,
+    "designMidPct": 15.6
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93561 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93561 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 93561 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-7-Z128.json",
+   "leaf": 469652216,
+   "proofBytes": 74416,
+   "redeemBytes": 19024,
+   "witnessBytes": 75172,
+   "unlockingBytes": 94428,
+   "lockingBytes": 35,
+   "txBytes": 94517,
+   "opStd": 35886931,
+   "opCons": 35402195,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35892405,
+   "opBchnAdjustedCons": 35407669,
+   "hashIterations": 3787,
+   "instructions": 213841,
+   "budgetR100": 75575200,
+   "budgetSpec": 83542400,
+   "pctR100": 47.5,
+   "pctSpec": 43,
+   "vsModel": {
+    "params8Pct": 27,
+    "designMidPct": 15.8
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94428 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 94428 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 94428 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-8-Z128.json",
+   "leaf": 725352379,
+   "proofBytes": 73520,
+   "redeemBytes": 19024,
+   "witnessBytes": 74293,
+   "unlockingBytes": 93549,
+   "lockingBytes": 35,
+   "txBytes": 93638,
+   "opStd": 35800752,
+   "opCons": 35323184,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35806226,
+   "opBchnAdjustedCons": 35328658,
+   "hashIterations": 3731,
+   "instructions": 213420,
+   "budgetR100": 74872000,
+   "budgetSpec": 82839200,
+   "pctR100": 47.8,
+   "pctSpec": 43.2,
+   "vsModel": {
+    "params8Pct": 26.7,
+    "designMidPct": 15.5
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93549 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93549 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 93549 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  },
+  {
+   "vector": "m1-s4-9-Z128.json",
+   "leaf": 516397238,
+   "proofBytes": 73904,
+   "redeemBytes": 19024,
+   "witnessBytes": 74701,
+   "unlockingBytes": 93957,
+   "lockingBytes": 35,
+   "txBytes": 94046,
+   "opStd": 35868540,
+   "opCons": 35387900,
+   "defineBodyBytes": 5474,
+   "opBchnAdjusted": 35874014,
+   "opBchnAdjustedCons": 35393374,
+   "hashIterations": 3755,
+   "instructions": 213954,
+   "budgetR100": 75198400,
+   "budgetSpec": 83165600,
+   "pctR100": 47.7,
+   "pctSpec": 43.1,
+   "vsModel": {
+    "params8Pct": 27,
+    "designMidPct": 15.7
+   },
+   "accepted": {
+    "looseStd": true,
+    "looseCons": true,
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": false,
+    "bchCons": false,
+    "specStd": true,
+    "specCons": true
+   },
+   "errors": {
+    "bchStd": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93957 bytes.",
+    "bchCons": "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 93957 bytes."
+   },
+   "txVerify": {
+    "r100Std": true,
+    "r100Cons": true,
+    "bchStd": "Unable to verify standard transaction: excessive unlocking bytecode length. The maximum standard unlocking bytecode length is 10000 bytes, but the unlocking bytecode at input index 0 is 93957 bytes.",
+    "specStd": true,
+    "specCons": true
+   },
+   "dag": {
+    "steps": 615,
+    "progBytes": 2123,
+    "chunks": 55,
+    "registers": 45,
+    "leafCopies": 33,
+    "stackAtStart": 479,
+    "opCount": {
+     "LD": 148,
+     "ADDL": 135,
+     "CK1": 4,
+     "SUBL": 12,
+     "MK1": 64,
+     "MULL": 267,
+     "RSUBL": 28,
+     "MUL": 2,
+     "ADD": 105,
+     "MK8": 5,
+     "SUB": 8,
+     "CK8": 5,
+     "LDB": 4
+    }
+   }
+  }
+ ]
+}

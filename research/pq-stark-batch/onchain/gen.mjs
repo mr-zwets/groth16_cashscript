@@ -841,7 +841,7 @@ export function build(vk, pis, opts = {}) {
   if (opts.ctx === 'witness') {
     // harness variant: 4 lanes of 8 bytes, each < 2^56 (top byte zero), as the introspection block produces them
     S.roll('CTXW'); S.raw(['SIZE', 32, 'NUMEQUALVERIFY', ...[0, 1, 2, 3].map((k) => ['DUP', 8 * k + 7, 'SPLIT', 'NIP', 1, 'SPLIT', 'DROP', B0, 'EQUALVERIFY']).flat()], 1, ['CTXB']);
-  } else S.raw(ctxCode(), 0, ['CTXB']);
+  } else S.raw([{raw: ctxCode()}], 0, ['CTXB']);
   mark(S, 'entry');
 
   g.transcript(S);

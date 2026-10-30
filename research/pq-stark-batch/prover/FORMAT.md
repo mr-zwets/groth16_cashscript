@@ -221,3 +221,27 @@ The LogUp (extension) constraints are not covered by this check. Their correctne
 | `dag`, `dag_row_check` | see above |
 | `tamper_sweep`, `tampered` | rejection cases, each `{name, patch?: [{at, hex}], insert?: {at, hex}, truncate?: n}`; see README |
 | `transcript_hash_inputs` | hex of every challenger SHA-256 input, in order |
+
+## CTX serialization (M1/M2 public values CTX[0..4]; fixed by the S4 generator)
+
+AIR-SPEC §3.1 leaves the exact output serialization to the generator. The layout (b) script
+(`../onchain/ctx.mjs`) recomputes CTX by introspection of the spending transaction, so a proof is bound to the
+transaction's outputs:
+
+```
+ser   = u32 LE output count
+        ‖ for each output, in order:
+            value          u64 LE                 OP_OUTPUTVALUE
+            category       u8 length ‖ bytes      OP_OUTPUTTOKENCATEGORY (0, 32 or 33 bytes, capability byte included)
+            commitment     u16 LE length ‖ bytes  OP_OUTPUTTOKENCOMMITMENT
+            token amount   u64 LE                 OP_OUTPUTTOKENAMOUNT (0 without fungible tokens)
+            locking        u32 LE length ‖ bytes  OP_OUTPUTBYTECODE
+h     = SHA-256(ser)
+CTX_k = little-endian integer of h[7k .. 7k+7), k = 0..3   (each < 2^56)
+```
+
+Every field is fixed-length or length-prefixed, so `ser` is injective in the introspectable content of the
+outputs. The transcript observes CTX_k as u64 LE, i.e. the bytes h[7k .. 7k+7) ‖ 0x00, which the script builds
+directly. The prover takes the hash as a fourth case component: `m1@LEAF@WSEED@<h as 64 hex chars>` (and `m2@...`).
+`../onchain/test-ctx.mjs` checks the script block against this definition on plain, token (FT, NFT with and without
+capability, 128-byte commitment) and long-bytecode outputs.

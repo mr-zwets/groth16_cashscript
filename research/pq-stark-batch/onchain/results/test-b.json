@@ -1,0 +1,168 @@
+{
+ "files": 26,
+ "cases": 2929,
+ "unexpected": 0,
+ "na": 26,
+ "refusedByGenerator": 0,
+ "families": {
+  "valid": {
+   "cases": 26,
+   "chainReject": 0,
+   "accept": 26,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "cap": {
+   "cases": 47,
+   "chainReject": 47,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "ood": {
+   "cases": 229,
+   "chainReject": 229,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "random": {
+   "cases": 122,
+   "chainReject": 122,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "pow": {
+   "cases": 78,
+   "chainReject": 78,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "final": {
+   "cases": 145,
+   "chainReject": 145,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "row": {
+   "cases": 129,
+   "chainReject": 129,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "salt": {
+   "cases": 129,
+   "chainReject": 129,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "sibling": {
+   "cases": 128,
+   "chainReject": 128,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "count": {
+   "cases": 116,
+   "chainReject": 116,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0,
+   "encoderRefused": 116
+  },
+  "fri_value": {
+   "cases": 55,
+   "chainReject": 55,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "truncate": {
+   "cases": 47,
+   "chainReject": 47,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0,
+   "encoderRefused": 47
+  },
+  "extend": {
+   "cases": 35,
+   "chainReject": 35,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0,
+   "encoderRefused": 35
+  },
+  "noncanon": {
+   "cases": 44,
+   "chainReject": 44,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "statement": {
+   "cases": 339,
+   "chainReject": 339,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 26,
+   "refused": 0
+  },
+  "other_vk": {
+   "cases": 12,
+   "chainReject": 8,
+   "accept": 4,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0,
+   "encoderRefused": 8
+  },
+  "tx": {
+   "cases": 182,
+   "chainReject": 182,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "root": {
+   "cases": 52,
+   "chainReject": 52,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  },
+  "witness": {
+   "cases": 1014,
+   "chainReject": 1014,
+   "accept": 0,
+   "unexpected": 0,
+   "na": 0,
+   "refused": 0
+  }
+ },
+ "list": [],
+ "skippedFiles": [],
+ "encoderRefused": 206
+}

@@ -122,3 +122,28 @@ Folder `research/pq-stark-batch/verifier/`; README has the full results and gaps
   - `verify-batch.mjs` is the spec to follow. Its exports are `vkFromVector`, `parse` (with an offset recorder), `verify`, `runCase` and `applyTamper`.
   - The generator must assert the VK-time properties that JS does not check per proof: the multiplicity height bound and the hiding budget.
   - Cases: `gen-cases.mjs` writes one file per vector, in the format Rust `check` and `agree.mjs` read. The on-chain suite can reuse it.
+
+## S4 - Generator and layout (b) for M1 (done with one miss, 2026-10-30)
+
+Folder `research/pq-stark-batch/onchain/` (README there). Regenerate with `gen-s4.sh` (about 20 min; nice, 4 threads for Rust, one node process). The S4 vectors are in `prover/vectors/S4/` (3 committed; 24 statements plus other-VK proofs in cache/s4).
+
+- **Generator.** The VK comes from VK data only (S3 `vkFromVector` plus strict-height and hiding-budget asserts). It supports one table, one height, cap 0, ood PoW 0. Track 5's gen.mjs was copied and adapted, and Track 5 is unchanged.
+  - Transcript: batch-stark prefix (seed and degree_bits as one constant), then the trace cap and the public values.
+  - AIR: the exported DAG (551 nodes, 53 constraints) runs as a 2.1 KB byte-code program in an OP_INVOKE interpreter. It uses registers for multi-use nodes and selectors multiplied through by (ζ−1)(ζ−g⁻¹).
+  - Periodic columns: a 32-step loop with packed coefficients. Quotient: prefix/suffix products. α′, A_z and the row keys: one loop. Extension multiply: a packed schoolbook product.
+- **Statement layer.** ROOT is a script constant. NF is a witness item with each lane < p. CTX is computed by introspection of the spending transaction's outputs; the serialization is in prover/FORMAT.md. The prover takes `m1@LEAF@WSEED@<ctx hash>` (`airs.rs`).
+- **Regimes, 24 transaction-bound statements:**
+  - Raised limits (r100: one 100 KB input) and bch-spec: all accepted, standard and consensus, including libauth whole-transaction verify.
+  - Today's rules: rejected (unlocking above 10,000 B), as designed.
+  - Unlocking 91,388–94,968 B; transaction 91,477–95,057 B (≤ 100,000); redeem 19,024 B; proof 71,344–74,928 B.
+- **Op-cost (BCHN-adjusted) 35.53–36.04M**, 47.4–48.6% of the r100 budget and 42.9–43.8% under bch-spec.
+  - **Against the S0 model (28.26M) it is +26–28%, outside ±15%.** Against DESIGN §5's 30–32M it is +11–20%.
+  - Queries are 16.09M (model 16.79M) and Merkle 7.05M (model 7.23M), both on model.
+  - The miss is the fixed part: 12.8M against a modelled 4.23M. Of that, the AIR is 8.0M (the model assumed 0.6M): DAG interpreter 5.79M, periodic 1.19M, quotient 0.44M. DEEP constants are 3.16M.
+- **Sweeps: 0 unexpected.**
+  - model-agree: 3,762 cases, model vs verify-batch, 0 disagreements, transcripts identical.
+  - Production test-b: 26 files, 2,929 cases. It covers the S3 families plus tx (182), root (52) and witness manipulations (1,014).
+  - Harness test-b (CTX as a witness item) on S3's M1 cap-0 case files: 3,309 cases, including forced (9), vk_variant (3) and other_vk.
+  - test-ctx: 4 transactions, 0 mismatches.
+  - Caveats: 59 NF + p cases are n/a (no 8-byte lane encoding); encodable non-canonical lanes are tested in the witness family. Malformed-by-length proofs are refused by the encoder. In one such case the lenient witness of a 1-byte truncation equals the valid proof's witness, and the script accepts it, correctly.
+- **For S5–S7:** extend `vkxFromVector` and `dagProgram` (ext constraints, challenges, perm values; several heights); cap > 0 is not built.

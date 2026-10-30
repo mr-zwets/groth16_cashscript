@@ -45,7 +45,7 @@ export const pushes = (items) => Uint8Array.from(items.flatMap((b) => [...encode
 
 // a spending transaction: one input (the verifier) and the given outputs (they fix CTX)
 export const FUND = {outpointTransactionHash: Uint8Array.from(Buffer.from('7438'.repeat(16), 'hex')), outpointIndex: 0};
-export function spendProgram(locking, unlocking, outputs, value = 100_000n) {
+export function spendProgram(locking, unlocking, outputs, value = 1_000_000n) {   // fixed denomination 0.01 BCH; output 900,000 + fee
   return {
     inputIndex: 0,
     sourceOutputs: [{lockingBytecode: locking, valueSatoshis: value}],

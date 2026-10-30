@@ -1,0 +1,5 @@
+ok   1 output(s): CTX f41008e624460b,cbe4068739dd65,1beab5864ce215,dd112ce510c1c vm true  / other set rejected true
+ok   2 output(s): CTX f2e7f5273924a0,e086f2c110f8eb,cb9af0b8936444,1ebf6feb1f0c56 vm true  / other set rejected true
+ok   4 output(s): CTX 6fd9d1c186aab9,646914dc76d1eb,4b6c3d1650f2ea,63850a2248b676 vm true  / other set rejected true
+ok   1 output(s): CTX cbd9d0199e9dd7,efefcd3fe5a68c,38b7e618e0640e,3f588c69648005 vm true  / other set rejected true
+test-ctx: 4 transactions, 0 mismatches
