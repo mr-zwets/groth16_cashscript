@@ -3,7 +3,7 @@
  "regime": "txv5",
  "J": 14,
  "JR": 0,
- "redeemBytes": 23687,
+ "redeemBytes": 23688,
  "valid": [
   {
    "i": 0,
@@ -11,20 +11,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 51861661,
-    "budget": 52134400,
-    "unlocking": 65127
+    "opCost": 51702110,
+    "budget": 51879200,
+    "unlocking": 64808
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 51944477,
-    "budget": 52134400,
-    "unlocking": 65127
+    "opCost": 51784158,
+    "budget": 51879200,
+    "unlocking": 64808
    },
    "pad": 1,
-   "slopes": 780,
-   "nq": 252,
+   "slopes": 782,
+   "nq": 240,
    "proofBytes": 768,
    "piBytes": 96
   },
@@ -34,20 +34,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 51737719,
-    "budget": 51871200,
-    "unlocking": 64798
+    "opCost": 51884667,
+    "budget": 52238400,
+    "unlocking": 65257
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 51819767,
-    "budget": 51871200,
-    "unlocking": 64798
+    "opCost": 51967483,
+    "budget": 52238400,
+    "unlocking": 65257
    },
-   "pad": 152,
-   "slopes": 777,
-   "nq": 240,
+   "pad": 1,
+   "slopes": 784,
+   "nq": 252,
    "proofBytes": 768,
    "piBytes": 96
   },
@@ -57,20 +57,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 51867573,
-    "budget": 52492800,
-    "unlocking": 65575
+    "opCost": 51525879,
+    "budget": 51659200,
+    "unlocking": 64533
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 51951157,
-    "budget": 52492800,
-    "unlocking": 65575
+    "opCost": 51607543,
+    "budget": 51659200,
+    "unlocking": 64533
    },
-   "pad": 1,
-   "slopes": 782,
-   "nq": 264,
+   "pad": 111,
+   "slopes": 776,
+   "nq": 234,
    "proofBytes": 768,
    "piBytes": 96
   },
@@ -80,20 +80,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 51895157,
-    "budget": 52262400,
-    "unlocking": 65287
+    "opCost": 51817157,
+    "budget": 52160800,
+    "unlocking": 65160
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 51978101,
-    "budget": 52262400,
-    "unlocking": 65287
+    "opCost": 51899973,
+    "budget": 52160800,
+    "unlocking": 65160
    },
    "pad": 1,
-   "slopes": 782,
-   "nq": 255,
+   "slopes": 781,
+   "nq": 252,
    "proofBytes": 768,
    "piBytes": 96
   },
@@ -103,20 +103,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 52072349,
-    "budget": 52595200,
-    "unlocking": 65703
+    "opCost": 51814884,
+    "budget": 52212000,
+    "unlocking": 65224
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 52156061,
-    "budget": 52595200,
-    "unlocking": 65703
+    "opCost": 51897828,
+    "budget": 52212000,
+    "unlocking": 65224
    },
    "pad": 1,
-   "slopes": 783,
-   "nq": 267,
+   "slopes": 780,
+   "nq": 255,
    "proofBytes": 768,
    "piBytes": 96
   }
@@ -132,7 +132,7 @@
    "name": "point.L.negated",
    "how": "adaptive",
    "rejected": true,
-   "error": "Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 51904000 (density control length: 64880); operation cost following operation: 51904011."
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
   },
   {
    "name": "point.L.infinity",
@@ -144,7 +144,7 @@
    "name": "point.R.plusG",
    "how": "adaptive",
    "rejected": true,
-   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+   "error": "Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 52058400 (density control length: 65073); operation cost following operation: 52058432."
   },
   {
    "name": "point.R.negated",
@@ -216,13 +216,13 @@
    "name": "point.H2.plusG",
    "how": "adaptive",
    "rejected": true,
-   "error": "Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 51953600 (density control length: 64942); operation cost following operation: 51953645."
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
   },
   {
    "name": "point.H2.negated",
    "how": "adaptive",
    "rejected": true,
-   "error": "Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 51955200 (density control length: 64944); operation cost following operation: 51955217."
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
   },
   {
    "name": "point.H2.infinity",
@@ -252,7 +252,7 @@
    "name": "point.Wzeta.plusG",
    "how": "adaptive",
    "rejected": true,
-   "error": "Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 51569600 (density control length: 64462); operation cost following operation: 51569649."
+   "error": "Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 51724000 (density control length: 64655); operation cost following operation: 51724032."
   },
   {
    "name": "point.Wzeta.negated",
@@ -306,7 +306,7 @@
    "name": "scalar.s1_zeta.plus1",
    "how": "adaptive",
    "rejected": true,
-   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+   "error": "Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 51725600 (density control length: 64657); operation cost following operation: 51725649."
   },
   {
    "name": "scalar.s2_zeta.plus1",
@@ -348,7 +348,7 @@
    "name": "mix.proof1-with-pi0",
    "how": "adaptive",
    "rejected": true,
-   "error": "Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 51466400 (density control length: 64333); operation cost following operation: 51466470."
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
   },
   {
    "name": "point.L.offCurve",
@@ -750,7 +750,7 @@
   {
    "name": "adaptive: proof 1 with the public inputs of proof 0",
    "rejected": true,
-   "error": "Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 51466400 (density control length: 64333); operation cost following operation: 51466470."
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
   },
   {
    "name": "redeem byte flipped",

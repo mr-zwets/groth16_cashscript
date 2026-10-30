@@ -1,9 +1,9 @@
 {
  "circuit": "range64",
  "regime": "spec",
- "J": 13,
+ "J": 21,
  "JR": 0,
- "redeemBytes": 18373,
+ "redeemBytes": 24337,
  "valid": [
   {
    "i": 0,
@@ -11,20 +11,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 64933485,
-    "budget": 65771200,
-    "unlocking": 72214
+    "opCost": 57932653,
+    "budget": 60170400,
+    "unlocking": 65213
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 64993133,
-    "budget": 65771200,
-    "unlocking": 72214
+    "opCost": 58019437,
+    "budget": 60170400,
+    "unlocking": 65213
    },
    "pad": 0,
-   "slopes": 1370,
-   "nq": 60,
+   "slopes": 733,
+   "nq": 279,
    "proofBytes": 864,
    "piBytes": 32
   },
@@ -34,20 +34,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 64517288,
-    "budget": 65512000,
-    "unlocking": 71890
+    "opCost": 57399769,
+    "budget": 59529600,
+    "unlocking": 64412
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 64576936,
-    "budget": 65512000,
-    "unlocking": 71890
+    "opCost": 57485273,
+    "budget": 59529600,
+    "unlocking": 64412
    },
    "pad": 0,
-   "slopes": 1360,
-   "nq": 60,
+   "slopes": 729,
+   "nq": 258,
    "proofBytes": 864,
    "piBytes": 32
   },
@@ -57,20 +57,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 64874980,
-    "budget": 65641600,
-    "unlocking": 72052
+    "opCost": 57635054,
+    "budget": 59810400,
+    "unlocking": 64763
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 64934628,
-    "budget": 65641600,
-    "unlocking": 72052
+    "opCost": 57721326,
+    "budget": 59810400,
+    "unlocking": 64763
    },
    "pad": 0,
-   "slopes": 1365,
-   "nq": 60,
+   "slopes": 728,
+   "nq": 270,
    "proofBytes": 864,
    "piBytes": 32
   },
@@ -80,20 +80,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 64925974,
-    "budget": 65692800,
-    "unlocking": 72116
+    "opCost": 57726403,
+    "budget": 59964000,
+    "unlocking": 64955
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 64985622,
-    "budget": 65692800,
-    "unlocking": 72116
+    "opCost": 57813059,
+    "budget": 59964000,
+    "unlocking": 64955
    },
    "pad": 0,
-   "slopes": 1367,
-   "nq": 60,
+   "slopes": 728,
+   "nq": 276,
    "proofBytes": 864,
    "piBytes": 32
   },
@@ -103,20 +103,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 64917081,
-    "budget": 65692800,
-    "unlocking": 72116
+    "opCost": 57482011,
+    "budget": 59785600,
+    "unlocking": 64732
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 64976729,
-    "budget": 65692800,
-    "unlocking": 72116
+    "opCost": 57568027,
+    "budget": 59785600,
+    "unlocking": 64732
    },
    "pad": 0,
-   "slopes": 1367,
-   "nq": 60,
+   "slopes": 730,
+   "nq": 267,
    "proofBytes": 864,
    "piBytes": 32
   }
@@ -716,6 +716,21 @@
    "error": "Program failed an OP_VERIFY operation."
   },
   {
+   "name": "WS: GT nibble byte xor 1",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WS: GT nibble byte = 16",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WS: GT nibble byte = 0x81",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
    "name": "WS: truncated by 32",
    "rejected": true,
    "error": "Program failed an OP_VERIFY operation."
@@ -733,7 +748,7 @@
   {
    "name": "WQ: extra trailing word",
    "rejected": true,
-   "error": "Program failed an OP_VERIFY operation."
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
   },
   {
    "name": "WQ: empty",
@@ -769,6 +784,21 @@
    "name": "adaptive: Lambda' = -Lambda",
    "rejected": true,
    "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
+  },
+  {
+   "name": "adaptive: nibbles of folded base 0 encode s + 1",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "adaptive: nibbles of folded base 8 encode s + 1",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "adaptive: nibbles of folded base 9 encode s + 1",
+   "rejected": true,
+   "error": "Program failed an OP_VERIFY operation."
   },
   {
    "name": "adaptive: proof 1 with the public inputs of proof 0",

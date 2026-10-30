@@ -13,6 +13,123 @@ score-history.json or the website changed. Not independently reviewed.
 - **Track 6** (2026-10-29): the first build, without GT folding. It is still built with `FOLD=0`. Its text follows
   further below, unchanged; its numbers are for that build.
 
+## Track 7, integrated: ceremony SRS, BSB22 commitments, GT fold (default build)
+
+Branch `wip/plonk-usable-verifier`: `wip/plonk-usable-msm`, `-srs` and `-bsb22` merged onto origin/main, then the
+pieces they did not cover were built (below). Research, not a leaderboard entry.
+
+### Results (score = unlocking + 35 B locking per input + tx overhead; ranges over 5 valid proofs per circuit)
+
+Every vector is on the Aztec Ignition SRS. `range64` and `merkle16rc` carry one BSB22 commitment (`std/rangecheck`).
+Op-cost is libauth standard; BCHN-adjusted adds the OP_DEFINE body bytes (single input +2,539 to +2,635 per spend;
+chain +34.0k to +38.3k per input). `results/summary.json` has every value.
+
+| circuit / regime | inputs / tx | score (B) | tx bytes | op-cost (M) | BCHN-adj. (M) | worst margin (BCHN) |
+|---|--:|--:|--:|--:|--:|--:|
+| mul2 / bch-spec, J = 23 | 1 / 1 | 59,291–60,669 | | 53.41–53.84 | 53.41–53.85 | 3.21% |
+| mul2 / one 100 KB input, J = 14 | 1 / 1 | 63,276–64,622 | | 50.50–50.90 | 50.50–50.91 | pad per proof |
+| mul2 / today, standard | 10 / 1 | 81,602–82,795 | 81,252–82,445 | 64.18–64.65 | 64.52–64.99 | 0.04% (FILL per proof) |
+| merkle16 / bch-spec, J = 23 | 1 / 1 | 60,567–61,306 | | 54.49–54.94 | 54.50–54.94 | 3.33% |
+| merkle16 / one 100 KB input, J = 14 | 1 / 1 | 64,631–65,355 | | 51.61–51.97 | 51.61–51.97 | pad per proof |
+| merkle16 / today, standard | 10 / 1 | 84,414–84,608 | 84,064–84,258 | 65.87–66.21 | 66.22–66.57 | 0.07% |
+| range64 (BSB22) / bch-spec, J = 21 | 1 / 1 | 64,510–65,311 | | 57.49–58.02 | 57.49–58.02 | 3.43% |
+| range64 (BSB22) / one 100 KB input, J = 14 | 1 / 1 | 68,985–69,553 | | 55.09–55.55 | 55.09–55.55 | pad per proof |
+| range64 (BSB22) / today, standard | 10 / 1 | 89,561–89,889 | 89,211–89,539 | 70.07–70.45 | 70.44–70.83 | 0.65% |
+| merkle16rc (BSB22) / bch-spec, J = 21 | 1 / 1 | 64,957–65,760 | | 57.36–57.86 | 57.36–57.86 | 3.87% |
+| merkle16rc (BSB22) / one 100 KB input, J = 14 | 1 / 1 | 68,764–69,363 | | 54.91–55.39 | 54.92–55.40 | pad per proof |
+| merkle16rc (BSB22) / today, standard | 10 / 1 | 89,802–90,249 | 89,452–89,899 | 69.87–70.35 | 70.26–70.73 | 0.65% |
+
+**Tests** (`results/test-*.json`, `results/chain-*.json`), consensus and standard mode, every verdict as `verify.mjs`
+(the JS reference) gives it:
+
+| | mul2 | merkle16 | range64 | merkle16rc |
+|---|---|---|---|---|
+| valid accepted (each regime) | 5/5 | 5/5 | 5/5 | 5/5 |
+| tampered rejected (each regime) | 76/76 | 78/78 | 86/86 | 91/91 (13 commitment cases) |
+| manipulations, single input (each regime) | 33/33 | 33/33 | 34/34 | 34/34 |
+| manipulations, chain | 32/32 | 33/33 | 35/35 | 35/35 |
+
+- The BSB22 circuits add an adaptive manipulation (the folded Qcp_0's nibbles encode s + 1, SI re-witnessed) and,
+  in the chain, a TV2 entry flip.
+- `srs-check.mjs` passes for all four circuits: VK [1]_1, [1]_2, [x]_2 against the pinned and downloaded ceremony
+  value; every [x]_2 slope piece in each single-input redeem and every SI slice hash in each chain; a control G2
+  point's constants absent.
+- Prover side: `verify.mjs` 351/351 cases (all four circuits on Ignition); gnark's own `Verify` rejects every
+  tampered case it can represent (37 + 38 + 44 + 47).
+
+### Comparison
+
+| | Track 6 (main: test SRS, no fold, no BSB22) | Track 7 branch | integrated | change vs Track 6 / branch |
+|---|--:|--:|--:|--:|
+| mul2 bch-spec | 66,290–66,549 | msm 59,480–59,995 | 59,291–60,669 | −8.8% (max) |
+| mul2 100 KB input | 69,757–69,919 | msm 63,497–63,948 | 63,276–64,622 | −7.6% |
+| mul2 today | 92,845–93,095 | msm 81,882–82,035 | 81,602–82,795 | −11.1% |
+| merkle16 bch-spec | 68,494–68,655 | msm 60,790–61,785 | 60,567–61,306 | −10.7% |
+| merkle16 100 KB input | 72,188–72,438 | msm 64,896–65,801 | 64,631–65,355 | −9.8% |
+| merkle16 today | 95,637–95,985 | msm 84,476–84,754 | 84,414–84,608 | −11.9% |
+| merkle16rc bch-spec | (unsupported) | bsb22 72,404–72,760 (J = 13) | 64,957–65,760 | −9.6% vs bsb22 |
+| merkle16rc 100 KB input | (unsupported) | bsb22 77,402–77,720 (J = 8) | 68,764–69,363 | −10.8% vs bsb22 |
+| merkle16rc today | (unsupported) | bsb22: **does not fit** (≥ 103.7 KB, relaxed VM only) | **89,802–90,249, 10 inputs, 1 standard tx** | fits |
+
+- mul2 and merkle16 moved only within the proof-to-proof spread against the msm branch; the SRS change does not
+  change sizes. The bch-spec margins moved to 3.21% / 3.33% (msm branch: 3.53% / 3.26%) with the Ignition proofs.
+- Track 6's op-cost: 58.0–58.3M (mul2 bch-spec) and 70.6–71.0M (mul2 today); the integrated build needs 53.4–53.8M
+  and 64.2–64.7M.
+- **Cost of one commitment** in the integrated build (merkle16rc against merkle16, same k and n): +4.4 KB at bch-spec
+  (J = 21 against 23, for the margin; at J = 23 it is +3.4 KB with a 1.4% margin), +4.0 KB in the 100 KB input,
+  +5.4–5.6 KB in the chain. Against the bsb22 branch's +3.9–4.1 KB, the commitment costs about the same: Bsb22_0
+  is one more variable base (≈ 1.6 KB of slopes, 2.1M op), and Qcp_0 one more folded base (65 nibble bytes, about
+  10.8k op per event, about +25 honest quotient words) instead of a G1 MSM base.
+
+### What the integration built (beyond the three branches)
+
+1. **Fixed and variable bases with BSB22.** `fixedNames` = Ql, Qr, Qm, Qo, Qk, S3, S1, S2, Qcp_j, [1]_1 (GT-folded);
+   `baseNames` adds Bsb22_j to the variable bases (L, R, O, Z, H0, H1, H2, Bsb22_j, Wz, Λ', Wzw, φ(Wzw)). Qcp_j's R
+   constants come from `gtConsts` like every VK point. FOLD=0 keeps the bsb22 branch's order.
+2. **TV/TV2 split (chain).** 11 variable bases make TV 10,560 B, over the 10,000 B push limit (the bsb22 branch's
+   blocker). `makePlan({tv2: [host, n1]})` puts the first n1 bases in TV (input 2) and the rest in TV2, a fixed
+   push in an MSM role (input 3, the first MA). Each host checks its own entries; LOADT reads both; ST reads Wζω's
+   table from TV2. Builds with ≤ 10 variable bases are unchanged.
+3. **BSB22 chain plans** (`plans.json`): MJ(50..42, C0) · ST · MJ(41..38, TV) · MA(37..25 + TV2, 24..12, 11..0) ·
+   SI(0–16 + GZ + C1, 16–36 + C2, 36–52 + WQa, 52–65 + WQb). C0 had grown to 10,684 B, so C2 takes more code
+   (blob targets 3,900 / 5,600) and input 0 one window less. Per-input data and need are within 10,000 B
+   (`node plan.mjs merkle16rc`).
+4. **BSB22 vectors regenerated on Ignition** (`go run . -srs ... -circuits range64,merkle16rc`), and
+   `gen-vectors.sh` runs both prover passes with `-srs`.
+5. **J for BSB22 at bch-spec is 21.** The extra folded base costs op: J = 23 leaves 0.9% (range64) / 1.4% (merkle16rc)
+   BCHN-adjusted margin; J = 21 gives 3.4% / 3.9% for +0.9 KB (`sweep.mjs`).
+6. **Soundness** (SOUNDNESS.md): scope now covers Ignition, BSB22 in both builds and the TV split (Lemma 3
+   "integration delta", §8); A6 with 10 folded bases: max deg 852, NQ = 420, SI error 2^-243.63
+   (`soundness/lattice.mjs` lists m_f = 8..11); total bound unchanged (≈ 2^-64 beyond ε_PLONK+BSB22). Stale line
+   references were replaced by function names.
+
+### Open / honest negatives (integrated build)
+
+- **Liveness is tested on 5 proofs per circuit.** Honest n_q is 264–282 words for the BSB22 circuits; input 9 can
+  hold WQb up to about 6.8 KB (n_q ≤ ~340). A proof needing more would be rejected, not accepted.
+- **Margins:** single-input bch-spec 3.2–3.9%; the 100 KB pad and the chain FILL are sized per proof (0.04–0.65%
+  worst per input, by construction).
+- **Still above the design model** (66 KB): the chain is 81.6–90.2 KB.
+- **m ≥ 2 commitments** are built by the same code but not tested (SOUNDNESS §8: γ/v length condition for m ≥ 3).
+- **SRS:** Ignition is verified as far as the verifier relies on it; the full transcripts (about 1.1 TB) and the
+  participants' signatures were not checked (prover FORMAT.md "SRS").
+- No BCHN node run; BCHN op-cost is modelled (DEFINE body bytes), not measured.
+- `chainprobe.mjs` and `results/chain-merkle16rc-probe.json` are the bsb22 branch's unfolded probe, kept as history.
+- `chain-*.json` `codeBytes` lists C0 and C1 only (C2 is in the plan's blob list).
+
+### Reproduce (integrated)
+
+```sh
+cd ../prover && SRS_CACHE=/path/cache ./gen-vectors.sh          # Ignition download + checks, both prover passes, verify.mjs
+cp vectors/*.json ../verifier/vectors/ && cd ../verifier
+SRS_CACHE=/path/cache PROVER_DIR=../prover/ node srs-check.mjs  # all four circuits
+nice node test.mjs merkle16rc spec 21; nice node test.mjs merkle16rc txv5 14; nice node chaintest.mjs merkle16rc
+nice node test.mjs mul2 spec 23;       nice node test.mjs mul2 txv5 14;       nice node chaintest.mjs mul2
+node summary.mjs                        # results/summary.json (all circuits, Track 6 comparison block)
+node plan.mjs merkle16rc                # per-input data / op / need of the chain plan
+node soundness/lattice.mjs
+```
+
 ## Track 7 branch `wip/plonk-usable-msm`: GT fold and the chain hand-over
 
 These numbers were measured on the test-SRS vectors, before the integration; the integrated build's are in the

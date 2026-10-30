@@ -1,5 +1,106 @@
 {
- "date": "2026-10-29",
+ "date": "2026-10-30",
+ "build": "Track 7 integrated (wip/plonk-usable-verifier): Aztec Ignition SRS, BSB22 commitments, GT fold of the fixed bases, TV/TV2 split",
+ "track6": {
+  "mul2/bch-spec": {
+   "score": [
+    66290,
+    66549
+   ],
+   "op": [
+    58043950,
+    58338567
+   ],
+   "J": 13
+  },
+  "mul2/100 KB input (TXv5)": {
+   "score": [
+    69757,
+    69919
+   ],
+   "op": [
+    55401807,
+    55700719
+   ],
+   "J": 8
+  },
+  "mul2/today (multi-input)": {
+   "inputs": 10,
+   "score": [
+    92845,
+    93095
+   ],
+   "op": [
+    70645374,
+    71004868
+   ]
+  },
+  "merkle16/bch-spec": {
+   "score": [
+    68494,
+    68655
+   ],
+   "op": [
+    60415634,
+    60723845
+   ],
+   "J": 13
+  },
+  "merkle16/100 KB input (TXv5)": {
+   "score": [
+    72188,
+    72438
+   ],
+   "op": [
+    57602422,
+    57853036
+   ],
+   "J": 8
+  },
+  "merkle16/today (multi-input)": {
+   "inputs": 10,
+   "score": [
+    95637,
+    95985
+   ],
+   "op": [
+    73166730,
+    73485376
+   ]
+  },
+  "merkle16rc/bch-spec": {
+   "score": [
+    72404,
+    72760
+   ],
+   "op": [
+    64977911,
+    65205320
+   ],
+   "J": 13,
+   "note": "wip/plonk-usable-bsb22 (test SRS, no fold)"
+  },
+  "merkle16rc/100 KB input (TXv5)": {
+   "score": [
+    77402,
+    77720
+   ],
+   "op": [
+    61824816,
+    62079333
+   ],
+   "J": 8,
+   "note": "wip/plonk-usable-bsb22"
+  },
+  "merkle16rc/today (multi-input)": {
+   "inputs": 11,
+   "score": [
+    103706,
+    104085
+   ],
+   "note": "wip/plonk-usable-bsb22: does not fit 100,000 B (relaxed VM probe only)"
+  }
+ },
  "gnark": "v0.16.4",
  "gnarkCrypto": "v0.21.1-0.20260913224755-1409fe592052",
  "regimes": {
@@ -9,49 +110,49 @@
    "J": 23,
    "proofBytes": 768,
    "publicInputBytes": 64,
-   "redeemBytes": 23019,
+   "redeemBytes": 23021,
    "unlocking": [
-    59897,
-    59639,
-    59607,
-    59383,
-    59382
+    59774,
+    60571,
+    59548,
+    59193,
+    59451
    ],
    "score": [
-    59995,
-    59737,
-    59705,
-    59481,
-    59480
+    59872,
+    60669,
+    59646,
+    59291,
+    59549
    ],
    "opCostStandard": [
-    53425901,
-    53669211,
-    53284953,
-    53545011,
-    53522838
+    53843232,
+    53789693,
+    53412157,
+    53416902,
+    53774209
    ],
    "opCostConsensus": [
-    53345645,
-    53589083,
-    53205081,
-    53465523,
-    53443094
+    53763744,
+    53708029,
+    53332797,
+    53337798,
+    53694849
    ],
    "opCostBchnAdjusted": [
-    53428440,
-    53671750,
-    53287492,
-    53547550,
-    53525377
+    53845771,
+    53792232,
+    53414696,
+    53419441,
+    53776748
    ],
    "defineBodyBytes": 2539,
    "budget": [
-    55917600,
-    55711200,
-    55685600,
-    55506400,
-    55505600
+    55819200,
+    56456800,
+    55638400,
+    55354400,
+    55560800
    ],
    "pad": [
     0,
@@ -60,7 +161,7 @@
     0,
     0
    ],
-   "worstMarginPct": 3.53,
+   "worstMarginPct": 3.21,
    "tests": {
     "valid": "5/5",
     "tampered": "76/76",
@@ -73,58 +174,58 @@
    "J": 14,
    "proofBytes": 768,
    "publicInputBytes": 64,
-   "redeemBytes": 23020,
+   "redeemBytes": 23022,
    "unlocking": [
-    63850,
-    63689,
-    63593,
-    63433,
-    63399
+    63791,
+    64524,
+    63533,
+    63178,
+    63528
    ],
    "score": [
-    63948,
-    63787,
-    63691,
-    63531,
-    63497
+    63889,
+    64622,
+    63631,
+    63276,
+    63626
    ],
    "opCostStandard": [
-    50538518,
-    50701014,
-    50371617,
-    50576837,
-    50579797
+    50899782,
+    50903671,
+    50497899,
+    50502243,
+    50804180
    ],
    "opCostConsensus": [
-    50458262,
-    50620886,
-    50291745,
-    50497349,
-    50500053
+    50820294,
+    50822007,
+    50418539,
+    50423139,
+    50724820
    ],
    "opCostBchnAdjusted": [
-    50541057,
-    50703553,
-    50374156,
-    50579376,
-    50582336
+    50902321,
+    50906210,
+    50500438,
+    50504782,
+    50806719
    ],
    "defineBodyBytes": 2539,
    "budget": [
-    51112800,
-    50984000,
-    50907200,
-    50779200,
-    50752000
+    51065600,
+    51652000,
+    50859200,
+    50575200,
+    50855200
    ],
    "pad": [
     1,
     1,
     1,
     1,
-    1
+    29
    ],
-   "worstMarginPct": 0.33,
+   "worstMarginPct": 0.1,
    "tests": {
     "valid": "5/5",
     "tampered": "76/76",
@@ -143,114 +244,114 @@
    ],
    "redeemBytes": 154,
    "unlocking": [
-    81167,
-    81235,
-    81082,
-    81113,
-    81105
+    81447,
+    81995,
+    81326,
+    80802,
+    81227
    ],
    "txBytes": [
-    81617,
-    81685,
-    81532,
-    81563,
-    81555
+    81897,
+    82445,
+    81776,
+    81252,
+    81677
    ],
    "score": [
-    81967,
-    82035,
-    81882,
-    81913,
-    81905
+    82247,
+    82795,
+    82126,
+    81602,
+    82027
    ],
    "opCostStandard": [
-    64235047,
-    64437796,
-    64013063,
-    64288029,
-    64331045
+    64654613,
+    64543851,
+    64258685,
+    64176861,
+    64527546
    ],
    "opCostBchnAdjusted": [
-    64574577,
-    64777326,
-    64352593,
-    64627559,
-    64670575
+    64994183,
+    64883421,
+    64598255,
+    64516431,
+    64867116
    ],
-   "defineBodyBytesPerInput": 33953,
+   "defineBodyBytesPerInput": 33957,
    "perInput0": [
     {
      "role": "MJ",
      "unlocking": 9755,
      "fill": 0,
-     "opCost": 7634725,
+     "opCost": 7731753,
      "budget": 7836800
     },
     {
      "role": "ST",
-     "unlocking": 9687,
-     "fill": 996,
-     "opCost": 7697016,
-     "budget": 7782400
+     "unlocking": 9619,
+     "fill": 928,
+     "opCost": 7642773,
+     "budget": 7728000
     },
     {
      "role": "MJ",
      "unlocking": 9858,
      "fill": 0,
-     "opCost": 7729026,
+     "opCost": 7876691,
      "budget": 7919200
     },
     {
      "role": "MA",
-     "unlocking": 6891,
-     "fill": 838,
-     "opCost": 5459906,
-     "budget": 5545600
+     "unlocking": 6970,
+     "fill": 820,
+     "opCost": 5523305,
+     "budget": 5608800
     },
     {
      "role": "MA",
-     "unlocking": 6708,
-     "fill": 819,
-     "opCost": 5313251,
-     "budget": 5399200
+     "unlocking": 6841,
+     "fill": 789,
+     "opCost": 5419706,
+     "budget": 5505600
     },
     {
      "role": "MA",
-     "unlocking": 6825,
-     "fill": 805,
-     "opCost": 5407577,
-     "budget": 5492800
+     "unlocking": 6851,
+     "fill": 799,
+     "opCost": 5428393,
+     "budget": 5513600
     },
     {
      "role": "SI",
-     "unlocking": 8497,
-     "fill": 0,
-     "opCost": 6795097,
-     "budget": 6830400
+     "unlocking": 8587,
+     "fill": 89,
+     "opCost": 6816871,
+     "budget": 6902400
     },
     {
      "role": "SI",
-     "unlocking": 7975,
-     "fill": 218,
-     "opCost": 6327163,
-     "budget": 6412800
+     "unlocking": 8002,
+     "fill": 243,
+     "opCost": 6348672,
+     "budget": 6434400
     },
     {
      "role": "SI",
-     "unlocking": 8114,
-     "fill": 235,
-     "opCost": 6438151,
-     "budget": 6524000
+     "unlocking": 8123,
+     "fill": 244,
+     "opCost": 6446010,
+     "budget": 6531200
     },
     {
      "role": "SI",
-     "unlocking": 6857,
-     "fill": 130,
-     "opCost": 5433135,
-     "budget": 5518400
+     "unlocking": 6841,
+     "fill": 497,
+     "opCost": 5420439,
+     "budget": 5505600
     }
    ],
-   "worstInputMarginPct": 0.02,
+   "worstInputMarginPct": 0.04,
    "tests": {
     "valid": "5/5",
     "tampered": "76/76",
@@ -263,49 +364,49 @@
    "J": 23,
    "proofBytes": 768,
    "publicInputBytes": 96,
-   "redeemBytes": 23686,
+   "redeemBytes": 23687,
    "unlocking": [
-    61109,
-    60692,
-    61526,
-    61205,
-    61687
+    60791,
+    61208,
+    60469,
+    61143,
+    61206
    ],
    "score": [
-    61207,
-    60790,
-    61624,
-    61303,
-    61785
+    60889,
+    61306,
+    60567,
+    61241,
+    61304
    ],
    "opCostStandard": [
-    54887889,
-    54706710,
-    54920888,
-    54975542,
-    55098232
+    54727861,
+    54935751,
+    54494670,
+    54841840,
+    54838643
    ],
    "opCostConsensus": [
-    54805073,
-    54624662,
-    54837304,
-    54892598,
-    55014520
+    54645813,
+    54852935,
+    54413006,
+    54759024,
+    54755699
    ],
    "opCostBchnAdjusted": [
-    54890476,
-    54709297,
-    54923475,
-    54978129,
-    55100819
+    54730448,
+    54938338,
+    54497257,
+    54844427,
+    54841230
    ],
    "defineBodyBytes": 2587,
    "budget": [
-    56887200,
-    56553600,
-    57220800,
-    56964000,
-    57349600
+    56632800,
+    56966400,
+    56375200,
+    56914400,
+    56964800
    ],
    "pad": [
     0,
@@ -314,7 +415,7 @@
     0,
     0
    ],
-   "worstMarginPct": 3.26,
+   "worstMarginPct": 3.33,
    "tests": {
     "valid": "5/5",
     "tampered": "78/78",
@@ -327,54 +428,54 @@
    "J": 14,
    "proofBytes": 768,
    "publicInputBytes": 96,
-   "redeemBytes": 23687,
+   "redeemBytes": 23688,
    "unlocking": [
-    65127,
-    64798,
-    65575,
-    65287,
-    65703
+    64808,
+    65257,
+    64533,
+    65160,
+    65224
    ],
    "score": [
-    65225,
-    64896,
-    65673,
-    65385,
-    65801
+    64906,
+    65355,
+    64631,
+    65258,
+    65322
    ],
    "opCostStandard": [
-    51944477,
-    51819767,
-    51951157,
-    51978101,
-    52156061
+    51784158,
+    51967483,
+    51607543,
+    51899973,
+    51897828
    ],
    "opCostConsensus": [
-    51861661,
-    51737719,
-    51867573,
-    51895157,
-    52072349
+    51702110,
+    51884667,
+    51525879,
+    51817157,
+    51814884
    ],
    "opCostBchnAdjusted": [
-    51947064,
-    51822354,
-    51953744,
-    51980688,
-    52158648
+    51786745,
+    51970070,
+    51610130,
+    51902560,
+    51900415
    ],
    "defineBodyBytes": 2587,
    "budget": [
-    52134400,
-    51871200,
-    52492800,
-    52262400,
-    52595200
+    51879200,
+    52238400,
+    51659200,
+    52160800,
+    52212000
    ],
    "pad": [
     1,
-    152,
     1,
+    111,
     1,
     1
    ],
@@ -397,118 +498,626 @@
    ],
    "redeemBytes": 154,
    "unlocking": [
-    83676,
-    83686,
-    83847,
-    83954,
-    83825
+    83729,
+    83808,
+    83614,
+    83788,
+    83748
    ],
    "txBytes": [
-    84126,
-    84136,
-    84297,
-    84404,
-    84275
+    84179,
+    84258,
+    84064,
+    84238,
+    84198
    ],
    "score": [
-    84476,
-    84486,
-    84647,
-    84754,
-    84625
+    84529,
+    84608,
+    84414,
+    84588,
+    84548
    ],
    "opCostStandard": [
-    66187101,
-    66095081,
-    66167129,
-    66218179,
-    66364025
+    66056949,
+    66213280,
+    65865053,
+    66092729,
+    66072508
    ],
    "opCostBchnAdjusted": [
-    66544311,
-    66452291,
-    66524339,
-    66575389,
-    66721235
+    66414179,
+    66570510,
+    66222283,
+    66449959,
+    66429738
    ],
-   "defineBodyBytesPerInput": 35721,
+   "defineBodyBytesPerInput": 35723,
    "perInput0": [
     {
      "role": "MJ",
      "unlocking": 9696,
      "fill": 0,
-     "opCost": 7684332,
+     "opCost": 7685018,
      "budget": 7789600
     },
     {
      "role": "ST",
      "unlocking": 9075,
      "fill": 0,
-     "opCost": 6931103,
+     "opCost": 6827631,
      "budget": 7292800
     },
     {
      "role": "MJ",
      "unlocking": 9858,
      "fill": 0,
-     "opCost": 7872725,
+     "opCost": 7824184,
      "budget": 7919200
     },
     {
      "role": "MA",
-     "unlocking": 6974,
-     "fill": 824,
-     "opCost": 5524570,
-     "budget": 5612000
+     "unlocking": 6972,
+     "fill": 822,
+     "opCost": 5523350,
+     "budget": 5610400
     },
     {
      "role": "MA",
-     "unlocking": 6708,
-     "fill": 819,
-     "opCost": 5312266,
-     "budget": 5399200
+     "unlocking": 6735,
+     "fill": 813,
+     "opCost": 5333515,
+     "budget": 5420800
     },
     {
      "role": "MA",
-     "unlocking": 6750,
-     "fill": 828,
-     "opCost": 5345759,
-     "budget": 5432800
+     "unlocking": 6776,
+     "fill": 821,
+     "opCost": 5365968,
+     "budget": 5453600
     },
     {
      "role": "SI",
      "unlocking": 9044,
      "fill": 0,
-     "opCost": 7219401,
+     "opCost": 7219970,
      "budget": 7268000
     },
     {
      "role": "SI",
-     "unlocking": 8408,
+     "unlocking": 8409,
      "fill": 0,
-     "opCost": 6675405,
-     "budget": 6759200
+     "opCost": 6655672,
+     "budget": 6760000
     },
     {
      "role": "SI",
-     "unlocking": 8547,
-     "fill": 667,
-     "opCost": 6783292,
-     "budget": 6870400
+     "unlocking": 8526,
+     "fill": 646,
+     "opCost": 6766129,
+     "budget": 6853600
     },
     {
      "role": "SI",
-     "unlocking": 8616,
-     "fill": 1504,
-     "opCost": 6838248,
-     "budget": 6925600
+     "unlocking": 8638,
+     "fill": 1910,
+     "opCost": 6855512,
+     "budget": 6943200
     }
    ],
-   "worstInputMarginPct": 0.12,
+   "worstInputMarginPct": 0.07,
    "tests": {
     "valid": "5/5",
     "tampered": "78/78",
     "manipulations": "33/33"
+   }
+  },
+  "range64/bch-spec": {
+   "inputs": 1,
+   "transactions": 1,
+   "J": 21,
+   "proofBytes": 864,
+   "publicInputBytes": 32,
+   "redeemBytes": 24337,
+   "unlocking": [
+    65213,
+    64412,
+    64763,
+    64955,
+    64732
+   ],
+   "score": [
+    65311,
+    64510,
+    64861,
+    65053,
+    64830
+   ],
+   "opCostStandard": [
+    58019437,
+    57485273,
+    57721326,
+    57813059,
+    57568027
+   ],
+   "opCostConsensus": [
+    57932653,
+    57399769,
+    57635054,
+    57726403,
+    57482011
+   ],
+   "opCostBchnAdjusted": [
+    58022072,
+    57487908,
+    57723961,
+    57815694,
+    57570662
+   ],
+   "defineBodyBytes": 2635,
+   "budget": [
+    60170400,
+    59529600,
+    59810400,
+    59964000,
+    59785600
+   ],
+   "pad": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "worstMarginPct": 3.43,
+   "tests": {
+    "valid": "5/5",
+    "tampered": "86/86",
+    "manipulations": "34/34"
+   }
+  },
+  "range64/100 KB input (TXv5)": {
+   "inputs": 1,
+   "transactions": 1,
+   "J": 14,
+   "proofBytes": 864,
+   "publicInputBytes": 32,
+   "redeemBytes": 24338,
+   "unlocking": [
+    69455,
+    68887,
+    69048,
+    69160,
+    68923
+   ],
+   "score": [
+    69553,
+    68985,
+    69146,
+    69258,
+    69021
+   ],
+   "opCostStandard": [
+    55545268,
+    55091294,
+    55219610,
+    55309187,
+    55119995
+   ],
+   "opCostConsensus": [
+    55458484,
+    55005790,
+    55133338,
+    55222531,
+    55033979
+   ],
+   "opCostBchnAdjusted": [
+    55547903,
+    55093929,
+    55222245,
+    55311822,
+    55122630
+   ],
+   "defineBodyBytes": 2635,
+   "budget": [
+    55596800,
+    55142400,
+    55271200,
+    55360800,
+    55171200
+   ],
+   "pad": [
+    903,
+    1234,
+    914,
+    834,
+    885
+   ],
+   "worstMarginPct": 0.09,
+   "tests": {
+    "valid": "5/5",
+    "tampered": "86/86",
+    "manipulations": "34/34"
+   }
+  },
+  "range64/today (multi-input)": {
+   "inputs": 10,
+   "transactions": 1,
+   "roles": "MJ,ST,MJ,MA,MA,MA,SI,SI,SI,SI",
+   "proofBytes": 864,
+   "publicInputBytes": 32,
+   "codeBlobs": [
+    9460,
+    3913
+   ],
+   "redeemBytes": 154,
+   "unlocking": [
+    89089,
+    88846,
+    88898,
+    88810,
+    88761
+   ],
+   "txBytes": [
+    89539,
+    89296,
+    89348,
+    89260,
+    89211
+   ],
+   "score": [
+    89889,
+    89646,
+    89698,
+    89610,
+    89561
+   ],
+   "opCostStandard": [
+    70450661,
+    70066895,
+    70170906,
+    70246098,
+    70066490
+   ],
+   "opCostBchnAdjusted": [
+    70827771,
+    70444005,
+    70548016,
+    70623208,
+    70443600
+   ],
+   "defineBodyBytesPerInput": 37711,
+   "perInput0": [
+    {
+     "role": "MJ",
+     "unlocking": 9620,
+     "fill": 0,
+     "opCost": 7638296,
+     "budget": 7728800
+    },
+    {
+     "role": "ST",
+     "unlocking": 9235,
+     "fill": 0,
+     "opCost": 7153781,
+     "budget": 7420800
+    },
+    {
+     "role": "MJ",
+     "unlocking": 9844,
+     "fill": 944,
+     "opCost": 7818655,
+     "budget": 7908000
+    },
+    {
+     "role": "MA",
+     "unlocking": 8634,
+     "fill": 173,
+     "opCost": 6850881,
+     "budget": 6940000
+    },
+    {
+     "role": "MA",
+     "unlocking": 7874,
+     "fill": 949,
+     "opCost": 6242823,
+     "budget": 6332000
+    },
+    {
+     "role": "MA",
+     "unlocking": 7321,
+     "fill": 978,
+     "opCost": 5800543,
+     "budget": 5889600
+    },
+    {
+     "role": "SI",
+     "unlocking": 9626,
+     "fill": 105,
+     "opCost": 7643633,
+     "budget": 7733600
+    },
+    {
+     "role": "SI",
+     "unlocking": 9644,
+     "fill": 0,
+     "opCost": 7582708,
+     "budget": 7748000
+    },
+    {
+     "role": "SI",
+     "unlocking": 8174,
+     "fill": 678,
+     "opCost": 6482439,
+     "budget": 6572000
+    },
+    {
+     "role": "SI",
+     "unlocking": 9117,
+     "fill": 1109,
+     "opCost": 7236902,
+     "budget": 7326400
+    }
+   ],
+   "worstInputMarginPct": 0.65,
+   "tests": {
+    "valid": "5/5",
+    "tampered": "86/86",
+    "manipulations": "35/35"
+   }
+  },
+  "merkle16rc/bch-spec": {
+   "inputs": 1,
+   "transactions": 1,
+   "J": 21,
+   "proofBytes": 864,
+   "publicInputBytes": 96,
+   "redeemBytes": 24625,
+   "unlocking": [
+    65662,
+    65245,
+    64859,
+    65214,
+    65246
+   ],
+   "score": [
+    65760,
+    65343,
+    64957,
+    65312,
+    65344
+   ],
+   "opCostStandard": [
+    57796917,
+    57740747,
+    57362132,
+    57781968,
+    57862103
+   ],
+   "opCostConsensus": [
+    57709237,
+    57653707,
+    57275604,
+    57695312,
+    57775191
+   ],
+   "opCostBchnAdjusted": [
+    57799552,
+    57743382,
+    57364767,
+    57784603,
+    57864738
+   ],
+   "defineBodyBytes": 2635,
+   "budget": [
+    60529600,
+    60196000,
+    59887200,
+    60171200,
+    60196800
+   ],
+   "pad": [
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "worstMarginPct": 3.87,
+   "tests": {
+    "valid": "5/5",
+    "tampered": "91/91",
+    "manipulations": "34/34"
+   }
+  },
+  "merkle16rc/100 KB input (TXv5)": {
+   "inputs": 1,
+   "transactions": 1,
+   "J": 14,
+   "proofBytes": 864,
+   "publicInputBytes": 96,
+   "redeemBytes": 24626,
+   "unlocking": [
+    69246,
+    69103,
+    68666,
+    69265,
+    69223
+   ],
+   "score": [
+    69344,
+    69201,
+    68764,
+    69363,
+    69321
+   ],
+   "opCostStandard": [
+    55377308,
+    55263499,
+    54913979,
+    55393162,
+    55359670
+   ],
+   "opCostConsensus": [
+    55289628,
+    55176459,
+    54827451,
+    55306506,
+    55272758
+   ],
+   "opCostBchnAdjusted": [
+    55379943,
+    55266134,
+    54916614,
+    55395797,
+    55362305
+   ],
+   "defineBodyBytes": 2635,
+   "budget": [
+    55429600,
+    55315200,
+    54965600,
+    55444800,
+    55411200
+   ],
+   "pad": [
+    310,
+    520,
+    500,
+    809,
+    606
+   ],
+   "worstMarginPct": 0.09,
+   "tests": {
+    "valid": "5/5",
+    "tampered": "91/91",
+    "manipulations": "34/34"
+   }
+  },
+  "merkle16rc/today (multi-input)": {
+   "inputs": 10,
+   "transactions": 1,
+   "roles": "MJ,ST,MJ,MA,MA,MA,SI,SI,SI,SI",
+   "proofBytes": 864,
+   "publicInputBytes": 96,
+   "codeBlobs": [
+    9745,
+    3913
+   ],
+   "redeemBytes": 154,
+   "unlocking": [
+    89375,
+    89277,
+    89002,
+    89449,
+    89341
+   ],
+   "txBytes": [
+    89825,
+    89727,
+    89452,
+    89899,
+    89791
+   ],
+   "score": [
+    90175,
+    90077,
+    89802,
+    90249,
+    90141
+   ],
+   "opCostStandard": [
+    70291142,
+    70230184,
+    69874200,
+    70349836,
+    70339902
+   ],
+   "opCostBchnAdjusted": [
+    70673992,
+    70613034,
+    70257050,
+    70732686,
+    70722752
+   ],
+   "defineBodyBytesPerInput": 38285,
+   "perInput0": [
+    {
+     "role": "MJ",
+     "unlocking": 9905,
+     "fill": 0,
+     "opCost": 7490081,
+     "budget": 7956800
+    },
+    {
+     "role": "ST",
+     "unlocking": 9300,
+     "fill": 0,
+     "opCost": 7239960,
+     "budget": 7472800
+    },
+    {
+     "role": "MJ",
+     "unlocking": 9850,
+     "fill": 950,
+     "opCost": 7822602,
+     "budget": 7912800
+    },
+    {
+     "role": "MA",
+     "unlocking": 8553,
+     "fill": 190,
+     "opCost": 6785370,
+     "budget": 6875200
+    },
+    {
+     "role": "MA",
+     "unlocking": 7848,
+     "fill": 955,
+     "opCost": 6221233,
+     "budget": 6311200
+    },
+    {
+     "role": "MA",
+     "unlocking": 7375,
+     "fill": 968,
+     "opCost": 5842688,
+     "budget": 5932800
+    },
+    {
+     "role": "SI",
+     "unlocking": 9609,
+     "fill": 88,
+     "opCost": 7629785,
+     "budget": 7720000
+    },
+    {
+     "role": "SI",
+     "unlocking": 9646,
+     "fill": 0,
+     "opCost": 7542189,
+     "budget": 7749600
+    },
+    {
+     "role": "SI",
+     "unlocking": 8176,
+     "fill": 680,
+     "opCost": 6483888,
+     "budget": 6573600
+    },
+    {
+     "role": "SI",
+     "unlocking": 9113,
+     "fill": 977,
+     "opCost": 7233346,
+     "budget": 7323200
+    }
+   ],
+   "worstInputMarginPct": 0.65,
+   "tests": {
+    "valid": "5/5",
+    "tampered": "91/91",
+    "manipulations": "35/35"
    }
   }
  },
@@ -517,79 +1126,89 @@
    {
     "phase": "decode",
     "what": "statement decode + curve checks",
-    "opCost": 323323
+    "opCost": 325406
    },
    {
     "phase": "transcript",
     "what": "gnark transcript (gamma..zeta)",
-    "opCost": 26820
+    "opCost": 26754
+   },
+   {
+    "phase": "htf",
+    "what": "BSB22 hash-to-field (3 SHA-256 per commitment)",
+    "opCost": 0
    },
    {
     "phase": "fr1",
     "what": "Fr block 1 (PI, lin, inverse check)",
-    "opCost": 142841
+    "opCost": 142909
    },
    {
     "phase": "fr2",
     "what": "v, u, t' and the MSM scalars",
-    "opCost": 167341
+    "opCost": 167139
    },
    {
     "phase": "recode",
     "what": "signed-digit recoding",
-    "opCost": 3725
+    "opCost": 3723
    },
    {
     "phase": "tables",
     "what": "MSM tables (affine, witnessed slopes)",
-    "opCost": 3396058
+    "opCost": 3395613
    },
    {
     "phase": "msmR0",
     "what": "P_right MSM",
-    "opCost": 2158450
+    "opCost": 2179692
    },
    {
     "phase": "msm",
     "what": "P* MSM (+ Wz add)",
-    "opCost": 25979354
+    "opCost": 26471030
    },
    {
     "phase": "preloop",
     "what": "SI transcript, z powers, setup",
-    "opCost": 1905096
+    "opCost": 1900888
    },
    {
     "phase": "postloop",
     "what": "Miller events (65, two fixed chains) + boundaries",
-    "opCost": 16634304
+    "opCost": 16670217
    },
    {
     "phase": "final",
     "what": "terminal, quotient, final identity",
-    "opCost": 2550377
+    "opCost": 2421675
    }
   ],
   "merkle16": [
    {
     "phase": "decode",
     "what": "statement decode + curve checks",
-    "opCost": 323967
+    "opCost": 325483
    },
    {
     "phase": "transcript",
     "what": "gnark transcript (gamma..zeta)",
-    "opCost": 26883
+    "opCost": 26850
+   },
+   {
+    "phase": "htf",
+    "what": "BSB22 hash-to-field (3 SHA-256 per commitment)",
+    "opCost": 0
    },
    {
     "phase": "fr1",
     "what": "Fr block 1 (PI, lin, inverse check)",
-    "opCost": 213703
+    "opCost": 213290
    },
    {
     "phase": "fr2",
     "what": "v, u, t' and the MSM scalars",
-    "opCost": 169170
+    "opCost": 169203
    },
    {
     "phase": "recode",
@@ -599,65 +1218,221 @@
    {
     "phase": "tables",
     "what": "MSM tables (affine, witnessed slopes)",
-    "opCost": 3395151
+    "opCost": 3396786
    },
    {
     "phase": "msmR0",
     "what": "P_right MSM",
-    "opCost": 2179003
+    "opCost": 2180565
    },
    {
     "phase": "msm",
     "what": "P* MSM (+ Wz add)",
-    "opCost": 26230276
+    "opCost": 26218866
    },
    {
     "phase": "preloop",
     "what": "SI transcript, z powers, setup",
-    "opCost": 2095014
+    "opCost": 2092489
    },
    {
     "phase": "postloop",
     "what": "Miller events (65, two fixed chains) + boundaries",
-    "opCost": 17405967
+    "opCost": 17385355
    },
    {
     "phase": "final",
     "what": "terminal, quotient, final identity",
-    "opCost": 2703584
+    "opCost": 2574022
+   }
+  ],
+  "range64": [
+   {
+    "phase": "decode",
+    "what": "statement decode + curve checks",
+    "opCost": 356335
+   },
+   {
+    "phase": "transcript",
+    "what": "gnark transcript (gamma..zeta)",
+    "opCost": 30370
+   },
+   {
+    "phase": "htf",
+    "what": "BSB22 hash-to-field (3 SHA-256 per commitment)",
+    "opCost": 9376
+   },
+   {
+    "phase": "fr1",
+    "what": "Fr block 1 (PI, lin, inverse check)",
+    "opCost": 160609
+   },
+   {
+    "phase": "fr2",
+    "what": "v, u, t' and the MSM scalars",
+    "opCost": 192931
+   },
+   {
+    "phase": "recode",
+    "what": "signed-digit recoding",
+    "opCost": 4011
+   },
+   {
+    "phase": "tables",
+    "what": "MSM tables (affine, witnessed slopes)",
+    "opCost": 3727545
+   },
+   {
+    "phase": "msmR0",
+    "what": "P_right MSM",
+    "opCost": 2158469
+   },
+   {
+    "phase": "msm",
+    "what": "P* MSM (+ Wz add)",
+    "opCost": 27802881
+   },
+   {
+    "phase": "preloop",
+    "what": "SI transcript, z powers, setup",
+    "opCost": 2288997
+   },
+   {
+    "phase": "postloop",
+    "what": "Miller events (65, two fixed chains) + boundaries",
+    "opCost": 18088976
+   },
+   {
+    "phase": "final",
+    "what": "terminal, quotient, final identity",
+    "opCost": 3050505
+   }
+  ],
+  "merkle16rc": [
+   {
+    "phase": "decode",
+    "what": "statement decode + curve checks",
+    "opCost": 360403
+   },
+   {
+    "phase": "transcript",
+    "what": "gnark transcript (gamma..zeta)",
+    "opCost": 30787
+   },
+   {
+    "phase": "htf",
+    "what": "BSB22 hash-to-field (3 SHA-256 per commitment)",
+    "opCost": 9376
+   },
+   {
+    "phase": "fr1",
+    "what": "Fr block 1 (PI, lin, inverse check)",
+    "opCost": 252529
+   },
+   {
+    "phase": "fr2",
+    "what": "v, u, t' and the MSM scalars",
+    "opCost": 193399
+   },
+   {
+    "phase": "recode",
+    "what": "signed-digit recoding",
+    "opCost": 4010
+   },
+   {
+    "phase": "tables",
+    "what": "MSM tables (affine, witnessed slopes)",
+    "opCost": 3728470
+   },
+   {
+    "phase": "msmR0",
+    "what": "P_right MSM",
+    "opCost": 2137423
+   },
+   {
+    "phase": "msm",
+    "what": "P* MSM (+ Wz add)",
+    "opCost": 27515957
+   },
+   {
+    "phase": "preloop",
+    "what": "SI transcript, z powers, setup",
+    "opCost": 2289558
+   },
+   {
+    "phase": "postloop",
+    "what": "Miller events (65, two fixed chains) + boundaries",
+    "opCost": 18027942
+   },
+   {
+    "phase": "final",
+    "what": "terminal, quotient, final identity",
+    "opCost": 3097415
    }
   ]
  },
  "bytes": {
   "mul2": {
-   "redeem": 23019,
+   "redeem": 23021,
    "chainSlopes1_2_universal": 5632,
    "chainSlopesX2_srsSpecific": 5632,
    "vkRawPoints_circuitSpecific": 517,
    "frConstants_circuitSpecific": "omega^i, n^-1, coset shift k, omega, log2(n) squarings (a few hundred bytes of pushes)",
-   "codeAndRest": 11238,
+   "codeAndRest": 11240,
    "witness": {
-    "slopes": 21024,
+    "slopes": 21280,
     "WS": 7048,
-    "WQ": 7584,
+    "WQ": 7200,
     "X": 128,
     "proof": 768,
     "PI": 64
    }
   },
   "merkle16": {
-   "redeem": 23686,
+   "redeem": 23687,
    "chainSlopes1_2_universal": 5632,
    "chainSlopesX2_srsSpecific": 5632,
    "vkRawPoints_circuitSpecific": 517,
    "frConstants_circuitSpecific": "omega^i, n^-1, coset shift k, omega, log2(n) squarings (a few hundred bytes of pushes)",
-   "codeAndRest": 11905,
+   "codeAndRest": 11906,
    "witness": {
-    "slopes": 20992,
+    "slopes": 21056,
     "WS": 7113,
-    "WQ": 8064,
+    "WQ": 7680,
     "X": 128,
     "proof": 768,
+    "PI": 96
+   }
+  },
+  "range64": {
+   "redeem": 24337,
+   "chainSlopes1_2_universal": 5632,
+   "chainSlopesX2_srsSpecific": 5632,
+   "vkRawPoints_circuitSpecific": 581,
+   "frConstants_circuitSpecific": "omega^i, n^-1, coset shift k, omega, log2(n) squarings (a few hundred bytes of pushes)",
+   "codeAndRest": 12492,
+   "witness": {
+    "slopes": 23456,
+    "WS": 7178,
+    "WQ": 8928,
+    "X": 128,
+    "proof": 864,
+    "PI": 32
+   }
+  },
+  "merkle16rc": {
+   "redeem": 24625,
+   "chainSlopes1_2_universal": 5632,
+   "chainSlopesX2_srsSpecific": 5632,
+   "vkRawPoints_circuitSpecific": 581,
+   "frConstants_circuitSpecific": "omega^i, n^-1, coset shift k, omega, log2(n) squarings (a few hundred bytes of pushes)",
+   "codeAndRest": 12780,
+   "witness": {
+    "slopes": 23456,
+    "WS": 7178,
+    "WQ": 9024,
+    "X": 128,
+    "proof": 864,
     "PI": 96
    }
   }
@@ -666,5 +1441,93 @@
   "sound-native (today, 3 inputs)": 27624,
   "sound-si-gls (bch-spec)": 21915,
   "sound-si-gls TXv5 padded (100 KB input)": 29300
+ },
+ "srs": {
+  "ceremony": "Aztec Ignition (MAIN IGNITION: 176 participants 2019-10-25..2019-12-17, then sealed); see FORMAT.md SRS and srs/",
+  "srsFileSha": "ee63bf8e2f8d4c9d55eb2ceb716da116e99b170cdb51ce39b279b1b555edbb85",
+  "tau2Raw": "260e01b251f6f1c7e7ff4e580791dee8ea51d87a358e038b4efe30fac09383c10118c4d5b837bcc2bc89b5b398b5974e9f5944073b32078b7e231fec938883b004fc6369f7110fe3d25156c1bb9a72859cf2a04641f99ba4ee413c80da6a5fe422febda3c0c0632a56475b4214e5615e11e6dd3f96e6cea2854a87d4dacc5e55"
+ },
+ "circuits": {
+  "mul2": {
+   "bsb22Commitments": 0,
+   "domainSize": 8,
+   "name": "mul2",
+   "nbConstraints": 4,
+   "nbPublic": 2,
+   "statement": "public n0, n1; private a, b with a*b == n0 and a+b == n1 (2 public inputs, the bench Groth16 fixtures' interface)",
+   "foldedBases": 8,
+   "foldedBaseNames": [
+    "Ql",
+    "Qr",
+    "Qm",
+    "Qo",
+    "S3",
+    "S1",
+    "S2",
+    "G"
+   ]
+  },
+  "merkle16": {
+   "bsb22Commitments": 0,
+   "domainSize": 16384,
+   "name": "merkle16",
+   "nbConstraints": 15110,
+   "nbPublic": 3,
+   "statement": "public root, nullifierHash, context; private nullifier, trapdoor, 16 siblings and index bits; nullifierHash == MiMC(nullifier), leaf == MiMC(nullifier, trapdoor), the path from leaf hashes to root (MiMC(left, right) per level); context is bound only as a public input",
+   "foldedBases": 9,
+   "foldedBaseNames": [
+    "Ql",
+    "Qr",
+    "Qm",
+    "Qo",
+    "Qk",
+    "S3",
+    "S1",
+    "S2",
+    "G"
+   ]
+  },
+  "range64": {
+   "bsb22Commitments": 1,
+   "domainSize": 256,
+   "name": "range64",
+   "nbConstraints": 129,
+   "nbPublic": 1,
+   "statement": "public n0; private a with a*a == n0 and 0 <= a < 2^64 (std/rangecheck: one BSB22 commitment)",
+   "foldedBases": 10,
+   "foldedBaseNames": [
+    "Ql",
+    "Qr",
+    "Qm",
+    "Qo",
+    "Qk",
+    "S3",
+    "S1",
+    "S2",
+    "Qcp0",
+    "G"
+   ]
+  },
+  "merkle16rc": {
+   "bsb22Commitments": 1,
+   "domainSize": 16384,
+   "name": "merkle16rc",
+   "nbConstraints": 15680,
+   "nbPublic": 3,
+   "statement": "merkle16 with a private 64-bit amount in the leaf: public root, nullifierHash, context; nullifierHash == MiMC(nullifier), leaf == MiMC(nullifier, trapdoor, amount), 0 <= amount < 2^64 (std/rangecheck: one BSB22 commitment), the path from leaf hashes to root (MiMC(left, right) per level)",
+   "foldedBases": 10,
+   "foldedBaseNames": [
+    "Ql",
+    "Qr",
+    "Qm",
+    "Qo",
+    "Qk",
+    "S3",
+    "S1",
+    "S2",
+    "Qcp0",
+    "G"
+   ]
+  }
  }
 }

@@ -3,7 +3,7 @@
  "regime": "spec",
  "J": 23,
  "JR": 0,
- "redeemBytes": 23019,
+ "redeemBytes": 23021,
  "valid": [
   {
    "i": 0,
@@ -11,20 +11,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 53345645,
-    "budget": 55917600,
-    "unlocking": 59897
+    "opCost": 53763744,
+    "budget": 55819200,
+    "unlocking": 59774
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 53425901,
-    "budget": 55917600,
-    "unlocking": 59897
+    "opCost": 53843232,
+    "budget": 55819200,
+    "unlocking": 59774
    },
    "pad": 0,
-   "slopes": 657,
-   "nq": 237,
+   "slopes": 665,
+   "nq": 225,
    "proofBytes": 768,
    "piBytes": 64
   },
@@ -34,20 +34,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 53589083,
-    "budget": 55711200,
-    "unlocking": 59639
+    "opCost": 53708029,
+    "budget": 56456800,
+    "unlocking": 60571
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 53669211,
-    "budget": 55711200,
-    "unlocking": 59639
+    "opCost": 53789693,
+    "budget": 56456800,
+    "unlocking": 60571
    },
    "pad": 0,
-   "slopes": 652,
-   "nq": 234,
+   "slopes": 657,
+   "nq": 258,
    "proofBytes": 768,
    "piBytes": 64
   },
@@ -57,20 +57,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 53205081,
-    "budget": 55685600,
-    "unlocking": 59607
+    "opCost": 53332797,
+    "budget": 55638400,
+    "unlocking": 59548
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 53284953,
-    "budget": 55685600,
-    "unlocking": 59607
+    "opCost": 53412157,
+    "budget": 55638400,
+    "unlocking": 59548
    },
    "pad": 0,
-   "slopes": 654,
-   "nq": 231,
+   "slopes": 661,
+   "nq": 222,
    "proofBytes": 768,
    "piBytes": 64
   },
@@ -80,20 +80,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 53465523,
-    "budget": 55506400,
-    "unlocking": 59383
+    "opCost": 53337798,
+    "budget": 55354400,
+    "unlocking": 59193
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 53545011,
-    "budget": 55506400,
-    "unlocking": 59383
+    "opCost": 53416902,
+    "budget": 55354400,
+    "unlocking": 59193
    },
    "pad": 0,
    "slopes": 653,
-   "nq": 225,
+   "nq": 219,
    "proofBytes": 768,
    "piBytes": 64
   },
@@ -103,20 +103,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 53443094,
-    "budget": 55505600,
-    "unlocking": 59382
+    "opCost": 53694849,
+    "budget": 55560800,
+    "unlocking": 59451
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 53522838,
-    "budget": 55505600,
-    "unlocking": 59382
+    "opCost": 53774209,
+    "budget": 55560800,
+    "unlocking": 59451
    },
    "pad": 0,
-   "slopes": 650,
-   "nq": 228,
+   "slopes": 658,
+   "nq": 222,
    "proofBytes": 768,
    "piBytes": 64
   }

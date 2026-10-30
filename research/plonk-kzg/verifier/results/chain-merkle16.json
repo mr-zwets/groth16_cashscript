@@ -60,157 +60,157 @@
   {
    "i": 0,
    "accepted": true,
-   "txBytes": 84126,
-   "unlocking": 83676,
+   "txBytes": 84179,
+   "unlocking": 83729,
    "inputs": 10,
    "perInput": [
     {
      "role": "MJ",
      "unlocking": 9696,
      "fill": 0,
-     "opCost": 7684332,
+     "opCost": 7685018,
      "budget": 7789600
     },
     {
      "role": "ST",
      "unlocking": 9075,
      "fill": 0,
-     "opCost": 6931103,
+     "opCost": 6827631,
      "budget": 7292800
     },
     {
      "role": "MJ",
      "unlocking": 9858,
      "fill": 0,
-     "opCost": 7872725,
+     "opCost": 7824184,
      "budget": 7919200
     },
     {
      "role": "MA",
-     "unlocking": 6974,
-     "fill": 824,
-     "opCost": 5524570,
-     "budget": 5612000
+     "unlocking": 6972,
+     "fill": 822,
+     "opCost": 5523350,
+     "budget": 5610400
     },
     {
      "role": "MA",
-     "unlocking": 6708,
-     "fill": 819,
-     "opCost": 5312266,
-     "budget": 5399200
+     "unlocking": 6735,
+     "fill": 813,
+     "opCost": 5333515,
+     "budget": 5420800
     },
     {
      "role": "MA",
-     "unlocking": 6750,
-     "fill": 828,
-     "opCost": 5345759,
-     "budget": 5432800
+     "unlocking": 6776,
+     "fill": 821,
+     "opCost": 5365968,
+     "budget": 5453600
     },
     {
      "role": "SI",
      "unlocking": 9044,
      "fill": 0,
-     "opCost": 7219401,
+     "opCost": 7219970,
      "budget": 7268000
     },
     {
      "role": "SI",
-     "unlocking": 8408,
+     "unlocking": 8409,
      "fill": 0,
-     "opCost": 6675405,
-     "budget": 6759200
+     "opCost": 6655672,
+     "budget": 6760000
     },
     {
      "role": "SI",
-     "unlocking": 8547,
-     "fill": 667,
-     "opCost": 6783292,
-     "budget": 6870400
+     "unlocking": 8526,
+     "fill": 646,
+     "opCost": 6766129,
+     "budget": 6853600
     },
     {
      "role": "SI",
-     "unlocking": 8616,
-     "fill": 1504,
-     "opCost": 6838248,
-     "budget": 6925600
+     "unlocking": 8638,
+     "fill": 1910,
+     "opCost": 6855512,
+     "budget": 6943200
     }
    ]
   },
   {
    "i": 1,
    "accepted": true,
-   "txBytes": 84136,
-   "unlocking": 83686,
+   "txBytes": 84258,
+   "unlocking": 83808,
    "inputs": 10,
    "perInput": [
     {
      "role": "MJ",
-     "unlocking": 9800,
-     "fill": 103,
-     "opCost": 7784894,
-     "budget": 7872800
+     "unlocking": 9696,
+     "fill": 0,
+     "opCost": 7682306,
+     "budget": 7789600
     },
     {
      "role": "ST",
      "unlocking": 9075,
      "fill": 0,
-     "opCost": 6826045,
+     "opCost": 6932698,
      "budget": 7292800
     },
     {
      "role": "MJ",
      "unlocking": 9858,
      "fill": 0,
-     "opCost": 7872632,
+     "opCost": 7824272,
      "budget": 7919200
     },
     {
      "role": "MA",
-     "unlocking": 6918,
-     "fill": 832,
-     "opCost": 5479722,
-     "budget": 5567200
+     "unlocking": 6949,
+     "fill": 831,
+     "opCost": 5504482,
+     "budget": 5592000
     },
     {
      "role": "MA",
-     "unlocking": 6764,
-     "fill": 809,
-     "opCost": 5356811,
-     "budget": 5444000
+     "unlocking": 6817,
+     "fill": 797,
+     "opCost": 5399460,
+     "budget": 5486400
     },
     {
      "role": "MA",
-     "unlocking": 6670,
-     "fill": 845,
-     "opCost": 5281693,
-     "budget": 5368800
+     "unlocking": 6780,
+     "fill": 825,
+     "opCost": 5369530,
+     "budget": 5456800
     },
     {
      "role": "SI",
      "unlocking": 9044,
      "fill": 0,
-     "opCost": 7223802,
+     "opCost": 7211445,
      "budget": 7268000
     },
     {
      "role": "SI",
-     "unlocking": 8408,
+     "unlocking": 8409,
      "fill": 0,
-     "opCost": 6659064,
-     "budget": 6759200
+     "opCost": 6654592,
+     "budget": 6760000
     },
     {
      "role": "SI",
-     "unlocking": 8511,
-     "fill": 631,
-     "opCost": 6754269,
-     "budget": 6841600
+     "unlocking": 8542,
+     "fill": 662,
+     "opCost": 6778958,
+     "budget": 6866400
     },
     {
      "role": "SI",
      "unlocking": 8638,
-     "fill": 1910,
-     "opCost": 6856149,
+     "fill": 1526,
+     "opCost": 6855537,
      "budget": 6943200
     }
    ]
@@ -218,237 +218,237 @@
   {
    "i": 2,
    "accepted": true,
-   "txBytes": 84297,
-   "unlocking": 83847,
+   "txBytes": 84064,
+   "unlocking": 83614,
    "inputs": 10,
    "perInput": [
     {
      "role": "MJ",
      "unlocking": 9696,
      "fill": 0,
-     "opCost": 7586342,
+     "opCost": 7634564,
      "budget": 7789600
     },
     {
      "role": "ST",
      "unlocking": 9075,
      "fill": 0,
-     "opCost": 7040314,
+     "opCost": 6740537,
      "budget": 7292800
     },
     {
      "role": "MJ",
      "unlocking": 9858,
      "fill": 0,
-     "opCost": 7773745,
+     "opCost": 7874000,
      "budget": 7919200
     },
     {
      "role": "MA",
-     "unlocking": 7029,
-     "fill": 815,
-     "opCost": 5568498,
-     "budget": 5656000
+     "unlocking": 6923,
+     "fill": 837,
+     "opCost": 5483702,
+     "budget": 5571200
     },
     {
      "role": "MA",
-     "unlocking": 6710,
-     "fill": 821,
-     "opCost": 5313348,
-     "budget": 5400800
+     "unlocking": 6684,
+     "fill": 827,
+     "opCost": 5292398,
+     "budget": 5380000
     },
     {
      "role": "MA",
-     "unlocking": 6750,
-     "fill": 828,
-     "opCost": 5345552,
-     "budget": 5432800
+     "unlocking": 6749,
+     "fill": 827,
+     "opCost": 5344788,
+     "budget": 5432000
     },
     {
      "role": "SI",
-     "unlocking": 9119,
-     "fill": 75,
-     "opCost": 7240336,
-     "budget": 7328000
-    },
-    {
-     "role": "SI",
-     "unlocking": 8408,
+     "unlocking": 9044,
      "fill": 0,
-     "opCost": 6646476,
-     "budget": 6759200
+     "opCost": 7203085,
+     "budget": 7268000
     },
     {
      "role": "SI",
-     "unlocking": 8538,
-     "fill": 658,
-     "opCost": 6775918,
-     "budget": 6863200
+     "unlocking": 8409,
+     "fill": 0,
+     "opCost": 6659929,
+     "budget": 6760000
     },
     {
      "role": "SI",
-     "unlocking": 8664,
-     "fill": 1168,
-     "opCost": 6876600,
-     "budget": 6964000
+     "unlocking": 8528,
+     "fill": 648,
+     "opCost": 6767961,
+     "budget": 6855200
+    },
+    {
+     "role": "SI",
+     "unlocking": 8648,
+     "fill": 2048,
+     "opCost": 6864089,
+     "budget": 6951200
     }
    ]
   },
   {
    "i": 3,
    "accepted": true,
-   "txBytes": 84404,
-   "unlocking": 83954,
+   "txBytes": 84238,
+   "unlocking": 83788,
    "inputs": 10,
    "perInput": [
     {
      "role": "MJ",
      "unlocking": 9696,
      "fill": 0,
-     "opCost": 7536431,
+     "opCost": 7635439,
      "budget": 7789600
     },
     {
      "role": "ST",
      "unlocking": 9075,
      "fill": 0,
-     "opCost": 6967255,
-     "budget": 7292800
-    },
-    {
-     "role": "MJ",
-     "unlocking": 9974,
-     "fill": 115,
-     "opCost": 7924360,
-     "budget": 8012000
-    },
-    {
-     "role": "MA",
-     "unlocking": 7004,
-     "fill": 822,
-     "opCost": 5548651,
-     "budget": 5636000
-    },
-    {
-     "role": "MA",
-     "unlocking": 6738,
-     "fill": 816,
-     "opCost": 5335819,
-     "budget": 5423200
-    },
-    {
-     "role": "MA",
-     "unlocking": 6749,
-     "fill": 827,
-     "opCost": 5345004,
-     "budget": 5432000
-    },
-    {
-     "role": "SI",
-     "unlocking": 9114,
-     "fill": 70,
-     "opCost": 7236510,
-     "budget": 7324000
-    },
-    {
-     "role": "SI",
-     "unlocking": 8408,
-     "fill": 0,
-     "opCost": 6676233,
-     "budget": 6759200
-    },
-    {
-     "role": "SI",
-     "unlocking": 8548,
-     "fill": 668,
-     "opCost": 6783776,
-     "budget": 6871200
-    },
-    {
-     "role": "SI",
-     "unlocking": 8648,
-     "fill": 1408,
-     "opCost": 6864140,
-     "budget": 6951200
-    }
-   ]
-  },
-  {
-   "i": 4,
-   "accepted": true,
-   "txBytes": 84275,
-   "unlocking": 83825,
-   "inputs": 10,
-   "perInput": [
-    {
-     "role": "MJ",
-     "unlocking": 9696,
-     "fill": 0,
-     "opCost": 7633221,
-     "budget": 7789600
-    },
-    {
-     "role": "ST",
-     "unlocking": 9075,
-     "fill": 0,
-     "opCost": 7073834,
+     "opCost": 6832991,
      "budget": 7292800
     },
     {
      "role": "MJ",
      "unlocking": 9858,
      "fill": 0,
-     "opCost": 7873359,
+     "opCost": 7874148,
      "budget": 7919200
     },
     {
      "role": "MA",
-     "unlocking": 6974,
-     "fill": 824,
-     "opCost": 5524641,
-     "budget": 5612000
+     "unlocking": 6976,
+     "fill": 826,
+     "opCost": 5526302,
+     "budget": 5613600
     },
     {
      "role": "MA",
-     "unlocking": 6711,
-     "fill": 822,
-     "opCost": 5314127,
-     "budget": 5401600
+     "unlocking": 6765,
+     "fill": 810,
+     "opCost": 5357182,
+     "budget": 5444800
     },
     {
      "role": "MA",
-     "unlocking": 6836,
-     "fill": 816,
-     "opCost": 5413951,
-     "budget": 5501600
+     "unlocking": 6778,
+     "fill": 823,
+     "opCost": 5367730,
+     "budget": 5455200
     },
     {
      "role": "SI",
-     "unlocking": 9114,
-     "fill": 70,
-     "opCost": 7236685,
-     "budget": 7324000
-    },
-    {
-     "role": "SI",
-     "unlocking": 8408,
+     "unlocking": 9044,
      "fill": 0,
-     "opCost": 6680598,
-     "budget": 6759200
+     "opCost": 7215289,
+     "budget": 7268000
     },
     {
      "role": "SI",
-     "unlocking": 8516,
-     "fill": 636,
-     "opCost": 6758199,
-     "budget": 6845600
+     "unlocking": 8409,
+     "fill": 0,
+     "opCost": 6643052,
+     "budget": 6760000
     },
     {
      "role": "SI",
-     "unlocking": 8637,
-     "fill": 1013,
-     "opCost": 6855410,
-     "budget": 6942400
+     "unlocking": 8533,
+     "fill": 653,
+     "opCost": 6771576,
+     "budget": 6859200
+    },
+    {
+     "role": "SI",
+     "unlocking": 8654,
+     "fill": 1542,
+     "opCost": 6869020,
+     "budget": 6956000
+    }
+   ]
+  },
+  {
+   "i": 4,
+   "accepted": true,
+   "txBytes": 84198,
+   "unlocking": 83748,
+   "inputs": 10,
+   "perInput": [
+    {
+     "role": "MJ",
+     "unlocking": 9696,
+     "fill": 0,
+     "opCost": 7586002,
+     "budget": 7789600
+    },
+    {
+     "role": "ST",
+     "unlocking": 9075,
+     "fill": 0,
+     "opCost": 6868052,
+     "budget": 7292800
+    },
+    {
+     "role": "MJ",
+     "unlocking": 9858,
+     "fill": 0,
+     "opCost": 7873184,
+     "budget": 7919200
+    },
+    {
+     "role": "MA",
+     "unlocking": 6950,
+     "fill": 832,
+     "opCost": 5505751,
+     "budget": 5592800
+    },
+    {
+     "role": "MA",
+     "unlocking": 6738,
+     "fill": 816,
+     "opCost": 5335877,
+     "budget": 5423200
+    },
+    {
+     "role": "MA",
+     "unlocking": 6805,
+     "fill": 818,
+     "opCost": 5389540,
+     "budget": 5476800
+    },
+    {
+     "role": "SI",
+     "unlocking": 9044,
+     "fill": 0,
+     "opCost": 7227241,
+     "budget": 7268000
+    },
+    {
+     "role": "SI",
+     "unlocking": 8409,
+     "fill": 0,
+     "opCost": 6658262,
+     "budget": 6760000
+    },
+    {
+     "role": "SI",
+     "unlocking": 8531,
+     "fill": 651,
+     "opCost": 6769882,
+     "budget": 6857600
+    },
+    {
+     "role": "SI",
+     "unlocking": 8642,
+     "fill": 1402,
+     "opCost": 6858717,
+     "budget": 6946400
     }
    ]
   }
@@ -487,7 +487,7 @@
   {
    "name": "point.R.infinity",
    "rejected": true,
-   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
    "how": "reused"
   },
   {
@@ -523,7 +523,7 @@
   {
    "name": "point.H0.infinity",
    "rejected": true,
-   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
    "how": "reused"
   },
   {
@@ -703,7 +703,7 @@
   {
    "name": "point.R.offCurve",
    "rejected": true,
-   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
    "how": "reused"
   },
   {
@@ -739,7 +739,7 @@
   {
    "name": "point.H0.offCurve",
    "rejected": true,
-   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
    "how": "reused"
   },
   {
@@ -947,7 +947,7 @@
   {
    "name": "TV entry bit flip",
    "rejected": true,
-   "error": "Unable to verify transaction: error in evaluating input index 2: Program failed an OP_VERIFY operation."
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation."
   },
   {
    "name": "DS (chain slopes) bit flip",

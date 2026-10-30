@@ -3,7 +3,7 @@
  "regime": "txv5",
  "J": 14,
  "JR": 0,
- "redeemBytes": 23020,
+ "redeemBytes": 23022,
  "valid": [
   {
    "i": 0,
@@ -11,20 +11,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 50458262,
-    "budget": 51112800,
-    "unlocking": 63850
+    "opCost": 50820294,
+    "budget": 51065600,
+    "unlocking": 63791
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 50538518,
-    "budget": 51112800,
-    "unlocking": 63850
+    "opCost": 50899782,
+    "budget": 51065600,
+    "unlocking": 63791
    },
    "pad": 1,
-   "slopes": 779,
-   "nq": 237,
+   "slopes": 789,
+   "nq": 225,
    "proofBytes": 768,
    "piBytes": 64
   },
@@ -34,20 +34,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 50620886,
-    "budget": 50984000,
-    "unlocking": 63689
+    "opCost": 50822007,
+    "budget": 51652000,
+    "unlocking": 64524
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 50701014,
-    "budget": 50984000,
-    "unlocking": 63689
+    "opCost": 50903671,
+    "budget": 51652000,
+    "unlocking": 64524
    },
    "pad": 1,
-   "slopes": 777,
-   "nq": 234,
+   "slopes": 779,
+   "nq": 258,
    "proofBytes": 768,
    "piBytes": 64
   },
@@ -57,20 +57,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 50291745,
-    "budget": 50907200,
-    "unlocking": 63593
+    "opCost": 50418539,
+    "budget": 50859200,
+    "unlocking": 63533
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 50371617,
-    "budget": 50907200,
-    "unlocking": 63593
+    "opCost": 50497899,
+    "budget": 50859200,
+    "unlocking": 63533
    },
    "pad": 1,
-   "slopes": 777,
-   "nq": 231,
+   "slopes": 784,
+   "nq": 222,
    "proofBytes": 768,
    "piBytes": 64
   },
@@ -80,20 +80,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 50497349,
-    "budget": 50779200,
-    "unlocking": 63433
+    "opCost": 50423139,
+    "budget": 50575200,
+    "unlocking": 63178
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 50576837,
-    "budget": 50779200,
-    "unlocking": 63433
+    "opCost": 50502243,
+    "budget": 50575200,
+    "unlocking": 63178
    },
    "pad": 1,
-   "slopes": 778,
-   "nq": 225,
+   "slopes": 776,
+   "nq": 219,
    "proofBytes": 768,
    "piBytes": 64
   },
@@ -103,20 +103,20 @@
    "consensus": {
     "accepted": true,
     "error": null,
-    "opCost": 50500053,
-    "budget": 50752000,
-    "unlocking": 63399
+    "opCost": 50724820,
+    "budget": 50855200,
+    "unlocking": 63528
    },
    "standard": {
     "accepted": true,
     "error": null,
-    "opCost": 50579797,
-    "budget": 50752000,
-    "unlocking": 63399
+    "opCost": 50804180,
+    "budget": 50855200,
+    "unlocking": 63528
    },
-   "pad": 1,
-   "slopes": 774,
-   "nq": 228,
+   "pad": 29,
+   "slopes": 783,
+   "nq": 222,
    "proofBytes": 768,
    "piBytes": 64
   }
@@ -126,7 +126,7 @@
    "name": "point.L.plusG",
    "how": "adaptive",
    "rejected": true,
-   "error": "Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 50548800 (density control length: 63186); operation cost following operation: 50548856."
+   "error": "Unable to verify transaction: error in evaluating input index 0: Unsuccessful evaluation: completed with a non-truthy value on top of the stack. Top stack item: \"\"."
   },
   {
    "name": "point.L.negated",
