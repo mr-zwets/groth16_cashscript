@@ -71,6 +71,8 @@ export function makeGenN(vk, stmt, opts = {}) {
     if (nextId >= 100) throw new Error('too many functions');
     fns.set(name, {id, body: Uint8Array.from(body)}); return id;
   };
+  // define, or reuse a function with the same body (roles share the query function when their bodies are identical)
+  const defShared = (name, body) => { const b = Buffer.from(body); for (const [, f] of fns) if (Buffer.from(f.body).equals(b)) return f.id; return defFn(name, body); };
   const marks = [];
   const mark = (stk, label) => { marks.push([label, stk.code.length]); if (opts.markers) stk.emit('NOP'); };
   const F = {};
@@ -123,7 +125,7 @@ export function makeGenN(vk, stmt, opts = {}) {
   const zeta = names('ze', D), alpha = names('al', D), alphaP = names('ap', D);
   const la0 = vk.logArities[0], hf0 = vk.logH - la0, nT = Math.ceil(hf0 / 4);
   const arities = [...new Set(vk.logArities)];
-  const g = {vk, D, h, Q, F, fns, defFn, marks, mark, GG, GH, tblFn, dagStats: []};
+  const g = {vk, D, h, Q, F, fns, defFn, defShared, marks, mark, GG, GH, tblFn, dagStats: []};
 
   // ---------------- statement ----------------
   // full/p0: sizes of the PT and statement items, NF lanes (pool) or every public value (witness) < p, CTX bytes
@@ -805,8 +807,8 @@ export function makeGenN(vk, stmt, opts = {}) {
 // ---------------- a role's main program ----------------
 // role 'full' | 'p0' | 'p1'; qs: the role's query numbers (ascending); pin: {selfIndex, otherIndex, otherLocking:
 // {pre, post} (bytes around H_lib)} for b2
-function buildMain(g, stmt, role, qs, pin) {
-  const {vk, D, h, F, defFn, mark} = g;
+function buildMain(g, stmt, role, qs, pin, share = false) {
+  const {vk, D, h, F, defFn, defShared, mark} = g;
   const Q = vk.Q, Qp = qs.length, RG = 2, nTrees = vk.trees.length, nRec = Math.ceil(Qp / RG);
   const pool = stmt.mode === 'pool';
   const init = [];
@@ -822,7 +824,14 @@ function buildMain(g, stmt, role, qs, pin) {
   S.emit('DEPTH', init.length, 'NUMEQUALVERIFY');
   if (role === 'p1') g.parseTail(S);
   g.statement(S, role);
-  g.transcript(S);
+  // b2: the transcript and the DEEP/FRI constants are shared functions over a canonical region on top of the stack
+  const shared = (key, region, body) => {
+    for (const x of region) S.roll(x);
+    if (!g[key]) { const s = new Stk(region); body(s); g[key] = {id: defFn(key, s.bytes()), outs: [...s.st]}; }
+    S.raw([g[key].id, 'INVOKE'], region.length, g[key].outs);
+  };
+  const tRegion = [...g.tailItems().map(([x]) => x).filter((x) => x !== 'CTXW'), ...(pool ? ['CTXB'] : [])];
+  if (share) shared('TRANSCRIPT', tRegion, (s) => g.transcript(s)); else g.transcript(S);
   // keep this role's indices (renamed idx0 .. idx_{Qp-1}, deepest first)
   for (let q = 0; q < Q; q++) if (!qs.includes(q)) S.drop('idx' + q);
   qs.forEach((q, j) => S.rename('idx' + q, 'jdx' + j));
@@ -830,8 +839,8 @@ function buildMain(g, stmt, role, qs, pin) {
   if (role !== 'p1') g.air(S);
   else for (const x of [...(vk.hasLookups ? ['TERM'] : []), ...(pool ? [] : []), 'al0', 'al1', 'al2']) if (S.has(x)) S.drop(x);
   if (role === 'p1' && vk.hasLookups) for (const x of ['la0', 'la1', 'la2', 'lb0', 'lb1', 'lb2']) if (S.has(x)) S.drop(x);
-  g.consts(S);
-  g.unpack(S);
+  const cRegion = ['OOD', 'FIN', ...names('ze', D), ...names('ap', D), ...vk.logArities.flatMap((_, r) => names(`be${r}_`, D))];
+  if (share) shared('CONSTS', cRegion, (s) => { g.consts(s); g.unpack(s); }); else { g.consts(S); g.unpack(S); }
   // queries
   { const lo = S.st.indexOf('idx0'); for (const x of S.st.slice(0, lo)) if (!/^(L\d|R\d|ROOTS|FROOTS)/.test(x)) S.roll(x); }
   {
@@ -847,7 +856,7 @@ function buildMain(g, stmt, role, qs, pin) {
       const extra = Qs.st.filter((x) => !qWant.includes(x)), missing = qWant.filter((x) => !Qs.st.includes(x));
       throw new Error(`query function leaves extra [${extra}] missing [${missing}]`);
     }
-    const idQ = defFn('Q_' + role, Qs.bytes());
+    const idQ = defShared('Q_' + role, Qs.bytes());
     S.raw(['BEGIN', idQ, 'INVOKE', '1SUB', 'DUP', 'NOT', 'UNTIL', 'DROP'], 1);
     S.st.splice(0, Qp);
     for (let j = 0; j < Qp; j++) S.st.splice(S.st.indexOf('idx' + j), 1);
@@ -936,8 +945,8 @@ export function buildB2(vk, stmt, QA, opts = {}) {
   const tailLen = g.tailItems().reduce((s, [, len]) => s + pushPrefix(len).length + len, 0);
   const T = lockingTemplates(tailLen);
   const q0 = Array.from({length: QA}, (_, q) => q), q1 = Array.from({length: vk.Q - QA}, (_, q) => QA + q);
-  const m0 = buildMain(g, stmt, 'p0', q0, {selfIndex: 0, otherIndex: 1, otherLocking: T.l1});
-  const m1 = buildMain(g, stmt, 'p1', q1, {selfIndex: 1, otherIndex: 0, otherLocking: T.l0});
+  const m0 = buildMain(g, stmt, 'p0', q0, {selfIndex: 0, otherIndex: 1, otherLocking: T.l1}, true);
+  const m1 = buildMain(g, stmt, 'p1', q1, {selfIndex: 1, otherIndex: 0, otherLocking: T.l0}, true);
   g.fns.set('MAIN0', {id: MAIN0, body: m0.main}); g.fns.set('MAIN1', {id: MAIN1, body: m1.main});
   const lib = Buffer.concat([...g.fns.values()].map((f) => { const len = Buffer.alloc(3); len.writeUIntLE(f.body.length, 0, 3); return Buffer.concat([Buffer.of(f.id), len, Buffer.from(f.body)]); }));
   if (lib.length < 256 || lib.length >= 65536) throw new Error('lib length outside PUSHDATA2');
