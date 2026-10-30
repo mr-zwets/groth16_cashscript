@@ -33,7 +33,7 @@ for (const c of ['mul2', 'merkle16', 'range64', 'merkle16rc']) {
     const f = `test-${c}-${reg}.json`; if (!existsSync(new URL('./results/' + f, import.meta.url))) continue;
     const t = R(f); const {redeem, info} = buildRedeem(vk, {J: J[reg], pad: reg === 'txv5'});
     const defBytes = Object.values(info.funcs).reduce((a, b) => a + b, 0);
-    const v = t.valid.map((x) => ({unlocking: x.standard.unlocking, opStd: x.standard.opCost, opCons: x.consensus.opCost, budget: x.standard.budget, pad: x.pad}));
+    const v = t.valid.filter((x) => x.consensus.accepted && x.standard.accepted).map((x) => ({unlocking: x.standard.unlocking, opStd: x.standard.opCost, opCons: x.consensus.opCost, budget: x.standard.budget, pad: x.pad}));
     const worst = v.reduce((a, b) => (b.opStd / b.budget > a.opStd / a.budget ? b : a));
     out.regimes[`${c}/${reg === 'spec' ? 'bch-spec' : '100 KB input (TXv5)'}`] = {inputs: 1, transactions: 1, J: J[reg], proofBytes: proofLen(vk), publicInputBytes: 32 * vk.nbPublic, redeemBytes: redeem.length,
       unlocking: v.map((x) => x.unlocking), score: v.map((x) => score(x.unlocking, 1)), opCostStandard: v.map((x) => x.opStd), opCostConsensus: v.map((x) => x.opCons),
@@ -55,13 +55,15 @@ for (const c of ['mul2', 'merkle16', 'range64', 'merkle16rc']) {
     const t = R(cf); const plan = makePlan(vk, planOpts(vk, c)); const built = buildMulti(vk, plan);
     // every input defines C1 and C0 (functions 0, 1) and then every function inside them
     const defBytes = built.defBytes;
-    const v = t.valid;
+    // ranges over the accepted valid proofs only (a rejected one is counted in the tally, not in the ranges)
+    const v = t.valid.filter((x) => x.accepted); if (!v.length) throw new Error(cf + ': no accepted valid proof');
     out.regimes[`${c}/today (multi-input)`] = {inputs: v[0].inputs, transactions: 1, roles: v[0].perInput.map((x) => x.role).join(','), proofBytes: proofLen(vk), publicInputBytes: 32 * vk.nbPublic,
       codeBlobs: t.codeBytes, redeemBytes: t.redeemBytes, unlocking: v.map((x) => x.unlocking), txBytes: v.map((x) => x.txBytes), score: v.map((x) => score(x.unlocking, x.inputs)),
       opCostStandard: v.map((x) => x.perInput.reduce((s, y) => s + y.opCost, 0)), opCostBchnAdjusted: v.map((x) => x.perInput.reduce((s, y) => s + y.opCost, 0) + x.inputs * defBytes),
       defineBodyBytesPerInput: defBytes, perInput0: v[0].perInput,
       worstInputMarginPct: +(100 * Math.min(...v.flatMap((x) => x.perInput.map((y) => 1 - (y.opCost + defBytes) / y.budget)))).toFixed(2),
-      tests: {valid: `${v.filter((x) => x.accepted).length}/${v.length}`, tampered: `${t.tampered.filter((x) => x.rejected).length}/${t.tampered.length}`, manipulations: `${t.manipulations.filter((x) => x.rejected).length}/${t.manipulations.length}`}};
+      nq: v.map((x) => x.nq), tests: {valid: `${t.valid.filter((x) => x.accepted).length}/${t.valid.length}`, tampered: `${t.tampered.filter((x) => x.rejected).length}/${t.tampered.length}`, manipulations: `${t.manipulations.filter((x) => x.rejected).length}/${t.manipulations.length}`}};
+    if (existsSync(new URL(`./results/liveness-${c}.json`, import.meta.url))) out.regimes[`${c}/today (multi-input)`].liveness = R(`liveness-${c}.json`).summary;
   }
 }
 writeFileSync(new URL('./results/summary.json', import.meta.url), JSON.stringify(out, null, 1) + '\n');

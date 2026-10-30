@@ -26,7 +26,7 @@ const program = (inputs, outputs, inputIndex) => ({inputIndex, sourceOutputs: in
 export function spendTx(regime, mode, inputs, outputs) {
   const vm = VMS[regime][mode];
   return inputs.map((inp, k) => { const prog = program(inputs, outputs, k); const st = vm.evaluate(prog); const ok = vm.verify({sourceOutputs: prog.sourceOutputs, transaction: prog.transaction});
-    return {accepted: ok === true && !st.error, error: st.error ?? (ok === true ? null : String(ok)), opCost: st.metrics.operationCost, budget: (VMS[regime].base + inp.unlocking.length) * 800, unlockingLen: inp.unlocking.length, metrics: st.metrics}; });
+    return {accepted: ok === true && !st.error, error: st.error ?? (ok === true ? null : String(ok)), evalError: st.error ?? null, opCost: st.metrics.operationCost, budget: (VMS[regime].base + inp.unlocking.length) * 800, unlockingLen: inp.unlocking.length, metrics: st.metrics}; });
 }
 // whole-transaction verdict only (fast: libauth stops at the first failing input)
 export function verifyTx(regime, mode, inputs, outputs) { const vm = VMS[regime][mode]; const prog = program(inputs, outputs, 0); const ok = vm.verify({sourceOutputs: prog.sourceOutputs, transaction: prog.transaction}); return {accepted: ok === true, error: ok === true ? null : String(ok)}; }

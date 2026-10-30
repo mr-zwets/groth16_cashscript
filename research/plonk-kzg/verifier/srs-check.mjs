@@ -6,13 +6,14 @@
 // The verifier uses three SRS points: [1]_1, [1]_2 and [x]_2. [1]_1 and [1]_2 are the standard BN254 generators.
 // [x]_2 enters the scripts only through the fixed-G2 Miller chain of the KZG pairing: 88 baked slopes per chain
 // (single input: raw slope pile pieces in the redeem; today's chain: the SHA-256 of each SI role's slope slice,
-// and the affine x of [x]_2 and of psi([x]_2), pushed as numbers and not byte-checked here). This script
+// and the affine x, y of [x]_2 and the x of psi([x]_2), pushed as script numbers by the SI code). This script
 //   1. takes [x]_2 from the ceremony (pinned below; the same four words as manifest.json crs.t2 and the G2 point
 //      hardcoded in Aztec's barretenberg Solidity verifiers), independently of the vectors;
 //   2. checks that every VK in vectors/ (and the prover track's vectors/, if present) carries exactly
 //      [1]_1, [1]_2 and that [x]_2;
 //   3. recomputes the chain constants from the ceremony point, builds the single-input redeem and the
-//      multi-input chain for every circuit, and checks that every constant derived from [x]_2 is in them;
+//      multi-input chain for every circuit, and checks that every constant derived from [x]_2 is in them
+//      (slope pieces / slice hashes, and the minimal number pushes of x([x]_2), y([x]_2), x(psi([x]_2)));
 //   4. control: the constants of a different G2 point are not in them.
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
@@ -21,6 +22,7 @@ import {join} from 'node:path';
 import {G1, G2, F2, mod, chainConsts} from './math.mjs';
 import {parseVK, loadVectors, le32, PROVER_DIR} from './plonk.mjs';
 import {buildRedeem, D_PIECE} from './script.mjs';
+import {pushNum} from './asm.mjs';
 import {makePlan, buildMulti, dsSlice, planOpts} from './multi.mjs';
 
 const IGNITION_T2 = { // x.c0, x.c1, y.c0, y.c1
@@ -49,6 +51,8 @@ const piles = (A, B) => { const steps = Array.from({length: 88}, (_, j) => stepB
   for (let i = 0; i < 88; i += D_PIECE) out.push(Buffer.concat(steps.slice(i, i + D_PIECE))); return out; };
 const CA = chainConsts(G2.BASE), CB = chainConsts(T2);
 const CTRL = chainConsts(G2.BASE.multiply(7n)); // control: another G2 point
+// the [x]_2 point constants the SI code pushes as numbers: x and y of [x]_2 (chain start), x of psi([x]_2) (terminal)
+const numPushes = (C) => [C.aff.x.c0, C.aff.x.c1, C.aff.y.c0, C.aff.y.c1, C.psi1x.c0, C.psi1x.c1].map((v) => Buffer.from(pushNum(mod(v))));
 
 for (const name of ['mul2', 'merkle16', 'range64', 'merkle16rc']) { // v1 and BSB22 (v2-bsb22) vectors
   const V = loadVectors(name);
@@ -66,6 +70,8 @@ for (const name of ['mul2', 'merkle16', 'range64', 'merkle16rc']) { // v1 and BS
   const pp = piles(CA, CB);
   ok(pp.every((x) => R.indexOf(x) >= 0), `${name}: single-input redeem (${R.length} B) holds all ${pp.length} slope pieces of the ceremony chain`);
   ok(piles(CA, CTRL).every((x) => R.indexOf(x) < 0), `${name}: control: no slope piece of another G2 point is in it`);
+  ok(numPushes(CB).every((x) => R.indexOf(x) >= 0), `${name}: single-input redeem pushes x, y of [x]_2 and x of psi([x]_2) (6 numbers)`);
+  ok(numPushes(CTRL).every((x) => R.indexOf(x) < 0), `${name}: control: none of those 6 numbers of another G2 point is in it`);
 
   // today's chain: each SI role checks SHA256(its slope slice) against a baked hash
   const plan = makePlan(vk, planOpts(vk, name)), built = buildMulti(vk, plan);
@@ -74,5 +80,7 @@ for (const name of ['mul2', 'merkle16', 'range64', 'merkle16rc']) { // v1 and BS
   const CH = {a: CA, b: CB}, CHc = {a: CA, b: CTRL};
   ok(si.every((ro) => all.indexOf(sha(dsSlice(CH, ro))) >= 0), `${name}: chain scripts (${all.length} B) hold SHA256 of all ${si.length} SI slope slices of the ceremony chain`);
   ok(si.every((ro) => all.indexOf(sha(dsSlice(CHc, ro))) < 0), `${name}: control: no slice hash of another G2 point is in them`);
+  ok(numPushes(CB).every((x) => all.indexOf(x) >= 0), `${name}: chain scripts push x, y of [x]_2 and x of psi([x]_2) (6 numbers)`);
+  ok(numPushes(CTRL).every((x) => all.indexOf(x) < 0), `${name}: control: none of those 6 numbers of another G2 point is in them`);
 }
 console.log('OK: the verifier\'s SRS constants are the Aztec Ignition ceremony\'s');

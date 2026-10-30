@@ -19,6 +19,17 @@ combined). This is the default build, and what the argument below covers:
 - **Chain (Lemma 3):** the 11 variable-base tables no longer fit one 10,000-byte push, so TV is split into TV (first 9
   bases, input 2) and TV2 (the rest, input 3). Each host checks its own entries (CHK15); LOADT reads both; ST reads
   the Wζω table from whichever holds it. The roles, cuts and blob hosts of each circuit are in `plans.json`.
+- **Review fixes (2026-10-30, after the protocol and measurement reviews):**
+  - **k ≥ 1 is enforced.** α²L_1(ζ) is read from the first batch-inverse entry, which is 1/(ζ − ω⁰) only when the first
+    Lagrange point belongs to a public input. With k = 0 and a commitment it would be the commitment's denominator, and the
+    verifier would check a different relation from gnark's (which computes L_1 separately, verify.go:131-134). `parseVK`
+    now rejects k = 0 (all three builds read the VK through it).
+  - **Chain quotient: three pieces, hashed separately.** WQ = WQa ‖ WQb ‖ WQc (WQc a variable push in input 4, an MA
+    role). ST never concatenates them (WQa ‖ WQb exceeded the 10,000-byte stack item limit from n_q = 310 on) and
+    derives z = H(h0 ‖ ρRaw ‖ H(WQa) ‖ H(WQb) ‖ H(WQc)). Every n_q up to the structural NQ now fits the chain
+    (`liveness.mjs`); before, the WQb host capped n_q at about 340 words, and the mul2 plan with the binding in ST at
+    about 260 (an honest fresh mul2 proof with n_q = 264 was rejected). No tuned plan uses bindST any more; the binder
+    is the last SI role in every plan.
 - Nothing else in the argument changes; the deltas are marked "integration" below.
 
 **Track 7 changes in one place** (2026-10-30, branch `wip/plonk-usable-msm`):
@@ -27,9 +38,10 @@ combined). This is the default build, and what the argument below covers:
   (Lemma 4).
 - The SI identities gain per-event monic factors and one terminal factor. The degree cap grows from 60 to 348 / 384
   quotient words (A6). The GT nibbles NB are part of WS, so h0 hashes them, and every nibble byte must be < 16.
-- Chain: ST also computes h0, ρ, z, the quotient Horner value QZ and (mul2) the GT binding, and publishes ρ, z and QZ
-  (and, for merkle16, the s_i) in G0.
-  - WQ = WQa ‖ WQb is split over two inputs; WQb is a variable-size push.
+- Chain: ST also computes h0, ρ, z and the quotient Horner value QZ, and publishes ρ, z, QZ and the s_i in G0 (the
+  first msm-branch build also ran the GT binding in ST for mul2, `bindST`; no tuned plan does now).
+  - WQ = WQa ‖ WQb ‖ WQc is split over three inputs (8, 9, 4); WQb and WQc are variable-size pushes (review fix: the
+    msm branch had WQa ‖ WQb only).
   - One SI role publishes GZ (the 8m values R_{i,j}(±z)), checked against its own computation.
   - The code is three hash-checked blobs.
   - The fixed-base table TF is gone.
@@ -55,7 +67,7 @@ File references are to this directory: `plonk.mjs` (value-level verifier), `scri
   [τ]_2 = τ·[1]_2. τ exists as a fixed constant; nobody needs to know it for the argument.
 - φ(x, y) = (β·x, y) is the G1 endomorphism with φ = [λ], λ² + λ + 1 ≡ 0 (mod r). The pair (β, λ) is the one in
   `math.mjs:138-146` (re-checked by the script).
-- **Scope.** k ≥ 1 public inputs is the tested case. The VK has m BSB22 commitments, m ∈ {0, 1}, in both the
+- **Scope.** k ≥ 1 public inputs, enforced by `parseVK` (k = 0 is rejected at build time; see the review fixes above). The VK has m BSB22 commitments, m ∈ {0, 1}, in both the
   single-input build (`script.mjs`) and the chain (`multi.mjs`) since the Track 7 integration; m = 1 is §8, tested on
   `range64` and `merkle16rc`. m ≥ 2 is built by the same code but not tested, and §8 states an extra length condition for it. The references are gnark v0.16.4 and gnark-crypto v0.21.1-0.20260913224755-1409fe592052.
 - H = SHA-256. Q is the total number of H evaluations, including those made while checking the adversary's output.
@@ -80,13 +92,19 @@ unchanged, except WS, which carries the GT nibbles in the folded build.
 | q_u | `"u"` ‖ vRaw ‖ PROOF[640,768) = Wζ ‖ Wζω (161) | u1 = LE uRaw[0,8), u2 = LE uRaw[8,16), t' = LE uRaw[16,32) | :198-203 | :352-355 | :123-124 |
 | q_h0 | TAG `"PLONKKZG-SI/1"` ‖ uRaw ‖ WS (13 + 32 + 6,528 + 65·m_f; m_f = folded bases: 0, 8, 9 or 10) | h0 | :316 | :395 (uRaw from G0[0,32), :392) | si.mjs:64 |
 | q_ρ | h0 ‖ `"rho"` (35) | ρ = LE mod p | :317, :326 | :396, :401 | |
-| q_z | h0 ‖ ρRaw ‖ WQ (64 + 32·n_q) | z = LE mod p, z ≠ 0 | :322, :325 | :397, :400 | |
+| q_z | h0 ‖ ρRaw ‖ WQ (64 + 32·n_q) | z = LE mod p, z ≠ 0 | :322, :325 | :397, :400 (FOLD=0) | |
+| q_z, folded chain | h0 ‖ ρRaw ‖ H(WQa) ‖ H(WQb) ‖ H(WQc) (160); the inner queries hash WQa (4,096), WQb, WQc (each ≥ 256, ≡ 0 mod 128) | z = LE mod p, z ≠ 0 | – | `stTranscript` | `multiWitness` |
 
 q_v is gnark-crypto `deriveGamma`: the transcript named "gamma", binding ζ, the digests [Λ', L, R, O, S1, S2], the claimed
 values [r0, l, r, o, s1, s2] and `zu.Marshal()`. With Λ' = Λ, this is byte-for-byte gnark's v (`verify.go` FoldProof call).
-Every query type has a distinct length (709 + 32k ≥ 741 for k ≥ 1; 32·n_q + 64 ≡ 0 mod 32 matches none of the others).
-With one commitment (m = 1) the lengths are γ 773 + 32k, α 165, v 741, b0 143 and b1 = b2 = 45; they are still pairwise
-distinct from each other and from the m = 0 types, and q_b1 / q_b2 differ in byte 32 (0x01 / 0x02). For m ≥ 3 the γ and v
+Within one verifier (one VK, so fixed m and k ≥ 1) every query type has a distinct length (709 + 32k ≥ 741 for k ≥ 1;
+32·n_q + 64 ≡ 0 mod 32 matches none of the others). With one commitment (m = 1) the lengths are γ 773 + 32k, α 165,
+v 741, b0 143 and b1 = b2 = 45; they are pairwise distinct from each other and from the other types of the same VK, and
+q_b1 / q_b2 differ in byte 32 (0x01 / 0x02). The typing is only needed within one VK: lengths of different m can
+coincide (q_v at m = 1 and q_γ at m = 0, k = 1 are both 741 B), which is harmless because a verifier has one fixed m.
+Folded chain: q_z is 160 B, and the WQ-piece queries are ≡ 0 (mod 128) and ≥ 256 B; no other type has either length
+(the odd lengths γ, v, b0, h0 for m_f = 10, and 35, 36, 45, 101, 161, 165, 228; q_h0 = 7,158 B for m_f = 9 is not
+≡ 0 mod 128). For m ≥ 3 the γ and v
 lengths coincide when k = m − 2 (§8). In the folded build q_h0 is 6,573 + 65·m_f bytes (7,093 / 7,158 / 7,223 for
 m_f = 8 / 9 / 10): not ≡ 0 (mod 32), and longer than every other type but q_z, so the typing still holds.
 So the type of a query, and the positions of the earlier digests inside it, follow from its length.
@@ -175,12 +193,20 @@ in `BatchVerifyMultiPoints`. Here π̃ is π with `ClaimedValues[0] := r0`. Equi
       gives max deg D_k = 708 / 780 and NQ = 348 / 384 for m = 8 / 9.
     - The cap is enforced:
       - single input: 1–NQ words with a nonzero leading word (`script.mjs` si);
-      - chain: ST checks 256 ≤ |WQb| ≤ 32·NQ − 4096 and |WQb| ≡ 0 (mod 128), so |WQa ‖ WQb| ≤ 32·NQ (`stTranscript`).
+      - chain: ST checks |WQb|, |WQc| ≥ 256, both ≡ 0 (mod 128), and |WQb| + |WQc| ≤ 32·NQ − 4096, so
+        |WQa ‖ WQb ‖ WQc| ≤ 32·NQ (`stTranscript`).
     - The error term becomes 1.134·(33 + 780)/p ≈ 2^-243.75 for m = 9 (2^-243.88 for m = 8; `soundness/lattice.mjs`).
     - Integration (BSB22, Qcp_0 folded): m = 10 gives max deg D_k = 852, NQ = 420 and 1.134·(33 + 852)/p ≈ 2^-243.63
-      (m = 11: 924, 456, 2^-243.51). The chain checks the cap the same way (|WQb| ≤ 32·420 − 4096). Liveness note: the
-      honest n_q of the BSB22 circuits is about 280 words, and input 9's 10,000-byte limit admits WQb up to about 6.8 KB,
-      i.e. n_q ≤ about 340; the cap itself would not fit there. A proof needing more would be rejected, not accepted.
+      (m = 11: 924, 456, 2^-243.51). The chain checks the cap the same way (|WQb| + |WQc| ≤ 32·420 − 4096). Liveness
+      (review fix): every n_q up to NQ fits the chain of every tested circuit (348 / 384 / 420 / 420 words for mul2,
+      merkle16, range64, merkle16rc; `liveness.mjs`, and the `liveness` case of `chaintest.mjs`). Before the fix the
+      WQb host's 10,000-byte limit capped n_q at about 340 (honest BSB22 n_q exceeds 330 with probability about 10^-5),
+      and the bindST mul2 plan at about 260. A proof that does not fit is rejected, never accepted.
+    - Folded chain transcript (review fix): z = H(h0 ‖ ρRaw ‖ H(WQa) ‖ H(WQb) ‖ H(WQc)). By ¬B1 (no collisions)
+      and ¬B2 (no hash output guessed before it is queried; Lemma 0), the three inner outputs fix WQa, WQb and WQc, and
+      so the polynomial QZ evaluates, before z is drawn; the outer query is then fresh as before. Different splits of
+      the same bytes over WQb / WQc, like leading zero words, are different q_z inputs, i.e. separate attempts, which
+      the Q factor of the theorem counts. The single-input build keeps q_z = H(h0 ‖ ρRaw ‖ WQ).
     - The nibbles are in WS, hence in q_h0's input, so every factor is fixed before ρ and z.
     - Every nibble byte is checked to be in [0, 15] before it selects a factor: `gtNibCheck`, on the whole NB; in the
       chain this is the binder's read of ST's WS, and every SI role's lookups use the same bytes (Lemma 3 step 3). So
@@ -337,15 +363,16 @@ Remarks.
 
 *Track 7 version (default, folded build).* Role names: input 0 = MJ (code C0, MSM windows 50..41, Jacobian), input 1 =
 ST, input 2 = MJ (host of TV, windows 40..37), inputs 3–5 = MA (windows 36..0, affine), inputs 6–9 = SI (events
-0–16, 16–34, 34–52, 52–65 + terminal). Input 6 hosts GZ and C1, input 7 hosts C2, input 8 hosts WQa, input 9 hosts WQb.
+0–16, 16–34, 34–52, 52–65 + terminal). Input 6 hosts GZ and C1, input 7 hosts C2, input 8 hosts WQa, input 9 hosts WQb,
+input 4 (the second MA role) hosts WQc.
 The windows, event cuts and blob hosts come from `plans.json`; `makePlan` asserts that windows and events are
 contiguous and cover everything once.
 
 **Lemma 3 (Track 7).** Assume ¬B3. Then the single-input verifier's value-level checks hold on the one value set
-(x = PI, π = PROOF, Λ' = X[0,64), inverse = X[64,96), WS (s^c ‖ NB ‖ states), WQ = WQa ‖ WQb). Its challenges,
-scalars, P*_var, P_R, nibbles and binding are those of §0, §2 and Lemma 4, and the SI final identity holds for them.
-The WQ length rule differs from single input: leading zero words are allowed, and the size is a multiple of 4 words
-(≥ 136 words). A6 needs only the cap.
+(x = PI, π = PROOF, Λ' = X[0,64), inverse = X[64,96), WS (s^c ‖ NB ‖ states), WQ = WQa ‖ WQb ‖ WQc). Its
+challenges, scalars, P*_var, P_R, nibbles and binding are those of §0, §2 and Lemma 4 (with the folded-chain q_z of §0),
+and the SI final identity holds for them. The WQ length rule differs from single input: leading zero words are allowed,
+and the size is a multiple of 4 words (≥ 144 words). A6 needs only the cap.
 
 *Proof.* Steps 1–3 are as in Track 6, with these changes:
 
@@ -354,27 +381,29 @@ The WQ length rule differs from single input: leading zero words are allowed, an
    (TXINPUTCOUNT = 10, every UTXOBYTECODE = own). By ¬B3 the executed code is the built code. C0 dispatches on
    INPUTINDEX.
 2. **Layout.**
-   - As in Track 6, every fixed push has its planned size, except the code pushes and WQb.
+   - As in Track 6, every fixed push has its planned size, except the code pushes, WQb and WQc.
    - Each blob is the last fixed push of its host and is hash-checked. No role code embeds an offset that depends on a
      blob's size.
    - WQb is the last fixed push of input 9. Its size is not pinned by its host. Nothing after it is read remotely
      (`offsetOf` throws on such a read).
    - Its encoding is still unique: ST requires 256 ≤ L ≤ 65,535, so the minimal push is PUSHDATA2, 0x4d ‖ LE16(L).
      ST reads that header (`rreadVar`: byte 0x4d checked, then L bytes), so it gets exactly input 9's stack item.
+   - WQc is the same for input 4: the last fixed push of that MA role (its slope pieces follow, read only by the role
+     itself), and the only remote read of input 4 is its HAND, which comes first. Its host drops it unread.
 3. **Remote reads.** `rread` as before. ST's read of the Wζω slice of TV is still not header-checked (§7). New reads:
    - WQa (ST), GZ (`GZD`), WS and G0 (SI roles): all by `rread`;
-   - WQb by `rreadVar`.
+   - WQb and WQc by `rreadVar`.
 4. **ST** runs Track 6's steps on its own pushes, and in addition (`stTranscript`):
-   - reads WQa ‖ WQb and checks the WQ size rule;
-   - computes h0 = SHA256(TAG ‖ uRaw ‖ WS), ρ and z (z ≠ 0) byte-exactly as q_h0, q_ρ, q_z of §0;
-   - computes QZ = Σ_w q_w·z^{2(n−1−w)} over WQ's words (each < p, `DLP`);
-   - (bindST, mul2) runs `gtNibCheck`, `gtBindLoop` and `gtBind` on NB = WS[192, 192 + 65m) and its own s_i.
+   - reads WQa, WQb and WQc as three items (never concatenated) and checks the WQ size rule;
+   - computes h0 = SHA256(TAG ‖ uRaw ‖ WS), ρ and z (z ≠ 0) byte-exactly as q_h0, q_ρ and the folded-chain q_z of §0;
+   - computes QZ = Σ_w q_w·z^{2(n−1−w)} over the words of WQa, then WQb, then WQc, i.e. of WQ (each < p, `DLP`);
+   - (bindST only; no tuned plan) runs `gtNibCheck`, `gtBindLoop` and `gtBind` on NB = WS[192, 192 + 65m) and its own s_i.
    
-   It requires G0 = uRaw ‖ LE32(s'_q)_{q ∈ var} ‖ ENC(P_R) ‖ ENC(ρ) ‖ ENC(z) ‖ ENC(QZ) [‖ LE32(s_i)_i, merkle16].
+   It requires G0 = uRaw ‖ LE32(s'_q)_{q ∈ var} ‖ ENC(P_R) ‖ ENC(ρ) ‖ ENC(z) ‖ ENC(QZ) ‖ LE32(s_i)_i (without the s_i under bindST).
 5. **Readers of G0:**
    - the MSM roles get s'_q;
    - the SI roles get P_R, ρ and z (`siPre`);
-   - the last SI role also gets QZ, and for merkle16 the s_i, decoded < r (`DLR`).
+   - the last SI role also gets QZ and the s_i, decoded < r (`DLR`).
    
    These are ST's computed values (step 3, ENC injective). So every SI role uses §0's ρ and z.
 6. **Tables.**
@@ -406,13 +435,13 @@ The WQ length rule differs from single input: leading zero words are allowed, an
    - The cuts are at chunk boundaries and hand over (step 7).
    - The last role:
      - runs the two terminal steps, F ·= S_c(±ηz)·Rconst(±z) and the W step;
-     - (merkle16) runs the nibble check and binding on NB from WS with the s_i from G0;
+     - runs the nibble check and binding on NB from WS with the s_i from G0 (every tuned plan);
      - checks the final identity R ≡ z·QZ·M(z) with ST's QZ, which is exactly the single-input Horner value (step 4).
    - So the SI computation and the binding are the single-input ones, split at chunk boundaries. Together with
      Lemma 4 this gives (E). ∎
 
 *Integration delta (BSB22 circuits, m = 1; `plans.json` `range64`, `merkle16rc`).* Roles: MJ(50..42, C0) · ST ·
-MJ(41..38, TV) · MA(37..25, TV2; 24..12; 11..0) · SI(0–16 + GZ + C1, 16–36 + C2, 36–52 + WQa, 52–65 + WQb), 10 inputs.
+MJ(41..38, TV) · MA(37..25, TV2; 24..12 + WQc; 11..0) · SI(0–16 + GZ + C1, 16–36 + C2, 36–52 + WQa, 52–65 + WQb), 10 inputs.
 The proof above holds with these changes:
 - **Step 2 (layout).** TV2 is a fixed-size push (960·2 bytes) right after the MA role's HAND and ZI. Its host pins its
   size in `own` like every other fixed push, so remote offsets into it are fixed.
@@ -560,8 +589,8 @@ has no B3 targets except R, and the same bound applies.
 - **Track 7: a gap found and closed while writing Lemma 4.** The first folded build did not range-check the nibble
   bytes; see the remark after Lemma 4. `gtNibCheck` (NB & 0x0f…0f == NB) is now run on the whole NB:
   - in the single-input program, right after NB is split off WS;
-  - in the chain, in the binder (ST for mul2, the last SI role for merkle16), whose read of ST's WS covers every byte
-    any SI role uses.
+  - in the chain, in the binder (the last SI role in every tuned plan; ST under bindST), whose read of ST's WS covers
+    every byte any SI role uses.
   
   Tests: nibble byte 0x10 and 0x81 manipulations are rejected (single input and chain). They are rejected anyway,
   since h0 changes; the check is what the argument relies on.
@@ -571,18 +600,24 @@ has no B3 targets except R, and the same bound applies.
   - Every Track 6 build is byte-identical with the fix: single spec and 100 KB, chain C0/C1, both circuits.
   - The reviewed `chunked/bn254/sound-si-gls/asm.mjs` and `bn-native-sound/asm.mjs` contain the same pattern. They
     were not changed here; whether their builds are affected was not checked.
-- **Track 7: WQb is not size-checked by its host.** ST checks the size rule on the bytes it reads, which are exactly
-  the host's stack item (Lemma 3 step 2).
+- **Track 7: WQb and WQc are not size-checked by their hosts.** ST checks the size rule on the bytes it reads, which are
+  exactly the hosts' stack items (Lemma 3 step 2).
 
 - **ST's read of the Wζω table is not header-checked.** It reads TV (TV2 in the BSB22 plans) at `off + 960·vi` with no header check
-  (`multi.mjs:372-373`). The redeem's C0/C1 loads do not check headers either (`:301`). The sketch says every remote
+  (`multi.mjs` `statement`, the Wζω table read). The redeem's code-blob loads do not check headers either (`buildMulti`,
+  the C0/C1/C2 load). The sketch says every remote
   read checks its push header. The argument above does not need header checks: offsets follow from the owner's size
   and DEPTH checks plus the consensus minimal-push rule (Lemma 3, step 2). The code blobs are hash-checked.
 - **The layout argument depends on consensus rules that were checked only in libauth.** Minimal pushes and push-only
   unlockings are consensus rules in libauth 3.1.0-next.8 and, per the BCH 2018-11 / 2019-11 upgrades, in BCHN. No BCHN
   node was run.
-- **WQ length rule.** The chain's WQ is fixed at 60 words with leading zeros allowed; the single-input build requires a
-  nonzero leading word. A6's degree bound uses only the 60-word cap, so the difference is malleability, not soundness.
+- **WQ length rule.**
+  - Folded build (default): the chain's WQ is WQa (4,096 B, fixed) ‖ WQb ‖ WQc, with |WQb|, |WQc| ≥ 256,
+    both ≡ 0 (mod 128), |WQb| + |WQc| ≤ 32·NQ − 4,096, and leading zero words allowed; checked in `stTranscript`. The
+    single-input build requires 1–NQ words with a nonzero leading word.
+  - FOLD=0 only: the chain's WQ is fixed at 60 words with leading zeros allowed.
+  - A6's degree bound uses only the cap, so the differences (leading zeros, the WQb / WQc split) are malleability, not
+    soundness.
 - **Formula correctness (A4) remains an assumption.** It is tested by the valid, tampered and adaptive vectors. It is
   not proved.
 
@@ -644,6 +679,11 @@ hc_0 equals gnark-crypto's `hash_to_field` output computed in Go; all 177 tamper
 
 **Completeness.** gnark's `Verify` accepts Bsb22_j at infinity; this verifier rejects it. An honest commitment is
 uniformly distributed (the random value at the commitment row), so this costs completeness with probability 1/r per proof.
+
+**k ≥ 1 (enforced).** gnark computes L_1(ζ) separately (verify.go:131-134). This verifier reads α²L_1(ζ) from the first
+entry of the batch inverse, which is (ζ − ω⁰)⁻¹ only if the first Lagrange point is public input 0. With k = 0 and m ≥ 1 it
+would be a commitment's (ζ − ω^{cci_0})⁻¹ and the checked relation would differ from gnark's (honest proofs rejected, and
+the equivalence argument above void). `parseVK` therefore rejects k = 0; FORMAT.md states the condition.
 
 **m ≥ 2, untested.** The code is generic in m, but two conditions are not checked by the build:
 - the length typing of §0 needs k ≠ m − 2 (otherwise q_γ and q_v have the same length);

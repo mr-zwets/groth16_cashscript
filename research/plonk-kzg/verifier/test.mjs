@@ -14,7 +14,9 @@ import {witnessFor, pushesOf} from './witness.mjs';
 import {p2sh32, encodeUnlocking, spend} from './vm.mjs';
 import {padFor} from './single.mjs';
 
-const [circuit = 'mul2', regime = 'spec', Js = '13', JRs = '0'] = process.argv.slice(2);
+const [circuit = 'mul2', regime = 'spec', Js, JRs = '0'] = process.argv.slice(2);
+// J is required (no default): the Track 7 builds use J = 23 (21 for BSB22 circuits) at bch-spec and 14 for txv5, Track 6 (FOLD=0) 13 / 8
+if (!/^\d+$/.test(Js ?? '')) { console.error('usage: node test.mjs <circuit> <spec|txv5> <J> [JR] [--quick]  (Track 7: spec 23, or 21 for range64/merkle16rc; txv5 14)'); process.exit(2); }
 const quick = process.argv.includes('--quick');
 const J = Number(Js), JR = Number(JRs), pad = regime === 'txv5';
 const d = loadVectors(circuit); const vk = parseVK(d.vk.hex);

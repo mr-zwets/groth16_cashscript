@@ -4,7 +4,7 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 import {loadVectors, parseVK, Reject, le32, verifyPlonk} from './plonk.mjs';
 import {p, aff, G1} from './math.mjs';
 import {makePlan, buildMulti, multiWitness, planOpts} from './multi.mjs';
-import {chainTx, sizeFills, txBytes} from './chain.mjs';
+import {chainTx, sizeFills, txBytes, nqStress} from './chain.mjs';
 import {spendTx, verifyTx, p2sh32, encodeUnlocking} from './vm.mjs';
 
 const [circuit = 'mul2'] = process.argv.slice(2); const quick = process.argv.includes('--quick');
@@ -21,7 +21,8 @@ for (const [i, pr] of (quick ? d.valid.slice(0, 1) : d.valid).entries()) {
   if (!ok || !w.accept) fail(`valid ${i}: ${v.map((x) => x.error).join(' / ')}`);
   if (i === 0) base = {w, fills, tx};
   out.valid.push({i, accepted: ok, txBytes: txBytes(tx), unlocking: tx.reduce((s, x) => s + x.unlocking.length, 0), inputs: tx.length,
-    perInput: per.map((x, k) => ({role: plan.roles[k].kind, unlocking: x.unlockingLen, fill: fills[k], opCost: x.opCost, budget: x.budget}))});
+    perInput: per.map((x, k) => ({role: plan.roles[k].kind, unlocking: x.unlockingLen, fill: fills[k], opCost: x.opCost, defBytes: built.defBytes, opCostBchn: x.opCost + built.defBytes, budget: x.budget,
+      bchnMarginPct: +(100 * (1 - (x.opCost + built.defBytes) / x.budget)).toFixed(3)})), nq: w.S.nq});
   console.log(`valid ${i}: ${ok ? 'accepted' : 'REJECTED'}, tx ${txBytes(tx)} B, op ${per.reduce((s, x) => s + x.opCost, 0)}`);
 }
 const run = (name, pushes, fills, mutate) => { let tx = chainTx(vk, plan, built, pushes, fills ?? base.fills); if (mutate) tx = mutate(tx); const v = both(tx); const rej = v.every((x) => !x.accepted);
@@ -66,6 +67,10 @@ if (plan.m) { // Track 7: the GT fold and the moved SI transcript
   m('WS nibble byte = 0x81 (negative)', (ps) => { ps[plan.iST][fi(plan.iST, 'WS')][192 + 5] = 0x81; });
   m('GZ word flipped', (ps) => { ps[plan.iGZ][fi(plan.iGZ, 'GZ')][300] ^= 1; });
   m('WQa word flipped', (ps) => { ps[plan.iWQa][fi(plan.iWQa, 'WQa')][4000] ^= 1; });
+  m('WQc word flipped', (ps) => { ps[plan.iWQc][fi(plan.iWQc, 'WQc')][100] ^= 1; });
+  m('WQc extra zero word (wrong size)', (ps) => { const k = fi(plan.iWQc, 'WQc'); ps[plan.iWQc][k] = Buffer.concat([Buffer.alloc(32), ps[plan.iWQc][k]]); });
+  m('WQ split moved (128 B from WQb to WQc, same polynomial bytes, different z)', (ps) => { const kb = fi(plan.iWQ, 'WQ'), kc = fi(plan.iWQc, 'WQc'); const b = ps[plan.iWQ][kb];
+    ps[plan.iWQc][kc] = Buffer.concat([b.subarray(b.length - 128), ps[plan.iWQc][kc]]); ps[plan.iWQ][kb] = b.subarray(0, b.length - 128); });
   m('WQb extra zero word (wrong size)', (ps) => { const k = fi(plan.iWQ, 'WQ'); ps[plan.iWQ][k] = Buffer.concat([Buffer.alloc(32), ps[plan.iWQ][k]]); });
 }
 m('X: Fr inverse * 2', (ps) => { const b = ps[plan.iST][fi(plan.iST, 'X')]; b[64] ^= 2; });
@@ -82,6 +87,10 @@ if (plan.m) for (const i of [...new Set([0, ...plan.FX.flatMap((nm, x) => (nm.st
 { const w = multiWitness(vk, plan, built, d.valid[1].proof, d.valid[0].publicInputs); M.push(['adaptive: proof 1 with the public inputs of proof 0', w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
 for (const [name, ps, mutate, fills] of M) out.manipulations.push(run(name, ps, fills, mutate));
 console.log(`manipulations: ${out.manipulations.filter((x) => x.rejected).length}/${out.manipulations.length} rejected`);
+// ---- liveness at the structural quotient bound (fold): a proof with n_q = NQ words must still fit (chain.mjs nqStress)
+if (plan.WQ_VAR) { const x = nqStress(vk, plan, built, d.valid[0].proof, d.valid[0].publicInputs, plan.NQ); const {perInput, ...rest} = x; out.liveness = rest;
+  if (!x.ok) fail(`liveness: n_q = ${plan.NQ} does not fit: ${x.bad.join('; ')} tx ${x.txBytes}`);
+  console.log(`liveness: n_q = ${plan.NQ} (structural max) ${x.ok ? 'fits' : 'DOES NOT FIT'}, tx ${x.txBytes} B, largest input in${x.maxInput.i} ${x.maxInput.unlocking} B`); }
 out.unexpected = bad;
 mkdirSync(new URL('./results/', import.meta.url), {recursive: true});
 if (!quick) writeFileSync(new URL(`./results/chain-${circuit}.json`, import.meta.url), JSON.stringify(out, null, 1) + '\n');

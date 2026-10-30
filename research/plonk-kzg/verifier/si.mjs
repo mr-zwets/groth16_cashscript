@@ -26,6 +26,11 @@ export const termDegP = (m = 0) => 6 + 4 * 9 + 6 + (m ? 6 : 0); // S_33, four Fr
 export const TERM_DEG_P = termDegP(0);
 export const nqMax = (m = 0) => Math.max(...Array.from({length: NSTATES}, (_, k) => nqOfDegD(chunkDegP(k, m) + 6)), nqOfDegD(termDegP(m) + 22));
 export const NQ_MAX = nqMax(0);
+// the structural n_q of one proof: as nqMax, with each event's GT factor count taken from the actual nibbles N[i][e]
+// (6 per set bit) instead of the all-15 worst case; liveness.mjs checks it against proveSI's n_q
+export const nqOfNibbles = (N) => { const m = N.length; const chunk = (k) => { let d = 6; for (let e = k ? BOUNDS[k - 1] : 0; e < BOUNDS[k]; e++) {
+  let f = 0; for (const Ni of N) { let x = Ni[e]; while (x) { f += x & 1; x >>= 1; } } d = 2 * d + 18 + (DIGITS[e] ? 24 : 0) + 6 * f; } return d; };
+  return Math.max(...Array.from({length: NSTATES}, (_, k) => nqOfDegD(chunk(k) + 6)), nqOfDegD(termDegP(m) + 22)); };
 
 const chainCache = new Map();
 export const chains = (vk) => { const key = vk.g2x.toHex(); if (!chainCache.has(key)) chainCache.set(key, {a: chainConsts(vk.g2), b: chainConsts(vk.g2x)}); return chainCache.get(key); };

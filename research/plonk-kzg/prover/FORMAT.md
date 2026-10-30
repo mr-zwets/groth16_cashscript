@@ -60,6 +60,11 @@ declaration order, which is gnark's public witness order:
 
 The count must equal the VK's `nbPublic`.
 
+`nbPublic` ≥ 1 is required by the CashVM verifier (`verifier/plonk.mjs` `parseVK` rejects 0): it reads α²·L_1(ζ) from the
+first entry of the batched Lagrange denominators, which is ζ − ω⁰ only when public input 0 exists. With no public input
+and a BSB22 commitment that entry would be the commitment's ζ − ω^cci (gnark computes L_1 separately). `verify.mjs`
+has the same requirement. All vectors have k ≥ 1 (`range64` k = 1).
+
 ## Verifying key (944 bytes)
 
 | offset | size | field |
@@ -149,8 +154,12 @@ uses are powers of that `x`.
 
 ### Setup from the SRS
 
-`main.go -srs FILE` (see `srs.go`) re-checks `[1]_1`, `[1]_2`, the pinned `[x]_2` and `G1[0] = [1]_1`, then per
-circuit takes the first `n + 3` points as gnark's canonical SRS, computes the Lagrange SRS of size `n` with
+`main.go -srs FILE` (see `srs.go`) re-checks `[1]_1`, `[1]_2`, the pinned `[x]_2` and `G1[0] = [1]_1`, and the file's
+sha256 against the value pinned for its point count (65,539 points: `ee63bf8e…bb85`, the record in `srs/`; it panics on a
+mismatch; a file of another size is not pinned). Then per circuit it re-runs the random-linear-combination power check of
+`ceremony/main.go` step 5 on the `n + 3` points it uses (`checkPowers`: `e(Σ r_i P_i, [x]_2) = e(Σ r_i P_{i+1}, [1]_2)`,
+with a control that must fail), so the G1 powers are checked on load, not only trusted from the file. It then
+takes the first `n + 3` points as gnark's canonical SRS, computes the Lagrange SRS of size `n` with
 gnark-crypto `kzg.ToLagrangeG1`, and calls `plonk.Setup`. Setup uses no secret, so the VK is reproducible: rerun
 `go run . -srs FILE -out DIR` and compare `vk.hex` (only the proofs differ, gnark blinds with `crypto/rand`).
 

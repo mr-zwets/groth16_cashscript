@@ -14,7 +14,7 @@ import {bn254} from '@noble/curves/bn254.js';
 import {p, r, mod, inv, powm, G1, G2, F2, GLV, OFFSET, aff} from './math.mjs';
 import {FIXED_NAMES, gtConsts, nibbles} from './gt.mjs';
 
-export const PROVER_DIR = process.env.PROVER_DIR ?? new URL('../../../../prover/research/plonk-kzg/prover/', import.meta.url).pathname;
+export const PROVER_DIR = process.env.PROVER_DIR ?? new URL('../prover/', import.meta.url).pathname; // research/plonk-kzg/prover/
 export const loadVectors = (name) => JSON.parse(readFileSync(new URL(`./vectors/${name}.json`, import.meta.url)));
 export const sha = (...xs) => createHash('sha256').update(Buffer.concat(xs.map((x) => Buffer.from(x)))).digest();
 export const be = (b) => (b.length ? BigInt('0x' + Buffer.from(b).toString('hex')) : 0n);
@@ -34,6 +34,9 @@ export const htfParts = (msg) => { const dstp = Buffer.concat([HTF_DST, Buffer.f
 export function parseVK(hex, {fold = process.env.FOLD !== '0'} = {}) {
   const b = Buffer.from(hex, 'hex'); assert.ok(b.length === 944 || (b.length >= 952 && (b.length - 952) % 72 === 0), 'vk length');
   const n = b.readBigUInt64BE(0), nbPublic = Number(b.readBigUInt64BE(8));
+  // k >= 1: alpha^2 L_1(zeta) is read from the first batch-inverse entry, which is 1/(zeta - omega^0) only when the first
+  // Lagrange point is a public input's (with k = 0 and a BSB22 commitment it would be the commitment's 1/(zeta - omega^cci))
+  assert.ok(nbPublic >= 1, 'k = 0 unsupported: L_1(zeta) uses the omega^0 denominator of the first public input');
   const vk = {fold, n, log2n: n.toString(2).length - 1, nbPublic, omega: be(b.subarray(16, 48)), nInv: be(b.subarray(48, 80)), k: be(b.subarray(80, 112)), raw: {}, pt: {}};
   assert.equal(1n << BigInt(vk.log2n), n);
   VK_NAMES.forEach((nm, i) => { const s = b.subarray(112 + 64 * i, 176 + 64 * i); vk.raw[nm] = s; const x = be(s.subarray(0, 32)), y = be(s.subarray(32)); vk.pt[nm] = x === 0n && y === 0n ? null : G1.fromAffine({x, y}); });

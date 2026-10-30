@@ -25,6 +25,20 @@ export function sizeFills(vk, plan, built, pushes, {strict = true} = {}) {
   }
   return fills;
 }
+// Liveness stress (liveness.mjs, chaintest.mjs): the chain of a valid proof with its quotient padded to nq words by
+// pseudo-random nonzero high words (multiWitness nqPad), FILLs sized as for a real proof. ok: every input <= 10,000 B
+// unlocking and within its BCHN-adjusted budget, the transaction <= 100,000 B, and the only failing check is the final
+// identity of the last input (the padded quotient is not the real one).
+export function nqStress(vk, plan, built, proof, pub, nq) {
+  const w = multiWitness(vk, plan, built, proof, pub, {nqPad: nq}); const fl = sizeFills(vk, plan, built, w.pushes, {strict: false});
+  const tx = chainTx(vk, plan, built, w.pushes, fl); const res = spendTx('bch2026', 'standard', tx); const last = res.length - 1;
+  const per = res.map((x, i) => ({i, role: plan.roles[i].kind, unlocking: x.unlockingLen, fill: fl[i], opBchn: x.opCost + built.defBytes, budget: x.budget, error: x.evalError}));
+  const bad = per.filter((x) => x.unlocking > 10000 || x.opBchn > x.budget || (x.i !== last && x.error));
+  const finalOnly = !!res[last].evalError && /verify/i.test(res[last].evalError);
+  const tb = txBytes(tx); const worst = per.reduce((a, b) => (b.unlocking > a.unlocking ? b : a));
+  return {nq, ok: !bad.length && tb <= 100000 && finalOnly, txBytes: tb, maxInput: {role: worst.role, i: worst.i, unlocking: worst.unlocking},
+    bad: bad.map((x) => `in${x.i} ${x.role} ${x.unlocking} B${x.error ? ' ' + x.error.slice(0, 60) : ''}`), lastError: res[last].evalError?.slice(0, 80), perInput: per.map(({i, error, ...x}) => x)};
+}
 if (import.meta.url === `file://${process.argv[1]}`) {
   const [c = 'mul2', pi = '0'] = process.argv.slice(2);
   const d = loadVectors(c); const vk = parseVK(d.vk.hex);

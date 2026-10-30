@@ -25,7 +25,8 @@ import {gtConsts, TB as GT_TB, GLS_BITS, nibbles} from './gt.mjs';
 import {kAffAdd, kAffDbl, kJDbl, kJMAdd, kConv, kEvent, kEval, EV_OUTS, digitOffset, SL_PIECE, gtStep, gtBind, gtBindLoop, pushTB} from './script.mjs';
 
 const ITERS = Number(process.env.SCHED_ITERS ?? 2500);
-const FIXED = ['Ql', 'Qr', 'Qm', 'Qo', 'Qk', 'S3', 'S1', 'S2', 'G', 'Qcp0', 'Qcp1', 'Qcp2', 'Qcp3']; // BSB22: Qcp_j are VK constants (TF)
+const FIXED_BASE = ['Ql', 'Qr', 'Qm', 'Qo', 'Qk', 'S3', 'S1', 'S2', 'G'];
+const fixedSet = (vk) => [...FIXED_BASE, ...vk.qcpNames]; // BSB22: every Qcp_j is a VK constant (TF, or GT-folded)
 const VKP = (vk) => ['S1', 'S2', 'S3', 'Ql', 'Qr', 'Qm', 'Qo', 'Qk', ...vk.qcpNames]; // GV = "gamma" || these points
 // byte offset in PROOF of a proof base (BSB22: Bsb_j after the qcp_j(zeta) scalars)
 const proofOff = (vk, nm) => (nm.startsWith('Bsb') ? bsbOff(vk, Number(nm.slice(3))) : PROOF_PTS[nm]);
@@ -34,9 +35,9 @@ const WQ_SIZE = 32 * NQ_MAX; // fixed-size quotient (leading zero words allowed)
 
 // ---------------- the plan ----------------
 // MSM windows 50..0: MJ roles (Jacobian, no slopes) then MA roles (affine, slopes). SI events split at even cuts.
-export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, gzHost = 0, blobs, bindST = false, tv2} = {}) {
+export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, wqcHost, wqbMax = 6144, gzHost = 0, blobs, bindST = false, tv2} = {}) {
   const names = baseNames(vk), nbm = names.length - 1, k = vk.nbPublic;
-  const fixed = names.slice(0, nbm).filter((n) => FIXED.includes(n)), vari = names.slice(0, nbm).filter((n) => !FIXED.includes(n));
+  const FIXED = fixedSet(vk); const fixed = names.slice(0, nbm).filter((n) => FIXED.includes(n)), vari = names.slice(0, nbm).filter((n) => !FIXED.includes(n));
   const FX = vk.fold ? fixedNames(vk) : [], m = FX.length; // GT-folded bases (Track 7)
   mj ??= m ? [[50, 42], [41, 39]] : [[50, 46], [45, 45], [44, 40]];
   ma ??= m ? [[38, 26], [25, 13], [12, 0]] : [[39, 30], [29, 20], [19, 10], [9, 0]];
@@ -72,7 +73,12 @@ export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, gzHost = 0
   // bindST: the GT binding in ST; else in the last SI role, with s_i published in G0 after QZ
   plan.stSI = m > 0; plan.bindST = bindST;
   plan.G0_SIZE = plan.stSI ? 32 + 32 * nbm + 64 + 96 + (bindST ? 0 : 32 * m) : 32 + 32 * nbm + 64; plan.TV_SIZE = 960 * n1; plan.TV2_SIZE = 960 * (vari.length - n1); plan.TF_SIZE = 960 * fixed.length;
-  plan.WQ_VAR = m > 0; const WQA = 4096; plan.WQA = m ? WQA : 0; // with the fold the quotient cap is large (348 / 384 words): WQ is a variable-size push (PUSHDATA2, >= 256 B)
+  plan.WQ_VAR = m > 0; const WQA = 4096; plan.WQA = m ? WQA : 0;
+  // WQc (fold): a second variable quotient piece, the last fixed push of an MA role (default the second MA role; not the TV2
+  // host). The WQb host's 10,000 B limit capped n_q at about 340 words; with WQc every n_q up to the structural NQ fits
+  // (liveness.mjs). Honest split: WQb takes up to wqbMax bytes, WQc the rest (at least 256 B: a minimal PUSHDATA2 push)
+  if (m) { wqcHost ??= roles.map((x, ix) => [x, ix]).filter(([x]) => x.kind === 'MA' && !x.hostTV2)[1]?.[1] ?? roles.findIndex((x) => x.kind === 'MA' && !x.hostTV2);
+    assert.ok(roles[wqcHost]?.kind === 'MA' && !roles[wqcHost].hostTV2, 'wqcHost: an MA role other than the TV2 host'); roles[wqcHost].hostWQc = true; plan.iWQc = wqcHost; plan.wqbMax = wqbMax; } else plan.iWQc = -1; // with the fold the quotient cap is large (348 / 384 words): WQ is a variable-size push (PUSHDATA2, >= 256 B)
   // fixed-size pushes at the start of each unlocking (name, size); CODE size is filled in after compilation
   for (const ro of roles) {
     const f = [];
@@ -82,6 +88,7 @@ export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, gzHost = 0
     if (ro.host === 'TV') f.push(['TV', plan.TV_SIZE]); if (ro.host === 'TF') f.push(['TF', plan.TF_SIZE]);
     if (ro.kind === 'MA') { f.push(['HAND', ro.conv ? 96 : 64]); if (ro.conv) f.push(['ZI', 32]); }
     if (ro.hostTV2) f.push(['TV2', plan.TV2_SIZE]);
+    if (ro.hostWQc) f.push(['WQc', 'var']); // last fixed push: no remote read of this role's pushes comes after it
     // SI: C1's size is set after compilation (no remote offset depends on it: it comes after every remotely read push but WQ,
     // whose offset then depends on it; WQ may be variable (the last fixed push)); GZ: the GT values R_{i,j}(+-z), 8 m words
     if (ro.kind === 'SI') { f.push(['HAND', ro.first ? 64 : 17 * 32]); if (ro.hostGZ) f.push(['GZ', 256 * m]); if (ro.hostWQa) f.push(['WQa', WQA]); f.push(['DS', null]); if (ro.hostWQ) f.push(['WQ', plan.WQ_VAR ? 'var' : WQ_SIZE]); }
@@ -112,7 +119,7 @@ export const planOpts = (vk, circuit) => { if (process.env.PLAN) return JSON.par
   const all = JSON.parse(readF(new URL('./plans.json', import.meta.url))); return all[circuit] ?? {}; };
 // ---------------- program generation ----------------
 export function buildMulti(vk, plan) {
-  const {names, nbm, fixed, vari, k, roles, N} = plan;
+  const {names, nbm, fixed, vari, k, roles, N} = plan; const FIXED = fixedSet(vk);
   const CH = chains(vk);
   const NBL = plan.blobs.length; const ctx = {funcs: new Map(), nextId: NBL + 1, defs: []}; // ids 0..NBL-1: C1..Ck, NBL: C0
   const root = new Asm([], ctx);
@@ -356,6 +363,7 @@ export function buildMulti(vk, plan) {
     own(a, ro, ro.slopes);
     if (ro.code) a.drop('CODE');
     if (ro.blob) a.drop(ro.blob);
+    if (ro.hostWQc) a.drop('WQc'); // read and checked by ST
     if (ro.kind === 'ST') stRole(a, ro);
     else if (ro.kind === 'MJ' || ro.kind === 'MA') mRole(a, ro, ix);
     else siRole(a, ro, ix);
@@ -517,28 +525,36 @@ function statement(a, vk, plan, call, rread) {
 // ST, with the fold: h0 = SHA256(TAG || uRaw || WS), rho, z (exactly as SI-GLS), the WQ size rules (WQ is read from its host:
 // PUSHDATA2, 256 <= size <= 32 NQ, size = 0 mod 128), QZ = q(z^2) by the 4-word Horner, the GT binding over NB = WS[192, 192 + 65 m)
 function stTranscript(a, plan, rread) {
-  rreadVar(a, plan, plan.iWQ, 'WQ', 'WQb'); // WQ = WQa (4096 B, fixed) || WQb (variable: 256 <= size <= 32 NQ - 4096, size = 0 mod 128)
-  a.pick('WQb', 'wq').op(OP.SIZE, 1, 'wq', 'qs').op(OP.NIP, 2, 'qs');
-  a.pick('qs').push(128).op(OP.MOD, 2, 'qm').op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1).push(256).push(32 * plan.NQ - plan.WQA + 1).op(OP.WITHIN, 3, 'ok').op(OP.VERIFY, 1);
-  if (plan.WQA) { rread(a, plan.iWQa, 'WQa', 'wqa'); a.roll('WQb').op(OP.CAT, 2, 'WQb'); }
+  // WQ = WQa (4096 B, fixed) || WQb (variable) || WQc (variable): |WQb|, |WQc| >= 256 and = 0 mod 128, |WQb| + |WQc| <= 32 NQ - 4096
+  rreadVar(a, plan, plan.iWQ, 'WQ', 'WQb'); rreadVar(a, plan, plan.iWQc, 'WQc', 'wqc');
+  for (const Q of ['WQb', 'wqc']) { a.pick(Q, 'wq').op(OP.SIZE, 1, 'wq', 'qs').op(OP.NIP, 2, 'qs');
+    a.pick('qs').push(128).op(OP.MOD, 2, 'qm').op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1).pick('qs').push(256).op(OP.GREATERTHANOREQUAL, 2, 'ok').op(OP.VERIFY, 1); }
+  a.op(OP.ADD, 2, 'qs').push(32 * plan.NQ - plan.WQA).op(OP.LESSTHANOREQUAL, 2, 'ok').op(OP.VERIFY, 1);
+  // the pieces stay separate items (WQ can exceed the 10,000-byte stack item limit from n_q = 310 on):
+  // z = SHA256(h0 || rhoRaw || SHA256(WQa) || SHA256(WQb) || SHA256(WQc)) (160 B), and the Horner runs over WQa, WQb, WQc
+  rread(a, plan.iWQa, 'WQa', 'wqa');
   a.pushBytes(TAG, 'tag').roll('uRaw').op(OP.CAT, 2, 'h').pick('WS').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'h0');
   a.pick('h0').pushBytes(Buffer.from('rho')).op(OP.CAT, 2, 'hr').op(OP.SHA256, 1, 'rhoRaw');
-  a.roll('h0').pick('rhoRaw').op(OP.CAT, 2, 'hh').pick('WQb').op(OP.CAT, 2, 'hq').op(OP.SHA256, 1, 'zRawS');
+  a.roll('h0').pick('rhoRaw').op(OP.CAT, 2, 'hh');
+  for (const Q of ['wqa', 'WQb', 'wqc']) a.pick(Q).op(OP.SHA256, 1, 'hqx').op(OP.CAT, 2, 'hh');
+  a.op(OP.SHA256, 1, 'zRawS');
   a.invoke('P', ['p']);
   const U = (x) => a.pushBytes([0x00]).op(OP.CAT, 2, x + '#c').op(OP.BIN2NUM, 1, x);
   a.roll('zRawS'); U('zRawS'); a.pick('p').op(OP.MOD, 2, 'z'); a.pick('z').op(OP.ZERONOTEQUAL, 1, 'znz').op(OP.VERIFY, 1);
   a.roll('rhoRaw'); U('rhoRaw'); a.roll('p').op(OP.MOD, 2, 'rho');
   { const k = new Kernel(); const z = k.env('z'); const z2 = k.mod(k.mul(z, z)), z4 = k.mod(k.mul(z2, z2)); k.output(z2, z4, k.mod(k.mul(z4, z4)), k.mod(k.mul(z2, z4))); a.kernel(k, ['z2', 'z4', 'z8', 'z6b'], {iters: 100}); }
-  a.roll('WQb').push(0, 'acc');
-  a.loop((s) => {
-    s.roll('WQb').push(128).op(OP.SPLIT, 2, 'Q4', 'WQb').roll('Q4');
-    for (let j = 0; j < 4; j++) s.invoke('DLP', ['q' + j, 'Q4']);
-    s.drop('Q4');
-    const k = new Kernel(); const I = (n) => k.in(n), E = (n) => k.env(n);
-    k.output(k.mod(k.sum(k.mul(I('acc'), E('z8')), k.mul(I('q0'), E('z6b')), k.mul(I('q1'), E('z4')), k.mul(I('q2'), E('z2')), I('q3')))); s.kernel(k, ['acc'], {iters: 300});
-    s.pick('WQb', 'WQc').op(OP.SIZE, 1, 'WQc', 'qs').op(OP.NIP, 2, 'qs').op(OP.NOT, 1, 'done');
-  });
-  a.drop('WQb');
+  a.push(0, 'acc');
+  for (const Q of ['wqa', 'WQb', 'wqc']) { // the 4-word Horner over WQa, WQb, WQc (inline: a local function costs ST ~0.19M op more)
+    a.roll(Q).roll('acc');
+    a.loop((s) => {
+      s.roll(Q).push(128).op(OP.SPLIT, 2, 'Q4', Q).roll('Q4');
+      for (let j = 0; j < 4; j++) s.invoke('DLP', ['q' + j, 'Q4']);
+      s.drop('Q4');
+      const k = new Kernel(); const I = (n) => k.in(n), E = (n) => k.env(n);
+      k.output(k.mod(k.sum(k.mul(I('acc'), E('z8')), k.mul(I('q0'), E('z6b')), k.mul(I('q1'), E('z4')), k.mul(I('q2'), E('z2')), I('q3')))); s.kernel(k, ['acc'], {iters: 300});
+      s.pick(Q, 'WQc').op(OP.SIZE, 1, 'WQc', 'qs').op(OP.NIP, 2, 'qs').op(OP.NOT, 1, 'done');
+    });
+    a.drop(Q); }
   for (const n of ['rho', 'z', 'acc']) a.roll('g0').roll(n).invoke('ENC', ['w']).op(OP.CAT, 2, 'g0');
   if (plan.bindST) { a.pick('WS', 'NB').push(192).op(OP.SPLIT, 2, 'x', 'NB').drop('x').push(65 * plan.m).op(OP.SPLIT, 2, 'NB', 'x').drop('x'); gtBindLoop(a, plan.m);
     gtBind(a, plan.FX, (nm) => 'fs' + plan.FX.indexOf(nm)); }
@@ -655,7 +671,10 @@ function chainStateAt(C, j) { // (x_j, c_{j-1}, lambda_{j-1}) after j steps (ker
   for (; jj < j; jj++) { const n = C.lams[jj]; const nc = F2.sub(F2.mul(F2.add(l, n), x), c); const sx = sOf[jj] === 'dbl' ? x : sOf[jj]; const nx = F2.sub(F2.sub(F2.sqr(n), x), sx); c = nc; l = n; x = nx; }
   return [x.c0, x.c1, c.c0, c.c1, l.c0, l.c1].map((v) => mod(v));
 }
-export function multiWitness(vk, plan, built, proofHex, pubHex, {lam, fsDelta} = {}) {
+// nqPad (liveness stress, liveness.mjs): prepend pseudo-random nonzero words (< p) to the quotient up to nqPad words, so
+// every input does the work and carries the bytes of an n_q = nqPad proof; the transcript (z, QZ, GZ, R) follows the
+// padded WQ, so only the final identity of the last SI role fails (the stress transaction is never accepted).
+export function multiWitness(vk, plan, built, proofHex, pubHex, {lam, fsDelta, nqPad} = {}) {
   const {names, nbm, roles} = plan; const CH = chains(vk);
   const V = verifyPlonk(vk, proofHex, pubHex, lam ? {lam} : {});
   if (fsDelta) { const fs = V.gt.fs.slice(); fs[fsDelta[0]] = mod(fs[fsDelta[0]] + fsDelta[1], r); V.gt = {...V.gt, ...nibbles(fs), fs: V.gt.fs}; } // test: nibbles for a wrong scalar
@@ -690,9 +709,14 @@ export function multiWitness(vk, plan, built, proofHex, pubHex, {lam, fsDelta} =
   assert.deepEqual(Aff, aff(V.Pstar), 'chain MSM P*');
   // SI
   const S = proveSI(CH, Aff, PR, V.uRaw, V.gt);
-  const WQ = plan.WQ_VAR ? Buffer.concat([Buffer.alloc(Math.max(256 + plan.WQA, Math.ceil(S.WQ.length / 128) * 128) - S.WQ.length), S.WQ]) : Buffer.concat([Buffer.alloc(WQ_SIZE - S.WQ.length), S.WQ]);
+  if (nqPad && 32 * nqPad > S.WQ.length) { const n = nqPad - S.WQ.length / 32;
+    S.WQ = Buffer.concat([...Array.from({length: n}, (_, i) => le32(mod(le(sha(Buffer.from('nq-stress'), le32(BigInt(i))))) || 1n)), S.WQ]); S.nqHonest = S.nq; S.nq = nqPad; S.stress = true; }
+  const WQ = plan.WQ_VAR ? Buffer.concat([Buffer.alloc(Math.max(512 + plan.WQA, Math.ceil(S.WQ.length / 128) * 128) - S.WQ.length), S.WQ]) : Buffer.concat([Buffer.alloc(WQ_SIZE - S.WQ.length), S.WQ]);
+  const wqbLen = plan.WQ_VAR ? Math.min(WQ.length - plan.WQA - 256, plan.wqbMax) : 0; // WQ = WQa || WQb || WQc (WQc >= 256 B)
   const h0 = sha(TAG, V.uRaw, S.WS), rhoRaw = sha(h0, Buffer.from('rho')); const rho = BigInt('0x' + Buffer.from(rhoRaw).reverse().toString('hex')) % p;
-  const z = BigInt('0x' + Buffer.from(sha(h0, rhoRaw, WQ)).reverse().toString('hex')) % p; const zm = mod(-z);
+  // the folded chain (WQa || WQb): z = SHA256(h0 || rhoRaw || SHA256(WQa) || WQb) (ST never concatenates WQa || WQb)
+  const WQp = plan.WQ_VAR ? [WQ.subarray(0, plan.WQA), WQ.subarray(plan.WQA, plan.WQA + wqbLen), WQ.subarray(plan.WQA + wqbLen)] : null;
+  const z = BigInt('0x' + Buffer.from(plan.WQA ? sha(h0, rhoRaw, ...WQp.map((x) => sha(x))) : sha(h0, rhoRaw, WQ)).reverse().toString('hex')) % p; const zm = mod(-z);
   if (plan.stSI) { let acc = 0n; const z2 = mod(z * z); for (let i = 0; i < WQ.length; i += 32) acc = mod(acc * z2 + le(WQ.subarray(i, i + 32)));
     G0 = Buffer.concat([G0, le32(rho), le32(z), le32(acc), ...(plan.bindST ? [] : V.gt.fs.map(le32))]); }
   const GZ = V.gt ? Buffer.concat(V.gt.G.R.map((Ri, i) => i).reverse().flatMap((i) => { const Ri = V.gt.G.R[i]; const out = [];
@@ -711,12 +735,12 @@ export function multiWitness(vk, plan, built, proofHex, pubHex, {lam, fsDelta} =
   // unlockings
   const X = Buffer.concat([be32(V.lamAff[0]), be32(V.lamAff[1]), le32(V.invProd), le32(ziR)]);
   const PI = Buffer.concat(pubHex.map((h) => Buffer.from(h, 'hex'))); const PROOF = Buffer.from(proofHex, 'hex');
-  const data = {CODE: built.code, G0, X, PI, PROOF, WS: S.WS, TV, TV2, TF, WQ: WQ.subarray(plan.WQA), WQa: WQ.subarray(0, plan.WQA), GZ}; built.cb.forEach((b, i) => { data['C' + (i + 1)] = b; });
+  const data = {CODE: built.code, G0, X, PI, PROOF, WS: S.WS, TV, TV2, TF, WQ: plan.WQ_VAR ? WQp[1] : WQ, WQa: WQp?.[0], WQc: WQp?.[2], GZ}; built.cb.forEach((b, i) => { data['C' + (i + 1)] = b; });
   const pushes = roles.map((ro, ix) => {
     const fx = ro.fixed.map(([n]) => (n === 'HAND' ? hands.get(ix) : n === 'ZI' ? le32(zi) : n === 'DS' ? dsSlice(CH, ro) : data[n]));
     fx.forEach((b, i) => assert.ok(b && (ro.fixed[i][1] === null || ro.fixed[i][1] === 'var' || b.length === ro.fixed[i][1]), `role ${ix} push ${ro.fixed[i][0]}`));
     const pieces = []; if (ro.slopes) { const sl = slopesOf.get(ix).map(le32); for (let i = 0; i < sl.length; i += SL_PIECE) pieces.push(Buffer.concat(sl.slice(i, i + SL_PIECE))); }
     return [...fx, ...pieces];
   });
-  return {V, S, pushes, accept: V.ok && S.accept};
+  return {V, S, pushes, accept: V.ok && S.accept && !S.stress};
 }

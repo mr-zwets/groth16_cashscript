@@ -598,20 +598,18 @@ exponentiation, is 12.3M. The transcript and the Fr work are negligible.
 
 ## Reproduce
 
-Track 6 numbers need `FOLD=0` now (the fold is the default); `results/` holds the Track 7 runs.
+Track 6 numbers need `FOLD=0` (the fold is the default); `results/` holds the Track 7 runs, and the integrated
+build's commands are in "Reproduce (integrated)" above. The Track 6 commands below overwrite `results/`.
 
 ```sh
-# node_modules: symlink to a zk-verifier-bench pnpm install (@bitauth/libauth 3.1.0-next.8, @noble/curves 2.2.0)
-# vectors/ is a copy of the prover track's vectors (wip/plonk-kzg-prover research/plonk-kzg/prover/vectors)
-node single.mjs mul2 spec 13            # one spend, bch-spec (J = 13 Jacobian windows)
-node single.mjs merkle16 txv5 8         # 100 KB input regime, minimal pad
-node chain.mjs merkle16                 # today's rules: 10-input transaction, per-input op / budget
-node profile.mjs mul2 13                # per-phase op-cost
-nice node test.mjs mul2 spec 13         # -> results/test-mul2-spec.json  (also: merkle16, txv5 8)
-nice node chaintest.mjs mul2            # -> results/chain-mul2.json      (about 25 min per circuit)
-node summary.mjs                        # -> results/summary.json
-SRS_CACHE=dir node srs-check.mjs        # baked SRS constants = Aztec Ignition ([x]_2 from the pinned/downloaded manifest)
-node soundness/lattice.mjs              # numbers behind SOUNDNESS.md (GLV lattice, ranges, bound)
+npm install                                   # package.json: @bitauth/libauth 3.1.0-next.8, @noble/curves 2.2.0
+# vectors/ is a copy of the prover track's vectors (../prover/vectors)
+FOLD=0 node single.mjs mul2 spec 13           # one spend, bch-spec (J = 13 Jacobian windows)
+FOLD=0 node single.mjs merkle16 txv5 8        # 100 KB input regime, minimal pad
+FOLD=0 node chain.mjs merkle16                # today's rules: 10-input transaction, per-input op / budget
+FOLD=0 node profile.mjs mul2 13               # per-phase op-cost
+FOLD=0 nice node test.mjs mul2 spec 13        # -> results/test-mul2-spec.json (also merkle16, and txv5 8)
+FOLD=0 nice node chaintest.mjs mul2           # -> results/chain-mul2.json (4-6 min per circuit)
 ```
 
 ## Files
