@@ -1,0 +1,1182 @@
+{
+ "circuit": "merkle16rc",
+ "plan": [
+  {
+   "kind": "MJ",
+   "hi": 50,
+   "lo": 42
+  },
+  {
+   "kind": "ST"
+  },
+  {
+   "kind": "MJ",
+   "hi": 41,
+   "lo": 38,
+   "host": "TV"
+  },
+  {
+   "kind": "MA",
+   "hi": 37,
+   "lo": 25
+  },
+  {
+   "kind": "MA",
+   "hi": 24,
+   "lo": 12
+  },
+  {
+   "kind": "MA",
+   "hi": 11,
+   "lo": 0
+  },
+  {
+   "kind": "SI",
+   "e0": 0,
+   "e1": 16
+  },
+  {
+   "kind": "SI",
+   "e0": 16,
+   "e1": 36
+  },
+  {
+   "kind": "SI",
+   "e0": 36,
+   "e1": 52
+  },
+  {
+   "kind": "SI",
+   "e0": 52,
+   "e1": 65
+  }
+ ],
+ "codeBytes": [
+  9745,
+  3913
+ ],
+ "redeemBytes": 154,
+ "valid": [
+  {
+   "i": 0,
+   "accepted": true,
+   "txBytes": 89825,
+   "unlocking": 89375,
+   "inputs": 10,
+   "perInput": [
+    {
+     "role": "MJ",
+     "unlocking": 9905,
+     "fill": 0,
+     "opCost": 7490081,
+     "budget": 7956800
+    },
+    {
+     "role": "ST",
+     "unlocking": 9300,
+     "fill": 0,
+     "opCost": 7239960,
+     "budget": 7472800
+    },
+    {
+     "role": "MJ",
+     "unlocking": 9850,
+     "fill": 950,
+     "opCost": 7822602,
+     "budget": 7912800
+    },
+    {
+     "role": "MA",
+     "unlocking": 8553,
+     "fill": 190,
+     "opCost": 6785370,
+     "budget": 6875200
+    },
+    {
+     "role": "MA",
+     "unlocking": 7848,
+     "fill": 955,
+     "opCost": 6221233,
+     "budget": 6311200
+    },
+    {
+     "role": "MA",
+     "unlocking": 7375,
+     "fill": 968,
+     "opCost": 5842688,
+     "budget": 5932800
+    },
+    {
+     "role": "SI",
+     "unlocking": 9609,
+     "fill": 88,
+     "opCost": 7629785,
+     "budget": 7720000
+    },
+    {
+     "role": "SI",
+     "unlocking": 9646,
+     "fill": 0,
+     "opCost": 7542189,
+     "budget": 7749600
+    },
+    {
+     "role": "SI",
+     "unlocking": 8176,
+     "fill": 680,
+     "opCost": 6483888,
+     "budget": 6573600
+    },
+    {
+     "role": "SI",
+     "unlocking": 9113,
+     "fill": 977,
+     "opCost": 7233346,
+     "budget": 7323200
+    }
+   ]
+  },
+  {
+   "i": 1,
+   "accepted": true,
+   "txBytes": 89727,
+   "unlocking": 89277,
+   "inputs": 10,
+   "perInput": [
+    {
+     "role": "MJ",
+     "unlocking": 9905,
+     "fill": 0,
+     "opCost": 7442629,
+     "budget": 7956800
+    },
+    {
+     "role": "ST",
+     "unlocking": 9300,
+     "fill": 0,
+     "opCost": 7262521,
+     "budget": 7472800
+    },
+    {
+     "role": "MJ",
+     "unlocking": 9787,
+     "fill": 887,
+     "opCost": 7772428,
+     "budget": 7862400
+    },
+    {
+     "role": "MA",
+     "unlocking": 8581,
+     "fill": 186,
+     "opCost": 6808001,
+     "budget": 6897600
+    },
+    {
+     "role": "MA",
+     "unlocking": 7795,
+     "fill": 966,
+     "opCost": 6179298,
+     "budget": 6268800
+    },
+    {
+     "role": "MA",
+     "unlocking": 7322,
+     "fill": 979,
+     "opCost": 5800181,
+     "budget": 5890400
+    },
+    {
+     "role": "SI",
+     "unlocking": 9620,
+     "fill": 99,
+     "opCost": 7638846,
+     "budget": 7728800
+    },
+    {
+     "role": "SI",
+     "unlocking": 9646,
+     "fill": 0,
+     "opCost": 7583624,
+     "budget": 7749600
+    },
+    {
+     "role": "SI",
+     "unlocking": 8171,
+     "fill": 675,
+     "opCost": 6479871,
+     "budget": 6569600
+    },
+    {
+     "role": "SI",
+     "unlocking": 9150,
+     "fill": 1270,
+     "opCost": 7262785,
+     "budget": 7352800
+    }
+   ]
+  },
+  {
+   "i": 2,
+   "accepted": true,
+   "txBytes": 89452,
+   "unlocking": 89002,
+   "inputs": 10,
+   "perInput": [
+    {
+     "role": "MJ",
+     "unlocking": 9905,
+     "fill": 0,
+     "opCost": 7488351,
+     "budget": 7956800
+    },
+    {
+     "role": "ST",
+     "unlocking": 9300,
+     "fill": 0,
+     "opCost": 7108439,
+     "budget": 7472800
+    },
+    {
+     "role": "MJ",
+     "unlocking": 9600,
+     "fill": 700,
+     "opCost": 7622875,
+     "budget": 7712800
+    },
+    {
+     "role": "MA",
+     "unlocking": 8555,
+     "fill": 192,
+     "opCost": 6786731,
+     "budget": 6876800
+    },
+    {
+     "role": "MA",
+     "unlocking": 7793,
+     "fill": 964,
+     "opCost": 6177359,
+     "budget": 6267200
+    },
+    {
+     "role": "MA",
+     "unlocking": 7266,
+     "fill": 987,
+     "opCost": 5755339,
+     "budget": 5845600
+    },
+    {
+     "role": "SI",
+     "unlocking": 9636,
+     "fill": 115,
+     "opCost": 7651219,
+     "budget": 7741600
+    },
+    {
+     "role": "SI",
+     "unlocking": 9646,
+     "fill": 0,
+     "opCost": 7557239,
+     "budget": 7749600
+    },
+    {
+     "role": "SI",
+     "unlocking": 8189,
+     "fill": 693,
+     "opCost": 6494169,
+     "budget": 6584000
+    },
+    {
+     "role": "SI",
+     "unlocking": 9112,
+     "fill": 1616,
+     "opCost": 7232479,
+     "budget": 7322400
+    }
+   ]
+  },
+  {
+   "i": 3,
+   "accepted": true,
+   "txBytes": 89899,
+   "unlocking": 89449,
+   "inputs": 10,
+   "perInput": [
+    {
+     "role": "MJ",
+     "unlocking": 9905,
+     "fill": 0,
+     "opCost": 7539040,
+     "budget": 7956800
+    },
+    {
+     "role": "ST",
+     "unlocking": 9300,
+     "fill": 0,
+     "opCost": 7143269,
+     "budget": 7472800
+    },
+    {
+     "role": "MJ",
+     "unlocking": 9850,
+     "fill": 950,
+     "opCost": 7822764,
+     "budget": 7912800
+    },
+    {
+     "role": "MA",
+     "unlocking": 8582,
+     "fill": 187,
+     "opCost": 6808567,
+     "budget": 6898400
+    },
+    {
+     "role": "MA",
+     "unlocking": 7850,
+     "fill": 957,
+     "opCost": 6223055,
+     "budget": 6312800
+    },
+    {
+     "role": "MA",
+     "unlocking": 7350,
+     "fill": 975,
+     "opCost": 5823019,
+     "budget": 5912800
+    },
+    {
+     "role": "SI",
+     "unlocking": 9636,
+     "fill": 115,
+     "opCost": 7651774,
+     "budget": 7741600
+    },
+    {
+     "role": "SI",
+     "unlocking": 9646,
+     "fill": 0,
+     "opCost": 7588930,
+     "budget": 7749600
+    },
+    {
+     "role": "SI",
+     "unlocking": 8188,
+     "fill": 692,
+     "opCost": 6492934,
+     "budget": 6583200
+    },
+    {
+     "role": "SI",
+     "unlocking": 9142,
+     "fill": 1518,
+     "opCost": 7256484,
+     "budget": 7346400
+    }
+   ]
+  },
+  {
+   "i": 4,
+   "accepted": true,
+   "txBytes": 89791,
+   "unlocking": 89341,
+   "inputs": 10,
+   "perInput": [
+    {
+     "role": "MJ",
+     "unlocking": 9905,
+     "fill": 0,
+     "opCost": 7540010,
+     "budget": 7956800
+    },
+    {
+     "role": "ST",
+     "unlocking": 9300,
+     "fill": 0,
+     "opCost": 7227578,
+     "budget": 7472800
+    },
+    {
+     "role": "MJ",
+     "unlocking": 9728,
+     "fill": 828,
+     "opCost": 7724971,
+     "budget": 7815200
+    },
+    {
+     "role": "MA",
+     "unlocking": 8691,
+     "fill": 165,
+     "opCost": 6895365,
+     "budget": 6985600
+    },
+    {
+     "role": "MA",
+     "unlocking": 7821,
+     "fill": 960,
+     "opCost": 6199731,
+     "budget": 6289600
+    },
+    {
+     "role": "MA",
+     "unlocking": 7292,
+     "fill": 981,
+     "opCost": 5776291,
+     "budget": 5866400
+    },
+    {
+     "role": "SI",
+     "unlocking": 9658,
+     "fill": 137,
+     "opCost": 7669040,
+     "budget": 7759200
+    },
+    {
+     "role": "SI",
+     "unlocking": 9646,
+     "fill": 0,
+     "opCost": 7580432,
+     "budget": 7749600
+    },
+    {
+     "role": "SI",
+     "unlocking": 8176,
+     "fill": 680,
+     "opCost": 6483975,
+     "budget": 6573600
+    },
+    {
+     "role": "SI",
+     "unlocking": 9124,
+     "fill": 1372,
+     "opCost": 7242509,
+     "budget": 7332000
+    }
+   ]
+  }
+ ],
+ "tampered": [
+  {
+   "name": "point.L.plusG",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.L.negated",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.L.infinity",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.R.plusG",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.R.negated",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.R.infinity",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.O.plusG",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.O.negated",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.O.infinity",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H0.plusG",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.H0.negated",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.H0.infinity",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H1.plusG",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.H1.negated",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.H1.infinity",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H2.plusG",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.H2.negated",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.H2.infinity",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Z.plusG",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.Z.negated",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.Z.infinity",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Wzeta.plusG",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.Wzeta.negated",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.Wzeta.infinity",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.WzetaOmega.plusG",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.WzetaOmega.negated",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.WzetaOmega.infinity",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Bsb22_0.plusG",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.Bsb22_0.negated",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.Bsb22_0.infinity",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "scalar.l_zeta.plus1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "scalar.r_zeta.plus1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "scalar.o_zeta.plus1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "scalar.s1_zeta.plus1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "scalar.s2_zeta.plus1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "scalar.z_zetaOmega.plus1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "scalar.qcp0_zeta.plus1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "pi.0.plus1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "pi.1.plus1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "pi.2.plus1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "pi.swap01",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "mix.proof1-with-pi0",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "bsb22.commitment-from-proof1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "bsb22.commitment-and-qcp-from-proof1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "bsb22.commitment-doubled",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "bsb22.commitment-minusG",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "bsb22.qcp-zeta-zero",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation.",
+   "how": "adaptive"
+  },
+  {
+   "name": "point.L.offCurve",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.L.xPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.L.yPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.R.offCurve",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.R.xPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.R.yPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.O.offCurve",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.O.xPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.O.yPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H0.offCurve",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H0.xPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H0.yPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H1.offCurve",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H1.xPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H1.yPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H2.offCurve",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H2.xPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.H2.yPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Z.offCurve",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Z.xPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Z.yPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Wzeta.offCurve",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Wzeta.xPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Wzeta.yPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.WzetaOmega.offCurve",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.WzetaOmega.xPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.WzetaOmega.yPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Bsb22_0.offCurve",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Bsb22_0.xPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "point.Bsb22_0.yPlusP",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "scalar.l_zeta.plusR",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "scalar.r_zeta.plusR",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "scalar.o_zeta.plusR",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "scalar.s1_zeta.plusR",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "scalar.s2_zeta.plusR",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "scalar.z_zetaOmega.plusR",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "scalar.qcp0_zeta.plusR",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "pi.0.plusR",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "pi.1.plusR",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "pi.2.plusR",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "size.truncated",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "size.extended",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "pi.count.dropLast",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  },
+  {
+   "name": "pi.count.extraZero",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation.",
+   "how": "reused"
+  }
+ ],
+ "manipulations": [
+  {
+   "name": "MA hand-over word + 1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 3: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "MA hand-over word + p (alias)",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 3: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "SI hand-over R word flipped",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 6: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "slope bit flip (MA)",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 4: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "TV entry bit flip",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 2: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "TV2 entry bit flip",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 3: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "DS (chain slopes) bit flip",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 7: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WS state bit flip",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WQ word bit flip",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "G0 scalar bit flip",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "code blob C0 byte flip",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "code blob C1 byte flip",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "code blob C2 byte flip",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "G0 rho word flipped",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "G0 z word flipped",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "G0 QZ (Horner value) flipped",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "G0 folded scalar s_0 flipped",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WS nibble byte + 1",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WS nibble byte = 0x10 (out of range)",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WS nibble byte = 0x81 (negative)",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "GZ word flipped",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 6: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WQa word flipped",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WQb extra zero word (wrong size)",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "X: Fr inverse * 2",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "two MA inputs swapped",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 3: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "nonzero FILL byte",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 4: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "extra input with the same locking",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "extra foreign input",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "input dropped (last SI)",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 0: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "adaptive: Lambda' = 2 Lambda",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "adaptive: Lambda' = Lambda + G",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "adaptive: nibbles of folded base 0 encode s + 1 (SI re-witnessed)",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "adaptive: nibbles of folded base 8 encode s + 1 (SI re-witnessed)",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "adaptive: nibbles of folded base 9 encode s + 1 (SI re-witnessed)",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "adaptive: proof 1 with the public inputs of proof 0",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation."
+  }
+ ],
+ "unexpected": 0
+}

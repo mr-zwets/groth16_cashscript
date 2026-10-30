@@ -3,12 +3,20 @@
 Status: **research, built and measured; not a leaderboard entry.** Nothing in REGISTRY, results.json,
 score-history.json or the website changed. Not independently reviewed.
 
-- **Track 7** (2026-10-30, branch `wip/plonk-usable-msm`): chain hand-over redesign plus GT folding of the fixed MSM
-  bases. It is the default build. See the next section.
+- **Track 7, integrated** (2026-10-30, branch `wip/plonk-usable-verifier`): the three Track 7 branches combined into
+  one verifier, the default build: the Aztec Ignition ceremony SRS for every vector (`-srs`), BSB22 commitments in
+  both the single input and the today's-rules chain, and the GT fold with the new hand-overs. See the next section.
+- **Track 7 branches** (2026-10-30), kept below as history; their numbers are per branch:
+  - `wip/plonk-usable-msm`: chain hand-over redesign plus GT folding of the fixed MSM bases (measured on the test SRS);
+  - `wip/plonk-usable-bsb22`: BSB22 commitments, unfolded, test SRS; its chain did not fit one transaction;
+  - `wip/plonk-usable-srs`: the Ignition ceremony SRS (its re-run is in the Track 6 section).
 - **Track 6** (2026-10-29): the first build, without GT folding. It is still built with `FOLD=0`. Its text follows
   further below, unchanged; its numbers are for that build.
 
-## Track 7: GT fold and the chain hand-over (default build)
+## Track 7 branch `wip/plonk-usable-msm`: GT fold and the chain hand-over
+
+These numbers were measured on the test-SRS vectors, before the integration; the integrated build's are in the
+section above.
 
 ### Results (score = unlocking + 35 B locking per input + tx overhead; 5 valid proofs per circuit)
 
@@ -130,7 +138,7 @@ the sum over both circuits.
   - bch-spec margins are 3.3–3.5% at J = 23.
   - Chain inputs are FILL-sized per proof, but data-bound inputs have only the slack of their own data.
   - The honest n_q varies (225–267), and the cap leaves headroom.
-- **Not changed:** the unsafe test SRS, BSB22 commitments, snarkjs.
+- **Not changed on this branch:** the unsafe test SRS, BSB22 commitments, snarkjs. (The integration adds the first two.)
 - **Malleability (no soundness effect):** WQ leading zero words in the chain, and the choice of a lattice-equivalent
   nibble decomposition.
 
@@ -244,9 +252,11 @@ Tests on the new vectors:
   - So the verifier fits a standard 100 KB transaction, but only just: 95.6–96.0 KB for merkle16.
   - A circuit with a few more fixed bases or public inputs would need an 11th input and could exceed 100,000 B.
 
-## Track 7: BSB22 commitments (api.Commit)
+## Track 7 branch `wip/plonk-usable-bsb22`: BSB22 commitments (api.Commit)
 
-Date: 2026-10-30. Branch `wip/plonk-usable-bsb22`. Research, not a leaderboard entry.
+Date: 2026-10-30. Branch `wip/plonk-usable-bsb22`. Research, not a leaderboard entry. This section is that branch's
+unfolded build on the test SRS (FOLD=0). In the integrated build the commitment's Qcp_j is GT-folded and the chain
+fits one transaction; see the integrated section at the top.
 
 Circuits that use gnark's range-check or lookup gadgets carry BSB22 commitments. The single-input verifier now
 handles them: `script.mjs` and `plonk.mjs` are generic in the number m of commitments, and m = 1 is tested. The protocol
