@@ -72,7 +72,7 @@ export class Asm {
   top(k = 0) { return this.st[this.st.length - 1 - k]; }
   // ---- stack moves ----
   pick(name, as) { const d = this.depth(name); if (d === 0) this.emit(OP.DUP); else if (d === 1) this.emit(OP.OVER); else this.emit(...pushNum(d), OP.PICK); this.st.push(as ?? name); return this; }
-  roll(name) { const d = this.depth(name); if (d === 1) this.emit(OP.SWAP); else if (d === 2) this.emit(OP.ROT); else if (d > 2) this.emit(...pushNum(d), OP.ROLL); this.st.splice(this.st.length - 1 - d, 1); this.st.push(name); return this; }
+  roll(name) { const d = this.depth(name), i = this.idx(name); if (d === 1) this.emit(OP.SWAP); else if (d === 2) this.emit(OP.ROT); else if (d > 2) this.emit(...pushNum(d), OP.ROLL); this.st.splice(i, 1); this.st.push(name); return this; } // arrange-check: symbolic index (piles may sit above the item), as in the Track 6 fix
   drop(name) { if (name !== undefined) { const d = this.depth(name); if (d === 1) { this.emit(OP.NIP); this.st.splice(this.st.length - 2, 1); return this; } if (d > 0) this.roll(name); } this.emit(OP.DROP); this.st.pop(); return this; }
   rename(name, as) { if (as === undefined) { this.st[this.st.length - 1] = name; return this; } this.st[this.idx(name)] = as; return this; }
   push(v, name) { this.emit(...pushNum(v)); this.st.push(name ?? this.fresh('c')); return this; }
@@ -88,6 +88,8 @@ export class Asm {
     // find largest k such that names[0..k) are, in order, directly below nothing that must move:
     let k = 0; // greedy: keep names[0..k) if they already occupy the bottom of the top-n window in order
     const win = this.st.slice(-n); while (k < n && win[k] === names[k]) k++;
+    // arrange-check fix (same as Track 7): the kept prefix must have only items that are rolled anyway above it (else they would stay in between)
+    while (k > 0 && !win.slice(k).every((x) => names.slice(k).includes(x))) k--;
     for (let i = k; i < n; i++) this.roll(names[i]);
     return this;
   }
