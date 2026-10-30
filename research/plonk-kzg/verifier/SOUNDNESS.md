@@ -200,8 +200,8 @@ in `BatchVerifyMultiPoints`. Here π̃ is π with `ClaimedValues[0] := r0`. Equi
       (m = 11: 924, 456, 2^-243.51). The chain checks the cap the same way (|WQb| + |WQc| ≤ 32·420 − 4096). Liveness
       (review fix): every n_q up to NQ fits the chain of every tested circuit (348 / 384 / 420 / 420 words for mul2,
       merkle16, range64, merkle16rc; `liveness.mjs`, and the `liveness` case of `chaintest.mjs`). Before the fix the
-      WQb host's 10,000-byte limit capped n_q at about 340 (honest BSB22 n_q exceeds 330 with probability about 10^-5),
-      and the bindST mul2 plan at about 260. A proof that does not fit is rejected, never accepted.
+      WQb host's 10,000-byte limit capped n_q at about 340 (of 10^6 sampled honest BSB22 proofs, 2–5 exceed 340), and
+      the bindST mul2 plan at about 260. A proof that does not fit is rejected, never accepted.
     - Folded chain transcript (review fix): z = H(h0 ‖ ρRaw ‖ H(WQa) ‖ H(WQb) ‖ H(WQc)). By ¬B1 (no collisions)
       and ¬B2 (no hash output guessed before it is queried; Lemma 0), the three inner outputs fix WQa, WQb and WQc, and
       so the polynomial QZ evaluates, before z is drawn; the outer query is then fresh as before. Different splits of

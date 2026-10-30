@@ -52,7 +52,7 @@
   }
  ],
  "codeBytes": [
-  9536,
+  9702,
   3693
  ],
  "redeemBytes": 154,
@@ -60,242 +60,225 @@
   {
    "i": 0,
    "accepted": true,
-   "txBytes": 84179,
-   "unlocking": 83729,
+   "txBytes": 84356,
+   "unlocking": 83906,
    "inputs": 10,
    "perInput": [
     {
      "role": "MJ",
-     "unlocking": 9696,
+     "unlocking": 9862,
      "fill": 0,
-     "opCost": 7685018,
-     "budget": 7789600
+     "opCost": 7686398,
+     "defBytes": 36055,
+     "opCostBchn": 7722453,
+     "budget": 7922400,
+     "bchnMarginPct": 2.524
     },
     {
      "role": "ST",
      "unlocking": 9075,
      "fill": 0,
-     "opCost": 6827631,
-     "budget": 7292800
+     "opCost": 6610791,
+     "defBytes": 36055,
+     "opCostBchn": 6646846,
+     "budget": 7292800,
+     "bchnMarginPct": 8.857
     },
     {
      "role": "MJ",
      "unlocking": 9858,
      "fill": 0,
-     "opCost": 7824184,
-     "budget": 7919200
+     "opCost": 7825406,
+     "defBytes": 36055,
+     "opCostBchn": 7861461,
+     "budget": 7919200,
+     "bchnMarginPct": 0.729
     },
     {
      "role": "MA",
-     "unlocking": 6972,
-     "fill": 822,
-     "opCost": 5523350,
-     "budget": 5610400
+     "unlocking": 6974,
+     "fill": 824,
+     "opCost": 5524576,
+     "defBytes": 36055,
+     "opCostBchn": 5560631,
+     "budget": 5612000,
+     "bchnMarginPct": 0.915
     },
     {
      "role": "MA",
-     "unlocking": 6735,
-     "fill": 813,
-     "opCost": 5333515,
-     "budget": 5420800
+     "unlocking": 6737,
+     "fill": 556,
+     "opCost": 5334679,
+     "defBytes": 36055,
+     "opCostBchn": 5370734,
+     "budget": 5422400,
+     "bchnMarginPct": 0.953
     },
     {
      "role": "MA",
-     "unlocking": 6776,
-     "fill": 821,
-     "opCost": 5365968,
-     "budget": 5453600
+     "unlocking": 6778,
+     "fill": 823,
+     "opCost": 5367186,
+     "defBytes": 36055,
+     "opCostBchn": 5403241,
+     "budget": 5455200,
+     "bchnMarginPct": 0.952
     },
     {
      "role": "SI",
      "unlocking": 9044,
      "fill": 0,
-     "opCost": 7219970,
-     "budget": 7268000
+     "opCost": 7219886,
+     "defBytes": 36055,
+     "opCostBchn": 7255941,
+     "budget": 7268000,
+     "bchnMarginPct": 0.166
     },
     {
      "role": "SI",
      "unlocking": 8409,
      "fill": 0,
-     "opCost": 6655672,
-     "budget": 6760000
+     "opCost": 6655834,
+     "defBytes": 36055,
+     "opCostBchn": 6691889,
+     "budget": 6760000,
+     "bchnMarginPct": 1.008
     },
     {
      "role": "SI",
-     "unlocking": 8526,
-     "fill": 646,
-     "opCost": 6766129,
-     "budget": 6853600
+     "unlocking": 8529,
+     "fill": 649,
+     "opCost": 6768023,
+     "defBytes": 36055,
+     "opCostBchn": 6804078,
+     "budget": 6856000,
+     "bchnMarginPct": 0.757
     },
     {
      "role": "SI",
-     "unlocking": 8638,
-     "fill": 1910,
-     "opCost": 6855512,
-     "budget": 6943200
+     "unlocking": 8640,
+     "fill": 2168,
+     "opCost": 6857351,
+     "defBytes": 36055,
+     "opCostBchn": 6893406,
+     "budget": 6944800,
+     "bchnMarginPct": 0.74
     }
-   ]
+   ],
+   "nq": 240
   },
   {
    "i": 1,
    "accepted": true,
-   "txBytes": 84258,
-   "unlocking": 83808,
+   "txBytes": 84433,
+   "unlocking": 83983,
    "inputs": 10,
    "perInput": [
     {
      "role": "MJ",
-     "unlocking": 9696,
+     "unlocking": 9862,
      "fill": 0,
-     "opCost": 7682306,
-     "budget": 7789600
+     "opCost": 7683686,
+     "defBytes": 36055,
+     "opCostBchn": 7719741,
+     "budget": 7922400,
+     "bchnMarginPct": 2.558
     },
     {
      "role": "ST",
      "unlocking": 9075,
      "fill": 0,
-     "opCost": 6932698,
-     "budget": 7292800
+     "opCost": 6689192,
+     "defBytes": 36055,
+     "opCostBchn": 6725247,
+     "budget": 7292800,
+     "bchnMarginPct": 7.782
     },
     {
      "role": "MJ",
      "unlocking": 9858,
      "fill": 0,
-     "opCost": 7824272,
-     "budget": 7919200
+     "opCost": 7825494,
+     "defBytes": 36055,
+     "opCostBchn": 7861549,
+     "budget": 7919200,
+     "bchnMarginPct": 0.728
     },
     {
      "role": "MA",
-     "unlocking": 6949,
-     "fill": 831,
-     "opCost": 5504482,
-     "budget": 5592000
+     "unlocking": 6951,
+     "fill": 833,
+     "opCost": 5505708,
+     "defBytes": 36055,
+     "opCostBchn": 5541763,
+     "budget": 5593600,
+     "bchnMarginPct": 0.927
     },
     {
      "role": "MA",
-     "unlocking": 6817,
-     "fill": 797,
-     "opCost": 5399460,
-     "budget": 5486400
+     "unlocking": 6819,
+     "fill": 540,
+     "opCost": 5400624,
+     "defBytes": 36055,
+     "opCostBchn": 5436679,
+     "budget": 5488000,
+     "bchnMarginPct": 0.935
     },
     {
      "role": "MA",
-     "unlocking": 6780,
-     "fill": 825,
-     "opCost": 5369530,
-     "budget": 5456800
+     "unlocking": 6782,
+     "fill": 827,
+     "opCost": 5370748,
+     "defBytes": 36055,
+     "opCostBchn": 5406803,
+     "budget": 5458400,
+     "bchnMarginPct": 0.945
     },
     {
      "role": "SI",
      "unlocking": 9044,
      "fill": 0,
-     "opCost": 7211445,
-     "budget": 7268000
+     "opCost": 7211765,
+     "defBytes": 36055,
+     "opCostBchn": 7247820,
+     "budget": 7268000,
+     "bchnMarginPct": 0.278
     },
     {
      "role": "SI",
      "unlocking": 8409,
      "fill": 0,
-     "opCost": 6654592,
-     "budget": 6760000
+     "opCost": 6656479,
+     "defBytes": 36055,
+     "opCostBchn": 6692534,
+     "budget": 6760000,
+     "bchnMarginPct": 0.998
     },
     {
      "role": "SI",
-     "unlocking": 8542,
-     "fill": 662,
-     "opCost": 6778958,
-     "budget": 6866400
+     "unlocking": 8543,
+     "fill": 663,
+     "opCost": 6779908,
+     "defBytes": 36055,
+     "opCostBchn": 6815963,
+     "budget": 6867200,
+     "bchnMarginPct": 0.746
     },
     {
      "role": "SI",
-     "unlocking": 8638,
-     "fill": 1526,
-     "opCost": 6855537,
-     "budget": 6943200
+     "unlocking": 8640,
+     "fill": 1784,
+     "opCost": 6856898,
+     "defBytes": 36055,
+     "opCostBchn": 6892953,
+     "budget": 6944800,
+     "bchnMarginPct": 0.747
     }
-   ]
+   ],
+   "nq": 252
   },
   {
    "i": 2,
-   "accepted": true,
-   "txBytes": 84064,
-   "unlocking": 83614,
-   "inputs": 10,
-   "perInput": [
-    {
-     "role": "MJ",
-     "unlocking": 9696,
-     "fill": 0,
-     "opCost": 7634564,
-     "budget": 7789600
-    },
-    {
-     "role": "ST",
-     "unlocking": 9075,
-     "fill": 0,
-     "opCost": 6740537,
-     "budget": 7292800
-    },
-    {
-     "role": "MJ",
-     "unlocking": 9858,
-     "fill": 0,
-     "opCost": 7874000,
-     "budget": 7919200
-    },
-    {
-     "role": "MA",
-     "unlocking": 6923,
-     "fill": 837,
-     "opCost": 5483702,
-     "budget": 5571200
-    },
-    {
-     "role": "MA",
-     "unlocking": 6684,
-     "fill": 827,
-     "opCost": 5292398,
-     "budget": 5380000
-    },
-    {
-     "role": "MA",
-     "unlocking": 6749,
-     "fill": 827,
-     "opCost": 5344788,
-     "budget": 5432000
-    },
-    {
-     "role": "SI",
-     "unlocking": 9044,
-     "fill": 0,
-     "opCost": 7203085,
-     "budget": 7268000
-    },
-    {
-     "role": "SI",
-     "unlocking": 8409,
-     "fill": 0,
-     "opCost": 6659929,
-     "budget": 6760000
-    },
-    {
-     "role": "SI",
-     "unlocking": 8528,
-     "fill": 648,
-     "opCost": 6767961,
-     "budget": 6855200
-    },
-    {
-     "role": "SI",
-     "unlocking": 8648,
-     "fill": 2048,
-     "opCost": 6864089,
-     "budget": 6951200
-    }
-   ]
-  },
-  {
-   "i": 3,
    "accepted": true,
    "txBytes": 84238,
    "unlocking": 83788,
@@ -303,154 +286,326 @@
    "perInput": [
     {
      "role": "MJ",
-     "unlocking": 9696,
+     "unlocking": 9862,
      "fill": 0,
-     "opCost": 7635439,
-     "budget": 7789600
+     "opCost": 7635944,
+     "defBytes": 36055,
+     "opCostBchn": 7671999,
+     "budget": 7922400,
+     "bchnMarginPct": 3.161
     },
     {
      "role": "ST",
      "unlocking": 9075,
      "fill": 0,
-     "opCost": 6832991,
-     "budget": 7292800
+     "opCost": 6530139,
+     "defBytes": 36055,
+     "opCostBchn": 6566194,
+     "budget": 7292800,
+     "bchnMarginPct": 9.963
     },
     {
      "role": "MJ",
      "unlocking": 9858,
      "fill": 0,
-     "opCost": 7874148,
-     "budget": 7919200
+     "opCost": 7875222,
+     "defBytes": 36055,
+     "opCostBchn": 7911277,
+     "budget": 7919200,
+     "bchnMarginPct": 0.1
     },
     {
      "role": "MA",
-     "unlocking": 6976,
-     "fill": 826,
-     "opCost": 5526302,
-     "budget": 5613600
+     "unlocking": 6925,
+     "fill": 839,
+     "opCost": 5484928,
+     "defBytes": 36055,
+     "opCostBchn": 5520983,
+     "budget": 5572800,
+     "bchnMarginPct": 0.93
     },
     {
      "role": "MA",
-     "unlocking": 6765,
-     "fill": 810,
-     "opCost": 5357182,
-     "budget": 5444800
+     "unlocking": 6686,
+     "fill": 570,
+     "opCost": 5293562,
+     "defBytes": 36055,
+     "opCostBchn": 5329617,
+     "budget": 5381600,
+     "bchnMarginPct": 0.966
     },
     {
      "role": "MA",
-     "unlocking": 6778,
-     "fill": 823,
-     "opCost": 5367730,
-     "budget": 5455200
+     "unlocking": 6751,
+     "fill": 829,
+     "opCost": 5346006,
+     "defBytes": 36055,
+     "opCostBchn": 5382061,
+     "budget": 5433600,
+     "bchnMarginPct": 0.949
     },
     {
      "role": "SI",
      "unlocking": 9044,
      "fill": 0,
-     "opCost": 7215289,
-     "budget": 7268000
+     "opCost": 7202485,
+     "defBytes": 36055,
+     "opCostBchn": 7238540,
+     "budget": 7268000,
+     "bchnMarginPct": 0.405
     },
     {
      "role": "SI",
      "unlocking": 8409,
      "fill": 0,
-     "opCost": 6643052,
-     "budget": 6760000
+     "opCost": 6659483,
+     "defBytes": 36055,
+     "opCostBchn": 6695538,
+     "budget": 6760000,
+     "bchnMarginPct": 0.954
+    },
+    {
+     "role": "SI",
+     "unlocking": 8528,
+     "fill": 648,
+     "opCost": 6767732,
+     "defBytes": 36055,
+     "opCostBchn": 6803787,
+     "budget": 6855200,
+     "bchnMarginPct": 0.75
+    },
+    {
+     "role": "SI",
+     "unlocking": 8650,
+     "fill": 2306,
+     "opCost": 6864762,
+     "defBytes": 36055,
+     "opCostBchn": 6900817,
+     "budget": 6952800,
+     "bchnMarginPct": 0.748
+    }
+   ],
+   "nq": 234
+  },
+  {
+   "i": 3,
+   "accepted": true,
+   "txBytes": 84410,
+   "unlocking": 83960,
+   "inputs": 10,
+   "perInput": [
+    {
+     "role": "MJ",
+     "unlocking": 9862,
+     "fill": 0,
+     "opCost": 7636819,
+     "defBytes": 36055,
+     "opCostBchn": 7672874,
+     "budget": 7922400,
+     "bchnMarginPct": 3.15
+    },
+    {
+     "role": "ST",
+     "unlocking": 9075,
+     "fill": 0,
+     "opCost": 6589421,
+     "defBytes": 36055,
+     "opCostBchn": 6625476,
+     "budget": 7292800,
+     "bchnMarginPct": 9.15
+    },
+    {
+     "role": "MJ",
+     "unlocking": 9858,
+     "fill": 0,
+     "opCost": 7875370,
+     "defBytes": 36055,
+     "opCostBchn": 7911425,
+     "budget": 7919200,
+     "bchnMarginPct": 0.098
+    },
+    {
+     "role": "MA",
+     "unlocking": 6978,
+     "fill": 828,
+     "opCost": 5527524,
+     "defBytes": 36055,
+     "opCostBchn": 5563579,
+     "budget": 5615200,
+     "bchnMarginPct": 0.919
+    },
+    {
+     "role": "MA",
+     "unlocking": 6766,
+     "fill": 552,
+     "opCost": 5358344,
+     "defBytes": 36055,
+     "opCostBchn": 5394399,
+     "budget": 5445600,
+     "bchnMarginPct": 0.94
+    },
+    {
+     "role": "MA",
+     "unlocking": 6780,
+     "fill": 825,
+     "opCost": 5368948,
+     "defBytes": 36055,
+     "opCostBchn": 5405003,
+     "budget": 5456800,
+     "bchnMarginPct": 0.949
+    },
+    {
+     "role": "SI",
+     "unlocking": 9044,
+     "fill": 0,
+     "opCost": 7216914,
+     "defBytes": 36055,
+     "opCostBchn": 7252969,
+     "budget": 7268000,
+     "bchnMarginPct": 0.207
+    },
+    {
+     "role": "SI",
+     "unlocking": 8409,
+     "fill": 0,
+     "opCost": 6642924,
+     "defBytes": 36055,
+     "opCostBchn": 6678979,
+     "budget": 6760000,
+     "bchnMarginPct": 1.199
     },
     {
      "role": "SI",
      "unlocking": 8533,
      "fill": 653,
-     "opCost": 6771576,
-     "budget": 6859200
+     "opCost": 6771436,
+     "defBytes": 36055,
+     "opCostBchn": 6807491,
+     "budget": 6859200,
+     "bchnMarginPct": 0.754
     },
     {
      "role": "SI",
-     "unlocking": 8654,
-     "fill": 1542,
-     "opCost": 6869020,
-     "budget": 6956000
+     "unlocking": 8655,
+     "fill": 1799,
+     "opCost": 6869331,
+     "defBytes": 36055,
+     "opCostBchn": 6905386,
+     "budget": 6956800,
+     "bchnMarginPct": 0.739
     }
-   ]
+   ],
+   "nq": 252
   },
   {
    "i": 4,
    "accepted": true,
-   "txBytes": 84198,
-   "unlocking": 83748,
+   "txBytes": 84374,
+   "unlocking": 83924,
    "inputs": 10,
    "perInput": [
     {
      "role": "MJ",
-     "unlocking": 9696,
+     "unlocking": 9862,
      "fill": 0,
-     "opCost": 7586002,
-     "budget": 7789600
+     "opCost": 7587382,
+     "defBytes": 36055,
+     "opCostBchn": 7623437,
+     "budget": 7922400,
+     "bchnMarginPct": 3.774
     },
     {
      "role": "ST",
      "unlocking": 9075,
      "fill": 0,
-     "opCost": 6868052,
-     "budget": 7292800
+     "opCost": 6615382,
+     "defBytes": 36055,
+     "opCostBchn": 6651437,
+     "budget": 7292800,
+     "bchnMarginPct": 8.794
     },
     {
      "role": "MJ",
      "unlocking": 9858,
      "fill": 0,
-     "opCost": 7873184,
-     "budget": 7919200
+     "opCost": 7874406,
+     "defBytes": 36055,
+     "opCostBchn": 7910461,
+     "budget": 7919200,
+     "bchnMarginPct": 0.11
     },
     {
      "role": "MA",
-     "unlocking": 6950,
-     "fill": 832,
-     "opCost": 5505751,
-     "budget": 5592800
+     "unlocking": 6952,
+     "fill": 834,
+     "opCost": 5506977,
+     "defBytes": 36055,
+     "opCostBchn": 5543032,
+     "budget": 5594400,
+     "bchnMarginPct": 0.918
     },
     {
      "role": "MA",
-     "unlocking": 6738,
-     "fill": 816,
-     "opCost": 5335877,
-     "budget": 5423200
+     "unlocking": 6740,
+     "fill": 559,
+     "opCost": 5337041,
+     "defBytes": 36055,
+     "opCostBchn": 5373096,
+     "budget": 5424800,
+     "bchnMarginPct": 0.953
     },
     {
      "role": "MA",
-     "unlocking": 6805,
-     "fill": 818,
-     "opCost": 5389540,
-     "budget": 5476800
+     "unlocking": 6807,
+     "fill": 820,
+     "opCost": 5390758,
+     "defBytes": 36055,
+     "opCostBchn": 5426813,
+     "budget": 5478400,
+     "bchnMarginPct": 0.942
     },
     {
      "role": "SI",
      "unlocking": 9044,
      "fill": 0,
-     "opCost": 7227241,
-     "budget": 7268000
+     "opCost": 7228351,
+     "defBytes": 36055,
+     "opCostBchn": 7264406,
+     "budget": 7268000,
+     "bchnMarginPct": 0.049
     },
     {
      "role": "SI",
      "unlocking": 8409,
      "fill": 0,
-     "opCost": 6658262,
-     "budget": 6760000
+     "opCost": 6660325,
+     "defBytes": 36055,
+     "opCostBchn": 6696380,
+     "budget": 6760000,
+     "bchnMarginPct": 0.941
     },
     {
      "role": "SI",
-     "unlocking": 8531,
-     "fill": 651,
-     "opCost": 6769882,
-     "budget": 6857600
+     "unlocking": 8533,
+     "fill": 653,
+     "opCost": 6771826,
+     "defBytes": 36055,
+     "opCostBchn": 6807881,
+     "budget": 6859200,
+     "bchnMarginPct": 0.748
     },
     {
      "role": "SI",
-     "unlocking": 8642,
-     "fill": 1402,
-     "opCost": 6858717,
-     "budget": 6946400
+     "unlocking": 8644,
+     "fill": 1660,
+     "opCost": 6860332,
+     "defBytes": 36055,
+     "opCostBchn": 6896387,
+     "budget": 6948000,
+     "bchnMarginPct": 0.743
     }
-   ]
+   ],
+   "nq": 255
   }
  ],
  "tampered": [
@@ -1030,6 +1185,21 @@
    "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
   },
   {
+   "name": "WQc word flipped",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WQc extra zero word (wrong size)",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
+   "name": "WQ split moved (128 B from WQb to WQc, same polynomial bytes, different z)",
+   "rejected": true,
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
+  },
+  {
    "name": "WQb extra zero word (wrong size)",
    "rejected": true,
    "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
@@ -1042,7 +1212,7 @@
   {
    "name": "two MA inputs swapped",
    "rejected": true,
-   "error": "Unable to verify transaction: error in evaluating input index 3: Program failed an OP_VERIFY operation."
+   "error": "Unable to verify transaction: error in evaluating input index 1: Program failed an OP_VERIFY operation."
   },
   {
    "name": "nonzero FILL byte",
@@ -1090,5 +1260,17 @@
    "error": "Unable to verify transaction: error in evaluating input index 9: Program failed an OP_VERIFY operation."
   }
  ],
+ "liveness": {
+  "nq": 384,
+  "ok": true,
+  "txBytes": 86688,
+  "maxInput": {
+   "role": "MJ",
+   "i": 0,
+   "unlocking": 9862
+  },
+  "bad": [],
+  "lastError": "Program failed an OP_VERIFY operation."
+ },
  "unexpected": 0
 }
