@@ -228,3 +228,28 @@ same.
   logs).
 - **For S8:** the a′ chain lemma (README); tx0 alone is a partial check whose only effect is an NFT; the baton is a
   deployment assumption; replay across final transactions needs the nullifier set (Track 9).
+
+## S8a - Soundness argument SOUNDNESS-T8.md (done, 2026-10-30)
+
+`research/pq-stark-batch/SOUNDNESS-T8.md`; calculator `params8.py --asbuilt` on the design branch (c488300,
+`asbuilt8-output.{txt,json}`); unit check `onchain/s8-arith.mjs` → `onchain/results/s8-arith.json`.
+
+- **Protocol level, as built:** M1 / Z128 (cap 0 and 5) λ_IOP 128.06 (fold1 binding); M2 / Z128-g, commit PoW 3,
+  lookup PoW 8: 128.70 (query binding). λ = 128, strict 127.21. Label: JB, powers-batching adaptation, unpublished.
+  - Shapes read from all 45 committed vectors: the byte model's VK view equals the exported shape 45/45; the S0 M1/M2
+    tables equal the as-built DAGs field by field.
+  - Lemmas with their own terms: multi-table ALI, DEEP, per-height batching, roll-in (a not a − 1), LogUp,
+    preprocessed, caps/injection (incl. the per-query bottom-path deviation), AIR ⇒ relation for M1 and M2 (bus),
+    b2 / a′ / NFT-thread chain lemmas, CTX transcript-binding lemma, statement-level lemmas.
+- **Depends on the unpublished adaptation:** batch round (margin 8.33 bits M1, 7.15 M2; the powers factor costs
+  6.5–6.7 bits), M2's roll-in fold1 (margin 0.87), per-height splitting. ALI/DEEP/LogUp/query do not.
+- **OPEN, found in S8a: proof field lanes are not range-checked, and the constraint interpreter is not residue-safe.**
+  D_SUB/D_SUBL/D_RSUBL (a − b + p) and D_NEG (p − a) in gen.mjs and genn.mjs go negative for a lane in [p + 1, 2^64);
+  MULE is then not congruent (s8-arith: 2/2 negative-lane cases wrong, controls right; a − b + 2p right). Raw-lane
+  subtrahends in the DAGs: 8 (M1), 27 (M2). Not shown exploitable, not shown safe (no attack built). Until fixed, the
+  as-built scripts are covered for canonical lanes only. Fix candidates: 2p offsets in the four ops, or `< p` checks
+  at parse; either changes every script, the b2 lib hash and op-cost, so S4–S7 sweeps/grading must be re-run.
+- **Coverage vectors:** Plonky3's three_instances_mixed_sizes under Z128 / Z128-g n1024 are 127.92 / 127.90 under our
+  accounting (coverage only).
+- **For the reviews:** SOUNDNESS-T8 §13 (fix §9.1; write the adaptation as a proof; simulation extractability for the
+  CTX lemma; ROOT < p assert in the generator; DESIGN §4 "transparent" wording).
