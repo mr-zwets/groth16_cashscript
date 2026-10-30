@@ -192,3 +192,94 @@ preprocessed columns, LogUp, extension-valued constraints and non-ZK sets. Merkl
 - For Plonky3's own test AIRs, the preprocessed commitment is salted with the prover's RNG, so a second-seed proof is a
   proof for another VK. The layout control runs it under its own VK. The M1/M2 statement VKs use the published
   SETUP_SEED and do not have this issue.
+
+# Track 8 S7: layout a′ for M1 under today's standard rules (Z128, Merkle cap 5)
+
+Files: `modela.mjs` (model, encoder: full paths below the cap, TBL, partial accumulators), `gena.mjs` (generator),
+`layouta.mjs` (plans, witnesses, transactions, NFT thread), `grade-a.mjs`, `profile-a.mjs`, `test-a.mjs`, `dbg-a.mjs`,
+`gen-s7.sh`. S4–S6 output is unchanged: `vkxN` takes cap > 0 only with `allowCap`, and `dagProgram` takes an
+optional constraint range. The M1 b2 library hash is unchanged (553a3cfc…).
+
+**Layout.** Every input has the same P2S locking R (118 B). R reads the two code blobs from the CODE inputs (first
+push, header checked), checks each blob's SHA-256, defines and invokes them. The last blob pins the input graph: the
+input count per transaction kind, and every input's locking equal to R. It then invokes the role for (kind, input
+index):
+
+| input | role | pushes | work |
+|---|---|---|---|
+| 0 | HEAD | caps (3 × 32 digests), OOD, PoW, FRI cap, NF, CTXW | statement (NF < p; in the final tx, CTXW = CTX of the outputs), transcript and every PoW check; kind 0: Σ_j ACC_j α^(C−hi_j) = q·Z_H·Dd^maxScale; NFT thread |
+| 1, 2 | CODE | code blob, ACC_j | kind 0: transcript again, AIR at ζ for constraint range j (53 constraints split [0,21) / [21,53)), checks its own ACC_j |
+| 3 | FIN | final polynomial, TBL (312 B) | transcript, DEEP point constants, A sums; checks its own TBL (query indices, α′, β, point constants, A sums) |
+| 4.. | QRY | 3 × (L_q, full path_q) | α′ ladder and row keys, fold columns, final polynomial, 3 queries, full paths up to the cap entry |
+
+- Values cross inputs only as pushes that the owning input checks: ACC by CODE, TBL by FIN, CTXW by the final HEAD.
+  Readers parse them from OP_INPUTBYTECODE with exact push headers.
+- Plans with more than one transaction use Track 5's NFT thread. Kind 0 spends the minting baton (returned to R) and
+  mints immutable NFTs with commitment k ‖ SHA256(tag ‖ G ‖ k). G is the final transcript digest, so it binds the
+  proof and ROOT, NF, CTX. Transaction k spends and burns its NFT. CTX is the final transaction's outputs.
+- Design choice: QRY inputs recompute the α′ ladder (1.40M op-cost each). Publishing it would cost 2.3 KB, and bytes
+  are the binding limit here.
+
+**Results** (24 transaction-bound statements, the S4 statements under Z128 cap 5; `results/grade-a.*`). Sizes are
+the same for every statement, because full paths have fixed size:
+
+| plan | transactions | inputs | bytes | every input std + cons | whole-tx verify | bch-spec |
+|---|--:|--:|---|---|---|---|
+| **1 transaction (stretch)** | 1 | 12 | **98,690** | 24/24 | 24/24 | 24/24 |
+| 2-transaction baseline | 2 | 11 + 5 | 91,059 + 40,497 = 131,556 | 24/24 | 24/24 | 24/24 |
+
+Op-cost per input, BCHN-adjusted (libauth + 36,844 B of OP_DEFINE bodies), 1-transaction plan:
+
+| role | unlocking | op-cost | % of budget |
+|---|--:|--:|--:|
+| HEAD | 6,454 | 1.31M | 25.2% |
+| CODE1 | 9,322 | 5.47M | 73.1% |
+| CODE2 | 9,316 | 4.98M | 66.6% |
+| FIN | 6,462 | 3.76M | 72.4% |
+| QRY (×8) | 8,322 | 6.07–6.09M | **90.7–91.0%** |
+| total | | 64.1–64.2M | |
+
+- The 1-transaction plan fits at Z128 itself: Q = 24, query PoW 24, no parameter change. The design's Z128-s stretch
+  (Q = 23, query PoW 28) is not needed. The margin is 1,310 B.
+- The design modelled 101–103 KB; the difference is the 312 B TBL in place of a 2.3 KB α′ table.
+- The binding limit on the QRY inputs is op-cost: about 91% of their budget.
+- QRY profile (`profile-a.txt`): entry 0.32M, row keys 1.40M, final-polynomial unpack 1.26M, three queries with full
+  paths about 2.95M.
+- CODE profile: AIR pre-pass 1.51M (periodic columns, selectors), DAG range 3.38M / 2.89M.
+- FIN profile: A sums 3.11M.
+- Policy controls: libauth standard rejects an unlocking of 10,025 B, a 100,118 B transaction and a 208 B output
+  locking, so these checks are live.
+
+**Sweeps** (`results/test-a-*.json`): 0 unexpected verdicts in all three. Every case needs the same verdict from the
+chain, the a′ model and the S3 reference (the last two only for proof-level cases).
+
+| sweep | cases |
+|---|--:|
+| production, 1 transaction | 3,765 |
+| production, 2 transactions | 4,181 |
+| harness (S3 M1 cap-5 case files, CTX as a witness item) | 2,387 |
+
+- **Production families** add:
+  - constants (650): every TBL field, a TBL index replaced by another valid index, TBL ±1 byte, ACC flips and swap,
+    ACC_1 + 1 with ACC_2 compensated so that HEAD's sum still holds, CTXW, NF;
+  - input (598): HEAD/FIN data, hint T, rows, paths, query swaps, missing or extra pushes;
+  - graph (208): code blob flipped or truncated, input order, another locking, extra or missing input;
+  - mix (130 / 156): HEAD, FIN, ACC or a QRY input from another proof or statement, and tx1 replayed from another
+    proof with this proof's NFT;
+  - tx (104), root (26);
+  - thread (390, 2 transactions): an NFT of another G, k = 2, another category, a mutable NFT, no NFT, the NFT passed
+    on, a token on another input, changed outputs, a tx0 QRY in tx1; baton not returned or to another locking, a wrong
+    or mutable minted NFT, an extra mint, no baton.
+- **Encoder-only:** 55 malformed-by-length cases (trailing bytes, a sibling count + 1 at the end) give the valid
+  proof's full-path witness, so the script accepts them, as in Track 5's layout a. A production encoder refuses them.
+- **Out of the generator:** the cap-6 and ood-PoW VK variants (the generator refuses them, counted as rejects) and
+  cap-0 proofs under their own VK (layout a′ is the cap-5 deployment).
+
+**Notes for S8:**
+- Chain lemma: R authenticates the code; the graph is pinned; each published value is checked by its owner and parsed
+  exactly by its readers; the HEAD identity is the S4 constraint sum split into ranges; full paths end at cap entries
+  of caps observed whole in the transcript.
+- 2 transactions: tx0 alone can be valid and mint an NFT for a proof that tx1 would reject (a partial check); the
+  effect, the outputs bound by CTX, is only in tx1.
+- Assumption: the minting baton is created at deployment under R.
+- Replaying one valid proof in two final transactions is the nullifier set's job (Track 9), as for layouts b and b2.

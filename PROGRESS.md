@@ -195,3 +195,36 @@ Folder `research/pq-stark-batch/onchain/`; the README has a "Track 8 S5 + S6" se
   - Merkle cap > 0 is S7.
   - The define loop's quadratic SPLIT costs 1–2M per input and could be optimized.
   - Input 1 re-derives the DEEP/FRI constants: 4.7M (M1), 8.2M (M2).
+
+## S7 - Layout a' for M1 under today's standard rules, Z128 cap 5 (done, 2026-10-30)
+
+Folder `research/pq-stark-batch/onchain/`; the README has a "Track 8 S7" section. Regenerate with `gen-s7.sh`
+(about 30 min; nice, 4 threads for Rust, one node process). S4–S6 output is unchanged: the M1 b2 library hash is the
+same.
+
+- **Layout.** Every input has one P2S locking R (118 B) that loads and authenticates two code blobs (18.6 KB) from
+  the CODE inputs.
+  - Roles: HEAD (caps, OOD, PoW, NF, CTXW; transcript; combines the AIR parts with the quotient), CODE1/CODE2 (code
+    plus a 24-byte ACC each; they evaluate constraint ranges [0,21) and [21,53) at ζ and check their own ACC), FIN
+    (final polynomial plus a 312 B TBL that it checks: query indices, α′, β, point constants, A sums), QRY ×8 (3
+    queries each with full paths below the cap).
+  - The 2-transaction plan links its transactions with Track 5's NFT thread; G binds the proof and ROOT, NF, CTX, and
+    CTX is the final transaction's outputs.
+- **Results (24 transaction-bound statements, all accepted):**
+  - **1 transaction (stretch goal, met at Z128 itself, no Z128-s):** 12 inputs, 98,690 B, every input standard and
+    consensus, whole-tx verify, bch-spec. Op-cost (BCHN-adjusted) is 64.1–64.2M in total; the QRY inputs are at
+    90.7–91.0% of their budget, the others ≤ 73%.
+  - **2-transaction baseline:** 11 + 5 inputs, 91,059 + 40,497 = 131,556 B, all accepted the same way.
+  - The design modelled about 14 inputs and 115–120 KB for the baseline. Ours is larger because tx1 carries HEAD, FIN
+    and the code again.
+- **Sweeps: 0 unexpected.**
+  - Production, 1 transaction: 3,765 cases. Production, 2 transactions: 4,181 cases. Both include the constants (650),
+    input (598), graph (208) and mix families; the 2-transaction sweep adds the thread and replay family (390).
+  - Harness on S3's M1 cap-5 case files: 2,387 cases.
+  - 55 malformed-by-length cases are encoder-only: the script sees the valid proof's full paths.
+- **Policy controls:** libauth standard rejects an unlocking of 10,025 B, a transaction of 100,118 B and a 208 B
+  locking.
+- **Committed:** prover/vectors/S7/ (3 vectors) and results/{grade,profile,test}-a.*. Cache: cache/s7 (vec, cases,
+  logs).
+- **For S8:** the a′ chain lemma (README); tx0 alone is a partial check whose only effect is an NFT; the baton is a
+  deployment assumption; replay across final transactions needs the nullifier set (Track 9).

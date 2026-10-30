@@ -1,0 +1,120 @@
+{
+ "plan": "1tx",
+ "harness": true,
+ "files": 36,
+ "cases": 2387,
+ "unexpected": 0,
+ "na": 33,
+ "refused": 0,
+ "encoderOnly": 69,
+ "malformed": 276,
+ "families": {
+  "valid": {
+   "cases": 33,
+   "chainReject": 0,
+   "accept": 33,
+   "unexpected": 0
+  },
+  "cap": {
+   "cases": 426,
+   "chainReject": 426,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "ood": {
+   "cases": 243,
+   "chainReject": 243,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "random": {
+   "cases": 129,
+   "chainReject": 129,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "pow": {
+   "cases": 99,
+   "chainReject": 99,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "final": {
+   "cases": 159,
+   "chainReject": 159,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "row": {
+   "cases": 150,
+   "chainReject": 150,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "salt": {
+   "cases": 150,
+   "chainReject": 150,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "sibling": {
+   "cases": 156,
+   "chainReject": 156,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "count": {
+   "cases": 144,
+   "chainReject": 111,
+   "accept": 33,
+   "unexpected": 0
+  },
+  "fri_value": {
+   "cases": 69,
+   "chainReject": 69,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "truncate": {
+   "cases": 54,
+   "chainReject": 54,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "extend": {
+   "cases": 42,
+   "chainReject": 6,
+   "accept": 36,
+   "unexpected": 0
+  },
+  "noncanon": {
+   "cases": 51,
+   "chainReject": 51,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "statement": {
+   "cases": 423,
+   "chainReject": 423,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "other_vk": {
+   "cases": 54,
+   "chainReject": 36,
+   "accept": 18,
+   "unexpected": 0
+  },
+  "vk_variant": {
+   "cases": 5,
+   "chainReject": 5,
+   "accept": 0,
+   "unexpected": 0
+  }
+ },
+ "list": [],
+ "skippedFiles": [
+  "m1-0-Z128_cap5~vk-cap+1.json: cap height 6 (layout a' is the cap-5 deployment)",
+  "m1-0-Z128_cap5~vk-opow=1.json: generator: ood PoW 0"
+ ]
+}

@@ -1,0 +1,156 @@
+{
+ "plan": "1tx",
+ "harness": false,
+ "files": 26,
+ "cases": 3765,
+ "unexpected": 0,
+ "na": 26,
+ "refused": 0,
+ "encoderOnly": 55,
+ "malformed": 200,
+ "families": {
+  "valid": {
+   "cases": 26,
+   "chainReject": 0,
+   "accept": 26,
+   "unexpected": 0
+  },
+  "cap": {
+   "cases": 419,
+   "chainReject": 419,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "ood": {
+   "cases": 229,
+   "chainReject": 229,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "random": {
+   "cases": 122,
+   "chainReject": 122,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "pow": {
+   "cases": 78,
+   "chainReject": 78,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "final": {
+   "cases": 145,
+   "chainReject": 145,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "row": {
+   "cases": 129,
+   "chainReject": 129,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "salt": {
+   "cases": 129,
+   "chainReject": 129,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "sibling": {
+   "cases": 128,
+   "chainReject": 128,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "count": {
+   "cases": 116,
+   "chainReject": 90,
+   "accept": 26,
+   "unexpected": 0
+  },
+  "fri_value": {
+   "cases": 55,
+   "chainReject": 55,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "truncate": {
+   "cases": 47,
+   "chainReject": 47,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "extend": {
+   "cases": 35,
+   "chainReject": 6,
+   "accept": 29,
+   "unexpected": 0
+  },
+  "noncanon": {
+   "cases": 44,
+   "chainReject": 44,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "statement": {
+   "cases": 339,
+   "chainReject": 339,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "other_vk": {
+   "cases": 6,
+   "chainReject": 2,
+   "accept": 4,
+   "unexpected": 0
+  },
+  "tx": {
+   "cases": 104,
+   "chainReject": 104,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "root": {
+   "cases": 26,
+   "chainReject": 26,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "constants": {
+   "cases": 650,
+   "chainReject": 650,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "input": {
+   "cases": 598,
+   "chainReject": 598,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "graph": {
+   "cases": 208,
+   "chainReject": 208,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "mix": {
+   "cases": 130,
+   "chainReject": 130,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "control": {
+   "cases": 2,
+   "chainReject": 0,
+   "accept": 2,
+   "unexpected": 0
+  }
+ },
+ "list": [],
+ "skippedFiles": [
+  "m1-s7-0-Z128.json: cap height 0 (layout a' is the cap-5 deployment)",
+  "m1-s7-1-Z128.json: cap height 0 (layout a' is the cap-5 deployment)"
+ ]
+}

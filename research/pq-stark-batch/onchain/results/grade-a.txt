@@ -1,0 +1,12 @@
+grade-a 1tx: 24/24 accepted; 1 tx, 12 inputs; tx bytes [[98690,98690]]; total [98690,98690]; op-cost BCHN-adj. total [64091793,64206917]; max input [90.8,91.01]%
+   HEAD: unlocking 6454-6454 B, op (BCHN-adj.) 1306276-1307971, 25.14-25.17% of budget, hash iterations <= 514
+   CODE1: unlocking 9322-9322 B, op (BCHN-adj.) 5469097-5475712, 73.01-73.1% of budget, hash iterations <= 513
+   CODE2: unlocking 9316-9316 B, op (BCHN-adj.) 4978716-4987335, 66.51-66.63% of budget, hash iterations <= 513
+   FIN: unlocking 6462-6462 B, op (BCHN-adj.) 3754751-3766116, 72.17-72.39% of budget, hash iterations <= 513
+   QRY: unlocking 8322-8322 B, op (BCHN-adj.) 6066097-6088611, 90.67-91.01% of budget, hash iterations <= 688
+grade-a 2tx: 24/24 accepted; 2 tx, 16 inputs; tx bytes [[91059,91059],[40497,40497]]; total [131556,131556]; op-cost BCHN-adj. total [68901451,69027137]; max input [90.89,91.1]%
+   HEAD: unlocking 6454-6454 B, op (BCHN-adj.) 520544-1312673, 10.02-25.26% of budget, hash iterations <= 521
+   CODE1: unlocking 9503-9528 B, op (BCHN-adj.) 234248-5482168, 3.07-71.61% of budget, hash iterations <= 519
+   CODE2: unlocking 9497-9522 B, op (BCHN-adj.) 234242-4993791, 3.07-65.27% of budget, hash iterations <= 519
+   FIN: unlocking 6462-6462 B, op (BCHN-adj.) 3753469-3772366, 72.15-72.51% of budget, hash iterations <= 519
+   QRY: unlocking 8322-8322 B, op (BCHN-adj.) 6066372-6094861, 90.67-91.1% of budget, hash iterations <= 694

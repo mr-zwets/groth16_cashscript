@@ -1,0 +1,12 @@
+in0 HEAD: op 1271067 (+36896 define bytes) entry 238157, transcript 221700, air 792864, cleanup 18346
+in1 CODE1: op 5437140 (+36896 define bytes) entry 258623, transcript 221700, air-pre 1514619, air-dag 3376598, cleanup 65600
+in2 CODE2: op 4946651 (+36896 define bytes) entry 258627, transcript 221700, air-pre 1514619, air-dag 2886106, cleanup 65599
+in3 FIN: op 3720012 (+36896 define bytes) entry 240565, transcript 221699, deep-points 96719, a-sums 3105967, tbl 54360, cleanup 702
+in4 QRY: op 6033354 (+36896 define bytes) entry 318576, row-keys 1403716, unpack 1262610, consts 0, q-x 662451, q-deep 776430, q-folds 381244, q-final+paths 812086, queries 313558, cleanup 102683
+in5 QRY: op 6032041 (+36896 define bytes) entry 318578, row-keys 1403716, unpack 1262610, consts 0, q-x 661001, q-deep 776433, q-folds 381334, q-final+paths 813606, queries 312080, cleanup 102683
+in6 QRY: op 6036756 (+36896 define bytes) entry 318578, row-keys 1403716, unpack 1262610, consts 0, q-x 661663, q-deep 775837, q-folds 381759, q-final+paths 819119, queries 310791, cleanup 102683
+in7 QRY: op 6042007 (+36896 define bytes) entry 318578, row-keys 1403716, unpack 1262610, consts 0, q-x 666910, q-deep 775631, q-folds 381770, q-final+paths 816655, queries 313454, cleanup 102683
+in8 QRY: op 6041106 (+36896 define bytes) entry 318578, row-keys 1403716, unpack 1262610, consts 0, q-x 665187, q-deep 776394, q-folds 381565, q-final+paths 816755, queries 313618, cleanup 102683
+in9 QRY: op 6032167 (+36896 define bytes) entry 318578, row-keys 1403716, unpack 1262610, consts 0, q-x 665391, q-deep 775892, q-folds 381714, q-final+paths 808336, queries 313247, cleanup 102683
+in10 QRY: op 6040248 (+36896 define bytes) entry 318578, row-keys 1403716, unpack 1262610, consts 0, q-x 666709, q-deep 776424, q-folds 381643, q-final+paths 815189, queries 312696, cleanup 102683
+in11 QRY: op 6032431 (+36896 define bytes) entry 318578, row-keys 1403716, unpack 1262610, consts 0, q-x 663992, q-deep 776800, q-folds 380787, q-final+paths 812706, queries 310559, cleanup 102683

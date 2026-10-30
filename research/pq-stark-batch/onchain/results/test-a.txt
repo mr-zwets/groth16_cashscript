@@ -1,0 +1,3 @@
+test-a (plan 1tx, harness: CTX a witness item): 36 files, 2387 cases, 0 unexpected, 33 n/a, 0 refused by the statement layer/generator, 276 malformed (69 encoder-only), 2 files skipped
+test-a (plan 2tx, production: CTX from the final transaction): 26 files, 4181 cases, 0 unexpected, 26 n/a, 0 refused by the statement layer/generator, 200 malformed (55 encoder-only), 2 files skipped
+test-a (plan 1tx, production: CTX from the final transaction): 26 files, 3765 cases, 0 unexpected, 26 n/a, 0 refused by the statement layer/generator, 200 malformed (55 encoder-only), 2 files skipped

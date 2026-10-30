@@ -19,6 +19,7 @@ export function vkxA(v) {
   const vk = vkxN(v, {allowCap: true});
   if (vk.inst.length !== 1 || vk.heights.length !== 1 || vk.hasLookups || vk.hasPre || !vk.zk) throw new Error("layout a': M1 shape only (one table, one height, ZK)");
   if (vk.trees.some((t) => t.B !== 0)) throw new Error("layout a': no injection");
+  if (vk.stmt !== 'pool' || vk.nPub !== 12) throw new Error("layout a': the M1 statement (12 public values: ROOT, NF, CTX)");
   vk.pathB = vk.trees.reduce((s, t) => s + (t.depth - t.capH) * H32, 0);
   vk.idxB = Math.ceil((vk.logH + 1) / 8);
   vk.tblLayout = tblLayout(vk);

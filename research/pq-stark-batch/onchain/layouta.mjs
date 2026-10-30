@@ -12,16 +12,16 @@ const M64 = (1n << 64n) - 1n;
 const u64s = (xs) => Buffer.concat(xs.map((x) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(((x % (1n << 64n)) + (1n << 64n)) & M64); return b; }));
 
 // counts: per transaction, the number of queries of each QRY input, e.g. [[3, 3, 3, 3, 3, 3, 3], [3]]
-export function makePlanA(vk, counts, {nc = 2} = {}) {
+export function makePlanA(vk, counts, {nc = 2, ctx} = {}) {
   let q = 0;
   const txs = counts.map((cs) => ({qry: cs.map((n) => { const r = [q, q + n]; q += n; return r; })}));
   if (q !== vk.Q) throw new Error(`plan covers ${q} of ${vk.Q} queries`);
-  return {txs, nc, parts: partsOf(vk, nc), ...(txs.length > 1 ? {thread: {category: CATEGORY}} : {})};
+  return {txs, nc, parts: partsOf(vk, nc), ...(txs.length > 1 ? {thread: {category: CATEGORY}} : {}), ...(ctx ? {ctx} : {})};
 }
 
 const cache = new Map();
 export function programA(vk, pis, plan, opts = {}) {
-  const key = JSON.stringify([vk.SO.batch.toString('hex'), vk.Q, vk.qpow, vk.capHeight, pis.slice(0, 4).map(String), plan.txs, plan.nc, plan.parts, opts]);
+  const key = JSON.stringify([vk.SO.batch.toString('hex'), vk.Q, vk.qpow, vk.capHeight, pis.slice(0, 4).map(String), plan.txs, plan.nc, plan.parts, plan.ctx ?? 'tx', opts]);
   if (!cache.has(key)) cache.set(key, buildA(vk, pis, plan, opts));
   return cache.get(key);
 }
@@ -74,9 +74,10 @@ export function spendA(vk, plan, proof, pis, outputs, opts = {}, mutate) {
 // every input of a transaction on a VM; stopAtReject: stop at the first rejecting input
 export function evaluateTxA(tx, vmName, {stopAtReject = false} = {}) {
   const out = [];
-  for (let i = 0; i < tx.unl.length; i++) {
+  for (let i = 0; i < tx.transaction.inputs.length; i++) {
+    const u = tx.transaction.inputs[i].unlockingBytecode.length;
     const r = evaluate(vmName, null, null, {inputIndex: i, sourceOutputs: tx.sourceOutputs, transaction: tx.transaction});
-    out.push({...r, unlocking: tx.unl[i].length, budget: (41 + tx.unl[i].length) * 800});
+    out.push({...r, unlocking: u, budget: (41 + u) * 800});
     if (stopAtReject && !r.accepted) break;
   }
   return out;

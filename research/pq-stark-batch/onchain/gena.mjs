@@ -52,7 +52,8 @@ function localFn(args, build) {
   return s.bytes();
 }
 
-// plan: {txs: [{qry: [[lo, hi], ...]}], nc (code inputs), thread?: {category (32 B, internal order)}}
+// plan: {txs: [{qry: [[lo, hi], ...]}], nc (code inputs), parts, thread?: {category (32 B, internal order)},
+//        ctx?: 'witness' (harness: the final HEAD takes CTXW as a witness item instead of the outputs' CTX)}
 export function buildA(vk, pis, plan, opts = {}) {
   { let next = 0;
     for (const tx of plan.txs) for (const r of tx.qry) {
@@ -191,7 +192,7 @@ export function buildA(vk, pis, plan, opts = {}) {
     const S = new Stk([...hNames]);
     S.emit('DEPTH', hNames.length, 'NUMEQUALVERIFY');
     for (const [x, len] of hItems) { S.pick(x); S.raw(['SIZE', 'NIP', len, 'NUMEQUALVERIFY'], 1); }
-    if (kind === T - 1) { S.pick('CTXW'); S.raw([{raw: ctxCode()}, 'EQUALVERIFY'], 1); }
+    if (kind === T - 1 && plan.ctx !== 'witness') { S.pick('CTXW'); S.raw([{raw: ctxCode()}, 'EQUALVERIFY'], 1); }
     parseFin(S); S.drop('TBL');
     mark(S, 'entry');
     trn(S);
