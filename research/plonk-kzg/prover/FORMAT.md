@@ -128,10 +128,10 @@ Circuit-size limit:
 
 ```
 format, gnark, gnarkCrypto
-circuit  { name, statement, nbConstraints, nbPublic, domainSize, bsb22Commitments: 0 }
+circuit  { name, statement, nbConstraints, nbPublic, domainSize, bsb22Commitments (0 in v1) }
 srs      { unsafe: true, toxicSeed, note, g1Points }
-vk       { hex (944 B), bytes, fields{...decimal...} }
-valid    [ { publicInputs[hex32], proof (hex, 768 B), linOpening (hex32), proveMillis } ]
+vk       { hex (944 B, v2-bsb22: 944 + 8 + 72 m), bytes, fields{...decimal...} }
+valid    [ { publicInputs[hex32], proof (hex, 768 B, v2-bsb22: 768 + 96 m), linOpening (hex32), bsb22Hash[hex32] (v2-bsb22), proveMillis } ]
 tampered [ { name, class, base, publicInputs, proof, expect: "reject", gnark: "reject" | "n/a" } ]
 notes    { ... }
 ```
@@ -158,3 +158,52 @@ That is 76 tampered proofs for `mul2` (k=2) and 78 for `merkle16` (k=3).
 
 The prover blinds with `crypto/rand`, so regenerating gives different valid proofs. The witnesses are seeded,
 and the VKs are byte-identical across runs.
+
+## BSB22 commitments (format `plonk-kzg-bn254/v2-bsb22`)
+
+Circuits that call gnark's `api.Commit`, directly or through a gadget (`std/rangecheck`, `std/lookup/logderivlookup`,
+the log-derivative argument in general), get BSB22 commitments: m ≥ 1 extra G1 points in the proof and m extra
+selector commitments in the VK. Their vectors use format `plonk-kzg-bn254/v2-bsb22`. Keys and proofs without
+commitments keep the v1 layout byte for byte, so `mul2.json` and `merkle16.json` are unchanged.
+
+**Verifying key** (944 + 8 + 72 m bytes): the 944 v1 bytes, then
+
+| offset | size | field |
+|---:|---:|---|
+| 944 | 8 | `m`, the number of commitments (u64 BE, ≥ 1) |
+| 952 + 72 j | 8 | `CommitmentConstraintIndexes[j]` (u64 BE): the commitment's row, counted after the public-input rows |
+| 960 + 72 j | 64 | `[Qcp_j]`, the commitment selector (`vk.Qcp[j]`, raw x ‖ y) |
+
+**Proof** (768 + 96 m bytes): gnark's `MarshalSolidity` appends, after the 768 v1 bytes,
+
+| offset | size | field | gnark struct |
+|---:|---:|---|---|
+| 768 + 32 j | 32 | `qcp_j(ζ)`, the opening of the selector Qcp_j at ζ | `BatchedProof.ClaimedValues[6 + j]` |
+| 768 + 32 m + 64 j | 64 | `[Bsb22_j]`, the commitment to the committed wires | `Bsb22Commitments[j]` |
+
+The decoder adds: every `qcp_j(ζ)` is `< r`; every `Bsb22_j` is canonical, not `(0,0)`, and on the curve. gnark's
+own `Verify` accepts the identity for `Bsb22_j` (its subgroup check does); this verifier rejects it. An honest
+`Bsb22_j` is never the identity in practice: gnark's prover puts a random value at the commitment row (whose
+`qcp` is 0) before committing, so the point is uniformly distributed.
+
+**JSON**: `circuit.bsb22Commitments` is m; `vk.fields` adds `Qcp` (decimal points) and
+`commitmentConstraintIndexes`; every valid proof adds `bsb22Hash`, gnark's hash-to-field of each commitment
+computed in Go with gnark-crypto's `hash_to_field.New([]byte("BSB22-Plonk"))`, so the JS hash can be cross-checked.
+
+**Circuits** (one commitment each, from `std/rangecheck`):
+
+| name | public inputs | statement | constraints | n | commitment row (cci) |
+|---|---|---|---:|---:|---:|
+| `range64` | `n0` | knows a with `a·a = n0` and `0 ≤ a < 2^64` | 129 | 2^8 | 49 |
+| `merkle16rc` | `root, nullifierHash, context` | merkle16 with leaf `MiMC(nullifier, trapdoor, amount)` and `0 ≤ amount < 2^64` | 15,680 | 2^14 | 15,600 |
+
+Both use the same test SRS as v1 (`verify.mjs` asserts one `[1]_1, [1]_2, [τ]_2` across all vector files).
+
+**Tamper classes** added for commitments (on top of the v1 classes, which now also cover `Bsb22_j` as a 10th
+point and `qcp_j(ζ)` as a 7th scalar):
+
+| class | variants | gnark checked |
+|---|---|---|
+| `commitment` | `Bsb22_0` taken from `valid[1]`; `Bsb22_0` and `qcp_0(ζ)` both taken from `valid[1]`; `2·Bsb22_0`; `Bsb22_0 − G`; `qcp_0(ζ) = 0` (5) | yes |
+
+That is 86 tampered proofs for `range64` (k = 1) and 91 for `merkle16rc` (k = 3).

@@ -1,4 +1,4 @@
-# gnark v0.16.4 PLONK verifier, step by step (BN254, KZG, SHA-256, no BSB22)
+# gnark v0.16.4 PLONK verifier, step by step (BN254, KZG, SHA-256; BSB22 commitments at the end)
 
 This is the verifier that `verify.mjs` implements. The byte format is in [FORMAT.md](FORMAT.md). The operation
 counts below were printed by `node verify.mjs --counts`, which counts operations during one real verification.
@@ -163,3 +163,82 @@ Keccak-f[1600] emulated in Script:
   permutation code.
 
 gnark's SHA-256 transcript avoids all of that, which is why this track uses gnark.
+
+## BSB22 commitments (api.Commit): what the verifier adds
+
+Circuits that call `api.Commit`, which gnark's range-check and lookup gadgets do through the log-derivative argument,
+carry m ≥ 1 BSB22 commitments. This section lists, from gnark v0.16.4 `backend/plonk/bn254/verify.go` (lines 45–55 sizes,
+75–79 subgroup checks, 108–115 α, 162–189 hash and PI, 264–277 [Lin], 283–289 fold, 351–355 γ binding) and gnark-crypto `ecc/bn254/fr/hash_to_field`, `field/hash/hashutils.go`
+(`ExpandMsgXmd`) and `ecc/bn254/fr/element.go` (`Hash`), everything that changes. `verify.mjs` implements it, and
+the byte layout is FORMAT.md "BSB22 commitments". Index j runs over the commitments, 0 ≤ j < m.
+
+**New objects:**
+- VK: `[Qcp_j]` (the commitment selector) and `cci_j = CommitmentConstraintIndexes[j]`. gnark requires
+  `len(cci) = len(Qcp)`.
+- Proof: `[Bsb22_j]`, the KZG commitment to the committed-wire polynomial Pi_j, and `qcp_j(ζ) = ClaimedValues[6 + j]`,
+  the opening of Qcp_j at ζ. gnark requires `len(Bsb22Commitments) = m` and `len(ClaimedValues) = 6 + m`.
+
+**Changes, in verifier order:**
+
+0. **Decode.** Each `Bsb22_j` is a 10th (11th, ...) G1 point with the same checks (gnark: `IsInSubGroup`, which
+   accepts the identity; ours: rejects it). Each `qcp_j(ζ)` is a 7th scalar, `< r`.
+1. **γ** binds `[Qcp_j]` (`Marshal()` = 64 raw bytes) after `[Qk]` and before the public inputs (`bindPublicData`):
+   `"gamma" ‖ S1 S2 S3 Ql Qr Qm Qo Qk ‖ Qcp_0..Qcp_{m−1} ‖ pub ‖ L R O`, 709 + 64m + 32k bytes. β and ζ are unchanged.
+2. **α** binds the commitments before Z: `"alpha" ‖ β_digest ‖ Bsb22_0..Bsb22_{m−1} ‖ Z`, 101 + 64m bytes.
+3. **Hash to field.** Each commitment is hashed to an Fr element with gnark's default `HashToFieldFn`,
+   `hash_to_field.New([]byte("BSB22-Plonk"))`. A fresh hash per commitment (`Reset` after each). Its `Sum` is
+   `fr.Hash(msg, "BSB22-Plonk", 1)`, which is RFC 9380 `expand_message_xmd` with SHA-256 and len_in_bytes = 48
+   (L = 16 + 32 for 128-bit security), then the 48 bytes read big-endian and reduced mod r. With
+   msg = `Bsb22_j.Marshal()` = the 64 raw bytes x ‖ y (big-endian, the same bytes as in the proof) and
+   DST' = `"BSB22-Plonk" ‖ 0x0b` (12 bytes):
+
+   ```
+   b0 = SHA256(0x00^64 ‖ msg ‖ 0x00 0x30 ‖ 0x00 ‖ DST')          143 bytes, 3 blocks
+   b1 = SHA256(b0 ‖ 0x01 ‖ DST')                                 45 bytes, 1 block
+   b2 = SHA256((b0 xor b1) ‖ 0x02 ‖ DST')                        45 bytes, 1 block
+   hc_j = BE(b1 ‖ b2[0..16)) mod r
+   ```
+
+   `Sum` returns the 32 canonical bytes of `hc_j`, and `verify.go` reads them back with `SetBytes(hashBts[:32])`,
+   which is the identity on a reduced value. The prover computes the same value (`prove.go` `bsb22Hint`) and places
+   it as the committed wire's value in row `k + cci_j` (`prove.go:467` puts it in Qk's Lagrange coefficients).
+   The hash is a random oracle in the security argument: it is what binds the in-circuit challenge to the
+   commitment (see SOUNDNESS.md, scope).
+4. **Public-input polynomial.** For each commitment, PI(ζ) gets one more Lagrange term at index `i_j = k + cci_j`:
+
+   ```
+   PI(ζ) += hc_j · L_{i_j}(ζ),   L_i(ζ) = ω^i (ζⁿ − 1) / (n (ζ − ω^i))
+   ```
+
+   gnark computes `ω^{i_j}` by exponentiation and divides separately. `ω^{i_j}` is a VK constant, so its
+   denominator joins the batched inversion: k + m denominators, still one inversion.
+5. **r0 / lin.** Same formula; only PI changed. gnark still checks `r0 = ClaimedValues[0]`.
+6. **Linearised commitment.** `[Lin] += Σ_j qcp_j(ζ) · [Bsb22_j]` (gnark prepends the commitments to the MultiExp).
+   That is the gate term `qcp_j(X)·Pi_j(X)` linearised in Pi_j: m more scalar multiplications with proof bases.
+7. **KZG fold (v).** Qcp_j joins the digests and qcp_j(ζ) the claimed values (`digestsToFold[6:] = vk.Qcp`):
+
+   ```
+   v = SHA256("gamma" ‖ ζ ‖ Lin L R O S1 S2 Qcp_0.. ‖ r0 l r o s1 s2 qcp_0(ζ).. ‖ z(ζω)) mod r      (645 + 96m bytes)
+   [D] += Σ_j v^{6+j} [Qcp_j],     e += Σ_j v^{6+j} qcp_j(ζ)
+   ```
+
+   So the opening of Qcp_j at ζ is checked by the same batched KZG opening as l, r, o, s1, s2: m more
+   scalar multiplications with fixed bases.
+8. **Unchanged:** β, ζ, u (Solidity template), the multi-point batching, the final 2-pairing check, and the
+   proof of Z at ζω. The commitment Pi_j itself is **not** opened anywhere: it enters only through
+   `qcp_j(ζ)·[Bsb22_j]` in [Lin] and through hc_j in PI.
+
+**Counts** (`node verify.mjs --counts`, m = 1):
+
+| | merkle16 (m = 0) | merkle16rc (m = 1) | range64 (m = 1, k = 1) |
+|---|---:|---:|---:|
+| G1 scalar multiplications | 19 | **21** | 21 |
+| – fixed base / proof base | 8 / 11 | 9 / 12 | 9 / 12 |
+| G1 on-curve checks | 9 | 10 | 10 |
+| Fr inversions | 1 | 1 | 1 |
+| SHA-256 calls | 6 | **9** | 9 |
+| SHA-256 blocks | 37 | 45 | 44 |
+| SHA-256 bytes | γ 805, α 101, v 645 | γ 869, α 165, htf 143 + 45 + 45, v 741 | |
+| proof bytes | 768 | 864 | 864 |
+
+The proof grows by 96 bytes per commitment, the VK by 72 bytes.

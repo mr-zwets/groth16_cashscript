@@ -68,14 +68,17 @@ func vkFields(vk *plonkbn254.VerifyingKey) map[string]any {
 	for i := range vk.Qcp {
 		qcp[i] = g1Dec(&vk.Qcp[i])
 	}
-	return map[string]any{
-		"Qcp": qcp, "commitmentConstraintIndexes": vk.CommitmentConstraintIndexes,
+	f := map[string]any{
 		"n": vk.Size, "nbPublic": vk.NbPublicVariables,
 		"omega": frBig(vk.Generator).String(), "nInv": frBig(vk.SizeInv).String(), "cosetShift": frBig(vk.CosetShift).String(),
 		"S1": g1Dec(&vk.S[0]), "S2": g1Dec(&vk.S[1]), "S3": g1Dec(&vk.S[2]),
 		"Ql": g1Dec(&vk.Ql), "Qr": g1Dec(&vk.Qr), "Qm": g1Dec(&vk.Qm), "Qo": g1Dec(&vk.Qo), "Qk": g1Dec(&vk.Qk),
 		"g1": g1Dec(&vk.Kzg.G1), "g2": g2Dec(&vk.Kzg.G2[0]), "g2x": g2Dec(&vk.Kzg.G2[1]),
 	}
+	if len(vk.Qcp) > 0 { // v2-bsb22 only, so v1 JSON stays as it was
+		f["Qcp"], f["commitmentConstraintIndexes"] = qcp, vk.CommitmentConstraintIndexes
+	}
+	return f
 }
 
 func cloneProof(p *plonkbn254.Proof) *plonkbn254.Proof {

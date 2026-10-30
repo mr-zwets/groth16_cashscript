@@ -7,7 +7,7 @@
 // 3. witness manipulations of a valid proof (count-preserving ones included) are rejected.
 import assert from 'node:assert/strict';
 import {mkdirSync, writeFileSync} from 'node:fs';
-import {loadVectors, parseVK, Reject, le32, be32, verifyPlonk} from './plonk.mjs';
+import {loadVectors, parseVK, Reject, le32, be32, verifyPlonk, proofLen} from './plonk.mjs';
 import {p, r, aff, mod, G1} from './math.mjs';
 import {buildRedeem} from './script.mjs';
 import {witnessFor, pushesOf} from './witness.mjs';
@@ -34,7 +34,7 @@ for (const [i, pr] of d.valid.entries()) {
   const wt = witnessFor(vk, pr.proof, pr.publicInputs, {J, JR}); wts.push(wt);
   const pushes = pushesOf(wt); const pl = padNeed(pushes); const res = run(pushes, pl);
   const ok = res.consensus.accepted && res.standard.accepted; if (!ok || !wt.accept) fail(`valid ${i}: ${res.consensus.error} / ${res.standard.error}`);
-  out.valid.push({i, ref: wt.accept, ...res, pad: pl, slopes: wt.w.slopes.length, nq: wt.S.nq, proofBytes: 768, piBytes: 32 * vk.nbPublic});
+  out.valid.push({i, ref: wt.accept, ...res, pad: pl, slopes: wt.w.slopes.length, nq: wt.S.nq, proofBytes: proofLen(vk), piBytes: 32 * vk.nbPublic});
   console.log(`valid ${i}: ${ok ? 'accepted' : 'REJECTED'} op ${res.standard.opCost} / ${res.standard.budget}, unlocking ${res.standard.unlocking}`);
 }
 const base = wts[0]; const basePushes = pushesOf(base); const basePad = padNeed(basePushes);
