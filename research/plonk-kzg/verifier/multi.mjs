@@ -674,17 +674,27 @@ function chainStateAt(C, j) { // (x_j, c_{j-1}, lambda_{j-1}) after j steps (ker
 // nqPad (liveness stress, liveness.mjs): prepend pseudo-random nonzero words (< p) to the quotient up to nqPad words, so
 // every input does the work and carries the bytes of an n_q = nqPad proof; the transcript (z, QZ, GZ, R) follows the
 // padded WQ, so only the final identity of the last SI role fails (the stress transaction is never accepted).
-export function multiWitness(vk, plan, built, proofHex, pubHex, {lam, fsDelta, nqPad} = {}) {
+// sPrime (digit stress, chain.mjs digitStress): replace the published MSM scalars s'_q (G0) by sPrime[q] and rebuild every
+// MSM role's hand-over and slopes for them (digits = 5-bit chunks of s' minus 16), so each MSM input runs to its end with
+// the op-cost of that digit pattern; ST (G0 != its own s') and the first SI role (P* != the SI chain's) then fail.
+// Re-witnessed manipulations (chaintest.mjs): wqShift 'b' | 'c' prepends a zero word to WQ (the same polynomial) and gives
+// it to WQb (resp. WQc), whose size is then 32 mod 128, with z, QZ, GZ and the SI hand-overs recomputed for the new pieces,
+// so only the WQ size rule can reject; nbPatch [byte, value] writes value into the nibble string NB of WS (h0 and every
+// later transcript value follow), while the GT factors keep the honest nibbles.
+export function multiWitness(vk, plan, built, proofHex, pubHex, {lam, fsDelta, nqPad, sPrime, wqShift, nbPatch} = {}) {
   const {names, nbm, roles} = plan; const CH = chains(vk);
   const V = verifyPlonk(vk, proofHex, pubHex, lam ? {lam} : {});
   if (fsDelta) { const fs = V.gt.fs.slice(); fs[fsDelta[0]] = mod(fs[fsDelta[0]] + fsDelta[1], r); V.gt = {...V.gt, ...nibbles(fs), fs: V.gt.fs}; } // test: nibbles for a wrong scalar
+  if (nbPatch) { const NB = Buffer.from(V.gt.NB); NB[nbPatch[0]] = nbPatch[1]; V.gt = {...V.gt, NB}; }
   const ptOf = (nm) => V.bases[names.indexOf(nm)];
   const TV = tableBlob(plan.vari.slice(0, plan.n1).map(ptOf)), TV2 = plan.iTV2 >= 0 ? tableBlob(plan.vari.slice(plan.n1).map(ptOf)) : null, TF = plan.fixed.length ? tfBlob(vk, plan) : null;
-  const sp = names.slice(0, nbm).map((nm) => V.S[nm] + digitOffset(NW));
+  const sp = sPrime ?? names.slice(0, nbm).map((nm) => V.S[nm] + digitOffset(NW));
+  const chunks = (s) => Array.from({length: NW}, (_, i) => Number((s >> BigInt(5 * i)) & 31n) - 16); // = recode(s' - offset) for 0 <= s' - offset
+  const digS = sp.map(chunks); if (!sPrime) assert.deepEqual(digS, sp.map((s) => recode(s - digitOffset(NW), NW)));
   // P_right: Jacobian windows, madd corr, madd Wz, conv
   const T = (P) => [aff(P), ...Array.from({length: TBL - 1}, (_, i) => aff(P.multiply(BigInt(i + 2))))];
   const tW = T(ptOf('Wzw')), tPhi = tW.map(([x, y]) => [mod(GLV.beta * x), y]);
-  const jrun = (tables, scal, nw, from, to, J0) => { let A = J0; const dig = scal.map((s) => recode(s - digitOffset(nw), nw));
+  const jrun = (tables, scal, nw, from, to, J0, digs) => { let A = J0; const dig = digs ?? scal.map((s) => recode(s - digitOffset(nw), nw));
     for (let i = from; i >= to; i--) { for (let k = 0; k < W; k++) A = jdbl(A); for (let q = tables.length - 1; q >= 0; q--) { const d = dig[q][i]; if (!d) continue; let [x, y] = tables[q][Math.abs(d) - 1]; if (d < 0) y = mod(-y); A = jmadd(A, [x, y]); } } return A; };
   let JR = jrun([tW, tPhi], [V.u1 + digitOffset(NWR), V.u2 + digitOffset(NWR)], NWR, NWR - 1, 0, [...aff(OFFSET), 1n]);
   JR = jmadd(JR, aff(corr(NWR))); JR = jmadd(JR, aff(ptOf('Wz')));
@@ -695,24 +705,25 @@ export function multiWitness(vk, plan, built, proofHex, pubHex, {lam, fsDelta, n
   const tabs = names.slice(0, nbm).map((nm) => T(ptOf(nm)));
   const hands = new Map(); const slopesOf = new Map(); let A = [...aff(OFFSET), 1n], zi = null, Aff = null;
   for (const [ix, ro] of roles.entries()) {
-    if (ro.kind === 'MJ') { A = jrun(tabs, sp, NW, ro.hi, ro.lo, A); hands.set(ro.next, Buffer.concat(A.map((v) => le32(mod(v))))); }
+    if (ro.kind === 'MJ') { A = jrun(tabs, sp, NW, ro.hi, ro.lo, A, digS); hands.set(ro.next, Buffer.concat(A.map((v) => le32(mod(v))))); }
     if (ro.kind === 'MA') {
       if (ro.conv) { zi = inv(A[2]); Aff = [mod(A[0] * zi * zi), mod(A[1] * zi * zi * zi)]; }
       const sl = []; const add = (P, Q) => { const l = mod((Q[1] - P[1]) * inv(Q[0] - P[0])); sl.push(l); const x3 = mod(l * l - P[0] - Q[0]); return [x3, mod(l * (P[0] - x3) - P[1])]; };
       const dbl = (P) => { const l = mod(3n * P[0] * P[0] * inv(2n * P[1])); sl.push(l); const x3 = mod(l * l - 2n * P[0]); return [x3, mod(l * (P[0] - x3) - P[1])]; };
-      const dig = sp.map((s) => recode(s - digitOffset(NW), NW));
+      const dig = digS;
       for (let i = ro.hi; i >= ro.lo; i--) { for (let k = 0; k < W; k++) Aff = dbl(Aff); for (let q = nbm - 1; q >= 0; q--) { const d = dig[q][i]; if (!d) continue; let [x, y] = tabs[q][Math.abs(d) - 1]; if (d < 0) y = mod(-y); Aff = add(Aff, [x, y]); } }
       if (ro.corr) Aff = add(Aff, aff(corr(NW)));
       slopesOf.set(ix, sl); hands.set(ro.next, Buffer.concat(Aff.map(le32)));
     }
   }
-  assert.deepEqual(Aff, aff(V.Pstar), 'chain MSM P*');
+  if (!sPrime) assert.deepEqual(Aff, aff(V.Pstar), 'chain MSM P*'); else Aff = aff(V.Pstar); // stress: the SI chain stays honest
   // SI
   const S = proveSI(CH, Aff, PR, V.uRaw, V.gt);
   if (nqPad && 32 * nqPad > S.WQ.length) { const n = nqPad - S.WQ.length / 32;
     S.WQ = Buffer.concat([...Array.from({length: n}, (_, i) => le32(mod(le(sha(Buffer.from('nq-stress'), le32(BigInt(i))))) || 1n)), S.WQ]); S.nqHonest = S.nq; S.nq = nqPad; S.stress = true; }
-  const WQ = plan.WQ_VAR ? Buffer.concat([Buffer.alloc(Math.max(512 + plan.WQA, Math.ceil(S.WQ.length / 128) * 128) - S.WQ.length), S.WQ]) : Buffer.concat([Buffer.alloc(WQ_SIZE - S.WQ.length), S.WQ]);
-  const wqbLen = plan.WQ_VAR ? Math.min(WQ.length - plan.WQA - 256, plan.wqbMax) : 0; // WQ = WQa || WQb || WQc (WQc >= 256 B)
+  let WQ = plan.WQ_VAR ? Buffer.concat([Buffer.alloc(Math.max(512 + plan.WQA, Math.ceil(S.WQ.length / 128) * 128) - S.WQ.length), S.WQ]) : Buffer.concat([Buffer.alloc(WQ_SIZE - S.WQ.length), S.WQ]);
+  let wqbLen = plan.WQ_VAR ? Math.min(WQ.length - plan.WQA - 256, plan.wqbMax) : 0; // WQ = WQa || WQb || WQc (WQc >= 256 B)
+  if (wqShift) { assert.ok(plan.WQ_VAR); WQ = Buffer.concat([Buffer.alloc(32), WQ]); if (wqShift === 'b') wqbLen += 32; }
   const h0 = sha(TAG, V.uRaw, S.WS), rhoRaw = sha(h0, Buffer.from('rho')); const rho = BigInt('0x' + Buffer.from(rhoRaw).reverse().toString('hex')) % p;
   // the folded chain (WQa || WQb): z = SHA256(h0 || rhoRaw || SHA256(WQa) || WQb) (ST never concatenates WQa || WQb)
   const WQp = plan.WQ_VAR ? [WQ.subarray(0, plan.WQA), WQ.subarray(plan.WQA, plan.WQA + wqbLen), WQ.subarray(plan.WQA + wqbLen)] : null;
@@ -742,5 +753,5 @@ export function multiWitness(vk, plan, built, proofHex, pubHex, {lam, fsDelta, n
     const pieces = []; if (ro.slopes) { const sl = slopesOf.get(ix).map(le32); for (let i = 0; i < sl.length; i += SL_PIECE) pieces.push(Buffer.concat(sl.slice(i, i + SL_PIECE))); }
     return [...fx, ...pieces];
   });
-  return {V, S, pushes, accept: V.ok && S.accept && !S.stress};
+  return {V, S, pushes, accept: V.ok && S.accept && !S.stress && !sPrime && !wqShift && !nbPatch};
 }

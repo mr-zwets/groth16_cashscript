@@ -4,7 +4,7 @@ import {mkdirSync, writeFileSync} from 'node:fs';
 import {loadVectors, parseVK, Reject, le32, verifyPlonk} from './plonk.mjs';
 import {p, aff, G1} from './math.mjs';
 import {makePlan, buildMulti, multiWitness, planOpts} from './multi.mjs';
-import {chainTx, sizeFills, txBytes, nqStress} from './chain.mjs';
+import {chainTx, sizeFills, txBytes, nqStress, digitStress} from './chain.mjs';
 import {spendTx, verifyTx, p2sh32, encodeUnlocking} from './vm.mjs';
 
 const [circuit = 'mul2'] = process.argv.slice(2); const quick = process.argv.includes('--quick');
@@ -25,8 +25,12 @@ for (const [i, pr] of (quick ? d.valid.slice(0, 1) : d.valid).entries()) {
       bchnMarginPct: +(100 * (1 - (x.opCost + built.defBytes) / x.budget)).toFixed(3)})), nq: w.S.nq});
   console.log(`valid ${i}: ${ok ? 'accepted' : 'REJECTED'}, tx ${txBytes(tx)} B, op ${per.reduce((s, x) => s + x.opCost, 0)}`);
 }
+// a rejection counts only when a verifier check caused it: a standard-mode op-cost/density error (FILL too small for
+// the manipulated witness) is a test failure, not a rejection
+const BUDGET = /density|cost/i;
 const run = (name, pushes, fills, mutate) => { let tx = chainTx(vk, plan, built, pushes, fills ?? base.fills); if (mutate) tx = mutate(tx); const v = both(tx); const rej = v.every((x) => !x.accepted);
-  if (!rej) fail(name); return {name, rejected: rej, error: v[1].error?.slice(0, 160)}; };
+  if (!rej) fail(name); if (BUDGET.test(v[1].error ?? '')) fail(`${name}: rejected by the op budget, not by a check (${v[1].error.slice(0, 120)})`);
+  return {name, rejected: rej, error: v[1].error?.slice(0, 160)}; };
 // ---- tampered vectors ----
 for (const t of quick ? d.tampered.slice(0, 6) : d.tampered) {
   let ps, how, fl;
@@ -75,7 +79,8 @@ if (plan.m) { // Track 7: the GT fold and the moved SI transcript
 }
 m('X: Fr inverse * 2', (ps) => { const b = ps[plan.iST][fi(plan.iST, 'X')]; b[64] ^= 2; });
 m('two MA inputs swapped', () => {}, (tx) => { const t = tx.slice(); const j = iMA, k2 = iMA + 1; [t[j], t[k2]] = [t[k2], t[j]]; return t; });
-m('nonzero FILL byte', () => {}, (tx) => tx.map((x, k) => { if (k !== iMA) return x; const pushes = []; return {...x, unlocking: (() => { const u = Buffer.from(x.unlocking); const pos = u.length - built.redeem.length - 2 - 10; u[pos] ^= 1; return u; })()}; }));
+const iFill = base.fills.indexOf(Math.max(...base.fills)); if (base.fills[iFill] < 16) fail('no input with a FILL of 16+ B for the nonzero FILL byte case');
+m(`nonzero FILL byte (input ${iFill})`, () => {}, (tx) => tx.map((x, k) => { if (k !== iFill) return x; return {...x, unlocking: (() => { const u = Buffer.from(x.unlocking); const pos = u.length - built.redeem.length - 3 - 10; u[pos] ^= 1; return u; })()}; }));
 m('extra input with the same locking', () => {}, (tx) => [...tx, tx[1]]);
 m('extra foreign input', () => {}, (tx) => [...tx, {locking: Uint8Array.of(0x51), unlocking: Uint8Array.of()}]);
 m('input dropped (last SI)', () => {}, (tx) => tx.slice(0, -1));
@@ -86,7 +91,28 @@ if (plan.m) for (const i of [...new Set([0, ...plan.FX.flatMap((nm, x) => (nm.st
   if (w.accept) fail('reference accepts nibbles for s + 1'); M.push([`adaptive: nibbles of folded base ${i} encode s + 1 (SI re-witnessed)`, w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
 { const w = multiWitness(vk, plan, built, d.valid[1].proof, d.valid[0].publicInputs); M.push(['adaptive: proof 1 with the public inputs of proof 0', w.pushes, null, sizeFills(vk, plan, built, w.pushes, {strict: false})]); }
 for (const [name, ps, mutate, fills] of M) out.manipulations.push(run(name, ps, fills, mutate));
+// re-witnessed: the transcript (h0 or z) and everything after it recomputed for the manipulated bytes, so that the named
+// check is the one that rejects: the only input whose own evaluation fails is the checking role, and (NIBC) it fails
+// before the GT binding loop, i.e. with less op-cost than the binding failure of 'nibbles of folded base 0 encode s + 1'
+if (plan.m) { const pr = d.valid[0]; const iSIL = plan.roles.findIndex((ro) => ro.kind === 'SI' && ro.last);
+  const own = (o) => { const w = multiWitness(vk, plan, built, pr.proof, pr.publicInputs, o); if (w.accept) fail('reference accepts ' + JSON.stringify(o));
+    const fl = sizeFills(vk, plan, built, w.pushes, {strict: false}); const tx = chainTx(vk, plan, built, w.pushes, fl);
+    return {w, fl, tx, per: spendTx('bch2026', 'standard', tx).map((x, i) => ({i, error: x.evalError, op: x.opCost})).filter((x) => x.error)}; };
+  const bindFail = own({fsDelta: [0, 1n]}).per.find((x) => x.i === iSIL)?.op;
+  const e0 = base.w.V.gt.N[0].findIndex((x) => x === 0); // an event where base 0's nibble is 0: byte 0x10 picks TM_0[0] = TP_1[0] = 1, as 0 does
+  for (const [name, o, host, before] of [['WQc extra zero word (re-witnessed: same polynomial, z recomputed; the size rule rejects)', {wqShift: 'c'}, plan.iST],
+    ['WQb extra zero word (re-witnessed: same polynomial, z recomputed; the size rule rejects)', {wqShift: 'b'}, plan.iST],
+    [`WS nibble byte = 0x10 (re-witnessed: h0 and the SI transcript recomputed, GT factors as for 0; NIBC rejects)`, {nbPatch: [e0 * plan.m, 0x10]}, iSIL, bindFail]]) {
+    const x = own(o); const r = run(name, x.w.pushes, x.fl); const f = x.per.map((y) => y.i);
+    const ok = f.length === 1 && f[0] === host && (before === undefined || x.per[0].op < before);
+    if (!ok) fail(`${name}: failing inputs ${JSON.stringify(x.per)} (expected only input ${host}${before !== undefined ? ', op < ' + before : ''})`);
+    out.manipulations.push({...r, failingInputs: x.per, expectedHost: host, ...(before !== undefined ? {bindingFailureOp: before} : {}), checkLocated: ok}); }
+}
 console.log(`manipulations: ${out.manipulations.filter((x) => x.rejected).length}/${out.manipulations.length} rejected`);
+// ---- liveness under the worst digit pattern (chain.mjs digitStress): every MSM input fits for any digits
+{ const x = digitStress(vk, plan, built, d.valid[0].proof, d.valid[0].publicInputs); out.digitStress = x;
+  if (!x.ok) fail(`digit stress: ${x.bad.join('; ')}`);
+  console.log(`digit stress: ${x.ok ? 'fits' : 'DOES NOT FIT'}, worst MJ input in${x.worstMJ.i}: need ${x.worstMJ.need} B, unfilled ${x.worstMJ.unfilled} B, headroom ${x.worstMJ.headroom} B`); }
 // ---- liveness at the structural quotient bound (fold): a proof with n_q = NQ words must still fit (chain.mjs nqStress)
 if (plan.WQ_VAR) { const x = nqStress(vk, plan, built, d.valid[0].proof, d.valid[0].publicInputs, plan.NQ); const {perInput, ...rest} = x; out.liveness = rest;
   if (!x.ok) fail(`liveness: n_q = ${plan.NQ} does not fit: ${x.bad.join('; ')} tx ${x.txBytes}`);

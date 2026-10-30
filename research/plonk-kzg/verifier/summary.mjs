@@ -63,6 +63,7 @@ for (const c of ['mul2', 'merkle16', 'range64', 'merkle16rc']) {
       defineBodyBytesPerInput: defBytes, perInput0: v[0].perInput,
       worstInputMarginPct: +(100 * Math.min(...v.flatMap((x) => x.perInput.map((y) => 1 - (y.opCost + defBytes) / y.budget)))).toFixed(2),
       nq: v.map((x) => x.nq), tests: {valid: `${t.valid.filter((x) => x.accepted).length}/${t.valid.length}`, tampered: `${t.tampered.filter((x) => x.rejected).length}/${t.tampered.length}`, manipulations: `${t.manipulations.filter((x) => x.rejected).length}/${t.manipulations.length}`}};
+    if (t.digitStress) out.regimes[`${c}/today (multi-input)`].digitStress = {ok: t.digitStress.ok, worstMJ: t.digitStress.worstMJ, msmInputs: t.digitStress.perInput.map(({error, ...x}) => x)};
     if (existsSync(new URL(`./results/liveness-${c}.json`, import.meta.url))) out.regimes[`${c}/today (multi-input)`].liveness = R(`liveness-${c}.json`).summary;
   }
 }

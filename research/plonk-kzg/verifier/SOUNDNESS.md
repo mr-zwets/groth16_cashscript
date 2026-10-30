@@ -17,19 +17,30 @@ combined). This is the default build, and what the argument below covers:
 - **A6 with m_f = 10:** max deg D_k = 852, NQ = 420 words, SI error 1.134·(33 + 852)/p ≈ 2^-243.63
   (`soundness/lattice.mjs` §6, which also lists m_f = 11).
 - **Chain (Lemma 3):** the 11 variable-base tables no longer fit one 10,000-byte push, so TV is split into TV (first 9
-  bases, input 2) and TV2 (the rest, input 3). Each host checks its own entries (CHK15); LOADT reads both; ST reads
+  bases, input 2) and TV2 (the rest, input 3). Since the re-review fixes every tuned plan splits TV this way (mul2 and
+  merkle16 too, with Wζω alone in TV2), so that input 2 has room under 10,000 B. Each host checks its own entries (CHK15); LOADT reads both; ST reads
   the Wζω table from whichever holds it. The roles, cuts and blob hosts of each circuit are in `plans.json`.
 - **Review fixes (2026-10-30, after the protocol and measurement reviews):**
   - **k ≥ 1 is enforced.** α²L_1(ζ) is read from the first batch-inverse entry, which is 1/(ζ − ω⁰) only when the first
     Lagrange point belongs to a public input. With k = 0 and a commitment it would be the commitment's denominator, and the
     verifier would check a different relation from gnark's (which computes L_1 separately, verify.go:131-134). `parseVK`
     now rejects k = 0 (all three builds read the VK through it).
-  - **Chain quotient: three pieces, hashed separately.** WQ = WQa ‖ WQb ‖ WQc (WQc a variable push in input 4, an MA
-    role). ST never concatenates them (WQa ‖ WQb exceeded the 10,000-byte stack item limit from n_q = 310 on) and
+  - **Chain quotient: three pieces, hashed separately.** WQ = WQa ‖ WQb ‖ WQc (WQc a variable push in input 5, the
+    last MA role; in the first fix round it was input 4 for mul2 and merkle16 and input 5 for the BSB22 plans). ST never concatenates them (WQa ‖ WQb exceeded the 10,000-byte stack item limit from n_q = 310 on) and
     derives z = H(h0 ‖ ρRaw ‖ H(WQa) ‖ H(WQb) ‖ H(WQc)). Every n_q up to the structural NQ now fits the chain
     (`liveness.mjs`); before, the WQb host capped n_q at about 340 words, and the mul2 plan with the binding in ST at
     about 260 (an honest fresh mul2 proof with n_q = 264 was rejected). No tuned plan uses bindST any more; the binder
     is the last SI role in every plan.
+- **Re-review fixes (2026-10-30, second round; layout only, the argument is unchanged):**
+  - **MSM windows rebalanced.** Under a digit stress (every 5-bit chunk of every published s'_q = 1, i.e. digit −15 in
+    every window, Λ' zero above window 25; `chain.mjs` `digitStress`, every MSM role re-witnessed for those digits) the
+    MJ host of TV needed up to 9,916 B, 84 B under the 10,000 B unlocking limit. Every plan now runs windows 50..42
+    (input 0) and 41..39 (input 2) in Jacobian and 38..0 in the three MA roles (cuts in step 8), with TV split for
+    every circuit and, for merkle16rc, a third code blob C3 in input 4 (an MA role whose FILL it replaces), so input 0's
+    code fits with room. The worst MJ input now keeps 339–772 B under 10,000 B for any digit pattern (`chaintest.mjs`,
+    `liveness.mjs`).
+  - **The WQc host is input 5 in every plan** (the last MA role; `makePlan` takes the second MA role that is not the TV2
+    host).
 - Nothing else in the argument changes; the deltas are marked "integration" below.
 
 **Track 7 changes in one place** (2026-10-30, branch `wip/plonk-usable-msm`):
@@ -40,7 +51,7 @@ combined). This is the default build, and what the argument below covers:
   quotient words (A6). The GT nibbles NB are part of WS, so h0 hashes them, and every nibble byte must be < 16.
 - Chain: ST also computes h0, ρ, z and the quotient Horner value QZ, and publishes ρ, z, QZ and the s_i in G0 (the
   first msm-branch build also ran the GT binding in ST for mul2, `bindST`; no tuned plan does now).
-  - WQ = WQa ‖ WQb ‖ WQc is split over three inputs (8, 9, 4); WQb and WQc are variable-size pushes (review fix: the
+  - WQ = WQa ‖ WQb ‖ WQc is split over three inputs (8, 9, 5); WQb and WQc are variable-size pushes (review fix: the
     msm branch had WQa ‖ WQb only).
   - One SI role publishes GZ (the 8m values R_{i,j}(±z)), checked against its own computation.
   - The code is three hash-checked blobs.
@@ -161,7 +172,7 @@ in `BatchVerifyMultiPoints`. Here π̃ is π with `ClaimedValues[0] := r0`. Equi
   - an affine add requires x2 ≠ x1 and λ(x2 − x1) = y2 − y1 (`script.mjs` `kAffAdd`);
   - an affine doubling requires 2yλ = 3x², with y ≠ 0 on G1 (`kAffDbl`);
   - Jacobian exceptional steps end at Z = 0, which is absorbing, and every conversion checks Z·zi = 1 (`kJDbl`, `kJMAdd`, `kConv`);
-  - the TV entries satisfy exact chord/tangent equations with Δx ≠ 0 (`multi.mjs` `CHK_ADD`, `CHK_DBL`, `CHK15`; with BSB22, TV and TV2 each in its own host);
+  - the TV entries satisfy exact chord/tangent equations with Δx ≠ 0 (`multi.mjs` `CHK_ADD`, `CHK_DBL`, `CHK15`; TV and TV2 each in its own host);
   - the digit offsets keep s' < 2^255 = 32^51 and u_i' < 2^70 (script);
   - so an accepted MSM equals Σ S_q·B_q exactly. P* and P_R are finite, affine G1 points.
 - **A5 (CashVM).** These rules are enforced by consensus, and an accepted transaction satisfies them:
@@ -361,10 +372,11 @@ Remarks.
 
 ## 5. Lemma 3: the today's-rules chain implies the single-input checks
 
-*Track 7 version (default, folded build).* Role names: input 0 = MJ (code C0, MSM windows 50..41, Jacobian), input 1 =
-ST, input 2 = MJ (host of TV, windows 40..37), inputs 3–5 = MA (windows 36..0, affine), inputs 6–9 = SI (events
-0–16, 16–34, 34–52, 52–65 + terminal). Input 6 hosts GZ and C1, input 7 hosts C2, input 8 hosts WQa, input 9 hosts WQb,
-input 4 (the second MA role) hosts WQc.
+*Track 7 version (default, folded build).* Role names: input 0 = MJ (code C0, MSM windows 50..42, Jacobian), input 1 =
+ST, input 2 = MJ (host of TV, windows 41..39), inputs 3–5 = MA (windows 38..0, affine; input 3 hosts ZI and TV2),
+inputs 6–9 = SI (events 0–16, 16–34, 34–52, 52–65 + terminal; BSB22 plans 0–16, 16–36, 36–52, 52–65). Input 6 hosts GZ
+and C1, input 7 hosts C2, input 8 hosts WQa, input 9 hosts WQb, input 5 (the last MA role) hosts WQc; in merkle16rc,
+input 4 hosts a third code blob C3.
 The windows, event cuts and blob hosts come from `plans.json`; `makePlan` asserts that windows and events are
 contiguous and cover everything once.
 
@@ -376,20 +388,21 @@ and the size is a multiple of 4 words (≥ 144 words). A6 needs only the cap.
 
 *Proof.* Steps 1–3 are as in Track 6, with these changes:
 
-1. **Code.** R loads C1 (input 6), C2 (input 7) and C0 (input 0) at fixed offsets. It checks their SHA-256 against
+1. **Code.** R loads C1 (input 6), C2 (input 7), [C3 (input 4, merkle16rc),] and C0 (input 0) at fixed offsets. It checks their SHA-256 against
    constants, then defines and invokes them (`buildMulti`, `load`). The graph pin is the shared function PIN
    (TXINPUTCOUNT = 10, every UTXOBYTECODE = own). By ¬B3 the executed code is the built code. C0 dispatches on
    INPUTINDEX.
 2. **Layout.**
    - As in Track 6, every fixed push has its planned size, except the code pushes, WQb and WQc.
    - Each blob is the last fixed push of its host and is hash-checked. No role code embeds an offset that depends on a
-     blob's size.
+     blob's size. C3 sits in an MA role: its slope pieces follow it, read only by the role itself, and the only other
+     remote read of input 4 is its HAND, which comes first.
    - WQb is the last fixed push of input 9. Its size is not pinned by its host. Nothing after it is read remotely
      (`offsetOf` throws on such a read).
    - Its encoding is still unique: ST requires 256 ≤ L ≤ 65,535, so the minimal push is PUSHDATA2, 0x4d ‖ LE16(L).
      ST reads that header (`rreadVar`: byte 0x4d checked, then L bytes), so it gets exactly input 9's stack item.
-   - WQc is the same for input 4: the last fixed push of that MA role (its slope pieces follow, read only by the role
-     itself), and the only remote read of input 4 is its HAND, which comes first. Its host drops it unread.
+   - WQc is the same for input 5: the last fixed push of that MA role (its slope pieces follow, read only by the role
+     itself), and the only remote read of input 5 is its HAND, which comes first. Its host drops it unread.
 3. **Remote reads.** `rread` as before. ST's read of the Wζω slice of TV is still not header-checked (§7). New reads:
    - WQa (ST), GZ (`GZD`), WS and G0 (SI roles): all by `rread`;
    - WQb and WQc by `rreadVar`.
@@ -421,7 +434,8 @@ and the size is a multiple of 4 words (≥ 144 words). A6 needs only the cap.
    - As in Track 6 (ENC, byte-exact HAND, `DLP` < p).
    - SI → SI hands over P*_var, both chain states, F± and R; the GT accumulators are not handed over.
 8. **The MSM** is Track 6's over the variable bases, with these differences:
-   - Role 0 runs Jacobian windows 50..41, role 2 runs 40..37. Role 3 converts with ZI, roles 3–5 are affine, and role 5
+   - Role 0 runs Jacobian windows 50..42, role 2 runs 41..39. Role 3 converts with ZI, roles 3–5 are affine (38..26,
+     25..13, 12..0; BSB22 plans 38..25, 24..12, 11..0), and role 5
      adds the correction.
    - The point handed to role 6 is the single-input program's P*_var (A4).
 9. **SI.**
@@ -441,7 +455,10 @@ and the size is a multiple of 4 words (≥ 144 words). A6 needs only the cap.
      Lemma 4 this gives (E). ∎
 
 *Integration delta (BSB22 circuits, m = 1; `plans.json` `range64`, `merkle16rc`).* Roles: MJ(50..42, C0) · ST ·
-MJ(41..38, TV) · MA(37..25, TV2; 24..12 + WQc; 11..0) · SI(0–16 + GZ + C1, 16–36 + C2, 36–52 + WQa, 52–65 + WQb), 10 inputs.
+MJ(41..39, TV) · MA(38..25 + ZI + TV2; 24..12 [merkle16rc: + C3]; 11..0 + WQc) · SI(0–16 + GZ + C1, 16–36 + C2, 36–52 + WQa,
+52–65 + WQb), 10 inputs. (Since the re-review fixes mul2 and merkle16 use the same TV/TV2 layout with their 10 variable bases: TV2 holds Wζω
+alone, 960·1 bytes, its host checks that one base, and ST reads Wζω's table, variable base 9, from TV2; steps 2 and 6
+below apply with these numbers.)
 The proof above holds with these changes:
 - **Step 2 (layout).** TV2 is a fixed-size push (960·2 bytes) right after the MA role's HAND and ZI. Its host pins its
   size in `own` like every other fixed push, so remote offsets into it are fixed.
@@ -603,7 +620,7 @@ has no B3 targets except R, and the same bound applies.
 - **Track 7: WQb and WQc are not size-checked by their hosts.** ST checks the size rule on the bytes it reads, which are
   exactly the hosts' stack items (Lemma 3 step 2).
 
-- **ST's read of the Wζω table is not header-checked.** It reads TV (TV2 in the BSB22 plans) at `off + 960·vi` with no header check
+- **ST's read of the Wζω table is not header-checked.** It reads TV2 (every tuned plan; TV in a plan without the split) at `off + 960·vi` with no header check
   (`multi.mjs` `statement`, the Wζω table read). The redeem's code-blob loads do not check headers either (`buildMulti`,
   the C0/C1/C2 load). The sketch says every remote
   read checks its push header. The argument above does not need header checks: offsets follow from the owner's size

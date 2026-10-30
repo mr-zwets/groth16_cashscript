@@ -10,12 +10,14 @@
 //      (chain.mjs nqStress: pseudo-random nonzero high words, so the op-cost is that of a real n_q proof) fits, with
 //      BCHN-adjusted FILLs, every input <= 10,000 B unlocking and within budget, and the transaction <= 100,000 B;
 //      it tries the structural maximum NQ first (si.mjs nqMax: no honest proof exceeds it);
-//   4. reports P(n_q > cap) from the samples (0 observed in S samples gives the 95% bound 3/S); exit 1 if cap < NQ.
+//   4. reports P(n_q > cap) from the samples (0 observed in S samples gives the 95% bound 3/S); exit 1 if cap < NQ;
+//   5. the digit stress (chain.mjs digitStress): every MSM input fits with all digits nonzero (the op-cost maximum of the
+//      MSM roles); reports the worst MJ input's headroom under 10,000 B; exit 1 if it does not fit.
 import {mkdirSync, writeFileSync} from 'node:fs';
 import {loadVectors, parseVK} from './plonk.mjs';
 import {r, mod} from './math.mjs';
 import {makePlan, buildMulti, multiWitness, planOpts} from './multi.mjs';
-import {nqStress} from './chain.mjs';
+import {nqStress, digitStress} from './chain.mjs';
 import {nqOfNibbles} from './si.mjs';
 import {nibbles} from './gt.mjs';
 import {sha} from './plonk.mjs';
@@ -52,7 +54,11 @@ const over = out.cap == null ? S : qs.filter((q) => q > out.cap).reduce((s, q) =
 out.summary = {nqCap: out.cap, nqStructuralMax: plan.NQ, honestMin: qs[0], honestP50: pct(0.5), honestMax: qs.at(-1), samples: S, samplesOverCap: over,
   pOverCap: over ? over / S : `< ${(3 / S).toExponential(1)} (0 of ${S}, 95%)`};
 console.log('cap', out.cap, 'samples over cap', over, '/', S);
+// 5. digits
+{ const x = digitStress(vk, plan, built, pr0.proof, pr0.publicInputs); out.digitStress = x; out.summary.digitStressOk = x.ok; out.summary.worstMJHeadroom = x.worstMJ.headroom;
+  console.log(`digit stress: ${x.ok ? 'fits' : 'DOES NOT FIT ' + x.bad.join('; ')}, worst MJ input in${x.worstMJ.i} need ${x.worstMJ.need} B unfilled ${x.worstMJ.unfilled} B, headroom ${x.worstMJ.headroom} B`); }
 mkdirSync(new URL('./results/', import.meta.url), {recursive: true});
 writeFileSync(new URL(`./results/liveness-${c}.json`, import.meta.url), JSON.stringify(out, null, 1) + '\n');
 if (out.cap !== plan.NQ) { console.log(`FAIL: the chain does not carry every n_q up to the structural ${plan.NQ}`); process.exit(1); }
-console.log(`OK: every n_q up to the structural maximum ${plan.NQ} fits`);
+if (!out.digitStress.ok) { console.log('FAIL: the digit stress does not fit'); process.exit(1); }
+console.log(`OK: every n_q up to the structural maximum ${plan.NQ} fits, and every digit pattern fits (worst MJ headroom ${out.digitStress.worstMJ.headroom} B)`);
