@@ -1,0 +1,5 @@
+{
+ "_note": "tuned today's-rules chain plans (Track 7, GT fold); PLAN='{...}' overrides. mj/ma: MSM windows (hi, lo) per role; si: SI event ranges; blobs: [role index, target size] of the code blobs C1, C2; bindST: the GT binding in ST (else in the last SI role)",
+ "mul2": {"mj": [[50, 41], [40, 37]], "ma": [[36, 24], [23, 12], [11, 0]], "si": [[0, 16], [16, 34], [34, 52], [52, 65]], "bindST": true},
+ "merkle16": {"mj": [[50, 41], [40, 37]], "ma": [[36, 24], [23, 12], [11, 0]], "si": [[0, 16], [16, 34], [34, 52], [52, 65]], "blobs": [[6, 3680], [7, 4750]]}
+}

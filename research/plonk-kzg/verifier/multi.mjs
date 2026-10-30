@@ -21,7 +21,7 @@ import {p, r, mod, inv, ETA, GAMMA1, DIGITS, NE, GLV, OFFSET, aff, G1, F2, peval
 import {W, TBL, NW, NWR, baseNames, corr, le32, be32, le, sha, recode, verifyPlonk, jdbl, jmadd} from './plonk.mjs';
 import {TAG, WS_SIZE, NQ_MAX, NSTATES, BOUNDS, chains, proveSI, factorSchedule, wsSize, nqMax} from './si.mjs';
 import {fixedNames} from './plonk.mjs';
-import {gtConsts, TB as GT_TB, GLS_BITS} from './gt.mjs';
+import {gtConsts, TB as GT_TB, GLS_BITS, nibbles} from './gt.mjs';
 import {kAffAdd, kAffDbl, kJDbl, kJMAdd, kConv, kEvent, kEval, EV_OUTS, digitOffset, SL_PIECE, gtStep, gtBind, gtBindLoop, pushTB} from './script.mjs';
 
 const ITERS = Number(process.env.SCHED_ITERS ?? 2500);
@@ -31,7 +31,7 @@ const WQ_SIZE = 32 * NQ_MAX; // fixed-size quotient (leading zero words allowed)
 
 // ---------------- the plan ----------------
 // MSM windows 50..0: MJ roles (Jacobian, no slopes) then MA roles (affine, slopes). SI events split at even cuts.
-export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, gzHost = 0, blobs} = {}) {
+export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, gzHost = 0, blobs, bindST = false} = {}) {
   const names = baseNames(vk), nbm = names.length - 1, k = vk.nbPublic;
   const fixed = names.slice(0, nbm).filter((n) => FIXED.includes(n)), vari = names.slice(0, nbm).filter((n) => !FIXED.includes(n));
   const FX = vk.fold ? fixedNames(vk) : [], m = FX.length; // GT-folded bases (Track 7)
@@ -61,8 +61,9 @@ export function makePlan(vk, {mj, ma, si, c1 = 3600, wqHost, wqaHost, gzHost = 0
   const plan = {iC1, c1Target: c1, blobs, names, nbm, fixed, vari, FX, m, NQ, k, roles, N: roles.length, iST: 1, iTV: idx((x) => x.host === 'TV'), iTF: idx((x) => x.host === 'TF'), iWQ: idx((x) => x.hostWQ), iWQa: idx((x) => x.hostWQa), iGZ: idx((x) => x.hostGZ)};
   // stSI (with the fold): ST also runs the SI transcript (h0, rho, z), the quotient Horner over WQ and the GT binding, and
   // publishes rho, z and the Horner value QZ in G0: G0 = uRaw || s'_q || P_right || rho || z || QZ
-  plan.stSI = m > 0;
-  plan.G0_SIZE = plan.stSI ? 32 + 32 * nbm + 64 + 96 : 32 + 32 * nbm + 64; plan.TV_SIZE = 960 * vari.length; plan.TF_SIZE = 960 * fixed.length;
+  // bindST: the GT binding in ST; else in the last SI role, with s_i published in G0 after QZ
+  plan.stSI = m > 0; plan.bindST = bindST;
+  plan.G0_SIZE = plan.stSI ? 32 + 32 * nbm + 64 + 96 + (bindST ? 0 : 32 * m) : 32 + 32 * nbm + 64; plan.TV_SIZE = 960 * vari.length; plan.TF_SIZE = 960 * fixed.length;
   plan.WQ_VAR = m > 0; const WQA = 4096; plan.WQA = m ? WQA : 0; // with the fold the quotient cap is large (348 / 384 words): WQ is a variable-size push (PUSHDATA2, >= 256 B)
   // fixed-size pushes at the start of each unlocking (name, size); CODE size is filled in after compilation
   for (const ro of roles) {
@@ -96,6 +97,10 @@ export function splitTree(s, name, n, pre, idx = {i: 0}, unit = 32, leaf = (t, n
   splitTree(s, name + 'L', k, pre, idx, unit, leaf);
   s.roll(name + 'R'); splitTree(s, name + 'R', n - k, pre, idx, unit, leaf);
 }
+// the tuned plan of a circuit (plans.json), unless PLAN (JSON) is set or the build is unfolded
+import {readFileSync as readF} from 'node:fs';
+export const planOpts = (vk, circuit) => { if (process.env.PLAN) return JSON.parse(process.env.PLAN); if (!vk.fold) return {};
+  const all = JSON.parse(readF(new URL('./plans.json', import.meta.url))); return all[circuit] ?? {}; };
 // ---------------- program generation ----------------
 export function buildMulti(vk, plan) {
   const {names, nbm, fixed, vari, k, roles, N} = plan;
@@ -501,8 +506,9 @@ function stTranscript(a, plan, rread) {
   });
   a.drop('WQb');
   for (const n of ['rho', 'z', 'acc']) a.roll('g0').roll(n).invoke('ENC', ['w']).op(OP.CAT, 2, 'g0');
-  a.pick('WS', 'NB').push(192).op(OP.SPLIT, 2, 'x', 'NB').drop('x').push(65 * plan.m).op(OP.SPLIT, 2, 'NB', 'x').drop('x'); gtBindLoop(a, plan.m);
-  gtBind(a, plan.FX, (nm) => 'fs' + plan.FX.indexOf(nm));
+  if (plan.bindST) { a.pick('WS', 'NB').push(192).op(OP.SPLIT, 2, 'x', 'NB').drop('x').push(65 * plan.m).op(OP.SPLIT, 2, 'NB', 'x').drop('x'); gtBindLoop(a, plan.m);
+    gtBind(a, plan.FX, (nm) => 'fs' + plan.FX.indexOf(nm)); }
+  else for (let i = 0; i < plan.m; i++) a.roll('g0').roll('fs' + i).push(32).op(OP.NUM2BIN, 2, 'w').op(OP.CAT, 2, 'g0'); // canonical < r
 }
 
 // ---------------- SI roles ----------------
@@ -577,7 +583,10 @@ function siProgram(a, vk, plan, ro, ix, {call, rread, handIn, handOut, CH, HOT, 
     const [a1, a2] = fr(ZP), [b1, b2] = fr(EZP);
     k.output(m(k.sub(k.add(mul(I('R'), E('rho')), mul(I('Fp'), m(mul(a2, b2)))), mul(I('Fm'), m(mul(a1, b1))))));
     a.kernel(k, ['R'], {iters: 1500}); }
-  if (plan.stSI) { rread(a, plan.iST, 'G0', 'g0'); a.push(32 + 32 * plan.nbm + 128).op(OP.SPLIT, 2, 'x', 'g0').drop('x').invoke('DLP', ['acc', 'g0']).drop('g0'); }
+  if (plan.stSI) { rread(a, plan.iST, 'G0', 'g0'); a.push(32 + 32 * plan.nbm + 128).op(OP.SPLIT, 2, 'x', 'g0').drop('x').invoke('DLP', ['acc', 'g0']);
+    if (!plan.bindST) { for (const nm of plan.FX) a.invoke('DLR', ['fs_' + nm, 'g0']); a.drop('g0');
+      a.pick('WSb', 'NB').push(192).op(OP.SPLIT, 2, 'x', 'NB').drop('x').push(65 * M).op(OP.SPLIT, 2, 'NB', 'x').drop('x'); gtBindLoop(a, M); gtBind(a, plan.FX); }
+    else a.drop('g0'); }
   else {
   { const k = new Kernel(); const z2 = k.env('z2'), z4 = k.env('z4'); k.output(k.mod(k.mul(z4, z4)), k.mod(k.mul(z2, z4))); a.kernel(k, ['z8', 'z6b'], {iters: 50}); }
   a.roll('WQb').push(0, 'acc');
@@ -612,9 +621,10 @@ function chainStateAt(C, j) { // (x_j, c_{j-1}, lambda_{j-1}) after j steps (ker
   for (; jj < j; jj++) { const n = C.lams[jj]; const nc = F2.sub(F2.mul(F2.add(l, n), x), c); const sx = sOf[jj] === 'dbl' ? x : sOf[jj]; const nx = F2.sub(F2.sub(F2.sqr(n), x), sx); c = nc; l = n; x = nx; }
   return [x.c0, x.c1, c.c0, c.c1, l.c0, l.c1].map((v) => mod(v));
 }
-export function multiWitness(vk, plan, built, proofHex, pubHex, {lam} = {}) {
+export function multiWitness(vk, plan, built, proofHex, pubHex, {lam, fsDelta} = {}) {
   const {names, nbm, roles} = plan; const CH = chains(vk);
   const V = verifyPlonk(vk, proofHex, pubHex, lam ? {lam} : {});
+  if (fsDelta) { const fs = V.gt.fs.slice(); fs[fsDelta[0]] = mod(fs[fsDelta[0]] + fsDelta[1], r); V.gt = {...V.gt, ...nibbles(fs), fs: V.gt.fs}; } // test: nibbles for a wrong scalar
   const ptOf = (nm) => V.bases[names.indexOf(nm)];
   const TV = tableBlob(plan.vari.map(ptOf)), TF = plan.fixed.length ? tfBlob(vk, plan) : null;
   const sp = names.slice(0, nbm).map((nm) => V.S[nm] + digitOffset(NW));
@@ -650,7 +660,7 @@ export function multiWitness(vk, plan, built, proofHex, pubHex, {lam} = {}) {
   const h0 = sha(TAG, V.uRaw, S.WS), rhoRaw = sha(h0, Buffer.from('rho')); const rho = BigInt('0x' + Buffer.from(rhoRaw).reverse().toString('hex')) % p;
   const z = BigInt('0x' + Buffer.from(sha(h0, rhoRaw, WQ)).reverse().toString('hex')) % p; const zm = mod(-z);
   if (plan.stSI) { let acc = 0n; const z2 = mod(z * z); for (let i = 0; i < WQ.length; i += 32) acc = mod(acc * z2 + le(WQ.subarray(i, i + 32)));
-    G0 = Buffer.concat([G0, le32(rho), le32(z), le32(acc)]); }
+    G0 = Buffer.concat([G0, le32(rho), le32(z), le32(acc), ...(plan.bindST ? [] : V.gt.fs.map(le32))]); }
   const GZ = V.gt ? Buffer.concat(V.gt.G.R.map((Ri, i) => i).reverse().flatMap((i) => { const Ri = V.gt.G.R[i]; const out = [];
     for (const [j, x] of [[0, z], [1, z], [0, mod(ETA * z)], [1, mod(ETA * z)]]) { out.push(le32(peval(Ri[j], x)), le32(peval(Ri[j], mod(-x)))); } return out; })) : null;
   const scP = [...S.Sc.slice(0, 6), 1n]; let Fp = peval(pneg(scP), z), Fm = peval(pneg(scP), zm), R = 0n, kst = 0;

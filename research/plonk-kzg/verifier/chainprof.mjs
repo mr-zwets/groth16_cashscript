@@ -1,11 +1,11 @@
 // node chainprof.mjs <circuit> : per-input inclusive op-cost of each function (top 12)
 import {loadVectors, parseVK} from './plonk.mjs';
-import {makePlan, buildMulti, multiWitness} from './multi.mjs';
+import {makePlan, buildMulti, multiWitness, planOpts} from './multi.mjs';
 import {chainTx, sizeFills} from './chain.mjs';
 import {fprof} from './fprof.mjs';
 const [c = 'mul2'] = process.argv.slice(2);
 const d = loadVectors(c); const vk = parseVK(d.vk.hex);
-const plan = makePlan(vk, JSON.parse(process.env.PLAN ?? '{}')); const built = buildMulti(vk, plan);
+const plan = makePlan(vk, planOpts(vk, c)); const built = buildMulti(vk, plan);
 const names = {...built.ids}; plan.blobs.forEach((_, b) => { names[b] = 'C' + (b + 1); }); names[plan.blobs.length] = 'C0'; plan.roles.forEach((r, i) => { names[built.roleBase + i] = 'role' + i + r.kind; });
 const w = multiWitness(vk, plan, built, d.valid[0].proof, d.valid[0].publicInputs);
 const tx = chainTx(vk, plan, built, w.pushes, process.env.NOFILL ? null : sizeFills(vk, plan, built, w.pushes));

@@ -1,10 +1,13 @@
 // Honest witness for the single-input script: slope stream, X, WS/WQ (SI), in push order.
 import {verifyPlonk, msmWitness, le32, be32} from './plonk.mjs';
 import {proveSI, chains} from './si.mjs';
+import {nibbles} from './gt.mjs';
+import {r, mod} from './math.mjs';
 import {SL_PIECE} from './script.mjs';
 
-export function witnessFor(vk, proofHex, pubHex, {J = 0, JR = 0, lam} = {}) {
+export function witnessFor(vk, proofHex, pubHex, {J = 0, JR = 0, lam, fsDelta} = {}) {
   const V = verifyPlonk(vk, proofHex, pubHex, lam ? {lam} : {});
+  if (fsDelta) { const fs = V.gt.fs.slice(); fs[fsDelta[0]] = mod(fs[fsDelta[0]] + fsDelta[1], r); V.gt = {...V.gt, ...nibbles(fs), fs: V.gt.fs}; } // test: nibbles for a wrong scalar
   const w = msmWitness(vk, V, {J, JR});
   const S = proveSI(chains(vk), w.Pleft, w.Pright, V.uRaw, V.gt);
   const sl = w.slopes.map(le32); const pieces = [];

@@ -1,12 +1,12 @@
 // Planning aid for the today's-rules chain: per input, data bytes (without FILL), op-cost in an unbudgeted VM and
 // the unlocking size that op-cost needs ((41 + U) * 800 >= op).   PLAN='{...}' node plan.mjs <circuit>
 import {loadVectors, parseVK} from './plonk.mjs';
-import {makePlan, buildMulti, multiWitness} from './multi.mjs';
+import {makePlan, buildMulti, multiWitness, planOpts} from './multi.mjs';
 import {chainTx} from './chain.mjs';
 import {spendTx} from './vm.mjs';
 const [c = 'mul2', pi = '0'] = process.argv.slice(2);
 const d = loadVectors(c); const vk = parseVK(d.vk.hex);
-const plan = makePlan(vk, JSON.parse(process.env.PLAN ?? '{}')); const built = buildMulti(vk, plan);
+const plan = makePlan(vk, planOpts(vk, c)); const built = buildMulti(vk, plan);
 console.log('C0', built.code.length, 'blobs', built.cb.map((b) => b.length).join(','), 'redeem', built.redeem.length);
 const w = multiWitness(vk, plan, built, d.valid[Number(pi)].proof, d.valid[Number(pi)].publicInputs);
 const tx = chainTx(vk, plan, built, w.pushes); const free = spendTx('free', 'standard', tx);

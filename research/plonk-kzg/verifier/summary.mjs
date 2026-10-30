@@ -8,7 +8,7 @@ import {loadVectors, parseVK} from './plonk.mjs';
 import {buildRedeem} from './script.mjs';
 import {witnessFor} from './witness.mjs';
 import {profile} from './profile.mjs';
-import {makePlan, buildMulti} from './multi.mjs';
+import {makePlan, buildMulti, planOpts} from './multi.mjs';
 import {chains} from './si.mjs';
 
 const J = {spec: 13, txv5: 8};
@@ -41,7 +41,7 @@ for (const c of ['mul2', 'merkle16']) {
   }
   const cf = `chain-${c}.json`;
   if (existsSync(new URL('./results/' + cf, import.meta.url))) {
-    const t = R(cf); const plan = makePlan(vk); const built = buildMulti(vk, plan);
+    const t = R(cf); const plan = makePlan(vk, planOpts(vk, c)); const built = buildMulti(vk, plan);
     // every input defines C1 and C0 (functions 0, 1) and then every function inside them
     const defBytes = built.code.length + built.c1.length + Object.values(built.funcs).reduce((a, b) => a + b, 0) + built.bodies.reduce((a, b) => a + b, 0);
     const v = t.valid;

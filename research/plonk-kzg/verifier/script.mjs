@@ -310,7 +310,7 @@ function si(a, {CH, section, STOP, L0guess, info, GT, FX}) {
   a.roll('rhoRaw'); U('rhoRaw'); a.pick('p').op(OP.MOD, 2, 'rho');
   a.roll('WQ').toAlt();
   a.roll('WS'); for (let j = 0; j < 6; j++) a.invoke('DLP', ['sc' + j, 'WS']);
-  if (m) a.push(65 * m).op(OP.SPLIT, 2, 'NB', 'WS'); // the GT nibbles (event-major), hashed in h0 with the rest of WS
+  if (m) { a.push(65 * m).op(OP.SPLIT, 2, 'NB', 'WS'); gtNibCheck(a, 'NB', 65 * m); } // the GT nibbles (event-major, each < 16), hashed in h0 with the rest of WS
   { const cuts = []; for (let kk = 0; kk < NSTATES; kk += WS_PIECE) cuts.push(kk * 192);
     for (let i = cuts.length - 1; i >= 1; i--) { a.push(cuts[i]).op(OP.SPLIT, 2, 'WS', 'tail').toAlt(); a.alt.pop(); }
     a.toAlt(); a.alt.pop(); a.pushAltPile('WSp', cuts.length); }
@@ -470,9 +470,16 @@ export function gtStep(s, m, {acc = true, nbAlt = false, evIn = false} = {}) {
   }
   s.drop('ev');
 }
+// nibble range check: every byte of NB is in [0, 15] (NB & 0x0f..0f == NB). Without it a byte >= 16 (or >= 0x80, negative
+// after BIN2NUM) would make the table PICKs read other stack items, decoupling the factors from the binding.
+export function gtNibCheck(a, name, len) {
+  if (!a.ctx.funcs.has('NIBC')) a.defLocal('NIBC', 1, 0, (s) => { s.pushBytes([0x0f], 'mk'); for (let i = 0; i < 10; i++) s.pick('mk', 'mk2').op(OP.CAT, 2, 'mk');
+    s.pick('in0', 'n').op(OP.SIZE, 1, 'n', 'ln').op(OP.NIP, 2, 'ln').op(OP.SPLIT, 2, 'mk', 'x').drop('x').pick('in0', 'n').op(OP.AND, 2, 'nm').roll('in0').op(OP.EQUALVERIFY, 2); });
+  assert.ok(len <= 1024); a.pick(name, 'nbc').invoke('NIBC', []);
+}
 // the binding accumulators from the whole nibble string NB (top item, 65 m bytes): acc_i = sum_e 2^(64-e) TB[N_i[e]]
 export function gtBindLoop(a, m) {
-  const n0 = a.st.length - 1; a.roll('NB');
+  const n0 = a.st.length - 1; gtNibCheck(a, 'NB', 65 * m); a.roll('NB');
   pushTB(a, 'tbc');
   for (let i = 0; i < m; i++) a.push(0, 'acc' + i);
   a.roll('NB');
