@@ -36,6 +36,14 @@ func encodeVK(vk *plonkbn254.VerifyingKey) []byte {
 	out = append(out, g1Raw(&vk.Kzg.G1)...)
 	out = append(out, g2Raw(&vk.Kzg.G2[0])...)
 	out = append(out, g2Raw(&vk.Kzg.G2[1])...)
+	// v2-bsb22 (FORMAT.md "BSB22 commitments"): only when the circuit has commitments, so v1 keys stay 944 bytes
+	if len(vk.Qcp) > 0 {
+		out = binary.BigEndian.AppendUint64(out, uint64(len(vk.Qcp)))
+		for i := range vk.Qcp {
+			out = binary.BigEndian.AppendUint64(out, vk.CommitmentConstraintIndexes[i])
+			out = append(out, g1Raw(&vk.Qcp[i])...)
+		}
+	}
 	return out
 }
 
@@ -56,7 +64,12 @@ func g2Dec(p *curve.G2Affine) map[string]any {
 }
 
 func vkFields(vk *plonkbn254.VerifyingKey) map[string]any {
+	qcp := make([]map[string]string, len(vk.Qcp))
+	for i := range vk.Qcp {
+		qcp[i] = g1Dec(&vk.Qcp[i])
+	}
 	return map[string]any{
+		"Qcp": qcp, "commitmentConstraintIndexes": vk.CommitmentConstraintIndexes,
 		"n": vk.Size, "nbPublic": vk.NbPublicVariables,
 		"omega": frBig(vk.Generator).String(), "nInv": frBig(vk.SizeInv).String(), "cosetShift": frBig(vk.CosetShift).String(),
 		"S1": g1Dec(&vk.S[0]), "S2": g1Dec(&vk.S[1]), "S3": g1Dec(&vk.S[2]),
@@ -82,8 +95,10 @@ func pointRef(p *plonkbn254.Proof, i int) *curve.G1Affine {
 		return &p.Z
 	case 7:
 		return &p.BatchedProof.H
-	default:
+	case 8:
 		return &p.ZShiftedOpening.H
+	default:
+		return &p.Bsb22Commitments[i-9]
 	}
 }
 
@@ -91,7 +106,22 @@ func scalarRef(p *plonkbn254.Proof, i int) *fr.Element {
 	if i < 5 {
 		return &p.BatchedProof.ClaimedValues[i+1]
 	}
-	return &p.ZShiftedOpening.ClaimedValue
+	if i == 5 {
+		return &p.ZShiftedOpening.ClaimedValue
+	}
+	return &p.BatchedProof.ClaimedValues[i] // i >= 6: qcp_j(zeta), j = i - 6
+}
+
+// proofLayout returns the point and scalar names and byte offsets of a MarshalSolidity proof with m commitments:
+// 768 bytes as in v1, then m scalars qcp_j(zeta) (32 B), then m points Bsb22_j (64 B).
+func proofLayout(m int) (pn []string, po []int, sn []string, so []int) {
+	pn, po = append([]string(nil), pointNames...), append([]int(nil), pointOffsets...)
+	sn, so = append([]string(nil), scalarNames...), append([]int(nil), scalarOffsets...)
+	for j := 0; j < m; j++ {
+		sn, so = append(sn, fmt.Sprintf("qcp%d_zeta", j)), append(so, 768+32*j)
+		pn, po = append(pn, fmt.Sprintf("Bsb22_%d", j)), append(po, 768+32*m+64*j)
+	}
+	return
 }
 
 var rBig = fr.Modulus()
@@ -116,6 +146,7 @@ func makeTampered(vk *plonkbn254.VerifyingKey, proofs []*plonkbn254.Proof, pubs 
 	baseBytes := base.MarshalSolidity()
 	var gen curve.G1Affine
 	_, _, gen, _ = curve.Generators()
+	pointNames, pointOffsets, scalarNames, scalarOffsets := proofLayout(len(vk.Qcp))
 
 	addStruct := func(name, class string, p *plonkbn254.Proof, pub []fr.Element) {
 		out = append(out, tamperedProof{Name: name, Class: class, Base: 0, PublicInputs: hexFrs(pub),
@@ -160,6 +191,26 @@ func makeTampered(vk *plonkbn254.VerifyingKey, proofs []*plonkbn254.Proof, pubs 
 	// 4. a valid proof presented with another proof's public inputs
 	if len(proofs) > 1 {
 		addStruct("mix.proof1-with-pi0", "mix", proofs[1], pub0)
+	}
+	// 5. BSB22: proof 0 with the commitment (and, separately, also qcp(zeta)) of proof 1; and the commitment point
+	// moved by an honest-looking amount (2C, C - G) so only the hash-to-field / PI term or the KZG check can catch it
+	if len(vk.Qcp) > 0 && len(proofs) > 1 {
+		q := cloneProof(base)
+		q.Bsb22Commitments[0] = proofs[1].Bsb22Commitments[0]
+		addStruct("bsb22.commitment-from-proof1", "commitment", q, pub0)
+		q = cloneProof(base)
+		q.Bsb22Commitments[0] = proofs[1].Bsb22Commitments[0]
+		q.BatchedProof.ClaimedValues[6] = proofs[1].BatchedProof.ClaimedValues[6]
+		addStruct("bsb22.commitment-and-qcp-from-proof1", "commitment", q, pub0)
+		q = cloneProof(base)
+		q.Bsb22Commitments[0].Double(&q.Bsb22Commitments[0])
+		addStruct("bsb22.commitment-doubled", "commitment", q, pub0)
+		q = cloneProof(base)
+		q.Bsb22Commitments[0].Sub(&q.Bsb22Commitments[0], &gen)
+		addStruct("bsb22.commitment-minusG", "commitment", q, pub0)
+		q = cloneProof(base)
+		q.BatchedProof.ClaimedValues[6].SetZero()
+		addStruct("bsb22.qcp-zeta-zero", "commitment", q, pub0)
 	}
 
 	// byte-level encodings that gnark's structs cannot represent

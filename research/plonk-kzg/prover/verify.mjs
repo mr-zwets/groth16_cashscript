@@ -1,5 +1,5 @@
-// Independent reference verifier for gnark v0.16.4 PLONK (KZG, BN254, SHA-256 Fiat-Shamir, no BSB22
-// commitments), over the byte format of FORMAT.md. It follows PROTOCOL.md step by step and is the spec the
+// Independent reference verifier for gnark v0.16.4 PLONK (KZG, BN254, SHA-256 Fiat-Shamir), with or without BSB22
+// (api.Commit) commitments, over the byte format of FORMAT.md (v1, and v2-bsb22 for keys with commitments). It follows PROTOCOL.md step by step and is the spec the
 // CashVM verifier follows. BigInt field arithmetic is written here; curve group law and the pairing come from
 // @noble/curves 2.2.0 (bn254). SHA-256 is node:crypto.
 //
@@ -39,6 +39,22 @@ const cat = (...xs) => Uint8Array.from(Buffer.concat(xs.map((x) => Buffer.from(x
 const ascii = (s) => Uint8Array.from(Buffer.from(s, 'ascii'));
 const sha256 = (label, msg) => { C.sha256.push({ label, bytes: msg.length }); return Uint8Array.from(createHash('sha256').update(msg).digest()); };
 
+// ---- gnark's BSB22 hash-to-field (gnark-crypto ecc/bn254/fr/hash_to_field, default DST "BSB22-Plonk") ----
+// fr.Hash(msg, dst, 1): RFC 9380 expand_message_xmd with SHA-256, len_in_bytes L = 48 (= 16 + 32), then the 48 bytes
+// read big-endian and reduced mod r. msg = the commitment's 64 raw bytes (G1Affine.Marshal = RawBytes = x || y).
+//   b0 = SHA256(0^64 || msg || I2OSP(48, 2) || 0x00 || DST || len(DST))
+//   b1 = SHA256(b0 || 0x01 || DST || len(DST))
+//   b2 = SHA256((b0 xor b1) || 0x02 || DST || len(DST))
+//   value = BE(b1 || b2[0..16)) mod r
+export const BSB22_DST = ascii('BSB22-Plonk');
+export const hashToField = (msg, dst = BSB22_DST) => {
+  const dstp = cat(dst, Uint8Array.of(dst.length));
+  const b0 = sha256('htf.b0', cat(new Uint8Array(64), msg, Uint8Array.of(0, 48, 0), dstp));
+  const b1 = sha256('htf.b1', cat(b0, Uint8Array.of(1), dstp));
+  const b2 = sha256('htf.b2', cat(b0.map((x, i) => x ^ b1[i]), Uint8Array.of(2), dstp));
+  return be(cat(b1, b2.subarray(0, 16))) % R;
+};
+
 // ---- G1 ----
 // strict decode: x, y canonical (< p), not (0,0), on y^2 = x^3 + 3. BN254 G1 has cofactor 1.
 const decodeG1 = (b, what, allowInfinity = false) => {
@@ -54,10 +70,10 @@ const rawG1 = (pt) => { if (pt.is0()) return new Uint8Array(64); const a = pt.to
 const smul = (pt, s, kind) => { C.g1Mul++; if (kind === 'fixed') C.g1MulFixedBase++; else C.g1MulProofBase++; s = md(s); return s === 0n || pt.is0() ? G1.ZERO : pt.multiply(s); };
 const padd = (a, b) => { C.g1Add++; return a.add(b); };
 
-// ---- VK (FORMAT.md, 944 bytes) ----
+// ---- VK (FORMAT.md: 944 bytes, or 944 + 8 + 72 m with m BSB22 commitments) ----
 export const parseVK = (hex) => {
   const b = hexToBytes(hex);
-  if (b.length !== 944) throw new Error('vk length');
+  if (b.length !== 944 && (b.length < 952 || (b.length - 952) % 72 !== 0)) throw new Error('vk length');
   const dv = new DataView(b.buffer, b.byteOffset);
   const n = dv.getBigUint64(0), nbPublic = Number(dv.getBigUint64(8));
   const omega = be(b.subarray(16, 48)), nInv = be(b.subarray(48, 80)), k = be(b.subarray(80, 112));
@@ -73,6 +89,17 @@ export const parseVK = (hex) => {
     return pt;
   };
   vk.g2 = g2(688); vk.g2x = g2(816);
+  // v2-bsb22 tail: u64 m, then per commitment u64 CommitmentConstraintIndex and [Qcp_j] (64 B)
+  vk.qcp = []; vk.cci = []; vk.raw.Qcp = [];
+  if (b.length > 944) {
+    const m = Number(dv.getBigUint64(944));
+    if (b.length !== 952 + 72 * m || m === 0) throw new Error('vk commitment count');
+    for (let j = 0; j < m; j++) {
+      const o = 952 + 72 * j;
+      vk.cci.push(dv.getBigUint64(o));
+      const s = b.subarray(o + 8, o + 72); vk.raw.Qcp.push(s); vk.qcp.push(decodeG1(s, `vk.Qcp${j}`, true));
+    }
+  }
   // sanity of the domain constants (VK is trusted, but a wrong file should fail loudly)
   if (powR(omega, n) !== 1n || (n > 1n && powR(omega, n / 2n) === 1n)) throw new Error('vk omega is not a primitive n-th root');
   if (mul(nInv, n % R) !== 1n) throw new Error('vk nInv');
@@ -85,7 +112,8 @@ export const verify = (vk, proofHex, pubHex, trace) => {
   const t = trace ?? (() => {});
   // 1. sizes
   const pb = hexToBytes(proofHex);
-  if (pb.length !== 768) throw new Error('proof length');
+  const m = vk.qcp.length; // BSB22 commitments: proof = 768 B, then m scalars qcp_j(zeta), then m points Bsb22_j
+  if (pb.length !== 768 + 96 * m) throw new Error('proof length');
   if (pubHex.length !== vk.nbPublic) throw new Error('public input count');
   // 2. public inputs and scalars: canonical, < r
   const pubRaw = pubHex.map((h) => { const b = hexToBytes(h); if (b.length !== 32) throw new Error('public input length'); return b; });
@@ -98,11 +126,15 @@ export const verify = (vk, proofHex, pubHex, trace) => {
   const pt = (off, nm) => decodeG1(raw(off), nm);
   const L = pt(0, 'L'), Rr = pt(64, 'R'), O = pt(128, 'O'), H0 = pt(192, 'H0'), H1 = pt(256, 'H1'), H2 = pt(320, 'H2');
   const Z = pt(544, 'Z'), Wz = pt(640, 'Wzeta'), Wzw = pt(704, 'WzetaOmega');
+  const qcpZ = Array.from({ length: m }, (_, j) => sc(768 + 32 * j, `qcp${j}(zeta)`));
+  const bsbOff = (j) => 768 + 32 * m + 64 * j;
+  const Bsb = Array.from({ length: m }, (_, j) => pt(bsbOff(j), `Bsb22_${j}`)); // strict: gnark would accept infinity
 
   // 4. Fiat-Shamir (gnark fiat-shamir transcript, SHA-256): challenge = SHA256(name || prev || bindings), value = BE mod r
-  const gammaRaw = sha256('gamma', cat(ascii('gamma'), ...['S1', 'S2', 'S3', 'Ql', 'Qr', 'Qm', 'Qo', 'Qk'].map((k) => vk.raw[k]), ...pubRaw, raw(0), raw(64), raw(128)));
+  //    BSB22: gamma also binds [Qcp_j] (after Qk, before the public inputs); alpha binds Bsb22_j before Z
+  const gammaRaw = sha256('gamma', cat(ascii('gamma'), ...['S1', 'S2', 'S3', 'Ql', 'Qr', 'Qm', 'Qo', 'Qk'].map((k) => vk.raw[k]), ...vk.raw.Qcp, ...pubRaw, raw(0), raw(64), raw(128)));
   const betaRaw = sha256('beta', cat(ascii('beta'), gammaRaw));
-  const alphaRaw = sha256('alpha', cat(ascii('alpha'), betaRaw, raw(544)));
+  const alphaRaw = sha256('alpha', cat(ascii('alpha'), betaRaw, ...Bsb.map((_, j) => raw(bsbOff(j))), raw(544)));
   const zetaRaw = sha256('zeta', cat(ascii('zeta'), alphaRaw, raw(192), raw(256), raw(320)));
   const [gamma, beta, alpha, zeta] = [gammaRaw, betaRaw, alphaRaw, zetaRaw].map((x) => be(x) % R);
   t({ gamma, beta, alpha, zeta });
@@ -112,6 +144,9 @@ export const verify = (vk, proofHex, pubHex, trace) => {
   const zh = sub(zn, 1n);
   const dens = []; let w = 1n;
   for (let i = 0; i < vk.nbPublic; i++) { dens.push(sub(zeta, w)); w = mul(w, vk.omega); }
+  // BSB22: the commitment hash sits at Lagrange index nbPublic + cci_j; its denominator joins the batch inversion
+  const wc = vk.cci.map((c) => powR(vk.omega, BigInt(vk.nbPublic) + c, false));
+  for (const x of wc) dens.push(sub(zeta, x));
   if (dens.some((d) => d === 0n)) throw new Error('zeta is in the domain');
   // Montgomery batch inversion: 1 inversion + 3(k-1) multiplications
   const pref = []; let acc = 1n;
@@ -121,6 +156,9 @@ export const verify = (vk, proofHex, pubHex, trace) => {
   const zhOverN = mul(zh, vk.nInv);
   let pi = 0n; w = 1n;
   for (let i = 0; i < vk.nbPublic; i++) { pi = add(pi, mul(mul(mul(zhOverN, invDens[i]), w), pub[i])); w = mul(w, vk.omega); }
+  const bsbHash = Bsb.map((_, j) => hashToField(raw(bsbOff(j))));
+  for (let j = 0; j < m; j++) pi = add(pi, mul(mul(mul(zhOverN, invDens[vk.nbPublic + j]), wc[j]), bsbHash[j]));
+  t({ bsbHash });
   const lagrange0 = mul(zhOverN, invDens[0]); // L_1(zeta) = (zeta^n - 1) / (n (zeta - 1)), the i = 0 term (needs >= 1 public input)
   const alpha2L1 = mul(mul(alpha, alpha), lagrange0);
 
@@ -144,16 +182,18 @@ export const verify = (vk, proofHex, pubHex, trace) => {
   lin = padd(lin, smul(H0, sub(0n, zh), 'proof'));
   lin = padd(lin, smul(H1, sub(0n, mul(zh, zn2)), 'proof'));
   lin = padd(lin, smul(H2, sub(0n, mul(zh, mul(zn2, zn2))), 'proof'));
+  for (let j = 0; j < m; j++) lin = padd(lin, smul(Bsb[j], qcpZ[j], 'proof')); // + qcp_j(zeta) [Bsb22_j]
   const linRaw = rawG1(lin);
 
   // 8. KZG folding challenge v (gnark-crypto kzg.deriveGamma: its own transcript, single challenge "gamma")
-  const vRaw = sha256('v', cat(ascii('gamma'), u256(zeta), linRaw, raw(0), raw(64), raw(128), vk.raw.S1, vk.raw.S2,
-    u256(r0), u256(l), u256(r), u256(o), u256(s1), u256(s2), u256(zu)));
+  //    BSB22: digests ... S1 S2 Qcp_j, claimed values ... s1 s2 qcp_j(zeta)
+  const vRaw = sha256('v', cat(ascii('gamma'), u256(zeta), linRaw, raw(0), raw(64), raw(128), vk.raw.S1, vk.raw.S2, ...vk.raw.Qcp,
+    u256(r0), u256(l), u256(r), u256(o), u256(s1), u256(s2), ...qcpZ.map(u256), u256(zu)));
   const v = be(vRaw) % R;
-  const vs = [1n, v]; for (let i = 2; i < 6; i++) vs.push(mul(vs[i - 1], v));
+  const vs = [1n, v]; for (let i = 2; i < 6 + m; i++) vs.push(mul(vs[i - 1], v));
   let D = lin;
-  [[L, l], [Rr, r], [O, o], [vk.S1, s1], [vk.S2, s2]].forEach(([Pt, _], i) => { D = padd(D, smul(Pt, vs[i + 1], i < 3 ? 'proof' : 'fixed')); });
-  const e = [r0, l, r, o, s1, s2].reduce((a, x, i) => add(a, mul(vs[i], x)), 0n);
+  [[L, l], [Rr, r], [O, o], [vk.S1, s1], [vk.S2, s2], ...vk.qcp.map((q, j) => [q, qcpZ[j]])].forEach(([Pt, _], i) => { D = padd(D, smul(Pt, vs[i + 1], i < 3 ? 'proof' : 'fixed')); });
+  const e = [r0, l, r, o, s1, s2, ...qcpZ].reduce((a, x, i) => add(a, mul(vs[i], x)), 0n);
 
   // 9. multi-point batching challenge u (gnark Solidity verifier; gnark's Go verifier samples u at random)
   const uRaw = sha256('u', cat(rawG1(D), raw(640), raw(544), raw(704), u256(zeta), u256(v)));
@@ -179,6 +219,10 @@ const tryVerify = (vk, proof, pub) => { try { return { ok: verify(vk, proof, pub
 const here = dirname(fileURLToPath(import.meta.url));
 const vecDir = join(here, 'vectors');
 const files = readdirSync(vecDir).filter((f) => f.endsWith('.json')).sort();
+{ // one SRS for every circuit: [1]_1, [1]_2, [x]_2 (VK bytes 624..944) are identical
+  const srs = new Set(files.map((f) => JSON.parse(readFileSync(join(vecDir, f), 'utf8')).vk.hex.slice(2 * 624, 2 * 944)));
+  if (srs.size !== 1) throw new Error('the vectors do not share one SRS');
+}
 const load = (f) => JSON.parse(readFileSync(join(vecDir, f), 'utf8'));
 const args = process.argv.slice(2);
 
@@ -199,11 +243,12 @@ if (args[0] === '--trace') {
   for (const f of files) {
     const d = load(f); const vk = parseVK(d.vk.hex);
     let acc = 0, rej = 0; const reasons = {};
-    for (const p of d.valid) { total++; let r0; const r = (() => { try { return { ok: verify(vk, p.proof, p.publicInputs, (o) => { if (o.r0 !== undefined) r0 = o.r0; }) }; } catch (err) { return { ok: false, reason: err.message }; } })();
+    for (const p of d.valid) { total++; let r0, bh; const r = (() => { try { return { ok: verify(vk, p.proof, p.publicInputs, (o) => { if (o.r0 !== undefined) r0 = o.r0; if (o.bsbHash) bh = o.bsbHash; }) }; } catch (err) { return { ok: false, reason: err.message }; } })();
+      if ((p.bsb22Hash ?? []).length !== vk.qcp.length || (p.bsb22Hash ?? []).some((h, j) => BigInt('0x' + h) !== bh?.[j])) { bad++; console.log(`UNEXPECTED ${f}: hash-to-field differs from gnark's`); }
       if (p.linOpening && r0 !== BigInt('0x' + p.linOpening)) { bad++; console.log(`UNEXPECTED ${f}: recomputed r0 differs from gnark's ClaimedValues[0]`); } if (r.ok) acc++; else { bad++; console.log(`UNEXPECTED reject ${f} valid: ${r.reason}`); } }
     for (const p of d.tampered) {
       total++; const r = tryVerify(vk, p.proof, p.publicInputs);
-      if (r.ok) { bad++; console.log(`UNEXPECTED accept ${f} ${p.name}`); } else { rej++; const k = r.reason.replace(/^(L|R|O|H\d|Z|Wzeta|WzetaOmega|public input \d|l|r|o|s1|s2|z\(zeta\*omega\))(:| >=)/, '<x>$2'); reasons[k] = (reasons[k] ?? 0) + 1; }
+      if (r.ok) { bad++; console.log(`UNEXPECTED accept ${f} ${p.name}`); } else { rej++; const k = r.reason.replace(/^(L|R|O|H\d|Z|Wzeta|WzetaOmega|Bsb22_\d|public input \d|l|r|o|s1|s2|qcp\d\(zeta\)|z\(zeta\*omega\))(:| >=)/, '<x>$2'); reasons[k] = (reasons[k] ?? 0) + 1; }
     }
     console.log(`${d.circuit.name}: valid ${acc}/${d.valid.length} accepted, tampered ${rej}/${d.tampered.length} rejected`);
     console.log('  rejection reasons:', JSON.stringify(reasons));
