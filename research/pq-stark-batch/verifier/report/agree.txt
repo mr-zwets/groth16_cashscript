@@ -1,0 +1,21 @@
+agree: 128 valid vectors (128 accepted, 128 transcripts identical), 14027 cases, 0 JS/Rust disagreements, 0 unexpected
+reseed: 21 groups, 21 with all proofs distinct
+  valid        128 cases  js accept 128  rust accept 128  agree 128  as expected 128
+  cap         1531 cases  js accept 0  rust accept 0  agree 1531  as expected 1531
+  terminal      72 cases  js accept 0  rust accept 0  agree 72  as expected 72
+  ood         2258 cases  js accept 0  rust accept 0  agree 2258  as expected 2258
+  random      1366 cases  js accept 0  rust accept 0  agree 1366  as expected 1366
+  pow          438 cases  js accept 0  rust accept 0  agree 438  as expected 438
+  final        996 cases  js accept 0  rust accept 0  agree 996  as expected 996
+  row         1158 cases  js accept 0  rust accept 0  agree 1158  as expected 1158
+  salt        1074 cases  js accept 0  rust accept 0  agree 1074  as expected 1074
+  sibling     1018 cases  js accept 0  rust accept 0  agree 1018  as expected 1018
+  count        823 cases  js accept 0  rust accept 0  agree 823  as expected 823
+  fri_value    388 cases  js accept 0  rust accept 0  agree 388  as expected 388
+  truncate     387 cases  js accept 0  rust accept 0  agree 387  as expected 387
+  extend       239 cases  js accept 0  rust accept 0  agree 239  as expected 239
+  noncanon     343 cases  js accept 0  rust accept 0  agree 343  as expected 343
+  statement   1358 cases  js accept 0  rust accept 0  agree 1358  as expected 1358
+  other_vk     411 cases  js accept 64  rust accept 64  agree 411  as expected 411
+  vk_variant    23 cases  js accept 0  rust accept 0  agree 23  as expected 23
+  forced        16 cases  js accept 0  rust accept 0  agree 16  as expected 16

@@ -98,3 +98,27 @@ Crate `research/pq-stark-batch/prover`: `src/stmt.rs` holds the AIRs, Poseidon2 
   - `s2 witness --case m1@L@W` exports the witness, NF, ROOT and the periodic columns.
   - `s2 batch` produces more than 20 statements on demand (they are cached, not committed).
   - Other parameter VKs reject the same proof, including PoW-bit changes, because batch-stark's domain separator and FRI bind the parameters. The generator must still pin them.
+
+## S3 - JS reference verifier verify-batch.mjs (done, 2026-10-30)
+
+Folder `research/pq-stark-batch/verifier/`; README has the full results and gaps. Regenerate with `gen-s3.sh` (about 3 min; nice, 4 threads for Rust, one node process).
+
+- **Verifier.** `verify-batch.mjs` is independent BigInt JS. It covers N tables, mixed-height injection, per-height alpha' ladders, roll-ins, LogUp (bus layout, lookup PoW, terminal sum), caps, ZK (salts, random codewords, randomized quotient), preprocessed and periodic columns, and the constraint DAG.
+  - The VK comes from VK data only. The round layout, cap lengths and FRI schedule are re-derived and must equal `shape`.
+- **Acceptance met.**
+  - 128 valid vectors are accepted by JS and Rust: 37 committed, 35 extra-seed, and 56 S2 batch statements (M1 cap 0 ×24, cap 5 ×24, M2 ×8).
+  - Transcripts: 128/128 identical to Rust's SHA-256 inputs, byte for byte.
+  - 14,027 cases, 0 JS/Rust disagreements, 0 unexpected. Families: cap, terminal, ood, random, pow, final, row (injected short tables included), salt, sibling, count, fri_value, truncate, extend, noncanon, statement (PV + 1, NF ± 1, NF + p, foreign ROOT/NF/CTX, permutations), other_vk (cap, set, zk, setup seed, M1 ↔ M2, plus 64 second-seed proofs that both accept), vk_variant (PoW bits, cap + 1), and forced (S2 unsatisfying-trace proofs; the bus-only ones fail on the terminal sum in both verifiers).
+  - ZK re-seed: 21 groups, all proofs distinct.
+  - JS takes 4–78 ms per proof.
+- **Suite sensitivity.** Each of eight checks was removed from a copy of the JS verifier. Six are caught: cap compare, constraint fold, periodic columns, injection, roll-in, terminal sum. **Two are not:** the lookup PoW check and the FRI final-polynomial check. A byte edit before the query indices re-draws them, so Merkle rejects first. Testing these two needs a modified prover; that is not done.
+- **Rust changes** (`prover/src/main.rs`, `s2.rs`):
+  - `check --verdicts OUT`;
+  - per-case `public_values` (non-canonical values rejected), `replace` and `expect`;
+  - `s3_valid_expect`;
+  - `s2 forced --with-proofs`.
+  - The S1/S2 vectors still check: 2,054 cases, 0 unexpected.
+- **For S4/S5:**
+  - `verify-batch.mjs` is the spec to follow. Its exports are `vkFromVector`, `parse` (with an offset recorder), `verify`, `runCase` and `applyTamper`.
+  - The generator must assert the VK-time properties that JS does not check per proof: the multiplicity height bound and the hiding budget.
+  - Cases: `gen-cases.mjs` writes one file per vector, in the format Rust `check` and `agree.mjs` read. The on-chain suite can reuse it.

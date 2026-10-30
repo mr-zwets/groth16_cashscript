@@ -152,7 +152,8 @@ fn tamper_cases(bytes: &[u8], sections: &[wire::Section]) -> Vec<Value> {
 }
 
 fn apply_tamper(valid: &[u8], t: &Value) -> Vec<u8> {
-    let mut b = valid.to_vec();
+    // `replace`: a whole other proof (S3 other-verifying-key cases), then the usual edits
+    let mut b = t.get("replace").and_then(|r| r.as_str()).map(unhex).unwrap_or_else(|| valid.to_vec());
     for p in t["patch"].as_array().into_iter().flatten() {
         let at = p["at"].as_u64().unwrap() as usize;
         let h = unhex(p["hex"].as_str().unwrap());
@@ -168,7 +169,7 @@ fn apply_tamper(valid: &[u8], t: &Value) -> Vec<u8> {
     b
 }
 
-fn pvs_json(pvs: &[Vec<Val>]) -> Value {
+pub fn pvs_json(pvs: &[Vec<Val>]) -> Value {
     json!(pvs.iter().map(|p| p.iter().map(|x| x.as_canonical_u64().to_string()).collect::<Vec<_>>()).collect::<Vec<_>>())
 }
 fn pvs_from_json(v: &Value) -> Vec<Vec<Val>> {
@@ -177,6 +178,24 @@ fn pvs_from_json(v: &Value) -> Vec<Vec<Val>> {
         .iter()
         .map(|p| p.as_array().unwrap().iter().map(|x| Val::from_u64(x.as_str().unwrap().parse().unwrap())).collect())
         .collect()
+}
+
+/// Public values of a case as the statement layer delivers them: decimal strings that must be canonical
+/// (< p). Anything else (e.g. NF + p) is rejected here, as the wire format rejects non-canonical elements.
+fn pvs_canonical(v: &Value) -> Result<Vec<Vec<Val>>, String> {
+    let mut out = Vec::new();
+    for p in v.as_array().ok_or("public values")? {
+        let mut row = Vec::new();
+        for x in p.as_array().ok_or("public values")? {
+            let n: u128 = x.as_str().ok_or("public value")?.parse().map_err(|_| "public value".to_string())?;
+            if n >= wire::P as u128 {
+                return Err("non-canonical public value".into());
+            }
+            row.push(Val::from_u64(n as u64));
+        }
+        out.push(row);
+    }
+    Ok(out)
 }
 
 /// Prove one case, encode, decode, verify; optionally run the tamper sweep. Also self-checks the
@@ -438,11 +457,20 @@ fn cmd_accept(args: &[String]) {
 
 /// check FILE...: rebuild the verifying key from the vector's case/set/shift/seed, require the same
 /// shape and preprocessed commitment, decode proof_hex (+ every tampered case), run verify_batch.
-fn cmd_check(files: &[String]) {
+fn cmd_check(args: &[String]) {
     quiet_panics();
+    // --verdicts OUT.json: write every case's verdict (S3 JS/Rust agreement suite)
+    let verdicts_out = arg(args, "--verdicts");
+    let files: Vec<String> = args
+        .iter()
+        .enumerate()
+        .filter(|(i, a)| !a.starts_with("--") && !(*i > 0 && args[i - 1] == "--verdicts"))
+        .map(|(_, a)| a.clone())
+        .collect();
+    let mut verdicts: Vec<Value> = Vec::new();
     let mut bad = 0;
     let mut n = 0;
-    for f in files {
+    for f in &files {
         let v: Value = serde_json::from_str(&std::fs::read_to_string(f).unwrap()).unwrap();
         let set: Params = serde_json::from_value(v["set"].clone()).unwrap();
         let shape: Shape = serde_json::from_value(v["shape"].clone()).unwrap();
@@ -465,12 +493,24 @@ fn cmd_check(files: &[String]) {
                 println!("FAIL {f}: verifying key differs from the vector's shape/preprocessed commitment");
                 bad += 1;
             }
-            let mut cases = if vk_ok { vec![("valid".to_string(), valid.clone(), true)] } else { vec![] };
+            // s3_valid_expect = false: the stored proof is checked under a deliberately different VK (S3 VK variants)
+            let valid_expect = v.get("s3_valid_expect").and_then(|e| e.as_bool()).unwrap_or(true);
+            let mut cases = if vk_ok { vec![("valid".to_string(), valid.clone(), valid_expect, Ok(pvs.clone()))] } else { vec![] };
             for t in v["tampered"].as_array().into_iter().flatten().filter(|_| vk_ok) {
-                cases.push((t["name"].as_str().unwrap().to_string(), apply_tamper(&valid, t), false));
+                // a case may carry its own public values (S3 statement cases) and an expected verdict
+                let tp = t.get("public_values").map(pvs_canonical).unwrap_or_else(|| Ok(pvs.clone()));
+                let expect = t.get("expect").and_then(|e| e.as_bool()).unwrap_or(false);
+                cases.push((t["name"].as_str().unwrap().to_string(), apply_tamper(&valid, t), expect, tp));
             }
-            for (name, b, expect) in cases {
-                let r = check_bytes!(&config, &c.airs, &pd.common, &b, &shape, &pvs);
+            for (name, b, expect, tp) in cases {
+                let r = match &tp {
+                    Ok(p) => check_bytes!(&config, &c.airs, &pd.common, &b, &shape, p),
+                    Err(e) => Err(e.clone()),
+                };
+                if verdicts_out.is_some() {
+                    verdicts.push(json!({"file": f, "name": name, "accept": r.is_ok(),
+                        "why": r.as_ref().err().cloned().unwrap_or_default()}));
+                }
                 n += 1;
                 let ok = r.is_ok() == expect;
                 if !ok {
@@ -481,6 +521,9 @@ fn cmd_check(files: &[String]) {
                 }
             }
         });
+    }
+    if let Some(out) = verdicts_out {
+        std::fs::write(&out, serde_json::to_string(&verdicts).unwrap()).unwrap();
     }
     eprintln!("rust check: {n} cases, {bad} unexpected");
     if bad > 0 {

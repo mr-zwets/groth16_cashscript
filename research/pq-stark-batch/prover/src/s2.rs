@@ -286,7 +286,7 @@ fn prove_and_verify(
     verify_pvs: &[Vec<Val>],
     log_heights: &[usize],
     seed: u64,
-) -> (String, String) {
+) -> (String, String, Option<String>) {
     let zk = set.zk as usize;
     let degs: Vec<usize> = log_heights.iter().map(|l| l + zk).collect();
     let trefs: Vec<&_> = traces.iter().collect();
@@ -295,9 +295,14 @@ fn prove_and_verify(
         let inst = StarkInstance::new_multiple(airs, &trefs, pvs);
         let pr = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| prove_batch(&config, &inst, &pd)));
         match pr {
-            Err(_) => ("prover panicked".into(), "no proof".into()),
-            Ok(Err(e)) => (format!("prover error {e:?}"), "no proof".into()),
+            Err(_) => ("prover panicked".into(), "no proof".into(), None),
+            Ok(Err(e)) => (format!("prover error {e:?}"), "no proof".into(), None),
             Ok(Ok(proof)) => {
+                // p3b-v1 bytes of the produced proof (S3 replays these in the JS verifier)
+                let pre_order = pd.common.preprocessed.as_ref().map(|g| g.matrix_to_instance.clone());
+                let shape = crate::shape::derive(set, airs, log_heights, &pd.common.lookups, pre_order.as_deref());
+                let (bytes, _, _) = crate::wire::encode(&serde_json::to_value(&proof).unwrap(), &shape);
+                let proof_hex: String = bytes.iter().map(|b| format!("{b:02x}")).collect();
                 let v = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                     verify_batch(&config, airs, &proof, verify_pvs, &pd.common)
                 }));
@@ -306,7 +311,7 @@ fn prove_and_verify(
                     Ok(Err(e)) => format!("rejected: {e:?}"),
                     Err(_) => "rejected (verifier panicked)".into(),
                 };
-                ("proof produced".into(), vr)
+                ("proof produced".into(), vr, Some(proof_hex))
             }
         }
     })
@@ -314,6 +319,8 @@ fn prove_and_verify(
 
 pub fn cmd_forced(args: &[String]) {
     let out = arg(args, "--out").expect("--out");
+    // --with-proofs: also store each produced proof (p3b-v1 hex) and its public values (S3 agreement suite)
+    let with_proofs = args.iter().any(|a| a == "--with-proofs");
     crate::quiet_panics();
     let set1 = get_set("Z128");
     let set2 = get_set("Z128g+cpow=3+lpow=8");
@@ -322,10 +329,10 @@ pub fn cmd_forced(args: &[String]) {
     let c2 = stmt_case(&format!("m2@{leaf}@{wseed}"), 0);
     let other = public_values(&witness(12345, 99)); // a foreign statement
     // control: the honest M1 statement through the same path must be accepted
-    let (p, v) = prove_and_verify(&set1, &c1.airs, &c1.traces, &c1.pvs, &c1.pvs, &c1.log_heights, 7);
+    let (p, v, _) = prove_and_verify(&set1, &c1.airs, &c1.traces, &c1.pvs, &c1.pvs, &c1.log_heights, 7);
     eprintln!("control M1 honest: {p}; verify_batch {v}");
     let mut controls_ok = v == "ACCEPTED";
-    let (p2, v2) = prove_and_verify(&set2, &c2.airs, &c2.traces, &c2.pvs, &c2.pvs, &c2.log_heights, 7);
+    let (p2, v2, _) = prove_and_verify(&set2, &c2.airs, &c2.traces, &c2.pvs, &c2.pvs, &c2.log_heights, 7);
     eprintln!("control M2 honest: {p2}; verify_batch {v2}");
     controls_ok &= v2 == "ACCEPTED";
     let mut rows = Vec::new();
@@ -333,12 +340,13 @@ pub fn cmd_forced(args: &[String]) {
     let mut run = |name: &str, what: &str, m2: bool, traces: Vec<RowMajorMatrix<Val>>, pvs: Vec<Vec<Val>>| {
         let (set, c) = if m2 { (&set2, &c2) } else { (&set1, &c1) };
         let t0 = Instant::now();
-        let (p, v) = prove_and_verify(set, &c.airs, &traces, &pvs, &pvs, &c.log_heights, 7);
+        let (p, v, hex) = prove_and_verify(set, &c.airs, &traces, &pvs, &pvs, &c.log_heights, 7);
         let ok = v != "ACCEPTED";
         all &= ok;
         eprintln!("{name}: {p}; verify_batch {v} -> {}", if ok { "ok" } else { "UNEXPECTED ACCEPT" });
         rows.push(json!({"name": name, "what": what, "statement": if m2 {"M2"} else {"M1"}, "set": set.name,
-            "prover": p, "verify_batch": v, "expected_reject": ok, "ms": t0.elapsed().as_millis()}));
+            "prover": p, "verify_batch": v, "expected_reject": ok, "ms": t0.elapsed().as_millis(),
+            "case": c.name, "public_values": crate::pvs_json(&pvs), "proof_hex": if with_proofs { hex } else { None }}));
     };
     let cell = |t: &RowMajorMatrix<Val>, r: usize, c: usize, v: Val| {
         let mut t = t.clone();

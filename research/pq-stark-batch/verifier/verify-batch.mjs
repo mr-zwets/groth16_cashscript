@@ -273,45 +273,48 @@ export function vkFromVector(v) {
 }
 
 // ------------------------------------------------------------------------- p3b-v1 parser
-export function parse(buf, vk) {
+// rec (optional): receives { label, kind, at, len } for every element read, in byte order. Kinds: digest,
+// count, base, ext, pow. The tamper generator (gen-cases.mjs) places its edits with this map.
+export function parse(buf, vk, rec = null) {
   let o = 0;
-  const take = (n) => { if (o + n > buf.length) throw new V('truncated'); const b = buf.subarray(o, o + n); o += n; return b; };
-  const base = () => { const x = take(8).readBigUInt64LE(); if (x >= P) throw new V('non-canonical field element'); return x; };
-  const ext = () => [base(), base(), base()];
-  const exts = (n) => Array.from({ length: n }, ext);
-  const bases = (n) => Array.from({ length: n }, base);
-  const cap = (n) => Array.from({ length: n }, () => Buffer.from(take(32)));
-  const digests = () => { const n = take(2).readUInt16LE(); return Array.from({ length: n }, () => Buffer.from(take(32))); };
+  const take = (n, label, kind) => { if (o + n > buf.length) throw new V('truncated'); if (rec) rec({ label, kind, at: o, len: n }); const b = buf.subarray(o, o + n); o += n; return b; };
+  const fe = (b) => { const x = b.readBigUInt64LE(); if (x >= P) throw new V('non-canonical field element'); return x; };
+  const base = (l, kind = 'base') => fe(take(8, l, kind));
+  const ext = (l) => { const b = take(24, l, 'ext'); return [fe(b.subarray(0, 8)), fe(b.subarray(8, 16)), fe(b.subarray(16, 24))]; };
+  const exts = (n, l) => Array.from({ length: n }, (_, k) => ext(`${l}[${k}]`));
+  const bases = (n, l) => Array.from({ length: n }, (_, k) => base(`${l}[${k}]`));
+  const cap = (n, l) => Array.from({ length: n }, (_, k) => Buffer.from(take(32, `${l}[${k}]`, 'digest')));
+  const digests = (l) => { const n = take(2, `${l}.count`, 'count').readUInt16LE(); return Array.from({ length: n }, (_, k) => Buffer.from(take(32, `${l}[${k}]`, 'digest'))); };
   const R = Object.fromEntries(vk.rounds.map((r) => [r.name, r]));
   const pr = {};
-  pr.mainCap = cap(R.trace.capLen);
-  pr.permCap = vk.hasLookups ? cap(R.permutation.capLen) : null;
-  pr.quotCap = cap(R.quotient.capLen);
-  pr.randCap = vk.zk ? cap(R.random.capLen) : null;
-  pr.terminals = vk.inst.map((I) => (I.numLookups ? ext() : null));
-  pr.ood = vk.inst.map((I) => ({
-    traceLocal: exts(I.width), traceNext: I.opensNext ? exts(I.width) : null,
-    preLocal: I.preWidth ? exts(I.preWidth) : null, preNext: I.preNext ? exts(I.preWidth) : null,
-    chunks: Array.from({ length: I.numChunks }, () => exts(D)), random: vk.zk ? exts(D) : null,
-    permLocal: exts(I.permWidth), permNext: exts(I.permWidth),
+  pr.mainCap = cap(R.trace.capLen, 'cap.trace');
+  pr.permCap = vk.hasLookups ? cap(R.permutation.capLen, 'cap.permutation') : null;
+  pr.quotCap = cap(R.quotient.capLen, 'cap.quotient');
+  pr.randCap = vk.zk ? cap(R.random.capLen, 'cap.random') : null;
+  pr.terminals = vk.inst.map((I, i) => (I.numLookups ? ext(`terminal[${i}]`) : null));
+  pr.ood = vk.inst.map((I, i) => ({
+    traceLocal: exts(I.width, `ood[${i}].trace_local`), traceNext: I.opensNext ? exts(I.width, `ood[${i}].trace_next`) : null,
+    preLocal: I.preWidth ? exts(I.preWidth, `ood[${i}].pre_local`) : null, preNext: I.preNext ? exts(I.preWidth, `ood[${i}].pre_next`) : null,
+    chunks: Array.from({ length: I.numChunks }, (_, k) => exts(D, `ood[${i}].chunk[${k}]`)), random: vk.zk ? exts(D, `ood[${i}].random`) : null,
+    permLocal: exts(I.permWidth, `ood[${i}].perm_local`), permNext: exts(I.permWidth, `ood[${i}].perm_next`),
   }));
-  pr.lookupPow = vk.hasLookups && vk.lpow > 0 ? base() : 0n;
-  pr.oodPow = vk.opow > 0 ? base() : 0n;
-  pr.randVals = vk.zk ? vk.rounds.map((r) => r.matrices.map((m) => Array.from({ length: m.points }, () => exts(r.rc)))) : null;
-  pr.batchPow = vk.bpow > 0 ? base() : 0n;
-  pr.friCaps = vk.friCaps.map((c) => cap(c));
-  pr.commitPow = vk.logArities.map(() => (vk.cpow > 0 ? base() : 0n));
-  pr.finalPoly = exts(vk.L);
-  pr.queryPow = vk.qpow > 0 ? base() : 0n;
+  pr.lookupPow = vk.hasLookups && vk.lpow > 0 ? base('pow.lookup', 'pow') : 0n;
+  pr.oodPow = vk.opow > 0 ? base('pow.ood', 'pow') : 0n;
+  pr.randVals = vk.zk ? vk.rounds.map((r) => r.matrices.map((m, mi) => Array.from({ length: m.points }, (_, p) => exts(r.rc, `random_values.${r.name}[${mi}][${p}]`)))) : null;
+  pr.batchPow = vk.bpow > 0 ? base('pow.batch', 'pow') : 0n;
+  pr.friCaps = vk.friCaps.map((c, r) => cap(c, `cap.fri[${r}]`));
+  pr.commitPow = vk.logArities.map((_, r) => (vk.cpow > 0 ? base(`pow.commit[${r}]`, 'pow') : 0n));
+  pr.finalPoly = exts(vk.L, 'final_poly');
+  pr.queryPow = vk.qpow > 0 ? base('pow.query', 'pow') : 0n;
   pr.inputs = vk.rounds.map((r) => {
-    const rows = Array.from({ length: vk.Q }, () => r.matrices.map((m) => bases(m.width)));
-    const salts = vk.zk ? Array.from({ length: vk.Q }, () => r.matrices.map(() => bases(vk.salt))) : null;
-    return { rows, salts, sibs: digests() };
+    const rows = Array.from({ length: vk.Q }, (_, q) => r.matrices.map((m, mi) => bases(m.width, `row.${r.name}[q${q}][m${mi}]`)));
+    const salts = vk.zk ? Array.from({ length: vk.Q }, (_, q) => r.matrices.map((_, mi) => bases(vk.salt, `salt.${r.name}[q${q}][m${mi}]`))) : null;
+    return { rows, salts, sibs: digests(`sib.${r.name}`) };
   });
-  pr.fri = vk.logArities.map((la) => {
-    const vals = Array.from({ length: vk.Q }, () => exts(2 ** la - 1));
-    const salts = vk.zk ? Array.from({ length: vk.Q }, () => bases(vk.salt)) : null;
-    return { vals, salts, sibs: digests() };
+  pr.fri = vk.logArities.map((la, r) => {
+    const vals = Array.from({ length: vk.Q }, (_, q) => exts(2 ** la - 1, `fri[${r}].value[q${q}]`));
+    const salts = vk.zk ? Array.from({ length: vk.Q }, (_, q) => bases(vk.salt, `fri[${r}].salt[q${q}]`)) : null;
+    return { vals, salts, sibs: digests(`fri[${r}].sib`) };
   });
   if (o !== buf.length) throw new V(`${buf.length - o} trailing bytes`);
   return pr;
