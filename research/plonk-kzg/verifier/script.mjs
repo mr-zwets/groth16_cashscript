@@ -15,7 +15,13 @@ import {W, TBL, NW, NWR, baseNames, corr, le32, PROOF_PTS} from './plonk.mjs';
 export const digitOffset = (nw) => { let c = 0n; for (let i = 0; i < nw; i++) c += 16n << BigInt(5 * i); return c; };
 import {TAG, wsSize, nqMax, NSTATES, chains} from './si.mjs';
 import {fixedNames} from './plonk.mjs';
-import {gtConsts, PI_SUM_OFFSET, TB as GT_TB} from './gt.mjs';
+import {gtConsts, PI_SUM_OFFSET, TB as GT_TB, PI as GT_PI} from './gt.mjs';
+// TB[15] .. TB[0] (TB[0] = 0 on top), TB[n] = sum_{j in n} pi_j, from the three constants pi_1..pi_3 (pi_0 = 1)
+export const pushTB = (a, pre) => { if (!a.ctx.funcs.has('TBC')) a.defLocal('TBC', 0, 16, (s) => {
+    const k = new Kernel(); const P = [k.c(1n), k.c(GT_PI[1]), k.c(GT_PI[2]), k.c(GT_PI[3])]; const T = [k.c(0n)];
+    for (let n = 1; n < 16; n++) { const hb = 31 - Math.clz32(n); T.push(n === 1 << hb ? P[hb] : k.add(T[n - (1 << hb)], P[hb])); }
+    k.output(...T.slice().reverse()); s.kernel(k, Array.from({length: 16}, (_, x) => 'o' + x), {iters: 100}); });
+  a.invoke('TBC', Array.from({length: 16}, (_, x) => pre + (15 - x))); };
 
 const ITERS = Number(process.env.SCHED_ITERS ?? 2500);
 export const SL_PIECE = 8; // slopes per stream piece (256 B)
@@ -425,7 +431,7 @@ function si(a, {CH, section, STOP, L0guess, info, GT, FX}) {
 // ---------------- GT fold (gt.mjs): tables, per-event step, binding; shared with multi.mjs ----------------
 // GT table items G_0 (top) .. G_{32m+15}: TP_0[0..15], TM_0[0..15], .., TP_{m-1}[..], TM_{m-1}[..], TB[0..15], where
 // TP_i[n] = prod_{j in n} R_{i,j}(z), TM_i[n] = the same at -z, TB[n] = sum_{j in n} pi_j (R_{i,2/3}(X) = R_{i,0/1}(eta X)).
-export function gtTables(a, GT, m, ZP, EZP) {
+export function gtTables(a, GT, m, ZP, EZP, {acc = true} = {}) {
   const n0 = a.st.length;
   if (!a.ctx.funcs.has('GTB')) a.defLocal('GTB', 23, 32, (s) => { // [c0..c5, d0..d5 (R_{i,0}, R_{i,1}), z..z6, ez..ez5] -> TM15..TM0, TP15..TP0
     const k = new Kernel(); const I = (x) => k.in('in' + x), mm = (x, y) => k.mod(k.mul(x, y));
@@ -436,32 +442,55 @@ export function gtTables(a, GT, m, ZP, EZP) {
     const tab = (sg) => { const T = [k.c(1n)]; for (let n = 1; n < 16; n++) { const hb = 31 - Math.clz32(n); T.push(n === 1 << hb ? k.mod(R[hb][sg]) : mm(T[n - (1 << hb)], T[1 << hb])); } return T; };
     const TP = tab(0), TM = tab(1);
     k.output(...TM.slice().reverse(), ...TP.slice().reverse()); s.kernel(k, Array.from({length: 32}, (_, x) => 'o' + x), {iters: 600}); });
-  for (let n = 15; n >= 0; n--) a.push(GT_TB[n], 'tb' + n);
+  pushTB(a, 'tb');
   for (let i = m - 1; i >= 0; i--) {
     for (const j of [0, 1]) for (let c = 0; c < 6; c++) a.push(GT.R[i][j][c], 'rk');
     for (const nm of [...ZP, ...EZP.slice(0, 5)]) a.pick(nm);
     a.invoke('GTB');
   }
   const NG = 32 * m + 16; a.st.splice(n0); for (let x = NG - 1; x >= 0; x--) a.st.push('G_' + x); // G_0 on top (named items, not a pile: kernels reach past them)
-  for (let i = 0; i < m; i++) a.push(0, 'acc' + i);
+  if (acc) for (let i = 0; i < m; i++) a.push(0, 'acc' + i);
 }
-// one event: for each folded base i, n = N_i[e] (the next byte of NB): F+ *= TP_i[n], F- *= TM_i[n], acc_i = 2 acc_i + TB[n]
-export function gtStep(s, m) {
-  s.roll('NB').push(m).op(OP.SPLIT, 2, 'ev', 'NB').op(OP.SWAP, 2, 'NB', 'ev');
+// one event: for each folded base i, n = N_i[e] (the next byte of NB): F+ *= TP_i[n], F- *= TM_i[n] [, acc_i = 2 acc_i + TB[n]]
+// nbAlt: NB is the top of the altstack (the chain's SIL); acc = false: the binding is computed after the loop (gtBindLoop)
+export function gtStep(s, m, {acc = true, nbAlt = false, evIn = false} = {}) {
+  if (evIn) { /* the event's m nibble bytes 'ev' are on top */ }
+  else if (nbAlt) { s.fromAlt('NB').push(m).op(OP.SPLIT, 2, 'ev', 'NB').toAlt('NB'); }
+  else s.roll('NB').push(m).op(OP.SPLIT, 2, 'ev', 'NB').op(OP.SWAP, 2, 'NB', 'ev');
   for (let i = 0; i < m; i++) {
     if (i) s.roll('ev');
     s.push(1).op(OP.SPLIT, 2, 'b', 'ev').op(OP.SWAP, 2, 'ev', 'b').op(OP.BIN2NUM, 1, 'n');
     let d = s.depth('G_0'); s.emit(OP.DUP, ...pushNum(d + 32 * i), OP.ADD, OP.PICK); s.st.push('tp');
-    d = s.depth('G_0'); s.emit(OP.OVER, ...pushNum(d + 32 * i + 16), OP.ADD, OP.PICK); s.st.push('tm');
-    s.emit(OP.ROT); s.st.splice(s.st.length - 3, 1); d = s.depth('G_0'); s.emit(...pushNum(d + 32 * m), OP.ADD, OP.PICK); s.st.push('tb');
-    s.roll('acc' + i).emit(OP.DUP, OP.ADD, OP.ADD); s.st.splice(s.st.length - 2, 2, 'acc' + i);
+    if (acc) {
+      d = s.depth('G_0'); s.emit(OP.OVER, ...pushNum(d + 32 * i + 16), OP.ADD, OP.PICK); s.st.push('tm');
+      s.emit(OP.ROT); s.st.splice(s.st.length - 3, 1); d = s.depth('G_0'); s.emit(...pushNum(d + 32 * m), OP.ADD, OP.PICK); s.st.push('tb');
+      s.roll('acc' + i).emit(OP.DUP, OP.ADD, OP.ADD); s.st.splice(s.st.length - 2, 2, 'acc' + i);
+    } else { s.emit(OP.SWAP); s.st.splice(s.st.length - 2, 2, 'tp', 'n'); s.st.pop(); d = s.depth('G_0'); s.emit(...pushNum(d + 32 * i + 16), OP.ADD, OP.PICK); s.st.push('tm'); }
     const k = new Kernel(); k.output(k.mod(k.mul(k.in('Fp'), k.in('tp'))), k.mod(k.mul(k.in('Fm'), k.in('tm')))); s.kernel(k, ['Fp', 'Fm'], {iters: 60});
   }
   s.drop('ev');
 }
+// the binding accumulators from the whole nibble string NB (top item, 65 m bytes): acc_i = sum_e 2^(64-e) TB[N_i[e]]
+export function gtBindLoop(a, m) {
+  const n0 = a.st.length - 1; a.roll('NB');
+  pushTB(a, 'tbc');
+  for (let i = 0; i < m; i++) a.push(0, 'acc' + i);
+  a.roll('NB');
+  a.loop((s) => {
+    s.push(m).op(OP.SPLIT, 2, 'ev', 'NB').op(OP.SWAP, 2, 'NB', 'ev');
+    for (let i = 0; i < m; i++) {
+      s.push(1).op(OP.SPLIT, 2, 'b', 'ev').op(OP.SWAP, 2, 'ev', 'b').op(OP.BIN2NUM, 1, 'n');
+      s.st.pop(); const d = s.depth('tbc0'); s.emit(...pushNum(d), OP.ADD, OP.PICK); s.st.push('tb');
+      s.roll('acc' + i).emit(OP.DUP, OP.ADD, OP.ADD); s.st.splice(s.st.length - 2, 2, 'acc' + i); s.roll('ev');
+    }
+    s.drop('ev').pick('NB', 'nbc').op(OP.SIZE, 1, 'nbc', 'sz').op(OP.NIP, 2, 'sz').op(OP.NOT, 1, 'done');
+  });
+  a.drop('NB'); for (let n = 0; n < 16; n++) a.drop('tbc' + n); void n0;
+}
 // binding: (acc_i - 2^64 sum_j pi_j - s_i) mod r == 0 for every folded base (s_i = 'fs_<name>', canonical < r)
 export function gtBind(a, FX, fsName = (nm) => 'fs_' + nm) {
   a.invoke('R', ['r']);
-  FX.forEach((nm, i) => { a.roll(fsName(nm)); const k = new Kernel(); k.output(k.modr(k.sub(k.sub(k.in('acc' + i), k.c(PI_SUM_OFFSET)), k.in(fsName(nm))))); a.kernel(k, ['bnd'], {iters: 50}); a.op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1); });
   a.drop('r');
+  if (!a.ctx.funcs.has('BND')) a.defLocal('BND', 2, 0, (s) => { s.invoke('R', ['r']); const k = new Kernel(); k.output(k.modr(k.sub(k.sub(k.in('in0'), k.c(PI_SUM_OFFSET)), k.in('in1')))); s.kernel(k, ['bnd'], {iters: 50}); s.drop('r').op(OP.NOT, 1, 'ok').op(OP.VERIFY, 1); });
+  FX.forEach((nm, i) => { a.arrange(['acc' + i, fsName(nm)]).invoke('BND', []); });
 }
