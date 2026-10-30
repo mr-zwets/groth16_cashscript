@@ -76,6 +76,95 @@ Consensus op-cost is about 0.1% below standard; both are in `results/summary.jso
   - So the verifier fits a standard 100 KB transaction, but only just: 95.6–96.0 KB for merkle16.
   - A circuit with a few more fixed bases or public inputs would need an 11th input and could exceed 100,000 B.
 
+## Track 7: BSB22 commitments (api.Commit)
+
+Date: 2026-10-30. Branch `wip/plonk-usable-bsb22`. Research, not a leaderboard entry.
+
+Circuits that use gnark's range-check or lookup gadgets carry BSB22 commitments. The single-input verifier now
+handles them: `script.mjs` and `plonk.mjs` are generic in the number m of commitments, and m = 1 is tested. The protocol
+delta is the prover track's PROTOCOL.md "BSB22 commitments"; the soundness scope is [SOUNDNESS.md](SOUNDNESS.md) §8.
+
+**What the script adds per commitment:**
+- decoding a 32-byte qcp_j(ζ) (< r) and a 64-byte point Bsb22_j (canonical, on the curve, not infinity): the proof
+  is 864 B;
+- [Qcp_j] in γ (a VK constant inside GV) and in v; Bsb22_j in α; qcp_j(ζ) in v;
+- gnark's hash-to-field on chain: 3 × `OP_SHA256` and one `OP_XOR` (`expand_message_xmd`, DST `BSB22-Plonk`), then
+  48 bytes BE mod r (`script.mjs` 3b);
+- one more Lagrange term in PI(ζ), whose denominator joins the one checked batch inverse;
+- two more MSM bases: Bsb22_j (proof base, scalar −t'·qcp_j(ζ), folded into P* like every other Λ term) and Qcp_j
+  (fixed base, scalar v^{6+j}).
+
+**Results** (merkle16rc: merkle16 with a private 64-bit amount, `std/rangecheck`, one commitment, k = 3, n = 2^14;
+`results/test-merkle16rc-*.json`). Score = unlocking + 35 + 63, ranges over the 5 valid proofs, op-cost libauth
+standard (consensus about 0.1% lower).
+
+| regime | merkle16 (Track 6) | merkle16rc (m = 1) | delta |
+|---|--:|--:|--:|
+| bch-spec, J = 13: score | 68,494–68,655 | 72,404–72,760 | +3.9–4.1 KB (+6%) |
+| bch-spec: op-cost | 60.42–60.72M | 64.98–65.21M | +4.5M |
+| bch-spec: worst margin | 3.3% | 1.10% | |
+| 100 KB input, J = 8: score | 72,188–72,438 | 77,402–77,720 | +5.2–5.3 KB |
+| 100 KB input: op-cost | 57.60–57.85M | 61.82–62.08M | +4.2M |
+| redeem | 18,244 | 18,659 | +415 B |
+| BCHN add-on (OP_DEFINE bodies) | +1,405 | +1,405 | 0 |
+| proof | 768 | 864 | +96 B |
+| today's rules (multi-input) | 95.6–96.0 KB, 10 inputs | **does not fit** (below) | |
+
+Tests, both modes, every verdict as the JS reference:
+
+| | merkle16rc bch-spec | merkle16rc 100 KB | range64 bch-spec |
+|---|---|---|---|
+| valid accepted | 5/5 | 5/5 | 5/5 |
+| prover-track tampered rejected (incl. 13 commitment cases) | 91/91 | 91/91 | 86/86 |
+| witness manipulations rejected | 28/28 | 28/28 | 28/28 |
+
+`range64` (k = 1, n = 2^8) is a debugging circuit: 71,988–72,312 B and 64.58–64.99M op on bch-spec, essentially the
+same as merkle16rc, since the cost does not depend on n.
+
+**Where the cost goes** (`node profile.mjs merkle16rc 13` against merkle16, proof 0, standard; same k and n):
+
+| phase | merkle16 | merkle16rc | delta |
+|---|--:|--:|--:|
+| decode + curve checks | 0.459M | 0.502M | +0.043M |
+| transcript γ..ζ | 0.027M | 0.031M | +0.004M |
+| hash-to-field | – | 0.009M | +0.009M |
+| Fr block 1 (PI with the commitment term) | 0.214M | 0.253M | +0.039M |
+| v, u, t', MSM scalars | 0.175M | 0.197M | +0.022M |
+| MSM tables (2 more bases) | 6.425M | 7.097M | +0.672M |
+| P* MSM (2 more bases) | 38.765M | 42.228M | +3.463M |
+| rest (P_right, SI) | 14.52M | 14.53M | ≈ 0 |
+| total (script) | 60.58M | 64.84M | +4.26M |
+
+- **The commitment's own work is negligible**: the hash-to-field, the larger hashes and the Fr term cost 0.12M op
+  together, and about 230 B of redeem.
+- **97% of the delta is the two extra MSM bases** (about 2.1M op and 1.6 KB of slopes each).
+- The redeem grows by 415 B: 64 B for [Qcp] in GV, 79 B for the hash-to-field, the rest in the Fr kernels.
+
+**Today's rules: does not fit one standard transaction (negative result).** `multi.mjs` handles m ≥ 1. It was run on
+the relaxed `free` VM, in consensus mode: the BCH 2026 rules with no item, bytecode or density limit, op-cost still
+counted (`node chainprobe.mjs` → `results/chain-merkle16rc-probe.json`).
+- **The logic is correct.** All 5 valid proofs accept. The 8 commitment tampers that decode (Bsb22 + G, −Bsb22,
+  qcp + 1, commitment from proof 1, commitment and qcp from proof 1, 2·Bsb22, Bsb22 − G, qcp = 0) are re-witnessed
+  adaptively and rejected.
+- **The bytes do not fit.**
+  - Total op-cost is 78.1–78.3M, against Track 6's 73.2–73.5M (standard).
+  - The 10-input layout is 101.9–102.2 KB. It also breaks two per-input limits: three MSM inputs need more than
+    10,000 B of unlocking, and TV (now 11 variable bases, 10,560 B) exceeds the 10,000 B stack-item limit.
+  - The best 11-input layout tried (5 affine roles) is **103.7–104.1 KB**. All inputs but the TV host are within
+    10,000 B. A TV split would need one more host and adds bytes.
+  - So a circuit with one commitment needs **at least 3.7 KB more than a 100,000 B standard transaction allows**.
+- **What would make it fit:**
+  - the design's GT folding of the fixed bases (estimated −6 KB, not built);
+  - or a chain across two transactions (not designed).
+  - Not tried here.
+
+**Not done:**
+- m ≥ 2 is built by the same generic code but not tested (SOUNDNESS.md §8 lists a length condition for m ≥ 3).
+- `results/summary.json` was not regenerated; it remains the Track 6 summary.
+- No large sweep beyond the 5 proofs per circuit was run.
+- The bch-spec margin at J = 13 is 1.1%. J = 12 (measured on proof 0) gives 3.4% for +745 B: unlocking 73,310 B, 64.40M
+  op of a 66.65M budget.
+
 ## What is built
 
 Protocol (`plonk.mjs`, `PROTOCOL.md` of the prover track):
@@ -234,5 +323,6 @@ node soundness/lattice.mjs              # numbers behind SOUNDNESS.md (GLV latti
 | `script.mjs`, `witness.mjs`, `single.mjs` | single-input program, honest witness, spend runner |
 | `multi.mjs`, `chain.mjs` | today's multi-input chain: plan, roles, witness, FILL sizing |
 | `test.mjs`, `chaintest.mjs`, `profile.mjs`, `summary.mjs`, `vm.mjs` | tests, profile, summary, VM runners |
-| `results/` | test-*.json, chain-*.json, summary.json |
+| `chainprobe.mjs` | Track 7: the m = 1 chain on the relaxed VM (logic check and bytes) |
+| `results/` | test-*.json, chain-*.json, summary.json; Track 7: test-merkle16rc-*.json, test-range64-spec.json, chain-merkle16rc-probe.json |
 | `SOUNDNESS.md`, `soundness/lattice.mjs` | soundness argument for the t'-fold, the u batching and the chain; its numeric checks |

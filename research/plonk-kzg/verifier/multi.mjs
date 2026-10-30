@@ -18,12 +18,15 @@ import {encodeDataPush, hash256} from '@bitauth/libauth';
 import {createHash} from 'node:crypto';
 import {Asm, Kernel, OP, pushNum, pushData} from './asm.mjs';
 import {p, r, mod, inv, ETA, GAMMA1, DIGITS, NE, GLV, OFFSET, aff, G1, F2, peval, pneg, psubst, frob1Monic, M as MPOLY} from './math.mjs';
-import {W, TBL, NW, NWR, baseNames, corr, le32, be32, sha, recode, verifyPlonk, jdbl, jmadd} from './plonk.mjs';
+import {W, TBL, NW, NWR, baseNames, corr, le32, be32, sha, recode, verifyPlonk, jdbl, jmadd, proofLen, bsbOff, HTF_DST, PROOF_PTS} from './plonk.mjs';
 import {TAG, WS_SIZE, NQ_MAX, NSTATES, BOUNDS, chains, proveSI, factorSchedule} from './si.mjs';
 import {kAffAdd, kAffDbl, kJDbl, kJMAdd, kConv, kEvent, kEval, EV_OUTS, digitOffset, SL_PIECE} from './script.mjs';
 
 const ITERS = Number(process.env.SCHED_ITERS ?? 2500);
-const FIXED = ['Ql', 'Qr', 'Qm', 'Qo', 'Qk', 'S3', 'S1', 'S2', 'G'];
+const FIXED = ['Ql', 'Qr', 'Qm', 'Qo', 'Qk', 'S3', 'S1', 'S2', 'G', 'Qcp0', 'Qcp1', 'Qcp2', 'Qcp3']; // BSB22: Qcp_j are VK constants (TF)
+const VKP = (vk) => ['S1', 'S2', 'S3', 'Ql', 'Qr', 'Qm', 'Qo', 'Qk', ...vk.qcpNames]; // GV = "gamma" || these points
+// byte offset in PROOF of a proof base (BSB22: Bsb_j after the qcp_j(zeta) scalars)
+const proofOff = (vk, nm) => (nm.startsWith('Bsb') ? bsbOff(vk, Number(nm.slice(3))) : PROOF_PTS[nm]);
 const hdr = (len) => Buffer.from(encodeDataPush(new Uint8Array(len))).subarray(0, encodeDataPush(new Uint8Array(len)).length - len);
 const WQ_SIZE = 32 * NQ_MAX; // fixed-size quotient (leading zero words allowed): fixed offsets for remote reads
 
@@ -50,7 +53,7 @@ export function makePlan(vk, {mj = [[50, 46], [45, 45], [44, 40]], ma = [[39, 30
   for (const ro of roles) {
     const f = [];
     if (ro.code) f.push(['CODE', null]);
-    if (ro.kind === 'ST') f.push(['G0', plan.G0_SIZE], ['X', 128], ['PI', 32 * k], ['PROOF', 768], ['WS', WS_SIZE]);
+    if (ro.kind === 'ST') f.push(['G0', plan.G0_SIZE], ['X', 128], ['PI', 32 * k], ['PROOF', proofLen(vk)], ['WS', WS_SIZE]);
     if (ro.kind === 'MJ' && !ro.start) f.push(['HAND', 96]);
     if (ro.host === 'TV') f.push(['TV', plan.TV_SIZE]); if (ro.host === 'TF') f.push(['TF', plan.TF_SIZE]);
     if (ro.kind === 'MA') { f.push(['HAND', ro.conv ? 96 : 64]); if (ro.conv) f.push(['ZI', 32]); }
@@ -127,7 +130,7 @@ export function buildMulti(vk, plan) {
     a.emit(...pushNum(f.id), OP.INVOKE); a.st.splice(a.st.length - f.ins.length); a.st.push(...f.outs); for (const [n, c] of f.piles) if (f.outs.includes(n)) a.piles.set(n, c); return a; };
   const TBN = 2 * TBL * nbm;
   const SC = Array.from({length: nbm}, (_, q) => 'sc' + q);
-  // LOADT: [PRF (proof 768 B), LAMB (Lambda' 64 B BE), TVb, TFb] -> TB (tables b = 0..nbm-1, entries 1..16, x then y)
+  // LOADT: [PRF (proof 768 + 96 m B), LAMB (Lambda' 64 B BE), TVb, TFb] -> TB (tables b = 0..nbm-1, entries 1..16, x then y)
   fn('LOADT', ['PRF', 'LAMB', 'TVb', 'TFb'], ['TB'], [['TB', TBN]], (s) => {
     s.invoke('GV', ['GVc']);
     // pieces, in reverse base order so that base 0's piece is on top: the PICK/ROLL depths stay small
@@ -137,9 +140,9 @@ export function buildMulti(vk, plan) {
     for (let b = nbm - 1; b >= 0; b--) { const [bl, i] = pieceOf[b]; s.roll(`${bl}_${i}`).rename(`${bl}_${i}`, 'pc' + b); }
     for (let b = 0; b < nbm; b++) { const nm = names[b];
       if (nm === 'G') s.push(1, 'x1').push(2, 'y1');
-      else if (FIXED.includes(nm)) { const i = ['S1', 'S2', 'S3', 'Ql', 'Qr', 'Qm', 'Qo', 'Qk'].indexOf(nm); s.pick('GVc', 'vb').push(5 + 64 * i).op(OP.SPLIT, 2, 'x', 'vb').drop('x').invoke('DBP', ['x1', 'vb']).invoke('DBP', ['y1', 'vb']).drop('vb'); }
+      else if (FIXED.includes(nm)) { const i = VKP(vk).indexOf(nm); s.pick('GVc', 'vb').push(5 + 64 * i).op(OP.SPLIT, 2, 'x', 'vb').drop('x').invoke('DBP', ['x1', 'vb']).invoke('DBP', ['y1', 'vb']).drop('vb'); }
       else if (nm === 'Lam') s.pick('LAMB', 'vb').invoke('DBP', ['x1', 'vb']).invoke('DBP', ['y1', 'vb']).drop('vb');
-      else { const off = {L: 0, R: 64, O: 128, H0: 192, H1: 256, H2: 320, Z: 544, Wz: 640, Wzw: 704}[nm]; s.pick('PRF', 'vb').push(off).op(OP.SPLIT, 2, 'x', 'vb').drop('x').invoke('DBP', ['x1', 'vb']).invoke('DBP', ['y1', 'vb']).drop('vb'); }
+      else { const off = proofOff(vk, nm); s.pick('PRF', 'vb').push(off).op(OP.SPLIT, 2, 'x', 'vb').drop('x').invoke('DBP', ['x1', 'vb']).invoke('DBP', ['y1', 'vb']).drop('vb'); }
       s.roll('pc' + b).invoke('LD15', Array.from({length: 30}, (_, i) => 'e' + i));
       const items = s.st.splice(s.st.length - 32); assert.equal(items[0], 'x1'); s.st.push('NEW' + b); s.piles.set('NEW' + b, 32);
     }
@@ -278,7 +281,7 @@ export function buildMulti(vk, plan) {
     rread(a, plan.iST, 'PROOF', 'PRF'); rread(a, plan.iST, 'X', 'LAMB');
     a.pick('TV', 'tv');
     for (const nm of vari) {
-      if (nm === 'Lam') a.pick('LAMB', 'vb'); else { const off = {L: 0, R: 64, O: 128, H0: 192, H1: 256, H2: 320, Z: 544, Wz: 640, Wzw: 704}[nm]; a.pick('PRF', 'vb').push(off).op(OP.SPLIT, 2, 'x', 'vb').drop('x'); }
+      if (nm === 'Lam') a.pick('LAMB', 'vb'); else { const off = proofOff(vk, nm); a.pick('PRF', 'vb').push(off).op(OP.SPLIT, 2, 'x', 'vb').drop('x'); }
       a.invoke('DBP', ['bx', 'vb']).invoke('DBP', ['by', 'vb']).drop('vb');
       a.roll('tv').push(960).op(OP.SPLIT, 2, 'pc', 'tv').arrange(['bx', 'by', 'pc']).invoke('CHK15', []);
     }
@@ -305,34 +308,48 @@ export function buildMulti(vk, plan) {
 
 // ---------------- ST: statement, transcript, Fr, scalars s', P_right; publishes G0 ----------------
 function statement(a, vk, plan, call) {
-  const {names, nbm, k} = plan;
+  const {names, nbm, k} = plan; const m = vk.m;
   a.pick('PROOF', 'pb');
   for (const n of ['Lx', 'Ly', 'Rx', 'Ry', 'Ox', 'Oy', 'H0x', 'H0y', 'H1x', 'H1y', 'H2x', 'H2y']) a.invoke('DBP', [n, 'pb']);
   for (const n of ['l', 'rr', 'o', 's1', 's2']) a.invoke('DBR', [n, 'pb']);
   a.invoke('DBP', ['Zx', 'pb']).invoke('DBP', ['Zy', 'pb']).invoke('DBR', ['zu', 'pb']);
   for (const n of ['Wzx', 'Wzy', 'Wzwx', 'Wzwy']) a.invoke('DBP', [n, 'pb']);
+  for (let j = 0; j < m; j++) a.invoke('DBR', ['qcp' + j, 'pb']);
+  for (let j = 0; j < m; j++) a.invoke('DBP', ['Bsb' + j + 'x', 'pb']).invoke('DBP', ['Bsb' + j + 'y', 'pb']);
   a.drop('pb');
   a.pick('PI', 'pib'); for (let i = 0; i < k; i++) a.invoke('DBR', ['pub' + i, 'pib']); a.drop('pib');
   a.pick('X', 'xb'); a.invoke('DBP', ['Lamx', 'xb']).invoke('DBP', ['Lamy', 'xb']).invoke('DLR', ['invP', 'xb']).invoke('DLP', ['ziR', 'xb']).drop('xb');
-  for (const P of ['L', 'R', 'O', 'H0', 'H1', 'H2', 'Z', 'Wz', 'Wzw', 'Lam']) a.pick(P + 'x').pick(P + 'y').invoke('G1C', []);
-  for (const P of ['L', 'R', 'O', 'H0', 'H1', 'H2', 'Z', 'Lam']) a.drop(P + 'x').drop(P + 'y');
+  const BS = Array.from({length: m}, (_, j) => 'Bsb' + j);
+  for (const P of ['L', 'R', 'O', 'H0', 'H1', 'H2', 'Z', 'Wz', 'Wzw', 'Lam', ...BS]) a.pick(P + 'x').pick(P + 'y').invoke('G1C', []);
+  for (const P of ['L', 'R', 'O', 'H0', 'H1', 'H2', 'Z', 'Lam', ...BS]) a.drop(P + 'x').drop(P + 'y');
   // transcript
   a.invoke('GV', ['GV']).pick('GV', 'h').pick('PI').op(OP.CAT, 2, 'h').pick('PROOF').push(192).op(OP.SPLIT, 2, 'lro', 'x').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'gRaw');
   a.pushBytes(Buffer.from('beta')).pick('gRaw').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'bRaw');
-  a.pushBytes(Buffer.from('alpha')).pick('bRaw').op(OP.CAT, 2, 'h').pick('PROOF').push(544).op(OP.SPLIT, 2, 'x', 'zz').drop('x').push(64).op(OP.SPLIT, 2, 'zr', 'x').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'aRaw');
+  a.pushBytes(Buffer.from('alpha')).pick('bRaw').op(OP.CAT, 2, 'h');
+  if (m > 0) a.pick('PROOF').push(bsbOff(vk, 0)).op(OP.SPLIT, 2, 'x', 'bsb').drop('x').op(OP.CAT, 2, 'h'); // BSB22: alpha binds Bsb22_j before Z
+  a.pick('PROOF').push(544).op(OP.SPLIT, 2, 'x', 'zz').drop('x').push(64).op(OP.SPLIT, 2, 'zr', 'x').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'aRaw');
   a.pushBytes(Buffer.from('zeta')).pick('aRaw').op(OP.CAT, 2, 'h').pick('PROOF').push(192).op(OP.SPLIT, 2, 'x', 'hh').drop('x').push(192).op(OP.SPLIT, 2, 'hr', 'x').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'zRaw');
   a.roll('gRaw').invoke('BMR', ['gamma']).roll('bRaw').invoke('BMR', ['beta']).roll('aRaw').invoke('BMR', ['alpha']).roll('zRaw').invoke('BMR', ['zeta']);
+  { const dstp = [...HTF_DST, HTF_DST.length]; // BSB22 hash-to-field, as script.mjs 3b
+    for (let j = 0; j < m; j++) {
+      a.push(0).push(64).op(OP.NUM2BIN, 2, 'zpad');
+      a.pick('PROOF').push(bsbOff(vk, j)).op(OP.SPLIT, 2, 'x', 'cm').drop('x').push(64).op(OP.SPLIT, 2, 'cm', 'x').drop('x').op(OP.CAT, 2, 'h');
+      a.pushBytes([0, 48, 0, ...dstp]).op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'b0');
+      a.pick('b0').pushBytes([1, ...dstp]).op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'b1');
+      a.roll('b0').pick('b1').op(OP.XOR, 2, 'bx').pushBytes([2, ...dstp]).op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'b2');
+      a.push(16).op(OP.SPLIT, 2, 'b2h', 'x').drop('x').roll('b1').roll('b2h').op(OP.CAT, 2, 'u48').invoke('BMR', ['hc' + j]);
+    } }
   a.invoke('R', ['r']);
   { const kk = new Kernel(); const E = (n) => kk.env(n), I = (n) => kk.in(n), M = (x) => kk.modr(x), mul = (x, y) => kk.mul(x, y), add = (x, y) => kk.add(x, y), sub = (x, y) => kk.sub(x, y), c = (v) => kk.c(v);
     const canon = (x) => M(add(M(x), E('r')));
     const zeta = E('zeta'), alpha = E('alpha'), beta = E('beta'), gamma = E('gamma');
     let zn = zeta; for (let i = 0; i < vk.log2n; i++) zn = M(mul(zn, zn));
-    const zh = sub(zn, c(1n)); const dens = vk.omegaPow.map((w) => sub(zeta, c(w)));
-    let prod = dens[0]; for (let i = 1; i < k; i++) prod = M(mul(prod, dens[i]));
+    const zh = sub(zn, c(1n)); const dens = vk.denPow.map((w) => sub(zeta, c(w)));
+    let prod = dens[0]; for (let i = 1; i < dens.length; i++) prod = M(mul(prod, dens[i]));
     const invP = I('invP'); const chk = M(sub(mul(prod, invP), c(1n)));
     const invDens = dens.map((_, i) => { let x = invP; dens.forEach((d, j) => { if (j !== i) x = M(mul(x, d)); }); return x; });
     const zhn = M(mul(zh, c(vk.nInv)));
-    let pi = null; for (let i = 0; i < k; i++) { const tI = M(mul(M(mul(zhn, invDens[i])), c(vk.omegaPow[i]))); const term = mul(tI, E('pub' + i)); pi = pi ? add(pi, term) : term; }
+    let pi = null; for (let i = 0; i < k + m; i++) { const tI = M(mul(M(mul(zhn, invDens[i])), c(vk.denPow[i]))); const term = mul(tI, E(i < k ? 'pub' + i : 'hc' + (i - k))); pi = pi ? add(pi, term) : term; }
     pi = M(pi);
     const a2l1 = M(mul(M(mul(alpha, alpha)), M(mul(zhn, invDens[0]))));
     const t1 = add(add(E('l'), M(mul(beta, E('s1')))), gamma), t2 = add(add(E('rr'), M(mul(beta, E('s2')))), gamma); const t12 = M(mul(t1, t2));
@@ -345,11 +362,16 @@ function statement(a, vk, plan, call) {
   const be32n = (n) => { a.pick(n).push(32).op(OP.NUM2BIN, 2, 'b').op(OP.REVERSEBYTES, 1, n + 'BE'); };
   a.pushBytes(Buffer.from('gamma')); be32n('zeta'); a.op(OP.CAT, 2, 'h').pick('X').push(64).op(OP.SPLIT, 2, 'lam', 'x').drop('x').op(OP.CAT, 2, 'h');
   a.pick('PROOF').push(192).op(OP.SPLIT, 2, 'lro', 'x').drop('x').op(OP.CAT, 2, 'h');
-  a.roll('GV').push(5).op(OP.SPLIT, 2, 'x', 's12').drop('x').push(128).op(OP.SPLIT, 2, 's12', 'x').drop('x').op(OP.CAT, 2, 'h');
+  a.pick('GV', 's12').push(5).op(OP.SPLIT, 2, 'x', 's12').drop('x').push(128).op(OP.SPLIT, 2, 's12', 'x').drop('x').op(OP.CAT, 2, 'h');
+  if (m > 0) a.pick('GV', 'qv').push(5 + 512).op(OP.SPLIT, 2, 'x', 'qv').drop('x').op(OP.CAT, 2, 'h'); // digests .. S1 S2 Qcp_j (the GV tail)
+  a.drop('GV');
   be32n('r0'); a.op(OP.CAT, 2, 'h').pick('PROOF').push(384).op(OP.SPLIT, 2, 'x', 'ev').drop('x').push(160).op(OP.SPLIT, 2, 'ev', 'x').drop('x').op(OP.CAT, 2, 'h');
+  if (m > 0) a.pick('PROOF').push(768).op(OP.SPLIT, 2, 'x', 'qe').drop('x').push(32 * m).op(OP.SPLIT, 2, 'qe', 'x').drop('x').op(OP.CAT, 2, 'h'); // claimed qcp_j(zeta)
   a.pick('PROOF').push(608).op(OP.SPLIT, 2, 'x', 'zub').drop('x').push(32).op(OP.SPLIT, 2, 'zub', 'x').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'vRaw');
   a.pick('vRaw').invoke('BMR', ['v']);
-  a.pushBytes(Buffer.from('u')).roll('vRaw').op(OP.CAT, 2, 'h').pick('PROOF').push(640).op(OP.SPLIT, 2, 'x', 'ww').drop('x').op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'uRaw');
+  a.pushBytes(Buffer.from('u')).roll('vRaw').op(OP.CAT, 2, 'h').pick('PROOF').push(640).op(OP.SPLIT, 2, 'x', 'ww').drop('x');
+  if (m > 0) a.push(128).op(OP.SPLIT, 2, 'ww', 'x').drop('x'); // W_zeta || W_zetaOmega only
+  a.op(OP.CAT, 2, 'h').op(OP.SHA256, 1, 'uRaw');
   a.pick('uRaw', 'ub').push(8).op(OP.SPLIT, 2, 'b1', 'ub').roll('b1').pushBytes([0]).op(OP.CAT, 2, 'b').op(OP.BIN2NUM, 1, 'u1');
   a.roll('ub').push(8).op(OP.SPLIT, 2, 'b2', 'ub').roll('b2').pushBytes([0]).op(OP.CAT, 2, 'b').op(OP.BIN2NUM, 1, 'u2');
   a.roll('ub').pushBytes([0]).op(OP.CAT, 2, 'b').op(OP.BIN2NUM, 1, 'tp');
@@ -357,12 +379,13 @@ function statement(a, vk, plan, call) {
   { const kk = new Kernel(); const E = (n) => kk.env(n), M = (x) => kk.modr(x), mul = (x, y) => kk.mul(x, y), add = (x, y) => kk.add(x, y), sub = (x, y) => kk.sub(x, y), c = (v) => kk.c(v);
     const canon = (x) => M(add(M(x), E('r')));
     const v = E('v'), tp = E('tp'), u = M(add(E('u1'), mul(c(GLV.lambda), E('u2')))), nt = sub(c(0n), tp);
-    const vs = [c(1n), v]; for (let i = 2; i < 6; i++) vs.push(M(mul(vs[i - 1], v)));
-    const e = M(kk.sum(E('r0'), mul(v, E('l')), mul(vs[2], E('rr')), mul(vs[3], E('o')), mul(vs[4], E('s1')), mul(vs[5], E('s2'))));
+    const vs = [c(1n), v]; for (let i = 2; i < 6 + m; i++) vs.push(M(mul(vs[i - 1], v)));
+    const e = M(kk.sum(E('r0'), mul(v, E('l')), mul(vs[2], E('rr')), mul(vs[3], E('o')), mul(vs[4], E('s1')), mul(vs[5], E('s2')), ...Array.from({length: m}, (_, j) => mul(vs[6 + j], E('qcp' + j)))));
     const zh = E('zh'), zn2 = E('zn2'), zz = M(mul(zh, zn2));
     const S = {Ql: mul(nt, E('l')), Qr: mul(nt, E('rr')), Qm: mul(nt, M(mul(E('l'), E('rr')))), Qo: mul(nt, E('o')), Qk: nt, S3: mul(nt, E('s1c')), Z: add(mul(nt, E('s2c')), u),
       H0: mul(tp, zh), H1: mul(tp, zz), H2: mul(tp, M(mul(zz, zn2))), Lam: add(c(1n), tp), L: v, R: vs[2], O: vs[3], S1: vs[4], S2: vs[5],
       G: sub(c(0n), add(e, M(mul(u, E('zu'))))), Wz: E('zeta'), Wzw: mul(M(mul(u, E('zeta'))), c(vk.omega))};
+    for (let j = 0; j < m; j++) { S['Bsb' + j] = mul(nt, E('qcp' + j)); S['Qcp' + j] = vs[6 + j]; }
     kk.output(...names.slice(0, nbm).map((nm) => kk.add(canon(S[nm]), E('Cdig'))));
     a.kernel(kk, names.slice(0, nbm).map((_, q) => 'sc' + q), {iters: 3000}); }
   a.drop('Cdig');

@@ -6,6 +6,9 @@ verifier departs from gnark v0.16.4's `plonk.Verify`:
 2. the batching scalar u = u1 + λ·u2;
 3. the today's-rules chain (`multi.mjs`).
 
+Track 7 extends the scope of the **single-input build** to VKs with one BSB22 commitment (`api.Commit`); §8 says what
+the commitment adds. The chain is still m = 0 only.
+
 Everything else reduces to gnark PLONK soundness. The numbers below are checked by
 [`soundness/lattice.mjs`](soundness/lattice.mjs) (`node soundness/lattice.mjs`).
 
@@ -21,38 +24,44 @@ File references are to this directory: `plonk.mjs` (value-level verifier), `scri
   [τ]_2 = τ·[1]_2. τ exists as a fixed constant; nobody needs to know it for the argument.
 - φ(x, y) = (β·x, y) is the G1 endomorphism with φ = [λ], λ² + λ + 1 ≡ 0 (mod r). The pair (β, λ) is the one in
   `math.mjs:138-146` (re-checked by the script).
-- **Scope.** The VK has no BSB22 commitments (`Qcp` empty, no `api.Commit`), and k ≥ 1 public inputs is the tested
-  case. The references are gnark v0.16.4 and gnark-crypto v0.21.1-0.20260913224755-1409fe592052.
+- **Scope.** k ≥ 1 public inputs is the tested case. The VK has m BSB22 commitments: m = 0 for the chain
+  (`multi.mjs`), m ∈ {0, 1} for the single-input build (`script.mjs`; m = 1 is §8, tested on `range64` and
+  `merkle16rc`). m ≥ 2 is built by the same code but not tested, and §8 states an extra length condition for it. The references are gnark v0.16.4 and gnark-crypto v0.21.1-0.20260913224755-1409fe592052.
 - H = SHA-256. Q is the total number of H evaluations, including those made while checking the adversary's output.
 - `LE(b)` / `BE(b)` is the unsigned integer of the bytes b, read little- / big-endian. In script, the LE path is
   `SPLIT`, then `CAT 0x00`, then `BIN2NUM`, which gives exactly the unsigned value. The BE path (`DBP`/`DBR`, `BMR`)
-  first applies `REVERSEBYTES`, then does the same (`script.mjs:83, :89`; `multi.mjs:77, :82`).
+  first applies `REVERSEBYTES`, then does the same (`script.mjs:84, :90`; `multi.mjs:77, :82`).
 
-**Hash inputs, exactly as implemented.** "PROOF" is the 768-byte proof, in the FORMAT.md layout. "X[0..64)" is Λ' as
-gnark raw bytes (BE x ‖ BE y).
+**Hash inputs, exactly as implemented.** "PROOF" is the 768 + 96m-byte proof, in the FORMAT.md layout. "X[0..64)" is Λ' as
+gnark raw bytes (BE x ‖ BE y). The rows show m = 0; the BSB22 changes (m ≥ 1, single input only) are in brackets and in §8.
 
 | query | input bytes (length) | value used | single input | chain (ST / SI) | reference |
 |---|---|---|---|---|---|
-| q_γ | `"gamma"` ‖ VK S1..Qk (512) ‖ PI ‖ PROOF[0,192) (709 + 32k) | γ = BE mod r | script.mjs:132 | multi.mjs:320 | plonk.mjs:64 |
-| q_β | `"beta"` ‖ γRaw (36) | β | :133 | :321 | :65 |
-| q_α | `"alpha"` ‖ βRaw ‖ PROOF[544,608) (101) | α | :134 | :322 | :65 |
-| q_ζ | `"zeta"` ‖ αRaw ‖ PROOF[192,384) (228) | ζ | :135 | :323 | :65 |
-| q_v | `"gamma"` ‖ BE32(ζ) ‖ X[0,64) ‖ PROOF[0,192) ‖ VK S1 ‖ S2 ‖ BE32(r0) ‖ PROOF[384,544) ‖ PROOF[608,640) (645) | v = BE mod r | :171-176 | :346-351 | :94 |
-| q_u | `"u"` ‖ vRaw ‖ PROOF[640,768) = Wζ ‖ Wζω (161) | u1 = LE uRaw[0,8), u2 = LE uRaw[8,16), t' = LE uRaw[16,32) | :177-180 | :352-355 | :98-99 |
-| q_h0 | TAG `"PLONKKZG-SI/1"` ‖ uRaw ‖ WS (13 + 32 + 6,528) | h0 | :291 | :395 (uRaw from G0[0,32), :392) | si.mjs:64 |
-| q_ρ | h0 ‖ `"rho"` (35) | ρ = LE mod p | :292, :301 | :396, :401 | |
-| q_z | h0 ‖ ρRaw ‖ WQ (64 + 32·n_q) | z = LE mod p, z ≠ 0 | :297, :300 | :397, :400 | |
+| q_γ | `"gamma"` ‖ VK S1..Qk (512) [‖ Qcp_0..Qcp_{m−1} (64m)] ‖ PI ‖ PROOF[0,192) (709 + 64m + 32k) | γ = BE mod r | script.mjs:135 | multi.mjs:320 | plonk.mjs:85 |
+| q_β | `"beta"` ‖ γRaw (36) | β | :136 | :321 | :86 |
+| q_α | `"alpha"` ‖ βRaw [‖ PROOF[768+32m, 768+96m) = Bsb22_0.. (64m)] ‖ PROOF[544,608) (101 + 64m) | α | :137-139 | :322 | :86 |
+| q_ζ | `"zeta"` ‖ αRaw ‖ PROOF[192,384) (228) | ζ | :140 | :323 | :86 |
+| q_b0, q_b1, q_b2 (per commitment j; §8) | 0^64 ‖ Bsb22_j ‖ 00 30 00 ‖ DST' (143); b0 ‖ 01 ‖ DST' (45); (b0 ⊕ b1) ‖ 02 ‖ DST' (45) | hc_j = BE(b1 ‖ b2[0,16)) mod r | :149-154 | not built | plonk.mjs:30-32, :97 |
+| q_v | `"gamma"` ‖ BE32(ζ) ‖ X[0,64) ‖ PROOF[0,192) ‖ VK S1 ‖ S2 [‖ Qcp_j] ‖ BE32(r0) ‖ PROOF[384,544) [‖ PROOF[768, 768+32m) = qcp_j(ζ)] ‖ PROOF[608,640) (645 + 96m) | v = BE mod r | :190-197 | :346-351 | :119 |
+| q_u | `"u"` ‖ vRaw ‖ PROOF[640,768) = Wζ ‖ Wζω (161) | u1 = LE uRaw[0,8), u2 = LE uRaw[8,16), t' = LE uRaw[16,32) | :198-203 | :352-355 | :123-124 |
+| q_h0 | TAG `"PLONKKZG-SI/1"` ‖ uRaw ‖ WS (13 + 32 + 6,528) | h0 | :316 | :395 (uRaw from G0[0,32), :392) | si.mjs:64 |
+| q_ρ | h0 ‖ `"rho"` (35) | ρ = LE mod p | :317, :326 | :396, :401 | |
+| q_z | h0 ‖ ρRaw ‖ WQ (64 + 32·n_q) | z = LE mod p, z ≠ 0 | :322, :325 | :397, :400 | |
 
 q_v is gnark-crypto `deriveGamma`: the transcript named "gamma", binding ζ, the digests [Λ', L, R, O, S1, S2], the claimed
 values [r0, l, r, o, s1, s2] and `zu.Marshal()`. With Λ' = Λ, this is byte-for-byte gnark's v (`verify.go` FoldProof call).
 Every query type has a distinct length (709 + 32k ≥ 741 for k ≥ 1; 32·n_q + 64 ≡ 0 mod 32 matches none of the others).
+With one commitment (m = 1) the lengths are γ 773 + 32k, α 165, v 741, b0 143 and b1 = b2 = 45; they are still pairwise
+distinct from each other and from the m = 0 types, and q_b1 / q_b2 differ in byte 32 (0x01 / 0x02). For m ≥ 3 the γ and v
+lengths coincide when k = m − 2 (§8).
 So the type of a query, and the positions of the earlier digests inside it, follow from its length.
 
-**The MSM scalars** (`plonk.mjs:102-104`, `script.mjs:186-192`, `multi.mjs:359-365`) give, with X_1..X_5 = L, R, O, S1,
-S2, z̄ = z(ζω) and Λ = gnark's linearised commitment (PROTOCOL.md step 4, `plonk.mjs:85-87`):
+**The MSM scalars** (`plonk.mjs:127-130`, `script.mjs:209-216`, `multi.mjs:359-365`) give, with X_1..X_5 = L, R, O, S1,
+S2 (and X_{6+j} = Qcp_j when m ≥ 1), z̄ = z(ζω) and Λ = gnark's linearised commitment (PROTOCOL.md step 4, plus
+Σ_j qcp_j(ζ)·Bsb22_j when m ≥ 1; `plonk.mjs:107-111`):
 
   P* = Σ_q S_q·B_q = F + (1 + t')·(Λ' − Λ),
-  F  = D − e·[1]_1 + ζ·Wζ + u·(Z − z̄·[1]_1 + ζω·Wζω),   D = Λ + Σ_{i=1..5} vⁱ·X_i,
+  F  = D − e·[1]_1 + ζ·Wζ + u·(Z − z̄·[1]_1 + ζω·Wζω),   D = Λ + Σ_{i=1..5+m} vⁱ·X_i,
   P_R = −(Wζ + u1·Wζω + u2·φ(Wζω)) = −(Wζ + u·Wζω).
 
 Here F is gnark's folded KZG point, computed with the true Λ but with v taken from q_v, which hashed Λ'. The final
@@ -95,9 +104,9 @@ in `BatchVerifyMultiPoints`. Here π̃ is π with `ClaimedValues[0] := r0`. Equi
   The baked constants (VK points, TF blob, both G2 line chains, the SI schedule) equal their definitions; the build
   asserts them against noble. This is tested, not proved (README "Not verified"). Given A4, the curve operations are
   exact:
-  - an affine add requires x2 ≠ x1 and λ(x2 − x1) = y2 − y1 (`script.mjs:95`);
-  - an affine doubling requires 2yλ = 3x², with y ≠ 0 on G1 (`:96`);
-  - Jacobian exceptional steps end at Z = 0, which is absorbing, and every conversion checks Z·zi = 1 (`:99`);
+  - an affine add requires x2 ≠ x1 and λ(x2 − x1) = y2 − y1 (`script.mjs:96`);
+  - an affine doubling requires 2yλ = 3x², with y ≠ 0 on G1 (`:97`);
+  - Jacobian exceptional steps end at Z = 0, which is absorbing, and every conversion checks Z·zi = 1 (`:100`);
   - the TV entries satisfy exact chord/tangent equations with Δx ≠ 0 (`multi.mjs:96-103`);
   - the digit offsets keep s' < 2^255 = 32^51 and u_i' < 2^70 (script);
   - so an accepted MSM equals Σ S_q·B_q exactly. P* and P_R are finite, affine G1 points.
@@ -119,7 +128,7 @@ in `BatchVerifyMultiPoints`. Here π̃ is π with `ClaimedValues[0] := r0`. Equi
     (`math.mjs:92`, `si.mjs:57`). A product of nonzero polynomials is nonzero. The states are monic of degree 6.
   - **The degree and the quotient cap** come from this build's schedule (`si.mjs:18-21`), as listed below. The cap is
     enforced: exactly 60 words in the chain (size pinned in `multi.mjs:229`), 1–60 words in the single-input build
-    (`script.mjs:293-296`). Every word is < p.
+    (`script.mjs:318-321`). Every word is < p.
 
   Fix the input of q_h0. This fixes P*, P_R, S_c and
   S_1..S_33. If FE(Miller(P*, [1]_2)·Miller(P_R, [τ]_2)) ≠ 1, the SI checks pass with probability at most
@@ -166,7 +175,7 @@ uRaw[16,32), (E) holds with probability at most 2^-128.
 
 *Proof.*
 - t' = LE(uRaw[16,32)) is uniform on [0, 2^128) and independent of uRaw[0,16), because the byte ranges are disjoint
-  (`script.mjs:178-180`).
+  (`script.mjs:201-203`).
 - With δ ≠ 0, (E) says 1 + t' ≡ −(A0 + u·A1)·δ⁻¹ (mod r), which is one residue class.
 - 1 + t' ranges over [1, 2^128], and 2^128 < r ≈ 2^253.6, so these values are pairwise distinct mod r.
 - So at most one t' satisfies (E). ∎
@@ -215,7 +224,7 @@ Q·2^-128.
 - gnark's other checks also hold:
   - subgroup: on-curve with cofactor 1, and the identity is rejected here, which is stricter;
   - `constLin == ClaimedValues[0]`: ClaimedValues[0] := r0;
-  - the public-input Lagrange terms: the batch inverse is checked (`script.mjs:149,165`).
+  - the public-input Lagrange terms: the batch inverse is checked (`script.mjs:168,184`).
 - So (x, π̃) is gnark-valid.
 
 Our batching therefore replaces gnark's batching error (1/r for a uniform scalar) by 2^-128 per hash query. KZG's own
@@ -351,3 +360,60 @@ has no B3 targets except R, and the same bound applies.
   nonzero leading word. A6's degree bound uses only the 60-word cap, so the difference is malleability, not soundness.
 - **Formula correctness (A4) remains an assumption.** It is tested by the valid, tampered and adaptive vectors. It is
   not proved.
+
+## 8. BSB22 commitments (Track 7): what one commitment adds
+
+The single-input build accepts VKs with m commitments (PROTOCOL.md "BSB22 commitments" of the prover track has the
+byte-level delta). This section states what changes in the argument above for m = 1, the tested case.
+
+**What the verifier computes.** Relative to m = 0, five things are added, each byte-exact with gnark's `Verify`:
+1. Qcp_j in q_γ and in q_v, Bsb22_j in q_α, qcp_j(ζ) in q_v (table in §0).
+2. Decoding: qcp_j(ζ) < r (`script.mjs:123`); Bsb22_j canonical and on the curve (`:124, :129`), so it is in G1.
+3. hc_j = HTF(Bsb22_j) with gnark's default hash-to-field (q_b0..q_b2, `:146-154`).
+4. PI(ζ) += hc_j · L_{k+cci_j}(ζ), with ζ − ω^{k+cci_j} in the same checked batch inverse (`:166-171`). The build
+   asserts that the k + m Lagrange points are distinct (`plonk.mjs:52`).
+5. Two MSM bases: Bsb22_j with scalar −t'·qcp_j(ζ) (its term of Λ, folded like the others) and Qcp_j with v^{6+j} (its
+   term of D) (`script.mjs:216`). So P* = F + (1 + t')·(Λ' − Λ) holds with the m = 1 definitions of Λ, D and e.
+
+Equivalence with gnark is tested, not proved (A4): on all 10 valid m = 1 proofs, r0 equals gnark's `ClaimedValues[0]` and
+hc_0 equals gnark-crypto's `hash_to_field` output computed in Go; all 177 tampered m = 1 vectors are rejected by
+`verify.mjs`, and the 91 that gnark's structs can hold are also rejected by gnark's `Verify`.
+
+**Changes to the assumptions.**
+- **A1 (ROM)** now also covers the hash-to-field: HTF(P) = BE(b1 ‖ b2[0,16)) mod r, built from three SHA-256 calls. In the
+  ROM, b1 ‖ b2[0,16) is 48 uniform bytes for each fresh P (b1 and b2 are outputs of distinct queries: their inputs differ
+  in byte 32). Reducing a uniform 384-bit value mod r leaves a statistical distance below r/2^384 ≈ 2^-130 from uniform on
+  Z_r. So HTF is a random oracle into Z_r, up to Q·2^-130 in total. That is the RFC 9380 design target. **The hash-to-field
+  is treated as a random oracle**; the argument does not open its internals beyond that.
+- **A2 (PLONK)** becomes ε_PLONK+BSB22(Q): gnark's PLONK *with* its BSB22 custom gate and that hash-to-field, under
+  gnark's Fiat–Shamir. The commitment gate (Belling–Soleimanian–Bégassat 2022, "BSB22"; not re-read here) needs:
+  - **The commitment is binding** before the in-circuit challenge exists. Bsb22_j is a KZG commitment to Pi_j, binding
+    under q-DLOG / AGM like every other commitment, and gnark makes it hiding with a random value at the commitment
+    row, where qcp_j = 0.
+  - **The challenge is a random oracle of the commitment.** hc_j = HTF(Bsb22_j) is fixed once Bsb22_j is, and the
+    prover cannot choose it. The gate places it as the committed wire's value at row k + cci_j: in the verifier,
+    through the public-input polynomial.
+  - **The commitment is opened through the batched KZG check.** Pi_j is never opened on its own. It enters the
+    linearised commitment as qcp_j(ζ)·[Bsb22_j], so A0 = 0 (the batched opening of D at ζ, §0) checks the gate
+    identity with the qcp_j·Pi_j term. The claimed qcp_j(ζ) is checked by the same batched opening, with the fold
+    weight v^{6+j} on [Qcp_j]. Bsb22_j is also bound into α and qcp_j(ζ) into v, so every later challenge depends on them.
+  This is an assumption about gnark's construction, exactly as A2 is for the m = 0 case. It is not proved here.
+
+**Changes to the lemmas.**
+- **Lemma 0.** Q now counts the htf queries too (3 per commitment per verification); the bounds are in Q and do not
+  change form. The ordering claim covers the main chain: Bsb22_j is in the q_α input and qcp_j(ζ) in the q_v input, so
+  the q_u input still fixes x, PROOF (all 864 bytes) and Λ' before uRaw. hc_j is a function of Bsb22_j alone. The htf
+  queries are not in the ordering chain: no main-chain query hashes their outputs. B1 and B2 range over all queries,
+  htf ones included, so their bounds also exclude the collisions between them and the main chain.
+- **Lemma 1** (t'-fold) and **Lemma 2** (u batching) are unchanged. They are statements about (E), with A0, A1 and δ
+  defined from Λ, D and e. The m = 1 terms only change what Λ, D and e are, and the fixed q_u input still fixes them.
+- **Lemma 3** (chain) does not cover m ≥ 1: the chain was not extended (README "BSB22", the today's-rules estimate).
+- **Theorem.** For m = 1, single input: Pr[accepted ∧ x ∉ L_vk] ≤ ε_PLONK+BSB22(Q) + Q·2^-128 + Q·2^-246.05 +
+  Q²·2^-252.09 (+ 8Q·2^-256) + Q·2^-130. The last term is the htf bias, and it is dominated by the Q·2^-128 term.
+
+**Completeness.** gnark's `Verify` accepts Bsb22_j at infinity; this verifier rejects it. An honest commitment is
+uniformly distributed (the random value at the commitment row), so this costs completeness with probability 1/r per proof.
+
+**m ≥ 2, untested.** The code is generic in m, but two conditions are not checked by the build:
+- the length typing of §0 needs k ≠ m − 2 (otherwise q_γ and q_v have the same length);
+- every Lagrange point must be distinct. The build asserts this; gnark guarantees it for its own keys.
