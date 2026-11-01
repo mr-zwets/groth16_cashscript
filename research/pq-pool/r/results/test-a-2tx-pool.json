@@ -1,0 +1,536 @@
+{
+ "plan": "2tx",
+ "harness": false,
+ "files": 26,
+ "cases": 4977,
+ "unexpected": 0,
+ "na": 26,
+ "refused": 0,
+ "encoderOnly": 55,
+ "malformed": 200,
+ "families": {
+  "valid": {
+   "cases": 26,
+   "chainReject": 0,
+   "accept": 26,
+   "unexpected": 0
+  },
+  "cap": {
+   "cases": 419,
+   "chainReject": 419,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "ood": {
+   "cases": 229,
+   "chainReject": 229,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "random": {
+   "cases": 122,
+   "chainReject": 122,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "pow": {
+   "cases": 78,
+   "chainReject": 78,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "final": {
+   "cases": 145,
+   "chainReject": 145,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "row": {
+   "cases": 129,
+   "chainReject": 129,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "salt": {
+   "cases": 129,
+   "chainReject": 129,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "sibling": {
+   "cases": 128,
+   "chainReject": 128,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "count": {
+   "cases": 116,
+   "chainReject": 90,
+   "accept": 0,
+   "unexpected": 0,
+   "encoderOnlyRelabel": 26
+  },
+  "fri_value": {
+   "cases": 55,
+   "chainReject": 55,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "truncate": {
+   "cases": 47,
+   "chainReject": 47,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "extend": {
+   "cases": 35,
+   "chainReject": 6,
+   "accept": 0,
+   "unexpected": 0,
+   "encoderOnlyRelabel": 29
+  },
+  "noncanon": {
+   "cases": 44,
+   "chainReject": 44,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "statement": {
+   "cases": 321,
+   "chainReject": 321,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "other_vk": {
+   "cases": 6,
+   "chainReject": 2,
+   "accept": 4,
+   "unexpected": 0
+  },
+  "tx": {
+   "cases": 104,
+   "chainReject": 104,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "root": {
+   "cases": 78,
+   "chainReject": 78,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "nf": {
+   "cases": 86,
+   "chainReject": 56,
+   "accept": 30,
+   "unexpected": 0
+  },
+  "ring": {
+   "cases": 78,
+   "chainReject": 78,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "windex": {
+   "cases": 130,
+   "chainReject": 130,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "commit": {
+   "cases": 104,
+   "chainReject": 104,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "out0": {
+   "cases": 208,
+   "chainReject": 182,
+   "accept": 26,
+   "unexpected": 0
+  },
+  "wonly": {
+   "cases": 52,
+   "chainReject": 52,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "constants": {
+   "cases": 702,
+   "chainReject": 702,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "input": {
+   "cases": 624,
+   "chainReject": 624,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "graph": {
+   "cases": 208,
+   "chainReject": 208,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "mix": {
+   "cases": 156,
+   "chainReject": 156,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "control": {
+   "cases": 2,
+   "chainReject": 0,
+   "accept": 2,
+   "unexpected": 0
+  },
+  "thread": {
+   "cases": 416,
+   "chainReject": 416,
+   "accept": 0,
+   "unexpected": 0
+  }
+ },
+ "list": [],
+ "skippedFiles": [
+  "m1-t9-0-Z128.json: cap height 0 (layout a' is the cap-5 deployment)",
+  "m1-t9-1-Z128.json: cap height 0 (layout a' is the cap-5 deployment)"
+ ],
+ "encoderOnlyRelabel": 55,
+ "noop": 18,
+ "noopList": [
+  "m1-t9-0-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-1-Z128_cap5.json)",
+  "m1-t9-0-Z128_cap5-seed2.json: statement: ROOT of another tree (foreign/stale; from m1-t9-1-Z128_cap5.json)",
+  "m1-t9-10-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-11-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-12-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-13-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-14-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-15-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-1-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-1-Z128_cap5-seed2.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-2-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-3-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-4-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-5-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-6-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-7-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-8-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)",
+  "m1-t9-9-Z128_cap5.json: statement: ROOT of another tree (foreign/stale; from m1-t9-0-Z128_cap5.json)"
+ ],
+ "documented": [
+  {
+   "file": "m1-t9-0-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-0-Z128_cap5-seed2.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-10-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-11-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-12-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-13-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-14-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-15-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-16-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-17-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-18-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-19-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-1-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-1-Z128_cap5-seed2.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-20-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-21-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-22-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-23-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-2-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-3-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-4-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-5-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-6-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-7-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-8-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  },
+  {
+   "file": "m1-t9-9-Z128_cap5.json",
+   "name": "a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN",
+   "rInputs": [
+    "accept",
+    "accept",
+    "accept",
+    "accept",
+    "accept"
+   ],
+   "slotInput": "accept"
+  }
+ ]
+}

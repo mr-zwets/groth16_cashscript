@@ -263,7 +263,7 @@ function poolCases(vk, plan, v, file, dir, base, payouts) {
   run('ring', 'W: ring path of the other epoch slot (ROOT is in the ring, wrong slot)', {state: G0, wT: {slot: 1 - note.slot}}, {rejecter: 'W', others: 'accept'});
   run('ring', 'W: ring slot 2 (an empty slot, Z)', {state: G0, wT: {slot: 2}}, {rejecter: 'W', others: 'accept'});
   if (T8DIR) {
-    const k = +file.match(/-(\d+)-Z128_cap5\.json$/)[1];
+    const k = +file.match(/-(\d+)-Z128_cap5(?:-seed2)?\.json$/)[1];
     const t8 = `${T8DIR}/m1-s7-${k}-Z128_cap5.json`;
     if (existsSync(t8)) {
       const ov = readVector(t8), op = ov.public_values.flat().map(BigInt);

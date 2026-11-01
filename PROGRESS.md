@@ -38,3 +38,21 @@ Design: zk-verifier-bench research/pq-pool/DESIGN-T9.md (maintainer decisions: s
   depth-30 tree, ring slots 0/1, epoch 2. S2 needs a prover witness input for given nk, r, index, siblings.
 - BCHN v29.1.0 regtest (fresh POLICY=1 node work/pool/bchn/bchn-t9s1q, stopped): 4 withdrawals (genesis, 1,000 spent,
   90.6% worst, 64 siblings) allowed at default policy and mined (loops, shifts, P2SH32 token covenant).
+
+## S2 — pool R + re-proved M1 statements: DONE (acceptance PASS)
+
+- Code and results: research/pq-pool/r/ (README.md), prover copy research/pq-pool/prover (explicit witness case
+  m1@LEAF@0@CTX@WIT; circuit unchanged), vectors/S2 (3 committed; 24 + 4 in work/pool/cache/s2).
+- R changes: ROOT a HEAD push before NF (lanes < p in HEAD/CODE/FIN; DAG reads it), CTX over outputs[1..] (count
+  n-1; >= 1 payout needed), final tx graph = 5 R inputs + W at index 5 (R checks its locking != R; does not pin W);
+  final HEAD thread rules skip input 5 and output 0 (output 0 must not carry the thread category). R is now
+  statement-independent: one (R, W) pair for all 24 statements (R 118 B, SHA-256 6cde4a7e..830a; W 499 B).
+- 24 statements on genesis notes 0-23: every vector's ROOT/NF/CTX equals the note's (JS Poseidon2 genesis = Rust).
+- grade (libauth BCH 2026, today's rules, BCHN-adjusted): 2tx+W 24/24, 91,183 + 41,457 = 132,640 B (+1,084 vs T8),
+  QRY max 91.1%, W 645 B / 0.234M / 42.7%. 1tx+W measured: 24/24 at 99,594 B (406 B margin at the empty set;
+  overflows once the SMT path grows ~400 B, a few thousand spends) — not a deliverable (decision 3).
+- Sweeps: production 2tx+W 4,977 cases 0 unexpected (all T8 S7 families + nf/ring/windex/commit/out0/wonly);
+  harness 2,387 cases 0 unexpected (= T8 S7 totals). 18 no-op tampers skipped (S3 'foreign ROOT' from a same-epoch
+  vector = same ROOT). Documented: a non-W input at the W slot passes R (no pool funds move; consumes the thread NFT
+  without NF insert); pinning W's category in R would close it (no cycle) — maintainer call.
+- Not done: BCHN (S3); conflicting txs only shown as two valid tx1 on one W outpoint (mempool test is S3).
