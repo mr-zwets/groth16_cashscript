@@ -82,7 +82,8 @@ reviews.
 - **Cost: R is pool specific.**
   - Each pool has its own R (one more 46 B check in a code blob; R stays 118 B), its own HR in W, and its own R carrier
     UTXOs for relayers.
-  - tx0 and tx1 each grow by 46 B, and BCHN's per-input OP_DEFINE charge by 46 B.
+  - tx0 and tx1 each grow by 46 B, and BCHN's per-input OP_DEFINE charge by 92 B (37,790 to 37,882: the 46 B count in the
+    function body and again in the code blob that defines it).
   - Proofs are not pool specific.
 - **Tests.** S2's `documented` case is now the `wpin` family (78 cases, 0 unexpected; HEAD rejects, others accept):
   - a non-W input;

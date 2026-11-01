@@ -195,7 +195,8 @@ its commitment starts with 0x57.
 - `makePlanA(..., {w: true, wCategory})` sets the category. Its default is S1's test category, and `programA`'s cache
   keys on it.
 - **R is now pool specific.** That costs 46 B in a code blob: tx0 and tx1 each grow by 46 B, and every R input's
-  OP_DEFINE bytes go from 37,790 to 37,836. R stays 118 B. Proofs are unchanged.
+  OP_DEFINE bytes go from 37,790 to 37,882 (+92: BCHN charges the 46 B twice, once in the role function's body and
+  once in the code blob that defines it). R stays 118 B. Proofs are unchanged.
 - There is no hash cycle. CAT is a genesis outpoint txid, fixed before R, W and D are built.
 
 **Re-run** (`../rerun-s4.sh`, the same S2 vectors and case files; results in `results/s4rerun/`; the S2 results above
