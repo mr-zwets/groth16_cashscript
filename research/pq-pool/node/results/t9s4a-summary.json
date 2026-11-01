@@ -1,0 +1,254 @@
+{
+ "setup": {
+  "ev": "setup",
+  "node": "t9s4a",
+  "subversion": "/Bitcoin Cash Node:29.1.0(EB32.0)/",
+  "threadCategory": "8cf1b6c68e9fef3c51a2fdb4aec01268c8265874af406ecd12cc602ba90d23e1",
+  "poolCategory": "a1749ade475b6c38ec09f78f05e1fce4422d2deafce9e3416c4ba8b57d0eb65c",
+  "R": "51ca537f7c034d5a2588025a257f7576a820e669eb7ff2810e8f9b0eeee2932bc9befa76926f2374d142c607727b013e7e678802df038952ca537f7c034d6125880261257f7576a8202833782bf3562bfc08f46b2163b9178cb6081342ebbd810fb81e5735eacda2358802e0038902df038a02e0038a",
+  "Rbytes": 118,
+  "Rsha256": "ea625b63168cf7bd584682b7be2adc7948d16b9b3c33791650d842e86fd8f056",
+  "nIn": 6,
+  "wIdx": 5,
+  "Dredeem": 291,
+  "Wredeem": 671,
+  "flushBlob": 2209,
+  "workerBlob": 7725,
+  "worker": "74539d76aa20b858998f622344d0635ce1188f76c9e56fbf5ca82667cb26e652c18755ce83f9885189518a",
+  "D": "1000000",
+  "PHI": "50000",
+  "FEE": "10000"
+ },
+ "genesis": {
+  "ok": true,
+  "txid": "55e23da4cebccf88040c8757a072cecaa3d4798da3e27ed3a68ca1419e3f7fbb",
+  "bytes": 389,
+  "tmaAllowed": true,
+  "noMintingNft": true,
+  "tokenOutputs": [
+   {
+    "n": 0,
+    "capability": "mutable",
+    "commitment": "44"
+   },
+   {
+    "n": 1,
+    "capability": "mutable",
+    "commitment": "57"
+   }
+  ]
+ },
+ "deposits": {
+  "rounds": 17,
+  "ok": 17,
+  "txs": 272,
+  "bytes": [
+   645,
+   645
+  ],
+  "allTmaAllowed": true
+ },
+ "flushes": {
+  "n": 17,
+  "ok": 17,
+  "rootEqualsOffline": 17,
+  "bytes": [
+   42127,
+   42129
+  ],
+  "maxInputPct": [
+   90.51,
+   91.08
+  ],
+  "rate": [
+   1.187,
+   1.187
+  ],
+  "tmaAllowed": 17,
+  "per": [
+   "D-flush:ok:20.56",
+   "1:ok:8.32",
+   "worker:ok:87.88",
+   "worker:ok:90.51",
+   "worker:ok:90.19",
+   "worker:ok:65.84"
+  ]
+ },
+ "proofs": [
+  {
+   "note": 3,
+   "root": 0,
+   "ms": 5575,
+   "bytes": 73744,
+   "publicValuesMatch": true
+  },
+  {
+   "note": 20,
+   "root": 1,
+   "ms": 3018,
+   "bytes": 74928,
+   "publicValuesMatch": true
+  },
+  {
+   "note": 5,
+   "root": 0,
+   "ms": 3637,
+   "bytes": 75696,
+   "publicValuesMatch": true
+  },
+  {
+   "note": 9,
+   "root": 0,
+   "ms": 2464,
+   "bytes": 76208,
+   "publicValuesMatch": true
+  },
+  {
+   "note": 9,
+   "root": 16,
+   "ms": 2626,
+   "bytes": 75824,
+   "publicValuesMatch": true
+  }
+ ],
+ "withdrawals": [
+  {
+   "label": "note3@root0",
+   "expect": "accept",
+   "ok": true,
+   "bytes": [
+    91229,
+    41675
+   ],
+   "maxPct": 91.1,
+   "W": {
+    "role": "W",
+    "ok": true,
+    "pct": 35.14,
+    "within": true
+   },
+   "tma": [
+    true,
+    true
+   ]
+  },
+  {
+   "label": "note20@root1",
+   "expect": "accept",
+   "ok": true,
+   "bytes": [
+    91229,
+    41707
+   ],
+   "maxPct": 90.96,
+   "W": {
+    "role": "W",
+    "ok": true,
+    "pct": 33.68,
+    "within": true
+   },
+   "tma": [
+    true,
+    true
+   ]
+  },
+  {
+   "label": "note5@root0, epoch 16",
+   "expect": "accept",
+   "ok": true,
+   "bytes": [
+    91229,
+    41739
+   ],
+   "maxPct": 91.06,
+   "W": {
+    "role": "W",
+    "ok": true,
+    "pct": 33.19,
+    "within": true
+   },
+   "tma": [
+    true,
+    true
+   ]
+  },
+  {
+   "label": "note9@root0, epoch 17 (slot 0 overwritten)",
+   "expect": "reject",
+   "ok": true,
+   "maxPct": 90.95,
+   "W": {
+    "role": "W",
+    "ok": false,
+    "err": "Program failed an OP_VERIFY operation.",
+    "pct": 6.02,
+    "within": true
+   },
+   "tma": [
+    true,
+    false
+   ],
+   "reject": {
+    "libauth": "W: Program failed an OP_VERIFY operation.",
+    "tma": "16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)",
+    "block": "blk-bad-inputs"
+   }
+  },
+  {
+   "label": "note9@root16 (new proof)",
+   "expect": "accept",
+   "ok": true,
+   "bytes": [
+    91229,
+    41739
+   ],
+   "maxPct": 90.91,
+   "W": {
+    "role": "W",
+    "ok": true,
+    "pct": 33.19,
+    "within": true
+   },
+   "tma": [
+    true,
+    true
+   ]
+  }
+ ],
+ "e2e": {
+  "ev": "e2e-summary",
+  "ok": true,
+  "flushes": 2,
+  "deposits": 32,
+  "withdrawn": 2,
+  "Dvalue": "100000",
+  "Wvalue": "30100000"
+ },
+ "wrap": {
+  "ev": "wrap-summary",
+  "ok": true,
+  "before": true,
+  "slot0IsRoot16": true,
+  "staleRejected": true,
+  "freshAccepted": true,
+  "flushes": 17,
+  "deposits": 272
+ },
+ "testmempoolaccept": {
+  "rows": 28,
+  "allowed": 27,
+  "rejected": [
+   "note9@root0, epoch 17 (slot 0 overwritten).tx1: 16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)"
+  ]
+ },
+ "end": {
+  "ev": "end",
+  "height": 301,
+  "flushes": 17,
+  "deposits": 272,
+  "withdrawn": 4,
+  "Dvalue": "100000",
+  "Wvalue": "268100000"
+ },
+ "errors": []
+}
