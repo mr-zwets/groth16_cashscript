@@ -1,0 +1,841 @@
+{
+  "airs": [
+    "fib(log_n=5)"
+  ],
+  "case": "single_instance",
+  "dag": [
+    {
+      "air": "fib(log_n=5)",
+      "constraints": [
+        {
+          "field": "base",
+          "node": 4
+        },
+        {
+          "field": "base",
+          "node": 8
+        },
+        {
+          "field": "base",
+          "node": 12
+        },
+        {
+          "field": "base",
+          "node": 16
+        },
+        {
+          "field": "base",
+          "node": 20
+        }
+      ],
+      "fold": "acc = sum_{i<K} alpha^(K-1-i) * C_i over the constraints in this order (Horner: acc = acc*alpha + C_i); check acc * inv_vanishing(zeta) == quotient(zeta)",
+      "lookups": [],
+      "node_is_ext": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
+      ],
+      "nodes": [
+        {
+          "op": "is_first_row"
+        },
+        {
+          "col": 0,
+          "op": "main",
+          "row": 0
+        },
+        {
+          "col": 0,
+          "op": "public"
+        },
+        {
+          "a": 1,
+          "b": 2,
+          "op": "sub"
+        },
+        {
+          "a": 0,
+          "b": 3,
+          "op": "mul"
+        },
+        {
+          "col": 1,
+          "op": "main",
+          "row": 0
+        },
+        {
+          "col": 1,
+          "op": "public"
+        },
+        {
+          "a": 5,
+          "b": 6,
+          "op": "sub"
+        },
+        {
+          "a": 0,
+          "b": 7,
+          "op": "mul"
+        },
+        {
+          "op": "is_transition"
+        },
+        {
+          "col": 0,
+          "op": "main",
+          "row": 1
+        },
+        {
+          "a": 5,
+          "b": 10,
+          "op": "sub"
+        },
+        {
+          "a": 9,
+          "b": 11,
+          "op": "mul"
+        },
+        {
+          "a": 1,
+          "b": 5,
+          "op": "add"
+        },
+        {
+          "col": 1,
+          "op": "main",
+          "row": 1
+        },
+        {
+          "a": 13,
+          "b": 14,
+          "op": "sub"
+        },
+        {
+          "a": 9,
+          "b": 15,
+          "op": "mul"
+        },
+        {
+          "op": "is_last_row"
+        },
+        {
+          "col": 2,
+          "op": "public"
+        },
+        {
+          "a": 5,
+          "b": 18,
+          "op": "sub"
+        },
+        {
+          "a": 17,
+          "b": 19,
+          "op": "mul"
+        }
+      ],
+      "num_lookups": 0,
+      "num_permutation_challenges": 0,
+      "num_public_values": 3,
+      "periodic_columns": [],
+      "permutation_width_ext": 0,
+      "preprocessed_width": 1,
+      "width": 2
+    }
+  ],
+  "dag_row_check": [
+    {
+      "base_values_checked": 160,
+      "instance": 0,
+      "nonzero_after_breaking_row1_col0": 2,
+      "nonzero_on_valid": 0
+    }
+  ],
+  "decode_encode_identity": true,
+  "format": "p3b-v1",
+  "log_heights": [
+    5
+  ],
+  "plonky3_rev": "0d803737b681774186cd283b1fd2d8e493655c82",
+  "plonky3_test": "p3-batch-stark tests/simple.rs: test_single_instance",
+  "preprocessed_commitment": {
+    "_marker": null,
+    "cap": [
+      [
+        185,
+        251,
+        218,
+        56,
+        142,
+        230,
+        97,
+        29,
+        197,
+        121,
+        118,
+        171,
+        115,
+        119,
+        189,
+        107,
+        79,
+        104,
+        20,
+        133,
+        82,
+        15,
+        244,
+        247,
+        189,
+        56,
+        65,
+        29,
+        114,
+        252,
+        51,
+        172
+      ]
+    ]
+  },
+  "proof_hex": "8b41bf34360ccaa033e187558ee3790bf96e89485ee8f5a31afe7fd4b1faa8341aecf3a05eeafc355b93e868a436891b5ba68c576bd8f5597f0bd2784aa6aedfaab2c2f5f2ab72847c6b3a7889ba48d60170537700e14b29fd45299c48ae35650130aafb83ac24073276ab449a2c8fb30056658263f18936c180f68431ab43b1743e1d5eb5e5172f14490e2297c11fd530ab019b19b3c24ec414840ae5dcc86be73e7cedb525b5adf13d9866c528840432a0e1315bf13dda61986883f2f45ee0f9c84963751e07b20bd531721aa8d62687dbcb6da0c8744847277c3ae19516b1daa6846ddb151569c32467cdfe3e55423cba9bcba8c904287e534340c23b1b1eb203bf9d88c5004708cd48af45ac72df0b8cfe7e294095a3b032aaac7b91f7f741f66453c2ce33932b54e7eceb576e92c0853ae34966c2cb32b7b9f3ede1f5f940cdce886f7709b5c541027e083f9ec0e0b7e4a2fa8154f93b3d0e844dfd6345f1a3a97fd65cb8a9ea3de5386a7a9ff18f4b0a49fdbb832e020000000000000005000000000000000000000000000000185d70265cdb671c353bc8fb3f28b0165960029eb223cf2fef7f3be8335ac3ddf9ab0c7478b3ea2b47632f0cb72de368f117b88305e5adaff7d3737a3625c58a069bf994f57cd05d28808b936d1f7c23c6a4462e9ac9ce1e00ffa1c8c7c9e78c0100000000000000056c31c41a36e7b09585217e5ca28c0042067c9e07333f494bf5674195ec25420b00531485b1942293a3550b3723c3be142745dc55f3fe8b0525e01d4a8c5392b99bda675630d49f2fcb8563c64b1d2343898b622440a9eb94476d38f1eb24fd180963f639228844e7dbeb12d9c37a378df5b6e1e821d8be085813c39ebe012de7c8245ebae4285fafffd6821837e34cb9274c4784a1c6e85e53692465fce624550fd04c70873f55092a8dc5e4937108fde691e906ebfbedc5c84eabb45132dc2cdc9710729b69a5e3332058f607bcbe7fed4b8b359cb70e61c66e3ee6c883074f3e90d0f706c6aeee5d7d70f0267f6e5542e2fec7cd17147266eeb8577b2c9c3bfb904fc5cbe6430257345b67f2dae201a43f44246b81ad0b0b868afc67a717bcf4cd3d0c582d0671d31b1819107516f6678891a7d9c18bc5c9ec859797ada68be8fecd877befebc91f8d439aa8aac61183b11747ca70e06381d9dee85eace1803986255fa8867b26a9880bc64671c565b760ba36e0ec2cedc6f08b13ff61873fd3a51be057a6903838b6f0715a421a53b4e389919ad297d86e6a56deadddd01fd6a3b9beda9b65e04e543d3e8fbf30e06e0b00b680c5bdde1960f5457413194470df0fbc7aef8853e35e7d9ec3c863fbb5b07d3df364af058afd595f4418394783b94f8b43983c4cabe1a8ddd59877fdb771480b21487b216d9839399ee75a399fdad5076bf12f09c81075c8cc044b9b45af77a5e33bb16e9d3525ad52235700369935f954f591795c8d6c47489094f667ea6bb44c77f52ee32d84610dcb9798b7cc9f66614f91bda901d280d0a034707b86390c7d24015aa0226724e871c95f0d9a4f7877274d7e4e824bacd4575cef841dfcba8dae45ed490a182368d62c5343a3575b5a96a21ed1c90a8b7223c8b70d96775f7f72581acb74a239648d1437f3e3a9dac96dbcac1488cabd8d75c3405259800709fb5c61282bc31676af2f9d658dbc146fdcfa9e1fb844a75f7a6cebf673d9beaf66dd6868077dc2efb95cca5d4080c57adcd595301ab5e8b39e5e1a4ac8871e7391ac13e3e8f282112c4c179ede2062360eb4e10a441dfbcd07fb14c968f4ec5c6f662f79d2847a51c680bc22fd2b0b00379ba7a008989f00212ffd74ca0ab9b4325d09d32a3cff7f4619f712dc71a48392eae1106bf01b5276b6974aa71e410306f193e8aece3f756d75d398f1f16cfece73e9f56c0f4a87100d16f0c83c7d5c1eccc207257fe2510597406961511c5629f7e5b755d29ccb3d6298118b1e49856b4037ee72cb5470f87a91707631402a378602121fbccb206bad7d1f2e443659b7b7b61641999f7bb90531cd46557971dc3f67eb4c9375a4f320741f5152dea7cd7a5a2e804d9aefbaf0d9c5acfffe022d084d32e568708f42e477a172c9d9d639c7a8cc435851929b6d1caf308cdf7ad7305c92f3574e48e9c23f1da8dc9453746b94fc5ddecda51a152ee95f8b0d00c2d8e97103cc270e7245253639f61b2ea0e732ce309bf60567f8c39ce2c318803a0baa034a7cf94358d7f3341bf17dee72648ada1b31af69b31238240f340f047370fadc334a10b04a8a41544b86ff51f85733ccfc3b51b4ac61b5660060cccd62a3797fc26017ef728c885569ee0390d20c5436b5440f8462579c67f2f28db59868047bb3f762cc2a73ef4258fc1baf0900a338cc134a7b8b22f8a3ae6c1d6404e71c6661a587a3862b919ffa46e06e689531f99a96017cee01a232cc9cc48fe47b6bc040b34a146c0781a0d6a425a556fd33a6cec2b254f25d79d5a33f50b947e1627349c904800b5a0366e011cc5234ae4fadba57b9a953f3b1bd53482247c29ba9e57ef334636b74f865fae16ba92cc3475b9af0ccf24867277cb63c3592ef492c7d5a77686f42805ab9da509ae0d47e36659f449eb1b23b69c9fe69e2313e815256fcb3c25e6ccf6673ec2b5742b13682dbfa5fefbc5d4683698db04beccebb3da38ede8469c3ca4a8a07532a189b91888c906cd62d99b81632aa477e194e5bb7cfbef357241eb47a3b2d4e7adb7e780e96f16c093944e0b0a71fd9e8a399863ad385a74a96a0616b0f6fd432a49d39604f524c171e8811bdeb747d477fe1d286da7d88d0018eee405e2dd9d09a3528ff9d405e1d4e7348b0cb14019758780907003fbebb92c1c2fcefbc6f5f8b6796d1e8e564cc4249402554e30d3edf0e65a669c3d38b98699e7039af607ceef7d03ca1d9271a2c13cdb26a18a60dae6fb15d161a8c3b0f5e8769bbda28608494ef235caa8c4dbed6c9de17c0d7a355bd495c69893fbe56740c0431abd0e40c7380fd8da3b027293cb3c60c47125ef80bdf7c71a1220a79e3846cac718669b4268cc5df89d42762a33d01ac762c557feaa24614821edacbb4a69c6239619ec50e7546d5707de5970402a1a763a0bdff10fd091bd91bbd1fc196650bc73f373be7e879fe62e188ade5f0ae7938f6f4a272d0e9aac80e1993090d64fdb8eebc4d9087db1f9bf94e5d053b80714995bbf63c7a8086a370452f8510db305eb13fcc5cf5ccab0500c12ed99f072dc7b0acdff76006c9acdfa3b66c542ad40640a1492e4b72b8a12e856f47be960a90a30e5f9030e0c6361166e2256569fc2ae1d24351331e13917aa2b0c13ebc26e31d53b0ad2778f626209200d258b98b03c37863dcd74824684b5a52349364ccb0946d72c04a2afed628163b10545f1eae367d03e3b633cc163c9310b084b9601add6a3dd7404c0cffd3691307189024d287d4601a95d37d7bd7",
+  "prove_ms": 0,
+  "public_values": [
+    [
+      "0",
+      "1",
+      "2178309"
+    ]
+  ],
+  "rust_verify": "accepted",
+  "rust_verify_ms": 0,
+  "sections": [
+    {
+      "at": 0,
+      "len": 32,
+      "name": "root.trace"
+    },
+    {
+      "at": 32,
+      "len": 32,
+      "name": "root.quotient"
+    },
+    {
+      "at": 64,
+      "len": 216,
+      "name": "ood[0]"
+    },
+    {
+      "at": 280,
+      "len": 0,
+      "name": "pow.ood"
+    },
+    {
+      "at": 280,
+      "len": 0,
+      "name": "pow.batch"
+    },
+    {
+      "at": 280,
+      "len": 96,
+      "name": "fri.roots"
+    },
+    {
+      "at": 376,
+      "len": 24,
+      "name": "pow.commit"
+    },
+    {
+      "at": 400,
+      "len": 96,
+      "name": "final_poly"
+    },
+    {
+      "at": 496,
+      "len": 8,
+      "name": "pow.query"
+    },
+    {
+      "at": 504,
+      "len": 32,
+      "name": "input.trace.rows"
+    },
+    {
+      "at": 536,
+      "len": 354,
+      "name": "input.trace.siblings"
+    },
+    {
+      "at": 890,
+      "len": 48,
+      "name": "input.quotient.rows"
+    },
+    {
+      "at": 938,
+      "len": 354,
+      "name": "input.quotient.siblings"
+    },
+    {
+      "at": 1292,
+      "len": 16,
+      "name": "input.preprocessed.rows"
+    },
+    {
+      "at": 1308,
+      "len": 354,
+      "name": "input.preprocessed.siblings"
+    },
+    {
+      "at": 1662,
+      "len": 48,
+      "name": "fri[0].values"
+    },
+    {
+      "at": 1710,
+      "len": 290,
+      "name": "fri[0].siblings"
+    },
+    {
+      "at": 2000,
+      "len": 48,
+      "name": "fri[1].values"
+    },
+    {
+      "at": 2048,
+      "len": 226,
+      "name": "fri[1].siblings"
+    },
+    {
+      "at": 2274,
+      "len": 48,
+      "name": "fri[2].values"
+    },
+    {
+      "at": 2322,
+      "len": 162,
+      "name": "fri[2].siblings"
+    }
+  ],
+  "seed": 1,
+  "set": {
+    "batch_pow_bits": 0,
+    "cap_height": 0,
+    "commit_pow_bits": 1,
+    "digest": 32,
+    "ext": 3,
+    "log_blowup": 2,
+    "log_final_poly_len": 2,
+    "lookup_pow_bits": 0,
+    "max_log_arity": 1,
+    "name": "PT",
+    "num_queries": 2,
+    "num_random_codewords": 4,
+    "ood_pow_bits": 0,
+    "query_pow_bits": 1,
+    "salt": 4,
+    "zk": false
+  },
+  "shape": {
+    "batch_pow": false,
+    "cap_height": 0,
+    "commit_pow": true,
+    "digest": 32,
+    "ext": 3,
+    "final_poly_len": 4,
+    "format": "p3b-v1",
+    "fri_cap_lens": [
+      1,
+      1,
+      1
+    ],
+    "has_lookups": false,
+    "instances": [
+      {
+        "degree_bits": 5,
+        "label": "fib(log_n=5)",
+        "log_lde": 7,
+        "log_n": 5,
+        "num_chunks": 1,
+        "num_lookups": 0,
+        "num_periodic": 0,
+        "num_public_values": 3,
+        "opens_next": true,
+        "perm_width": 0,
+        "preprocessed_next": true,
+        "preprocessed_width": 1,
+        "width": 2
+      }
+    ],
+    "log_arities": [
+      1,
+      1,
+      1
+    ],
+    "log_blowup": 2,
+    "lookup_pow": false,
+    "num_queries": 2,
+    "ood_pow": false,
+    "query_pow": true,
+    "rounds": [
+      {
+        "cap_len": 1,
+        "matrices": [
+          {
+            "instance": 0,
+            "log_height": 7,
+            "points": 2,
+            "what": "trace",
+            "width": 2
+          }
+        ],
+        "name": "trace",
+        "rc": 0
+      },
+      {
+        "cap_len": 1,
+        "matrices": [
+          {
+            "instance": 0,
+            "log_height": 7,
+            "points": 1,
+            "what": "quotient[0]",
+            "width": 3
+          }
+        ],
+        "name": "quotient",
+        "rc": 0
+      },
+      {
+        "cap_len": 1,
+        "matrices": [
+          {
+            "instance": 0,
+            "log_height": 7,
+            "points": 2,
+            "what": "preprocessed",
+            "width": 1
+          }
+        ],
+        "name": "preprocessed",
+        "rc": 0
+      }
+    ],
+    "salt": 0,
+    "zk": false
+  },
+  "shift": 0,
+  "sizes": {
+    "counts": 12,
+    "final_poly": 96,
+    "fri_leaves": 144,
+    "fri_roots": 96,
+    "fri_salts": 0,
+    "fri_siblings": 672,
+    "input_leaves": 96,
+    "input_salts": 0,
+    "input_siblings": 1056,
+    "ood_values": 216,
+    "pow_witnesses": 32,
+    "random_values": 0,
+    "roots": 64,
+    "terminals": 0,
+    "total": 2484
+  },
+  "tamper_sweep": {
+    "cases": 42,
+    "unexpected_accepts": []
+  },
+  "tampered": [
+    {
+      "name": "flip root.trace @0",
+      "patch": [
+        {
+          "at": 0,
+          "hex": "8a"
+        }
+      ]
+    },
+    {
+      "name": "flip root.trace @31",
+      "patch": [
+        {
+          "at": 31,
+          "hex": "35"
+        }
+      ]
+    },
+    {
+      "name": "flip root.quotient @0",
+      "patch": [
+        {
+          "at": 32,
+          "hex": "1b"
+        }
+      ]
+    },
+    {
+      "name": "flip root.quotient @31",
+      "patch": [
+        {
+          "at": 63,
+          "hex": "de"
+        }
+      ]
+    },
+    {
+      "name": "flip ood[0] @0",
+      "patch": [
+        {
+          "at": 64,
+          "hex": "ab"
+        }
+      ]
+    },
+    {
+      "name": "flip ood[0] @215",
+      "patch": [
+        {
+          "at": 279,
+          "hex": "a2"
+        }
+      ]
+    },
+    {
+      "name": "flip fri.roots @0",
+      "patch": [
+        {
+          "at": 280,
+          "hex": "b1"
+        }
+      ]
+    },
+    {
+      "name": "flip fri.roots @95",
+      "patch": [
+        {
+          "at": 375,
+          "hex": "2f"
+        }
+      ]
+    },
+    {
+      "name": "flip pow.commit @0",
+      "patch": [
+        {
+          "at": 376,
+          "hex": "03"
+        }
+      ]
+    },
+    {
+      "name": "flip pow.commit @23",
+      "patch": [
+        {
+          "at": 399,
+          "hex": "01"
+        }
+      ]
+    },
+    {
+      "name": "flip final_poly @0",
+      "patch": [
+        {
+          "at": 400,
+          "hex": "19"
+        }
+      ]
+    },
+    {
+      "name": "flip final_poly @95",
+      "patch": [
+        {
+          "at": 495,
+          "hex": "8d"
+        }
+      ]
+    },
+    {
+      "name": "flip pow.query @0",
+      "patch": [
+        {
+          "at": 496,
+          "hex": "00"
+        }
+      ]
+    },
+    {
+      "name": "flip pow.query @7",
+      "patch": [
+        {
+          "at": 503,
+          "hex": "01"
+        }
+      ]
+    },
+    {
+      "name": "flip input.trace.rows @0",
+      "patch": [
+        {
+          "at": 504,
+          "hex": "04"
+        }
+      ]
+    },
+    {
+      "name": "flip input.trace.rows @31",
+      "patch": [
+        {
+          "at": 535,
+          "hex": "43"
+        }
+      ]
+    },
+    {
+      "name": "flip input.trace.siblings @0",
+      "patch": [
+        {
+          "at": 536,
+          "hex": "0a"
+        }
+      ]
+    },
+    {
+      "name": "flip input.trace.siblings @353",
+      "patch": [
+        {
+          "at": 889,
+          "hex": "d2"
+        }
+      ]
+    },
+    {
+      "name": "flip input.quotient.rows @0",
+      "patch": [
+        {
+          "at": 890,
+          "hex": "a4"
+        }
+      ]
+    },
+    {
+      "name": "flip input.quotient.rows @47",
+      "patch": [
+        {
+          "at": 937,
+          "hex": "6f"
+        }
+      ]
+    },
+    {
+      "name": "flip input.quotient.siblings @0",
+      "patch": [
+        {
+          "at": 938,
+          "hex": "0a"
+        }
+      ]
+    },
+    {
+      "name": "flip input.quotient.siblings @353",
+      "patch": [
+        {
+          "at": 1291,
+          "hex": "f5"
+        }
+      ]
+    },
+    {
+      "name": "flip input.preprocessed.rows @0",
+      "patch": [
+        {
+          "at": 1292,
+          "hex": "ed"
+        }
+      ]
+    },
+    {
+      "name": "flip input.preprocessed.rows @15",
+      "patch": [
+        {
+          "at": 1307,
+          "hex": "2a"
+        }
+      ]
+    },
+    {
+      "name": "flip input.preprocessed.siblings @0",
+      "patch": [
+        {
+          "at": 1308,
+          "hex": "0a"
+        }
+      ]
+    },
+    {
+      "name": "flip input.preprocessed.siblings @353",
+      "patch": [
+        {
+          "at": 1661,
+          "hex": "cc"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[0].values @0",
+      "patch": [
+        {
+          "at": 1662,
+          "hex": "63"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[0].values @47",
+      "patch": [
+        {
+          "at": 1709,
+          "hex": "ae"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[0].siblings @0",
+      "patch": [
+        {
+          "at": 1710,
+          "hex": "08"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[0].siblings @289",
+      "patch": [
+        {
+          "at": 1999,
+          "hex": "38"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[1].values @0",
+      "patch": [
+        {
+          "at": 2000,
+          "hex": "61"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[1].values @47",
+      "patch": [
+        {
+          "at": 2047,
+          "hex": "08"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[1].siblings @0",
+      "patch": [
+        {
+          "at": 2048,
+          "hex": "06"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[1].siblings @225",
+      "patch": [
+        {
+          "at": 2273,
+          "hex": "ab"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[2].values @0",
+      "patch": [
+        {
+          "at": 2274,
+          "hex": "c9"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[2].values @47",
+      "patch": [
+        {
+          "at": 2321,
+          "hex": "aa"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[2].siblings @0",
+      "patch": [
+        {
+          "at": 2322,
+          "hex": "04"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[2].siblings @161",
+      "patch": [
+        {
+          "at": 2483,
+          "hex": "d6"
+        }
+      ]
+    },
+    {
+      "name": "non-canonical ood[0][0] = p",
+      "patch": [
+        {
+          "at": 64,
+          "hex": "01000000ffffffff"
+        }
+      ]
+    },
+    {
+      "name": "truncate 1",
+      "truncate": 2483
+    },
+    {
+      "insert": {
+        "at": 2484,
+        "hex": "00"
+      },
+      "name": "extend 1"
+    }
+  ],
+  "transcript_hash_inputs": [
+    "89000000000000000170332d6261740063682d73746172006b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000e6b0218995cc000b3503ac82bdb8500e4e4bc6567454400930d4e4c783f65005afab9a7b10000000024000000080000000000000000010000000008000000000000000002000000000800000000000000000180000000000500000000000000000000000000000000000000000000008b41bf34360ccaa033e187558ee3790bf96e89485ee8f5a31afe7fd4b1faa83400000000000000000100000000000000053d210000000000b9fbda388ee6611dc57976ab7377bd6b4f681485520ff4f7bd38411d72fc33ac",
+    "20f9c65c32d748ead631017ec9354ba922675bbba8454ac32ce52daa24443d351aecf3a05eeafc355b93e868a436891b5ba68c576bd8f5597f0bd2784aa6aedf",
+    "21a3391cb938ec15b0e53d739dede60ebab55bec467aab4a77901db5cc1f883fb9000000000000000170332d667269002d7063730000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a6010be7471eb003eebddc0383a43004c581a09e477bb00fb1b394a369c830041573d101d0000000054000000080000000000000000030000000008000000000000000001000000000800000000000000000200000008000000000000000000010000000800000000000000000100000000080000000000000000010000000008000000000000000002800000000000aab2c2f5f2ab72847c6b3a7889ba48d60170537700e14b29fd45299c48ae35650130aafb83ac24073276ab449a2c8fb30056658263f18936c180f68431ab43b1743e1d5eb5e5172f14490e2297c11fd530ab019b19b3c24ec414840ae5dcc86b87dbcb6da0c8744847277c3ae19516b1daa6846ddb151569c32467cdfe3e55423cba9bcba8c904287e534340c23b1b1eb203bf9d88c5004708cd48af45ac72df0b8cfe7e294095a3e73e7cedb525b5adf13d9866c528840432a0e1315bf13dda61986883f2f45ee0f9c84963751e07b20bd531721aa8d626",
+    "52ac15a2e8c04a7a168bd901a474ee6e358c739babff69430238a2a0bdecd07aa1000000000000000170332d667269000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006e784b614efa000eb0d4e5953c10b00964b46c0a8ecd400fb93186e20e72600db4f6398bd000000003c00000008000000000000000002000000000800000000000000000100000000080000000000000000010000000800000000000000000001000000080000000000000000018000b032aaac7b91f7f741f66453c2ce33932b54e7eceb576e92c0853ae34966c2cb",
+    "88346572f05fec09142512e5a67eb0943a070227dab5eb750994a6658adb4ee70200000000000000",
+    "c11103b86f18af865dd8f1e1672add4d2cf0a72d1f0edc222f86fc68b86cad0832b7b9f3ede1f5f940cdce886f7709b5c541027e083f9ec0e0b7e4a2fa8154f9",
+    "2b1fb6ad7814bcba739a5ee8a485272f75bc2b54e6e1e629e4ba82c9f19c1a170500000000000000",
+    "451d79aa3498764da7c9e84e2831984204146cd460986320be04a7fd424c51f23b3d0e844dfd6345f1a3a97fd65cb8a9ea3de5386a7a9ff18f4b0a49fdbb832e",
+    "4b66d59eb7b60f2000dfb7c87e3de5f0b9cd3ce2f618e12fca871290f8c7437b0000000000000000",
+    "6319be6e139084dddfd72879e64909fae26975c3a17c44ecdf5c6f4c38670284185d70265cdb671c353bc8fb3f28b0165960029eb223cf2fef7f3be8335ac3ddf9ab0c7478b3ea2b47632f0cb72de368f117b88305e5adaff7d3737a3625c58a069bf994f57cd05d28808b936d1f7c23c6a4462e9ac9ce1e00ffa1c8c7c9e78c",
+    "f7429e0f6867fe241f7184689b0a08e43694a689ccc3d76dceabffe6b7d943980100000000000000"
+  ]
+}

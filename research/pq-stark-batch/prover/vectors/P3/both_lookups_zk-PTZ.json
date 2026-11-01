@@ -1,0 +1,2460 @@
+{
+  "airs": [
+    "mul_lookups(reps=2, local=true, global=true)",
+    "fib_lookups(log_n=5, global=true)"
+  ],
+  "case": "both_lookups_zk",
+  "dag": [
+    {
+      "air": "mul_lookups(reps=2, local=true, global=true)",
+      "constraints": [
+        {
+          "field": "base",
+          "node": 4
+        },
+        {
+          "field": "base",
+          "node": 8
+        },
+        {
+          "field": "base",
+          "node": 12
+        },
+        {
+          "field": "base",
+          "node": 17
+        },
+        {
+          "field": "base",
+          "node": 20
+        },
+        {
+          "field": "base",
+          "node": 24
+        },
+        {
+          "field": "ext",
+          "node": 35
+        },
+        {
+          "field": "ext",
+          "node": 44
+        },
+        {
+          "field": "ext",
+          "node": 59
+        },
+        {
+          "field": "ext",
+          "node": 62
+        },
+        {
+          "field": "ext",
+          "node": 68
+        },
+        {
+          "field": "ext",
+          "node": 73
+        }
+      ],
+      "fold": "acc = sum_{i<K} alpha^(K-1-i) * C_i over the constraints in this order (Horner: acc = acc*alpha + C_i); check acc * inv_vanishing(zeta) == quotient(zeta)",
+      "lookups": [
+        {
+          "column": 0,
+          "count_weight": 1,
+          "elements": [
+            [
+              [
+                {
+                  "Leaf": {
+                    "Variable": {
+                      "entry": {
+                        "Main": {
+                          "offset": 0
+                        }
+                      },
+                      "index": 0
+                    }
+                  }
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "Leaf": {
+                    "Variable": {
+                      "entry": {
+                        "Main": {
+                          "offset": 0
+                        }
+                      },
+                      "index": 6
+                    }
+                  }
+                }
+              ]
+            ]
+          ],
+          "flags": null,
+          "kind": "Local",
+          "multiplicities": [
+            [
+              {
+                "Leaf": {
+                  "Constant": 1
+                }
+              }
+            ],
+            [
+              {
+                "Leaf": {
+                  "Constant": 18446744069414584320
+                }
+              }
+            ]
+          ]
+        },
+        {
+          "column": 1,
+          "count_weight": 1,
+          "elements": [
+            [
+              [
+                {
+                  "Leaf": {
+                    "Variable": {
+                      "entry": {
+                        "Main": {
+                          "offset": 0
+                        }
+                      },
+                      "index": 3
+                    }
+                  }
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "Leaf": {
+                    "Variable": {
+                      "entry": {
+                        "Main": {
+                          "offset": 0
+                        }
+                      },
+                      "index": 6
+                    }
+                  }
+                }
+              ]
+            ]
+          ],
+          "flags": null,
+          "kind": "Local",
+          "multiplicities": [
+            [
+              {
+                "Leaf": {
+                  "Constant": 1
+                }
+              }
+            ],
+            [
+              {
+                "Leaf": {
+                  "Constant": 18446744069414584320
+                }
+              }
+            ]
+          ]
+        },
+        {
+          "column": 2,
+          "count_weight": 2,
+          "elements": [
+            [
+              [
+                {
+                  "Leaf": {
+                    "Variable": {
+                      "entry": {
+                        "Main": {
+                          "offset": 0
+                        }
+                      },
+                      "index": 0
+                    }
+                  }
+                }
+              ],
+              [
+                {
+                  "Leaf": {
+                    "Variable": {
+                      "entry": {
+                        "Main": {
+                          "offset": 0
+                        }
+                      },
+                      "index": 1
+                    }
+                  }
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "Leaf": {
+                    "Variable": {
+                      "entry": {
+                        "Main": {
+                          "offset": 0
+                        }
+                      },
+                      "index": 3
+                    }
+                  }
+                }
+              ],
+              [
+                {
+                  "Leaf": {
+                    "Variable": {
+                      "entry": {
+                        "Main": {
+                          "offset": 0
+                        }
+                      },
+                      "index": 4
+                    }
+                  }
+                }
+              ]
+            ]
+          ],
+          "flags": null,
+          "kind": {
+            "Global": "MulFib"
+          },
+          "multiplicities": [
+            [
+              {
+                "Leaf": {
+                  "Constant": 18446744069414584320
+                }
+              }
+            ],
+            [
+              {
+                "Leaf": {
+                  "Constant": 18446744069414584320
+                }
+              }
+            ]
+          ]
+        }
+      ],
+      "node_is_ext": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true
+      ],
+      "nodes": [
+        {
+          "col": 0,
+          "op": "main",
+          "row": 0
+        },
+        {
+          "col": 1,
+          "op": "main",
+          "row": 0
+        },
+        {
+          "a": 0,
+          "b": 1,
+          "op": "mul"
+        },
+        {
+          "col": 2,
+          "op": "main",
+          "row": 0
+        },
+        {
+          "a": 2,
+          "b": 3,
+          "op": "sub"
+        },
+        {
+          "op": "is_transition"
+        },
+        {
+          "col": 0,
+          "op": "main",
+          "row": 1
+        },
+        {
+          "a": 1,
+          "b": 6,
+          "op": "sub"
+        },
+        {
+          "a": 5,
+          "b": 7,
+          "op": "mul"
+        },
+        {
+          "a": 0,
+          "b": 1,
+          "op": "add"
+        },
+        {
+          "col": 1,
+          "op": "main",
+          "row": 1
+        },
+        {
+          "a": 9,
+          "b": 10,
+          "op": "sub"
+        },
+        {
+          "a": 5,
+          "b": 11,
+          "op": "mul"
+        },
+        {
+          "col": 3,
+          "op": "main",
+          "row": 0
+        },
+        {
+          "col": 4,
+          "op": "main",
+          "row": 0
+        },
+        {
+          "a": 13,
+          "b": 14,
+          "op": "mul"
+        },
+        {
+          "col": 5,
+          "op": "main",
+          "row": 0
+        },
+        {
+          "a": 15,
+          "b": 16,
+          "op": "sub"
+        },
+        {
+          "col": 3,
+          "op": "main",
+          "row": 1
+        },
+        {
+          "a": 14,
+          "b": 18,
+          "op": "sub"
+        },
+        {
+          "a": 5,
+          "b": 19,
+          "op": "mul"
+        },
+        {
+          "a": 13,
+          "b": 14,
+          "op": "add"
+        },
+        {
+          "col": 4,
+          "op": "main",
+          "row": 1
+        },
+        {
+          "a": 21,
+          "b": 22,
+          "op": "sub"
+        },
+        {
+          "a": 5,
+          "b": 23,
+          "op": "mul"
+        },
+        {
+          "col": 0,
+          "op": "challenge"
+        },
+        {
+          "a": 25,
+          "b": 0,
+          "op": "sub"
+        },
+        {
+          "col": 6,
+          "op": "main",
+          "row": 0
+        },
+        {
+          "a": 25,
+          "b": 27,
+          "op": "sub"
+        },
+        {
+          "a": 26,
+          "b": 28,
+          "op": "mul"
+        },
+        {
+          "col": 1,
+          "op": "perm",
+          "row": 0
+        },
+        {
+          "a": 29,
+          "b": 30,
+          "op": "mul"
+        },
+        {
+          "op": "const",
+          "v": "18446744069414584320"
+        },
+        {
+          "a": 32,
+          "b": 26,
+          "op": "mul"
+        },
+        {
+          "a": 28,
+          "b": 33,
+          "op": "add"
+        },
+        {
+          "a": 31,
+          "b": 34,
+          "op": "sub"
+        },
+        {
+          "col": 2,
+          "op": "challenge"
+        },
+        {
+          "a": 36,
+          "b": 13,
+          "op": "sub"
+        },
+        {
+          "a": 36,
+          "b": 27,
+          "op": "sub"
+        },
+        {
+          "a": 37,
+          "b": 38,
+          "op": "mul"
+        },
+        {
+          "col": 2,
+          "op": "perm",
+          "row": 0
+        },
+        {
+          "a": 39,
+          "b": 40,
+          "op": "mul"
+        },
+        {
+          "a": 32,
+          "b": 37,
+          "op": "mul"
+        },
+        {
+          "a": 38,
+          "b": 42,
+          "op": "add"
+        },
+        {
+          "a": 41,
+          "b": 43,
+          "op": "sub"
+        },
+        {
+          "col": 4,
+          "op": "challenge"
+        },
+        {
+          "col": 5,
+          "op": "challenge"
+        },
+        {
+          "a": 0,
+          "b": 46,
+          "op": "mul"
+        },
+        {
+          "a": 1,
+          "b": 47,
+          "op": "add"
+        },
+        {
+          "a": 45,
+          "b": 48,
+          "op": "sub"
+        },
+        {
+          "a": 13,
+          "b": 46,
+          "op": "mul"
+        },
+        {
+          "a": 14,
+          "b": 50,
+          "op": "add"
+        },
+        {
+          "a": 45,
+          "b": 51,
+          "op": "sub"
+        },
+        {
+          "a": 49,
+          "b": 52,
+          "op": "mul"
+        },
+        {
+          "col": 3,
+          "op": "perm",
+          "row": 0
+        },
+        {
+          "a": 53,
+          "b": 54,
+          "op": "mul"
+        },
+        {
+          "a": 32,
+          "b": 52,
+          "op": "mul"
+        },
+        {
+          "a": 32,
+          "b": 49,
+          "op": "mul"
+        },
+        {
+          "a": 56,
+          "b": 57,
+          "op": "add"
+        },
+        {
+          "a": 55,
+          "b": 58,
+          "op": "sub"
+        },
+        {
+          "col": 0,
+          "op": "perm",
+          "row": 0
+        },
+        {
+          "op": "is_first_row"
+        },
+        {
+          "a": 60,
+          "b": 61,
+          "op": "mul"
+        },
+        {
+          "col": 0,
+          "op": "perm",
+          "row": 1
+        },
+        {
+          "a": 63,
+          "b": 60,
+          "op": "sub"
+        },
+        {
+          "a": 30,
+          "b": 40,
+          "op": "add"
+        },
+        {
+          "a": 65,
+          "b": 54,
+          "op": "add"
+        },
+        {
+          "a": 64,
+          "b": 66,
+          "op": "sub"
+        },
+        {
+          "a": 67,
+          "b": 5,
+          "op": "mul"
+        },
+        {
+          "col": 0,
+          "op": "perm_value"
+        },
+        {
+          "a": 69,
+          "b": 60,
+          "op": "sub"
+        },
+        {
+          "a": 70,
+          "b": 66,
+          "op": "sub"
+        },
+        {
+          "op": "is_last_row"
+        },
+        {
+          "a": 71,
+          "b": 72,
+          "op": "mul"
+        }
+      ],
+      "num_lookups": 3,
+      "num_permutation_challenges": 6,
+      "num_public_values": 0,
+      "periodic_columns": [],
+      "permutation_width_ext": 4,
+      "preprocessed_width": 0,
+      "width": 7
+    },
+    {
+      "air": "fib_lookups(log_n=5, global=true)",
+      "constraints": [
+        {
+          "field": "base",
+          "node": 4
+        },
+        {
+          "field": "base",
+          "node": 8
+        },
+        {
+          "field": "base",
+          "node": 12
+        },
+        {
+          "field": "base",
+          "node": 16
+        },
+        {
+          "field": "base",
+          "node": 20
+        },
+        {
+          "field": "ext",
+          "node": 29
+        },
+        {
+          "field": "ext",
+          "node": 31
+        },
+        {
+          "field": "ext",
+          "node": 35
+        },
+        {
+          "field": "ext",
+          "node": 39
+        }
+      ],
+      "fold": "acc = sum_{i<K} alpha^(K-1-i) * C_i over the constraints in this order (Horner: acc = acc*alpha + C_i); check acc * inv_vanishing(zeta) == quotient(zeta)",
+      "lookups": [
+        {
+          "column": 0,
+          "count_weight": 2,
+          "elements": [
+            [
+              [
+                {
+                  "Leaf": {
+                    "Variable": {
+                      "entry": {
+                        "Main": {
+                          "offset": 0
+                        }
+                      },
+                      "index": 0
+                    }
+                  }
+                }
+              ],
+              [
+                {
+                  "Leaf": {
+                    "Variable": {
+                      "entry": {
+                        "Main": {
+                          "offset": 0
+                        }
+                      },
+                      "index": 1
+                    }
+                  }
+                }
+              ]
+            ]
+          ],
+          "flags": null,
+          "kind": {
+            "Global": "MulFib"
+          },
+          "multiplicities": [
+            [
+              {
+                "Leaf": {
+                  "Constant": 2
+                }
+              }
+            ]
+          ]
+        }
+      ],
+      "node_is_ext": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "nodes": [
+        {
+          "op": "is_first_row"
+        },
+        {
+          "col": 0,
+          "op": "main",
+          "row": 0
+        },
+        {
+          "col": 0,
+          "op": "public"
+        },
+        {
+          "a": 1,
+          "b": 2,
+          "op": "sub"
+        },
+        {
+          "a": 0,
+          "b": 3,
+          "op": "mul"
+        },
+        {
+          "col": 1,
+          "op": "main",
+          "row": 0
+        },
+        {
+          "col": 1,
+          "op": "public"
+        },
+        {
+          "a": 5,
+          "b": 6,
+          "op": "sub"
+        },
+        {
+          "a": 0,
+          "b": 7,
+          "op": "mul"
+        },
+        {
+          "op": "is_transition"
+        },
+        {
+          "col": 0,
+          "op": "main",
+          "row": 1
+        },
+        {
+          "a": 5,
+          "b": 10,
+          "op": "sub"
+        },
+        {
+          "a": 9,
+          "b": 11,
+          "op": "mul"
+        },
+        {
+          "a": 1,
+          "b": 5,
+          "op": "add"
+        },
+        {
+          "col": 1,
+          "op": "main",
+          "row": 1
+        },
+        {
+          "a": 13,
+          "b": 14,
+          "op": "sub"
+        },
+        {
+          "a": 9,
+          "b": 15,
+          "op": "mul"
+        },
+        {
+          "op": "is_last_row"
+        },
+        {
+          "col": 2,
+          "op": "public"
+        },
+        {
+          "a": 5,
+          "b": 18,
+          "op": "sub"
+        },
+        {
+          "a": 17,
+          "b": 19,
+          "op": "mul"
+        },
+        {
+          "col": 0,
+          "op": "challenge"
+        },
+        {
+          "col": 1,
+          "op": "challenge"
+        },
+        {
+          "a": 1,
+          "b": 22,
+          "op": "mul"
+        },
+        {
+          "a": 5,
+          "b": 23,
+          "op": "add"
+        },
+        {
+          "a": 21,
+          "b": 24,
+          "op": "sub"
+        },
+        {
+          "col": 1,
+          "op": "perm",
+          "row": 0
+        },
+        {
+          "a": 25,
+          "b": 26,
+          "op": "mul"
+        },
+        {
+          "op": "const",
+          "v": "2"
+        },
+        {
+          "a": 27,
+          "b": 28,
+          "op": "sub"
+        },
+        {
+          "col": 0,
+          "op": "perm",
+          "row": 0
+        },
+        {
+          "a": 30,
+          "b": 0,
+          "op": "mul"
+        },
+        {
+          "col": 0,
+          "op": "perm",
+          "row": 1
+        },
+        {
+          "a": 32,
+          "b": 30,
+          "op": "sub"
+        },
+        {
+          "a": 33,
+          "b": 26,
+          "op": "sub"
+        },
+        {
+          "a": 34,
+          "b": 9,
+          "op": "mul"
+        },
+        {
+          "col": 0,
+          "op": "perm_value"
+        },
+        {
+          "a": 36,
+          "b": 30,
+          "op": "sub"
+        },
+        {
+          "a": 37,
+          "b": 26,
+          "op": "sub"
+        },
+        {
+          "a": 38,
+          "b": 17,
+          "op": "mul"
+        }
+      ],
+      "num_lookups": 1,
+      "num_permutation_challenges": 2,
+      "num_public_values": 3,
+      "periodic_columns": [],
+      "permutation_width_ext": 2,
+      "preprocessed_width": 1,
+      "width": 2
+    }
+  ],
+  "dag_row_check": [
+    {
+      "base_values_checked": 192,
+      "instance": 0,
+      "nonzero_after_breaking_row1_col0": 3,
+      "nonzero_on_valid": 0
+    },
+    {
+      "base_values_checked": 160,
+      "instance": 1,
+      "nonzero_after_breaking_row1_col0": 2,
+      "nonzero_on_valid": 0
+    }
+  ],
+  "decode_encode_identity": true,
+  "format": "p3b-v1",
+  "log_heights": [
+    5,
+    5
+  ],
+  "plonky3_rev": "0d803737b681774186cd283b1fd2d8e493655c82",
+  "plonky3_test": "p3-batch-stark tests/simple.rs: test_batch_stark_both_lookups_zk",
+  "preprocessed_commitment": {
+    "_marker": null,
+    "cap": [
+      [
+        108,
+        32,
+        153,
+        232,
+        125,
+        47,
+        1,
+        222,
+        56,
+        173,
+        32,
+        88,
+        178,
+        184,
+        30,
+        115,
+        67,
+        233,
+        77,
+        137,
+        119,
+        222,
+        30,
+        183,
+        180,
+        147,
+        14,
+        98,
+        66,
+        188,
+        210,
+        223
+      ],
+      [
+        22,
+        233,
+        155,
+        43,
+        137,
+        167,
+        50,
+        88,
+        43,
+        169,
+        171,
+        185,
+        34,
+        232,
+        7,
+        155,
+        117,
+        203,
+        116,
+        135,
+        119,
+        26,
+        168,
+        15,
+        24,
+        157,
+        146,
+        99,
+        71,
+        4,
+        1,
+        69
+      ],
+      [
+        178,
+        165,
+        131,
+        232,
+        163,
+        64,
+        59,
+        137,
+        201,
+        138,
+        15,
+        39,
+        217,
+        46,
+        207,
+        2,
+        245,
+        23,
+        158,
+        223,
+        145,
+        164,
+        227,
+        178,
+        139,
+        203,
+        148,
+        170,
+        34,
+        210,
+        115,
+        87
+      ],
+      [
+        255,
+        133,
+        230,
+        224,
+        59,
+        112,
+        99,
+        175,
+        53,
+        39,
+        67,
+        143,
+        251,
+        140,
+        146,
+        97,
+        31,
+        51,
+        62,
+        122,
+        162,
+        138,
+        98,
+        70,
+        178,
+        160,
+        27,
+        40,
+        194,
+        246,
+        180,
+        10
+      ]
+    ]
+  },
+  "proof_hex": "cc63bd84baa0f6dd879cc36ab4ea56a26e62921d33a13c283c994c6a8c0ff65a248e0bf4844591f611f0a2c23149667087e3568d5b261eb5cf7347430e995a34ac36c5a70673fadd1c1141544f12b6a3f7ec5ac995929e089c49371c740cfa3a34c0777bbb78f8dea2fa227edcbbee4310c1a19b6909326632b6ebdace2732d053e78f8caec122bf6f8630ceb79f5070dc94594bfdb163eb62641d56093d563852cfd154424008d53ef91db372abfb9997137a15ec06c92b3743d46d43dbb1cbdc1a382e8cc0fb0ee39db3f0cb1a2a6baef1cab0ed5593e91bf2f756dee12b759a3ff4a3d212230117294ec043dcf52d047c2480f4311d499f04d082b503ca3951a34cd3962ef4286d073fd710b34cdf048035db37cd081a359e2d2399d81b0c1399366f6157b127e0180a1cd33e7667ee075262dc06d692b09baba5f3df8797a708f4e81008460af9b72a860f16c56e2bc379c4b29deaabd39c9e16725a1dbbe9ab314d86791a7fe7617e97ef50e9023866ba78dedfa642acc3ef1ae0b7bdbd066aaf4fcfb624243d674705cb04e073b226f8abe7582e6aac66b220e48f75b6d68e9483d62be0d9c2d46098936c4207bfb1ec76bab9d3d0af307c69ab5456f53551ca49aa0ffba94a0320763d96463ee69221ea5108889ed83f5d6635bb850ae6c961ec69ea88b94456d62d8e7881352b290416efcc37f5a9d0a10f816122a4512b83fab61cd2ac14a1f41da69e29ecdc4f896265861985b0d47c0548e32d53ed5e0be25861d61325b0769d9979e67ac381c5b9fc62f0f9d8536cd3bc99c8a561a0d4bb0b18a17b1ab6faffff6f9c0622b3ab054a648887cc9047d6ffb95f6e4a9c2d5f79a2ff17842489690e6742ae964476020a3f5e4088c2ad8179f0b05f0e41e55615cd5695626a659e7417401d54183993cdcf83178dc87af9d111e3d6c9d8e250e2ab62911e4ea21c0acd338b1bc5932043e66973783330b3b6b9fa26ece34bcb975c078a3f4f965d2199d98b2a3f72676f5bbe5415d0910adf7eafa6e4e0888e0e7fd7adfbdc3487c3580099d53e5338884655cfc16adbc5e11cbd9799e70fbe60a75490286292da13ae4fa8d80cc70c6ba913e673a7c195e13eb144fa4cbedf17457899a26780eada7f64633f34206a4ab061ec401fd344f1a2775e7e45e94e90d84dade53543689f5e7a4372867ffa1edf83a6d71f4449fbe250ffc3a053d278eda5ec6da21f142776d594bbafae7d12805dbcbfd6f6421dca4815b216b87273a1b753529a797b84098882fb8056e7907a1bd333f32286ef8db2d336afec0c6cc239d6bf84c00f93ad936935f217ffd724d454c80633de715e534976a09ee29b13972749e7ffcd4fe38202cbbfe1d9f4aa847bd39833e71ce024242d1707c7c978733e2f9f0bf4b96cf62e8b1fa7eaeac4c6f6c91ea8e96bf9c75b0774299ed75cbb42d46f7fefddb4f93c908e536d8a45bf4c40414c96477049bee2b1a18f39c77e7d6dc3de5e56e505196fa79aed85362b2b2b50ed48caf048237af0f5801b63c718fecaacfdc3ea2d3257f2a71cd397cbf40a57757cb4bdc3d054f2d9f0d8dd3f132f9e26ba4a39c76b9f5c031898571fd67a9f48eb97100e2075adaf5d77ad38ba9c0ccce13c75d64a95064b9f8e3b9fc4febd2db783d1c6186df6c528f454b344fbf0b627bc90d3493ebfd48abd661b6f94a16aa6327b276c57fefab61c32abbe2aee389706baa2f1d8c6d6098b3f4c22bb7da43e680d9ec1e759eb5a42b2fbd77ef4dfce80fa269ae7c0fa448eb2aedc4216f1ed9f006f161d89eb3eb7380cb9dd6fdfd0414d72a8c46eabad2d81409cfc8a48a628bafc33b3f8bbedcf3e86642ca9bbd10fb8093250e17b8b8e274fe09364c7f5070fef855db8bb2d070e76062de8a689915cd22d731785a14ee303f16615393ea7a04b493e22a9cb5faa94d4673904dbfe8b6dff136fcfafd1cfc1608ccf273410d485bc3fc2374b5da760493aa1df241bc9c504b48e3586af3cff6c0b2b1a8fd331b736fee4789fd8e2344d35e696984b3d7884522eba4e54d6ab82239fb279b8734b32f610d801f26ac3439594df77260f6653eec85b3028b187b3d6a609694a99a167a6d9063025bf177a424344bffd4a3200394f03fa2e4a41981d7f64ecd5521322858ce14565c8dcc6d0fde5ea3f6679061ce77706d7e819c1088b8562ff05a6bac3eb868c5cc9c66eea881ba6235aae9abcb213f7c88c00c3727aa10c767176023fbe1fa04863c6298153de95fe1cc34a847faf281bec5f821ce15fc10af8fd83299fe3c5f1f1a726903f53b59bcb96ec6a6b0af65763e302c618ac0780a88a217715379a88fd1e2c1d65c0201f761c33b006c59c28ca611ea904e35ed96427082239d5d2cba4913e1d521350531e602c724b2b6b6156e933bf371206deb5a691a43c175ec0c416682fa1798d4890e3875c24e569a5a600cabb52a9fbcc3695366e2382507289ab96ff5fe384073ae70115aacb78158a96748377d8019333d6c6c45a8be71f0e4e9eb1ec5eaa260eece57cf9554102d797ffa53b0ac8ecfe087165a955e5fb26d8495bf6685f04711f1c326272cd9cac624a9a24a8e293facd4f2de55955f77901f00c27bc639985ed45d31860565fbe0763814368629cf11a9d983bbc2eea8599d510e86c13e953b2a40227fc1c65c319de77e4d469b24f9ea9813539d52424f8a311bd6867f9b20811b1036ba51847a121d7156564fecdf91994b42bc7627873fbebe464bb374a8d6cb9fbcfebfaf51dc6ea050a10997cccebdb18bca53359d78d34afcffb158109056aa4b6c1e4662477bea0e9e48d7fb443927b9aeabbf64509ccf0a1ea39495fc963652d07a69ec69993fb871bd1a429503633567e0d79bb9d7f3596deed28ffb0a5d966b4edf37c2c1b65cec6134f5fb5c31c5924c2f4c6e0e2aacf342a8d30e5b69d43acf1983c76951161766aca301a955947d280d9b50ac0ab5515223c2b3b5b045e341fd0b8c8bb031f0fddbb1c65226ee6e58eafffeb3eb34bdb27ab1ddbc125866c04d6a3fcd69ebcaa47c5b4bae8d672df077468e0811243fddc16cc9c5479c7d8c63595b448f1e13ee4ee3153240cd08b4e591a40a45c8833e7e5751a19e84c80e9373fbc184fcf66f9fb384ab34e8b6bd1ef0269a609a1ea8e641f9c1c89fd9f8e14fe02991413f7c0151b6527e0f352f8b0d3be7cb6fc069fa7a8f88957068fc91f0aedc09b1220825566bf722a3c1dcc847233943a1c3d197b833b4517b59ae9cb8de91e8c2fae8443385e822a6b41e33a324198b3a868cc72229019c6dd78aacc72f45bb6c23d12c3a553d1be2d0f667d227998d17062bf507ce3cafdf45f180dece9ec6f05d86563054927f75aa68d8805d4c5cd9f6d14df3b61e554737e7a5b5a79c848efd3c387e29bbbab36ec8a6142226f214ba188e5703550d2dea4359c90a540ea0969d99a99386f7cfbb364365f9d3a77d234564cdb937cf19afb3db1fcb487cccd1a39600802542b11a085c4259bf556dfbae3dc7e18b5edd3a15df968cc6b9b55c1cd50a0ae581249782e3a0c1c703102e92dd64ebb0df0b7fe24bc6f6db833a05e32030064bca3f5dd8c19af9edb494f0ada23e5d178d4e01252975a3cb281aec302ddbb6899a3735935ee05e52ff3ae0414594ce25419ac4e7ecd68616cca8a25def0694359dc25f43ab202db1fe5aaf14b00a69251ee1ac48db7880a30338717ee8c4fadb38455ec72480579fb8b29ce785596268dcb47bb74184f0c835a31ec2f61d21ab8aab8cec5f819b001c6f981f3b0bf5413a3c374aaa5fd8f86462f8b4ccbff1811f53e3716d4929857e24e68117bf28c4af2cfc1d5e63c880ac88a2f161320c381fdf2a4cd30d09015349182fdd4efb793cf4cc52f42ad94e644a444ef2dcbea54fdae677d3b2e513cd73c40ae2ad321b6f42ae62c465a47690e32d4609d41cfb5b4fe3baa6c89a6f5a910be6f323c39602ee699e6aed48d543eecbc36aeb0d5d3a5d5ac5a3008add94583ba2301d39365721711f329be7ce4cf630ddeb0a2b9112ce97c191e0fa9ae3d9ed3d4dc3b623a011cf7b181db3d90f21cd2608eab08dfebec500bbe293d8c129c6260a8c2ee78c213fff2bf750da80ca5fc44465d205ee745a0d03fc54541d4c08ae9ccebb211d4ea340bac43a5aca4d0ed7a6c4e3ca475e0da909a3b48af668b8e9377cecebaa606af9165b7260a7aa835763493afc03597562eee029b053c2680a1ed986a5dcc3b8558adfb8f223b48e9ef65b02d7372fb051565ad920518ecca3a6d218eb048b94860347cf04039d270e4b4585163c851c4765d3e18ab1d604597331e05b176036a9200a572820274df51557fc97fa7c828ebdf014a30462035380b5e0bb2ff34725b5c7b0a0e51cf93d415e5787cd57aca44684cc90d2d15e92085e20eb68da1f2f8e90158b086791cd74a8ab2e0ebeb91387b2f5883df82de1b9f1f2e9cf8af98c8cfa0f50ba3ba1c0bac93e390a9be9a58f9c3b21818396d71d43ad225d6b2b948ed8b17d3d3579aaabe05d18a868b5423610d130fea67006990fea3182f329c26ce9e237304250eb7e3a0db31eaadbfa18abb389090df2a1bd2228c9dc61c3c00459eb5f976e8a7555f66a2f3cdebcad3257d5ca94dd05c67926c27b4a3a48df05a753530ada8850b1a925a4c8f0c13cd872ac175d68945e4020627f43da121f3eb064469e3992f72ffa418ac16528a0074f345fdf6923b9aa90a0eabc757c6cbebfea0806fa7ce2df1311d0577c9bfc26bfea2905ec4c308f74ae487b48f2db9970572748adea2ef9becd944573d766b32905e9b1a096115633c9702ef45e81ff668f7409f45fdf0cd12d125abacd431d2f05079b309dfb8a8616cac4aeaf856bd16834861c1976fa3a81d1e645046bba2ce12c72a33b60556628295c6b6202c68bec245899c1dd46ce0f03bb43f9495ac6d7f539397d649499aa9640b704613e1c6fbdd12e149ed75a2195ae62771d76523af7857386f27ba006c6352bf9929c7be040534c1ba925271c417472336bbbd3e506528bd6af80a0736e1cd04a597bf81cfa210df2f78f953f9850c618a88f0653327ec1590f84d8dece6db33ecef1308b972434bef7fe40dce8483b97877fd708ecc8e62ff2013a8039c53ee19ec274aa7f753bed6f0b184001542e4dbf473a3fa42cf89bf0587880572f8d525237d026fdd0bd0ed7c74285f7fb9525eb4853303e91f255f0300da22b75edc6e6366fdf49252120bd718bad5c65dacc9515a46fafbf79366ef4a344d5b508e8a4f6d0a6d86adcb5d1f8755a72658868bfe464ab8ad9539b3d145df723cc33865f8a7d9f3d92fc1dc303147fd6d3c9d8e6dd9d9d27f3fbb19599c1b4bf212558ec7bae06a00e12bb49b146634d0423ada71e49886aa37f15f38e635b736c67f4a036ea8ad1980e318782bedb24e88abc7caffece87b0a6d1a76c70cc0565265d13ed788a292c78c2c2a44af9e9322435347822c52f4d9a9dc3921a96a8ec8186117369a97cffc369bfee7a6da5ef97c4594a9a7782ef22650cc5db598b4bf840bc57472c3431cd233cb0d023f65bc615193a401ec186689bf2668c693e6731a544daa52d762e237b315463fbf2d1ff1515fe98f00697e8171141b8a39b974617abcc081e75e110c357d5d05832af982af70f7e08d81a2c324233f0a8e1c8405306540e1f3b12a0a9f4130d28f5a7c9038f2c66c57916bfc7e14264968ea64281c21d67ad76031acb0935b00f28b36b3db4c565ee9c4e1031e8297f2f8694ee36a69f0cda3594452ccbe9f7874b51edb537ed6b3ff1e169392d413c80d8442a89bac0c28f50e031c055af8d707282ab7498b7adecb01691d04344ca19651f61ae39fe2ad0f5d27536e981cac446340531931d80c4ee8e9a84420a7954c98070885bcf82141509dad6e57c6b09ccdbd59c843832c714bd5f88e03adc54f42e74efc47713c434aa0d20ce9be6dbb371c1deae065ac87b469ee5f2be5641a4eb96786005eb733f75ecd6a8743b491cbd84294ad8a5ea74aac3b1dfba396205495a066332b3dc0b4d0ffa38cf785081b4f8a9ff113ea9610a2247c04c05198bcbdf8c244110df9dfd3150cc32ba522addaeaa777fc838c364a5981c8b3a5c9a96c8a6a607f13ef8c650f364a348e61f90c04b5c58b327675b0eceea410e322d5414d744453ee0b388da6a5b79dc6a28026ec0ae6a81e63422b7a3026db4860b69ae5c79a32167402f4b1559e56b836eec055c0d3e7cef9555cd7c885df464c3d5499e7b2aaf4e10b249c1168c39d0e7f95907fb8f3273f9e29e70deafbb7f645b6adcb3077ca20d4bc2bbc8115ba809ff675e98fd768a990aff9464d82278735018bc8e6ce41f2aa8afbb9e0220283f0b1a498bf61048d6fe3062a3ca0a91fb1cca3a36bff744fef849b8fde063c8e857e82de9df506791bb7016fb1769fe933c59638a6733941906484ccebcab481262f7ccf14a947ac9983e4f00fe64d662930b0091b44182f47fbd805bbd8baa6e18f1c5497b02a9877db0ab053a44067762847024e191e90671d7c8ab8b904c6110d5204dda545c8d0e930db92272e09a76f27c3a54c63519809174b7cde9adc1009cbccb815141e41d87d877415fe712d9c067533a75d8e3e463fd2e31439bdb08b2293339e0d6492cf24b9b2327c1049ea2ecce6a4b8af4a1f389e850419a977a618ee511135205ad52eed756b83ccd1a751c76033c5ce4702b20b1656ce274530e8649b7632557cabb48b6a080cde860c1fd8ce20309778a56dde390f3a5bee594a05435fa8738f0c9220d81b269282fb9ad1ea0d0baca3c73a75bec3cb0da30bfa411d3c5af17eb4c2a266e5cd79ad9900474ec5f438b33c3951dd827de96454e821e93e83634d3af2b8e0e68eb903c7db613f409ba20c93d07cf68fa09efbd16936b40a50fcf5a8a862ec485bc0ea4ce7d033a0dbe5e867614a5bb6b6f103880e1cf5c8973bf09ac0af0ca26765324a20abdc041bcd2b7c7b06d6da511d2470880224881341f87f12c7ad08de7e068abf478fd3e8a4b9f7fb3523469b06c567bf28b781ef0ef2cbe59f6e21fc36e434c5974a401e463fb32030a514e3e225af544d28f6744acabfd37f90f264399de84e9a5817528fc68a18925f045823ae3aef4435bd20c06e24dc741a338e28dbfbb4a73d33fcfabac9139e763099c115c30ba8730c50a8a9561a4164369e892377f4e89e2b8ad25384da234a8695b5901f1cda018c3a1715b3d84b2781fdd91f82311c42c6e74bde3d3c79c18c266f3aeeb5c6bb1f859d20a8157e6aeaaaa638b616c7143667e8e413831cf72617f39cc3f1a32ce24953457f8a872d031b4835311479a51f376f2b9b563604b7cc7d53a5776e893241f1a74f4c5b150549f4fd0efd75f35eafda1cc5f1a3558cc7fedce341caca4454b6ef2dae1dc89b0bec0191154c702a6cbcd193fde000fee5fc73aa63a59f6b290291ce172c14f3995e2a4056975b9c6fa5f5446bf6463fac5485da3b4b7e3a93479ef3b05486f5b4111f106b92a484fa65eeb3f1de2d62ce0bb32f8ce2d02d8942c5cec5dc2b19931a31c6f8fd8a3fe0bfc6fe080e2e7a7973f5e887d68fb2291d0edd45db521c0cc89fc88b52d8c6ff5f864f26d4f2d606e3b040a11276b93cd8603e2cc11e4090cf2fa46b0f638d1950e613fe9e4aea843f0780c96616aec49c54d5c82c50bb37a9b5afbea788b3f66694d233cf4f06140f65a78fdbfb2e71f04c7989cd0805d9665eb79b611a1ddbd952c86dcb87736d85010000000000000000000000000000000100000000000000000000000000000072f0a9352becdc5aa3f89da0be7bf1185dd56af2cdffafeb3bdba07cbf2e584049fada33dac55e2eb992f98e4519e8ad6dd12947c35406e211fc706b3c4445960fee200e675ee34a20a9830f15411c6a98e43efc5f82f5b728f26dfa53b46521000000000000000019ff6bf36d2920149b2312650e32e0f900cfe659a5839251512cc4ae5f4397bb745c855767ac70746af61a0dccc705f2b8c2c7b919cda8ec0f471685d291b78562ceace8355cbff8d1479b3e02acc999334f9424f4f0834ac70e86e8d2de3598dba2b3278974a23bd572bf6e58ff732454b6fc78b53158eb69233b04aa71b02020752d4eff8a2d43a8fb2a42d49b3fba8b8195f1830d831c023111dfc2ec09bf014828753170499902bfee22960a3f58bb641764b9d6ab71203bfb53c460025d1625e28478213f966156f7ad31b1d1c8acd9ffa444bc4c522c2c9bacffe43ebb2cfa6ed5a91713600bab3f5ad33757804617692c1117e61f42842f9f1fe1c0b2f5c4d8cc67f251564c58b8b9384c1314813758965dc459c46bf907abdb016d9705c724814cf76b405d14742a7b509670ce156ee549de55d3e1df0a7c403ded6dc260eab911680839c48b3828ca1b11c610af10b94731b69542d0a57ef29c5a030c00347ebec95cf1b848e6bf5769731915c574fccb654c7dcc3614e62db732d0c37f677ef68090930443ad1b3ebc15fb7d55d807e0f89541533a9305f4fa4fb08fe41b11a32f6d91656446943bacd3075f6007936173112d1452a757baadee7e105edaf4cec79bfe78059398b75e7ea880a88cc45d3a667e675bbd1840de22de0f1b89b42782b28752611a30ee66c176495aed1cb308734316115efeeedeb29228e276c21aebbaff5de7637e9b5643304dc84eb41014f86f1f20b7d3d13103bdd11618627f636de1cdb2b56df79296cd8d81413e13f8df68b4b7bde24be88fd98b916575d3fafbb0725b12dcff2c6aab4f330b2983c76e9d3553061b26b24ab178b451fac45091122859a833c3a9304e3d454b9b2cd9d7d1842dcfc9fcd112d03911ac198c7901ef93227dcfcfa8d07cc38437409a53a0dae61deb0d33dfdaa3e9a3a829865fee3ae5d9e737149d8e43bd1926a628d9503f587004d4b56d51df6a20adb0f100486e5b8b3b0121380d515faac81fbe476f31aae74c69436e15ff8cf8d1b0f64d2700a6a4f211e31c6edbe1e44b7d9524823f87c35d048b0bd100c4ce6bd931b15101c181747475c4882cdd4ae866880b161f74e26c2bfa42d637875951acdb39c85d0fae9208eae314cc267d64c0e11ac91e687c47120395d1c925602b31a8d523249475cd996ebe27b303fd1a5e8f127123817a9f00ce9b4b1878cad2ffbd0880d12f1a14b6c18906e9bfec802ee6674ba9fcdcc4ab5f482bd1605e238e336ac5305141a177eac3cf75067e9a1f59128d323edd291d66ad526b9bd59a6acb6f88df79492b7252a8227437d8031f6eeea5210bed265f7f51236fbdc6ea7c152eaec879f9088e3d06f9a1a42b5de7258de988ce106b09ffc2ed81aabe75f1663ec3e6f77d77b1f29db57d7ed2b86795efe37fe0a043f41e8b579919e58186f02b1fda6d5b01812c8e5df0e64d340a33d444b0804eb5bb6473f232986b67ed1f8885b9de68edcba4d94b8798629d58b6872238a49e3b73a3bb99bb39052370c8d1e61b15a91ba025ae178e7a979741aa54868738e618c5bade5fb0f5ccd7a4a6b5a33eeda1dc8b990e27d167280c00a5cb00b1acf32814bce41c163f0415e8dd913b14fc36fac1674e09f77022a7893cb2da25be84b11ca314c9916f8288a6cf6e60e673cc14ae94228d9ba336e85d6e5705de01779a954b3b2b7b4a79e88c20218bcd696e9a1300607a742b720b94caf189bae036ce22a35fd1db52933ecffe74f64e760c4fdc1d0f1502b1189f3faf1ac829fe2d16b5dd1e0c75a4da3034afd6ee0519c7b0719d0aa973406ff0e374d6df3399a6f2b995aae73b7398be2a352e2f8e4106983b88d2df9782fb2ec17af80184bae55e8498ade18a515bad8bc11b682d4af82ea2a7584cedbf5f1ea731708518de1bf527314511e9d04bda90453f7c29f5d5e8d5dacac5304648033bf66ccf9391e4100080085b16e0a77bf8b7a19fce9472993361aa65f2e6d9fe5b27b17a19e002bfee2b02024b6580fe94ec9f296303e3053d14e5c7c318678d82a9826b6a611547be044483a0b0a32c6a027e8b8c5b131452f21300900a9780a32a07befc79fdc424c2f47b720d69a3f8f15e3c600f68c73afb6968096c7103f6fe244ade82a7074aa86334e8ca94282273a041ef96b041c6b01d90958c0665e75f0645b735aa1d38872cd2306379b14d49e246578a7beaf948ca2753dcf175e574d53c701d0fb3e47d250f6c0172d07c1ad5802b740b34d4d1f48fa366894f1de89ef1ddbb8a6da4fe89004f8d70e91b054432a3b258a6112dcbb95b01b31ea57c926fecf4e9c0922ee16ff4314e1ef94e78953d1d7f0e3b1ec6653b02c4147614ce04185f4d852ce129f81bb77c69cf6d919eaf33efad0cb1a08364a1f4d88f15670059a99f93a592ed2c2ad615d3a49631deacd9445e3e8afb9ba1dd411d6ca54e4be13e49a721a10335c5e85ea5ef24b7f7fe7ff10c410b1c7d0defaca8f7ed22eb67ecc7310b38dd8debae22aaeae61936455ec94ed45f33d1b94e4b0906c5695d92ae159446001ebb97f4359c63a5f7e66a97373c361c89bf08e6ae78006755ebe2c6d518ccfc36458b751ed2dc23873d039d02e409dc1700820218aab940e2dfd7937320461c5b18a9e010c978df9d42dda8d78acc5017f79f3ab18cb69b9694306a95bed1e5996da9f4da1a6fd0dc7eb48ae9ad6198848da3844fed89140b5a102905bacff47c7a19c7a5e06bbafa98045ac91f393f2628809a9c10836a09b5e9aa56a320449a83f9b56a107dce2cd6756117da593ee7ae48f2b63f19c75373d5cdf184b1aa2867f5eecb50e50db4134ea5e6b2430b62e2292ee5bac9294962ca8b3fa38044a34a9228da351966b2d2af38ba519802e3422b7f91ff086c733e1db3e3ebf4eed32c7d12dc4bfd431f47ee911126bc9ed477e7b59c708b974235f8d8f1be34eeecfd8c74bb5e344ebb772dd2a447e4cea3da9f029bd2de59639c4f6a8e76210935cc9db41c24569f11c234ecdb5d73a9c863398436cf1250498fb8119eeadf305c5bf5e9a48a2a13dbc55a77081b296938ec6366df928018496aa5e321e21e08a47b1f9e381c66e80fa78929e022d51780fe36c1a1ae660994979c57f2ac19614ebbc98f2a03a1679ba6a9f8ab4622c5855a517cd688e5d871fc365b95539a9bf6b5a432d0b96fd7c14a8c4bcd7f8c50762728905da5b4a4ad77763d374a3bcab9af7ebb088aa32c227280a2de8491c4c3afcd3b9771ffe33227c50dc54f17961748453b2c63d723e101c9357041da1329a563f91cb48ddec3f387d72d97e2727f19d752341ad4d14367fee7ae2f1fb59b05116bc557b6e5f58cd4560ce175378ab63308dd5e4c104aa40159071e0f50d52538be0af65e2bba829d57b78b60abb4895e3c26ca48576c940bff05dffaeb06d9c0474af3815bd8dec453b7d87fce7fd60f104a3860fd471349e608959ab456890fa79a6cef583a4e7ef9c9b95cbb283f552454597882d8cd7448e71cc1699c25c786683085ab27fec4ffa6c45fb277b35d8918b90fcfe89369e443241f600b479d369cc5137a7721125041d93932a721af54dd936533e44bcf0215b8e344176b8c33c2a74c2eb3ad2c392c2f70c66b94cbe21df8626ffff66ef1122470241f7e2c2fc4d2037ee791c34c52e1918883f0ba517302d1fa25c17a9814cfc468f9ecb1b06666ed64de2c60da82d4efeddaa96e0a29539e9d9923ec4a271545587df27d0162182bf578cc4080c05e013945514a3445a8110d070f87886cf310e9bed5ff05abf6e2d5d180abbe560fdf2de8131073d975619aa61d05a4ac4feb249db00097a5255521f1366109bfd25a19d760210de899da25af04da2cc8d89350dc12fe07a8ea519e564a35117383d378d38f2082e079ec88889ff1d80b0a5c2dab8e620c4a6defbc7f7635e693bcdd24212da9733038396374a6c8a94f6b7b4f2e843cfcec32deaf7af8783c382c913db111288e826e6d334d31bb070cf1aac623e7421c2e4668c36c8881294066ad25e6ffb43e44a52549aa362ca35f1e5c9dbda1613cbadb91348ac666e94107981b71153b002b52ad44cd515bfb805bd94e3ca46926810ecdb9daaebe2d12e622f458aa52cf25a018d9f8dbe07c4e1226577b15fef4233810785d9ac2b210c44968fc6bb5224678cf047d874fec6b02428cbc1857a1c713069f10b7ed600d4f5d1b7e3c42f32e9d8cbcfe5388de10d9771ad39dd73458d0c18386c606efafba68da44ca4f4ebf9da1b5f4019deb1d9ba3b0fd9ede2c2663a95448ccc2a17735ff48c2772eee0806d8026475702f59dc4b67b198121b55aac3570ba174898e5a96ced8070381437645935574fa48aca4d4014e4b6a7f0718cc7a4e72664f3895389b193e587fb219bc8c74d0c525cefc887d128c93a726b2f287f1acb3cb57e22df30a84da50ed4cefefd7c47ed140c1a1d6ab9017b710e08d07b0d468eabc1ab36c3a451cb6e63fc7004e0c4bd2477b13ee6f3e4309afb53155d65b6b60ed57404e04c06e51ad5fb8ea1dedcdd911f0b56150b49c3804d11ceaf76563dfebc5907c7c8d39574d1b274eb8a4d8a469e855f765a9db75524ce255aff2c6fb81cc0ffa1c46c9d17e43a69cb0389b1bec8b70715c863d7fb39edcb095ea2069dcdd317745a3ccfe3f7cf54ea19762f21607fd25f27ff47d9d8ed4e586380c86f52507eeea4ce87f6290690b35c71b58681862e12435619964e11788a93da60e3fd26b8212248d715afb9fffe512229c6df39558ec7ddd1ef5ba4791caccb015ac3a60e2e2afea31c9528120b90e85ddc67bd88f96aef9145f7a442535a1693b2f58901c9551bce692dbafd10e9eadca28003dba94818c950fb28a9afd6b7fffe052345d94867eb98b8ffa81fc49e7304edfbe398d2eaa69aeb6a311dddb5c3175d2ea58e2da35c3c22799c510b6e032d7381f58272191c1af925e8b8b4ed06c8343bb10d7b36aafedf14681a6474b5f11208c3758d8fbef1647db8e1faea3fd33540886577e5f82766dce80d7170bf9af131ba69c28e9e7b00e7307d42a724da1699c26b6c7a694e39380742d9fdabee46ed527320ee1f81e324e0c00e0f0cbbe8c74dfab2bb5070066b63d3d92c61034985171b2c469637daf9dff0ea012dc66cd737c2d9ca378b6aa8635a91ad73a0b9c305ab395d59a411c7ecafa15d0162dc48caa40f7218a32ff02fabb1687a409afda5623edb0d60a9cfd0db5b4db541ead5b1a7fd47e2659532f4a41124bf0066e71195ae81c38ab4e2a9c49a0390df978651b25ccaaab6fd35803b681201735d189296747a2bebbe0e614b208ba534ca2e6e162c63b794bb6ec4292d0cf425b7b731181b4bf5550f8b01a44e63445c3440051b9b2071dd905f630162d40ffd533dc34a9cd7dd70997ed521f403736f515ed2f36021c2f781cd5731285dcd96f16bfa2197552298edb2ab35447ebd8d2341e59424fab77f43491f895c27e9cd789fdf6f65c6f938b4b3364a6556a53b5ec5f1b73b7e60dc5b07dc7d2a430c021067f9f56959448657957077859763b6a493522c182fdf1d1e64d55dc44f1a336429d5a9ba48874f0049d5ab90a7b168a1311527a33bf8fd23a35a8aeb8b05ece66f699fbba1e41d8878926b750038d4e78488ca2f316ef91ec7f1004ee3b9287ef2fcf32743978e90d7d8aff1f896d54258fff751f17f5be6a4e7ae86d73027927b954eaaa1be0d8ed8bf063c1881687371fae5a3e0b50b56f5b90f20c00afa32d6696e3ecb72e6bb78c679c965e6ad0fdf6ad04d6cb855b621e2f351a45029dc9ac3075071ec44e993010920e3afdf56684c7b6a0a9e9997b29fe872d5f2ac29a86d5f553f9af8ec3378b0f3e2946203bd7ce1ae1eb7dcd3024f308dfd22516130eb88e4065d0613ffd8128d81ff51c9bac8072599a065e9555e46bc29d24a6533500f1bb3a025a36943cdf203c707384bb75984a3af19cacba5caf4670b04e4a1d7f084feb10bca257a054db9bbfc8ed0ff59194d63d6557ece22c97283d4f85b81990407418734a01ae57983e25a3e21f2c098b587f7597d70843b32f3e2b6da7788d70dd085133595cbdb80f605c30e9694d8f5cd08083e6a8f4aae25123d2c1eb7d7c6c201be6286004c818b0eaaa3e91558dccb4a0311d6d5aada7868b93a7eeb6d582d64aa397c38594484ecab29f64216ef1bfeef70580e5e1ddcbb9543df049823da5e638cfab6fe577fa2400e4a0e2f31024bf6fe08fec91dda8b4d4e5c57790f8246507b6210b91aefa440c498fcdbdfe9fd9fffe4ef8a22cf7c9c2de21438711d7013d240367800d802b833485a908635dd48367ebf648da831ada8942a80c2b22c1aec04e931abc914c5244579b08274523556f713a4fb1ba9227ee76cd12cafe39b11c12bc61be366fbd135f80f922c11ae1ccf6682fd38cb1486b509390b92817cd4f27b9d2755a39198cc52ce40c0eb48756a57dfbd98faeb9ae625b83609d2bc9d2f1418af6fff45b7228285de4e9e698455b542c243da5935b98a03bed001c4927d914162ca0e6f6acbbdf152122ee747c72924cf8a844f473915820f9e3a7b16d01cb57fd9fd5fe20dd175f71c60459114532edc56974f714a0b854d6b057b80b6abd692d118ae47f8997afc57c3c4e4247dc404ba32851407f47b169d4333dd5aa8bb49bdea706d78f420710993024370b7505612e30f3af78cdbf6825d618bd4764cfa6016e0893ac9b6be9fd58b0c6c4c5c5354d59108f64673b5e361bc4fb5cd6907977f5ca1f370ea101a0ddd7fb0ad764ceacab38122405859c5f522f9af7071fcae4dc4842e19623eeb7124ea98ad799153523de54c975f7ca7d1043c9dbfce2c20c7dc0ecfdf30221361848f7e6aa470d303653ccd5681a199da699533ef6b78350f4d1e4c0ffdb42539f13c167e9a3c06bf8eda2ee7497f558da59f3c1660851f9bdeef7c0662f8ac64f2cf66fdb74fe5c84a493d5011ca467ae9ecc3753f8ac47a8f91d18a6f9a7c0fc2dbb358facaaee21456fecadf50e0e3f23db08afe6b00eee4352a04667692cf7929c295cdb720c0091bfd670ef646d3fca7b73b0ab5612c00527699316a8506eafb5b2bdd29d2da64defc91170941af8360f536a846b2b23140ee16ee52eee0cc511befe8de7ec8151f3c30301b69b4ace146069fd9d9a7d3d72bb7a10715070a58d3a2220277ae2ec6ada598019fc7c0d0951e9219047b1926f7a9aebacd68501ff9afad0e473d9c22a28bacfa72de094242e93d9a17f975795e68461e8ad5a8136f1f61118ef0c6454a5fb13ad187df647c1486f257b014498cc579ff300eca6236d2c74afb4e27828cd6313ee9ba186ea710418bb7805fb561a192e8b89ec71d25baa0b82062ade845109745de8d9866e7dee8743b88865a2bc668d251c07b0c130001ab0bd368e5606d934a662d0421ec471033ceac1d659166e4febd3f4d1436cb429486c12b78a59aaf48f34a553203e9a85e8e4cc0e92c4e39f5cabc203395ecc00bf95146bb01299fba1711457bc7b916af02aec68a9f9176036225ebca49a4b093a93297113621c58e8cfc17ca8d18a0a396180dea6cf7650a6af5d667f39c1dc37322544e72e2e1eb2fc70f390c88139b2178a811cf208c6c09ba006271f4fc6b64323e56377f187aca5346688a4dfd661d874a79ad411eda9d8d26459a1b608b6bdb6b38e89f87467e5a7faac4e409227561c36e752ad15db9fdeef56265f3f5c9dc75d69bbe371101738664b4d8eba5b09130a00c2257b49bac04ac1be71c53bd3068a772d5d3de34b0f730a08b05f440c9078d50a8c133a6da7b93a228ee56a738e0d838dc11d4e663c52bce6f49edf549565cd17040579c245d352e332b3c02e02c02960e73d9fab1cf658011b574c7af28bb8f6ce6d8ec72c85a0d8c18ebb169cc7e6f6d63593f8293251be8d00ccf3efacb2a63705c8a6998cca321e60b63ae86283022fbcacb0e2c718799a27f3c6874f0a00a4bcb6b9c0227627ecf05331a09e399c43a44cacf1d915e55cd2d9af92ba437969b6034affc9e3fe6773363b2afc7f6b20dd502387e84141b414769e68abc2b74eed91605bf2079a613e9efcbd404f52b5c7db00b0a05ec2598ecf176fe174290b46f96334e4b0f2b1bc5a488a99757c7e32f6e67f2063c502a9024092932b53b28e672298b97942b012134eae574474b10a711cd3c1abb13887d9872ca19b4050c3003947abde71fc719554ae7f7902f1eda1de66c5bc461214bb9ef37280b1e11b4b1195b9db671faa31d0365b43bd90f8700b0da08098f20d4445a1a381b19ca89a05267fb6e14404d34582dfd2bc7f728485a331f6245ca64200d0db5a8978122a1b3cdfb82d3cadc63ab4bb0508009b7279797611dcedf51284b63f56c15c5af200d8f2d204569835ad312377d1d2578aa04025325212e5ccf348c1f46feafbffd4f362cf54cd54b42bd5a18aca25a3f9535632be49b3822ed370a24be9ce7140585c7ad19f4f9b76228516aff23f11b65bda34df7c9de3bdeab35272df116929e54467c6c3e3c3ea2e3d442e42fd640e0b00081736d6bb5ed5772101d189628cfa7667d725f59504fb10f36e628684cae74e186089b851a564c6eb668c50e0c656f8dcdc5cf63d268d28aa4dda5f595ac6a66f605f8655113cb8e0be9e329769a6c4e7823df7ab3b7047fe6ce5897c4d72ae41a3b511660eebc4ee82a4326f26fadc3cc6ff6760fd7793d0feb31bc8f8fdcea79f9d198fe7cb554737253688046574f4dacba0473508910b9defd1214b15146b696b87ea2812c916a3925fcbba5c53842a2b928d4a6bc0a3532a772055c75fb773f5b872af6a653ce92fb9f1269f42f0d948f5121052e3b56097ea20e024e13fbf83e746840935280abc4106007085f76a35319b62a037496e5a12792dd79307d05e5dba026525da2194778ea0967c74588701fb2623933eda1e8d2af411351f68f36b99876c10e4878a831c7e84eb3c3c4c224585d6916f699f9d152a524a565dfe99659203a682cd4138e6800240664a1a70d5dacc3f6cd53a03dc6636de714118b928a0dd27da73c5e5556ff895d5ce1f966669135f3a4b0676c70c221262a0f127ef1faa7e69b8698db35b1a6c043db27ddb7a826aa81596e5de8f9d3cf49a6383dfa0886a0c14c5f9896fac507bc6ee9aafaea5072dee3338affaf8e40d5e7f1a802fd5620e94cbdb6141c5744b03c2e1ed604381e82072b5cc8e45f8e2ae1e7647ef517f4027225797980fb593280e00c7d6b8c8032e3ecc8bc860630fa6cb38fdad1cb169ab8b018a5024aad41a5da3306093401647fb4e51760400c12bc334000640b164de6351d737fb0e6f66a526b218a67558771942d8456623516913f45ff1b148cc85b1441d095a45b2c71c1c1a229a7347b81b0b1ca980dc378b355ae560d28c867868a192d9e3b9a336cd03a0b0eabcf2aacca55de3988c276100ca4d48e628479e495e8e7a726b4ee368a938b359a4308af38c3c46c7a4",
+  "prove_ms": 1,
+  "public_values": [
+    [],
+    [
+      "0",
+      "1",
+      "2178309"
+    ]
+  ],
+  "rust_verify": "accepted",
+  "rust_verify_ms": 0,
+  "sections": [
+    {
+      "at": 0,
+      "len": 128,
+      "name": "root.trace"
+    },
+    {
+      "at": 128,
+      "len": 128,
+      "name": "root.permutation"
+    },
+    {
+      "at": 256,
+      "len": 128,
+      "name": "root.quotient"
+    },
+    {
+      "at": 384,
+      "len": 128,
+      "name": "root.random"
+    },
+    {
+      "at": 512,
+      "len": 24,
+      "name": "terminal[0]"
+    },
+    {
+      "at": 536,
+      "len": 24,
+      "name": "terminal[1]"
+    },
+    {
+      "at": 560,
+      "len": 1560,
+      "name": "ood[0]"
+    },
+    {
+      "at": 2120,
+      "len": 792,
+      "name": "ood[1]"
+    },
+    {
+      "at": 2912,
+      "len": 0,
+      "name": "pow.lookup"
+    },
+    {
+      "at": 2912,
+      "len": 0,
+      "name": "pow.ood"
+    },
+    {
+      "at": 2912,
+      "len": 2112,
+      "name": "random_values"
+    },
+    {
+      "at": 5024,
+      "len": 0,
+      "name": "pow.batch"
+    },
+    {
+      "at": 5024,
+      "len": 512,
+      "name": "fri.roots"
+    },
+    {
+      "at": 5536,
+      "len": 32,
+      "name": "pow.commit"
+    },
+    {
+      "at": 5568,
+      "len": 96,
+      "name": "final_poly"
+    },
+    {
+      "at": 5664,
+      "len": 8,
+      "name": "pow.query"
+    },
+    {
+      "at": 5672,
+      "len": 224,
+      "name": "input.random.rows"
+    },
+    {
+      "at": 5896,
+      "len": 128,
+      "name": "input.random.salts"
+    },
+    {
+      "at": 6024,
+      "len": 386,
+      "name": "input.random.siblings"
+    },
+    {
+      "at": 6410,
+      "len": 272,
+      "name": "input.trace.rows"
+    },
+    {
+      "at": 6682,
+      "len": 128,
+      "name": "input.trace.salts"
+    },
+    {
+      "at": 6810,
+      "len": 386,
+      "name": "input.trace.siblings"
+    },
+    {
+      "at": 7196,
+      "len": 1344,
+      "name": "input.quotient.rows"
+    },
+    {
+      "at": 8540,
+      "len": 768,
+      "name": "input.quotient.salts"
+    },
+    {
+      "at": 9308,
+      "len": 386,
+      "name": "input.quotient.siblings"
+    },
+    {
+      "at": 9694,
+      "len": 16,
+      "name": "input.preprocessed.rows"
+    },
+    {
+      "at": 9710,
+      "len": 64,
+      "name": "input.preprocessed.salts"
+    },
+    {
+      "at": 9774,
+      "len": 386,
+      "name": "input.preprocessed.siblings"
+    },
+    {
+      "at": 10160,
+      "len": 416,
+      "name": "input.permutation.rows"
+    },
+    {
+      "at": 10576,
+      "len": 128,
+      "name": "input.permutation.salts"
+    },
+    {
+      "at": 10704,
+      "len": 386,
+      "name": "input.permutation.siblings"
+    },
+    {
+      "at": 11090,
+      "len": 48,
+      "name": "fri[0].values"
+    },
+    {
+      "at": 11138,
+      "len": 64,
+      "name": "fri[0].salts"
+    },
+    {
+      "at": 11202,
+      "len": 322,
+      "name": "fri[0].siblings"
+    },
+    {
+      "at": 11524,
+      "len": 48,
+      "name": "fri[1].values"
+    },
+    {
+      "at": 11572,
+      "len": 64,
+      "name": "fri[1].salts"
+    },
+    {
+      "at": 11636,
+      "len": 258,
+      "name": "fri[1].siblings"
+    },
+    {
+      "at": 11894,
+      "len": 48,
+      "name": "fri[2].values"
+    },
+    {
+      "at": 11942,
+      "len": 64,
+      "name": "fri[2].salts"
+    },
+    {
+      "at": 12006,
+      "len": 194,
+      "name": "fri[2].siblings"
+    },
+    {
+      "at": 12200,
+      "len": 48,
+      "name": "fri[3].values"
+    },
+    {
+      "at": 12248,
+      "len": 64,
+      "name": "fri[3].salts"
+    },
+    {
+      "at": 12312,
+      "len": 130,
+      "name": "fri[3].siblings"
+    }
+  ],
+  "seed": 1,
+  "set": {
+    "batch_pow_bits": 0,
+    "cap_height": 2,
+    "commit_pow_bits": 1,
+    "digest": 32,
+    "ext": 3,
+    "log_blowup": 2,
+    "log_final_poly_len": 2,
+    "lookup_pow_bits": 0,
+    "max_log_arity": 1,
+    "name": "PTZ",
+    "num_queries": 2,
+    "num_random_codewords": 4,
+    "ood_pow_bits": 0,
+    "query_pow_bits": 1,
+    "salt": 4,
+    "zk": true
+  },
+  "shape": {
+    "batch_pow": false,
+    "cap_height": 2,
+    "commit_pow": true,
+    "digest": 32,
+    "ext": 3,
+    "final_poly_len": 4,
+    "format": "p3b-v1",
+    "fri_cap_lens": [
+      4,
+      4,
+      4,
+      4
+    ],
+    "has_lookups": true,
+    "instances": [
+      {
+        "degree_bits": 6,
+        "label": "mul_lookups(reps=2, local=true, global=true)",
+        "log_lde": 8,
+        "log_n": 5,
+        "num_chunks": 8,
+        "num_lookups": 3,
+        "num_periodic": 0,
+        "num_public_values": 0,
+        "opens_next": true,
+        "perm_width": 12,
+        "preprocessed_next": false,
+        "preprocessed_width": 0,
+        "width": 7
+      },
+      {
+        "degree_bits": 6,
+        "label": "fib_lookups(log_n=5, global=true)",
+        "log_lde": 8,
+        "log_n": 5,
+        "num_chunks": 4,
+        "num_lookups": 1,
+        "num_periodic": 0,
+        "num_public_values": 3,
+        "opens_next": true,
+        "perm_width": 6,
+        "preprocessed_next": true,
+        "preprocessed_width": 1,
+        "width": 2
+      }
+    ],
+    "log_arities": [
+      1,
+      1,
+      1,
+      1
+    ],
+    "log_blowup": 2,
+    "lookup_pow": false,
+    "num_queries": 2,
+    "ood_pow": false,
+    "query_pow": true,
+    "rounds": [
+      {
+        "cap_len": 4,
+        "matrices": [
+          {
+            "instance": 0,
+            "log_height": 8,
+            "points": 1,
+            "what": "random",
+            "width": 7
+          },
+          {
+            "instance": 1,
+            "log_height": 8,
+            "points": 1,
+            "what": "random",
+            "width": 7
+          }
+        ],
+        "name": "random",
+        "rc": 4
+      },
+      {
+        "cap_len": 4,
+        "matrices": [
+          {
+            "instance": 0,
+            "log_height": 8,
+            "points": 2,
+            "what": "trace",
+            "width": 11
+          },
+          {
+            "instance": 1,
+            "log_height": 8,
+            "points": 2,
+            "what": "trace",
+            "width": 6
+          }
+        ],
+        "name": "trace",
+        "rc": 4
+      },
+      {
+        "cap_len": 4,
+        "matrices": [
+          {
+            "instance": 0,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[0]",
+            "width": 7
+          },
+          {
+            "instance": 0,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[1]",
+            "width": 7
+          },
+          {
+            "instance": 0,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[2]",
+            "width": 7
+          },
+          {
+            "instance": 0,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[3]",
+            "width": 7
+          },
+          {
+            "instance": 0,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[4]",
+            "width": 7
+          },
+          {
+            "instance": 0,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[5]",
+            "width": 7
+          },
+          {
+            "instance": 0,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[6]",
+            "width": 7
+          },
+          {
+            "instance": 0,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[7]",
+            "width": 7
+          },
+          {
+            "instance": 1,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[0]",
+            "width": 7
+          },
+          {
+            "instance": 1,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[1]",
+            "width": 7
+          },
+          {
+            "instance": 1,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[2]",
+            "width": 7
+          },
+          {
+            "instance": 1,
+            "log_height": 8,
+            "points": 1,
+            "what": "quotient[3]",
+            "width": 7
+          }
+        ],
+        "name": "quotient",
+        "rc": 4
+      },
+      {
+        "cap_len": 4,
+        "matrices": [
+          {
+            "instance": 1,
+            "log_height": 8,
+            "points": 2,
+            "what": "preprocessed",
+            "width": 1
+          }
+        ],
+        "name": "preprocessed",
+        "rc": 0
+      },
+      {
+        "cap_len": 4,
+        "matrices": [
+          {
+            "instance": 0,
+            "log_height": 8,
+            "points": 2,
+            "what": "permutation",
+            "width": 16
+          },
+          {
+            "instance": 1,
+            "log_height": 8,
+            "points": 2,
+            "what": "permutation",
+            "width": 10
+          }
+        ],
+        "name": "permutation",
+        "rc": 4
+      }
+    ],
+    "salt": 4,
+    "zk": true
+  },
+  "shift": 0,
+  "sizes": {
+    "counts": 18,
+    "final_poly": 96,
+    "fri_leaves": 192,
+    "fri_roots": 512,
+    "fri_salts": 256,
+    "fri_siblings": 896,
+    "input_leaves": 2272,
+    "input_salts": 1216,
+    "input_siblings": 1920,
+    "ood_values": 2352,
+    "pow_witnesses": 40,
+    "random_values": 2112,
+    "roots": 512,
+    "terminals": 48,
+    "total": 12442
+  },
+  "tamper_sweep": {
+    "cases": 84,
+    "unexpected_accepts": []
+  },
+  "tampered": [
+    {
+      "name": "flip root.trace @0",
+      "patch": [
+        {
+          "at": 0,
+          "hex": "cd"
+        }
+      ]
+    },
+    {
+      "name": "flip root.trace @127",
+      "patch": [
+        {
+          "at": 127,
+          "hex": "d1"
+        }
+      ]
+    },
+    {
+      "name": "flip root.permutation @0",
+      "patch": [
+        {
+          "at": 128,
+          "hex": "52"
+        }
+      ]
+    },
+    {
+      "name": "flip root.permutation @127",
+      "patch": [
+        {
+          "at": 255,
+          "hex": "38"
+        }
+      ]
+    },
+    {
+      "name": "flip root.quotient @0",
+      "patch": [
+        {
+          "at": 256,
+          "hex": "50"
+        }
+      ]
+    },
+    {
+      "name": "flip root.quotient @127",
+      "patch": [
+        {
+          "at": 383,
+          "hex": "bc"
+        }
+      ]
+    },
+    {
+      "name": "flip root.random @0",
+      "patch": [
+        {
+          "at": 384,
+          "hex": "07"
+        }
+      ]
+    },
+    {
+      "name": "flip root.random @127",
+      "patch": [
+        {
+          "at": 511,
+          "hex": "a5"
+        }
+      ]
+    },
+    {
+      "name": "flip terminal[0] @0",
+      "patch": [
+        {
+          "at": 512,
+          "hex": "50"
+        }
+      ]
+    },
+    {
+      "name": "flip terminal[0] @23",
+      "patch": [
+        {
+          "at": 535,
+          "hex": "84"
+        }
+      ]
+    },
+    {
+      "name": "flip terminal[1] @0",
+      "patch": [
+        {
+          "at": 536,
+          "hex": "b1"
+        }
+      ]
+    },
+    {
+      "name": "flip terminal[1] @23",
+      "patch": [
+        {
+          "at": 559,
+          "hex": "7b"
+        }
+      ]
+    },
+    {
+      "name": "flip ood[0] @0",
+      "patch": [
+        {
+          "at": 560,
+          "hex": "c2"
+        }
+      ]
+    },
+    {
+      "name": "flip ood[0] @1559",
+      "patch": [
+        {
+          "at": 2119,
+          "hex": "0b"
+        }
+      ]
+    },
+    {
+      "name": "flip ood[1] @0",
+      "patch": [
+        {
+          "at": 2120,
+          "hex": "c1"
+        }
+      ]
+    },
+    {
+      "name": "flip ood[1] @791",
+      "patch": [
+        {
+          "at": 2911,
+          "hex": "09"
+        }
+      ]
+    },
+    {
+      "name": "flip random_values @0",
+      "patch": [
+        {
+          "at": 2912,
+          "hex": "de"
+        }
+      ]
+    },
+    {
+      "name": "flip random_values @2111",
+      "patch": [
+        {
+          "at": 5023,
+          "hex": "07"
+        }
+      ]
+    },
+    {
+      "name": "flip fri.roots @0",
+      "patch": [
+        {
+          "at": 5024,
+          "hex": "c4"
+        }
+      ]
+    },
+    {
+      "name": "flip fri.roots @511",
+      "patch": [
+        {
+          "at": 5535,
+          "hex": "84"
+        }
+      ]
+    },
+    {
+      "name": "flip pow.commit @0",
+      "patch": [
+        {
+          "at": 5536,
+          "hex": "00"
+        }
+      ]
+    },
+    {
+      "name": "flip pow.commit @31",
+      "patch": [
+        {
+          "at": 5567,
+          "hex": "01"
+        }
+      ]
+    },
+    {
+      "name": "flip final_poly @0",
+      "patch": [
+        {
+          "at": 5568,
+          "hex": "73"
+        }
+      ]
+    },
+    {
+      "name": "flip final_poly @95",
+      "patch": [
+        {
+          "at": 5663,
+          "hex": "20"
+        }
+      ]
+    },
+    {
+      "name": "flip pow.query @0",
+      "patch": [
+        {
+          "at": 5664,
+          "hex": "01"
+        }
+      ]
+    },
+    {
+      "name": "flip pow.query @7",
+      "patch": [
+        {
+          "at": 5671,
+          "hex": "01"
+        }
+      ]
+    },
+    {
+      "name": "flip input.random.rows @0",
+      "patch": [
+        {
+          "at": 5672,
+          "hex": "18"
+        }
+      ]
+    },
+    {
+      "name": "flip input.random.rows @223",
+      "patch": [
+        {
+          "at": 5895,
+          "hex": "ba"
+        }
+      ]
+    },
+    {
+      "name": "flip input.random.salts @0",
+      "patch": [
+        {
+          "at": 5896,
+          "hex": "2d"
+        }
+      ]
+    },
+    {
+      "name": "flip input.random.salts @127",
+      "patch": [
+        {
+          "at": 6023,
+          "hex": "02"
+        }
+      ]
+    },
+    {
+      "name": "flip input.random.siblings @0",
+      "patch": [
+        {
+          "at": 6024,
+          "hex": "0d"
+        }
+      ]
+    },
+    {
+      "name": "flip input.random.siblings @385",
+      "patch": [
+        {
+          "at": 6409,
+          "hex": "f9"
+        }
+      ]
+    },
+    {
+      "name": "flip input.trace.rows @0",
+      "patch": [
+        {
+          "at": 6410,
+          "hex": "d0"
+        }
+      ]
+    },
+    {
+      "name": "flip input.trace.rows @271",
+      "patch": [
+        {
+          "at": 6681,
+          "hex": "d3"
+        }
+      ]
+    },
+    {
+      "name": "flip input.trace.salts @0",
+      "patch": [
+        {
+          "at": 6682,
+          "hex": "b9"
+        }
+      ]
+    },
+    {
+      "name": "flip input.trace.salts @127",
+      "patch": [
+        {
+          "at": 6809,
+          "hex": "29"
+        }
+      ]
+    },
+    {
+      "name": "flip input.trace.siblings @0",
+      "patch": [
+        {
+          "at": 6810,
+          "hex": "0d"
+        }
+      ]
+    },
+    {
+      "name": "flip input.trace.siblings @385",
+      "patch": [
+        {
+          "at": 7195,
+          "hex": "f7"
+        }
+      ]
+    },
+    {
+      "name": "flip input.quotient.rows @0",
+      "patch": [
+        {
+          "at": 7196,
+          "hex": "ff"
+        }
+      ]
+    },
+    {
+      "name": "flip input.quotient.rows @1343",
+      "patch": [
+        {
+          "at": 8539,
+          "hex": "69"
+        }
+      ]
+    },
+    {
+      "name": "flip input.quotient.salts @0",
+      "patch": [
+        {
+          "at": 8540,
+          "hex": "c2"
+        }
+      ]
+    },
+    {
+      "name": "flip input.quotient.salts @767",
+      "patch": [
+        {
+          "at": 9307,
+          "hex": "4f"
+        }
+      ]
+    },
+    {
+      "name": "flip input.quotient.siblings @0",
+      "patch": [
+        {
+          "at": 9308,
+          "hex": "0d"
+        }
+      ]
+    },
+    {
+      "name": "flip input.quotient.siblings @385",
+      "patch": [
+        {
+          "at": 9693,
+          "hex": "b6"
+        }
+      ]
+    },
+    {
+      "name": "flip input.preprocessed.rows @0",
+      "patch": [
+        {
+          "at": 9694,
+          "hex": "51"
+        }
+      ]
+    },
+    {
+      "name": "flip input.preprocessed.rows @15",
+      "patch": [
+        {
+          "at": 9709,
+          "hex": "05"
+        }
+      ]
+    },
+    {
+      "name": "flip input.preprocessed.salts @0",
+      "patch": [
+        {
+          "at": 9710,
+          "hex": "ef"
+        }
+      ]
+    },
+    {
+      "name": "flip input.preprocessed.salts @63",
+      "patch": [
+        {
+          "at": 9773,
+          "hex": "f3"
+        }
+      ]
+    },
+    {
+      "name": "flip input.preprocessed.siblings @0",
+      "patch": [
+        {
+          "at": 9774,
+          "hex": "0d"
+        }
+      ]
+    },
+    {
+      "name": "flip input.preprocessed.siblings @385",
+      "patch": [
+        {
+          "at": 10159,
+          "hex": "2d"
+        }
+      ]
+    },
+    {
+      "name": "flip input.permutation.rows @0",
+      "patch": [
+        {
+          "at": 10160,
+          "hex": "f6"
+        }
+      ]
+    },
+    {
+      "name": "flip input.permutation.rows @415",
+      "patch": [
+        {
+          "at": 10575,
+          "hex": "0c"
+        }
+      ]
+    },
+    {
+      "name": "flip input.permutation.salts @0",
+      "patch": [
+        {
+          "at": 10576,
+          "hex": "31"
+        }
+      ]
+    },
+    {
+      "name": "flip input.permutation.salts @127",
+      "patch": [
+        {
+          "at": 10703,
+          "hex": "73"
+        }
+      ]
+    },
+    {
+      "name": "flip input.permutation.siblings @0",
+      "patch": [
+        {
+          "at": 10704,
+          "hex": "0d"
+        }
+      ]
+    },
+    {
+      "name": "flip input.permutation.siblings @385",
+      "patch": [
+        {
+          "at": 11089,
+          "hex": "24"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[0].values @0",
+      "patch": [
+        {
+          "at": 11090,
+          "hex": "45"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[0].values @47",
+      "patch": [
+        {
+          "at": 11137,
+          "hex": "75"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[0].salts @0",
+      "patch": [
+        {
+          "at": 11138,
+          "hex": "a6"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[0].salts @63",
+      "patch": [
+        {
+          "at": 11201,
+          "hex": "12"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[0].siblings @0",
+      "patch": [
+        {
+          "at": 11202,
+          "hex": "0b"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[0].siblings @321",
+      "patch": [
+        {
+          "at": 11523,
+          "hex": "9a"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[1].values @0",
+      "patch": [
+        {
+          "at": 11524,
+          "hex": "41"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[1].values @47",
+      "patch": [
+        {
+          "at": 11571,
+          "hex": "42"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[1].salts @0",
+      "patch": [
+        {
+          "at": 11572,
+          "hex": "bc"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[1].salts @63",
+      "patch": [
+        {
+          "at": 11635,
+          "hex": "04"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[1].siblings @0",
+      "patch": [
+        {
+          "at": 11636,
+          "hex": "09"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[1].siblings @257",
+      "patch": [
+        {
+          "at": 11893,
+          "hex": "1a"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[2].values @0",
+      "patch": [
+        {
+          "at": 11894,
+          "hex": "c9"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[2].values @47",
+      "patch": [
+        {
+          "at": 11941,
+          "hex": "5e"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[2].salts @0",
+      "patch": [
+        {
+          "at": 11942,
+          "hex": "ca"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[2].salts @63",
+      "patch": [
+        {
+          "at": 12005,
+          "hex": "40"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[2].siblings @0",
+      "patch": [
+        {
+          "at": 12006,
+          "hex": "07"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[2].siblings @193",
+      "patch": [
+        {
+          "at": 12199,
+          "hex": "6e"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[3].values @0",
+      "patch": [
+        {
+          "at": 12200,
+          "hex": "ad"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[3].values @47",
+      "patch": [
+        {
+          "at": 12247,
+          "hex": "8f"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[3].salts @0",
+      "patch": [
+        {
+          "at": 12248,
+          "hex": "44"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[3].salts @63",
+      "patch": [
+        {
+          "at": 12311,
+          "hex": "77"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[3].siblings @0",
+      "patch": [
+        {
+          "at": 12312,
+          "hex": "05"
+        }
+      ]
+    },
+    {
+      "name": "flip fri[3].siblings @129",
+      "patch": [
+        {
+          "at": 12441,
+          "hex": "a5"
+        }
+      ]
+    },
+    {
+      "name": "non-canonical ood[0][0] = p",
+      "patch": [
+        {
+          "at": 560,
+          "hex": "01000000ffffffff"
+        }
+      ]
+    },
+    {
+      "name": "truncate 1",
+      "truncate": 12441
+    },
+    {
+      "insert": {
+        "at": 12442,
+        "hex": "00"
+      },
+      "name": "extend 1"
+    }
+  ],
+  "transcript_hash_inputs": [
+    "a1000000000000000170332d6261740063682d73746172006b000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000ec7d0e6c70c9f00ec082ab64e22bb008227dd96bccb720070f5276cb6848b002f44a9ed92000000003c00000008000000000000000002000000000800000000000000000700000000080000000000000000020000000800000000000000000000000000080000000000000000018000060000000000000000000000000000000000000000000000060000000000000000000000000000000000000000000000cc63bd84baa0f6dd879cc36ab4ea56a26e62921d33a13c283c994c6a8c0ff65a248e0bf4844591f611f0a2c23149667087e3568d5b261eb5cf7347430e995a34ac36c5a70673fadd1c1141544f12b6a3f7ec5ac995929e089c49371c740cfa3a34c0777bbb78f8dea2fa227edcbbee4310c1a19b6909326632b6ebdace2732d000000000000000000100000000000000053d2100000000006c2099e87d2f01de38ad2058b2b81e7343e94d8977de1eb7b4930e6242bcd2df16e99b2b89a732582ba9abb922e8079b75cb7487771aa80f189d926347040145b2a583e8a3403b89c98a0f27d92ecf02f5179edf91a4e3b28bcb94aa22d27357ff85e6e03b7063af3527438ffb8c92611f333e7aa28a6246b2a01b28c2f6b40a",
+    "eb539103359c2c3d542d5695f20c077254855057ba9d041e1d85e6286ef4c3e7",
+    "3cb9c8ee8a5f4a69e419759e7f191ad54535b230df3b5d261ba3682495dd1ae553e78f8caec122bf6f8630ceb79f5070dc94594bfdb163eb62641d56093d563852cfd154424008d53ef91db372abfb9997137a15ec06c92b3743d46d43dbb1cbdc1a382e8cc0fb0ee39db3f0cb1a2a6baef1cab0ed5593e91bf2f756dee12b759a3ff4a3d212230117294ec043dcf52d047c2480f4311d499f04d082b503ca39512b83fab61cd2ac14a1f41da69e29ecdc4f896265861985b0d47c0548e32d53ed5e0be25861d61325b0769d9979e67a",
+    "432f998b6bb861157986f6393f3a592026c11608e953fefb1a3ff16711424bf351a34cd3962ef4286d073fd710b34cdf048035db37cd081a359e2d2399d81b0c1399366f6157b127e0180a1cd33e7667ee075262dc06d692b09baba5f3df8797a708f4e81008460af9b72a860f16c56e2bc379c4b29deaabd39c9e16725a1dbbe9ab314d86791a7fe7617e97ef50e9023866ba78dedfa642acc3ef1ae0b7bdbd066aaf4fcfb624243d674705cb04e073b226f8abe7582e6aac66b220e48f75b6d68e9483d62be0d9c2d46098936c4207bfb1ec76bab9d3d0af307c69ab5456f53551ca49aa0ffba94a0320763d96463ee69221ea5108889ed83f5d6635bb850ae6c961ec69ea88b94456d62d8e7881352b290416efcc37f5a9d0a10f816122a4",
+    "9db145f75d7d18877ae4877c5ba314d9729fff8d585b1fa077bf9df597257a5d91010000000000000170332d667269002d7063730000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a736081f76103005eeb0b96be255500e1df0296e5a2af009d674ba9144fbb00f831484ebb000000012c0000000800000000000000000500000000080000000000000000020000000008000000000000000001000000080000000000000000000100000008000000000000000002000000000800000000000000000200000000080000000000000000020000000800000000000000000c00000000080000000000000000010000000008000000000000000001000000080000000000000000000100000008000000000000000001000000000800000000000000000100000000080000000000000000010000000800000000000000000100000000080000000000000000010000000008000000000000000001000000080000000000000000000100000008000000000000000001000000000800000000000000000100000000080000000000000000010000000800000000000000000200000000080000000000000000020000000008000000000000000002000000080000000000000000000280000000000000f610d801f26ac3439594df77260f6653eec85b3028b187b3d6a609694a99a167a6d9063025bf177a424344bffd4a3200394f03fa2e4a41981d7f64ecd5521322858ce14565c8dcc6dfebec500bbe293d8c129c6260a8c2ee78c213fff2bf750da80ca5fc44465d205ee745a0d03fc54541d4c08ae9ccebb211d4ea340bac43a5aca4d0ed7a6c4e3ca475e0da909a3b48af668b8e9377cecebaa606af9165b7260a7aa835763493afb833a05e32030064bca3f5dd8c19af9edb494f0ada23e5d178d4e01252975a3cb281aec302ddbb6899a3735935ee05e52ff3ae0414594ce25419ac4e7ecd68616cca8a25def06943c03597562eee029b053c2680a1ed986a5dcc3b8558adfb8f223b48e9ef65b02d7372fb051565ad920518ecca3a6d218eb048b94860347cf04039d270e4b4585163c851c4765d3e18ab1d604597331e05b176036a9200a572820274df51557fc9c381c5b9fc62f0f9d8536cd3bc99c8a561a0d4bb0b18a17b1ab6faffff6f9c0622b3ab054a648887cc9047d6ffb95f6e4a9c2d5f79a2ff17842489690e6742ae964476020a3f5e4088c2ad8179f0b05f0e41e55615cd5695626a659e7417401d54183993cdcf83178dc87af9d111e3d6c9d8e250e2ab62911e4ea21c0acd338b1bc5932043e66973783330b3b6b9fa26ece34bcb975c078a3f4f965d2199d98b2a3f72676f5bbe547fa7c828ebdf014a30462035380b5e0bb2ff34725b5c7b0a0e51cf93d415e5787cd57aca44684cc90d2d15e92085e20eb68da1f2f8e90158b086791cd74a8ab2e0ebeb91387b2f5883df82de1b9f1f2e9cf8af98c8cfa0f50ba3ba1c0bac93e315d0910adf7eafa6e4e0888e0e7fd7adfbdc3487c3580099d53e5338884655cfc16adbc5e11cbd9799e70fbe60a75490286292da13ae4fa8d80cc70c6ba913e673a7c195e13eb144fa4cbedf17457899a26780eada7f64633f34206a4ab061ec401fd344f1a2775e7e45e94e90d84dade53543689f5e7a4372867ffa1edf83a6d71f4449fbe250ffc3a053d278eda5ec6da21f142776d594bbafae7d12805dbcbfd6f6421dca481590a9be9a58f9c3b21818396d71d43ad225d6b2b948ed8b17d3d3579aaabe05d18a868b5423610d130fea67006990fea3182f329c26ce9e237304250eb7e3a0db31eaadbfa18abb389090df2a1bd2228c9dc61c3c00459eb5f976e8a7555f66a2c0ab5515223c2b3b5b045e341fd0b8c8bb031f0fddbb1c65226ee6e58eafffeb3eb34bdb27ab1ddbc125866c04d6a3fcf3cdebcad3257d5ca94dd05c67926c27b4a3a48df05a753530ada8850b1a925a4c8f0c13cd872ac175d68945e4020627f43da121f3eb064469e3992f72ffa418ac16528a0074f345fdf6923b9aa90a0eabc757c6cbebfea0806fa7ce2df1311dd69ebcaa47c5b4bae8d672df077468e0811243fddc16cc9c5479c7d8c63595b448f1e13ee4ee3153240cd08b4e591a400577c9bfc26bfea2905ec4c308f74ae487b48f2db9970572748adea2ef9becd944573d766b32905e9b1a096115633c9702ef45e81ff668f7409f45fdf0cd12d125abacd431d2f05079b309dfb8a8616cac4aeaf856bd16834861c1976fa3a81db216b87273a1b753529a797b84098882fb8056e7907a1bd333f32286ef8db2d336afec0c6cc239d6bf84c00f93ad936935f217ffd724d454c80633de715e534976a09ee29b1397271e645046bba2ce12c72a33b60556628295c6b6202c68bec245899c1dd46ce0f03bb43f9495ac6d7f539397d649499aa9640b704613e1c6fbdd12e149ed75a2195ae62771d76523af7857386f27ba006c6352bf9929c7be040534c1ba925271c449e7ffcd4fe38202cbbfe1d9f4aa847bd39833e71ce024242d1707c7c978733e2f9f0bf4b96cf62e8b1fa7eaeac4c6f6c91ea8e96bf9c75b0774299ed75cbb42d46f7fefddb4f93c17472336bbbd3e506528bd6af80a0736e1cd04a597bf81cfa210df2f78f953f9850c618a88f0653327ec1590f84d8dece6db33ecef1308b972434bef7fe40dce8483b97877fd708ecc8e62ff2013a8039c53ee19ec274aa7f753bed6f0b18400908e536d8a45bf4c40414c96477049bee2b1a18f39c77e7d6dc3de5e56e505196fa79aed85362b2b2b50ed48caf048237af0f5801b63c718fecaacfdc3ea2d3257f2a71cd397cbf41542e4dbf473a3fa42cf89bf0587880572f8d525237d026fdd0bd0ed7c74285f7fb9525eb4853303e91f255f0300da22b75edc6e6366fdf49252120bd718bad5c65dacc9515a46fafbf79366ef4a344d5b508e8a4f6d0a6d86adcb5d1f8755a70a57757cb4bdc3d054f2d9f0d8dd3f132f9e26ba4a39c76b9f5c031898571fd67a9f48eb97100e2075adaf5d77ad38ba9c0ccce13c75d64a95064b9f8e3b9fc4febd2db783d1c6182658868bfe464ab8ad9539b3d145df723cc33865f8a7d9f3d92fc1dc303147fd6d3c9d8e6dd9d9d27f3fbb19599c1b4bf212558ec7bae06a00e12bb49b146634d0423ada71e49886aa37f15f38e635b736c67f4a036ea8ad1980e318782bedb26df6c528f454b344fbf0b627bc90d3493ebfd48abd661b6f94a16aa6327b276c57fefab61c32abbe2aee389706baa2f1d8c6d6098b3f4c22bb7da43e680d9ec1e759eb5a42b2fbd74e88abc7caffece87b0a6d1a76c70cc0565265d13ed788a292c78c2c2a44af9e9322435347822c52f4d9a9dc3921a96a8ec8186117369a97cffc369bfee7a6da5ef97c4594a9a7782ef22650cc5db598b4bf840bc57472c3431cd233cb0d023f7ef4dfce80fa269ae7c0fa448eb2aedc4216f1ed9f006f161d89eb3eb7380cb9dd6fdfd0414d72a8c46eabad2d81409cfc8a48a628bafc33b3f8bbedcf3e86642ca9bbd10fb8093265bc615193a401ec186689bf2668c693e6731a544daa52d762e237b315463fbf2d1ff1515fe98f00697e8171141b8a39b974617abcc081e75e110c357d5d05832af982af70f7e08d81a2c324233f0a8e1c8405306540e1f3b12a0a9f4130d28f50e17b8b8e274fe09364c7f5070fef855db8bb2d070e76062de8a689915cd22d731785a14ee303f16615393ea7a04b493e22a9cb5faa94d4673904dbfe8b6dff136fcfafd1cfc1605a7c9038f2c66c57916bfc7e14264968ea64281c21d67ad76031acb0935b00f28b36b3db4c565ee9c4e1031e8297f2f8694ee36a69f0cda3594452ccbe9f7874b51edb537ed6b3ff1e169392d413c80d8442a89bac0c28f50e031c055af8d7078ccf273410d485bc3fc2374b5da760493aa1df241bc9c504b48e3586af3cff6c0b2b1a8fd331b736fee4789fd8e2344d35e696984b3d7884522eba4e54d6ab82239fb279b8734b32282ab7498b7adecb01691d04344ca19651f61ae39fe2ad0f5d27536e981cac446340531931d80c4ee8e9a84420a7954c98070885bcf82141509dad6e57c6b09ccdbd59c843832c714bd5f88e03adc54f42e74efc47713c434aa0d20ce9be6dbb991413f7c0151b6527e0f352f8b0d3be7cb6fc069fa7a8f88957068fc91f0aedc09b1220825566bf722a3c1dcc847233943a1c3d197b833b4517b59ae9cb8de91e8c2fae8443385e371c1deae065ac87b469ee5f2be5641a4eb96786005eb733f75ecd6a8743b491cbd84294ad8a5ea74aac3b1dfba396205495a066332b3dc0b4d0ffa38cf785081b4f8a9ff113ea9610a2247c04c05198bcbdf8c244110df9dfd3150cc32ba522822a6b41e33a324198b3a868cc72229019c6dd78aacc72f45bb6c23d12c3a553d1be2d0f667d227998d17062bf507ce3cafdf45f180dece9ec6f05d86563054927f75aa68d8805d4addaeaa777fc838c364a5981c8b3a5c9a96c8a6a607f13ef8c650f364a348e61f90c04b5c58b327675b0eceea410e322d5414d744453ee0b388da6a5b79dc6a28026ec0ae6a81e63422b7a3026db4860b69ae5c79a32167402f4b1559e56b836c5cd9f6d14df3b61e554737e7a5b5a79c848efd3c387e29bbbab36ec8a6142226f214ba188e5703550d2dea4359c90a540ea0969d99a99386f7cfbb364365f9d3a77d234564cdb93eec055c0d3e7cef9555cd7c885df464c3d5499e7b2aaf4e10b249c1168c39d0e7f95907fb8f3273f9e29e70deafbb7f645b6adcb3077ca20d4bc2bbc8115ba809ff675e98fd768a990aff9464d82278735018bc8e6ce41f2aa8afbb9e02202837cf19afb3db1fcb487cccd1a39600802542b11a085c4259bf556dfbae3dc7e18b5edd3a15df968cc6b9b55c1cd50a0ae581249782e3a0c1c703102e92dd64ebb0df0b7fe24bc6f6df0b1a498bf61048d6fe3062a3ca0a91fb1cca3a36bff744fef849b8fde063c8e857e82de9df506791bb7016fb1769fe933c59638a6733941906484ccebcab481262f7ccf14a947ac9983e4f00fe64d662930b0091b44182f47fbd805bbd8baa6a45c8833e7e5751a19e84c80e9373fbc184fcf66f9fb384ab34e8b6bd1ef0269a609a1ea8e641f9c1c89fd9f8e14fe02d0fde5ea3f6679061ce77706d7e819c1088b8562ff05a6bac3eb868c5cc9c66eea881ba6235aae9abcb213f7c88c00c3727aa10c767176023fbe1fa04863c6298153de95fe1cc34a847faf281bec5f821ce15fc10af8fd83299fe3c5f1f1a726903f53b59bcb96ec6a6b0af65763e302c618ac0780a88a217715379a88fd1e2c1d65c0201f761c33b006c59c28ca611ea904e35ed96427082239d5d2cba4913e1d521350531e602c724b2b6b6156e933bf371206deb5a691a43c175ec0c416682fa1798d4890e3875c24e569a5a600cabb52a9fbcc3695366e2382507289ab96ff5fe384073ae70115aacb78158a96748377d8019333d6c6c45a8be71f0e4e9eb1ec5eaa260eece57cf9554102d797ffa53b0ac8ecfe087165a955e5fb26d849e18f1c5497b02a9877db0ab053a44067762847024e191e90671d7c8ab8b904c6110d5204dda545c8d0e930db92272e09a76f27c3a54c63519809174b7cde9adc1009cbccb815141e41d87d877415fe712d9c067533a75d8e3e463fd2e31439bd5bf6685f04711f1c326272cd9cac624a9a24a8e293facd4f2de55955f77901f00c27bc639985ed45d31860565fbe0763814368629cf11a9d983bbc2eea8599d510e86c13e953b2a40227fc1c65c319de77e4d469b24f9ea9813539d52424f8a311bd6867f9b20811b1036ba51847a121d7156564fecdf91994b42bc7627873fbebe464bb374a8d6cb9fbcfebfaf51dc6ea050a10997cccebdb18bca53359d78d34afcffb158109056aa4b6c1e4662477bea0e9e48d7fb443927b9aeabbf64509ccf0a1ea39495fc963652d07a69ec69993fb871bd1a429503633567e0d79bb9d7f3596deed28ffb0a5d966b4edf37c2c1b65cec6134f5fb5c31c5924c2f4c6e0e2aacf342a8d30e5b69d43acf1983c76951161766aca301a955947d280d9b50ab08b2293339e0d6492cf24b9b2327c1049ea2ecce6a4b8af4a1f389e850419a977a618ee511135205ad52eed756b83ccd1a751c76033c5ce4702b20b1656ce274530e8649b7632557cabb48b6a080cde860c1fd8ce20309778a56dde390f3a5b59dc25f43ab202db1fe5aaf14b00a69251ee1ac48db7880a30338717ee8c4fadb38455ec72480579fb8b29ce785596268dcb47bb74184f0c835a31ec2f61d21ab8aab8cec5f819b001c6f981f3b0bf5413a3c374aaa5fd8f86462f8b4ccbff1811f53e3716d4929857e24e68117bf28c4af2cfc1d5e63c880ac88a2f161320c381fdf2a4cd30d09015349182fdd4efb7ee594a05435fa8738f0c9220d81b269282fb9ad1ea0d0baca3c73a75bec3cb0da30bfa411d3c5af17eb4c2a266e5cd79ad9900474ec5f438b33c3951dd827de96454e821e93e83634d3af2b8e0e68eb903c7db613f409ba20c93d07cf68fa09e93cf4cc52f42ad94e644a444ef2dcbea54fdae677d3b2e513cd73c40ae2ad321b6f42ae62c465a47690e32d4609d41cfb5b4fe3baa6c89a6f5a910be6f323c39602ee699e6aed48d543eecbc36aeb0d5d3a5d5ac5a3008add94583ba2301d39365721711f329be7ce4cf630ddeb0a2b9112ce97c191e0fa9ae3d9ed3d4dc3b623a011cf7b181db3d90f21cd2608eab08fbd16936b40a50fcf5a8a862ec485bc0ea4ce7d033a0dbe5e867614a5bb6b6f103880e1cf5c8973bf09ac0af0ca26765324a20abdc041bcd2b7c7b06d6da511d2470880224881341f87f12c7ad08de7e068abf478fd3e8a4b9f7fb3523469b06",
+    "dab1f377154bfa1f9db87d6e7014c533b402b97b0f73c2866e2d33c0e8094fa6ad000000000000000170332d66726900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000694e8e8f76fa400c90e531223f6dd00161bcff2cf7816009153e3796f17ca009c4b5d405600000000480000000800000000000000000200000000080000000000000000010000000008000000000000000001000000080000000000000000000100000008000000000000000001000000000800000000000000000180000000c567bf28b781ef0ef2cbe59f6e21fc36e434c5974a401e463fb32030a514e3e225af544d28f6744acabfd37f90f264399de84e9a5817528fc68a18925f045823ae3aef4435bd20c06e24dc741a338e28dbfbb4a73d33fcfabac9139e763099c115c30ba8730c50a8a9561a4164369e892377f4e89e2b8ad25384da234a8695b5",
+    "74458922aebb59b754c0bcf0da32402fcec400b7c330182014083e51896ae6c10100000000000000",
+    "74c9baca818459e1bd97579a0f040b0b81126c6e057facc98c851940dfe0a28e901f1cda018c3a1715b3d84b2781fdd91f82311c42c6e74bde3d3c79c18c266f3aeeb5c6bb1f859d20a8157e6aeaaaa638b616c7143667e8e413831cf72617f39cc3f1a32ce24953457f8a872d031b4835311479a51f376f2b9b563604b7cc7d53a5776e893241f1a74f4c5b150549f4fd0efd75f35eafda1cc5f1a3558cc7fe",
+    "cf8725b47df44f4a47dbaeba52d94ab088c051390a95d8eab3f9cb53841d95690000000000000000",
+    "e60d598eeac9fed5d2864db84ca1b3a5ca4f4ccf4f84f31733f8552f3574784edce341caca4454b6ef2dae1dc89b0bec0191154c702a6cbcd193fde000fee5fc73aa63a59f6b290291ce172c14f3995e2a4056975b9c6fa5f5446bf6463fac5485da3b4b7e3a93479ef3b05486f5b4111f106b92a484fa65eeb3f1de2d62ce0bb32f8ce2d02d8942c5cec5dc2b19931a31c6f8fd8a3fe0bfc6fe080e2e7a7973",
+    "7fd060d62ebb99e356379ab17fba5138cd9cea3694d769c2b83bef66034a25fc0100000000000000",
+    "acd85f52cec4ae997e4e164ad98d647ab1401924e4d1cce2f9cd48e28be5e9a6f5e887d68fb2291d0edd45db521c0cc89fc88b52d8c6ff5f864f26d4f2d606e3b040a11276b93cd8603e2cc11e4090cf2fa46b0f638d1950e613fe9e4aea843f0780c96616aec49c54d5c82c50bb37a9b5afbea788b3f66694d233cf4f06140f65a78fdbfb2e71f04c7989cd0805d9665eb79b611a1ddbd952c86dcb87736d85",
+    "d9b39692c170ee19b8e1796eba2bccbb6d543f57b3d0cb4623a43f43b6fc15820000000000000000",
+    "2525e50ad19ffc1c32141df5dc83419d5ac0c5bb91ab0dc9671ab1f41d1bfcdc72f0a9352becdc5aa3f89da0be7bf1185dd56af2cdffafeb3bdba07cbf2e584049fada33dac55e2eb992f98e4519e8ad6dd12947c35406e211fc706b3c4445960fee200e675ee34a20a9830f15411c6a98e43efc5f82f5b728f26dfa53b46521",
+    "e25741621d9da6926375700a90ea9244b391f244dbf15b5a0a3a13b83d9f38280000000000000000"
+  ]
+}

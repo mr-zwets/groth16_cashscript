@@ -1,0 +1,31 @@
+[package]
+name = "pq-stark-batch-prover"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "verifier.cash Track 8 research: Plonky3 batch-stark proofs with SHA-256 over Goldilocks (cubic trinomial extension), serialized as p3b-v1 for a CashVM verifier"
+
+# Plonky3 pinned to one exact commit (2026-10-26, "fix(stark): report a constraint read of an undeclared next-row column (#2585)").
+# Same pin as Track 5 (research/pq-stark/prover).
+[dependencies]
+p3-air = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-batch-stark = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82", features = ["parallel"] }
+p3-challenger = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-commit = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-dft = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-field = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-fri = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-goldilocks = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-lookup = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-matrix = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-merkle-tree = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-sha256 = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-symmetric = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-uni-stark = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82", features = ["parallel"] }
+p3-maybe-rayon = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82", features = ["parallel"] }
+rand = { version = "0.10", features = ["std_rng"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[profile.release]
+debug = false

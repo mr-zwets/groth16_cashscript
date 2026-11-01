@@ -1,0 +1,275 @@
+{
+  "all_as_expected": true,
+  "cases": [
+    {
+      "accepted": false,
+      "case": "ROOT[0] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "ROOT[1] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "ROOT[2] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "ROOT[3] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "NF[0] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "NF[1] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "NF[2] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "NF[3] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "CTX[0] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "CTX[1] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "CTX[2] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "CTX[3] + 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "NF[0] - 1",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "foreign ROOT (another tree)",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "other CTX (changed outputs)",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "ROOT and NF swapped",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "CTX lanes reversed",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "ROOT[0] and ROOT[1] swapped",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "verified under VK Z128+cap=5",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "verified under VK Z128g",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "verified under VK Z128+q=23",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "verified under VK Z128+qpow=23",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "verified under VK Z128+bpow=19",
+      "set": "Z128",
+      "statement": "m1"
+    },
+    {
+      "accepted": false,
+      "case": "ROOT[0] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "ROOT[1] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "ROOT[2] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "ROOT[3] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "NF[0] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "NF[1] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "NF[2] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "NF[3] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "CTX[0] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "CTX[1] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "CTX[2] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "CTX[3] + 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "NF[0] - 1",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "foreign ROOT (another tree)",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "other CTX (changed outputs)",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "ROOT and NF swapped",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "CTX lanes reversed",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "ROOT[0] and ROOT[1] swapped",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "verified under VK Z128g+cpow=2+lpow=8",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "verified under VK Z128g+cpow=3+lpow=0",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "verified under VK Z128g+cpow=3+lpow=8+cap=5",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    },
+    {
+      "accepted": false,
+      "case": "VK with another preprocessed setup seed (other commitment)",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "m2"
+    }
+  ]
+}

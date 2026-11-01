@@ -1,0 +1,37 @@
+{
+ "files": 36,
+ "cases": 1030,
+ "unexpected": 0,
+ "na": 0,
+ "refused": 0,
+ "encoderRefused": 0,
+ "families": {
+  "valid": {
+   "cases": 36,
+   "chainReject": 0,
+   "accept": 36,
+   "unexpected": 0
+  },
+  "tx": {
+   "cases": 144,
+   "chainReject": 144,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "root": {
+   "cases": 36,
+   "chainReject": 36,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "layout": {
+   "cases": 814,
+   "chainReject": 810,
+   "accept": 4,
+   "unexpected": 0
+  }
+ },
+ "list": [],
+ "skippedFiles": [],
+ "layoutB": 0
+}

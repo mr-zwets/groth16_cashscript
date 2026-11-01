@@ -1,0 +1,167 @@
+{
+  "all_rejected": true,
+  "cases": [
+    {
+      "expected_reject": true,
+      "ms": 683,
+      "name": "m1 sbox cell",
+      "prover": "proof produced",
+      "set": "Z128",
+      "statement": "M1",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(0) })",
+      "what": "u0 + 1 on row 1 (first full round): breaks A_0 and C_j"
+    },
+    {
+      "expected_reject": true,
+      "ms": 907,
+      "name": "m1 state cell",
+      "prover": "proof produced",
+      "set": "Z128",
+      "statement": "M1",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(0) })",
+      "what": "s3 + 1 on row 300 (partial round)"
+    },
+    {
+      "expected_reject": true,
+      "ms": 1611,
+      "name": "m1 sibling",
+      "prover": "proof produced",
+      "set": "Z128",
+      "statement": "M1",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(0) })",
+      "what": "sibling u0 + 1 on slot 5's chain row (row 191): next slot input no longer matches"
+    },
+    {
+      "expected_reject": true,
+      "ms": 1415,
+      "name": "m1 bit = 2",
+      "prover": "proof produced",
+      "set": "Z128",
+      "statement": "M1",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(0) })",
+      "what": "path bit u4 = 2 on slot 7's chain row (row 255)"
+    },
+    {
+      "expected_reject": true,
+      "ms": 1190,
+      "name": "m1 z off",
+      "prover": "proof produced",
+      "set": "Z128",
+      "statement": "M1",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(0) })",
+      "what": "z = 0 on row 5"
+    },
+    {
+      "expected_reject": true,
+      "ms": 1452,
+      "name": "m1 IV lane",
+      "prover": "proof produced",
+      "set": "Z128",
+      "statement": "M1",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(0) })",
+      "what": "s7 (TAG_NF lane) + 1 on row 0"
+    },
+    {
+      "expected_reject": true,
+      "ms": 1061,
+      "name": "m1 claimed NF + 1",
+      "prover": "proof produced",
+      "set": "Z128",
+      "statement": "M1",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(0) })",
+      "what": "honest trace, public NF[0] + 1 (prover and verifier use the claimed values)"
+    },
+    {
+      "expected_reject": true,
+      "ms": 746,
+      "name": "m1 foreign ROOT",
+      "prover": "proof produced",
+      "set": "Z128",
+      "statement": "M1",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(0) })",
+      "what": "honest trace, public ROOT of another tree"
+    },
+    {
+      "expected_reject": true,
+      "ms": 1512,
+      "name": "m1 other nk, claimed NF",
+      "prover": "proof produced",
+      "set": "Z128",
+      "statement": "M1",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(0) })",
+      "what": "a consistent trace for nk' = nk + e0 under the original public values (NF and ROOT differ)"
+    },
+    {
+      "expected_reject": true,
+      "ms": 1855,
+      "name": "m2 T_ctl nk (bus only)",
+      "prover": "proof produced",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "M2",
+      "verify_batch": "rejected: Lookup(TerminalSumNonZero)",
+      "what": "T_ctl row 0 in0 + 1: every AIR constraint holds; only bus P2 is unbalanced"
+    },
+    {
+      "expected_reject": true,
+      "ms": 1418,
+      "name": "m2 T_ctl r (bus only)",
+      "prover": "proof produced",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "M2",
+      "verify_batch": "rejected: Lookup(TerminalSumNonZero)",
+      "what": "T_ctl row 1 in5 + 1 (the leaf randomness r)"
+    },
+    {
+      "expected_reject": true,
+      "ms": 858,
+      "name": "m2 T_hash state",
+      "prover": "proof produced",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "M2",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(0) })",
+      "what": "T_hash s0 + 1 on row 40"
+    },
+    {
+      "expected_reject": true,
+      "ms": 1308,
+      "name": "m2 T_hash carried input",
+      "prover": "proof produced",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "M2",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(0) })",
+      "what": "T_hash in3 + 1 on row 31 (a chain row, received on the bus)"
+    },
+    {
+      "expected_reject": true,
+      "ms": 984,
+      "name": "m2 T_ctl padding",
+      "prover": "proof produced",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "M2",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(1) })",
+      "what": "T_ctl row 64 out0 = 1 (a padding row)"
+    },
+    {
+      "expected_reject": true,
+      "ms": 1744,
+      "name": "m2 foreign ROOT",
+      "prover": "proof produced",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "M2",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(1) })",
+      "what": "honest traces, public ROOT of another tree"
+    },
+    {
+      "expected_reject": true,
+      "ms": 1349,
+      "name": "m2 claimed NF + 1",
+      "prover": "proof produced",
+      "set": "Z128g+cpow=3+lpow=8",
+      "statement": "M2",
+      "verify_batch": "rejected: Verification(OodEvaluationMismatch { index: Some(1) })",
+      "what": "honest traces, public NF[1] + 1"
+    }
+  ],
+  "controls_accepted": true,
+  "note": "release build: Plonky3's prover does not pre-check constraints, so a proof is produced for each unsatisfying trace and verify_batch must reject it"
+}
