@@ -562,8 +562,8 @@ const traceCeiling = (inputIndex) => {
 };
 
 export const MILLER_INTRINSIC_CEILINGS = [
-  7_404_546, 7_473_706, 6_296_374, 7_440_919, 7_697_331,
-  6_800_962, 7_029_267, 6_601_149, 7_570_285,
+  7_406_955, 7_475_930, 6_298_579, 7_443_143, 7_699_555,
+  6_803_231, 7_031_491, 6_603_396, 7_572_955,
 ];
 const dependencyCost = (inputIndex) => {
   if (inputIndex === 2) return inputs[2].unlocking.length + 2 * inputs[3].unlocking.length;

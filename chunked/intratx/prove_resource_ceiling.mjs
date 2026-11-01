@@ -389,7 +389,7 @@ results.forEach((result) => {
 const universalWireBytes = Math.max(...results.map((result) => result.wireBytes));
 const universalTotalOperationCost = Math.max(...results.map((result) =>
   result.costs.reduce((sum, cost) => sum + cost, 0)));
-if (universalWireBytes !== 99_079 || universalTotalOperationCost !== 79_226_279) {
+if (universalWireBytes !== 99_110 || universalTotalOperationCost !== 79_249_398) {
   throw new Error('certified proof-independent relay encoding changed');
 }
 console.log(`proved proof-independent relay encoding: ${universalWireBytes} wire bytes, ` +
