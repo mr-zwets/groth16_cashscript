@@ -3,7 +3,7 @@
  "what": "SHA-256 SMT library + W-state covenant (static genesis history): agreement, rejections, costs",
  "vm": "libauth 3.1.0-next.8 BCH 2026 (standard for W transactions; looseCons for the bare library harness)",
  "seed": 1,
- "redeemBytes": 499,
+ "redeemBytes": 671,
  "smtHarnessBytes": 163,
  "D": "1000000",
  "genesis": {
@@ -62,71 +62,71 @@
   "presentAttempts": 2540,
   "disagreements": [],
   "opCost": {
-   "min": 219804,
-   "max": 353984
+   "min": 226753,
+   "max": 360933
   },
-  "worstPct": 41.28,
-  "maxBytes": 1566,
+  "worstPct": 36.27,
+  "maxBytes": 1738,
   "samples": [
    {
     "spent": 1,
     "siblings": 0,
     "L": 64,
-    "wUnlocking": 645,
-    "opCost": 221185,
-    "budget": 548800,
-    "pct": 40.3,
-    "txBytes": 1020
+    "wUnlocking": 817,
+    "opCost": 228134,
+    "budget": 686400,
+    "pct": 33.24,
+    "txBytes": 1192
    },
    {
     "spent": 2,
     "siblings": 1,
     "L": 61,
-    "wUnlocking": 677,
-    "opCost": 229196,
-    "budget": 574400,
-    "pct": 39.9,
-    "txBytes": 1052
+    "wUnlocking": 849,
+    "opCost": 236145,
+    "budget": 712000,
+    "pct": 33.17,
+    "txBytes": 1224
    },
    {
     "spent": 10,
     "siblings": 3,
     "L": 60,
-    "wUnlocking": 742,
-    "opCost": 234600,
-    "budget": 626400,
-    "pct": 37.45,
-    "txBytes": 1117
+    "wUnlocking": 914,
+    "opCost": 241549,
+    "budget": 764000,
+    "pct": 31.62,
+    "txBytes": 1289
    },
    {
     "spent": 100,
     "siblings": 7,
     "L": 57,
-    "wUnlocking": 870,
-    "opCost": 250680,
-    "budget": 728800,
-    "pct": 34.4,
-    "txBytes": 1245
+    "wUnlocking": 1042,
+    "opCost": 257629,
+    "budget": 866400,
+    "pct": 29.74,
+    "txBytes": 1417
    },
    {
     "spent": 1000,
     "siblings": 11,
     "L": 51,
-    "wUnlocking": 999,
-    "opCost": 283254,
-    "budget": 832000,
-    "pct": 34.04,
-    "txBytes": 1374
+    "wUnlocking": 1171,
+    "opCost": 290203,
+    "budget": 969600,
+    "pct": 29.93,
+    "txBytes": 1546
    },
    {
     "spent": 5000,
     "siblings": 12,
     "L": 52,
-    "wUnlocking": 1031,
-    "opCost": 278208,
-    "budget": 857600,
-    "pct": 32.44,
-    "txBytes": 1406
+    "wUnlocking": 1203,
+    "opCost": 285157,
+    "budget": 995200,
+    "pct": 28.65,
+    "txBytes": 1578
    }
   ],
   "finalSpent": 7460,
@@ -2839,11 +2839,11 @@
    "siblings": 0,
    "L": 64,
    "accepted": true,
-   "wUnlocking": 645,
-   "opCost": 221167,
-   "budget": 548800,
-   "pct": 40.3,
-   "txBytes": 1020
+   "wUnlocking": 817,
+   "opCost": 228116,
+   "budget": 686400,
+   "pct": 33.23,
+   "txBytes": 1192
   },
   {
    "name": "one key, the leaf neighbour K xor 1 (L = 0, 1 sibling: loop B over all 64 levels with the fewest bytes)",
@@ -2851,11 +2851,11 @@
    "siblings": 1,
    "L": 0,
    "accepted": true,
-   "wUnlocking": 676,
-   "opCost": 519621,
-   "budget": 573600,
-   "pct": 90.59,
-   "txBytes": 1051
+   "wUnlocking": 848,
+   "opCost": 526570,
+   "budget": 711200,
+   "pct": 74.04,
+   "txBytes": 1223
   },
   {
    "name": "one key K xor 2^63 (L = 63, 1 sibling)",
@@ -2863,11 +2863,11 @@
    "siblings": 1,
    "L": 63,
    "accepted": true,
-   "wUnlocking": 677,
-   "opCost": 219788,
-   "budget": 574400,
-   "pct": 38.26,
-   "txBytes": 1052
+   "wUnlocking": 849,
+   "opCost": 226737,
+   "budget": 712000,
+   "pct": 31.85,
+   "txBytes": 1224
   },
   {
    "name": "64 keys K xor 2^l (every sibling present: 64 siblings)",
@@ -2875,11 +2875,11 @@
    "siblings": 64,
    "L": 0,
    "accepted": true,
-   "wUnlocking": 2694,
-   "opCost": 663072,
-   "budget": 2188000,
-   "pct": 30.3,
-   "txBytes": 3069
+   "wUnlocking": 2866,
+   "opCost": 670021,
+   "budget": 2325600,
+   "pct": 28.81,
+   "txBytes": 3241
   },
   {
    "name": "2^12 random keys",
@@ -2887,11 +2887,11 @@
    "siblings": 12,
    "L": 52,
    "accepted": true,
-   "wUnlocking": 1031,
-   "opCost": 278176,
-   "budget": 857600,
-   "pct": 32.44,
-   "txBytes": 1406
+   "wUnlocking": 1203,
+   "opCost": 285125,
+   "budget": 995200,
+   "pct": 28.65,
+   "txBytes": 1578
   },
   {
    "name": "2^16 random keys",
@@ -2899,13 +2899,13 @@
    "siblings": 15,
    "L": 49,
    "accepted": true,
-   "wUnlocking": 1127,
-   "opCost": 295466,
-   "budget": 934400,
-   "pct": 31.62,
-   "txBytes": 1502
+   "wUnlocking": 1299,
+   "opCost": 302415,
+   "budget": 1072000,
+   "pct": 28.21,
+   "txBytes": 1674
   }
  ],
  "pass": true,
- "seconds": 212
+ "seconds": 220
 }
