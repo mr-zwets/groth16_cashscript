@@ -1,0 +1,3 @@
+2 workloads (policy); libauth charges OP_DEFINE bodies: true
+ALLOWED  fit13  mined=true
+REJECTED probe13 16: mandatory-script-verify-flag-failed (VM cost limit exceeded) mined=true

@@ -1,0 +1,125 @@
+{
+ "stage": "Track 9 S0",
+ "what": "compressions per flush worker input and the flush op-cost table",
+ "codeBytes": 7567,
+ "today": {
+  "nMax": 13,
+  "atMax": {
+   "n": 13,
+   "lockingBytes": 94,
+   "unlockingBytes": 10000,
+   "accepted": true,
+   "txVerify": true,
+   "opCost": 7508795,
+   "defineBytes": 7567,
+   "bchnAdjusted": 7516362,
+   "budget": 8032800,
+   "pctStd": 93.48,
+   "pctBchn": 93.57
+  },
+  "overMax": {
+   "n": 14,
+   "lockingBytes": 94,
+   "unlockingBytes": 10000,
+   "accepted": false,
+   "error": "Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 8032800 (density control length: 10041); operation cost following operation: 8032894.",
+   "txVerify": "Unable to verify transaction: error in evaluating input index 0: Program attempted an operation that would exceed the operation cost density limit. Maximum operation cost: 8032800 (density control length: 10041); operation cost following operation: 8032894.",
+   "opCost": 8032894,
+   "defineBytes": 7567,
+   "bchnAdjusted": 8040461,
+   "budget": 8032800,
+   "pctStd": 100,
+   "pctBchn": 100.1
+  },
+  "libauthAloneAcceptsOverMax": false
+ },
+ "perCompressionInLoop": 574314,
+ "fixedPerInput": {
+  "libauth": 42709,
+  "bchnAdjusted": 50276
+ },
+ "raised100k": {
+  "nMax": 138,
+  "atMax": {
+   "n": 138,
+   "lockingBytes": 97,
+   "unlockingBytes": 99800,
+   "accepted": true,
+   "txVerify": true,
+   "opCost": 79399014,
+   "defineBytes": 7567,
+   "bchnAdjusted": 79406581,
+   "budget": 79872800,
+   "pctStd": 99.41,
+   "pctBchn": 99.42
+  }
+ },
+ "table": [
+  {
+   "flush": 1,
+   "k": 0,
+   "perms": 30,
+   "opCostCompressions": 17229420,
+   "opCostWithFixed": 17380248,
+   "inputs10k": 3,
+   "bytesInputs10k": 30000,
+   "permsPerDeposit": 30,
+   "inputs100k": 1
+  },
+  {
+   "flush": 4,
+   "k": 2,
+   "perms": 31,
+   "opCostCompressions": 17803734,
+   "opCostWithFixed": 17954562,
+   "inputs10k": 3,
+   "bytesInputs10k": 30000,
+   "permsPerDeposit": 7.75,
+   "inputs100k": 1
+  },
+  {
+   "flush": 8,
+   "k": 3,
+   "perms": 34,
+   "opCostCompressions": 19526676,
+   "opCostWithFixed": 19677504,
+   "inputs10k": 3,
+   "bytesInputs10k": 30000,
+   "permsPerDeposit": 4.25,
+   "inputs100k": 1
+  },
+  {
+   "flush": 16,
+   "k": 4,
+   "perms": 41,
+   "opCostCompressions": 23546874,
+   "opCostWithFixed": 23747978,
+   "inputs10k": 4,
+   "bytesInputs10k": 40000,
+   "permsPerDeposit": 2.56,
+   "inputs100k": 1
+  },
+  {
+   "flush": 32,
+   "k": 5,
+   "perms": 56,
+   "opCostCompressions": 32161584,
+   "opCostWithFixed": 32412964,
+   "inputs10k": 5,
+   "bytesInputs10k": 50000,
+   "permsPerDeposit": 1.75,
+   "inputs100k": 1
+  },
+  {
+   "flush": 64,
+   "k": 6,
+   "perms": 87,
+   "opCostCompressions": 49965318,
+   "opCostWithFixed": 50317250,
+   "inputs10k": 7,
+   "bytesInputs10k": 70000,
+   "permsPerDeposit": 1.36,
+   "inputs100k": 1
+  }
+ ]
+}
