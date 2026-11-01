@@ -1,0 +1,42 @@
+node /Bitcoin Cash Node:29.1.0(EB32.0)/; R 118 B sha256 199fcb9af998fb10; thread category 8cf1b6c68e9fef3c51a2fdb4aec01268c8265874af406ecd12cc602ba90d23e1
+W genesis A: 71b7d9c39c37406ed334b30169e3dcc9cd22e92e8732be971167c6d1cfd8f0c5 category 6d2cc7ea8792138147eea5a97eee112ba2910a3b83829a98117fad2ce0254dd2
+seq 0: OK 91183+41457 B lib true/true (max 90.9%, W 42.69%) tma true/true  block true
+seq 1: OK 91183+41489 B lib true/true (max 91.06%, W 40.54%) tma true/true  block true
+seq 2: OK 91183+41521 B lib true/true (max 91.07%, W 39.64%) tma true/true  block true
+seq 3: OK 91183+41521 B lib true/true (max 91.03%, W 39.64%) tma true/true  block true
+seq 4: OK 91183+41554 B lib true/true (max 90.92%, W 41.09%) tma true/true  block true
+seq 5: OK 91183+41554 B lib true/true (max 91.06%, W 38.78%) tma true/true  block true
+seq 6: OK 91183+41586 B lib true/true (max 91.07%, W 41.01%) tma true/true  block true
+seq 7: OK 91183+41586 B lib true/true (max 90.93%, W 38.04%) tma true/true  block true
+seq 8: OK 91183+41554 B lib true/true (max 90.97%, W 40.32%) tma true/true  block true
+seq 9: OK 91183+41586 B lib true/true (max 91.04%, W 40.26%) tma true/true  block true
+seq 10: OK 91183+41554 B lib true/true (max 91.01%, W 40.32%) tma true/true  block true
+seq 11: OK 91183+41554 B lib true/true (max 90.99%, W 39.55%) tma true/true  block true
+seq 12: OK 91183+41586 B lib true/true (max 91%, W 40.27%) tma true/true  block true
+seq 13: OK 91183+41586 B lib true/true (max 90.98%, W 38.78%) tma true/true  block true
+seq 14: OK 91183+41586 B lib true/true (max 91.09%, W 44.04%) tma true/true  block true
+seq 15: OK 91183+41554 B lib true/true (max 90.98%, W 39.55%) tma true/true  block true
+seq 16: OK 91183+41618 B lib true/true (max 90.92%, W 37.37%) tma true/true  block true
+seq 17: OK 91183+41554 B lib true/true (max 91.01%, W 38.78%) tma true/true  block true
+seq 18: OK 91183+41554 B lib true/true (max 90.89%, W 39.55%) tma true/true  block true
+seq 19: OK 91183+41650 B lib true/true (max 91.02%, W 36.75%) tma true/true  block true
+seq 20: OK 91183+41554 B lib true/true (max 91.02%, W 38.78%) tma true/true  block true
+seq 21: OK 91183+41554 B lib true/true (max 91.1%, W 38.78%) tma true/true  block true
+seq 22: OK 91183+41586 B lib true/true (max 90.99%, W 38.04%) tma true/true  block true
+seq 23: OK 91183+41618 B lib true/true (max 91.01%, W 38.1%) tma true/true  block true
+replay present-path: REJECTED as expected lib W: Program failed an OP_VERIFY operation. | tma 16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation) | send {"rpcError":"sendrawtransaction: {\"code\":-26,\"message\":\"mandatory-script-verify-flag-failed (Script failed an OP_EQ | block blk-bad-inputs
+replay stale-witness: REJECTED as expected lib W: Program failed an OP_VERIFY operation. | tma 16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation) | send {"rpcError":"sendrawtransaction: {\"code\":-26,\"message\":\"mandatory-script-verify-flag-failed (Script failed an OP_EQ | block blk-bad-inputs
+W genesis B: bdba9af39ffdbaa7128cc35e4509ea2e38b0c44653e9f374d009609fb92dbc45 category 266a65244aa65f3bb7586986a076f52128cd8c0461756da0dc59f488c12b6613
+chain 0: lib true/true tma true/true sent true/true W' in mempool true depends 1
+chain 1: lib true/true tma true/true sent true/true W' in mempool true depends 2
+chain 2: lib true/true tma true/true sent true/true W' in mempool true depends 2
+chain 3: lib true/true tma true/true sent true/true W' in mempool true depends 2
+chain 4: lib true/true tma true/true sent true/true W' in mempool true depends 2
+chain 5: lib true/true tma true/true sent true/true W' in mempool true depends 2
+chain 6: lib true/true tma true/true sent true/true W' in mempool true depends 2
+chain 7: lib true/true tma true/true sent true/true W' in mempool true depends 2
+chain 8: lib true/true tma true/true sent true/true W' in mempool true depends 2
+chain 9: lib true/true tma true/true sent true/true W' in mempool true depends 2
+chain10: OK block 275 21 txs (1327416 B), all 20 included true, mempool after []
+race: OK loser tma 18: txn-mempool-conflict send {"rpcError":"sendrawtransaction: {\"code\":-26,\"message\":\"txn-mempool-conflict (code 18)\"}"}; rebuilt (same tx0 true, same R inputs true) tma true sent true; block true,true,true,true
+conflict: OK 2nd tx1 tma 18: txn-mempool-conflict; rebuilt: lib W: Program failed an OP_VERIFY operation. | tma 16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation) | block blk-bad-inputs

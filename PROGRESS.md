@@ -56,3 +56,21 @@ Design: zk-verifier-bench research/pq-pool/DESIGN-T9.md (maintainer decisions: s
   vector = same ROOT). Documented: a non-W input at the W slot passes R (no pool funds move; consumes the thread NFT
   without NF insert); pinning W's category in R would close it (no cycle) — maintainer call.
 - Not done: BCHN (S3); conflicting txs only shown as two valid tx1 on one W outpoint (mempool test is S3).
+
+## S3 — BCHN regtest (2-tx withdrawal): DONE (acceptance PASS)
+
+- Code and results: research/pq-pool/node/ (README.md; s3.ts driver, node.sh + rig.ts copied from bench main 1d00508,
+  Funder from nc.ts). Fresh POLICY=1 node work/pool/bchn/bchn-t9s3a (BCHN 29.1.0, listen=0, connect=0), stopped.
+- Real W geneses (pool A 30 D, pool B 20 D): mature coinbase vout 0 -> one mutable NFT, no minting NFT ever exists.
+  Thread category = node faucet's, so R rebuilt (118 B, sha256 199fcb9a..; only the 32 category bytes differ from S2).
+- 24/24 withdrawals (pool A, statements 0..23) accepted: tma allowed, sent, mined; 91,183 + 41,457..41,650 B; max
+  input 91.1% (QRY), W 36.8-44.0%; gettxout of W matches the JS state after every step.
+- NF double spend (statement 0 replayed, present-path and stale witness): tx0 valid and mined; tx1 rejected by
+  libauth (W input), testmempoolaccept/sendrawtransaction (mandatory-script-verify-flag-failed) and as a block
+  (blk-bad-inputs).
+- 10-withdrawal unconfirmed chain (pool B, statements 0..9): 20 txs sent unconfirmed, all in block 275, mempool empty.
+- Race (statements 10/11): loser txn-mempool-conflict; rebuilt tx1 (same tx0, byte-identical R inputs 0..4, same
+  payout; only W input and output 0 change) allowed and mined. Same-NF conflict (statement 12 twice): second tx1
+  mempool conflict; rebuilt on the unconfirmed state rejected by W (libauth, tma, block).
+- testmempoolaccept: 76/76 valid txs allowed; the 5 refusals are the expected ones.
+- Not done: timing (Track 8 node check covers it), deposits/flush (S4). R does not pin W (S2 item) still open.
