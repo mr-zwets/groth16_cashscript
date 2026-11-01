@@ -1,0 +1,70 @@
+{
+ "stage": "Track 9 S0",
+ "what": "Poseidon2-Gl-8 in CashVM (libauth 3.1.0-next.8, BCH 2026 VM)",
+ "constants": "poseidon2-gl8-constants.json (copied from bench research/pq-stark/design-t8, Plonky3 0d803737)",
+ "options": {
+  "sbox": "mid",
+  "m4": "chain",
+  "psum": "3dup"
+ },
+ "test_vector": true,
+ "inputs": 1005,
+ "random": 1000,
+ "edge": 5,
+ "inputs_sha256": "27a5973df60504ac45a83bba05203a868f2c453bd72d32f4fc28c1207303d757",
+ "p3_outputs_sha256": "4a5876addad66eaf5e7d113fd1984265d34a747e3f237c8c9df60b787ccca24b",
+ "agree_permRef_vs_p3": 1005,
+ "agree_script_vs_p3": 1005,
+ "rejections": {
+  "cases": 100,
+  "rejected": 100
+ },
+ "code_bytes": {
+  "perm8": 7681,
+  "compress4": 7567
+ },
+ "opcost": {
+  "perm8.op": {
+   "min": 580112,
+   "max": 582868,
+   "mean": 582070
+  },
+  "perm8.instr": {
+   "min": 4251,
+   "max": 4251,
+   "mean": 4251
+  },
+  "perm8.arith": {
+   "min": 114530,
+   "max": 116296,
+   "mean": 115627
+  },
+  "perm8.pushed": {
+   "min": 40482,
+   "max": 41486,
+   "mean": 41343
+  },
+  "compress4.op": {
+   "min": 571221,
+   "max": 573974,
+   "mean": 573181
+  },
+  "compress4.instr": {
+   "min": 4173,
+   "max": 4173,
+   "mean": 4173
+  },
+  "compress4.arith": {
+   "min": 114038,
+   "max": 115802,
+   "mean": 115134
+  },
+  "compress4.pushed": {
+   "min": 39883,
+   "max": 40886,
+   "mean": 40746
+  }
+ },
+ "bchn_adjusted_note": "straight-line code, no OP_DEFINE inside: BCHN op-cost = libauth op-cost per permutation. Packaged as one OP_DEFINE body, BCHN adds the body bytes once per input (perm8: 7681, compress4: 7567).",
+ "bad": []
+}
