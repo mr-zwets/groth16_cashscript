@@ -66,8 +66,9 @@
   "count": {
    "cases": 116,
    "chainReject": 90,
-   "accept": 26,
-   "unexpected": 0
+   "accept": 0,
+   "unexpected": 0,
+   "encoderOnlyRelabel": 26
   },
   "fri_value": {
    "cases": 55,
@@ -84,8 +85,9 @@
   "extend": {
    "cases": 35,
    "chainReject": 6,
-   "accept": 29,
-   "unexpected": 0
+   "accept": 0,
+   "unexpected": 0,
+   "encoderOnlyRelabel": 29
   },
   "noncanon": {
    "cases": 44,
@@ -158,5 +160,6 @@
  "skippedFiles": [
   "m1-s7-0-Z128.json: cap height 0 (layout a' is the cap-5 deployment)",
   "m1-s7-1-Z128.json: cap height 0 (layout a' is the cap-5 deployment)"
- ]
+ ],
+ "encoderOnlyRelabel": 55
 }

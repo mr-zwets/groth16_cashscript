@@ -198,7 +198,8 @@ preprocessed columns, LogUp, extension-valued constraints and non-ZK sets. Merkl
 Files: `modela.mjs` (model, encoder: full paths below the cap, TBL, partial accumulators), `gena.mjs` (generator),
 `layouta.mjs` (plans, witnesses, transactions, NFT thread), `grade-a.mjs`, `profile-a.mjs`, `test-a.mjs`, `dbg-a.mjs`,
 `gen-s7.sh`. S4–S6 output is unchanged: `vkxN` takes cap > 0 only with `allowCap`, and `dagProgram` takes an
-optional constraint range. The M1 b2 library hash is unchanged (553a3cfc…).
+optional constraint range. At S7 the M1 b2 library hash was unchanged (553a3cfc…); the S8b residue fix changed it
+(see the S8b section below).
 
 **Layout.** Every input has the same P2S locking R (118 B). R reads the two code blobs from the CODE inputs (first
 push, header checked), checks each blob's SHA-256, defines and invokes them. The last blob pins the input graph: the
@@ -283,3 +284,48 @@ chain, the a′ model and the S3 reference (the last two only for proof-level ca
   effect, the outputs bound by CTX, is only in tx1.
 - Assumption: the minting baton is created at deployment under R.
 - Replaying one valid proof in two final transactions is the nullifier set's job (Track 9), as for layouts b and b2.
+
+# Track 8 S8b: interpreter residue fix and the post-fix re-run
+
+The constraint interpreter's `D_SUB`, `D_SUBL`, `D_RSUBL` and `D_NEG` now add 2p (not p) before `MOD`, in `gen.mjs`
+and `genn.mjs`, so every op is congruent mod p for raw proof lanes in [0, 2^64) (SOUNDNESS-T8 §9.1, `s8-arith.mjs`:
+69 cases, 0 wrong on the fixed bodies). Every script changed, so every S4–S7 node step was re-run on the cached
+proofs (`rerun-s8b.sh`; the first run stopped inside test-b2-m2p3 when the machine went down, and
+`rerun-s8b-resume.sh` ran the rest on 2026-11-01). All result files in `results/` are post-fix.
+
+**Verdicts: 0 unexpected in every suite.** Case totals include cases that never ran on chain:
+
+| suite | cases | not run on chain | encoder-only | files skipped |
+|---|--:|--:|--:|--:|
+| S4 b production / harness | 2,929 / 3,309 | 0 / 33 | 0 / 1 | 0 / 2 |
+| S5/S6 b2 M2 + Plonky3 / M1 harness / production | 8,252 / 2,558 / 1,030 | 59 / 35 / 0 | 0 / 1 / 0 | 3 / 2 / 0 |
+| S7 a′ 1 tx / 2 tx / harness | 3,765 / 4,181 / 2,387 | 0 / 0 / 35 | 55 / 55 / 69 | 2 / 2 / 2 |
+
+- *Not run on chain:* the statement layer or the generator refuses the case before a script exists (statement
+  family: CTX lane ≥ 2^56, another per-instance public-value layout, non-canonical ROOT; vk_variant: VKs the generator
+  refuses). The verdict (reject) is right, but these are not on-chain rejections.
+- *Encoder-only:* malformed-by-length proofs that the reference rejects and the encoder refuses, whose on-chain
+  witness is the valid proof's, so the script accepts it.
+- *Files skipped:* the cap+1 and ood-PoW = 1 VK variants (out of the generators' scope) and, in a′ production, the two
+  cap-0 vectors (a′ is the cap-5 deployment).
+
+**Post-fix figures** (bytes are identical to pre-fix; op-cost moved by a few hundred per input that runs the
+interpreter; every budget percentage is unchanged to 0.1 point):
+- Layout b (24): BCHN-adjusted op-cost 35,528,878–36,043,226 (mean 35,833,248), 47.4–48.6% of the r100 budget;
+  24/24 under r100 and bch-spec; 0/24 today.
+- b2 M1 (24): in0 27.16–27.38M, in1 19.56–19.82M; b2 M2 (8): in0 35.20–35.52M, in1 33.20–33.51M (`grade-b2.txt`).
+  M1 b2 library 19,468 B, HASH256 for statement 0 = `95630cefe3d0c46347a21c43c2680201f9c216d07a22c0f8f95ef679c52726b9`
+  (pre-fix 553a3cfc…; the hash also depends on the statement's ROOT). M2 library 27,759 B.
+- a′ (24): 1 transaction 98,690 B, total 64,092,057–64,207,225 BCHN-adjusted; CODE1 ≤ 5,475,822 (73.1%); QRY
+  6,066,097–6,088,611 (90.67–91.01%). 2 transactions 131,556 B, 68.90–69.03M.
+- `grade-b.mjs` now gates on max(std, cons) + OP_DEFINE body bytes, as `grade-b2.mjs` and `grade-a.mjs` already did
+  (no verdict changed).
+
+**Against the S0 model (unchanged by the fix, stated here for REPORT):**
+- Op-cost: layout b is +26.8% over params8's 28.26M, outside the ±15% acceptance band. The miss is the fixed part:
+  the AIR at ζ costs 7.85–8.03M against an assumed 0.6M.
+- Bytes agree with S0 within about +0.5% to +1.3% once the real code sizes are put in the model (figures from the
+  S8b measurement review's re-modelling; layout b unlocking
+  mean 93,612 vs 93,181 at redeem 19,024; b2 M1 tx 97,417 vs about 97,591 at lib 19,468; b2 M2 tx 158,006 vs about
+  155,926 at lib 27,759; a′ 98,690 vs 98.5–101.5 KB). All are above S0's modelled ranges because the code came out
+  larger than the 13–18 KB (b), 18–24 KB (b2) and 7.5–9 KB (a′) assumed.

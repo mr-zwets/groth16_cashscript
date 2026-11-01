@@ -66,8 +66,9 @@
   "count": {
    "cases": 144,
    "chainReject": 111,
-   "accept": 33,
-   "unexpected": 0
+   "accept": 0,
+   "unexpected": 0,
+   "encoderOnlyRelabel": 33
   },
   "fri_value": {
    "cases": 69,
@@ -84,8 +85,9 @@
   "extend": {
    "cases": 42,
    "chainReject": 6,
-   "accept": 36,
-   "unexpected": 0
+   "accept": 0,
+   "unexpected": 0,
+   "encoderOnlyRelabel": 36
   },
   "noncanon": {
    "cases": 51,
@@ -95,9 +97,10 @@
   },
   "statement": {
    "cases": 423,
-   "chainReject": 423,
+   "chainReject": 390,
    "accept": 0,
-   "unexpected": 0
+   "unexpected": 0,
+   "notRunOnChain": 33
   },
   "other_vk": {
    "cases": 54,
@@ -107,14 +110,17 @@
   },
   "vk_variant": {
    "cases": 5,
-   "chainReject": 5,
+   "chainReject": 3,
    "accept": 0,
-   "unexpected": 0
+   "unexpected": 0,
+   "notRunOnChain": 2
   }
  },
  "list": [],
  "skippedFiles": [
   "m1-0-Z128_cap5~vk-cap+1.json: cap height 6 (layout a' is the cap-5 deployment)",
   "m1-0-Z128_cap5~vk-opow=1.json: generator: ood PoW 0"
- ]
+ ],
+ "encoderOnlyRelabel": 69,
+ "notRunOnChain": 35
 }

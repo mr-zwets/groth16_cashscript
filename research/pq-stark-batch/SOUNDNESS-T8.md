@@ -1,16 +1,27 @@
 # Track 8 / Soundness: the batch-stark CashVM verifier as built
 
-Date: 2026-10-30. Stage S8a of DESIGN-T8 §6/§7. Research only; not a leaderboard entry; not reviewed yet (the three
-S8 reviews follow this document).
+Date: 2026-10-30. Stage S8a of DESIGN-T8 §6/§7, revised in S8b (fix round after the protocol/soundness and
+measurement reviews). Research only; not a leaderboard entry.
 
-- **Code under argument:** groth16_cashscript `wip/stark-usable` at 14b9862 (S7 head), folder
+**S8b changes in one place:** §9.1 is closed (2p offsets in the four interpreter ops of both generators; `s8-arith.mjs`
+now runs the generated op bodies on maximal lanes); every S4–S7 figure in this document and in the README is from the
+post-fix re-run (`onchain/rerun-s8b.sh`, which stopped inside the S5/S6 block when the machine went down, completed
+by `onchain/rerun-s8b-resume.sh` on 2026-11-01; results committed with this document); Lemma 8 (ii) states the tail-length condition (asserted); Lemma 9 gives the
+ACC canonicity argument; Lemma 10 describes the transactions as built; §7/§9.2 list three more deviations (raw PoW
+witness lanes, ACC canonicity via CODE, the extra ζ^n ≠ −1 check) and the new generator/VK asserts.
+
+- **Code under argument:** groth16_cashscript `wip/stark-usable`: scripts and generators at 12d47d4 (S7 head 14b9862
+  plus the §9.1 fix and asserts; unchanged since, apart from `grade-b.mjs`'s BCHN gate, which has no effect on any
+  verdict), with the complete post-fix results committed in the commit named in PROGRESS.md (S8b entry), folder
   `research/pq-stark-batch/`: prover (`prover/`, p3b-v1), reference verifier (`verifier/verify-batch.mjs`), on-chain
   model and generators (`onchain/model*.mjs`, `gen.mjs` (S4), `genn.mjs` (S5/S6), `gena.mjs` (S7)).
-- **Calculator:** zk-verifier-bench `wip/stark-usable-design` (c488300), `research/pq-stark/design-t8/params8.py`.
+- **Calculator and design text:** zk-verifier-bench `wip/stark-usable-design` at 6050eaf (`params8.py --asbuilt`
+  unchanged since c488300; 6050eaf adds the S8b DESIGN §4 and AIR-SPEC §3.6/§4.3/§6 edits),
+  `research/pq-stark/design-t8/params8.py`.
   - `python3 params8.py` gives the S0 λ tables (`tables8-output.txt`, unchanged by S8).
   - `python3 params8.py --asbuilt <vector dirs>` (new in S8) rebuilds every shape the scripts were tested on from the
     VK data in the committed vectors and computes λ for each (`asbuilt8-output.{txt,json}`).
-- **Unit check (new in S8):** `onchain/s8-arith.mjs` → `onchain/results/s8-arith.json` (§9.1).
+- **Unit check (S8a, extended in S8b):** `onchain/s8-arith.mjs` → `onchain/results/s8-arith.json` (§9.1).
 - **Base:** Track 5's `research/pq-stark/soundness/SOUNDNESS.md` and `params5.py`, used unchanged.
 
 Every λ figure in this document carries the label **"JB, powers-batching adaptation, unpublished"**: it is a
@@ -31,25 +42,22 @@ powers-of-one-challenge batching (§6).
      lengths), and the S0 tables of M1 and M2 equal the as-built DAGs field by field (`asbuilt8-output.txt`).
    - Caps do not change the IOP: M1 cap 0 and cap 5 have identical rounds.
    - Every new charge of DESIGN §6 is a lemma below with its own round term in params8.py (§5).
-2. **Script level: every accept-relevant value has an owner, with one exception that is open.**
+2. **Script level: every accept-relevant value has an owner.**
    - §7 lists each value that can change the verdict and the script step that fixes or checks it, for layouts b,
      b2 and a′. §8 gives the layout hand-over lemmas (b2 tail, a′ ACC/TBL/CTXW, the NFT thread).
-   - **Exception (§9.1): canonicity of proof-supplied field lanes.** The scripts read OOD values, terminals, row
-     values, FRI values and final-polynomial coefficients as unreduced 8-byte integers in [0, 2^64), as Track 5 did.
-     Track 5 accepted this as "malleability with no soundness impact" on the premise that the script computes on the
-     residues. **That premise does not hold for the S4–S7 constraint interpreter**: its SUB/NEG ops add only p, so
-     a lane in [p + 1, 2^64) can drive an intermediate negative, and the packed extension product is then not
-     congruent to the field product (`s8-arith.mjs`: 2 of 2 negative-lane cases give a wrong residue; the canonical
-     and non-negative-unreduced controls are correct). The constraint DAGs contain such subtractions with a raw
-     proof lane as subtrahend: 8 in M1, 27 in M2.
-     - Not shown exploitable, and not shown safe: building a proof that tests it would be attack construction, which
-       is outside this stage.
-     - Consequence for the claims: **until fixed, the 128-bit statement covers the protocol and the scripts on
-       proofs whose field lanes are canonical; it does not yet cover the as-built scripts against arbitrary
-       witnesses.**
-     - Fix candidates (§9.1): a `< p` check on every proof lane at parse time, or a 2p offset in four interpreter
-       ops. The second was checked congruent in `s8-arith.mjs`; neither is applied (both change the library hash,
-       op-cost and every committed script, and need the sweeps re-run).
+   - **Proof-supplied field lanes (§9.1, found open in S8a, fixed in S8b).** The scripts read OOD values, terminals,
+     row values, FRI values and final-polynomial coefficients as unreduced 8-byte integers in [0, 2^64), as Track 5
+     did, and rely on every operation being congruent mod p on such inputs. S8a found that the S4–S7 constraint
+     interpreter was not: its SUB/NEG ops added only p, so a raw lane in [p + 1, 2^64) could drive an intermediate
+     negative and the packed extension product was then not congruent. S8b applies the 2p offset to `D_SUB`,
+     `D_SUBL`, `D_RSUBL` and `D_NEG` in both generators (no byte cost: p and 2p are both 9-byte pushes). Every
+     interpreter op output is reduced mod p, so only raw leaves can exceed p, and with the offset every intermediate
+     is non-negative. `s8-arith.mjs` runs the generated op bodies of both generators and `MULE` in libauth on maximal
+     lanes (2^64 − 1, p, p + 1, mixed): 64/64 congruent and canonical; the pre-fix bodies fail 38 of the same cases.
+     Every S4–S7 suite was re-run on the fixed scripts, 0 unexpected verdicts (§2).
+     - With the fix, Track 5's residue argument applies: a non-canonical lane is another byte encoding of the same
+       residue, hence another oracle query, and the 128-bit statement covers the as-built scripts against arbitrary
+       witnesses (subject to §6 and the stated limits in §12).
 3. **What rests on our unreviewed Track 5 adaptation** (§6): the batching round of every set (margin 8.33 bits
    over 128 for M1, 7.15 for M2), the roll-in fold of M2 (margin 0.87), and the per-height splitting of the batching
    term (our own extension). The query rounds, ALI, DEEP and LogUp terms do not depend on it.
@@ -68,21 +76,50 @@ The verdict of a deployed script is the conjunction of four things. Each has its
 | part | claim | where | status |
 |---|---|---|---|
 | A. Protocol | `p3-batch-stark` (pin 0d80373) with the hiding two-adic FRI PCS, Goldilocks, D = 3, SHA-256, at the as-built shapes and parameters, is round-by-round knowledge sound with error 2^−λ_IOP per round | §3–§6 | argument; rests on the Track 5 base |
-| B. Script = protocol | for canonical proofs, the script accepts exactly when the reference verifier accepts, and every value the verdict depends on is fixed by the VK or checked by an owner | §7–§9 | argument plus tests; one open gap (§9.1) |
+| B. Script = protocol | the script accepts exactly when the reference verifier accepts on the residues of the proof's lanes, and every value the verdict depends on is fixed by the VK or checked by an owner | §7–§9 | argument plus tests; §9.1 closed in S8b (fix in both generators, op-level check, every S4–S7 suite re-run post-fix) |
 | C. AIR ⇒ relation | a trace satisfying M1's (or M2's) constraints yields a witness of the M1 relation for the public values | §10 | proof sketch, row type by row type; mutation-tested |
 | D. Statement | the relation gives membership, a unique nullifier per leaf, hiding of the leaf, and binding to the outputs | §11 | argument; collision resistance of T∘P and SHA-256 |
 
-**Evidence that B holds as implemented** (from the build stages, not re-run here):
-- the on-chain model agrees with the independent reference `verify-batch.mjs` on 3,762 (S4) and 17,911 (S5/S6) case
-  runs, with byte-identical transcripts; the reference agrees with Plonky3's Rust `verify_batch` on 14,027 cases
-  (S3), with byte-identical transcripts on 128 proofs;
-- the scripts agree with model and reference on 2,929 + 3,309 (S4), 8,252 + 2,558 + 1,030 (S5/S6) and
-  3,765 + 4,181 + 2,387 (S7) cases, 0 unexpected;
+**Evidence that B holds as implemented.** The model and reference agreements are from the build stages (the fix
+does not touch the model or the reference); every script-level count is from the post-fix re-run (scripts at
+12d47d4):
+- the on-chain model agrees with the independent reference `verify-batch.mjs` on 3,762 (S4) and 17,911 (S5/S6,
+  re-run post-fix) case runs, with byte-identical transcripts; the reference agrees with Plonky3's Rust
+  `verify_batch` on 14,027 cases (S3), with byte-identical transcripts on 128 proofs;
+- the scripts agree with model and reference, 0 unexpected verdicts, on:
+
+  | suite (results file) | cases | of which not run on chain | encoder-only | files skipped |
+  |---|--:|--:|--:|--:|
+  | S4 layout b, production (`test-b.json`) | 2,929 | 0 | 0 | 0 |
+  | S4 layout b, harness (`test-b-harness.json`) | 3,309 | 33 (statement) | 1 | 2 |
+  | S5/S6 b2, M2 + Plonky3 AIRs (`test-b2-m2p3.json`) | 8,252 | 59 (statement 56, vk_variant 3) | 0 | 3 |
+  | S5/S6 b2, M1 harness (`test-b2-m1.json`) | 2,558 | 35 (statement 33, vk_variant 2) | 1 | 2 |
+  | S5/S6 b2, production (`test-b2-prod.json`) | 1,030 | 0 | 0 | 0 |
+  | S7 a′, production 1 tx (`test-a-1tx.json`) | 3,765 | 0 | 55 | 2 |
+  | S7 a′, production 2 tx (`test-a-2tx.json`) | 4,181 | 0 | 55 | 2 |
+  | S7 a′, harness (`test-a-harness.json`) | 2,387 | 35 (statement 33, vk_variant 2) | 69 | 2 |
+
+  - *Not run on chain:* cases the statement layer or the generator refuses before a script exists: a public value
+    the harness cannot encode (CTX lane ≥ 2^56, another per-instance PV layout, non-canonical ROOT) and VK variants
+    the generator refuses. Their verdict (reject) is right, but no script executed them; they are inside the case
+    totals, not inside the on-chain rejections.
+  - *Encoder-only:* malformed-by-length p3b-v1 proofs that the reference rejects and the encoder refuses, but whose
+    on-chain witness is the valid proof's (for example a truncated trailing zero byte, or trailing bytes after the
+    full paths in a′), so the script accepts the valid witness. They count as expected, not as chain rejections.
+  - *Files skipped:* VKs out of the layout's scope: the cap+1 variant (cap 1 for b/b2, cap 6 for a′), the ood-PoW = 1
+    variants (the generators support ood PoW 0 only), and cap-0 proofs in the a′ production folder (a′ is the cap-5
+    deployment).
+  - Grading, post-fix: layout b 24/24 under r100 and bch-spec (`grade-b.json`), b2 M1 24/24 and M2 8/8 per input
+    (`grade-b2.json`), a′ 24/24 in both plans (`grade-a.json`), each with the BCHN-adjusted gate max(std, cons) +
+    OP_DEFINE body bytes ≤ budget. Byte counts are identical to pre-fix; op-cost moved by a few hundred per input that runs
+    the interpreter (+193 to +307 on the mean figures compared with the S4–S7 handoffs) (e.g. layout b mean 35,833,248 BCHN-adjusted; a′ QRY unchanged at 90.67–91.01%).
+  - The M1 b2 library is still 19,468 B; its HASH256 changed (statement 0: 95630cef…26b9; before the fix 553a3cfc…),
+    as expected, because the 2p constants are in the library.
 - S3's sensitivity run shows which checks plain tampering cannot reach (the lookup PoW and final-polynomial checks);
   those are argued from the code (§7), not from the sweeps.
 
-Tests support B; they do not prove it. In particular no test exercises a consistently built proof with non-canonical
-lanes, which is why §9.1 is open although every sweep passed.
+Tests support B; they do not prove it. No sweep exercises a consistently built proof with non-canonical lanes; that
+case is covered by the congruence argument of §9.1 and the op-level check in `s8-arith.mjs`, not by the sweeps.
 
 ## 3. Base (unchanged from Track 5)
 
@@ -255,11 +292,11 @@ Layout columns: **b** (`gen.mjs` S4 for M1, `genn.mjs` `buildB`), **b2** (`genn.
 | value | owner | b | b2 | a′ |
 |---|---|---|---|---|
 | widths, heights, degree_bits, chunk counts, opening points, round layout | generator; `vkFromVector` re-derives it and refuses a vector whose `shape` differs | redeem | lib (HASH256 = H_lib in both lockings) | code blobs (SHA-256 checked by R) |
-| FRI schedule, final length, Q, every PoW bit count, cap height | generator (strict height, fold grid, hiding budget, Σw·h < p asserted) | redeem | lib | blobs |
+| FRI schedule, final length, Q, every PoW bit count, cap height | generator (strict height, fold grid, hiding budget, Σw·h < p asserted; S8b: a lookup without `count_weight` and a DAG that reads an undeclared next row (Plonky3's `UndeclaredNextRowRead`) are refused; the statement mode is explicit) | redeem | lib | blobs |
 | constraint DAG and its emission order, periodic coefficients | generator (`dagProgram`, periodic coefficients) | redeem | lib | blobs, constraint ranges [0,21) / [21,53) |
 | domain separators `SO.batch` (seed + degree_bits), `SO.pcs`, `SO.fri` | transcript constants | redeem | lib | blobs |
 | preprocessed cap (M2) | transcript constant and Merkle root constant | – | lib | – |
-| ROOT | transcript constant and DAG constant (pool mode; Track 9 would read it from covenant state) | redeem | lib | blobs |
+| ROOT | transcript constant and DAG constant (pool mode; Track 9 would read it from covenant state); each lane < p asserted by the generator (`program` for b, `makeGenN` for b2 and a′) | redeem | lib | blobs |
 | H_lib, templates of the other input's locking | the lockings themselves (b2) | – | both lockings, MAIN0/MAIN1 | – |
 | R, CAT (token category), TTAG | R (P2S locking of every input); thread code | – | – | R / HEAD |
 
@@ -277,10 +314,10 @@ Layout columns: **b** (`gen.mjs` S4 for M1, `genn.mjs` `buildB`), **b2** (`genn.
 |---|---|
 | main / permutation / quotient / random caps (ROOTS) | item size = VK length; split at VK offsets; observed whole; the same bytes are the Merkle roots (cap entries in a′) |
 | terminals (TERM) | size checked; observed with the permutation cap before α; used as DAG leaves; batch sum = 0 checked |
-| opened values (OOD) | size checked; observed whole (step 5); used by the AIR check (instance by instance) and by the A sums of every ladder. **Lane canonicity: not checked (§9.1)** |
-| PoW witnesses (LPOW, BPOW, CPOW, QPOW) | size checked; low g bits of the next digest = 0 (`powCheck`) |
+| opened values (OOD) | size checked; observed whole (step 5); used by the AIR check (instance by instance) and by the A sums of every ladder. Lane canonicity not checked; every use is congruent mod p for lanes < 2^64 (§9.1, fixed in S8b) |
+| PoW witnesses (LPOW, BPOW, CPOW, QPOW) | size checked; low g bits of the next digest = 0 (`powCheck`); observed as raw 8 bytes with no `< p` check (§9.2: Plonky3 samples the witness as a field element; another byte string is another oracle query with the same grinding cost) |
 | FRI caps (FROOTS) | size checked; observed per round before β_r; Merkle roots of the FRI trees |
-| final polynomial (FIN) | size = L·24 (so degree < L by construction); observed before the query PoW; evaluated per query and compared with the folded value. Lane canonicity: not checked (residues used in a non-negative path, §9.1) |
+| final polynomial (FIN) | size = L·24 (so degree < L by construction); observed before the query PoW; evaluated per query and compared with the folded value. Lane canonicity not checked; residues used in a non-negative path, slot bounds asserted (GG ≤ 127, §9.1) |
 
 **C. Challenges and derived constants** (never witness data except where noted)
 
@@ -288,7 +325,7 @@ Layout columns: **b** (`gen.mjs` S4 for M1, `genn.mjs` `buildB`), **b2** (`genn.
 |---|---|
 | lookup α, β; α; ζ; α′; β_r | sampled by the script from the digest chain; each sample < p checked (`POPB`) |
 | query indices | low log H bits of the chain after the query PoW. b, b2: computed in the script. a′: in TBL, which FIN recomputes and checks byte for byte; QRY reads TBL |
-| Z_H(ζ) ≠ 0, ζ^n ≠ −1 (ZK) | per instance, `nonzero` checks in the AIR phase |
+| Z_H(ζ) ≠ 0, ζ^n ≠ −1 (ZK) | per instance, `nonzero` checks in the AIR phase. ζ^n ≠ −1 is an extra check that Plonky3 and `verify-batch.mjs` do not make (§9.2) |
 | bus challenges, selectors, periodic values at ζ, quotient recomposition constants | computed from the above and VK constants |
 | α′ powers, A sums, DEEP point constants, β^arity | computed in the script. b2: input 1 recomputes them from the same tail. a′: FIN checks them in TBL; QRY recomputes the α′ ladder and row keys itself |
 | G (final digest) | a′ only; computed by HEAD from its own and FIN's pushes; bound into the NFT commitment |
@@ -298,7 +335,7 @@ Layout columns: **b** (`gen.mjs` S4 for M1, `genn.mjs` `buildB`), **b2** (`genn.
 | value | owner |
 |---|---|
 | Q1. blob length | `SIZE = blob.total` (VK constant), then fixed-length splits: every row, salt, FRI value block and hint has a fixed position |
-| Q2. rows and salts of every input matrix | hashed into the leaf (tallest group) or the injected-row hash (shorter groups); the leaf is authenticated to the root (Lemma 7); row lanes parsed unreduced (§9.1) and used in the DEEP dot products |
+| Q2. rows and salts of every input matrix | hashed into the leaf (tallest group) or the injected-row hash (shorter groups); the leaf is authenticated to the root (Lemma 7); row lanes parsed unreduced and used in the DEEP dot products (congruent; ≤ 127 row values per height asserted for the 17-byte slots, §9.1) |
 | Q3. bottom siblings (mixed heights) | consumed per query in the B-level walk; the level-B node must authenticate in the record tree |
 | Q4. FRI sibling values and salts | the folded value from the previous round is inserted at the index position, the leaf hashed and authenticated in FRI tree r |
 | Q5. inverse hints T_top, T_h | parsed < p; T·s0·∏N = 1 resp. T_h·∏N = 1 checked; a zero product cannot pass, so the hint is unique and exists only when every DEEP denominator is nonzero |
@@ -335,8 +372,11 @@ the same transcript; so the transaction accepts only if the single-input verifie
 - **(ii) Same tail.** Input 1 takes the last `tailLen` bytes of input 0's unlocking (a VK constant) and parses them
   forward with exact push headers for each fixed-length item, requiring nothing to remain (`parseTail`). Input 0
   checks `DEPTH` and that each of its top items has exactly the VK length. BCH consensus requires unlocking bytecode
-  to be push-only with minimal push encodings, so input 0's last pushes, with those lengths, occupy exactly the last
-  `tailLen` bytes with exactly those headers: both inputs parse the same items.
+  to be push-only with minimal push encodings, and **every tail item has length ≥ 2** (a VK constant, asserted in
+  `buildB2`; today every PT and statement item is ≥ 8 bytes), so the minimal push header of each item is determined
+  by its length alone (no item can take the OP_0, OP_1..OP_16 or OP_1NEGATE form). Hence input 0's last pushes, with
+  those lengths, occupy exactly the last `tailLen` bytes with exactly those headers: both inputs parse the same
+  items.
 - **(iii) Same transcript and graph.** Both inputs run the shared TRANSCRIPT and CONSTS functions on the same tail
   bytes and so derive the same challenges and indices. MAIN0 and MAIN1 each pin the transaction: exactly 2 inputs,
   their own input index, and the other input's locking = the template around H_lib. So no third input, no swapped
@@ -361,6 +401,10 @@ those of the single-input verifier on one proof, for the statement (ROOT, NF, CT
   - ACC_j (24 B): CODE_j evaluates its constraint range at ζ and checks ACC_j equals it. HEAD checks
     Σ_j ACC_j·α^{C − hi_j} = q(ζ)·Z_H(ζ)·Dd^{maxScale}. With ACC_j = Σ_{i∈[lo_j,hi_j)} α^{hi_j−1−i}·c_i, the left
     side is Σ_i α^{C−1−i}·c_i, the full Horner fold, so this is S4's single-input AIR check split into ranges.
+  - *ACC canonicity.* HEAD reads ACC_j through `RDV` with no `< p` check. It is canonical anyway: CODE_j compares the
+    ACC_j bytes with `ENC` of its own result, which is reduced (every interpreter output is MOD p and non-negative
+    after §9.1), and `ENC` writes canonical 8-byte lanes; so only the canonical encoding of the true range value
+    passes CODE_j. (HEAD's products are congruent for any lane < 2^64 in any case.)
   - TBL (312 B: query indices, α′, β, DEEP point constants, A sums): FIN recomputes every field from the transcript
     and checks TBL byte for byte. QRY uses TBL's indices and constants and recomputes the α′ ladder itself.
 - **Queries.** The QRY ranges partition [0, Q) (checked when the plan is built; each QRY's range is a constant of
@@ -373,6 +417,15 @@ those of the single-input verifier on one proof, for the statement (ROOT, NF, CT
 **Lemma 10 (a′, 2 tx).** If tx0 and tx1 both accept, there is one G (the final transcript digest) for which the
 union of their checks is Lemma 9's set, and the statement's CTX is tx1's outputs.
 
+- **As built, every transaction has the same input pattern**: HEAD (input 0), CODE_1..nc, FIN, then its QRY inputs.
+  - **tx0** (kind 0): HEAD checks the statement, runs the transcript with every PoW, checks the AIR identity
+    Σ_j ACC_j·α^{C − hi_j} = q(ζ)·Z_H(ζ)·Dd^{maxScale}, returns the baton and mints the NFT; CODE_1..nc evaluate their
+    constraint ranges and check ACC_j; FIN checks TBL against the transcript; QRY covers [0, 21).
+  - **tx1** (kind 1): HEAD runs the transcript, checks CTXW = CTX(tx1's outputs) and burns the NFT; the CODE inputs only
+    carry the code blobs (their role is `DEPTH 1 NUMEQUALVERIFY DROP 1`: no AIR check, no ACC push); FIN checks TBL
+    again, because tx1's QRY inputs read it; QRY covers [21, 24).
+  - Both FINs and both HEADs derive their transcript from pushes bound by the same G (below), so FIN runs in both
+    transactions on the same transcript, and the QRY ranges of the two transactions partition [0, Q).
 - tx0 is kind 0 (input 0 holds the minting baton of CAT, capability byte 2). Its HEAD returns the baton to R in
   output 0 and mints, for each later transaction k, one immutable NFT of CAT under R with commitment
   k ‖ SHA256(TTAG ‖ G ‖ k). Outputs beyond those carry no token.
@@ -380,8 +433,8 @@ union of their checks is Lemma 9's set, and the statement's CTX is tx1's outputs
   computed by tx1's own HEAD from its own pushes. By collision resistance G′ = G. G covers every transcript input
   (caps, ROOT, NF, CTXW, OOD, PoW witnesses, FRI caps, final polynomial), so both transactions verify the same proof
   prefix and statement. No input or output of tx1 may carry another CAT token, so the NFT is burned.
-- tx0 runs the AIR check (CODE inputs and HEAD identity) and its QRY ranges; tx1 runs FIN and the remaining QRY
-  ranges and checks CTXW = CTX(tx1's outputs). The ranges partition [0, Q).
+- The kind is taken from input 0's token (the baton gives kind 0, otherwise the NFT commitment's first byte); the
+  graph is pinned by the input count of that kind and every locking = R.
 - **Assumptions and limits.**
   - The minting baton is created under R at deployment, and CAT has no other minting baton.
   - tx0 alone is a partial check: it can mint an NFT for a proof tx1 would reject. Its only effect is that NFT;
@@ -392,45 +445,57 @@ union of their checks is Lemma 9's set, and the statement's CTX is tx1's outputs
 
 ## 9. Where the scripts deviate from the reference verifier
 
-### 9.1 Field lanes from the proof are not range-checked, and the interpreter is not residue-safe (OPEN)
+### 9.1 Field lanes from the proof are not range-checked; the interpreter is residue-safe (CLOSED in S8b)
 
 **What the scripts do.** The reference verifier and Plonky3 reject any 8-byte lane ≥ p. The scripts, like Track 5's,
 check `< p` only on challenge samples, NF, public values (harness) and the inverse hints. OOD values, terminals, row
 values, FRI values and final-polynomial coefficients are parsed as integers in [0, 2^64) (`RDV`, `PKL`, the row
-parser) and used directly.
+parser) and used directly. An 8-byte non-canonical encoding exists only for residues ≤ 2^32 − 2 (2^64 − p = 2^32 − 1).
 
-**Track 5's argument and why it no longer covers the scripts.** Track 5 accepted this because "the residues are used":
-if every step of the script maps a lane to the same residue as its reduced value, an unreduced lane is just another
-byte encoding of the same field element. Changing the encoding changes the transcript bytes and Merkle leaves, so it
-is a different oracle query, and Fiat–Shamir soundness is unaffected. That argument needs every script operation to be
-congruent mod p for inputs in [0, 2^64).
-- Additions, multiplications by constants, `SUBE` (offset 2p), the DEEP numerators, `PAIRK` (bias p·2^137), the
-  final-polynomial Horner step and the terminal sum are all congruent for such inputs: every intermediate stays
-  non-negative, and the packed products fit their 17-byte slots.
-- The constraint interpreter's `D_SUB`, `D_SUBL`, `D_RSUBL` (a − b + p) and `D_NEG` (p − a), present in `gen.mjs`
-  (S4) and `genn.mjs` (S5–S7, so also a′'s CODE inputs), are **not**: with b in [p + 1, 2^64) and a < b − p the
-  result is negative, `MOD` keeps the sign, and the next packed extension product (`MULE`) is then not congruent to
-  the field product.
-- `s8-arith.mjs` runs the real `MULE` body in libauth (`results/s8-arith.json`): canonical lanes and an unreduced but
-  non-negative lane (p + 5) give the correct residue; a lane from `D_SUB(2, p + 5)` = −3 and a case with two such
-  lanes do not (the results differ by borrow errors); the same inputs through a − b + 2p are correct.
-- Reachability: in the as-built DAGs, `sub` nodes whose subtrahend is a raw proof lane (a `main`, `pre` or
-  `perm_value` leaf) number 8 in M1 (u_j − s_j in the chain constraints D_j) and 16 + 11 in M2.
+**Track 5's argument.** If every step of the script maps a lane to the same residue as its reduced value, an
+unreduced lane is just another byte encoding of the same field element. Changing the encoding changes the transcript
+bytes and Merkle leaves, so it is a different oracle query, and Fiat–Shamir soundness is unaffected. That argument
+needs every script operation to be congruent mod p for inputs in [0, 2^64).
 
-**Status.** For any proof whose lanes are all canonical, every intermediate is non-negative and the script computes
-the field semantics; the sweeps confirm agreement there. For a proof with a non-canonical lane in such a position, the
-AIR check evaluates something that is not the AIR identity, while DEEP/FRI use the residue. Whether a prover can turn
-this into acceptance of a false statement is **unknown**: it was not analysed further and no such proof was built
-(attack construction is out of scope for this stage). The S3 `noncanon` family (343 cases) does not test it: it
-modifies honest proofs after the fact, which changes the later challenges and fails the Merkle/FRI checks first.
+**What S8a found.** The constraint interpreter's `D_SUB`, `D_SUBL`, `D_RSUBL` (a − b + p) and `D_NEG` (p − a), in
+`gen.mjs` (S4) and `genn.mjs` (S5–S7, so also a′'s CODE inputs), were not congruent: with b in [p + 1, 2^64) and
+a < b − p the result is negative, `MOD` keeps the sign, and the next packed extension product (`MULE`) is then not
+congruent to the field product. In the as-built DAGs, `sub` nodes whose subtrahend is a raw proof lane number 8 in M1
+(u_j − s_j in the chain constraints D_j) and 16 + 11 in M2. Not shown exploitable; a prover can re-randomize the
+commitments until a lane of interest has a small residue, so the narrow encoding range did not close it.
 
-**Fix candidates** (not applied; each changes every committed script and the b2 library hash, so S4–S7's sweeps and
-op-cost figures would need to be re-run):
-1. Offset 2p in `D_SUB`, `D_SUBL`, `D_RSUBL` and `D_NEG` (as `SUBE` already does). No size change; makes every
-   operation congruent for lanes in [0, 2^64), so Track 5's residue argument then holds. Checked in `s8-arith.mjs`.
-   An audit of every subtraction site is needed; S8a's grep found no other site with a raw operand.
-2. A `DUP <p> LESSTHAN VERIFY` on every proof lane at parse time, as Plonky3 does. This also removes the malleability,
-   but costs op-cost per lane, and layout a′'s QRY inputs already run at 91% of their budget.
+**Fix applied in S8b (both generators):** `D_SUB`, `D_SUBL`, `D_RSUBL` compute a − b + 2p and `D_NEG` computes 2p − a,
+then `MOD p`, as `SUBE` already did. p and 2p are both 9-byte pushes, so no script changes size; the library hash and
+every committed script change.
+
+**Why that is enough** (the review's audit, checked against the code):
+- Every interpreter op output goes through `MOD p` on a non-negative value, so it lies in [0, p). The only values that
+  can exceed p are the raw leaves (main, pre, perm, perm_value, OOD lanes read by `LD`/`LDB`), all < 2^64 < 2p. So
+  every subtraction operand is < 2^64 and a − b + 2p > 0.
+- The other subtraction sites have a reduced subtrahend: `subBase` (ζ − c), the quotient recomposition (Z_j − 1), the
+  DEEP numerators (A sums and unpacked dot products, both reduced before the subtraction), the DEEP point constants
+  (ζ-derived), `SUBE` (2p), `PAIRK` (bias p·2^137). The terminal sum is a reduced sum of non-negative lanes.
+- Packed products. `MULE` packs three lanes per operand in 17-byte slots; each output slot is a sum of ≤ 3 products of
+  two values < 2^64, < 2^130, and is unpacked with the signed `BIN2NUM` (≤ 2^135 − 1). The dot products and the
+  final-polynomial Horner step use `SB` = 17-byte slots holding sums of products of a lane < 2^64 and a value < p: safe
+  for ≤ 127 terms. As built: ≈ 74 row values per height (M1), ≈ 91 (M2, height 20), GG ≤ 32. S8b adds generator
+  asserts (`assertPackBounds`: row values per height ≤ 127 and GG ≤ 127; D = 3 for `MULE`; ≤ 4 fold levels per round
+  for `PAIRK`'s 26-byte slots), so a wider VK fails at generation instead of overflowing silently.
+- `s8-arith.mjs` (libauth, `results/s8-arith.json`, 69 cases):
+  - Part A (history): the pre-fix form gives a wrong residue in 2/2 negative-lane cases; the canonical, the
+    non-negative-unreduced and the 2p controls are right.
+  - Part B: the generated `D_SUB`, `D_NEG`, `D_SUBL`, `D_RSUBL` bodies of `genn.mjs` and `gen.mjs` on six lane
+    patterns (all 2^64 − 1; 0 against 2^64 − 1; p, p + 1, p − 1 mixed; p + 5 / p + 9; 2^63), each followed by `MULE`
+    on the result: 60/60 congruent, every output canonical. The same check on the pre-fix bodies fails 38 cases.
+  - Part C: `MULE` on maximal non-negative raw lanes (all six 2^64 − 1; 2^64 − 1 against p − 1; mixed p / 2^64 − 1 /
+    0): 4/4 congruent.
+
+**Status: closed.** With every operation congruent on [0, 2^64), Track 5's residue argument holds for the as-built
+scripts. The scripts still accept non-canonical encodings (malleability with no soundness effect, as in Track 5):
+a `< p` parse check on every lane would remove it but costs op-cost per lane, and a′'s QRY inputs run at about 91% of
+their budget. All S4–S7 suites were re-run on the fixed scripts (`rerun-s8b.sh`, completed by `rerun-s8b-resume.sh`):
+layouts b, b2 and a′ all give 0 unexpected verdicts (§2 table), and every valid proof is still accepted in every
+regime it was before.
 
 ### 9.2 Other deviations (no soundness effect)
 
@@ -438,8 +503,20 @@ op-cost figures would need to be re-run):
 - **Encoder-only malformed cases:** a′ (55 cases) and b/b2 (1 case) where the encoder's lenient parse of a malformed
   proof reproduces the valid proof's witness; the script then accepts the valid proof, which is correct.
 - **ood PoW > 0** and **cap > 0 for multi-height VKs** are refused by the generator, not handled.
-- **ROOT** is a script constant written as 4 × u64 LE; the generator should assert each lane < p when it builds a
-  pool VK (not done; ROOT comes from the pool's field-element state, so this is a deployment check).
+- **ROOT** is a script constant written as 4 × u64 LE. The generator asserts each lane < p (layout b: `program`;
+  b2 and a′: `makeGenN`, which `buildA` calls). A lane ≥ p would have been observed raw but used reduced: no Plonky3
+  proof could verify under such a VK (a completeness issue only).
+- **PoW witnesses** (LPOW, BPOW, CPOW, QPOW) are observed as raw 8 bytes with no `< p` check. Plonky3 grinds over field
+  elements; a witness ≥ p is another byte string, hence another oracle query, and the grinding cost per query is
+  unchanged. No soundness effect.
+- **ζ^n = −1** is rejected by the scripts (`genn.mjs`, `gena.mjs`, per instance under ZK) but not by Plonky3 or
+  `verify-batch.mjs`. This is a completeness deviation: ζ^n = −1 has at most n roots, so its probability is at most n/|F_p^3| per instance (≤ 2^−180 for n ≤ 2^12); the
+  model-vs-reference agreement implicitly assumes it never occurs.
+- **Undeclared next-row reads.** Plonky3 rejects a DAG that reads a next row the VK does not open
+  (`check_next_row_reads`); `verify-batch.mjs` substitutes zeros. S8b makes `vkxN` refuse such a DAG, so no script is
+  generated for it. M1 and M2 open full rows and read only declared columns.
+- **Statement mode** (pool or witness) is an explicit argument of every production build path (`grade-b2`,
+  `profile-b2`, layout a′); the case-name guess survives only as `stmt: 'auto'` in the S3 test harness.
 - **The per-query bottom path** replaces Plonky3's INJ handling (Lemma 7): same binding.
 
 ## 10. AIR ⇒ relation
@@ -517,8 +594,8 @@ nullifier set (Track 9) prevents its second use.
 a random permutation. ZK of the proof itself is "by construction" (Plonky3's hiding PCS, ePrint 2024/1037); FRI-layer
 hiding is not analysed (DESIGN limits).
 
-**Canonical public values.** NF lanes are checked < p; CTX lanes are < 2^56 by construction; ROOT lanes must be
-< p by deployment (§9.2). So the public values the transcript observes are the field elements the AIR uses.
+**Canonical public values.** NF lanes are checked < p; CTX lanes are < 2^56 by construction; ROOT lanes are
+asserted < p by the generator (§9.2). So the public values the transcript observes are the field elements the AIR uses.
 
 **Lemma 13 (CTX binding, transcript only).** CTX is not referenced by any constraint (AIR-SPEC §3.1; the generator
 refuses a DAG that reads it). It enters only transcript step 1, before every challenge.
@@ -526,10 +603,16 @@ refuses a DAG that reads it). It enters only transcript step 1, before every cha
   serialization (prover/FORMAT.md, "CTX serialization") and SHA-256 truncated to 28 bytes. A different output set
   with the same CTX is a second preimage of 224-bit truncated SHA-256 (224 bits classical, about 112 quantum); the
   prover, who chooses the outputs, gains nothing from a collision, because it could prove any CTX anyway.
-- *A proof for one CTX does not verify for another.* Changing CTX changes the first digest, hence every challenge.
-  Accepting the same commitments under new challenges is exactly the event round-by-round soundness bounds, so a
-  replayed proof with changed outputs is rejected except with probability about Q_H·2^−128 (S3's statement family and
-  S4/S5/S7's tx families test this: 0 accepted).
+- *The same proof bytes do not verify for another CTX.* (ROOT, NF, CTX′) is a true statement, so round-by-round
+  soundness, which bounds acceptance of false statements, is not the right tool here. The argument is direct: changing
+  CTX changes the first digest, hence every challenge (α, ζ, α′, the FRI β's, the query indices), while the proof's
+  commitments, OOD values and openings stay fixed. Fixed openings pass the quotient identity at a fresh ζ, the fold
+  checks at fresh β's and the Merkle paths at fresh indices only with probability bounded by the same per-round terms
+  (random-oracle model, about Q_H·2^−128 over the observer's hash queries). So an unmodified proof replayed with
+  changed outputs is rejected except with negligible probability; S3's statement family and S4/S5/S7's tx families
+  test exactly this (0 accepted).
+- *A modified or new proof for CTX′ by a party without the witness* is not covered by soundness at all (the statement
+  is true); it is covered only by the simulation-extractability assumption of the next bullet.
 - *A mempool observer cannot make a fresh proof for new outputs.* The statement (ROOT, NF, CTX′) is true for any
   CTX′, so soundness alone does not stop a party that knows the witness. Stopping a party that only saw an honest
   proof needs **simulation extractability** of the Fiat–Shamir-compiled ZK proof: an adversary that sees proofs and
@@ -543,37 +626,41 @@ refuses a DAG that reads it). It enters only transcript step 1, before every cha
   127.21. Generic quantum collision search gives about 85 bits for T∘P and SHA-256.
 - Every λ is "JB, powers-batching adaptation, unpublished" (§6).
 - ZK is by construction; FRI-layer hiding and simulation extractability are not proved (§11).
-- The scripts are covered only for canonical proof lanes until §9.1 is fixed.
+- Proof lanes are not range-checked: the scripts accept non-canonical encodings of the same residues (malleability, no
+  soundness effect after the S8b fix, §9.1).
 - Replay of one valid proof in two final transactions is not prevented by the verifier in any layout (Track 9's
   nullifier set). In a′ two transactions, tx0 alone is a partial check, and the baton is a deployment assumption.
 - Standardness (for REPORT, not soundness): layout a′ needs no raised limit; M1 b2 needs the per-input unlocking,
   bytecode and stack-item limits raised to 100,000 B; M2 b2 additionally needs the transaction-size limit raised;
   layout b needs the per-input limits raised.
 
-## 13. Open items for the reviews (ordered)
+## 13. Open items (after S8b)
 
-1. **§9.1:** decide and apply a fix (2p offsets or range checks), audit every subtraction site, re-run the S4–S7
-   sweeps and op-cost grading. Until then, state the as-built scripts as covered for canonical lanes only.
+1. ~~§9.1~~ **closed in S8b** (2p offsets, op-level check on maximal lanes, all S4–S7 suites re-run on the fixed
+   scripts, 0 unexpected; §2).
 2. **Write the powers-batching adaptation (Track 5 §2.1) and its two curve extensions (per-height ladders, roll-in
    degree a) as a proof** and have it checked; M2's roll-in has only 0.87 bits of slack.
 3. **Simulation extractability** for the CTX lemma: find a published result that covers BCS-compiled, hiding FRI
    STARKs, or state the assumption in REPORT exactly as in §11.
-4. Assert ROOT lanes < p in the generator (§9.2).
-5. DESIGN §4: "transparent preprocessed" → "recomputable from the published SETUP_SEED".
+4. ~~ROOT lanes < p~~ asserted by the generator in S8b (§9.2).
+5. ~~DESIGN §4 "transparent preprocessed"~~ corrected on the design branch in S8b (with AIR-SPEC §3.6, §4.3, §6).
 6. Plonky3's `three_instances_mixed_sizes` coverage vectors are at 127.90–127.92 under our accounting; if they are
    ever cited as more than coverage, they need commit PoW +1.
 
 ## 14. Reproduce
 
 ```
-# zk-verifier-bench, branch wip/stark-usable-design
+# zk-verifier-bench, branch wip/stark-usable-design (6050eaf)
 cd research/pq-stark/design-t8
 python3 params8.py                       # S0 tables: tables8-output.{txt,json}
 V=<groth16_cashscript wip/stark-usable>/research/pq-stark-batch/prover/vectors
 python3 params8.py --asbuilt $V/S2 $V/S4 $V/S5 $V/S7 $V/Z128 $V/P3   # asbuilt8-output.{txt,json}, about 1 s
 
 # groth16_cashscript, branch wip/stark-usable (node_modules: symlink to a libauth 3.1.0-next.8 install)
-cd research/pq-stark-batch/onchain && node s8-arith.mjs   # results/s8-arith.json, under 1 s
+cd research/pq-stark-batch/onchain && node s8-arith.mjs   # results/s8-arith.json, a few seconds
+# the S4-S7 node suites on the cached proofs (S8b re-run; one node process, about 2 h)
+S3_CACHE=... S4_CACHE=... S5_CACHE=... S7_CACHE=... ./rerun-s8b.sh
+# rerun-s8b-resume.sh runs the same steps from test-b2-m2p3 onward (used after the first run was interrupted)
 ```
 
 Both need only the standard library (Python) or the repository's own modules (node).

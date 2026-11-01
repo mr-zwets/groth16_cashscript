@@ -29,9 +29,9 @@
     "mean": 97417
    },
    "op0": {
-    "min": 27160167,
-    "max": 27379457,
-    "mean": 27283480
+    "min": 27160321,
+    "max": 27379655,
+    "mean": 27283673
    },
    "op1": {
     "min": 19562843,
@@ -142,9 +142,9 @@
     "mean": 158006
    },
    "op0": {
-    "min": 35204141,
-    "max": 35518356,
-    "mean": 35367061
+    "min": 35204471,
+    "max": 35518576,
+    "mean": 35367368
    },
    "op1": {
     "min": 33203776,
@@ -222,10 +222,15 @@
     {
      "unlockingBytes": 63425,
      "lockingBytes": 63,
-     "opStd": 27316084,
-     "opCons": 27028084,
-     "opBchnAdjusted": 27335344,
+     "opStd": 27316326,
+     "opCons": 27028326,
+     "opBchnAdjusted": 27335586,
      "budgetR100": 50772800,
+     "budgetSpec": 58740000,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 53.8,
      "pctSpec": 46.5,
      "hashIterations": 2250,
@@ -251,6 +256,11 @@
      "opCons": 19486960,
      "opBchnAdjusted": 19788076,
      "budgetR100": 27742400,
+     "budgetSpec": 35709600,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71.3,
      "pctSpec": 55.4,
      "hashIterations": 2202,
@@ -305,10 +315,15 @@
     {
      "unlockingBytes": 62450,
      "lockingBytes": 63,
-     "opStd": 27261417,
-     "opCons": 26981609,
-     "opBchnAdjusted": 27280677,
+     "opStd": 27261692,
+     "opCons": 26981884,
+     "opBchnAdjusted": 27280952,
      "budgetR100": 49992800,
+     "budgetSpec": 57960000,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.6,
      "pctSpec": 47.1,
      "hashIterations": 2186,
@@ -334,6 +349,11 @@
      "opCons": 19382332,
      "opBchnAdjusted": 19678328,
      "budgetR100": 27228000,
+     "budgetSpec": 35195200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 72.3,
      "pctSpec": 55.9,
      "hashIterations": 2162,
@@ -388,10 +408,15 @@
     {
      "unlockingBytes": 62450,
      "lockingBytes": 63,
-     "opStd": 27251079,
-     "opCons": 26971271,
-     "opBchnAdjusted": 27270339,
+     "opStd": 27251222,
+     "opCons": 26971414,
+     "opBchnAdjusted": 27270482,
      "budgetR100": 49992800,
+     "budgetSpec": 57960000,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.5,
      "pctSpec": 47.1,
      "hashIterations": 2186,
@@ -417,6 +442,11 @@
      "opCons": 19419164,
      "opBchnAdjusted": 19718232,
      "budgetR100": 27527200,
+     "budgetSpec": 35494400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71.6,
      "pctSpec": 55.6,
      "hashIterations": 2186,
@@ -471,10 +501,15 @@
     {
      "unlockingBytes": 62429,
      "lockingBytes": 63,
-     "opStd": 27210818,
-     "opCons": 26931010,
-     "opBchnAdjusted": 27230078,
+     "opStd": 27211038,
+     "opCons": 26931230,
+     "opBchnAdjusted": 27230298,
      "budgetR100": 49976000,
+     "budgetSpec": 57943200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.5,
      "pctSpec": 47,
      "hashIterations": 2186,
@@ -500,6 +535,11 @@
      "opCons": 19390765,
      "opBchnAdjusted": 19689833,
      "budgetR100": 27510400,
+     "budgetSpec": 35477600,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71.6,
      "pctSpec": 55.5,
      "hashIterations": 2186,
@@ -554,10 +594,15 @@
     {
      "unlockingBytes": 63555,
      "lockingBytes": 63,
-     "opStd": 27360197,
-     "opCons": 27071173,
-     "opBchnAdjusted": 27379457,
+     "opStd": 27360395,
+     "opCons": 27071371,
+     "opBchnAdjusted": 27379655,
      "budgetR100": 50876800,
+     "budgetSpec": 58844000,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 53.8,
      "pctSpec": 46.5,
      "hashIterations": 2258,
@@ -583,6 +628,11 @@
      "opCons": 19486657,
      "opBchnAdjusted": 19786749,
      "budgetR100": 27657600,
+     "budgetSpec": 35624800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71.5,
      "pctSpec": 55.5,
      "hashIterations": 2194,
@@ -637,10 +687,15 @@
     {
      "unlockingBytes": 62299,
      "lockingBytes": 63,
-     "opStd": 27159398,
-     "opCons": 26880614,
-     "opBchnAdjusted": 27178658,
+     "opStd": 27159596,
+     "opCons": 26880812,
+     "opBchnAdjusted": 27178856,
      "budgetR100": 49872000,
+     "budgetSpec": 57839200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.5,
      "pctSpec": 47,
      "hashIterations": 2178,
@@ -666,6 +721,11 @@
      "opCons": 19444995,
      "opBchnAdjusted": 19747135,
      "budgetR100": 27819200,
+     "budgetSpec": 35786400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71,
      "pctSpec": 55.2,
      "hashIterations": 2210,
@@ -720,10 +780,15 @@
     {
      "unlockingBytes": 63555,
      "lockingBytes": 63,
-     "opStd": 27348564,
-     "opCons": 27059540,
-     "opBchnAdjusted": 27367824,
+     "opStd": 27348784,
+     "opCons": 27059760,
+     "opBchnAdjusted": 27368044,
      "budgetR100": 50876800,
+     "budgetSpec": 58844000,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 53.8,
      "pctSpec": 46.5,
      "hashIterations": 2258,
@@ -749,6 +814,11 @@
      "opCons": 19414127,
      "opBchnAdjusted": 19712171,
      "budgetR100": 27430400,
+     "budgetSpec": 35397600,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71.9,
      "pctSpec": 55.7,
      "hashIterations": 2178,
@@ -803,10 +873,15 @@
     {
      "unlockingBytes": 63208,
      "lockingBytes": 63,
-     "opStd": 27358313,
-     "opCons": 27072361,
-     "opBchnAdjusted": 27377573,
+     "opStd": 27358390,
+     "opCons": 27072438,
+     "opBchnAdjusted": 27377650,
      "budgetR100": 50599200,
+     "budgetSpec": 58566400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.1,
      "pctSpec": 46.7,
      "hashIterations": 2234,
@@ -832,6 +907,11 @@
      "opCons": 19465376,
      "opBchnAdjusted": 19765468,
      "budgetR100": 27647200,
+     "budgetSpec": 35614400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71.5,
      "pctSpec": 55.5,
      "hashIterations": 2194,
@@ -886,10 +966,15 @@
     {
      "unlockingBytes": 61919,
      "lockingBytes": 63,
-     "opStd": 27140907,
-     "opCons": 26865195,
-     "opBchnAdjusted": 27160167,
+     "opStd": 27141061,
+     "opCons": 26865349,
+     "opBchnAdjusted": 27160321,
      "budgetR100": 49568000,
+     "budgetSpec": 57535200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.8,
      "pctSpec": 47.2,
      "hashIterations": 2154,
@@ -915,6 +1000,11 @@
      "opCons": 19489985,
      "opBchnAdjusted": 19793149,
      "budgetR100": 27932800,
+     "budgetSpec": 35900000,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 70.9,
      "pctSpec": 55.1,
      "hashIterations": 2218,
@@ -969,10 +1059,15 @@
     {
      "unlockingBytes": 63177,
      "lockingBytes": 63,
-     "opStd": 27262725,
-     "opCons": 26976773,
-     "opBchnAdjusted": 27281985,
+     "opStd": 27262912,
+     "opCons": 26976960,
+     "opBchnAdjusted": 27282172,
      "budgetR100": 50574400,
+     "budgetSpec": 58541600,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 53.9,
      "pctSpec": 46.6,
      "hashIterations": 2234,
@@ -998,6 +1093,11 @@
      "opCons": 19506331,
      "opBchnAdjusted": 19810519,
      "budgetR100": 28040000,
+     "budgetSpec": 36007200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 70.7,
      "pctSpec": 55,
      "hashIterations": 2226,
@@ -1052,10 +1152,15 @@
     {
      "unlockingBytes": 62946,
      "lockingBytes": 63,
-     "opStd": 27287998,
-     "opCons": 27004094,
-     "opBchnAdjusted": 27307258,
+     "opStd": 27288218,
+     "opCons": 27004314,
+     "opBchnAdjusted": 27307478,
      "budgetR100": 50389600,
+     "budgetSpec": 58356800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.2,
      "pctSpec": 46.8,
      "hashIterations": 2218,
@@ -1081,6 +1186,11 @@
      "opCons": 19518760,
      "opBchnAdjusted": 19824996,
      "budgetR100": 28228800,
+     "budgetSpec": 36196000,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 70.2,
      "pctSpec": 54.8,
      "hashIterations": 2242,
@@ -1135,10 +1245,15 @@
     {
      "unlockingBytes": 62816,
      "lockingBytes": 63,
-     "opStd": 27258759,
-     "opCons": 26975879,
-     "opBchnAdjusted": 27278019,
+     "opStd": 27258946,
+     "opCons": 26976066,
+     "opBchnAdjusted": 27278206,
      "budgetR100": 50285600,
+     "budgetSpec": 58252800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.2,
      "pctSpec": 46.8,
      "hashIterations": 2210,
@@ -1164,6 +1279,11 @@
      "opCons": 19271967,
      "opBchnAdjusted": 19562843,
      "budgetR100": 26700800,
+     "budgetSpec": 34668000,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 73.3,
      "pctSpec": 56.4,
      "hashIterations": 2122,
@@ -1218,10 +1338,15 @@
     {
      "unlockingBytes": 62818,
      "lockingBytes": 63,
-     "opStd": 27274466,
-     "opCons": 26991586,
-     "opBchnAdjusted": 27293726,
+     "opStd": 27274708,
+     "opCons": 26991828,
+     "opBchnAdjusted": 27293968,
      "budgetR100": 50287200,
+     "budgetSpec": 58254400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.3,
      "pctSpec": 46.9,
      "hashIterations": 2210,
@@ -1247,6 +1372,11 @@
      "opCons": 19435854,
      "opBchnAdjusted": 19739018,
      "budgetR100": 27912800,
+     "budgetSpec": 35880000,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 70.7,
      "pctSpec": 55,
      "hashIterations": 2218,
@@ -1301,10 +1431,15 @@
     {
      "unlockingBytes": 62839,
      "lockingBytes": 63,
-     "opStd": 27308092,
-     "opCons": 27025212,
-     "opBchnAdjusted": 27327352,
+     "opStd": 27308356,
+     "opCons": 27025476,
+     "opBchnAdjusted": 27327616,
      "budgetR100": 50304000,
+     "budgetSpec": 58271200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.3,
      "pctSpec": 46.9,
      "hashIterations": 2210,
@@ -1330,6 +1465,11 @@
      "opCons": 19440033,
      "opBchnAdjusted": 19742173,
      "budgetR100": 27815200,
+     "budgetSpec": 35782400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71,
      "pctSpec": 55.2,
      "hashIterations": 2210,
@@ -1384,10 +1524,15 @@
     {
      "unlockingBytes": 62966,
      "lockingBytes": 63,
-     "opStd": 27320871,
-     "opCons": 27036967,
-     "opBchnAdjusted": 27340131,
+     "opStd": 27321058,
+     "opCons": 27037154,
+     "opBchnAdjusted": 27340318,
      "budgetR100": 50405600,
+     "budgetSpec": 58372800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.2,
      "pctSpec": 46.8,
      "hashIterations": 2218,
@@ -1413,6 +1558,11 @@
      "opCons": 19382013,
      "opBchnAdjusted": 19678009,
      "budgetR100": 27223200,
+     "budgetSpec": 35190400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 72.3,
      "pctSpec": 55.9,
      "hashIterations": 2162,
@@ -1467,10 +1617,15 @@
     {
      "unlockingBytes": 62579,
      "lockingBytes": 63,
-     "opStd": 27257349,
-     "opCons": 26976517,
-     "opBchnAdjusted": 27276609,
+     "opStd": 27257602,
+     "opCons": 26976770,
+     "opBchnAdjusted": 27276862,
      "budgetR100": 50096000,
+     "budgetSpec": 58063200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.4,
      "pctSpec": 47,
      "hashIterations": 2194,
@@ -1496,6 +1651,11 @@
      "opCons": 19465097,
      "opBchnAdjusted": 19766213,
      "budgetR100": 27739200,
+     "budgetSpec": 35706400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71.3,
      "pctSpec": 55.4,
      "hashIterations": 2202,
@@ -1550,10 +1710,15 @@
     {
      "unlockingBytes": 62192,
      "lockingBytes": 63,
-     "opStd": 27189434,
-     "opCons": 26911674,
-     "opBchnAdjusted": 27208694,
+     "opStd": 27189599,
+     "opCons": 26911839,
+     "opBchnAdjusted": 27208859,
      "budgetR100": 49786400,
+     "budgetSpec": 57753600,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.7,
      "pctSpec": 47.1,
      "hashIterations": 2170,
@@ -1579,6 +1744,11 @@
      "opCons": 19461922,
      "opBchnAdjusted": 19764062,
      "budgetR100": 27832000,
+     "budgetSpec": 35799200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71,
      "pctSpec": 55.2,
      "hashIterations": 2210,
@@ -1633,10 +1803,15 @@
     {
      "unlockingBytes": 62037,
      "lockingBytes": 63,
-     "opStd": 27141528,
-     "opCons": 26864792,
-     "opBchnAdjusted": 27160788,
+     "opStd": 27141671,
+     "opCons": 26864935,
+     "opBchnAdjusted": 27160931,
      "budgetR100": 49662400,
+     "budgetSpec": 57629600,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.7,
      "pctSpec": 47.1,
      "hashIterations": 2162,
@@ -1662,6 +1837,11 @@
      "opCons": 19362211,
      "opBchnAdjusted": 19658207,
      "budgetR100": 27221600,
+     "budgetSpec": 35188800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 72.2,
      "pctSpec": 55.9,
      "hashIterations": 2162,
@@ -1716,10 +1896,15 @@
     {
      "unlockingBytes": 63037,
      "lockingBytes": 63,
-     "opStd": 27266516,
-     "opCons": 26981588,
-     "opBchnAdjusted": 27285776,
+     "opStd": 27266648,
+     "opCons": 26981720,
+     "opBchnAdjusted": 27285908,
      "budgetR100": 50462400,
+     "budgetSpec": 58429600,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.1,
      "pctSpec": 46.7,
      "hashIterations": 2226,
@@ -1745,6 +1930,11 @@
      "opCons": 19394409,
      "opBchnAdjusted": 19692453,
      "budgetR100": 27418400,
+     "budgetSpec": 35385600,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71.8,
      "pctSpec": 55.7,
      "hashIterations": 2178,
@@ -1799,10 +1989,15 @@
     {
      "unlockingBytes": 63189,
      "lockingBytes": 63,
-     "opStd": 27318857,
-     "opCons": 27032905,
-     "opBchnAdjusted": 27338117,
+     "opStd": 27319044,
+     "opCons": 27033092,
+     "opBchnAdjusted": 27338304,
      "budgetR100": 50584000,
+     "budgetSpec": 58551200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54,
      "pctSpec": 46.7,
      "hashIterations": 2234,
@@ -1828,6 +2023,11 @@
      "opCons": 19451523,
      "opBchnAdjusted": 19753663,
      "budgetR100": 27820000,
+     "budgetSpec": 35787200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71,
      "pctSpec": 55.2,
      "hashIterations": 2210,
@@ -1882,10 +2082,15 @@
     {
      "unlockingBytes": 62056,
      "lockingBytes": 63,
-     "opStd": 27162410,
-     "opCons": 26885674,
-     "opBchnAdjusted": 27181670,
+     "opStd": 27162575,
+     "opCons": 26885839,
+     "opBchnAdjusted": 27181835,
      "budgetR100": 49677600,
+     "budgetSpec": 57644800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.7,
      "pctSpec": 47.2,
      "hashIterations": 2162,
@@ -1911,6 +2116,11 @@
      "opCons": 19447851,
      "opBchnAdjusted": 19747943,
      "budgetR100": 27641600,
+     "budgetSpec": 35608800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71.4,
      "pctSpec": 55.5,
      "hashIterations": 2194,
@@ -1965,10 +2175,15 @@
     {
      "unlockingBytes": 63425,
      "lockingBytes": 63,
-     "opStd": 27337692,
-     "opCons": 27049692,
-     "opBchnAdjusted": 27356952,
+     "opStd": 27337868,
+     "opCons": 27049868,
+     "opBchnAdjusted": 27357128,
      "budgetR100": 50772800,
+     "budgetSpec": 58740000,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 53.9,
      "pctSpec": 46.6,
      "hashIterations": 2250,
@@ -1994,6 +2209,11 @@
      "opCons": 19365322,
      "opBchnAdjusted": 19661318,
      "budgetR100": 27225600,
+     "budgetSpec": 35192800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 72.2,
      "pctSpec": 55.9,
      "hashIterations": 2162,
@@ -2048,10 +2268,15 @@
     {
      "unlockingBytes": 62698,
      "lockingBytes": 63,
-     "opStd": 27270524,
-     "opCons": 26988668,
-     "opBchnAdjusted": 27289784,
+     "opStd": 27270722,
+     "opCons": 26988866,
+     "opBchnAdjusted": 27289982,
      "budgetR100": 50191200,
+     "budgetSpec": 58158400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.4,
      "pctSpec": 46.9,
      "hashIterations": 2202,
@@ -2077,6 +2302,11 @@
      "opCons": 19480949,
      "opBchnAdjusted": 19783089,
      "budgetR100": 27832800,
+     "budgetSpec": 35800000,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 71.1,
      "pctSpec": 55.3,
      "hashIterations": 2210,
@@ -2131,10 +2361,15 @@
     {
      "unlockingBytes": 62943,
      "lockingBytes": 63,
-     "opStd": 27277289,
-     "opCons": 26993385,
-     "opBchnAdjusted": 27296549,
+     "opStd": 27277487,
+     "opCons": 26993583,
+     "opBchnAdjusted": 27296747,
      "budgetR100": 50387200,
+     "budgetSpec": 58354400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.2,
      "pctSpec": 46.8,
      "hashIterations": 2218,
@@ -2160,6 +2395,11 @@
      "opCons": 19492755,
      "opBchnAdjusted": 19795919,
      "budgetR100": 27939200,
+     "budgetSpec": 35906400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 70.9,
      "pctSpec": 55.1,
      "hashIterations": 2218,
@@ -2214,10 +2454,15 @@
     {
      "unlockingBytes": 80414,
      "lockingBytes": 63,
-     "opStd": 35185292,
-     "opCons": 34810636,
-     "opBchnAdjusted": 35212843,
+     "opStd": 35185578,
+     "opCons": 34810922,
+     "opBchnAdjusted": 35213129,
      "budgetR100": 64364000,
+     "budgetSpec": 72331200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.7,
      "pctSpec": 48.7,
      "hashIterations": 2927,
@@ -2243,6 +2488,11 @@
      "opCons": 32610337,
      "opBchnAdjusted": 33203776,
      "budgetR100": 60837600,
+     "budgetSpec": 68804800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.6,
      "pctSpec": 48.3,
      "hashIterations": 4421,
@@ -2307,10 +2557,15 @@
     {
      "unlockingBytes": 82436,
      "lockingBytes": 63,
-     "opStd": 35490805,
-     "opCons": 35100021,
-     "opBchnAdjusted": 35518356,
+     "opStd": 35491025,
+     "opCons": 35100241,
+     "opBchnAdjusted": 35518576,
      "budgetR100": 65981600,
+     "budgetSpec": 73948800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 53.8,
      "pctSpec": 48,
      "hashIterations": 3053,
@@ -2336,6 +2591,11 @@
      "opCons": 32675259,
      "opBchnAdjusted": 33270490,
      "budgetR100": 61029600,
+     "budgetSpec": 68996800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.5,
      "pctSpec": 48.2,
      "hashIterations": 4435,
@@ -2400,10 +2660,15 @@
     {
      "unlockingBytes": 81301,
      "lockingBytes": 63,
-     "opStd": 35309668,
-     "opCons": 34927844,
-     "opBchnAdjusted": 35337219,
+     "opStd": 35310009,
+     "opCons": 34928185,
+     "opBchnAdjusted": 35337560,
      "budgetR100": 65073600,
+     "budgetSpec": 73040800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.3,
      "pctSpec": 48.4,
      "hashIterations": 2983,
@@ -2429,6 +2694,11 @@
      "opCons": 32638232,
      "opBchnAdjusted": 33229879,
      "budgetR100": 60659200,
+     "budgetSpec": 68626400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.8,
      "pctSpec": 48.4,
      "hashIterations": 4407,
@@ -2493,10 +2763,15 @@
     {
      "unlockingBytes": 82224,
      "lockingBytes": 63,
-     "opStd": 35472570,
-     "opCons": 35083578,
-     "opBchnAdjusted": 35500121,
+     "opStd": 35472966,
+     "opCons": 35083974,
+     "opBchnAdjusted": 35500517,
      "budgetR100": 65812000,
+     "budgetSpec": 73779200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 53.9,
      "pctSpec": 48.1,
      "hashIterations": 3039,
@@ -2522,6 +2797,11 @@
      "opCons": 32901374,
      "opBchnAdjusted": 33505565,
      "budgetR100": 61945600,
+     "budgetSpec": 69912800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.1,
      "pctSpec": 47.9,
      "hashIterations": 4505,
@@ -2586,10 +2866,15 @@
     {
      "unlockingBytes": 79778,
      "lockingBytes": 63,
-     "opStd": 35176590,
-     "opCons": 34807310,
-     "opBchnAdjusted": 35204141,
+     "opStd": 35176920,
+     "opCons": 34807640,
+     "opBchnAdjusted": 35204471,
      "budgetR100": 63855200,
+     "budgetSpec": 71822400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 55.1,
      "pctSpec": 49,
      "hashIterations": 2885,
@@ -2615,6 +2900,11 @@
      "opCons": 32685226,
      "opBchnAdjusted": 33282249,
      "budgetR100": 61210400,
+     "budgetSpec": 69177600,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.4,
      "pctSpec": 48.1,
      "hashIterations": 4449,
@@ -2679,10 +2969,15 @@
     {
      "unlockingBytes": 81982,
      "lockingBytes": 63,
-     "opStd": 35388335,
-     "opCons": 35001135,
-     "opBchnAdjusted": 35415886,
+     "opStd": 35388654,
+     "opCons": 35001454,
+     "opBchnAdjusted": 35416205,
      "budgetR100": 65618400,
+     "budgetSpec": 73585600,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54,
      "pctSpec": 48.1,
      "hashIterations": 3025,
@@ -2708,6 +3003,11 @@
      "opCons": 32671348,
      "opBchnAdjusted": 33264787,
      "budgetR100": 60855200,
+     "budgetSpec": 68822400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.7,
      "pctSpec": 48.3,
      "hashIterations": 4421,
@@ -2772,10 +3072,15 @@
     {
      "unlockingBytes": 81766,
      "lockingBytes": 63,
-     "opStd": 35378828,
-     "opCons": 34993420,
-     "opBchnAdjusted": 35406379,
+     "opStd": 35379125,
+     "opCons": 34993717,
+     "opBchnAdjusted": 35406676,
      "budgetR100": 65445600,
+     "budgetSpec": 73412800,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.1,
      "pctSpec": 48.2,
      "hashIterations": 3011,
@@ -2801,6 +3106,11 @@
      "opCons": 32791759,
      "opBchnAdjusted": 33392366,
      "budgetR100": 61572000,
+     "budgetSpec": 69539200,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.2,
      "pctSpec": 48,
      "hashIterations": 4477,
@@ -2865,10 +3175,15 @@
     {
      "unlockingBytes": 81308,
      "lockingBytes": 63,
-     "opStd": 35313991,
-     "opCons": 34932167,
-     "opBchnAdjusted": 35341542,
+     "opStd": 35314255,
+     "opCons": 34932431,
+     "opBchnAdjusted": 35341806,
      "budgetR100": 65079200,
+     "budgetSpec": 73046400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.3,
      "pctSpec": 48.4,
      "hashIterations": 2983,
@@ -2894,6 +3209,11 @@
      "opCons": 32774273,
      "opBchnAdjusted": 33374880,
      "budgetR100": 61563200,
+     "budgetSpec": 69530400,
+     "bchnWithinBudget": {
+      "r100": true,
+      "spec": true
+     },
      "pctR100": 54.2,
      "pctSpec": 48,
      "hashIterations": 4477,

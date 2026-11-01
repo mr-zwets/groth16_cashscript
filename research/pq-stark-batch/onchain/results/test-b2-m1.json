@@ -75,8 +75,9 @@
   "truncate": {
    "cases": 54,
    "chainReject": 53,
-   "accept": 1,
-   "unexpected": 0
+   "accept": 0,
+   "unexpected": 0,
+   "encoderOnlyRelabel": 1
   },
   "extend": {
    "cases": 42,
@@ -92,9 +93,10 @@
   },
   "statement": {
    "cases": 423,
-   "chainReject": 423,
+   "chainReject": 390,
    "accept": 0,
-   "unexpected": 0
+   "unexpected": 0,
+   "notRunOnChain": 33
   },
   "other_vk": {
    "cases": 54,
@@ -110,9 +112,10 @@
   },
   "vk_variant": {
    "cases": 5,
-   "chainReject": 5,
+   "chainReject": 3,
    "accept": 0,
-   "unexpected": 0
+   "unexpected": 0,
+   "notRunOnChain": 2
   },
   "forced": {
    "cases": 9,
@@ -126,5 +129,7 @@
   "m1-0-Z128~vk-cap+1.json: generator: Merkle cap 0 (layouts b and b2)",
   "m1-0-Z128~vk-opow=1.json: generator: ood PoW 0"
  ],
- "layoutB": 0
+ "layoutB": 0,
+ "notRunOnChain": 35,
+ "encoderOnlyRelabel": 1
 }

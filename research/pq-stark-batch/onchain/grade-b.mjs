@@ -37,7 +37,7 @@ for (const path of files) {
     hashIterations: R.looseStd.iters, instructions: R.looseStd.instr,
     budgetR100: (41 + L) * 800, budgetSpec: (10_000 + L) * 800,
     // BCHN counts OP_DEFINE body bytes on top of libauth's op-cost (Track 8a): gate on the adjusted value too
-    bchnWithinBudget: {r100: bchn <= (41 + L) * 800 && R.looseCons.opCost + defBytes <= (41 + L) * 800, spec: bchn <= (10_000 + L) * 800},
+    bchnWithinBudget: {r100: Math.max(bchn, R.looseCons.opCost + defBytes) <= (41 + L) * 800, spec: Math.max(bchn, R.looseCons.opCost + defBytes) <= (10_000 + L) * 800},
     pctR100: +(100 * bchn / ((41 + L) * 800)).toFixed(1), pctSpec: +(100 * bchn / ((10_000 + L) * 800)).toFixed(1),
     vsModel: {params8Pct: +(100 * (bchn / MODEL.params8 - 1)).toFixed(1), designMidPct: +(100 * (bchn / 31_000_000 - 1)).toFixed(1)},
     accepted: Object.fromEntries(Object.entries(R).map(([k, x]) => [k, x.accepted])),
