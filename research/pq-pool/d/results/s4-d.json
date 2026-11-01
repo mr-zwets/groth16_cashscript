@@ -1,0 +1,1682 @@
+{
+ "stage": "Track 9 S4",
+ "what": "D-state covenant, flush, ring (libauth)",
+ "sizes": {
+  "Dredeem": 291,
+  "Wredeem": 671,
+  "flushBlob": 2209,
+  "workerBlob": 7725,
+  "workerLocking": 43,
+  "compress": 7567,
+  "levelFn": 112
+ },
+ "seq": [
+  {
+   "flush": 0,
+   "leaves": 16,
+   "root": "9619584dd9f988004cc00feaa16386c02b1f0ebedd8776f1e1293aca571d532e",
+   "offline": "9619584dd9f988004cc00feaa16386c02b1f0ebedd8776f1e1293aca571d532e",
+   "rootEqualsOffline": true,
+   "histRootEqualsRing": true,
+   "count": 16,
+   "epoch": 1,
+   "bytes": 42127,
+   "maxPct": 90.5,
+   "withdrawal": true
+  },
+  {
+   "flush": 1,
+   "leaves": 32,
+   "root": "9ea974ba33aae27073a2d3f781437fde8ebb8eed359e226f0a30aa37a7ad40c0",
+   "offline": "9ea974ba33aae27073a2d3f781437fde8ebb8eed359e226f0a30aa37a7ad40c0",
+   "rootEqualsOffline": true,
+   "histRootEqualsRing": true,
+   "count": 32,
+   "epoch": 2,
+   "bytes": 42127,
+   "maxPct": 90.66,
+   "withdrawal": true
+  },
+  {
+   "flush": 2,
+   "leaves": 48,
+   "root": "f4ede421d4c0850b204728a33af1af7edc795ea7afe514ae7f9257b75917a844",
+   "offline": "f4ede421d4c0850b204728a33af1af7edc795ea7afe514ae7f9257b75917a844",
+   "rootEqualsOffline": true,
+   "histRootEqualsRing": true,
+   "count": 48,
+   "epoch": 3,
+   "bytes": 42128,
+   "maxPct": 90.67,
+   "withdrawal": true
+  },
+  {
+   "flush": 3,
+   "leaves": 64,
+   "root": "766538724ce538b7129a6ad2a66cbd652b48479b530958fbfee3db1414865fe6",
+   "offline": "766538724ce538b7129a6ad2a66cbd652b48479b530958fbfee3db1414865fe6",
+   "rootEqualsOffline": true,
+   "histRootEqualsRing": true,
+   "count": 64,
+   "epoch": 4,
+   "bytes": 42128,
+   "maxPct": 90.8,
+   "withdrawal": true
+  }
+ ],
+ "wrap": {
+  "before": {
+   "epoch": 16,
+   "accepted": true
+  },
+  "after": {
+   "epoch": 17,
+   "staleRejected": true,
+   "newestAccepted": true,
+   "root1Accepted": true,
+   "slot0IsRoot16": true
+  },
+  "flushes": 17,
+  "deposits": 272,
+  "lastRootEqualsOffline": true,
+  "allRootsEqualOffline": true
+ },
+ "families": {
+  "seq": {
+   "cases": 8,
+   "ok": 8
+  },
+  "deposit": {
+   "cases": 16,
+   "ok": 16
+  },
+  "lane": {
+   "cases": 4,
+   "ok": 4
+  },
+  "flush": {
+   "cases": 1,
+   "ok": 1
+  },
+  "frontier": {
+   "cases": 7,
+   "ok": 7
+  },
+  "ring": {
+   "cases": 4,
+   "ok": 4
+  },
+  "mid": {
+   "cases": 7,
+   "ok": 7
+  },
+  "io": {
+   "cases": 6,
+   "ok": 6
+  },
+  "wout": {
+   "cases": 5,
+   "ok": 5
+  },
+  "dout": {
+   "cases": 3,
+   "ok": 3
+  },
+  "wbranch": {
+   "cases": 3,
+   "ok": 3
+  },
+  "premature": {
+   "cases": 2,
+   "ok": 2
+  },
+  "wrap": {
+   "cases": 5,
+   "ok": 5
+  },
+  "edge": {
+   "cases": 5,
+   "ok": 5
+  }
+ },
+ "cases": [
+  {
+   "family": "seq",
+   "name": "flush 0: note 3 withdrawn against root 0 (stand-in R)",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "seq",
+   "name": "flush 1: note 19 withdrawn against root 1 (stand-in R)",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "seq",
+   "name": "flush 2: note 35 withdrawn against root 2 (stand-in R)",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "seq",
+   "name": "flush 3: note 51 withdrawn against root 3 (stand-in R)",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "deposit",
+   "name": "control: an honest deposit",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "deposit",
+   "name": "control: every leaf lane = p - 1 (the largest allowed)",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "lane",
+   "name": "leaf lane 0 = p",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "lane",
+   "name": "leaf lane 3 = p",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "lane",
+   "name": "leaf lane 1 = 2^64 - 1",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "lane",
+   "name": "leaf lane 2 = p + 5",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "leaf of 31 B",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "leaf of 33 B",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "witness len + 1",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "witness chain byte flipped",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "output 0 value: in + D + f - 1",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "output 0 value: in + D (no fee)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "output 0 commitment: queue unchanged",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "output 0 commitment: depHash byte flipped",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "output 0 commitment: prefix 0x57",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "output 0 locking: W's locking",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "output 0 NFT immutable",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "D at input 1 (inputs swapped)",
+   "ok": true,
+   "rejecter": [
+    "W"
+   ],
+   "verdicts": "accept reject"
+  },
+  {
+   "family": "deposit",
+   "name": "D token moved to output 1, output 0 plain",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "deposit",
+   "name": "a 17th deposit on a full queue (len = 16)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept"
+  },
+  {
+   "family": "flush",
+   "name": "control: an honest flush (count 64, epoch 4)",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "frontier",
+   "name": "FR byte 0 flipped",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "frontier",
+   "name": "FR entry of level 6 (the set bit of 64) replaced by Z",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "frontier",
+   "name": "FR entries of levels 6 and 7 swapped",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "frontier",
+   "name": "FR of 25 entries",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "frontier",
+   "name": "count + 16 (FR unchanged)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "frontier",
+   "name": "count - 16 (FR unchanged)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "frontier",
+   "name": "the IO and witness of another frontier (count 48), against this depHash",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "ring",
+   "name": "RING: old slot value flipped",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "ring",
+   "name": "RING: a sibling flipped",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "ring",
+   "name": "RING: slot 0's value and path (epoch mod 16 = 4)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "ring",
+   "name": "RING of 128 B (no old value)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "mid",
+   "name": "MID: ROOT flipped (workers keep the honest IO)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "mid",
+   "name": "MID: A8 flipped (workers keep the honest IO)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "mid",
+   "name": "MID: X flipped (workers keep the honest IO)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "mid",
+   "name": "a wrong ROOT claimed consistently (MID, worker 4 IO, W's histRoot'): worker 4 rejects",
+   "ok": true,
+   "rejecter": [
+    "worker4"
+   ],
+   "verdicts": "accept accept accept accept accept reject"
+  },
+  {
+   "family": "mid",
+   "name": "a wrong H11 claimed consistently (MID, workers 2 and 3 IO): worker 2 rejects (worker 3, starting from it, misses H23)",
+   "ok": true,
+   "rejecter": [
+    "worker2"
+   ],
+   "verdicts": "accept accept accept reject reject accept"
+  },
+  {
+   "family": "mid",
+   "name": "a wrong A8 claimed consistently (MID, workers 1 and 2 IO): worker 1 rejects (worker 2, starting from it, misses H11)",
+   "ok": true,
+   "rejecter": [
+    "worker1"
+   ],
+   "verdicts": "accept accept reject reject accept accept"
+  },
+  {
+   "family": "mid",
+   "name": "a wrong X (the new frontier node) claimed consistently (MID, worker 2 IO, D's F'): worker 2 rejects",
+   "ok": true,
+   "rejecter": [
+    "worker2"
+   ],
+   "verdicts": "accept accept accept reject accept accept"
+  },
+  {
+   "family": "io",
+   "name": "worker 1 IO: a leaf byte flipped",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept reject accept accept accept"
+  },
+  {
+   "family": "io",
+   "name": "worker 4 IO: last byte flipped (its E literal)",
+   "ok": true,
+   "rejecter": [
+    "D",
+    "worker4"
+   ],
+   "verdicts": "reject accept accept accept accept reject"
+  },
+  {
+   "family": "io",
+   "name": "workers 2 and 3 swapped",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "io",
+   "name": "worker 4 missing (5 inputs)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept"
+  },
+  {
+   "family": "io",
+   "name": "worker 3 locking: a P2S OP_1 (its unlocking unchanged)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept reject accept"
+  },
+  {
+   "family": "io",
+   "name": "worker 1 unlocking: an extra push before IO",
+   "ok": true,
+   "rejecter": [
+    "D",
+    "worker1"
+   ],
+   "verdicts": "reject accept reject accept accept accept"
+  },
+  {
+   "family": "wout",
+   "name": "W output: histRoot' with ROOT in slot 5 (not epoch mod 16)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "wout",
+   "name": "W output: epoch not incremented",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "wout",
+   "name": "W output: nfRoot changed",
+   "ok": true,
+   "rejecter": [
+    "D",
+    "W"
+   ],
+   "verdicts": "reject reject accept accept accept accept"
+  },
+  {
+   "family": "wout",
+   "name": "W output value: + 16 D - 1",
+   "ok": true,
+   "rejecter": [
+    "D",
+    "W"
+   ],
+   "verdicts": "reject reject accept accept accept accept"
+  },
+  {
+   "family": "wout",
+   "name": "W output locking: D's locking",
+   "ok": true,
+   "rejecter": [
+    "D",
+    "W"
+   ],
+   "verdicts": "reject reject accept accept accept accept"
+  },
+  {
+   "family": "dout",
+   "name": "D output value: - 16 (D + f) - 1 (keeper takes 1 sat more)",
+   "ok": true,
+   "rejecter": [
+    "D",
+    "W"
+   ],
+   "verdicts": "reject reject accept accept accept accept"
+  },
+  {
+   "family": "dout",
+   "name": "D output commitment: queue not reset",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "dout",
+   "name": "D output commitment: depHash of count + 16 with the old frontier",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "wbranch",
+   "name": "W's flush branch with D running its deposit branch (D at 0, W at 1): W rejects",
+   "ok": true,
+   "rejecter": [
+    "W"
+   ],
+   "verdicts": "accept reject accept"
+  },
+  {
+   "family": "wbranch",
+   "name": "a fake D (another category, prefix 0x44, OP_1 locking) at input 0: W rejects",
+   "ok": true,
+   "rejecter": [
+    "W"
+   ],
+   "verdicts": "accept reject accept accept accept accept"
+  },
+  {
+   "family": "wbranch",
+   "name": "a fake W (another category, prefix 0x57, OP_1 locking) at input 1: D rejects",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "premature",
+   "name": "flush with 15 queued deposits plus a 16th leaf never deposited",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "premature",
+   "name": "flush with the 15 queued leaves only (LV of 480 B)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "wrap",
+   "name": "epoch 16: a flush-0 note against root 0 (slot 0, written at epoch 0) accepted",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "wrap",
+   "name": "epoch 17: another flush-0 note against root 0 after the flush at epoch 16 overwrote slot 0",
+   "ok": true,
+   "rejecter": [
+    "W"
+   ],
+   "verdicts": "accept reject"
+  },
+  {
+   "family": "wrap",
+   "name": "epoch 17: the same, with slot 1's path",
+   "ok": true,
+   "rejecter": [
+    "W"
+   ],
+   "verdicts": "accept reject"
+  },
+  {
+   "family": "wrap",
+   "name": "epoch 17: that note against the newest root (root 16, slot 0) accepted",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "wrap",
+   "name": "epoch 17: a flush-0 note against root 1 (slot 1, written at epoch 1, still in the ring) accepted",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "edge",
+   "name": "l0 = 29: bits 4..28 of count set (count 536870896)",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "edge",
+   "name": "count = 2^30 - 16: no zero bit, the tree becomes full (F' all Z) (count 1073741808)",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "edge",
+   "name": "count = 2^30: the tree is full (count 1073741824)",
+   "ok": true,
+   "rejecter": [
+    "D"
+   ],
+   "verdicts": "reject accept accept accept accept accept"
+  },
+  {
+   "family": "edge",
+   "name": "count = 0 (an empty tree) (count 0)",
+   "ok": true,
+   "expect": "accept"
+  },
+  {
+   "family": "edge",
+   "name": "a queued leaf with lane 0 = p (synthetic queue): worker 1 rejects (literal lane < p)",
+   "ok": true,
+   "rejecter": [
+    "worker1"
+   ],
+   "verdicts": "accept accept reject accept accept accept"
+  }
+ ],
+ "fail": [],
+ "costs": {
+  "flush": [
+   {
+    "bytes": 42127,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4213,
+      "op": 699653,
+      "pct": 20.56
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47576,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6072911,
+      "pct": 87.85
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7269804,
+      "pct": 90.5
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7242228,
+      "pct": 90.16
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4255358,
+      "pct": 65.86
+     }
+    ]
+   },
+   {
+    "bytes": 42127,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4213,
+      "op": 699443,
+      "pct": 20.55
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6070832,
+      "pct": 87.82
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7282396,
+      "pct": 90.66
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7243452,
+      "pct": 90.17
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4255311,
+      "pct": 65.86
+     }
+    ]
+   },
+   {
+    "bytes": 42128,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4214,
+      "op": 699723,
+      "pct": 20.56
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6074089,
+      "pct": 87.87
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7282986,
+      "pct": 90.67
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7242405,
+      "pct": 90.16
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4255129,
+      "pct": 65.85
+     }
+    ]
+   },
+   {
+    "bytes": 42128,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4214,
+      "op": 699222,
+      "pct": 20.54
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6073766,
+      "pct": 87.86
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7293845,
+      "pct": 90.8
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7244133,
+      "pct": 90.18
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4255360,
+      "pct": 65.86
+     }
+    ]
+   },
+   {
+    "bytes": 42128,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4214,
+      "op": 699733,
+      "pct": 20.56
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6072213,
+      "pct": 87.84
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7281172,
+      "pct": 90.64
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7243846,
+      "pct": 90.18
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4255243,
+      "pct": 65.85
+     }
+    ]
+   },
+   {
+    "bytes": 42128,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4214,
+      "op": 699502,
+      "pct": 20.55
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6073743,
+      "pct": 87.86
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7292261,
+      "pct": 90.78
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7244361,
+      "pct": 90.18
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4253987,
+      "pct": 65.83
+     }
+    ]
+   },
+   {
+    "bytes": 42128,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4214,
+      "op": 699768,
+      "pct": 20.56
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6073558,
+      "pct": 87.86
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7291907,
+      "pct": 90.78
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7243707,
+      "pct": 90.18
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4254902,
+      "pct": 65.85
+     }
+    ]
+   },
+   {
+    "bytes": 42128,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4214,
+      "op": 698999,
+      "pct": 20.53
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6073025,
+      "pct": 87.85
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7305876,
+      "pct": 90.95
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7243993,
+      "pct": 90.18
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4254633,
+      "pct": 65.84
+     }
+    ]
+   },
+   {
+    "bytes": 42129,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4215,
+      "op": 699751,
+      "pct": 20.55
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6073562,
+      "pct": 87.86
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7281140,
+      "pct": 90.64
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7242842,
+      "pct": 90.17
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4255526,
+      "pct": 65.86
+     }
+    ]
+   },
+   {
+    "bytes": 42129,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4215,
+      "op": 699520,
+      "pct": 20.55
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6072534,
+      "pct": 87.84
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7292271,
+      "pct": 90.78
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7244037,
+      "pct": 90.18
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4254468,
+      "pct": 65.84
+     }
+    ]
+   },
+   {
+    "bytes": 42129,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4215,
+      "op": 699786,
+      "pct": 20.55
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6073183,
+      "pct": 87.85
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7292735,
+      "pct": 90.79
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7242015,
+      "pct": 90.16
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4253068,
+      "pct": 65.82
+     }
+    ]
+   },
+   {
+    "bytes": 42129,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4215,
+      "op": 699285,
+      "pct": 20.54
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6072649,
+      "pct": 87.85
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7305966,
+      "pct": 90.95
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7243582,
+      "pct": 90.18
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4255161,
+      "pct": 65.85
+     }
+    ]
+   },
+   {
+    "bytes": 42129,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4215,
+      "op": 699782,
+      "pct": 20.55
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6073872,
+      "pct": 87.86
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7292224,
+      "pct": 90.78
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7242039,
+      "pct": 90.16
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4255598,
+      "pct": 65.86
+     }
+    ]
+   },
+   {
+    "bytes": 42129,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4215,
+      "op": 699551,
+      "pct": 20.55
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6072660,
+      "pct": 87.85
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7303327,
+      "pct": 90.92
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7242374,
+      "pct": 90.16
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4255137,
+      "pct": 65.85
+     }
+    ]
+   },
+   {
+    "bytes": 42129,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4215,
+      "op": 699817,
+      "pct": 20.55
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6073710,
+      "pct": 87.86
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7303459,
+      "pct": 90.92
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7244276,
+      "pct": 90.18
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4256474,
+      "pct": 65.87
+     }
+    ]
+   },
+   {
+    "bytes": 42129,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4215,
+      "op": 698776,
+      "pct": 20.52
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6073309,
+      "pct": 87.86
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7316926,
+      "pct": 91.09
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7244660,
+      "pct": 90.19
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4254849,
+      "pct": 65.85
+     }
+    ]
+   },
+   {
+    "bytes": 42129,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4215,
+      "op": 699728,
+      "pct": 20.55
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6073932,
+      "pct": 87.87
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7280185,
+      "pct": 90.63
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7244484,
+      "pct": 90.19
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4253766,
+      "pct": 65.83
+     }
+    ]
+   }
+  ],
+  "edge": [
+   {
+    "count": 536870896,
+    "ok": true,
+    "per": [
+     20.53,
+     8.32,
+     87.86,
+     91.11,
+     91.89,
+     66.71
+    ]
+   },
+   {
+    "count": 1073741808,
+    "ok": true,
+    "per": [
+     20.51,
+     8.32,
+     87.86,
+     91.11,
+     91.89,
+     66.98
+    ]
+   },
+   {
+    "count": 0,
+    "ok": true,
+    "per": [
+     20.56,
+     8.32,
+     87.86,
+     90.51,
+     90.18,
+     65.84
+    ]
+   }
+  ],
+  "flushSample": [
+   {
+    "bytes": 42127,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4213,
+      "op": 699653,
+      "pct": 20.56
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47576,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6072911,
+      "pct": 87.85
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7269804,
+      "pct": 90.5
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7242228,
+      "pct": 90.16
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4255358,
+      "pct": 65.86
+     }
+    ]
+   },
+   {
+    "bytes": 42127,
+    "per": [
+     {
+      "role": "D",
+      "unlocking": 4213,
+      "op": 699443,
+      "pct": 20.55
+     },
+     {
+      "role": "W",
+      "unlocking": 674,
+      "op": 47577,
+      "pct": 8.32
+     },
+     {
+      "role": "worker1",
+      "unlocking": 8600,
+      "op": 6070832,
+      "pct": 87.82
+     },
+     {
+      "role": "worker2",
+      "unlocking": 10000,
+      "op": 7282396,
+      "pct": 90.66
+     },
+     {
+      "role": "worker3",
+      "unlocking": 10000,
+      "op": 7243452,
+      "pct": 90.17
+     },
+     {
+      "role": "worker4",
+      "unlocking": 8036,
+      "op": 4255311,
+      "pct": 65.86
+     }
+    ]
+   }
+  ]
+ },
+ "seqAll": true,
+ "summary": {
+  "seq": true,
+  "wrap": {
+   "before": {
+    "epoch": 16,
+    "accepted": true
+   },
+   "after": {
+    "epoch": 17,
+    "staleRejected": true,
+    "newestAccepted": true,
+    "root1Accepted": true,
+    "slot0IsRoot16": true
+   },
+   "flushes": 17,
+   "deposits": 272,
+   "lastRootEqualsOffline": true,
+   "allRootsEqualOffline": true
+  },
+  "failures": 0,
+  "cases": 72,
+  "deposit": {
+   "n": 272,
+   "bytes": [
+    645,
+    645
+   ],
+   "opD": [
+    18598,
+    18611
+   ],
+   "budgetD": 321600
+  },
+  "flush": {
+   "n": 17,
+   "bytes": [
+    42127,
+    42129
+   ],
+   "perRole": [
+    {
+     "role": "D",
+     "unlocking": 4213,
+     "op": [
+      698776,
+      699817
+     ],
+     "pctMax": 20.56
+    },
+    {
+     "role": "W",
+     "unlocking": 674,
+     "op": [
+      47576,
+      47577
+     ],
+     "pctMax": 8.32
+    },
+    {
+     "role": "worker1",
+     "unlocking": 8600,
+     "op": [
+      6070832,
+      6074089
+     ],
+     "pctMax": 87.87
+    },
+    {
+     "role": "worker2",
+     "unlocking": 10000,
+     "op": [
+      7269804,
+      7316926
+     ],
+     "pctMax": 91.09
+    },
+    {
+     "role": "worker3",
+     "unlocking": 10000,
+     "op": [
+      7242015,
+      7244660
+     ],
+     "pctMax": 90.19
+    },
+    {
+     "role": "worker4",
+     "unlocking": 8036,
+     "op": [
+      4253068,
+      4256474
+     ],
+     "pctMax": 65.87
+    }
+   ]
+  },
+  "seconds": 14
+ }
+}
