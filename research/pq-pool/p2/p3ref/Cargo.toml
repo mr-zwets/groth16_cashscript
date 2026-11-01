@@ -1,0 +1,15 @@
+[package]
+name = "p2gl8-ref"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "verifier.cash Track 9 S0: p3-goldilocks Poseidon2 width-8 outputs for a list of inputs (differential reference for the CashVM permutation)"
+
+# Same Plonky3 pin as Track 8 (research/pq-stark-batch/prover); Cargo.lock copied from there.
+[dependencies]
+p3-field = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-goldilocks = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+p3-symmetric = { git = "https://github.com/Plonky3/Plonky3", rev = "0d803737b681774186cd283b1fd2d8e493655c82" }
+
+[profile.release]
+debug = false
