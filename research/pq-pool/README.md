@@ -28,8 +28,8 @@ snapshot. `summary-s4.json` (from `node summary-s4.mjs`) holds S4 and the S1–S
   - S2 harness: 2,387 cases, 0 unexpected.
   - S3 on BCHN: 24/24, and replay, chain10, race and conflict all as before, with 76/76 allowed.
 
-SOUNDNESS-T9 (S7) is not written. The section below collects what it must state, as found in the S0–S4 work and its
-reviews.
+SOUNDNESS-T9 (S7a) is in `SOUNDNESS-T9.md`: lemmas L1–L7, the owner table, and the status of A1–A5 below (plus a new
+A6, the thread category's minting NFTs). The section below is the input it was written from.
 
 ## Assumptions and known properties (input to SOUNDNESS-T9)
 
