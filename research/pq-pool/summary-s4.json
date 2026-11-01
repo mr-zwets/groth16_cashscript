@@ -1,0 +1,787 @@
+{
+ "track": 9,
+ "stage": "S4",
+ "date": "2026-11-01",
+ "title": "Deposits (D state, SHA-256 queue), permissionless flush (Poseidon2-Gl-8 subtree and path in 4 worker inputs), 16-slot ring; R pins the pool W (A3)",
+ "vm": "libauth 3.1.0-next.8 BCH 2026 (op-cost BCHN-adjusted: libauth + OP_DEFINE body bytes); BCHN 29.1.0 regtest, POLICY=1",
+ "sizes": {
+  "Dredeem": 291,
+  "Wredeem": 671,
+  "flushBlob": 2209,
+  "workerBlob": 7725,
+  "workerLocking": 43,
+  "compress": 7567,
+  "levelFn": 112
+ },
+ "libauth": {
+  "pass": true,
+  "cases": 72,
+  "unexpected": 0,
+  "families": {
+   "seq": {
+    "cases": 8,
+    "ok": 8
+   },
+   "deposit": {
+    "cases": 16,
+    "ok": 16
+   },
+   "lane": {
+    "cases": 4,
+    "ok": 4
+   },
+   "flush": {
+    "cases": 1,
+    "ok": 1
+   },
+   "frontier": {
+    "cases": 7,
+    "ok": 7
+   },
+   "ring": {
+    "cases": 4,
+    "ok": 4
+   },
+   "mid": {
+    "cases": 7,
+    "ok": 7
+   },
+   "io": {
+    "cases": 6,
+    "ok": 6
+   },
+   "wout": {
+    "cases": 5,
+    "ok": 5
+   },
+   "dout": {
+    "cases": 3,
+    "ok": 3
+   },
+   "wbranch": {
+    "cases": 3,
+    "ok": 3
+   },
+   "premature": {
+    "cases": 2,
+    "ok": 2
+   },
+   "wrap": {
+    "cases": 5,
+    "ok": 5
+   },
+   "edge": {
+    "cases": 5,
+    "ok": 5
+   }
+  },
+  "seq": [
+   {
+    "flush": 0,
+    "rootEqualsOffline": true,
+    "histRootEqualsRing": true
+   },
+   {
+    "flush": 1,
+    "rootEqualsOffline": true,
+    "histRootEqualsRing": true
+   },
+   {
+    "flush": 2,
+    "rootEqualsOffline": true,
+    "histRootEqualsRing": true
+   },
+   {
+    "flush": 3,
+    "rootEqualsOffline": true,
+    "histRootEqualsRing": true
+   }
+  ],
+  "wrap": {
+   "before": {
+    "epoch": 16,
+    "accepted": true
+   },
+   "after": {
+    "epoch": 17,
+    "staleRejected": true,
+    "newestAccepted": true,
+    "root1Accepted": true,
+    "slot0IsRoot16": true
+   },
+   "flushes": 17,
+   "deposits": 272,
+   "lastRootEqualsOffline": true,
+   "allRootsEqualOffline": true
+  },
+  "deposit": {
+   "n": 272,
+   "bytes": [
+    645,
+    645
+   ],
+   "opD": [
+    18598,
+    18611
+   ],
+   "budgetD": 321600
+  },
+  "flush": {
+   "n": 17,
+   "bytes": [
+    42127,
+    42129
+   ],
+   "perRole": [
+    {
+     "role": "D",
+     "unlocking": 4213,
+     "op": [
+      698776,
+      699817
+     ],
+     "pctMax": 20.56
+    },
+    {
+     "role": "W",
+     "unlocking": 674,
+     "op": [
+      47576,
+      47577
+     ],
+     "pctMax": 8.32
+    },
+    {
+     "role": "worker1",
+     "unlocking": 8600,
+     "op": [
+      6070832,
+      6074089
+     ],
+     "pctMax": 87.87
+    },
+    {
+     "role": "worker2",
+     "unlocking": 10000,
+     "op": [
+      7269804,
+      7316926
+     ],
+     "pctMax": 91.09
+    },
+    {
+     "role": "worker3",
+     "unlocking": 10000,
+     "op": [
+      7242015,
+      7244660
+     ],
+     "pctMax": 90.19
+    },
+    {
+     "role": "worker4",
+     "unlocking": 8036,
+     "op": [
+      4253068,
+      4256474
+     ],
+     "pctMax": 65.87
+    }
+   ]
+  }
+ },
+ "bchn_e2e": {
+  "genesis": {
+   "ok": true,
+   "txid": "55e23da4cebccf88040c8757a072cecaa3d4798da3e27ed3a68ca1419e3f7fbb",
+   "bytes": 389,
+   "tmaAllowed": true,
+   "noMintingNft": true,
+   "tokenOutputs": [
+    {
+     "n": 0,
+     "capability": "mutable",
+     "commitment": "44"
+    },
+    {
+     "n": 1,
+     "capability": "mutable",
+     "commitment": "57"
+    }
+   ]
+  },
+  "deposits": {
+   "rounds": 17,
+   "ok": 17,
+   "txs": 272,
+   "bytes": [
+    645,
+    645
+   ],
+   "allTmaAllowed": true
+  },
+  "flushes": {
+   "n": 17,
+   "ok": 17,
+   "rootEqualsOffline": 17,
+   "bytes": [
+    42127,
+    42129
+   ],
+   "maxInputPct": [
+    90.51,
+    91.08
+   ],
+   "rate": [
+    1.187,
+    1.187
+   ],
+   "tmaAllowed": 17
+  },
+  "proofs": [
+   {
+    "note": 3,
+    "root": 0,
+    "ms": 5575,
+    "bytes": 73744,
+    "publicValuesMatch": true
+   },
+   {
+    "note": 20,
+    "root": 1,
+    "ms": 3018,
+    "bytes": 74928,
+    "publicValuesMatch": true
+   },
+   {
+    "note": 5,
+    "root": 0,
+    "ms": 3637,
+    "bytes": 75696,
+    "publicValuesMatch": true
+   },
+   {
+    "note": 9,
+    "root": 0,
+    "ms": 2464,
+    "bytes": 76208,
+    "publicValuesMatch": true
+   },
+   {
+    "note": 9,
+    "root": 16,
+    "ms": 2626,
+    "bytes": 75824,
+    "publicValuesMatch": true
+   }
+  ],
+  "withdrawals": [
+   {
+    "label": "note3@root0",
+    "expect": "accept",
+    "ok": true,
+    "bytes": [
+     91229,
+     41675
+    ],
+    "maxPct": 91.1,
+    "W": {
+     "role": "W",
+     "ok": true,
+     "pct": 35.14,
+     "within": true
+    },
+    "tma": [
+     true,
+     true
+    ]
+   },
+   {
+    "label": "note20@root1",
+    "expect": "accept",
+    "ok": true,
+    "bytes": [
+     91229,
+     41707
+    ],
+    "maxPct": 90.96,
+    "W": {
+     "role": "W",
+     "ok": true,
+     "pct": 33.68,
+     "within": true
+    },
+    "tma": [
+     true,
+     true
+    ]
+   },
+   {
+    "label": "note5@root0, epoch 16",
+    "expect": "accept",
+    "ok": true,
+    "bytes": [
+     91229,
+     41739
+    ],
+    "maxPct": 91.06,
+    "W": {
+     "role": "W",
+     "ok": true,
+     "pct": 33.19,
+     "within": true
+    },
+    "tma": [
+     true,
+     true
+    ]
+   },
+   {
+    "label": "note9@root0, epoch 17 (slot 0 overwritten)",
+    "expect": "reject",
+    "ok": true,
+    "maxPct": 90.95,
+    "W": {
+     "role": "W",
+     "ok": false,
+     "err": "Program failed an OP_VERIFY operation.",
+     "pct": 6.02,
+     "within": true
+    },
+    "tma": [
+     true,
+     false
+    ],
+    "reject": {
+     "libauth": "W: Program failed an OP_VERIFY operation.",
+     "tma": "16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)",
+     "block": "blk-bad-inputs"
+    }
+   },
+   {
+    "label": "note9@root16 (new proof)",
+    "expect": "accept",
+    "ok": true,
+    "bytes": [
+     91229,
+     41739
+    ],
+    "maxPct": 90.91,
+    "W": {
+     "role": "W",
+     "ok": true,
+     "pct": 33.19,
+     "within": true
+    },
+    "tma": [
+     true,
+     true
+    ]
+   }
+  ],
+  "wrap": {
+   "ev": "wrap-summary",
+   "ok": true,
+   "before": true,
+   "slot0IsRoot16": true,
+   "staleRejected": true,
+   "freshAccepted": true,
+   "flushes": 17,
+   "deposits": 272
+  },
+  "testmempoolaccept": {
+   "tx_rows": 28,
+   "allowed": 27,
+   "deposits_allowed": 272,
+   "expected_refusals": [
+    "note9@root0, epoch 17 (slot 0 overwritten).tx1: 16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)"
+   ]
+  },
+  "errors": []
+ },
+ "reruns": {
+  "s1_test_w": {
+   "pass": true,
+   "w_redeem_bytes": 671,
+   "library_disagreements": 0,
+   "w_disagreements": 0,
+   "rejections": {
+    "control": {
+     "cases": 4,
+     "pass": 4
+    },
+    "nf": {
+     "cases": 12,
+     "pass": 12
+    },
+    "bitmap": {
+     "cases": 37,
+     "pass": 37
+    },
+    "sibling": {
+     "cases": 24,
+     "pass": 24
+    },
+    "ring": {
+     "cases": 32,
+     "pass": 32
+    },
+    "carry": {
+     "cases": 32,
+     "pass": 32
+    },
+    "output": {
+     "cases": 20,
+     "pass": 20
+    },
+    "value": {
+     "cases": 16,
+     "pass": 16
+    },
+    "graph": {
+     "cases": 16,
+     "pass": 16
+    },
+    "head": {
+     "cases": 4,
+     "pass": 4
+    },
+    "present": {
+     "cases": 6,
+     "pass": 6
+    }
+   }
+  },
+  "s2_grade": {
+   "2tx+W": {
+    "statements": 24,
+    "accepted": 24,
+    "txs": 2,
+    "inputs": 17,
+    "txBytes": [
+     [
+      91229,
+      91229
+     ],
+     [
+      41675,
+      41675
+     ]
+    ],
+    "totalBytes": [
+     132904,
+     132904
+    ],
+    "opTotalBchnAdjusted": [
+     69219422,
+     69378728
+    ],
+    "maxPct": [
+     90.9,
+     91.1
+    ],
+    "perRole": {
+     "HEAD": {
+      "unlocking": [
+       6487,
+       6487
+      ],
+      "opBchnAdjusted": [
+       535567,
+       1325477
+      ],
+      "pct": [
+       10.26,
+       25.38
+      ],
+      "hashIters": 523
+     },
+     "CODE1": {
+      "unlocking": [
+       9565,
+       9590
+      ],
+      "opBchnAdjusted": [
+       237187,
+       5497416
+      ],
+      "pct": [
+       3.09,
+       71.35
+      ],
+      "hashIters": 521
+     },
+     "CODE2": {
+      "unlocking": [
+       9572,
+       9597
+      ],
+      "opBchnAdjusted": [
+       237194,
+       5008939
+      ],
+      "pct": [
+       3.08,
+       64.96
+      ],
+      "hashIters": 521
+     },
+     "FIN": {
+      "unlocking": [
+       6462,
+       6462
+      ],
+      "opBchnAdjusted": [
+       3760434,
+       3785761
+      ],
+      "pct": [
+       72.28,
+       72.77
+      ],
+      "hashIters": 521
+     },
+     "QRY": {
+      "unlocking": [
+       8322,
+       8322
+      ],
+      "opBchnAdjusted": [
+       6066261,
+       6095099
+      ],
+      "pct": [
+       90.67,
+       91.1
+      ],
+      "hashIters": 696
+     },
+     "W": {
+      "unlocking": [
+       817,
+       817
+      ],
+      "opBchnAdjusted": [
+       241192,
+       241224
+      ],
+      "pct": [
+       35.14,
+       35.14
+      ],
+      "hashIters": 151
+     }
+    }
+   },
+   "1tx+W": {
+    "statements": 24,
+    "accepted": 24,
+    "txs": 1,
+    "inputs": 13,
+    "txBytes": [
+     [
+      99766,
+      99766
+     ]
+    ],
+    "totalBytes": [
+     99766,
+     99766
+    ],
+    "opTotalBchnAdjusted": [
+     64371062,
+     64512392
+    ],
+    "maxPct": [
+     90.79,
+     90.99
+    ],
+    "perRole": {
+     "HEAD": {
+      "unlocking": [
+       6487,
+       6487
+      ],
+      "opBchnAdjusted": [
+       1317119,
+       1319739
+      ],
+      "pct": [
+       25.22,
+       25.27
+      ],
+      "hashIters": 514
+     },
+     "CODE1": {
+      "unlocking": [
+       9338,
+       9338
+      ],
+      "opBchnAdjusted": [
+       5477521,
+       5489974
+      ],
+      "pct": [
+       73,
+       73.17
+      ],
+      "hashIters": 513
+     },
+     "CODE2": {
+      "unlocking": [
+       9335,
+       9335
+      ],
+      "opBchnAdjusted": [
+       4988796,
+       5001487
+      ],
+      "pct": [
+       66.51,
+       66.68
+      ],
+      "hashIters": 513
+     },
+     "FIN": {
+      "unlocking": [
+       6462,
+       6462
+      ],
+      "opBchnAdjusted": [
+       3760616,
+       3778571
+      ],
+      "pct": [
+       72.29,
+       72.63
+      ],
+      "hashIters": 513
+     },
+     "QRY": {
+      "unlocking": [
+       8322,
+       8322
+      ],
+      "opBchnAdjusted": [
+       6066426,
+       6087909
+      ],
+      "pct": [
+       90.67,
+       90.99
+      ],
+      "hashIters": 688
+     },
+     "W": {
+      "unlocking": [
+       817,
+       817
+      ],
+      "opBchnAdjusted": [
+       241192,
+       241224
+      ],
+      "pct": [
+       35.14,
+       35.14
+      ],
+      "hashIters": 151
+     }
+    }
+   }
+  },
+  "s2_production_sweep": {
+   "cases": 5055,
+   "unexpected": 0,
+   "chain_reject": 4912,
+   "accept": 88,
+   "encoder_only": 55,
+   "wpin": {
+    "cases": 78,
+    "chainReject": 78,
+    "accept": 0,
+    "unexpected": 0
+   }
+  },
+  "s2_harness": {
+   "cases": 2387,
+   "unexpected": 0
+  },
+  "s3_bchn": {
+   "seq": {
+    "accepted": 24,
+    "of": 24,
+    "tx0Bytes": [
+     91229,
+     91229
+    ],
+    "tx1Bytes": [
+     41675,
+     41868
+    ],
+    "totalBytes": [
+     132904,
+     133097
+    ],
+    "rate0": [
+     2.302,
+     2.302
+    ],
+    "rate1": [
+     1.505,
+     1.512
+    ],
+    "maxInputPct": 91.1,
+    "W": {
+     "pct": [
+      31.56,
+      37.24
+     ],
+     "unlocking": [
+      817,
+      1010
+     ],
+     "op": [
+      239825,
+      294079
+     ]
+    },
+    "tmaAllowed": 24,
+    "sameBlock": 24
+   },
+   "replay": [
+    true,
+    true
+   ],
+   "chain10": true,
+   "race": true,
+   "conflict": true,
+   "geneses": [
+    {
+     "pool": "A",
+     "txid": "783e108aacf2cbe8fac8c8f66371dd05285a3a393ff2498e216a9a6ae30c5f73",
+     "category": "6d2cc7ea8792138147eea5a97eee112ba2910a3b83829a98117fad2ce0254dd2",
+     "noMintingNft": true,
+     "value": "30000000"
+    },
+    {
+     "pool": "B",
+     "txid": "8298a25d087bb04209f33daf7aa724c2f5b0e47442bf873f514d2ca4b4536a5c",
+     "category": "266a65244aa65f3bb7586986a076f52128cd8c0461756da0dc59f488c12b6613",
+     "noMintingNft": true,
+     "value": "20000000"
+    }
+   ],
+   "testmempoolaccept": {
+    "rows": 81,
+    "allowed": 76,
+    "expected_refusals": 5
+   },
+   "errors": []
+  }
+ },
+ "review_items": {
+  "A3": "closed: the final HEAD pins input 5 to category CAT||01 and commitment prefix 0x57 (R is pool specific: +46 B in a code blob)",
+  "A1": "documented, not changed: per-pool ring roots built from the pool's own deposits bound withdrawals per pool; the pin alone does not stop a proof from being used in another pool whose ring holds the same root"
+ }
+}

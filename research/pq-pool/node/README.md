@@ -57,3 +57,30 @@ Reproduce: `S2_VEC=work/pool/cache/s2/vec OPCOST_DIR=work/pool/bchn ./run-s3.sh 
 - **No deposits or flush (S4).** The history is S1's static genesis ring.
 - **Coinbase-only funding.** The W genesis and the funding transactions spend bare-OP_1 coinbases mined by the rig and were not policy-tested. The S3 acceptance criterion is stated for each withdrawal transaction, not each transaction.
 - **S2's open item still holds: R does not pin W.** It was not exercised on BCHN, by design (constructive tests only).
+
+## S4 (wip/pool9b): the end-to-end run and the S3 re-run
+
+**S4 end to end** (`s4.ts`, `run-s4.sh`, node `t9s4a`, POLICY=1, datadir under work/pool9b/bchn, stopped):
+
+| step | result |
+|---|---|
+| genesis | one pool category (a P2SH32(OP_1) output at vout 0): D and W mutable NFTs, no minting NFT. testmempoolaccept **allowed** (389 B) |
+| deposits | 272, each 645 B, all allowed, sent as unconfirmed chains on D, 16 per block |
+| flushes | 17, 42,127–42,129 B, all allowed and mined; **root = offline Poseidon2 tree 17/17**; D and W on chain match the JS state after each |
+| proofs | 5, Track 8 prover with the explicit witness (siblings from the offline tree), 73,744–76,208 B, 2.5–5.6 s; public values = (flush root, NF, CTX) |
+| withdrawals | note 3 at root 0, note 20 at root 1, note 5 at root 0 at epoch 16, note 9 at root 16: each tx0 + tx1 allowed and mined (91,229 + 41,675–41,739 B, max input 91.1%) |
+| stale root | note 9 at root 0, epoch 17: tx1 rejected by W (libauth OP_VERIFY; testmempoolaccept `mandatory-script-verify-flag-failed`; block `blk-bad-inputs`) |
+
+Details in `../d/README.md`, files `results/t9s4a{.jsonl,.log,-summary.json}`.
+
+**S3 re-run** with the S4 R (W-slot pin; one R per pool, since R now names the pool's category) and the S4 W (flush
+branch): node `t9s3b`, files `results/t9s3b*`. **Same verdicts as S3:**
+- seq: 24/24 (91,229 + 41,675–41,868 B; W 31.6–37.2%).
+- replay: both tx1 rejected (libauth W; testmempoolaccept; block).
+- chain10: one block (275, 21 txs).
+- race: the loser rebuilt and accepted.
+- conflict: rejected as before.
+- testmempoolaccept: 76/76 valid allowed, plus the same 5 expected refusals.
+
+Pools A and B now have different R: SHA-256 `f0499884…abc3` and `fdcd398a…7a81`. Pool B still re-withdraws statements
+0–12, because it shares the static genesis ring (`../README.md` A1).

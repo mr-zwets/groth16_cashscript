@@ -122,5 +122,6 @@
   "m1-0-Z128_cap5~vk-opow=1.json: generator: ood PoW 0"
  ],
  "encoderOnlyRelabel": 69,
- "notRunOnChain": 35
+ "notRunOnChain": 35,
+ "documented": []
 }
