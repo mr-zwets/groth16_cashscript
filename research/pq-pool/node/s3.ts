@@ -13,6 +13,8 @@
 //             rejected (libauth: W input; BCHN: testmempoolaccept, sendrawtransaction, and a block holding it),
 //             with (a) the honest witness for the current state (a membership path) and (b) a stale witness
 //             (the absence path from the genesis state).
+//   (S4 rerun: R pins the W slot to the pool's category, so pools A and B each have their own R; W has the S4
+//   flush branch.)
 //   chain10   pool B (second genesis): statements 0..9; all 20 txs sent unconfirmed, tx1_k spends tx1_{k-1}'s
 //             output 0; then one block (BCHN's assembler) must hold all 20.
 //   race      pool B: statements 10 (X) and 11 (Y) both build tx1 on the same W outpoint. X wins; Y's tx1 is a
@@ -99,27 +101,28 @@ class Funder {
 const vecs = Array.from({ length: 24 }, (_, i) => readVector(`${VEC}/m1-t9-${i}-Z128_cap5.json`));
 const counts = (vk: any) => { const p = Array.from({ length: Math.ceil(vk.Q / 3) }, (_, i) => Math.min(3, vk.Q - 3 * i)); return [p.slice(0, -1), p.slice(-1)]; };
 let THREAD_CAT: Uint8Array; // internal order
-const GEN = () => ({ nodeCategory: hex(THREAD_CAT) }); // keys programA's cache (it does not key on the category)
-const stmt = (i: number) => {
+// Track 9 S4: R pins the W slot to the pool's category (review item A3), so each pool has its own R
+const GEN = (cat: Uint8Array) => ({ nodeCategory: hex(THREAD_CAT), pool: hex(cat) });
+const stmt = (i: number, cat: Uint8Array) => {
   const v = vecs[i]; const vk = vkxA(v); const pis = v.public_values.flat().map(BigInt);
-  const plan = { ...makePlanA(vk, counts(vk), { w: true }), thread: { category: Buffer.from(THREAD_CAT) } };
-  const pg = programA(vk, pis, plan, GEN());
+  const plan = { ...makePlanA(vk, counts(vk), { w: true, wCategory: Buffer.from(cat) }), thread: { category: Buffer.from(THREAD_CAT) } };
+  const pg = programA(vk, pis, plan, GEN(cat));
   const payouts: Out[] = v.t9_payouts.map((o: any) => ({ lockingBytecode: hexToBin(o.lockingBytecode), valueSatoshis: BigInt(o.valueSatoshis) }));
   return { v, vk, pis, plan, pg, payouts, proof: Buffer.from(v.proof_hex, 'hex') };
 };
 
 type St = { keys: bigint[]; slots: any; histRoot: any; epoch: any; value: bigint; outpoint: Buffer; index: number; txid: Uint8Array /* internal */ };
-type Pool = { name: string; pool: any; cat: Uint8Array; st: St; genesisTxid: string };
+type Pool = { name: string; pool: any; cat: Uint8Array; st: St; genesisTxid: string; R: Uint8Array };
 
 // one withdrawal attempt: libauth tx objects (outpoints assigned later). stale: build W's witness from these keys.
 const build = (i: number, P: Pool, st: St, o: { staleKeys?: bigint[] } = {}) => {
-  const s = stmt(i);
+  const s = stmt(i, P.cat);
   const root = s.pis.slice(0, 4), nf = s.pis.slice(4, 8);
   const ws = wSpend(P.pool, o.staleKeys ? { ...st, keys: o.staleKeys } : st, root, nf);
   // the W input's source is always the real current W output
   ws.w.value = st.value; ws.w.token = tokenOf(P.cat, commitmentOf(st));
   ws.out0.valueSatoshis = st.value - D;
-  const sp = spendA(s.vk, s.plan, s.proof, s.pis, [ws.out0, ...s.payouts], { w: ws.w, gen: GEN() });
+  const sp = spendA(s.vk, s.plan, s.proof, s.pis, [ws.out0, ...s.payouts], { w: ws.w, gen: GEN(P.cat) });
   if (sp.txs.length !== 2) throw new Error('2-tx plan expected');
   return { i, s, ws, sp, tx0: sp.txs[0], tx1: sp.txs[1], K: ws.K as bigint, defineBytes: sp.pg.defineBytes as number, wIdx: sp.pg.wIdx as number };
 };
@@ -190,12 +193,14 @@ const checkW = async (P: Pool) => {
 const advance = (P: Pool, b: B) => { P.st = { ...P.st, keys: [...P.st.keys, b.K], value: P.st.value - D, txid: b.id1!, outpoint: Buffer.from(b.id1!), index: 0 }; };
 
 // W genesis: spend a mature coinbase (vout 0) into one mutable NFT of category = its txid; no minting NFT
-const wGenesis = async (name: string, R: Uint8Array, nIn: number, wIdx: number, value: bigint): Promise<Pool> => {
+const wGenesis = async (name: string, value: bigint): Promise<Pool> => {
   await chain.init();
   const nextH = chain.height + 1;
   const cb = chain.pool.find((u: any) => u.cbHeight !== undefined && u.vout === 0 && nextH - u.cbHeight >= 100 && u.value > value + 1_000_000n)!;
   chain.pool = chain.pool.filter((u) => u !== cb);
   const cat = cb.txid; // internal order
+  const s0 = stmt(0, cat);
+  const R = s0.pg.redeem as Uint8Array, nIn = s0.pg.inCount[s0.pg.inCount.length - 1], wIdx = s0.pg.wIdx;
   const pool = makePool({ R, CAT: Buffer.from(cat), nIn, wIdx });
   const st0: St = { ...genesisState(value), txid: new Uint8Array(32), index: 0 } as any;
   const out0 = { lockingBytecode: pool.locking, valueSatoshis: value, token: tokenOf(Buffer.from(cat), commitmentOf(st0)) };
@@ -205,12 +210,12 @@ const wGenesis = async (name: string, R: Uint8Array, nIn: number, wIdx: number, 
   const s = await chain.submit(chain.buildBlock([raw]));
   if (!s.accepted) throw new Error('W genesis rejected: ' + s.result);
   chain.pool.push({ txid: id, vout: 1, value: cb.value - value - 10_000n, locking: OP_1 } as any);
-  const P: Pool = { name, pool, cat, st: { ...st0, txid: id, outpoint: Buffer.from(id), index: 0 }, genesisTxid: disp(id) };
+  const P: Pool = { name, pool, cat, st: { ...st0, txid: id, outpoint: Buffer.from(id), index: 0 }, genesisTxid: disp(id), R };
   // the genesis tx as BCHN decoded it: exactly one output of category cat, capability mutable
   const dec = await rpc('getrawtransaction', disp(id), true);
   const catOuts = (dec?.vout ?? []).filter((o: any) => o.tokenData?.category === disp(cat));
   const w = await checkW(P);
-  log({ ev: 'w-genesis', pool: name, txid: disp(id), category: disp(cat), Wredeem: pool.redeem.length, Wlocking: hex(pool.locking), HR: hex(pool.HR), value,
+  log({ ev: 'w-genesis', pool: name, txid: disp(id), category: disp(cat), R: hex(R), Rbytes: R.length, Rsha256: hex(sha256(R)), nIn, wIdx, defineBytes: s0.pg.defineBytes, Wredeem: pool.redeem.length, Wlocking: hex(pool.locking), HR: hex(pool.HR), value,
     tokenOutputsOfCategory: catOuts.map((o: any) => ({ n: o.n, capability: o.tokenData?.nft?.capability })), noMintingNft: catOuts.length === 1 && catOuts[0].tokenData?.nft?.capability === 'mutable', checkW: w });
   if (!w.ok || catOuts.length !== 1) throw new Error('W genesis check failed');
   say(`W genesis ${name}: ${disp(id)} category ${disp(cat)}`);
@@ -229,17 +234,15 @@ const main = async () => {
   await chain.mine(220);
   f = new Funder(chain); await f.genesis();
   THREAD_CAT = f.category();
-  const s0 = stmt(0);
-  const R = s0.pg.redeem as Uint8Array, nIn = s0.pg.inCount[s0.pg.inCount.length - 1], wIdx = s0.pg.wIdx;
-  log({ ev: 'setup', node: NAME, subversion: net?.subversion, acceptnonstdtxn: 0, threadCategory: disp(THREAD_CAT), R: hex(R), Rbytes: R.length, Rsha256: hex(sha256(R)), nIn, wIdx, defineBytes: s0.pg.defineBytes, D, PHI });
-  say(`node ${net?.subversion}; R ${R.length} B sha256 ${hex(sha256(R)).slice(0, 16)}; thread category ${disp(THREAD_CAT)}`);
-  const samePg = (b: B) => { if (hex(b.s.pg.redeem) !== hex(R)) throw new Error(`statement ${b.i}: R differs`); };
+  log({ ev: 'setup', node: NAME, subversion: net?.subversion, acceptnonstdtxn: 0, threadCategory: disp(THREAD_CAT), D, PHI, note: 'S4: one R per pool (w-genesis events)' });
+  say(`node ${net?.subversion}; thread category ${disp(THREAD_CAT)}`);
+  const samePg = (b: B, P: Pool) => { if (hex(b.s.pg.redeem) !== hex(P.R)) throw new Error(`statement ${b.i}: R differs`); };
 
   // ================= seq: pool A, statements 0..23
-  const A = await wGenesis('A', R, nIn, wIdx, 30n * D);
+  const A = await wGenesis('A', 30n * D);
   let seqOk = 0;
   for (let i = 0; i < 24; i++) {
-    const b: B = build(i, A, A.st); samePg(b);
+    const b: B = build(i, A, A.st); samePg(b, A);
     await fundBatch(f, [b]); finalize(b, { txid: A.st.txid, vout: A.st.index });
     const l0 = lib(b.tx0, b, false), l1 = lib(b.tx1, b, true);
     const r0 = await send(b.raw0!, `seq${i}.tx0`), r1 = await send(b.raw1!, `seq${i}.tx1`);
@@ -280,10 +283,10 @@ const main = async () => {
   }
 
   // ================= chain10: pool B, statements 0..9, 20 txs unconfirmed, one block
-  const Bp = await wGenesis('B', R, nIn, wIdx, 20n * D);
+  const Bp = await wGenesis('B', 20n * D);
   {
     const bs: B[] = []; let st = Bp.st;
-    for (let i = 0; i < 10; i++) { const b: B = build(i, Bp, st); samePg(b); bs.push(b); st = { ...st, keys: [...st.keys, b.K], value: st.value - D }; }
+    for (let i = 0; i < 10; i++) { const b: B = build(i, Bp, st); samePg(b, Bp); bs.push(b); st = { ...st, keys: [...st.keys, b.K], value: st.value - D }; }
     await fundBatch(f, bs);
     const steps: any[] = []; const libs: any[] = [];
     for (const b of bs) {

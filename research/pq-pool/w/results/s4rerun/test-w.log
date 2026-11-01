@@ -1,0 +1,23 @@
+[1.4s] library: tree preseed 0: 1500 cases so far, 0 disagreements
+[2.6s] library: tree preseed 0: 3000 cases so far, 0 disagreements
+[3.4s] library: tree preseed 16: 4000 cases so far, 0 disagreements
+[4.3s] library: tree preseed 256: 5000 cases so far, 0 disagreements
+[5.3s] library: tree preseed 1024: 6000 cases so far, 0 disagreements
+[7.1s] library: tree preseed 4096: 7500 cases so far, 0 disagreements
+[8.0s] library: tree preseed 0: 8500 cases so far, 0 disagreements
+[9.4s] library: tree preseed 64: 10000 cases so far, 0 disagreements
+[9.4s] library done 0 disagreements
+[12.5s] W: 1000 cases, 750 spent, 0 disagreements
+[18.2s] W: 2000 cases, 1494 spent, 0 disagreements
+[26.5s] W: 3000 cases, 2237 spent, 0 disagreements
+[39.3s] W: 4000 cases, 2993 spent, 0 disagreements
+[54.8s] W: 5000 cases, 3728 spent, 0 disagreements
+[73.1s] W: 6000 cases, 4456 spent, 0 disagreements
+[97.4s] W: 7000 cases, 5213 spent, 0 disagreements
+[128.7s] W: 8000 cases, 5960 spent, 0 disagreements
+[164.4s] W: 9000 cases, 6720 spent, 0 disagreements
+[203.5s] W: 10000 cases, 7460 spent, 0 disagreements
+[203.5s] W agreement done 0 disagreements
+[207.7s] rejections {"control":{"cases":4,"pass":4},"nf":{"cases":12,"pass":12},"bitmap":{"cases":37,"pass":37},"sibling":{"cases":24,"pass":24},"ring":{"cases":32,"pass":32},"carry":{"cases":32,"pass":32},"output":{"cases":20,"pass":20},"value":{"cases":16,"pass":16},"graph":{"cases":16,"pass":16},"head":{"cases":4,"pass":4},"present":{"cases":6,"pass":6}}
+[219.6s] costs [[0,64,228116,33.23],[1,0,526570,74.04],[1,63,226737,31.85],[64,0,670021,28.81],[12,52,285125,28.65],[15,49,302415,28.21]]
+[219.6s] PASS true

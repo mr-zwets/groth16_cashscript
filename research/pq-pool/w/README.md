@@ -190,3 +190,25 @@ These are the `makePool` / `buildW` parameters.
 - wIdx = W's fixed input index, which must not be 0.
 - CAT = the real genesis category (internal byte order).
 - The HEAD tail: ROOT, NF, CTXW, in that order, at the end of HEAD's unlocking.
+
+## S4: the flush branch, and the re-run (wip/pool9b)
+
+`buildW` now has a second branch (`flushBranch`), taken when W's unlocking holds only the redeem (DEPTH 0). The
+withdraw branch above is unchanged and sits in its ELSE. The redeem grows from 499 to **671 B**.
+- **The flush branch's checks.**
+  - W is input 1.
+  - Input 0 is the real D: category CAT ‖ 0x01, prefix 0x44.
+  - Output 0's value is D's value − 16 (D + f). Only D's flush branch allows that.
+  - Output 1 keeps W's locking, CAT ‖ 0x01, no fungible amount, the prefix and nfRoot, and gets value + 16 D.
+- **D checks the rest.** D's flush code checks histRoot′ (the new root in slot epoch mod 16) and epoch + 1
+  (`../d/README.md`).
+- **With S4, a single W input still holds.** A withdrawal pins nIn = 6 and W at 5. A flush pins D at 0 and W at 1.
+
+**Re-run** (`node test-w.mjs`, seed 1, 220 s; `results/s4rerun/s1-w.json` and `test-w.log`): **PASS**.
+- Library: 10,000 cases, 0 disagreements.
+- W: 10,000 transactions (7,460 withdrawals), 0 disagreements.
+- Rejection families: all 203 cases pass.
+- Costs grow with the 172 B larger unlocking, so the budget grows too:
+  - genesis: 228K op-cost, 33.2%;
+  - the constructed worst case (K xor 1): 527K, **74.0%** (S1: 90.6%);
+  - 64 siblings: 670K, 28.8%.

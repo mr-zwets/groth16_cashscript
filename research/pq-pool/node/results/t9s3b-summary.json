@@ -1,0 +1,160 @@
+{
+ "setup": {
+  "ev": "setup",
+  "node": "t9s3b",
+  "subversion": "/Bitcoin Cash Node:29.1.0(EB32.0)/",
+  "acceptnonstdtxn": 0,
+  "threadCategory": "8cf1b6c68e9fef3c51a2fdb4aec01268c8265874af406ecd12cc602ba90d23e1",
+  "D": "1000000",
+  "PHI": "50000",
+  "note": "S4: one R per pool (w-genesis events)"
+ },
+ "geneses": [
+  {
+   "pool": "A",
+   "txid": "783e108aacf2cbe8fac8c8f66371dd05285a3a393ff2498e216a9a6ae30c5f73",
+   "category": "6d2cc7ea8792138147eea5a97eee112ba2910a3b83829a98117fad2ce0254dd2",
+   "noMintingNft": true,
+   "value": "30000000"
+  },
+  {
+   "pool": "B",
+   "txid": "8298a25d087bb04209f33daf7aa724c2f5b0e47442bf873f514d2ca4b4536a5c",
+   "category": "266a65244aa65f3bb7586986a076f52128cd8c0461756da0dc59f488c12b6613",
+   "noMintingNft": true,
+   "value": "20000000"
+  }
+ ],
+ "seq": {
+  "accepted": 24,
+  "of": 24,
+  "tx0Bytes": [
+   91229,
+   91229
+  ],
+  "tx1Bytes": [
+   41675,
+   41868
+  ],
+  "totalBytes": [
+   132904,
+   133097
+  ],
+  "rate0": [
+   2.302,
+   2.302
+  ],
+  "rate1": [
+   1.505,
+   1.512
+  ],
+  "maxInputPct": 91.1,
+  "W": {
+   "pct": [
+    31.56,
+    37.24
+   ],
+   "unlocking": [
+    817,
+    1010
+   ],
+   "op": [
+    239825,
+    294079
+   ]
+  },
+  "tmaAllowed": 24,
+  "sameBlock": 24
+ },
+ "replay": {
+  "tx0Accepted": true,
+  "variants": [
+   {
+    "name": "present-path",
+    "rejected": true,
+    "libauth": "W: Program failed an OP_VERIFY operation.",
+    "tma": "16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)",
+    "block": "blk-bad-inputs"
+   },
+   {
+    "name": "stale-witness",
+    "rejected": true,
+    "libauth": "W: Program failed an OP_VERIFY operation.",
+    "tma": "16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)",
+    "block": "blk-bad-inputs"
+   }
+  ],
+  "Wunchanged": true
+ },
+ "chain10": {
+  "ok": true,
+  "tmaAllowed": 10,
+  "block": {
+   "height": 275,
+   "bytes": 1330056,
+   "ntx": 21,
+   "allIncluded": true,
+   "mempoolAfter": []
+  },
+  "bytes": 1329878,
+  "W": [
+   32.29,
+   35.14
+  ],
+  "maxPct": 91.08
+ },
+ "race": {
+  "ok": true,
+  "loser": "18: txn-mempool-conflict",
+  "rebuilt": {
+   "sameTx0": true,
+   "sameRInputs": true,
+   "samePayouts": true,
+   "wInputChanged": true,
+   "tx1Bytes": [
+    41772,
+    41772
+   ]
+  },
+  "rebuiltAllowed": true,
+  "block": {
+   "height": 277,
+   "ntx": 5,
+   "included": [
+    true,
+    true,
+    true,
+    true
+   ],
+   "loserIncluded": false,
+   "mempoolAfter": []
+  }
+ },
+ "conflict": {
+  "ok": true,
+  "second": "18: txn-mempool-conflict",
+  "rebuiltLibauth": "W: Program failed an OP_VERIFY operation.",
+  "rebuiltTma": "16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)",
+  "rebuiltBlock": "blk-bad-inputs"
+ },
+ "testmempoolaccept": {
+  "rows": 81,
+  "allowed": 76,
+  "rejected": [
+   "replay.present-path.tx1: 16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)",
+   "replay.stale-witness.tx1: 16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)",
+   "raceY.tx1(loser): 18: txn-mempool-conflict",
+   "confB.tx1(conflict): 18: txn-mempool-conflict",
+   "confB.tx1(rebuilt, NF present): 16: mandatory-script-verify-flag-failed (Script failed an OP_EQUALVERIFY operation)"
+  ]
+ },
+ "end": {
+  "ev": "end",
+  "height": 279,
+  "Avalue": "6000000",
+  "Aspent": 24,
+  "Bvalue": "7000000",
+  "Bspent": 13
+ },
+ "errors": []
+}

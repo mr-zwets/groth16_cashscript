@@ -9,7 +9,8 @@
 //                 Checks: K8 and B are 8 B; 0 <= L <= 64 and L is exactly the number of trailing zero bits of
 //                 B + 2^64; a sent sibling is not Z; every bit of B and every byte of S is used.
 // ringCode():     4 unrolled levels: ROOT, slot, 128 B of siblings -> histRoot candidate.
-// buildW(params): the W-state redeem script (P2SH32), withdraw branch only (S1; deposits/flush are S4):
+// buildW(params): the W-state redeem script (P2SH32). Withdraw branch (S1) below; S4 adds the flush branch
+//   (flushBranch, taken when W's unlocking holds the redeem only). The withdraw branch:
 //   1. graph: TXINPUTCOUNT = nIn, INPUTINDEX = wIdx, SHA-256(input 0's locking) = HR (R, the verifier's P2S locking)
 //   2. own token: category = CAT || 0x01 (mutable); commitment = 0x57 || nfRoot || histRoot || epoch
 //   3. reads HEAD's unlocking (input 0) with OP_INPUTBYTECODE: its last pushes are the fixed tail `tail` (default
@@ -68,8 +69,29 @@ export function smtCode() {
 export const DEFAULT_TAIL = [['ROOT', 32], ['NF', 32], ['CTXW', 32]];
 export const D_DEFAULT = 1_000_000n;   // DESIGN-T9 maintainer decision 7: D = 0.01 BCH
 
-// params: {HR (32 B), CAT (32 B, internal order), D, nIn, wIdx, tail}
-export function buildW({HR, CAT, D = D_DEFAULT, nIn = 2, wIdx = 1, tail = DEFAULT_TAIL}) {
+export const FEE_DEFAULT = 10_000n, BATCH = 16;   // Track 9 S4: flush fee f per deposit (regtest), 2^k = 16
+
+// Track 9 S4: the flush branch (W's unlocking is the redeem only, DEPTH 0). W is input 1 of a flush; input 0 must be
+// the real D (category CAT || 0x01, commitment prefix 0x44) and output 0's value must be D's value - 16 (D + f),
+// which only D's flush branch allows (D's deposit branch adds D + f; D has no other branch). D's flush code checks
+// the ring update (histRoot', epoch + 1) of output 1. W checks its own output 1 as well: its locking, CAT || 0x01,
+// no fungible amount, prefix 0x57 and nfRoot unchanged, value = own + 16 D.
+function flushBranch(CAT01, D, FEE) {
+  return asm(
+    'INPUTINDEX', 1, 'NUMEQUALVERIFY',
+    'INPUTINDEX', 'UTXOTOKENCATEGORY', CAT01, 'EQUALVERIFY',
+    0, 'UTXOTOKENCATEGORY', CAT01, 'EQUALVERIFY',
+    0, 'UTXOTOKENCOMMITMENT', 1, 'SPLIT', 'DROP', Uint8Array.of(0x44), 'EQUALVERIFY',
+    0, 'OUTPUTVALUE', 0, 'UTXOVALUE', BigInt(BATCH) * (D + FEE), 'SUB', 'NUMEQUALVERIFY',
+    1, 'OUTPUTBYTECODE', 'INPUTINDEX', 'UTXOBYTECODE', 'EQUALVERIFY',
+    1, 'OUTPUTTOKENCATEGORY', CAT01, 'EQUALVERIFY',
+    1, 'OUTPUTTOKENAMOUNT', 0, 'NUMEQUALVERIFY',
+    1, 'OUTPUTTOKENCOMMITMENT', 33, 'SPLIT', 'DROP', 'INPUTINDEX', 'UTXOTOKENCOMMITMENT', 33, 'SPLIT', 'DROP', 'EQUALVERIFY',
+    1, 'OUTPUTVALUE', 'INPUTINDEX', 'UTXOVALUE', BigInt(BATCH) * D, 'ADD', 'NUMEQUAL');
+}
+
+// params: {HR (32 B), CAT (32 B, internal order), D, nIn, wIdx, tail, FEE, flush (default true: the S4 flush branch)}
+export function buildW({HR, CAT, D = D_DEFAULT, nIn = 2, wIdx = 1, tail = DEFAULT_TAIL, FEE = FEE_DEFAULT, flush = true}) {
   if (HR.length !== 32 || CAT.length !== 32) throw new Error('HR and CAT are 32 B');
   if (wIdx === 0) throw new Error('input 0 is HEAD');
   const CAT01 = Uint8Array.from([...CAT, 1]);
@@ -117,7 +139,8 @@ export function buildW({HR, CAT, D = D_DEFAULT, nIn = 2, wIdx = 1, tail = DEFAUL
   s.raw([Uint8Array.of(0x57), 'SWAP', 'CAT', 'SWAP', 'CAT', 0, 'OUTPUTTOKENCOMMITMENT', 'EQUALVERIFY'], 2);
   if (s.st.length) throw new Error('W: stack not empty: ' + s.st.join(','));
   s.emit(0, 'OUTPUTVALUE', 'INPUTINDEX', 'UTXOVALUE', BigInt(D), 'SUB', 'NUMEQUAL');
-  return s.bytes();
+  if (!flush) return s.bytes();
+  return asm('DEPTH', 0, 'NUMEQUAL', 'IF', {raw: flushBranch(CAT01, BigInt(D), BigInt(FEE))}, 'ELSE', {raw: s.bytes()}, 'ENDIF');
 }
 
 // test stand-in for S2's R (P2S): three pushes of 32 B (ROOT, NF, CTXW), sizes checked, nothing else

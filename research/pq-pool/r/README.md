@@ -185,3 +185,33 @@ the W slot and an OP_RETURN as output 0. **R's five inputs accept.**
   rejection of the second one is S3's job.
 - **The 1-tx + W plan** was graded but not swept, and it is not a deliverable.
 - **Track 8's per-phase profile (`profile-a`)** was not re-run. The input costs are in `grade-a`.
+
+## S4 changes and re-run (wip/pool9b)
+
+**The W-slot pin (review item A3).** The final HEAD (kind 1 in the 2-tx plan) now also checks the last input
+(`TXINPUTCOUNT − 1`, which is input 5, because R pins the input count): its category is `plan.wCategory ‖ 0x01` and
+its commitment starts with 0x57.
+- The prefix matters because S4's D state has the same category, with prefix 0x44.
+- `makePlanA(..., {w: true, wCategory})` sets the category. Its default is S1's test category, and `programA`'s cache
+  keys on it.
+- **R is now pool specific.** That costs 46 B in a code blob: tx0 and tx1 each grow by 46 B, and every R input's
+  OP_DEFINE bytes go from 37,790 to 37,882 (+92: BCHN charges the 46 B twice, once in the role function's body and
+  once in the code blob that defines it). R stays 118 B. Proofs are unchanged.
+- There is no hash cycle. CAT is a genesis outpoint txid, fixed before R, W and D are built.
+
+**Re-run** (`../rerun-s4.sh`, the same S2 vectors and case files; results in `results/s4rerun/`; the S2 results above
+are unchanged):
+
+| item | S2 | S4 re-run |
+|---|---|---|
+| grade 2-tx + W | 24/24, 91,183 + 41,457 = 132,640 B, max 91.1% | **24/24**, 91,229 + 41,675 = **132,904 B**, max 91.1% (tx1: +46 B pin, +172 B W redeem 671 B) |
+| grade 1-tx + W (measured only) | 99,594 B | 99,766 B (234 B left) |
+| one (R, W) pair for all 24 | yes | yes |
+| production sweep (2-tx + W) | 4,977 cases, 0 unexpected | **5,055 cases, 0 unexpected** (4,912 chain rejections, 88 accepts, 55 encoder-only) |
+| harness sweep (1-tx, no W) | 2,387, 0 unexpected | **2,387, 0 unexpected** |
+| `documented` (a non-W input at the W slot, R accepts) | 26 runs | **gone**: now the `wpin` family below |
+
+`wpin` (78 cases = 26 files × 3; HEAD rejects in tx1, every other tx1 input accepts):
+- a non-W input (OP_1, 1,000,000 sat) at the W slot with an OP_RETURN output 0 (S2's documented case);
+- the W of another pool, whose HR names this R, so its own script accepts;
+- the pool's category with D's prefix 0x44 behind an OP_1 locking.
