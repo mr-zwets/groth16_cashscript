@@ -16,3 +16,25 @@ Design: zk-verifier-bench research/pq-pool/DESIGN-T9.md (maintainer decisions: s
   Not included: queue/frontier/ring SHA-256, lane range checks, covenant checks (S4).
 - BCHN v29.1.0 regtest (fresh POLICY=1 node under work/pool/bchn, stopped): fit13 allowed + mined; DEFINE probe
   (budget between libauth and libauth + DEFINE) rejected by policy (VM cost limit exceeded), as node-check predicts.
+
+## S1 — SHA-256 SMT + W-state covenant (static genesis history): DONE (acceptance PASS)
+
+- Code and results: research/pq-pool/w/ (README.md has everything). W tested with a stand-in R (size checks only);
+  the real R is S2.
+- W redeem 499 B (P2SH32). Checks: graph (nIn, wIdx, SHA-256(input 0 locking) = HR), own category CAT||01, HEAD tail
+  read via INPUTBYTECODE (last pushes ROOT NF CTXW, headers checked — S2 must keep this tail), ROOT != Z and in ring
+  (slot + 128 B), SMT absence (O = nfRoot) + insert, output 0 (same locking, category, no FT, commitment 0x57||N||
+  histRoot||epoch copied, value = in - D, D = 1,000,000).
+- SMT: depth 64, H(Z,Z)=Z, compressed path = bitmap + non-Z siblings + L (lowest set bit, 1 B, checked with shifts;
+  addition to the design). Two loops (A: levels < L, N only; B: levels >= L). First one-loop version cost 0.575M and
+  did NOT fit the W input budget (design's 0.2M estimate missed the per-instruction cost); two-loop: 0.19-0.23M.
+- Acceptance (results/s1-w.json, seed 1): library vs JS reference 10,000 cases (6,449 inserts, 3,551 present; long
+  shared prefixes, neighbours, extremes; all L 0..64) 0 disagreements; W on whole txs (libauth BCH 2026 std) 10,000
+  (7,460 withdrawals, 2,540 spent-NF attempts) 0 disagreements; 205 rejection cases (NF+1, present key, bitmap/L,
+  sibling, ring, carry-over, output, value, graph) all rejected by W; double spend in sequence rejected.
+- W input cost: 0.22-0.30M op-cost (31-41% of budget) natural; constructed worst (L = 0, one sibling) 90.6%;
+  W unlocking 645 B - 1.1 KB; tx 1,020-1,566 B.
+- Genesis (results/genesis.json): 2 epochs x 16 notes (32, so S2's 24 statements get distinct notes), Poseidon2
+  depth-30 tree, ring slots 0/1, epoch 2. S2 needs a prover witness input for given nk, r, index, siblings.
+- BCHN v29.1.0 regtest (fresh POLICY=1 node work/pool/bchn/bchn-t9s1q, stopped): 4 withdrawals (genesis, 1,000 spent,
+  90.6% worst, 64 siblings) allowed at default policy and mined (loops, shifts, P2SH32 token covenant).
