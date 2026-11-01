@@ -10,10 +10,10 @@ and the flush workers, and the libauth acceptance test. W's flush branch is in `
 |---|---|
 | flush root = offline Poseidon2 tree over 64 sequential deposits (4 flushes) | **4/4 equal** (libauth); 17/17 over 272 deposits in libauth and again on BCHN |
 | ring wraparound expires a stale root (rejected at epoch + 16) | **yes**: root 0 (written at epoch 0) is accepted at epoch 16 and rejected by W after the flush at epoch 16 overwrites slot 0 (libauth with S1's stand-in R; BCHN with real R and real proofs: W rejects, testmempoolaccept `mandatory-script-verify-flag-failed`, block `blk-bad-inputs`) |
-| premature flush, wrong frontier, leaf lane ≥ p rejected | **yes** (families `premature` 2, `frontier` 7, `lane` 4, plus 54 more plain rejections; 0 unexpected) |
+| premature flush, wrong frontier, leaf lane ≥ p rejected | **yes** (families `premature` 2, `frontier` 7, `lane` 4, plus 46 more plain rejections, 59 in all; 0 unexpected. The 72 cases are 59 rejections + 13 required accepts) |
 | deposit → flush → prove → withdraw on BCHN (POLICY=1), testmempoolaccept at default policy | **yes**: genesis, 272 deposits, 17 flushes and 4 withdrawals (tx0 and tx1) were each allowed by testmempoolaccept and mined; 5 proofs from the Track 8 prover with the explicit witness |
 | A3: R pins input 5 to the pool's W | **closed** (R checks category and prefix 0x57; `../r/README.md`) |
-| A1: pool-specific nullifiers, or why not needed | **documented, not changed** (`../README.md` A1) |
+| A1: pool-specific nullifiers, or why not needed | **resolved by G (initial ring all Z); no script change** (`../README.md` A1, `../SOUNDNESS-T9.md` §6) |
 
 ## Design as built
 
@@ -72,7 +72,13 @@ Regtest values are D = 1,000,000 sat and f = 10,000 sat.
      and value = W + 16 D. D′ at output 0 has `0x44 ‖ SHA-256(0x00 ‖ Z) ‖ SHA-256(count+16 ‖ F′)` and value =
      D − 16 (D + f).
 - **The keeper fee is implicit.** The 16 f released from D, plus the worker inputs, go to whatever outputs the keeper
-  adds. On BCHN the keeper output got 118,000 sat after a 50,000 sat fee (1.19 sat/B).
+  adds. On BCHN the keeper output got 118,000 sat after a 50,000 sat fee (1.19 sat/B; 4 workers at 2,000 sat each).
+- **Worker UTXOs are anyone-can-spend until the flush confirms.** The worker locking checks only DEPTH 3 and
+  H(WBLOB), so anyone who sees a funded worker UTXO can spend it with a small IO program in a transaction of their
+  own (WBLOB is public). The keeper then loses that worker's value and must rebuild the flush with a new worker.
+  Pool funds are not affected: D binds each worker's IO in the flush, so a worker spent elsewhere moves no D or W
+  value. Keepers should fund workers at the dust minimum (about 600 sat each for the 52 B output under BCHN's default
+  dust rule; computed, not measured) and broadcast the worker-setup transaction and the flush together.
 - **The worker** (P2S, 43 B): `DEPTH 3 NUMEQUALVERIFY DUP HASH256 <H(WBLOB)> EQUALVERIFY 1 DEFINE 1 INVOKE`.
   - Its unlocking is `IO PAD WBLOB`. WBLOB defines S0's compression T∘P and interprets IO over a stack of nodes.
   - The ops are: `01 lit` push (every lane < p); `02` compress the top two nodes; `03` swap them; `04 lit` pop, which
@@ -89,6 +95,10 @@ Regtest values are D = 1,000,000 sat and f = 10,000 sat.
 ## Results
 
 ### libauth (`node test-d.mjs` → `results/s4-d.json`, 14 s): PASS, 72 cases, 0 unexpected
+
+The 72 cases are 59 rejections + 13 required accepts (seq 4, deposit 2, flush 1, wrap 3, edge 3). The family table
+below sums to 76 because the `seq` row also counts its 4 root/ring equality checks (root = offline tree, histRoot =
+ring of the roots), which are checks inside the accepted cases, not separate transactions.
 
 Every valid transaction passes bchStd and bchCons on every input and libauth's whole-transaction verification, and
 the BCHN-adjusted op-cost is within budget on every input. A rejection counts only if the input also rejects on the
@@ -192,7 +202,15 @@ cd ../node && S2_VEC=<S2 vectors> PROVER=$CACHE/target/release/pq-pool-prover S4
   code each. With 100 KB per-input limits it would be one worker (S0: 138 compressions fit).
 - **Anyone can flush, and only the full queue can be flushed.**
   - Deposits stall at len = 16 until someone flushes.
-  - The 16 f fee pays the keeper.
+  - The 16 f fee pays the keeper. A third-party keeper breaks even only if
+    16 f ≥ (flush bytes + worker-setup bytes) × feerate, i.e. f_min ≈ (42,129 + ~400) × feerate / 16 ≈ 2.7k sat at
+    1 sat/B (the setup transaction size is an estimate for one input and 4 worker outputs; not measured). The regtest
+    f = 10,000 sat covers about 3.7 sat/B. Below f_min only depositors who flush themselves keep the pool moving; that
+    weakens the "stall bounded by fee" argument but cannot cause theft.
+  - When the tree is full (count = 2^30, after the flush at 2^30 − 16), D's deposit branch, which cannot see count,
+    still accepts up to 16 more deposits. They can never be flushed or refunded, so up to 16 (D + f) is locked for
+    good. Not reachable in practice (2^30 deposits first); a final flush that writes a full sentinel queue would close
+    it and is not implemented.
   - No timeout or partial flush exists. A partial flush would need a different subtree shape.
 - **Notes become withdrawable only after a flush, and a proof's root expires 16 flushes later.**
   - A note can always be re-proved against a newer root (BCHN: note 9).

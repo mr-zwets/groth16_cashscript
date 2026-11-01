@@ -25,7 +25,7 @@ snapshot. `summary-s4.json` (from `node summary-s4.mjs`) holds S4 and the S1–S
 - **S1–S3 re-runs.**
   - test-w: PASS.
   - S2 production sweep: 5,055 cases (the 4,977 plus 78 `wpin`), 0 unexpected.
-  - S2 harness: 2,387 cases, 0 unexpected.
+  - S2 harness: 2,387 cases, 0 unexpected (2,232 chain rejections + 51 accepts + 69 encoder-only + 35 not run on chain).
   - S3 on BCHN: 24/24, and replay, chain10, race and conflict all as before, with 76/76 allowed.
 
 SOUNDNESS-T9 (S7a) is in `SOUNDNESS-T9.md`: lemmas L1–L7, the owner table, and the status of A1–A5 below (plus a new
@@ -33,7 +33,8 @@ A6, the thread category's minting NFTs). The section below is the input it was w
 
 ## Assumptions and known properties (input to SOUNDNESS-T9)
 
-**A1. Ring roots are unique to one pool (needed for L6, withdrawals ≤ deposits). S4: documented, not changed.**
+**A1. Ring roots are unique to one pool (needed for L6, withdrawals ≤ deposits). Resolved by G (initial ring all Z); no
+script change.**
 - A proof binds only ROOT, NF and CTX. Neither the proof nor the statement names a pool, and each pool (each category)
   has its own nullifier set.
 - So a note whose root is in two pools' rings can be withdrawn once from each. S3's pool B shows this with the static
@@ -102,4 +103,6 @@ A6, the thread category's minting NFTs). The section below is the input it was w
 rejections. It is 4,834 rejections, 88 required accepts and 55 encoder-only relabels (a malformed-by-length proof whose
 on-chain witness is the valid one, so the script accepts it). Per-family counts are in `r/README.md` and in the JSON's
 `families`. The S4 re-run has 5,055 cases: 4,912 chain rejections (the 4,834 plus 78 `wpin`), 88 required accepts and
-55 encoder-only relabels.
+55 encoder-only relabels. The harness sweep (no W, 1-tx) reads the same way: 2,387 = 2,232 chain rejections + 51
+accepts + 69 encoder-only relabels + 35 cases not run on chain (statement 33: CTX lanes ≥ 2^56; vk_variant 2), which
+the sweep counts as expected rejections without running them (`r/results/test-a-harness.json`, `notRunOnChain`).

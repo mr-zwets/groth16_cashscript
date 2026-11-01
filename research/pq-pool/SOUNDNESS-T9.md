@@ -69,7 +69,9 @@ self-relay.
 **Deployment checks** (off chain; §6 gives the full lists):
 - **G:** the pool genesis transaction is the reference one (two mutable NFTs of CAT at the reference lockings with the
   empty initial commitments, no minting NFT, no fungible amount).
-- **T:** every minting NFT of TCAT is locked by R (T8 Lemma 10's deployment assumption).
+- **T:** every minting NFT of TCAT is locked by a reference R (of any pool that shares TCAT); each R places thread
+  NFTs only at its own locking (`r/gena.mjs`, tx0: outputs 0..T−1 have input's UTXOBYTECODE), and tx1 requires inputs
+  0..4 to have that same locking (T8 Lemma 10's deployment assumption, stated for pool-specific R).
 
 ## 3. The lemmas
 
@@ -191,8 +193,12 @@ deposit order.
      to `0x57 ‖ nfRoot ‖ histRoot′ ‖ u32le(E + 1)`.
   4. *ROOT is the appended tree's root.* D builds each worker's IO program from LV, count, FR, the 26 zero hashes
      (constants in the blob) and MID = A8 ‖ B4 ‖ H11 ‖ H23 ‖ ROOT ‖ X, and requires that inputs 2..5 have the worker
-     locking and that each one's first push is exactly that program (PUSHDATA2 header included). Each worker checks
-     HASH256(WBLOB) against its locking, runs the program (every literal is 32 B with lanes < p; `02` computes T∘P of the
+     locking and that each one's first push is exactly that program (PUSHDATA2 header included; this needs every IO to
+     be 256..65,535 B, since minimal push encoding is a consensus rule: the IO sizes depend only on the bits of count
+     and on where l0 falls, never on leaf or frontier values, from 472/481/474/304 B (workers 1–4, minima over 10
+     sampled counts incl. 0, 2^29 and 2^30 − 16) to at most about 560 B (12 levels × 35 B plus the l0 and hand-over
+     items), and every worker unlocking is ≤ 10,000 B, so the fixed header is always minimal and a flush can always be
+     built). Each worker checks HASH256(WBLOB) against its locking, runs the program (every literal is 32 B with lanes < p; `02` computes T∘P of the
      top two nodes; `04 lit` pops and requires equality; the node stack must end empty). So every MID item is the
      value the program computes, the hand-over items (A8, B4, H11, H23) are checked by the worker that computes them
      and re-imported by the next, and ROOT is the output of the frontier append: the 16 leaves give the level-4 subtree
@@ -369,12 +375,12 @@ W at the reference W locking (HR of the reference R for (TCAT, CAT)) with `0x57 
 | W's identity at input 1 | blob: category = D's own (CAT ‖ 0x01), commitment 69 B with prefix 0x57 (L1); W: INPUTINDEX = 1 in its flush branch |
 | nfRoot, histRoot, epoch (read from W) | blob: parsed from W's input commitment |
 | RING = OLD ‖ 4 siblings | blob: 160 B; OLD path = histRoot; ROOT path = histRoot′; slot = epoch mod 16 |
-| worker inputs 2..5 | blob: UTXOBYTECODE = WORKER; first push = the expected IO (header and length included) |
+| worker inputs 2..5 | blob: UTXOBYTECODE = WORKER; first push = the expected IO (header and length included; the PUSHDATA2 header is minimal because every IO is 256..65,535 B independent of the data, L3 step 4) |
 | worker unlocking | worker: DEPTH = 3 (IO PAD WBLOB), HASH256(WBLOB) = H(WBLOB); IO literals 32 B, lanes < p; final node stack empty. PAD has no effect on the verdict beyond the budget |
 | output 0 (D′) | D: locking, CAT ‖ 0x01, amount 0, commitment `0x44 ‖ Q0 ‖ SHA-256(u32le(count+16) ‖ F′)`, value = in − 16(δ + f); W: value = D's value − 16(δ + f) |
 | output 1 (W′) | blob: locking = input 1's, category = input 1's, amount 0, commitment `0x57 ‖ nfRoot ‖ histRoot′ ‖ u32le(epoch+1)`, value = W + 16δ; W: locking = own, CAT ‖ 0x01, amount 0, first 33 B unchanged, value = own + 16δ |
 | W's branch | W: DEPTH = 0 selects the flush branch; input 0 = CAT ‖ 0x01 with prefix 0x44 |
-| keeper outputs, extra inputs | no owner needed: the 16f and the workers' values are the keeper's |
+| keeper outputs, extra inputs | no owner needed for pool funds: D′ and W′ fix every pool value, so the keeper gets at most 16f plus whatever worker values are still in the flush. Worker UTXOs are anyone-can-spend before the flush confirms (§7), so their values are not reliably the keeper's |
 
 **Wd. Withdrawal tx1** (inputs 0..4 R, input 5 W; output 0 W′, outputs 1.. payout)
 
@@ -410,7 +416,7 @@ reading rule (a sweep's "cases" are not all on-chain rejections):
 | `p2/test-p2.mjs` (S0) | T∘P = p3-goldilocks on 1,005 inputs | L3 (same root function as the AIR) |
 | `w/test-w.mjs` (S4 re-run) | 10,000 library + 10,000 transactions, 0 disagreements; 203 rejection cases pass | L2 |
 | `r/` production sweep (S4 re-run) | 5,055 cases, 0 unexpected = 4,912 chain rejections + 88 required accepts + 55 encoder-only | L4, L7, A3 |
-| `r/` harness sweep (S4 re-run) | 2,387, 0 unexpected | L4 |
+| `r/` harness sweep (S4 re-run) | 2,387 cases, 0 unexpected = 2,232 chain rejections + 51 accepts + 69 encoder-only + 35 not run on chain | L4 |
 | `d/test-d.mjs` | 72 cases, 0 unexpected | L1, L3, L6 (values) |
 | BCHN `t9s3b` (S3 re-run) | 24/24; replay and conflict rejected by W; race rebuild accepted; 76/76 allowed | L2, L7 |
 | BCHN `t9s4a` | genesis checked; 272 deposits, 17 flushes (root = offline tree), 4 withdrawals; stale root rejected; 299 allowed | L1, L3, L4 |
@@ -450,21 +456,39 @@ covers every withdrawal (S3), and the S4 genesis, deposits, flushes and withdraw
 They are not covenant transactions and no lemma depends on them.
 
 **A5. How to read the sweep totals. Carried as a reading rule** (used in §5): 5,055 = 4,912 chain rejections + 88
-required accepts + 55 encoder-only relabels (malformed-by-length proofs whose on-chain witness is the valid one).
+required accepts + 55 encoder-only relabels (malformed-by-length proofs whose on-chain witness is the valid one), with
+none not run on chain. The harness sweep: 2,387 = 2,232 chain rejections + 51 accepts + 69 encoder-only relabels + 35
+cases not run on chain and counted as expected rejections (statement 33: CTX lanes ≥ 2^56; vk_variant 2;
+`r/results/test-a-harness.json` `notRunOnChain`). `d/test-d.mjs`: 72 = 59 rejections + 13 required accepts; its family
+table shows 76 because `seq` also counts 4 root/ring equality checks.
 
 **A6 (new). The thread category's minting NFTs exist only under R. Carried as assumption T, fund relevant.** This is
 T8 Lemma 10's deployment assumption. tx1 alone is a partial check (it re-runs the transcript, FIN and queries 21..23,
 but not the AIR identity or queries 0..20, which tx0 checked); the thread NFT is what ties tx1 to an accepted tx0. If a
 minting NFT of TCAT existed outside R, that tie would not hold, and L4, hence L6, would not follow. In the S3/S4
 regtest rig the node faucet keeps a minting NFT of TCAT at an OP_1 output to fund thread batons: a rig fixture that
-fails T on purpose, like the static ring of A1. A deployment must create TCAT with its minting NFTs locked by R only,
-and wallets must check TCAT's genesis like CAT's.
+fails T on purpose, like the static ring of A1. A deployment must create TCAT with its minting NFTs locked by reference R lockings only (one per pool that
+shares TCAT, or give each pool its own TCAT), and wallets must check TCAT's genesis like CAT's. Sharing TCAT across
+pools is sound under T as worded in §2: each R mints thread NFTs only to its own locking, and tx1 requires that
+locking on inputs 0..4.
 
 ## 7. Liveness and properties outside soundness
 
 - **Flushes are permissionless** and paid (16f to the keeper). Deposits stall at len = 16 until someone flushes; there
-  is no partial flush or refund. The tree holds 2^30 leaves (count ≤ 2^30 − 16 per flush check), i.e. 2^26 flushes,
-  after which flushes, and so deposits beyond the queue, stop.
+  is no partial flush or refund. The tree holds 2^30 leaves (count ≤ 2^30 − 16 per flush check), i.e. 2^26 flushes.
+  After the last flush (count = 2^30), D's deposit branch, which cannot see count, still accepts one more queue of up
+  to 16 deposits; these can never be flushed or refunded, so up to 16(δ + f) is locked for good. Not reachable in
+  practice (2^30 δ deposited first). Not implemented: a final flush that writes a sentinel queue (len = 16) so D refuses
+  further deposits.
+- **Keeper incentive.** A third-party keeper breaks even only if 16f ≥ (flush bytes + worker-setup bytes) × feerate:
+  f_min ≈ (42,129 + ~400) × feerate / 16 ≈ 2.7k sat at 1 sat/B (the ~400 B setup transaction, one input and 4 worker
+  outputs, is an estimate). The regtest f = 10,000 sat covers about 3.7 sat/B. With f below f_min, only depositors who
+  flush themselves keep the pool moving: the "stall bounded by fee" argument weakens, but no theft follows (L6).
+- **Keeper-side griefing.** Worker UTXOs (P2S, 43 B) check only DEPTH 3 and H(WBLOB), so they are anyone-can-spend:
+  before the flush confirms, an observer can sweep a worker's value with a small IO program, and the keeper's flush
+  fails and must be rebuilt with fresh workers. Pool funds are unaffected (D binds every worker's IO; D′ and W′ are
+  fixed). Keepers should fund workers at the dust minimum (about 600 sat for the 52 B output under BCHN's default dust
+  rule; computed) and broadcast the worker-setup transaction and the flush together.
 - **Root expiry.** A proof's ROOT leaves the ring 16 flushes after it was written. The note is not lost: the tree only
   grows, so the owner re-proves against a newer root (BCHN `t9s4a`, note 9).
 - **Relaying.** A relayer can censor but not redirect (L7); the owner can self-relay. R carriers and thread batons

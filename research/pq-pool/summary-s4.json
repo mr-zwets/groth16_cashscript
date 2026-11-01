@@ -782,6 +782,6 @@
  },
  "review_items": {
   "A3": "closed: the final HEAD pins input 5 to category CAT||01 and commitment prefix 0x57 (R is pool specific: +46 B in a code blob)",
-  "A1": "documented, not changed: per-pool ring roots built from the pool's own deposits bound withdrawals per pool; the pin alone does not stop a proof from being used in another pool whose ring holds the same root"
+  "A1": "resolved by G (initial ring all Z); no script change: per-pool ring roots built from the pool's own deposits bound withdrawals per pool; the pin alone does not stop a proof from being used in another pool whose ring holds the same root"
  }
 }
