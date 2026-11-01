@@ -112,6 +112,26 @@ OP_DEFINE bodies on every R input. W has no OP_DEFINE.
 - The 55 encoder-only cases (harness: 69) are malformed-by-length proofs whose on-chain witness is the valid proof's.
 - In the harness, 35 cases are not run on chain: 33 CTX lanes ≥ 2^56 and 2 VK variants.
 - The harness totals equal Track 8 S7's exactly (2,387 / 69 / 35).
+- **So 0 unexpected over 4,977 is not 4,977 on-chain rejections.** The production cases split into 4,834 chain
+  rejections, 88 required accepts and 55 encoder-only relabels. Not counted in the 4,977: 26 n/a cases (a public value
+  ≥ 2^64), and the 26 `documented` runs below.
+
+  | family | cases | chain reject | accept | encoder-only |
+  |---|--:|--:|--:|--:|
+  | valid | 26 | 0 | 26 | 0 |
+  | cap / ood / random / pow / final | 419 / 229 / 122 / 78 / 145 | all | 0 | 0 |
+  | row / salt / sibling / fri_value | 129 / 129 / 128 / 55 | all | 0 | 0 |
+  | count | 116 | 90 | 0 | 26 |
+  | truncate / noncanon / statement | 47 / 44 / 321 | all | 0 | 0 |
+  | extend | 35 | 6 | 0 | 29 |
+  | other_vk | 6 | 2 | 4 | 0 |
+  | constants / input / graph / mix / thread | 702 / 624 / 208 / 156 / 416 | all | 0 | 0 |
+  | control | 2 | 0 | 2 | 0 |
+  | tx / root | 104 / 78 | all | 0 | 0 |
+  | nf | 86 | 56 | 30 | 0 |
+  | ring / windex / commit / wonly | 78 / 130 / 104 / 52 | all | 0 | 0 |
+  | out0 | 208 | 182 | 26 | 0 |
+  | **total** | **4,977** | **4,834** | **88** | **55** |
 
 **The S7 families in the production sweep:**
 - **Proof-level families from the S3 case files.** All families are present:
@@ -154,6 +174,10 @@ the W slot and an OP_RETURN as output 0. **R's five inputs accept.**
   tx0.
 - Closing this would mean pinning W's category in R. That creates no hash cycle (CAT is a genesis outpoint), but it is a
   change to the design, so it is left open for the maintainer.
+- Recorded as a known griefing-only property for SOUNDNESS-T9 (`../README.md` A3). Pinning CAT ‖ 0x01 at input wIdx
+  would make R specific to one pool.
+- Related (A1 there): the proof binds only ROOT, NF and CTX, and R names no pool, so withdrawals ≤ deposits holds per
+  pool only while each pool's ring roots are its own.
 
 ### Not covered
 

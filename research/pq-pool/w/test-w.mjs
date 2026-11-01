@@ -139,9 +139,12 @@ function rejections(states) {
     const r = runTx(tx);
     const wi = tx.sourceOutputs.findIndex((o) => Buffer.from(o.lockingBytecode).equals(Buffer.from(pool.locking)));
     const v = {tx: r.tx === true, in0: r.ins[0]?.accepted, w: r.ins[wi]?.accepted};
-    const rejected = !v.tx && v.w === false;
+    // same 3-way verdict as S2's verdicts(): a bchStd rejection of W that looseStd (no resource limits) accepts is a
+    // resource 'limit', not a failed check, and never counts as a rejection
+    const wVerdict = v.w !== false ? 'accept' : (runTx(tx, 'looseStd').ins[wi]?.accepted ? 'limit' : 'reject');
+    const rejected = !v.tx && wVerdict === 'reject';
     const ok = !noop && rejected && (!expectIn0 || v.in0 === true);
-    fams.push({family, name, state: ctx.name, rejected, wIndex: wi, wRejected: v.w === false, in0Accepted: v.in0, noop, pass: ok, wError: r.ins[wi]?.error});
+    fams.push({family, name, state: ctx.name, rejected, wIndex: wi, wRejected: v.w === false, wVerdict, in0Accepted: v.in0, noop, pass: ok, wError: r.ins[wi]?.error});
   };
   for (const ctx of states) {
     // control

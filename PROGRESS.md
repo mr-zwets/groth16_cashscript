@@ -72,5 +72,18 @@ Design: zk-verifier-bench research/pq-pool/DESIGN-T9.md (maintainer decisions: s
 - Race (statements 10/11): loser txn-mempool-conflict; rebuilt tx1 (same tx0, byte-identical R inputs 0..4, same
   payout; only W input and output 0 change) allowed and mined. Same-NF conflict (statement 12 twice): second tx1
   mempool conflict; rebuilt on the unconfirmed state rejected by W (libauth, tma, block).
-- testmempoolaccept: 76/76 valid txs allowed; the 5 refusals are the expected ones.
+- testmempoolaccept: 76/76 valid withdrawal txs (tx0/tx1) allowed; the 5 refusals are the expected ones (genesis/funding txs not policy-tested).
 - Not done: timing (Track 8 node check covers it), deposits/flush (S4). R does not pin W (S2 item) still open.
+
+## Review fix round (S0-S3 review: pass, 6 minors, no blocker/major): DONE
+
+- New research/pq-pool/README.md: stage index + "Assumptions and known properties (input to SOUNDNESS-T9)":
+  A1 ring roots unique per pool (L6 per pool; static genesis tree never seeds >1 funded pool; S3 pool B shown as
+  valid behaviour), A2 genesis "no minting NFT" is an off-chain wallet/relayer check (trust anchor, re-check at S4),
+  A3 R does not pin W = griefing only (fix: pin CAT||01 at wIdx, R becomes pool-specific; maintainer call),
+  A4 76/76 covers withdrawal txs only, A5 sweep total split 4,834 reject / 88 accept / 55 encoder-only.
+- r/README: per-family reject/accept/encoder-only table next to the 4,977 total; A1/A3 cross-refs.
+- node/README: "each withdrawal transaction" wording; pool B / L6 assumption; baton check is off-chain.
+- w/test-w.mjs rejections(): 3-way verdict (bchStd reject + looseStd accept = 'limit', fails the case), as S2's
+  verdicts(). Rerun seed 1 (212 s): PASS, identical results, 199/199 'reject', 0 'limit', worst 90.59%.
+- Not changed (by design / maintainer call): R still does not pin W; no pool category in leaf/NF domain.

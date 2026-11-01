@@ -26,6 +26,10 @@ W is P2SH32. Its redeem script is 499 B. Its unlocking is, bottom first: S, B, L
    - Its commitment is `0x57 ‖ N ‖` (histRoot ‖ epoch, the bytes copied from the input).
    - Its value is W's input value − D, with D = 1,000,000 sat.
 
+**Trust anchor (L1).** W cannot check that no minting NFT of CAT exists. Wallets and relayers must check the genesis
+transaction: exactly one NFT of CAT, mutable, no minting capability (S3 checked this on BCHN; see `../README.md` A2).
+Even with a minting NFT, a forged W UTXO could pay out only its own value, because W allows exactly one W input.
+
 **No second W.** CAT is pinned in the redeem script. A mutable NFT input allows at most one NFT of its category in the
 outputs, and output 0 must hold it, so no other output can carry the category.
 
@@ -71,7 +75,7 @@ missed the 100-per-instruction base cost. The two-loop version costs 0.19–0.23
 
 ## Results
 
-`node test-w.mjs` (seed 1, 210 s) → `results/s1-w.json`. Result: **PASS**.
+`node test-w.mjs` (seed 1, 210 s; review rerun 212 s, same results) → `results/s1-w.json`. Result: **PASS**.
 
 **1. SMT library vs the JS reference.** 10,000 cases, 0 disagreements. The script must accept exactly when the
 reference says the key is absent, and then O and N must equal the reference's roots before and after the insert.
@@ -98,6 +102,11 @@ reference says the key is absent, and then O and N must equal the reference's ro
 **3. Rejection families.** 199 cases plus 4 honest controls, over 4 states: empty set, 1 spent, 40 spent, 7,460 spent.
 - Every case is rejected by W's input, and input 0 (the stand-in R) still accepts, except in the families that change
   input 0 itself.
+- A W rejection counts only if it is a failed check: when bchStd rejects W, the input is re-run on looseStd (no
+  resource limits), and a looseStd accept is labelled `limit` and fails the case. This is the same 3-way verdict as S2's
+  `verdicts()` (added in the review fix round, rerun with seed 1: all 199 are `reject`, 0 `limit`; `wVerdict` in the
+  JSON). W's errors: 174 OP_VERIFY, 9 OP_SPLIT (short or extra sibling data) and 16 false final results (NUMEQUAL, value
+  family).
 - A guard fails any tamper that leaves the transaction unchanged. 7 tampers that cannot apply in a state (for example,
   swapping siblings when there is only one) are listed as skipped.
 
