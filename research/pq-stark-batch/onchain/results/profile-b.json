@@ -1,14 +1,14 @@
 [
  {
   "vector": "m1-s4-0-Z128.json",
-  "opStd": 35976107,
+  "opStd": 35976349,
   "queries": 16091177,
   "perQuery": 670466,
   "merkle": 7050644,
-  "fixed": 12834286,
+  "fixed": 12834528,
   "air": {
-   "total": 8027858,
-   "dagInterpreter": 5788839,
+   "total": 8028100,
+   "dagInterpreter": 5789081,
    "periodic": 1191145,
    "quotient": 438254,
    "selectorsAndPowers": 157764,
@@ -26,7 +26,7 @@
    "air-start": 451856,
    "air-generic-a": 157764,
    "air-periodic": 1191145,
-   "air-specific": 5788839,
+   "air-specific": 5789081,
    "air-generic-b": 438254,
    "deep-consts": 3159706,
    "tables": 160031,

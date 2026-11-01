@@ -97,11 +97,12 @@
   "truncate": {
    "cases": 54,
    "chainReject": 53,
-   "accept": 1,
+   "accept": 0,
    "unexpected": 0,
    "na": 0,
    "refused": 0,
-   "encoderRefused": 54
+   "encoderRefused": 54,
+   "encoderOnlyRelabel": 1
   },
   "extend": {
    "cases": 42,
@@ -122,11 +123,12 @@
   },
   "statement": {
    "cases": 423,
-   "chainReject": 423,
+   "chainReject": 390,
    "accept": 0,
    "unexpected": 0,
    "na": 33,
-   "refused": 0
+   "refused": 0,
+   "notRunOnChain": 33
   },
   "other_vk": {
    "cases": 54,
@@ -167,5 +169,7 @@
   "m1-0-Z128~vk-cap+1.json: S4 generator: Merkle cap 0 (layout b)",
   "m1-0-Z128~vk-opow=1.json: S4 generator: ood PoW 0"
  ],
- "encoderRefused": 276
+ "encoderRefused": 276,
+ "notRunOnChain": 33,
+ "encoderOnlyRelabel": 1
 }

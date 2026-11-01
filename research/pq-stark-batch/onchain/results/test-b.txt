@@ -1,0 +1,4 @@
+test-b: 26 files, 2929 cases, 0 unexpected, 26 n/a, 0 refused by the generator, 206 malformed by length (encoder refuses), 0 files skipped
+0 not run on chain (short-circuit, counted as rejects: {}); 0 encoder-only relabels (reference rejects; script accepts the valid witness; inside the ok count)
+test-b (harness: CTX as a witness item): 36 files, 3309 cases, 0 unexpected, 33 n/a, 0 refused by the generator, 276 malformed by length (encoder refuses), 2 files skipped
+33 not run on chain (short-circuit, counted as rejects: {"statement":33}); 1 encoder-only relabels (reference rejects; script accepts the valid witness; inside the ok count)
