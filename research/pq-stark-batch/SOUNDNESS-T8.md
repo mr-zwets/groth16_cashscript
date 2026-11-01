@@ -53,7 +53,7 @@ powers-of-one-challenge batching (§6).
      `D_SUBL`, `D_RSUBL` and `D_NEG` in both generators (no byte cost: p and 2p are both 9-byte pushes). Every
      interpreter op output is reduced mod p, so only raw leaves can exceed p, and with the offset every intermediate
      is non-negative. `s8-arith.mjs` runs the generated op bodies of both generators and `MULE` in libauth on maximal
-     lanes (2^64 − 1, p, p + 1, mixed): 64/64 congruent and canonical; the pre-fix bodies fail 38 of the same cases.
+     lanes (2^64 − 1, p, p + 1, mixed): 64/64 congruent and canonical; the pre-fix subtraction form gives a wrong residue on negative lanes (2/2, s8-arith Part A).
      Every S4–S7 suite was re-run on the fixed scripts, 0 unexpected verdicts (§2).
      - With the fix, Track 5's residue argument applies: a non-canonical lane is another byte encoding of the same
        residue, hence another oracle query, and the 128-bit statement covers the as-built scripts against arbitrary
@@ -486,7 +486,7 @@ every committed script change.
     non-negative-unreduced and the 2p controls are right.
   - Part B: the generated `D_SUB`, `D_NEG`, `D_SUBL`, `D_RSUBL` bodies of `genn.mjs` and `gen.mjs` on six lane
     patterns (all 2^64 − 1; 0 against 2^64 − 1; p, p + 1, p − 1 mixed; p + 5 / p + 9; 2^63), each followed by `MULE`
-    on the result: 60/60 congruent, every output canonical. The same check on the pre-fix bodies fails 38 cases.
+    on the result: 60/60 congruent, every output canonical; the pre-fix subtraction form gives a wrong residue on negative lanes (2/2, s8-arith Part A).
   - Part C: `MULE` on maximal non-negative raw lanes (all six 2^64 − 1; 2^64 − 1 against p − 1; mixed p / 2^64 − 1 /
     0): 4/4 congruent.
 
@@ -630,7 +630,7 @@ refuses a DAG that reads it). It enters only transcript step 1, before every cha
   soundness effect after the S8b fix, §9.1).
 - Replay of one valid proof in two final transactions is not prevented by the verifier in any layout (Track 9's
   nullifier set). In a′ two transactions, tx0 alone is a partial check, and the baton is a deployment assumption.
-- Standardness (for REPORT, not soundness): layout a′ needs no raised limit; M1 b2 needs the per-input unlocking,
+- Limits (consensus/relay; for REPORT, not soundness): layout a′ needs no raised limit; M1 b2 needs the per-input unlocking,
   bytecode and stack-item limits raised to 100,000 B; M2 b2 additionally needs the transaction-size limit raised;
   layout b needs the per-input limits raised.
 

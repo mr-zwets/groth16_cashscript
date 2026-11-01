@@ -287,6 +287,8 @@ chain, the a′ model and the S3 reference (the last two only for proof-level ca
 
 # Track 8 S8b: interpreter residue fix and the post-fix re-run
 
+test-b.json, test-b2-prod.json, test-ctx.txt and model-agree-n.txt were regenerated post-fix with identical output (logs dated after 12d47d4), so git shows no change for them.
+
 The constraint interpreter's `D_SUB`, `D_SUBL`, `D_RSUBL` and `D_NEG` now add 2p (not p) before `MOD`, in `gen.mjs`
 and `genn.mjs`, so every op is congruent mod p for raw proof lanes in [0, 2^64) (SOUNDNESS-T8 §9.1, `s8-arith.mjs`:
 69 cases, 0 wrong on the fixed bodies). Every script changed, so every S4–S7 node step was re-run on the cached
