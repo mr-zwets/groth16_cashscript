@@ -962,7 +962,7 @@ const equalPointCallerVariableCost = callerPickCost + callerInvokeReturnCost + c
 const equalPointSurcharge = abstractEqualityAdd.operationCost + abstractDouble.operationCost +
   equalPointCallerVariableCost - abstractGenericAdd.operationCost;
 
-export const GLV_GENERIC_INTRINSIC = [5_845_761, 7_033_265];
+export const GLV_GENERIC_INTRINSIC = [5_846_896, 7_034_400];
 export const GLV_EQUAL_POINT_SURCHARGE = 12_099;
 if (JSON.stringify(intrinsicCeilings) !== JSON.stringify(GLV_GENERIC_INTRINSIC)) {
   throw new Error(`GLV generic intrinsic ceilings changed: ${JSON.stringify(intrinsicCeilings)}`);
