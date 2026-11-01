@@ -705,7 +705,11 @@
   },
   "s2_harness": {
    "cases": 2387,
-   "unexpected": 0
+   "unexpected": 0,
+   "chain_reject": 2232,
+   "accept": 51,
+   "encoder_only": 69,
+   "not_run_on_chain": 35
   },
   "s3_bchn": {
    "seq": {
@@ -783,5 +787,77 @@
  "review_items": {
   "A3": "closed: the final HEAD pins input 5 to category CAT||01 and commitment prefix 0x57 (R is pool specific: +46 B in a code blob)",
   "A1": "resolved by G (initial ring all Z); no script change: per-pool ring roots built from the pool's own deposits bound withdrawals per pool; the pin alone does not stop a proof from being used in another pool whose ring holds the same root"
+ },
+ "soundness": {
+  "doc": "research/pq-pool/SOUNDNESS-T9.md",
+  "lemmas": {
+   "L1": "state uniqueness: exactly one D and one W of CAT (G; CashTokens rules; successor pins)",
+   "L2": "SMT: accepted withdrawal inserts an absent key; truncation gives only false \"spent\" (H1)",
+   "L3": "ring entries are roots of 16e-leaf prefixes of the pool's own deposits (H1, H2, L1, G)",
+   "L4": "accepted tx0 + tx1 = one fully verified Track 8 proof (T8: 128.06 bits M1 Z128 cap 5; T)",
+   "L5": "one NF per leaf (T8 section 11)",
+   "L6": "withdrawals <= 16 * flushes <= deposits; W value = genesis value + denomination * (16E - w)",
+   "L7": "outputs[1..] bound by CTX, output 0 fixed by W; payout redirection excluded under SE"
+  },
+  "assumptions": {
+   "H1": "SHA-256 collision resistance, no preimage of Z",
+   "H2": "T∘P collision resistance",
+   "KS": "Track 8 knowledge soundness (powers-batching adaptation unpublished)",
+   "SE": "simulation extractability (assumed)",
+   "G": "off-chain genesis check (two mutable NFTs of CAT, reference lockings, empty commitments, ring all Z)",
+   "T": "minting NFTs of TCAT only under reference R lockings"
+  },
+  "items": {
+   "A1": "resolved by G",
+   "A2": "carried as G (fund relevant)",
+   "A3": "closed",
+   "A4": "carried (test scope)",
+   "A5": "carried (reading rule)",
+   "A6": "new, carried as T (fund relevant; rig faucet violates it on purpose)"
+  },
+  "open": [
+   "SE assumed",
+   "powers-batching adaptation unpublished/unreviewed",
+   "no standalone G/T checker",
+   "append correctness argued and tested, not machine-checked",
+   "multi-proof extraction bound for L6 not written out",
+   "full-tree sentinel queue not implemented"
+  ]
+ },
+ "review": {
+  "verdict": "fix",
+  "blocker": 0,
+  "major": 0,
+  "minor": 8,
+  "fixed": 8,
+  "scriptChanges": 0,
+  "items": [
+   "d/README rejection count (59 = 46 + 13 named; 72 = 59 + 13 accepts)",
+   "harness sweep split (2,232 + 51 + 69 + 35)",
+   "full-tree end state: last queue of up to 16 deposits locked",
+   "worker UTXOs anyone-can-spend (keeper griefing; pool funds unaffected)",
+   "keeper fee lower bound f_min ~ 2.7k sat at 1 sat/B (estimate)",
+   "assumption T reworded for pool-specific R",
+   "A1 status unified",
+   "PUSHDATA2 precondition: worker IO sizes data-independent, >= 256 B"
+  ]
+ },
+ "commits": {
+  "s4": [
+   "8953563",
+   "abc7bb4",
+   "b21d7f7",
+   "4312eb0",
+   "6b46b9d",
+   "af2b4dc",
+   "6f79fdd",
+   "2f8f931"
+  ],
+  "soundness": [
+   "545b8c8"
+  ],
+  "fixes": [
+   "029d8f2"
+  ]
  }
 }

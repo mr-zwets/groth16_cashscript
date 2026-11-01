@@ -23,3 +23,7 @@
 - [x] A1 status unified: "resolved by G (initial ring all Z); no script change" (README, d/README, summary-s4)
 - [x] L3 step 4 / owner table: IO sizes data-independent, 472..~560 B (sampled), so PUSHDATA2 header always minimal
 - re-runs: none needed (no script or test change); summary-s4.mjs regenerated, identical except the A1 string
+
+# Report text (Track 9b)
+- [x] summary-s4.json: harness sweep split, soundness block (L1-L7, H1/H2/KS/SE/G/T, A1-A6, open items), review (8 minor, all fixed, no script change), commit lists
+- [x] REPORT.md "Track 9b" section drafted for zk-verifier-bench (returned as text; not committed to bench)
