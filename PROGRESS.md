@@ -273,3 +273,13 @@ Scripts/generators at 12d47d4 (2p offsets in D_SUB/D_SUBL/D_RSUBL/D_NEG); comple
   stated in README; rm grade-b gate now max(std, cons) + define bytes (no verdict changed).
 - **Open (unchanged):** SOUNDNESS-T8 §13 items 2, 3, 6 (write the powers-batching adaptation as a proof; simulation
   extractability; coverage vectors at 127.9).
+
+## Report text - Track 8 REPORT section drafted, results summary JSON (done, 2026-11-01)
+
+- `research/pq-stark-batch/onchain/summary-t8.mjs` → `onchain/results/summary-t8.json`: one JSON with the post-fix
+  per-layout figures (bytes, inputs, txs, BCHN-adjusted op-cost, budget %, regime acceptance), every sweep's totals
+  with not-run-on-chain / encoder-only / skipped counts, the agreement counts and the soundness figures (copied from
+  SOUNDNESS-T8 §1, label "JB, powers-batching adaptation, unpublished"). Run: `node summary-t8.mjs` from onchain/.
+- The Track 8 section for zk-verifier-bench `research/pq-stark/REPORT.md` was returned to the orchestrator as text
+  (not committed; REPORT.md is on bench main). Its Sources links point at groth16_cashscript `main` paths, valid once
+  wip/stark-usable is merged.
