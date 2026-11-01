@@ -95,7 +95,7 @@ reference says the key is absent, and then O and N must equal the reference's ro
 - 7,460 withdrawals were accepted. 2,540 attempts with an already-spent NF were all rejected.
 - The ROOT was taken from slot 0 or 1 at random.
 
-**3. Rejection families.** 205 cases over 4 states: empty set, 1 spent, 40 spent, 7,460 spent.
+**3. Rejection families.** 199 cases plus 4 honest controls, over 4 states: empty set, 1 spent, 40 spent, 7,460 spent.
 - Every case is rejected by W's input, and input 0 (the stand-in R) still accepts, except in the families that change
   input 0 itself.
 - A guard fails any tamper that leaves the transaction unchanged. 7 tampers that cannot apply in a state (for example,

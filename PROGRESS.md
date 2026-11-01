@@ -30,7 +30,7 @@ Design: zk-verifier-bench research/pq-pool/DESIGN-T9.md (maintainer decisions: s
   did NOT fit the W input budget (design's 0.2M estimate missed the per-instruction cost); two-loop: 0.19-0.23M.
 - Acceptance (results/s1-w.json, seed 1): library vs JS reference 10,000 cases (6,449 inserts, 3,551 present; long
   shared prefixes, neighbours, extremes; all L 0..64) 0 disagreements; W on whole txs (libauth BCH 2026 std) 10,000
-  (7,460 withdrawals, 2,540 spent-NF attempts) 0 disagreements; 205 rejection cases (NF+1, present key, bitmap/L,
+  (7,460 withdrawals, 2,540 spent-NF attempts) 0 disagreements; 199 rejection cases + 4 controls (NF+1, present key, bitmap/L,
   sibling, ring, carry-over, output, value, graph) all rejected by W; double spend in sequence rejected.
 - W input cost: 0.22-0.30M op-cost (31-41% of budget) natural; constructed worst (L = 0, one sibling) 90.6%;
   W unlocking 645 B - 1.1 KB; tx 1,020-1,566 B.
