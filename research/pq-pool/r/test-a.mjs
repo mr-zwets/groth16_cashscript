@@ -5,8 +5,8 @@
 // families now change the payouts, output 1.., where Track 8 changed output 0); the root family tampers the HEAD
 // push. --pool adds the DESIGN-T9 S2 families (poolCases below): ring, nf (same NF twice: in sequence and in
 // conflicting transactions), windex (W at the wrong index or missing), commit (output-0 commitment), out0 (output 0
-// changes do not touch CTX; outputs >= 1 do), wonly (W without R), and 'documented' (a non-W input at the W slot:
-// R alone accepts; no pool funds move). Pool cases name the input that must reject (W, HEAD or any) and check that
+// changes do not touch CTX; outputs >= 1 do), wonly (W without R), and wpin (Track 9 S4, review item A3: R pins
+// the W slot to the pool's W; S2 recorded a non-W input there as 'documented'). Pool cases name the input that must reject (W, HEAD or any) and check that
 // every other input of tx1 accepts under today's standard rules.
 // --harness runs the 1-transaction plan without W (CTX a witness item) on S3's generic cap-5 case files.
 // Track 8 header follows.
@@ -31,6 +31,8 @@ import {applyTamper} from '../../pq-stark-batch/onchain/modeln.mjs';
 import {makePlanA, spendA, evaluateTxA, verifyTxA, CATEGORY, programA} from './layouta.mjs';
 import {poolOf, genesisState, wSpend, nextState, G as GEN} from './pool.mjs';
 import {keyOf, nfBytes} from '../w/smt.mjs';
+import {makePool, tokenOf} from '../w/wtx.mjs';
+import {pushes} from '../../pq-stark-batch/onchain/vm.mjs';
 import {threadCommit} from './gena.mjs';
 import {runCase, vkFromVector, parse as strictParse} from '../../pq-stark-batch/verifier/verify-batch.mjs';
 import {ctxOf} from './ctx.mjs';
@@ -327,19 +329,23 @@ function poolCases(vk, plan, v, file, dir, base, payouts) {
     const v2 = verdicts(t2);
     record(file, 'wonly', 'W at its index after a non-R input 0 (OP_1 locking): W rejects (HR)', false, v2[1] !== 'reject', null, null, `inputs: ${v2.join(' ')}`);
   }
-  // documented: a non-W input at the W slot. R does not pin W (no cycle); R's inputs accept; the transaction moves no
-  // pool funds (its outputs are paid by that input), so this is not a pool spend
+  // wpin (Track 9 S4, review item A3; S2 recorded the first case as 'documented', R accepting): the final HEAD pins
+  // the W slot to the pool's W (category || 0x01, prefix 0x57). Each case keeps CTX (output 0 is outside it).
   {
-    const b = poolTxs(vk, plan, buf, base, payouts, {state: G0, tx1: (t) => { t.sourceOutputs[wIdx] = {lockingBytecode: Uint8Array.of(0x51), valueSatoshis: 1_000_000n}; t.transaction.inputs[wIdx] = {...t.transaction.inputs[wIdx], unlockingBytecode: Uint8Array.of()}; t.transaction.outputs = t.transaction.outputs.slice(1); return t; }, outs1: (o) => o});
-    // without the W output, CTX over outputs [1..] no longer covers the payout: put a plain output 0 back
-    const t1 = b.txs[1]; t1.transaction.outputs = [{lockingBytecode: Uint8Array.of(0x6a), valueSatoshis: 0n}, ...t1.transaction.outputs];
-    const v1 = verdicts(t1);
-    const rOk = v1.slice(0, wIdx).every((x) => x === 'accept');
-    F_DOC.push({file, name: 'a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN', rInputs: v1.slice(0, wIdx), slotInput: v1[wIdx]});
-    console.log(`doc  ${file} [documented] non-W input at the W slot: R inputs ${rOk ? 'all accept' : v1.slice(0, wIdx).join(',')}; slot input ${v1[wIdx]} (expected: R does not pin W; no pool funds move)`);
+    const slotTo = (so, unlocking, out0) => (t) => { t.sourceOutputs[wIdx] = so; t.transaction.inputs[wIdx] = {...t.transaction.inputs[wIdx], unlockingBytecode: unlocking}; t.transaction.outputs[0] = out0; return t; };
+    run('wpin', 'a non-W input (OP_1, 1,000,000 sat) at the W slot, output 0 = OP_RETURN: HEAD rejects (S2: documented, R accepted)',
+      {state: G0, tx1: slotTo({lockingBytecode: Uint8Array.of(0x51), valueSatoshis: 1_000_000n}, Uint8Array.of(), {lockingBytecode: Uint8Array.of(0x6a), valueSatoshis: 0n})}, {rejecter: 'HEAD', others: 'accept'});
+    // another pool's W that names this R (its own rules hold: its category, HR = SHA-256(this R)); only the pin stops it
+    const poolB = makePool({R: pool.R, CAT: sha(Buffer.from('another pool category')), nIn: pool.nIn, wIdx: pool.wIdx});
+    const wsB = wSpend(poolB, G0, base.slice(0, 4), base.slice(4, 8));
+    run('wpin', 'the W of another pool (another category, HR = this R; it accepts) at the W slot: HEAD rejects',
+      {state: G0, tx1: slotTo({lockingBytecode: wsB.w.locking, valueSatoshis: wsB.w.value, token: wsB.w.token}, pushes(wsB.w.items), wsB.out0)}, {rejecter: 'HEAD', others: 'accept'});
+    // the pool's category with the D prefix 0x44 (an OP_1 locking, so that only R's pin can reject it)
+    const fakeD = {lockingBytecode: Uint8Array.of(0x51), valueSatoshis: 1_000_000n, token: tokenOf(pool.CAT, Buffer.concat([Buffer.of(0x44), Buffer.alloc(64, 3)]))};
+    run('wpin', 'the pool category with the D-state prefix 0x44 (OP_1 locking) at the W slot: HEAD rejects (prefix)',
+      {state: G0, tx1: slotTo(fakeD, Uint8Array.of(), {...fakeD, valueSatoshis: 999_000n})}, {rejecter: 'HEAD', others: 'accept'});
   }
 }
-const F_DOC = [];
 
 for (const f of files) {
   const v = readVector(f), file = f.split('/').pop(), dir = f.split('/').slice(0, -1).join('/');
@@ -436,6 +442,5 @@ console.log(`test-a (plan ${PLAN}${HARNESS ? ', harness: CTX a witness item' : '
 const notRunNote = () => `; ${stats.notRunOnChain ?? 0} not run on chain (short-circuit, counted as rejects: ${JSON.stringify(Object.fromEntries(Object.entries(stats.families).filter(([, x]) => x.notRunOnChain).map(([k, x]) => [k, x.notRunOnChain])))}); ${stats.encoderOnlyRelabel ?? 0} encoder-only relabels (reference rejects; script accepts the valid witness; inside the ok count)`;
 console.log(notRunNote().slice(2));
 console.log(JSON.stringify(stats.families));
-stats.documented = F_DOC;
 if (outFile) writeFileSync(outFile, JSON.stringify(stats, null, 1) + '\n');
 process.exit(stats.unexpected ? 1 : 0);

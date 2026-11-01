@@ -6,6 +6,8 @@
 //   3. plan.w: the final transaction has exactly one non-R input, the W state, at the last index (wIdx = its input
 //      count - 1). R checks that this input's locking is not R; the thread rules of the final HEAD skip it (input
 //      wIdx may carry a token) and skip output 0 (it may carry a token, but not the thread category).
+//   4. (S4, review item A3) the final HEAD pins the W slot to the pool's W: category plan.wCategory || 0x01 and
+//      commitment prefix 0x57. R is then specific to one pool.
 // Track 8 S7 header follows.
 // Track 8 S7: layout a' (DESIGN-T8 §5 a'): M1 (Z128, Merkle cap 5) under today's standard rules: every input's
 // unlocking <= 10,000 B, every stack item and function body <= 10,000 B, P2S locking <= 201 B, every transaction
@@ -41,6 +43,7 @@ import {makeGenN} from './genn.mjs';
 import {P, inv, g2, sha, OPS} from '../../pq-stark-batch/onchain/modeln.mjs';
 import {ctxCode} from './ctx.mjs';
 import {encodeDataPush} from '@bitauth/libauth';
+import {CATEGORY as W_TEST_CATEGORY} from '../w/wtx.mjs';
 
 export const ROLE_BASE = 1000, ID_CODE = 990;
 export const TTAG = Buffer.from('pq-stark-batch/thread');
@@ -77,6 +80,10 @@ export function buildA(vk, pis, plan, opts = {}) {
   void pis;   // Track 9: the program does not depend on the statement (ROOT is a witness)
   const stmt = {mode: 'pool', root: 'witness', ctx: 'witness'};
   const W = !!plan.w;
+  // Track 9 S4: the pool's W category (internal order) that the final HEAD pins at the W slot (default: S1's test
+  // category, w/wtx.mjs CATEGORY)
+  const WCAT = W ? Buffer.from(plan.wCategory ?? W_TEST_CATEGORY) : null;
+  if (W && WCAT.length !== 32) throw new Error('plan.wCategory: 32 B');
   const g = makeGenN(vk, stmt, {...opts, keepG: true});
   const {D, h, Q, F, fns, defFn, mark, tblFn} = g;
   const I = vk.inst[0], e8 = 8 * D, NR = vk.logArities.length;
@@ -267,6 +274,11 @@ export function buildA(vk, pis, plan, opts = {}) {
           // outputs n-1 .. 1 carry no token; output 0 (the W-state output) does not carry the thread category
           S.raw(['TXOUTPUTCOUNT', 'BEGIN', '1SUB', 'DUP', 'OUTPUTTOKENCATEGORY', 0, 'EQUALVERIFY', 'DUP', 1, 'NUMEQUAL', 'UNTIL', 'DROP'], 0);
           S.raw([0, 'OUTPUTTOKENCATEGORY', 'SIZE', 'IF', 32, 'SPLIT', 'DROP', 'ENDIF', CAT, 'EQUAL', 'NOT', 'VERIFY'], 0);
+          // Track 9 S4 (review item A3): the W slot (the last input; R pins the input count) holds the pool's W:
+          // category WCAT || 0x01 (mutable) and commitment prefix 0x57 (the pool's D state has the same category
+          // and prefix 0x44). WCAT is the pool's genesis outpoint txid, so R becomes pool specific; no hash cycle.
+          S.raw(['TXINPUTCOUNT', '1SUB', 'DUP', 'UTXOTOKENCATEGORY', Buffer.concat([WCAT, Uint8Array.of(1)]), 'EQUALVERIFY',
+            'UTXOTOKENCOMMITMENT', 1, 'SPLIT', 'DROP', Uint8Array.of(0x57), 'EQUALVERIFY'], 0);
         }
       }
       mark(S, 'thread');

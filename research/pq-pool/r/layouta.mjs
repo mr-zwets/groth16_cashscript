@@ -15,16 +15,17 @@ const M64 = (1n << 64n) - 1n;
 const u64s = (xs) => Buffer.concat(xs.map((x) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(((x % (1n << 64n)) + (1n << 64n)) & M64); return b; }));
 
 // counts: per transaction, the number of queries of each QRY input, e.g. [[3, 3, 3, 3, 3, 3, 3], [3]]
-export function makePlanA(vk, counts, {nc = 2, ctx, w = false} = {}) {
+export function makePlanA(vk, counts, {nc = 2, ctx, w = false, wCategory} = {}) {
   let q = 0;
   const txs = counts.map((cs) => ({qry: cs.map((n) => { const r = [q, q + n]; q += n; return r; })}));
   if (q !== vk.Q) throw new Error(`plan covers ${q} of ${vk.Q} queries`);
-  return {txs, nc, parts: partsOf(vk, nc), ...(txs.length > 1 ? {thread: {category: CATEGORY}} : {}), ...(ctx ? {ctx} : {}), ...(w ? {w: true} : {})};
+  return {txs, nc, parts: partsOf(vk, nc), ...(txs.length > 1 ? {thread: {category: CATEGORY}} : {}), ...(ctx ? {ctx} : {}), ...(w ? {w: true} : {}), ...(w && wCategory ? {wCategory: Buffer.from(wCategory)} : {})};
 }
 
 const cache = new Map();
 export function programA(vk, pis, plan, opts = {}) {
-  const key = JSON.stringify([vk.SO.batch.toString('hex'), vk.Q, vk.qpow, vk.capHeight, plan.txs, plan.nc, plan.parts, plan.ctx ?? 'tx', !!plan.w, opts]);
+  const key = JSON.stringify([vk.SO.batch.toString('hex'), vk.Q, vk.qpow, vk.capHeight, plan.txs, plan.nc, plan.parts, plan.ctx ?? 'tx', !!plan.w, opts,
+    plan.wCategory ? Buffer.from(plan.wCategory).toString('hex') : null, plan.thread?.category ? Buffer.from(plan.thread.category).toString('hex') : null]);
   if (!cache.has(key)) cache.set(key, buildA(vk, pis, plan, opts));
   return cache.get(key);
 }

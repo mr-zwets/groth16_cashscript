@@ -1,6 +1,6 @@
+no-op tampers skipped: 18
+test-a (plan 2tx, production: CTX from the final transaction): 26 files, 5055 cases, 0 unexpected, 26 n/a, 0 refused by the statement layer/generator, 200 malformed (55 encoder-only), 2 files skipped
+0 not run on chain (short-circuit, counted as rejects: {}); 55 encoder-only relabels (reference rejects; script accepts the valid witness; inside the ok count)
 no-op tampers skipped: 0
 test-a (plan 1tx, harness: CTX a witness item): 36 files, 2387 cases, 0 unexpected, 33 n/a, 0 refused by the statement layer/generator, 276 malformed (69 encoder-only), 2 files skipped
 35 not run on chain (short-circuit, counted as rejects: {"statement":33,"vk_variant":2}); 69 encoder-only relabels (reference rejects; script accepts the valid witness; inside the ok count)
-no-op tampers skipped: 18
-test-a (plan 2tx, production: CTX from the final transaction): 26 files, 4977 cases, 0 unexpected, 26 n/a, 0 refused by the statement layer/generator, 200 malformed (55 encoder-only), 2 files skipped
-0 not run on chain (short-circuit, counted as rejects: {}); 55 encoder-only relabels (reference rejects; script accepts the valid witness; inside the ok count)
