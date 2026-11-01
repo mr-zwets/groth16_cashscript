@@ -7,7 +7,8 @@ DESIGN-T9 with the maintainer's 1-day cut: S0–S3 only. Stage folders:
 - `r/` (with `prover/`): S2, the pool R and the 24 re-proved genesis statements.
 - `node/`: S3, BCHN regtest runs of the 2-transaction withdrawal.
 
-Each folder has its own README with results and limits. There are no deposits and no flush (S4), and SOUNDNESS-T9
+Each folder has its own README with results and limits. `summary-t9.json` (from `node summary-t9.mjs`) collects the
+headline numbers of all four stages. There are no deposits and no flush (S4), and SOUNDNESS-T9
 (S7) is not written. The section below collects what SOUNDNESS-T9 must state, as found in the S0–S3 work and its
 review.
 

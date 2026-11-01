@@ -87,3 +87,9 @@ Design: zk-verifier-bench research/pq-pool/DESIGN-T9.md (maintainer decisions: s
 - w/test-w.mjs rejections(): 3-way verdict (bchStd reject + looseStd accept = 'limit', fails the case), as S2's
   verdicts(). Rerun seed 1 (212 s): PASS, identical results, 199/199 'reject', 0 'limit', worst 90.59%.
 - Not changed (by design / maintainer call): R still does not pin W; no pool category in leaf/NF domain.
+
+## Report: DONE
+
+- research/pq-pool/summary-t9.mjs -> research/pq-pool/summary-t9.json (S0-S3 results summary from the committed
+  stage result files; review pass, 6 minors fixed in 86415d2; open items and caveats listed).
+- Bench report text (zk-verifier-bench research/pq-pool/REPORT.md) written in the bench checkout, not committed.
