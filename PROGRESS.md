@@ -253,3 +253,23 @@ same.
   accounting (coverage only).
 - **For the reviews:** SOUNDNESS-T8 §13 (fix §9.1; write the adaptation as a proof; simulation extractability for the
   CTX lemma; ROOT < p assert in the generator; DESIGN §4 "transparent" wording).
+
+## S8b - Residue fix verified, post-fix re-run complete, review findings applied (done, 2026-11-01)
+
+Scripts/generators at 12d47d4 (2p offsets in D_SUB/D_SUBL/D_RSUBL/D_NEG); complete post-fix results at c47d104
+(S4 results in 726ea25). SOUNDNESS-T8 "Code under argument" points here.
+
+- **Re-run.** `rerun-s8b.sh` stopped inside test-b2-m2p3 on 2026-10-30 (machine down). `rerun-s8b-resume.sh` ran the
+  S5/S6 block from test-b2-m2p3 and the S7 block (13:11–13:48, one nice node process). Every suite: 0 unexpected.
+  - S4 b: 2,929 + 3,309 (33 not run on chain, 1 encoder-only, 2 files skipped). model-agree-n 17,911, 0 disagreements.
+  - S5/S6 b2: m2p3 8,252 (59 not run: statement 56, vk_variant 3), M1 2,558 (35 not run, 1 encoder-only), prod 1,030.
+  - S7 a′: 1 tx 3,765, 2 tx 4,181 (55 encoder-only each), harness 2,387 (35 not run, 69 encoder-only).
+  - Grading: b 24/24, b2 M1 24/24 + M2 8/8 per input (M2 tx needs 200,000 B), a′ 24/24 both plans. Bytes identical to
+    pre-fix; op-cost + a few hundred; budget percentages unchanged to 0.1 point (a′ QRY 90.67–91.01%).
+  - M1 b2 lib 19,468 B, HASH256 (statement 0) 95630cef…26b9 (was 553a3cfc…).
+- **Review findings:** rp major (re-run incomplete) fixed; rp Lemma 13 split (same bytes vs new proof → SE assumption);
+  rp citations (design 6050eaf, code commits above); rp/rm uncounted cases now in SOUNDNESS §2 and README tables;
+  rm post-fix op-cost and lib hash in README; rm S0 op-cost miss (+26.8%, AIR 8.03M vs 0.6M) and code-size overshoot
+  stated in README; rm grade-b gate now max(std, cons) + define bytes (no verdict changed).
+- **Open (unchanged):** SOUNDNESS-T8 §13 items 2, 3, 6 (write the powers-batching adaptation as a proof; simulation
+  extractability; coverage vectors at 127.9).
