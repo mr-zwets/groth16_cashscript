@@ -30,7 +30,9 @@ const run = (label, kind, outputs, unlockings = T0.unlockings) => {
   const acc = (m) => res[m].every((x) => x.accepted);
   runs.push({label, kind, consensus: acc('consensus'), standard: acc('standard'),
     rejecting: res.consensus.map((x, i) => (x.accepted ? null : {input: i, section: sectionOf(unlockings, i), error: String(x.error).replace(/^.*?: /, '').slice(0, 90)})).filter(Boolean),
-    opCost: res.standard.map((x) => x.opCost)});
+    opCost: res.standard.map((x) => x.opCost),
+    tx: {lockingHex: Buffer.from(lock).toString('hex'), unlockingsHex: unlockings.map((u) => Buffer.from(u).toString('hex')),
+      outputs: outputs.map((o) => ({lockingHex: Buffer.from(o.lockingBytecode).toString('hex'), valueSatoshis: o.valueSatoshis.toString()}))}});
   return runs.at(-1);
 };
 const out = (pv) => [{lockingBytecode: cov.opReturnOf(pv), valueSatoshis: 0n}];
