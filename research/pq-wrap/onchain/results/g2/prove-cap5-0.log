@@ -1,0 +1,6 @@
+tw2x18x16@789325355@4000@cb7bcd40c992fdc3c25c2f0cf5e09c4bd9b3b8dc46b5a814ae15e6190b6b46df: set=Z128+lb=5+lf=8+q=43+bpow=20+cpow=11+cap=5 shift=0 heights=[18, 16] bytes=231534 prove=22005ms verify=8ms folds=[2, 3, 3, 3] caps=[("random", 32), ("trace", 32), ("quotient", 32)] round-trip=true sweep=null -> OK
+tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap5: leaf 789325355 wseed 4000 seed 400 ctx cb7bcd40c992fdc3.. 231534 B, 25031 ms
+
+real	0m25.145s
+user	0m59.518s
+sys	0m9.056s

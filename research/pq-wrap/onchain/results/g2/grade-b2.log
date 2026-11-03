@@ -1,0 +1,86 @@
+tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json proof 224814 lib 25230 unl 134965+125256 tx 260355 | in0 51380036 (47.6%) in1 51869042 (51.7%) | r100 false/false tx false r100t-tx false | r150 true/true r150t-tx true | spec false/false tx false | today false/false
+tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json proof 224142 lib 25230 unl 134721+125929 tx 260784 | in0 51294161 (47.6%) in1 51941444 (51.5%) | r100 false/false tx false r100t-tx false | r150 true/true r150t-tx true | spec false/false tx false | today false/false
+{
+ "tw2x18x16": {
+  "statements": 2,
+  "QA": 19,
+  "proofBytes": {
+   "min": 224142,
+   "max": 224814,
+   "mean": 224478
+  },
+  "libBytes": {
+   "min": 25230,
+   "max": 25230,
+   "mean": 25230
+  },
+  "unlocking0": {
+   "min": 134721,
+   "max": 134965,
+   "mean": 134843
+  },
+  "unlocking1": {
+   "min": 125256,
+   "max": 125929,
+   "mean": 125593
+  },
+  "txBytes": {
+   "min": 260355,
+   "max": 260784,
+   "mean": 260570
+  },
+  "op0": {
+   "min": 51294161,
+   "max": 51380036,
+   "mean": 51337099
+  },
+  "op1": {
+   "min": 51869042,
+   "max": 51941444,
+   "mean": 51905243
+  },
+  "pct0": {
+   "min": 47.6,
+   "max": 47.6,
+   "mean": 48
+  },
+  "pct1": {
+   "min": 51.5,
+   "max": 51.7,
+   "mean": 52
+  },
+  "pctSpec0": {
+   "min": 44.3,
+   "max": 44.3,
+   "mean": 44
+  },
+  "pctSpec1": {
+   "min": 47.8,
+   "max": 47.9,
+   "mean": 48
+  },
+  "bothInputsR100": false,
+  "bothInputsR150": true,
+  "txVerifyR150t": 2,
+  "maxStackItem": 134965,
+  "bothInputsSpec": false,
+  "txVerifyR100": 0,
+  "txVerifyR100t": 0,
+  "txVerifySpec": 0,
+  "todayAccepted": 0,
+  "todayErrors": [
+   "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 134965",
+   "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 125256",
+   "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 134721",
+   "The provided unlocking bytecode exceeds the maximum bytecode length. Maximum bytecode length: 10000 bytes. Unlocking bytecode length: 125929"
+  ],
+  "txErrors": [
+   "Unable to verify standard transaction: transaction exceeds maximum standard byte length. This transaction is 260355 bytes, but the maximum standard transaction ",
+   "Unable to verify standard transaction: transaction exceeds maximum standard byte length. This transaction is 260784 bytes, but the maximum standard transaction "
+  ]
+ }
+}
+
+real	0m4.912s
+user	0m5.775s
+sys	0m0.332s
