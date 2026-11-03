@@ -13,7 +13,8 @@ by plain acceptance/rejection tests; no attack was constructed.
   - `p2/`: Poseidon2-Gl-8 (T∘P) in CashVM, used by the flush workers;
   - JS references: `w/smt.mjs`, `w/genesis.mjs` (`tree()`), `d/dpool.mjs` (`DState`, `WState`, `flushPlan`).
 - **Base:** Track 8's `research/pq-stark-batch/SOUNDNESS-T8.md` (S8b), cited as **T8**. Its λ figures carry the
-  label "JB, powers-batching adaptation, unpublished" (T8 §6); so does every use of them here.
+  label "JB; powers batching by [BCIKS20] Thm 7.2, FRI step proved in BATCHING-PROOF.md (internally reviewed, not
+  externally)" (T8 §6); so does every use of them here.
 - **Input:** the assumptions A1–A5 collected in `README.md` ("Assumptions and known properties"). §6 resolves or
   carries each of them.
 
@@ -62,7 +63,8 @@ self-relay.
 
 **Proof-system assumptions** (carried from T8, not re-proved):
 - **KS:** the a′ verifier is round-by-round knowledge sound at λ_IOP = 128.06 for M1 (T8 §1, §5), with the T8 §6 caveat
-  on the unpublished powers-batching adaptation.
+  on powers batching (a direct application of [BCIKS20] Thm 7.2, with the remaining FRI step proved in
+  zk-verifier-bench `research/pq-stark/BATCHING-PROOF.md`, reviewed internally but not externally).
 - **SE:** simulation extractability of the Fiat–Shamir-compiled hiding STARK (T8 §11, Lemma 13, last bullet). Stated as
   an assumption, as in T8.
 
@@ -506,7 +508,8 @@ locking on inputs 0..4.
 ## 8. Stated limits and open items
 
 1. **SE is assumed** (L7), as in T8 §13.3.
-2. **The powers-batching adaptation is unpublished** (T8 §6, §13.2); every λ here inherits the label.
+2. **Powers batching is reviewed internally, not externally** (T8 §6, §13.2): a direct application of [BCIKS20]
+   Thm 7.2, with the remaining FRI step proved in zk-verifier-bench `research/pq-stark/BATCHING-PROOF.md`. Every λ here inherits the label.
 3. **G and T are off-chain checks** with no standalone checker yet. Writing one (decode the two genesis transactions,
    rebuild the reference lockings and initial commitments, compare) is the natural S5 relayer/wallet task.
 4. **The append correctness in L3** is argued for the algorithm and tested (17/17 over 272 deposits, edge cases at
