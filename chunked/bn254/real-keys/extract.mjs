@@ -19,6 +19,7 @@ import assert from 'node:assert/strict';
 import {readFileSync, writeFileSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {bn254} from '@noble/curves/bn254.js';
+import * as CL from './claims.mjs';
 
 const U = (f) => readFileSync(new URL('./upstream/' + f, import.meta.url), 'utf8');
 const sha = (b) => createHash('sha256').update(b).digest();
@@ -74,7 +75,7 @@ const sp1Proof = (hex) => {
 };
 const sp1Fixtures = SP1_RAW.map(([id, source, vkey, pvHex, proofHex], i) => {
   const {A, B, C} = sp1Proof(proofHex); const n0 = BigInt('0x' + vkey), n1 = sp1Digest(Buffer.from(pvHex, 'hex'));
-  assert.ok(n0 < r && n1 < r);
+  assert.ok(n0 < r && n1 < r); assert.deepEqual(CL.sp1Inputs(vkey, Buffer.from(pvHex, 'hex')), [n0, n1], 'claims.mjs agrees');
   assert.ok(groth16(sp1Vk, [n0, n1], A, B, C), `${id}: verifies under the SP1 v5 VK`);
   assert.ok(!groth16(sp1Vk, [n1, n0], A, B, C), `${id}: swapped inputs must fail`);
   return {fixture: i, id, source, programVKey: '0x' + vkey, publicValuesHex: pvHex, proofHex,
@@ -138,6 +139,7 @@ const rzFixtures = [], rzOther = [];
 for (const v of ['5_0', '3_0', '2_2', '2_1', '2_0']) {
   const rc = receipt(v); const {A, B, C, sel} = seal(rc.seal);
   const cd = claimDigest(Buffer.from(rc.imageId, 'hex'), Buffer.from(rc.journal, 'hex')); const [c0, c1] = split(cd);
+  assert.deepEqual(CL.risc0Inputs(rc.imageId, Buffer.from(rc.journal, 'hex')), [c0, c1], 'claims.mjs agrees');
   const full = groth16(rzVk, [CR0, CR1, c0, c1, BN254_CONTROL_ID], A, B, C), folded = groth16(rzFolded, [c0, c1], A, B, C);
   assert.equal(full, folded, `receipt V${v}: 5-input and folded verdicts agree`);
   const entry = {id: `risc0-test-receipt-V${v}`, source: `risc0/risc0-ethereum@fe5adc304262eec32986246a29e46c9a250cd7e9 contracts/test/TestReceiptV${v}.sol`,
