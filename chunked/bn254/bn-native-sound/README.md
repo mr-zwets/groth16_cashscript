@@ -27,12 +27,20 @@ used anywhere.
 |---|---|
 | **score** (scripts + tx overhead) | **27,624** = 27,475 (3 × 35 locking + 27,370 unlocking) + 149 |
 | unlocking per input | 9,316 / 9,262 / 8,792 (fillers 96 / 41 / 67 zero bytes, prover-sized) |
-| op cost, standard | 7,036,431 / 6,995,632 / 6,642,322 = 20.67M (margins 6.00% / 6.00% / 6.00% of 7,485,600 / 7,442,400 / 7,066,400) |
-| op cost, consensus | 7,002,127 / 6,961,328 / 6,609,426 (margins 6.46% / 6.46% / 6.47%) |
+| op cost, standard | 7,050,949 / 7,010,150 / 6,656,840 = 20.72M (margins 5.81% / 5.81% / 5.80% of 7,485,600 / 7,442,400 / 7,066,400) |
+| op cost, consensus | 7,016,645 / 6,975,846 / 6,623,944 (margins 6.26% / 6.27% / 6.26%) |
 | code | 7,310 B: one blob, hosted as pieces of 3,767 B (input 0) and 3,543 B (input 1) |
 | redeem `R` | 65 B, identical in all three inputs (locking `aa20 d9ba…a11a 87`) |
-| worst-case op per input (sweep, cap rule) | 7.06M (every nibble 15), 12.1% below the 10,000-byte cap budget 8,032,800 |
+| worst-case op per input (cap rule) | 7.07M standard (every nibble 15, bench `worstCaseProof`), 11.95% below the 10,000-byte cap budget 8,032,800 |
 | tx | ≈ 27.6 kB (standard ≤ 100,000); every locking 35 B, every unlocking ≤ 10,000 B |
+
+Op costs are BCHN accounting (libauth 3.1.0-next.8 with `patches/@bitauth__libauth@3.1.0-next.8.patch`: `OP_DEFINE`
+charges its function body as stack-pushed bytes, bitauth/libauth#166). The shipped vectors were sized before that
+patch (fillers 96 / 41 / 67 for a 6.00% standard margin), so they now measure about 5.8% standard and 6.26% consensus.
+The score and vectors are unchanged and every input is still accepted in both modes. A fresh `node build.mjs`
+re-sizes the fillers to 115 / 60 / 84 (score 27,680); `build.json` records that fresh sizing. The sweep figures under
+Verification predate the patch; the bench worst-case vector measures 7,072,572 / 7,028,528 / 6,807,899 standard
+(7,037,244 / 6,993,200 / 6,773,979 consensus), still within the cap rule.
 
 For comparison (bench, same VK): crown8-rawchain 77,193 B (8 inputs, unreviewed), intratx-residue 86,950 B
 (11 inputs, unreviewed). The design estimate was ≈ 28.0 kB (27–29 kB).
@@ -218,7 +226,7 @@ costs 100.
 | filler | All zero (byte-exact), ≤ 10,000, and read by nothing except the `ZT` hash (`FILL_2`). The lengths of `FILL_0` and `FILL_1` are not committed (txid malleability only; owner decision). |
 | challenges | `z ≠ 0`; every input derives ρ and z itself. |
 | graph | `TXINPUTCOUNT == 3` and every `UTXOBYTECODE(j)` equals the own one. Outputs are unconstrained: applications that release funds add output rules in role 2. No funding or fee input with another locking can be added: fees and any released value come from these three `P2SH32(R)` UTXOs. |
-| margins | Fillers are prover-sized to a ≥ 6% standard-mode margin per input (fixture 0: 6.00/6.00/6.00% standard, 6.46/6.46/6.47% consensus). Cap rule: the forced worst case per input is ≤ 0.94 × 8,032,800 (see Liveness). |
+| margins | Fillers are prover-sized to a ≥ 6% standard-mode margin per input (a design buffer, not a validity condition). The shipped fixture 0 was sized before the OP_DEFINE charge and measures 5.81/5.81/5.80% standard, 6.26/6.27/6.26% consensus under BCHN accounting. Cap rule: the forced worst case per input is ≤ 0.94 × 8,032,800 (see Liveness). |
 | reduced values before guards | Every equality or ≠0 guard tests a value reduced mod p (or mod r): the inverse-norm equations, curve checks, endpoint, binding, final identity. `z` is tested in [0, p). |
 | nonzero line factors | The X^0 coefficient of every B line polynomial is `y_P = −y_A`, and of every δ line `y_C`. Both are ≠ 0: A and C are on `y² = x³ + 3`, which has no 2-torsion point (G1 has odd prime order), so no curve point has y = 0. Each line factor is therefore a nonzero polynomial of degree < 12, hence nonzero mod M. Every other factor is monic. |
 
@@ -435,8 +443,8 @@ In zk-verifier-bench:
   - **Code read from inputs 0 and 1's unlocking bytes** and authenticated by `R ∋ K_code`. This pattern is new to
     the bench and needs the owner's OK to count as verifier code.
   - **Public inputs bind through the GT-GLS fold and the mod-r check,** as already accepted for SI-GLS.
-- **Margins are thin by design.** The fixture is at 6.00% standard (6.46% consensus). The worst swept case at the
-  10,000-byte cap leaves 12.1%. Any later change that adds op cost must re-run `sweep.mjs`.
+- **Margins are thin by design.** The shipped fixture is at 5.81% standard (6.26% consensus) under BCHN accounting. The
+  worst case at the 10,000-byte cap leaves 11.95%. Any later change that adds op cost must re-run `sweep.mjs`.
 - **Outputs are unconstrained** (as for SI-GLS). An application that releases value must add output rules (for
   example in role 2), or anyone holding a valid proof can redirect the spend.
 - **Inputs are fixed** (application note). GRAPH requires exactly 3 inputs, all spending `P2SH32(R)`. No funding or

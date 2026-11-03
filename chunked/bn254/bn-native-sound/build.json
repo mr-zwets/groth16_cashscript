@@ -238,40 +238,41 @@
   "identities": 34,
   "note": "affine B lines have the SI-GLS slot degrees (<= 9), so the SI-GLS bound (deg <= 275, n_q <= 132) carries over"
  },
+ "accounting": "BCHN (OP_DEFINE body charged as stack-pushed bytes; libauth 3.1.0-next.8 patched, bitauth/libauth#166)",
  "fixture0": {
   "nq": 114,
   "fills": [
-   96,
-   41,
-   67
+   115,
+   60,
+   84
   ],
   "margin": 0.06,
   "unlocking": [
-   9316,
-   9262,
-   8792
+   9335,
+   9281,
+   8810
   ],
-  "unlockingTotal": 27370,
-  "score": 27624,
+  "unlockingTotal": 27426,
+  "score": 27680,
   "inputs": [
    {
-    "consensus": 7002127,
-    "standard": 7036431,
-    "budget": 7485600,
+    "consensus": 7016126,
+    "standard": 7050430,
+    "budget": 7500800,
     "marginStandard": 6,
     "marginConsensus": 6.46
    },
    {
-    "consensus": 6961328,
-    "standard": 6995632,
-    "budget": 7442400,
+    "consensus": 6975497,
+    "standard": 7009801,
+    "budget": 7457600,
     "marginStandard": 6,
     "marginConsensus": 6.46
    },
    {
-    "consensus": 6609426,
-    "standard": 6642322,
-    "budget": 7066400,
+    "consensus": 6623012,
+    "standard": 6655908,
+    "budget": 7080800,
     "marginStandard": 6,
     "marginConsensus": 6.47
    }
