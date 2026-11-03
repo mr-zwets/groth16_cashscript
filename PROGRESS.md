@@ -9,3 +9,13 @@
 - [x] covenant binding variant (covenant.mjs, covenant-test.mjs; guard r2:covenant)
 - [x] BCHN node check (block + POLICY=1): t11a full, t11b timing rerun; 6/6 valid accepted + allowed, 142/142 rejected
 - [x] README (chunked/bn254/real-keys/README.md), bench node-check README section
+
+## Fix round (review verdict: pass, 7 minor findings)
+
+- [x] F1 SP1VerifierGroth16.sol re-copied from 512b5e02 (git blob d7f1cf63 matches); fixtures unchanged.
+- [x] F2 upstream/SOURCES.md (repo, commit, path, git blob id per file).
+- [x] F3 risc0 RiscZeroGroth16Verifier.sol + IRiscZeroVerifier.sol vendored from fe5adc30; extract.mjs text-pins them.
+- [x] F4 redteam-core.mjs 10b: false statement with digits/t/states recomputed -> input 2 rejected at r2:cleanup (169 / 173 runs, 0 accepted).
+- [x] F5 covenant-test: covenant pinned to another programVKey / image id -> r2:covenant (12/12, 10/10).
+- [x] F6 build JSON `deployment` field + README table label (plain builds: verifier core, not deployable).
+- [x] F7 bench node-check README: mempool verdicts of rejections attributed to the timing node; BCHN re-run t11c.
