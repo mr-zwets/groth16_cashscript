@@ -1,7 +1,7 @@
 //! Track 12 example host (SP1 v5).
 //!   cargo run --release -- vkey                       print the programVKey to pin in the covenant
 //!   cargo run --release -- prove <request.json> <proof.json>
-//! request.json (written by `node ../../../example.mjs request sp1 ...`):
+//! request.json (written by `node ../../../example.mjs request <secretHex> <statement.json> request.json`):
 //!   {"secretHex": "..", "instanceId": "<32 B hex>", "outputs": [{"lockingHex": "..", "valueSatoshis": "200000"}, ..]}
 //! proof.json: {"system": "sp1", "programVKey": "0x..", "publicValuesHex": "..", "proofHex": "<a4594c59 ‖ 8 words>"}
 //! Groth16 on CPU: SP1_PROVER=cpu (the gnark wrap step runs in docker, or natively with sp1-sdk's `native-gnark`).

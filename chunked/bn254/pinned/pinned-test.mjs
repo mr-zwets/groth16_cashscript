@@ -39,23 +39,29 @@ function sectionOf(prog, locks, unl, input) {
   const trace = vm.VMS.consensus.debug(vm.programOf(locks, unl, input)); let sec = 'unlocking/redeem';
   for (const s of trace) { const ri = roleIns.findIndex((x) => x.n === s.instructions?.length);
     if (ri >= 0) { let n = 'r' + ri + ':start'; for (const m of marks) if (m.role === ri && m.roff <= roleIns[ri].offs[Math.max(0, s.ip - 1)]) n = m.name; sec = n; }
-    if (s.error) break; }
-  return sec;
+    if (s.error) { const f = s.instructions?.[s.ip - 1]?.opcode; return {section: sec, failOp: f === undefined ? null : f.toString(16).padStart(2, '0')}; } }
+  return {section: sec, failOp: null};
 }
 // outputs: normalized (+ optional token field, passed to the VM as is)
-function run(label, kind, {prog, unlockings, outputs, expect = 'reject', system, bench = true, note}) {
+// sections: the expected rejecting inputs and their failing sections, 'input:section,...' (default for a rejection:
+// '2:r2:covenant', i.e. only role 2 fails, inside the template). failOp: optional hex opcode that every rejecting input must fail on (libauth names NUMEQUALVERIFY and VERIFY alike).
+// No rejection may come from a resource limit (op cost, stack item size): those are asserted absent on every run.
+const RESOURCE = /operation cost|exceed|maximum|limit/i;
+function run(label, kind, {prog, unlockings, outputs, expect = 'reject', system, bench = true, note, sections = expect === 'reject' ? '2:r2:covenant' : '', failOp}) {
   const lock = tx.lockingOf(prog); const locks = unlockings.map(() => lock);
   vm.setOutputs(outputs);
   const res = Object.fromEntries(['consensus', 'standard'].map((m) => [m, vm.spendAll(locks, unlockings, m)]));
   const acc = (m) => res[m].every((x) => x.accepted);
-  const rejecting = res.consensus.map((x, i) => (x.accepted ? null : {input: i, section: sectionOf(prog, locks, unlockings, i), error: String(x.error).replace(/^.*?: /, '').slice(0, 90)})).filter(Boolean);
+  const rejecting = res.consensus.map((x, i) => (x.accepted ? null : {input: i, ...sectionOf(prog, locks, unlockings, i), error: String(x.error).replace(/^.*?: /, '').slice(0, 90)})).filter(Boolean);
   const r0 = {label, kind, system, expect, consensus: acc('consensus'), standard: acc('standard'), rejecting, note,
     opCost: res.standard.map((x) => x.opCost), budget: res.standard.map((x) => x.budget), unlocking: unlockings.map((u) => u.length), bench,
     tx: {lockingHex: hex(lock), unlockingsHex: unlockings.map(hex),
       outputs: outputs.map((o) => ({lockingHex: hex(o.lockingBytecode), valueSatoshis: o.valueSatoshis.toString(), ...(o.token ? {token: {category: hex(o.token.category), amount: o.token.amount.toString()}} : {})}))}};
   runs.push(r0);
-  const ok = expect === 'accept' ? r0.consensus && r0.standard : !r0.consensus && !r0.standard;
-  console.log(`${ok ? 'ok  ' : 'FAIL'} ${expect === 'accept' ? 'accept' : 'reject'} [${system}] ${label}${rejecting.length ? '  [' + rejecting.map((y) => 'input ' + y.input + ' ' + y.section + ': ' + y.error).join('; ') + ']' : ''}`);
+  const got = rejecting.map((y) => y.input + ':' + y.section).join(',');
+  r0.sectionsExpected = sections; r0.sectionsOk = got === sections && rejecting.every((y) => !RESOURCE.test(y.error)) && (!failOp || rejecting.every((y) => y.failOp === failOp));
+  const ok = (expect === 'accept' ? r0.consensus && r0.standard : !r0.consensus && !r0.standard) && r0.sectionsOk;
+  console.log(`${ok ? 'ok  ' : 'FAIL'}${r0.sectionsOk ? '' : ' (sections: expected ' + sections + ')'} ${expect === 'accept' ? 'accept' : 'reject'} [${system}] ${label}${rejecting.length ? '  [' + rejecting.map((y) => 'input ' + y.input + ' ' + y.section + ': ' + y.error).join('; ') + ']' : ''}`);
   return r0;
 }
 
@@ -93,6 +99,12 @@ const le32 = (v) => { const b = Buffer.alloc(32); let x = v; for (let i = 0; i <
 // ======================================================================================================================
 const summary = {key, builds: {}};
 const withVariants = (P) => (P.system === 'sp1' ? {programVKey: P.programVKey} : {imageId: P.imageId});
+const mixes = [];
+// observed with this build (recorded so that a change in WHERE mixing fails is caught): all script guards, no budget
+// (the transcript / handover checks of the reviewed core: each input's commitments bind the other inputs' pieces)
+const MIX_SECTIONS = {'A0 A1 B2, outputs of A': '0:r0:transcript,1:r1:transcript,2:r2:covenant', 'A0 A1 B2, outputs of B': '0:r0:transcript,1:r1:transcript',
+  'B0 B1 A2, outputs of A': '0:r0:transcript,1:r1:transcript', 'A0 B1 A2, outputs of A': '0:r0:post,1:r1:transcript',
+  "A0 A1 A'2 (A' = same statement, re-randomized proof)": '0:r0:transcript,1:r1:transcript', "A'0 A1 A2": '0:r0:transcript'};
 const xorLast = (h) => h.slice(0, -2) + (parseInt(h.slice(-2), 16) ^ 1).toString(16).padStart(2, '0');
 
 if (key === 'test') {
@@ -173,18 +185,36 @@ if (key === 'test') {
     // ---- input / output index games ----
     go('outputs swapped (memo first, payout second)', 'index-games', {outputs: norm([OUTS[1], OUTS[0]])});
     go('payout split into two outputs (100,000 + 100,000)', 'index-games', {outputs: norm([{...OUTS[0], valueSatoshis: 100000n}, {...OUTS[0], valueSatoshis: 100000n}, OUTS[1]])});
-    go('inputs 0 and 2 swapped (unlockings permuted)', 'index-games', {unlockings: [U[2], U[1], U[0]]});
-    go('inputs 0 and 1 swapped', 'index-games', {unlockings: [U[1], U[0], U[2]]});
-    go('a 4th input (input 2 duplicated)', 'index-games', {unlockings: [U[0], U[1], U[2], U[2]]});
-    go('only inputs 0 and 1 (2 inputs)', 'index-games', {unlockings: [U[0], U[1]]});
+    go('inputs 0 and 2 swapped (unlockings permuted)', 'index-games', {unlockings: [U[2], U[1], U[0]], sections: '0:unlocking/redeem,1:unlocking/redeem,2:unlocking/redeem'});
+    go('inputs 0 and 1 swapped', 'index-games', {unlockings: [U[1], U[0], U[2]], sections: '0:unlocking/redeem,1:unlocking/redeem,2:unlocking/redeem'});
+    go('a 4th input (input 2 duplicated)', 'index-games', {unlockings: [U[0], U[1], U[2], U[2]], sections: '0:r0:graph,1:r1:graph,2:r2:graph,3:unlocking/redeem'});
+    go('only inputs 0 and 1 (2 inputs)', 'index-games', {unlockings: [U[0], U[1]], sections: '0:r0:graph,1:r1:graph'});
     go('payout output carries a fungible token (category = 32 x 0xab, amount 1)', 'index-games', {bench: false, note: 'libauth only: on BCHN a token output with an unknown category fails the token rules before the script verdict matters',
       outputs: [{...O[0], token: {category: Buffer.alloc(32, 0xab), amount: 1n}}, O[1]]});
+    // ---- change back to the covenant's own locking (a valid proof of exactly that statement): the on-chain
+    //      self-payment guard (OP_VERIFY of NOT(b_k == UTXOBYTECODE(INPUTINDEX))) must reject it
+    { const own = tx.lockingOf(prog);
+      const Os = norm([{lockingBytecode: own, valueSatoshis: 150000n}, OUTS[1]]), Os2 = norm([OUTS[0], {lockingBytecode: own, valueSatoshis: 50000n}]);
+      const sv = (l, outs) => run(l, 'self-payment', {prog, system, unlockings: spend(prog, M(...publicInputsFor(P, outs)), publicInputsFor(P, outs), outs).unlockings, outputs: outs, failOp: '69'}); // OP_VERIFY after EQUAL NOT: the guard, not a NUMEQUALVERIFY (9d) of the statement
+      sv('valid proof whose outputs pay change back to THIS covenant (output 0)', Os);
+      sv('valid proof whose outputs pay the payout + change back to THIS covenant (output 1)', Os2); }
+    // ---- mixing inputs of two valid spends of this covenant ----
+    { const O1 = norm([OUTS[0]]); const s1 = publicInputsFor(P, O1); const V = spend(prog, M(...s1), s1, O1).unlockings; const W = spend(prog, pfR, [n0, n1], O).unlockings;
+      const mix = (label, unl, outs, sections) => run(label, 'mixing', {prog, system, unlockings: unl, outputs: outs, sections});
+      mixes.push(['A0 A1 B2, outputs of A', [U[0], U[1], V[2]], O], ['A0 A1 B2, outputs of B', [U[0], U[1], V[2]], O1], ['B0 B1 A2, outputs of A', [V[0], V[1], U[2]], O],
+        ['A0 B1 A2, outputs of A', [U[0], V[1], U[2]], O], ["A0 A1 A'2 (A' = same statement, re-randomized proof)", [U[0], U[1], W[2]], O], ["A'0 A1 A2", [W[0], U[1], U[2]], O]);
+      for (const [l, unl, outs] of mixes.splice(0)) mix('mixed spends: ' + l, unl, outs, MIX_SECTIONS[l]); }
+    // ---- spendability caps and builder preflight (unit checks, no transaction) ----
+    { const many = (n, len) => Array.from({length: n}, () => ({lockingBytecode: Buffer.alloc(len, 0x51), valueSatoshis: 1000n}));
+      assert.throws(() => encodePV(INSTANCE, many(97, 1)), /outputs/); encodePV(INSTANCE, many(96, 21));
+      assert.throws(() => encodePV(INSTANCE, many(1, 9900)), /PV/); encodePV(INSTANCE, many(1, 9849));
+      assert.throws(() => encodePV(INSTANCE, many(96, 60)), /x \|PV\|/); encodePV(INSTANCE, many(64, 60)); }
     // ---- public inputs >= r (honest witness, STMT word patched; DG, challenges and handovers recomputed) ----
-    go('STMT n0 + r (alias)', 'public-input-range', {unlockings: recommitStmt(T, (s) => le32(n0 + r).copy(s, STMT_LAYOUT.n0))});
-    go('STMT n1 + r (alias)', 'public-input-range', {unlockings: recommitStmt(T, (s) => le32(n1 + r).copy(s, STMT_LAYOUT.n1))});
+    go('STMT n0 + r (alias)', 'public-input-range', {unlockings: recommitStmt(T, (s) => le32(n0 + r).copy(s, STMT_LAYOUT.n0)), sections: '0:r0:statement,1:r1:statement,2:r2:statement'});
+    go('STMT n1 + r (alias)', 'public-input-range', {unlockings: recommitStmt(T, (s) => le32(n1 + r).copy(s, STMT_LAYOUT.n1)), sections: '0:r0:statement,1:r1:statement,2:r2:statement'});
     if (system === 'sp1') { const full = BigInt('0x' + sha(pvOf(INSTANCE, O)).toString('hex'));
-      go(`STMT n1 = unmasked sha256(PV) (${full >= r ? '>= r' : '< r'})`, 'public-input-range', {unlockings: recommitStmt(T, (s) => le32(full).copy(s, STMT_LAYOUT.n1))}); }
-    go('STMT n1 = 2^256 - 1', 'public-input-range', {unlockings: recommitStmt(T, (s) => le32((1n << 256n) - 1n).copy(s, STMT_LAYOUT.n1))});
+      go(`STMT n1 = unmasked sha256(PV) (${full >= r ? '>= r' : '< r'})`, 'public-input-range', {unlockings: recommitStmt(T, (s) => le32(full).copy(s, STMT_LAYOUT.n1)), ...(full >= r ? {sections: '0:r0:statement,1:r1:statement,2:r2:statement'} : {})}); }
+    go('STMT n1 = 2^256 - 1', 'public-input-range', {unlockings: recommitStmt(T, (s) => le32((1n << 256n) - 1n).copy(s, STMT_LAYOUT.n1)), sections: '0:r0:statement,1:r1:statement,2:r2:statement'});
     // ---- swapped inputs ----
     goProof('valid proof of the swapped statement (n1, n0)', 'swapped-inputs', [n1, n0]);
     go('application proof, STMT n0 and n1 swapped (DG recommitted)', 'swapped-inputs', {unlockings: recommitStmt(T, (s) => { le32(n1).copy(s, STMT_LAYOUT.n0); le32(n0).copy(s, STMT_LAYOUT.n1); })});
@@ -219,7 +249,7 @@ if (key === 'test') {
     codeSha256: hex(createHash('sha256').update(progA.code).digest()), redeemBytes: progA.R.length, lockingHex: hex(tx.lockingOf(progA))};
 }
 vm.setOutputs([{lockingBytecode: Uint8Array.of(0x6a), valueSatoshis: 1000n}]);
-const bad = runs.filter((x) => (x.expect === 'accept') !== (x.consensus && x.standard) || x.consensus !== x.standard);
+const bad = runs.filter((x) => (x.expect === 'accept') !== (x.consensus && x.standard) || x.consensus !== x.standard || !x.sectionsOk);
 const nA = runs.filter((x) => x.expect === 'accept').length;
 console.log(`${key}: ${runs.length} runs: ${nA} accept controls accepted, ${runs.length - nA} rejections rejected${bad.length ? '; MISMATCH: ' + bad.map((x) => x.label).join(' | ') : ''}`);
 for (const [s, b] of Object.entries(summary.builds)) console.log(`  ${s}: code ${b.codeBytes} B${b.control ? `, control unlocking ${b.control.unlocking.join(' / ')}, op std ${b.control.opCostStandard.join(' / ')}, margins ${b.control.marginStandard.join(' / ')}%, tx ${b.control.txBytes} B` : ''}`);

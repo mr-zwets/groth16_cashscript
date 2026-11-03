@@ -7,6 +7,8 @@
 //   1. PV is REBUILT on chain from the spending transaction (pv.mjs layout):
 //        PV = TAG ‖ INSTANCE ‖ NUM2BIN(TXOUTPUTCOUNT, 1) ‖ Σ_k NUM2BIN(OUTPUTVALUE k, 8) ‖ NUM2BIN(|b_k|, 2) ‖ b_k
 //      with b_k = OUTPUTBYTECODE k, and OUTPUTTOKENCATEGORY k must be empty for every k (no token outputs).
+//      Also b_k != UTXOBYTECODE(INPUTINDEX) for every k: no output may pay back to this covenant's own locking, because
+//      such "change" would re-fund the same INSTANCE and re-arm the (now public) proof for a replay.
 //      TAG and INSTANCE are constants of the code.
 //   2. The statement is derived from PV and constants only, and must equal the decoded STMT inputs:
 //        SP1 v5     n0 == PROGRAM_VKEY;   n1 == LE(sha256(PV)) & (2^253 - 1)
@@ -22,7 +24,7 @@ import {buildProgram, setCovenant} from '../bn-native-sound/script.mjs';
 import {PV_TAG} from './pv.mjs';
 import {sha, SYSTEM_STATE_ZERO} from '../real-keys/claims.mjs';
 
-const I = {TXOUTPUTCOUNT: 0xc4, OUTPUTVALUE: 0xcc, OUTPUTBYTECODE: 0xcd, OUTPUTTOKENCATEGORY: 0xd1}, REVERSEBYTES = 0xbc;
+const I = {INPUTINDEX: 0xc0, UTXOBYTECODE: 0xc7, TXOUTPUTCOUNT: 0xc4, OUTPUTVALUE: 0xcc, OUTPUTBYTECODE: 0xcd, OUTPUTTOKENCATEGORY: 0xd1}, REVERSEBYTES = 0xbc;
 const tag = (s) => sha(Buffer.from(s));
 const hex32 = (h) => { const b = Buffer.from(String(h).replace(/^0x/, ''), 'hex'); assert.equal(b.length, 32, '32-byte constant'); return b; };
 
@@ -40,15 +42,17 @@ function pvFromOutputs(a, P) {
   a.pushBytes(Buffer.concat([PV_TAG, hex32(P.instanceId)]), 'pv');
   a.op(I.TXOUTPUTCOUNT, 0, 'nout').pick('nout', 'nc').push(1).op(OP.NUM2BIN, 2, 'nb');       // fails if n > 127
   a.roll('pv').roll('nb').op(OP.CAT, 2, 'pv');
+  a.op(I.INPUTINDEX, 0, 'ix').op(I.UTXOBYTECODE, 1, 'own');                                 // this covenant's locking
   a.push(0, 'k');
   a.loop((s) => {
     s.pick('k', 'kc').op(I.OUTPUTTOKENCATEGORY, 1, 'tc').push(0, 'empty').op(OP.EQUALVERIFY, 2);  // no token on output k
     s.pick('k', 'kc').op(I.OUTPUTVALUE, 1, 'v').push(8).op(OP.NUM2BIN, 2, 'vb');                 // u64 LE
-    s.pick('k', 'kc').op(I.OUTPUTBYTECODE, 1, 'lb').op(OP.SIZE, 1, 'lb', 'ls').push(2).op(OP.NUM2BIN, 2, 'lsb'); // u16 LE length
+    s.pick('k', 'kc').op(I.OUTPUTBYTECODE, 1, 'lb').pick('lb', 'lc').pick('own', 'oc').op(OP.EQUAL, 2, 'eq').op(OP.NOT, 1, 'ne').op(OP.VERIFY, 1); // b_k != own locking
+    s.op(OP.SIZE, 1, 'lb', 'ls').push(2).op(OP.NUM2BIN, 2, 'lsb'); // u16 LE length
     s.roll('pv').roll('vb').op(OP.CAT, 2, 'pv').roll('lsb').op(OP.CAT, 2, 'pv').roll('lb').op(OP.CAT, 2, 'pv');
     s.roll('k').op(OP.ADD1, 1, 'k').pick('k', 'kc').pick('nout', 'nc').op(OP.NUMEQUAL, 2, 'done');
   });
-  a.drop('k').drop('nout');
+  a.drop('k').drop('own').drop('nout');
 }
 
 export function templateHook(P) {

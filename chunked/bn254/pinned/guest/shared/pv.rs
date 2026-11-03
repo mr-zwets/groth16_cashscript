@@ -1,10 +1,11 @@
 // Track 12 public-values layout (must match ../../pv.mjs and the covenant's on-chain rebuild, template.mjs):
-//   PV = "BCHPAYv1" ‖ instance (32 B) ‖ n (1 B, 1..=127) ‖ Σ_k value_k (u64 LE) ‖ len_k (u16 LE) ‖ locking_k
+//   PV = "BCHPAYv1" ‖ instance (32 B) ‖ n (1 B, 1..=96 spendable) ‖ Σ_k value_k (u64 LE) ‖ len_k (u16 LE) ‖ locking_k
 // Included verbatim (include!) by both guests; no_std-friendly (alloc only).
 pub const PV_TAG: &[u8; 8] = b"BCHPAYv1";
 
 pub fn encode_pv(instance: &[u8; 32], outputs: &[(u64, Vec<u8>)]) -> Vec<u8> {
-    assert!(!outputs.is_empty() && outputs.len() <= 127, "1..=127 outputs");
+    // Spendability caps (same as pv.mjs, measured there): a PV outside them could be proven but never spent.
+    assert!(!outputs.is_empty() && outputs.len() <= 96, "1..=96 outputs");
     let mut pv = Vec::with_capacity(41 + outputs.iter().map(|(_, l)| 10 + l.len()).sum::<usize>());
     pv.extend_from_slice(PV_TAG);
     pv.extend_from_slice(instance);
@@ -16,6 +17,8 @@ pub fn encode_pv(instance: &[u8; 32], outputs: &[(u64, Vec<u8>)]) -> Vec<u8> {
         pv.extend_from_slice(&(locking.len() as u16).to_le_bytes());
         pv.extend_from_slice(locking);
     }
+    assert!(pv.len() <= 9_900, "PV <= 9,900 B");
+    assert!(outputs.len() * pv.len() <= 300_000, "outputs x |PV| <= 300,000");
     pv
 }
 
