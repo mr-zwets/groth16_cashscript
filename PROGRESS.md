@@ -7,5 +7,5 @@
 - [x] build-key.mjs: SP1 v5 (3 proofs) and RISC Zero (1 receipt) accepted, consensus + standard.
 - [x] rejection suite per key (redteam-key.mjs: 168 / 172 runs, all rejected)
 - [x] covenant binding variant (covenant.mjs, covenant-test.mjs; guard r2:covenant)
-- [ ] BCHN node check (block + POLICY=1)
-- [ ] README / report
+- [x] BCHN node check (block + POLICY=1): t11a full, t11b timing rerun; 6/6 valid accepted + allowed, 142/142 rejected
+- [x] README (chunked/bn254/real-keys/README.md), bench node-check README section
