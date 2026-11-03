@@ -1,0 +1,4 @@
+tw2x18x16@789325355@4000@cb7bcd40c992fdc3c25c2f0cf5e09c4bd9b3b8dc46b5a814ae15e6190b6b46df: set=Z128+lb=5+lf=8+q=43+bpow=20+cpow=11+cap=0 shift=0 heights=[18, 16] bytes=224814 prove=18772ms verify=7ms folds=[2, 3, 3, 3] caps=[("random", 1), ("trace", 1), ("quotient", 1)] round-trip=true sweep=null -> OK
+tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0: leaf 789325355 wseed 4000 seed 400 ctx cb7bcd40c992fdc3.. 224814 B, 21767 ms
+tw2x18x16@705816938@4001@476e852c1654fd4f4bba05a663778d86040c70655e515497b4fafe4ede36ac3f: set=Z128+lb=5+lf=8+q=43+bpow=20+cpow=11+cap=0 shift=0 heights=[18, 16] bytes=224142 prove=16058ms verify=7ms folds=[2, 3, 3, 3] caps=[("random", 1), ("trace", 1), ("quotient", 1)] round-trip=true sweep=null -> OK
+tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0: leaf 705816938 wseed 4001 seed 401 ctx 476e852c1654fd4f.. 224142 B, 19061 ms

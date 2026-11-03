@@ -1,0 +1,123 @@
+{
+ "files": 2,
+ "cases": 172,
+ "unexpected": 0,
+ "na": 0,
+ "refused": 2,
+ "encoderRefused": 18,
+ "families": {
+  "valid": {
+   "cases": 2,
+   "chainReject": 0,
+   "accept": 2,
+   "unexpected": 0
+  },
+  "cap": {
+   "cases": 2,
+   "chainReject": 2,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "ood": {
+   "cases": 4,
+   "chainReject": 4,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "random": {
+   "cases": 2,
+   "chainReject": 2,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "pow": {
+   "cases": 12,
+   "chainReject": 12,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "final": {
+   "cases": 4,
+   "chainReject": 4,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "row": {
+   "cases": 6,
+   "chainReject": 6,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "salt": {
+   "cases": 6,
+   "chainReject": 6,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "sibling": {
+   "cases": 14,
+   "chainReject": 14,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "count": {
+   "cases": 14,
+   "chainReject": 14,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "fri_value": {
+   "cases": 16,
+   "chainReject": 16,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "truncate": {
+   "cases": 2,
+   "chainReject": 2,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "extend": {
+   "cases": 2,
+   "chainReject": 2,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "noncanon": {
+   "cases": 2,
+   "chainReject": 2,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "statement": {
+   "cases": 12,
+   "chainReject": 10,
+   "accept": 0,
+   "unexpected": 0,
+   "notRunOnChain": 2
+  },
+  "tx": {
+   "cases": 8,
+   "chainReject": 8,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "root": {
+   "cases": 2,
+   "chainReject": 2,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "layout": {
+   "cases": 62,
+   "chainReject": 62,
+   "accept": 0,
+   "unexpected": 0
+  }
+ },
+ "list": [],
+ "skippedFiles": [],
+ "layoutB": 0,
+ "notRunOnChain": 2
+}
