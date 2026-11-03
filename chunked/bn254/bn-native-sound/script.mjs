@@ -8,6 +8,10 @@ import {kADblN, kAAddN, kDStep, kEval, kTable} from './kernels.mjs';
 import {p, r, ETA, GAMMA1, PSI, B_TWIST, VKC, PI_SUM_OFFSET} from '../sound-si-gls/math.mjs';
 import {ROLES, NROLES, DS, DSTATE, SCHEDULE, TAG, STMT_SIZE, D_SIZE, HAND_SIZE, F_MAX, NQ_MAX, pushLen, hdrOf, sha} from './protocol.mjs';
 
+// Track 11: optional application hook, run by role 2 right after the statement is decoded (n0, n1 on the stack by
+// name). Default null: the program is byte-identical to the reviewed build.
+let COVENANT = null;
+export const setCovenant = (fn) => { COVENANT = fn; };
 export const IX = {INPUTINDEX: 0xc0, TXINPUTCOUNT: 0xc3, UTXOBYTECODE: 0xc7, INPUTBYTECODE: 0xca};
 const ITERS = Number(process.env.SCHED_ITERS ?? 4000);
 const D_PIECE = 8; // delta slopes per pile piece (512 B)
@@ -251,6 +255,7 @@ function roleProgram(i, ctx, lay, WIN) {
   a.mark('statement');
   a.roll('STMT').invoke('STMT', STMT_OUT);
   if (!last) for (const n of ['n0', 'n1', 'r']) a.drop(n);
+  if (last && COVENANT) { a.mark('covenant'); COVENANT(a); } // Track 11 (real-keys/covenant.mjs): application binding of n0, n1; off by default
   if (i === 0) { // owner checks: A, C on y^2 = x^3 + 3; B on the twist y^2 = x^3 + b'
     a.pick('xA').pick('yA').invoke('G1C', []); a.pick('xC').pick('yC').invoke('G1C', []);
     const k = new Kernel(); const [x0, x1, y0, y1] = ['xB0', 'xB1', 'yB0', 'yB1'].map((n) => k.env(n)); const m = (x) => k.mod(x);

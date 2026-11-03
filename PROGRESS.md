@@ -5,7 +5,7 @@
 - [x] extract.mjs: VKs + fixtures, noble pairing check of every proof against the full upstream statement; RISC Zero constants folded into IC0 (checked both ways).
 - [x] math.mjs: BN_VK_FIXTURES env switch (default unchanged: code sha 75c780ae… reproduced).
 - [x] build-key.mjs: SP1 v5 (3 proofs) and RISC Zero (1 receipt) accepted, consensus + standard.
-- [ ] rejection suite per key
-- [ ] covenant binding variant
+- [x] rejection suite per key (redteam-key.mjs: 168 / 172 runs, all rejected)
+- [x] covenant binding variant (covenant.mjs, covenant-test.mjs; guard r2:covenant)
 - [ ] BCHN node check (block + POLICY=1)
 - [ ] README / report

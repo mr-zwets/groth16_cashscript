@@ -1,0 +1,186 @@
+{
+ "key": "risc0",
+ "covenant": {
+  "kind": "risc0",
+  "imageId": "51350de41e575076bf180dbe2efb38edc25b32e47195a92b2c05850457e457a0",
+  "pvLen": 21,
+  "app": "risc0-test-receipt-V5_0"
+ },
+ "codeSha256": "fcf1c1989d0cd88f69fb8b329e8d9f27f1587464bc8ed05f2068907ee98b765c",
+ "runs": [
+  {
+   "label": "control: application proof, output 0 = OP_RETURN <PV>",
+   "kind": "control",
+   "consensus": true,
+   "standard": true,
+   "rejecting": [],
+   "opCost": [
+    7070792,
+    7025675,
+    6613602
+   ]
+  },
+  {
+   "label": "PV first byte flipped (same length)",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7070792,
+    7025675,
+    265553
+   ]
+  },
+  {
+   "label": "PV last byte flipped",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7070792,
+    7025675,
+    265554
+   ]
+  },
+  {
+   "label": "PV with one byte appended",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7070792,
+    7025675,
+    260898
+   ]
+  },
+  {
+   "label": "PV truncated by one byte",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7070792,
+    7025675,
+    260896
+   ]
+  },
+  {
+   "label": "output 0 is a plain OP_RETURN (no PV)",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7070792,
+    7025675,
+    260875
+   ]
+  },
+  {
+   "label": "PV moved to output 1 (output 0 a plain OP_RETURN)",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7070792,
+    7025675,
+    260875
+   ]
+  },
+  {
+   "label": "PV pushed with a non-minimal PUSHDATA1 header",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7070792,
+    7025675,
+    260898
+   ]
+  },
+  {
+   "label": "output 0 = OP_RETURN <sha256(PV)> (a digest instead of the data)",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7070792,
+    7025675,
+    260908
+   ]
+  },
+  {
+   "label": "PV = journal with every byte xor 0x20",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7070792,
+    7025675,
+    265554
+   ]
+  }
+ ]
+}

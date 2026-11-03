@@ -48,7 +48,11 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   assert.equal(sha(prog.code), Buffer.from(prog.Kcode).toString('hex'));
   const lock = tx.lockingOf(prog);
   const fixtures = [];
-  for (const fx of FIXTURES.fixtures) {
+  const cov = covenant ? await import('./covenant.mjs') : null;
+  // covenant mode: the application is fixture 0 (its program and PV length are baked); the other fixtures are valid
+  // Groth16 proofs of other programs and must be REJECTED (covenant-test.mjs)
+  for (const fx of covenant ? FIXTURES.fixtures.slice(0, 1) : FIXTURES.fixtures) {
+    if (cov) cov.useOutputsFor(cov.pvOf(fx));
     const core = proveCore(fx); const si = proveSI(fx);
     assert.deepEqual(core.states.map((s) => s.join()), si.states.map((s) => s.join()), `${fx.id}: states equal SI-GLS`);
     assert.deepEqual(core.Sc.join(), si.Sc.join(), `${fx.id}: residue root equals SI-GLS`);

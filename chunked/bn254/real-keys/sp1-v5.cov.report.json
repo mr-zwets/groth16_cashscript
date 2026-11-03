@@ -1,0 +1,222 @@
+{
+ "key": "sp1-v5",
+ "covenant": {
+  "kind": "sp1",
+  "programVKey": "0x00bee99e7cb561bd60cb0bb43002e9ae74ff8769c756fd82e6a4b18d990f7680",
+  "pvLen": 64,
+  "app": "silvana-add"
+ },
+ "codeSha256": "96e1620b3a3f6944ec7ff93062f9d3fbdd12bef8554a2db6a0657c20b2c820d4",
+ "runs": [
+  {
+   "label": "control: application proof, output 0 = OP_RETURN <PV>",
+   "kind": "control",
+   "consensus": true,
+   "standard": true,
+   "rejecting": [],
+   "opCost": [
+    7043185,
+    6997366,
+    6648813
+   ]
+  },
+  {
+   "label": "valid proof of another program (sparsity-tdx-gcp) with the application's PV in output 0",
+   "kind": "wrong-program",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7041075,
+    7007564,
+    258069
+   ]
+  },
+  {
+   "label": "valid proof of another program (pessina-solana-aa, programVKey 0x00390c74c8…) with its own PV in output 0",
+   "kind": "wrong-program",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7042004,
+    7002408,
+    258084
+   ]
+  },
+  {
+   "label": "valid proof of another program (pessina-solana-aa) with the application's PV in output 0",
+   "kind": "wrong-program",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7042004,
+    7002408,
+    258084
+   ]
+  },
+  {
+   "label": "PV first byte flipped (same length)",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7043185,
+    6997366,
+    262848
+   ]
+  },
+  {
+   "label": "PV last byte flipped",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7043185,
+    6997366,
+    262848
+   ]
+  },
+  {
+   "label": "PV with one byte appended",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7043185,
+    6997366,
+    260364
+   ]
+  },
+  {
+   "label": "PV truncated by one byte",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7043185,
+    6997366,
+    260362
+   ]
+  },
+  {
+   "label": "output 0 is a plain OP_RETURN (no PV)",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7043185,
+    6997366,
+    260298
+   ]
+  },
+  {
+   "label": "PV moved to output 1 (output 0 a plain OP_RETURN)",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7043185,
+    6997366,
+    260298
+   ]
+  },
+  {
+   "label": "PV pushed with a non-minimal PUSHDATA1 header",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7043185,
+    6997366,
+    260364
+   ]
+  },
+  {
+   "label": "output 0 = OP_RETURN <sha256(PV)> (a digest instead of the data)",
+   "kind": "wrong-public-values",
+   "consensus": false,
+   "standard": false,
+   "rejecting": [
+    {
+     "input": 2,
+     "section": "r2:covenant",
+     "error": "Program failed an OP_VERIFY operation."
+    }
+   ],
+   "opCost": [
+    7043185,
+    6997366,
+    260331
+   ]
+  }
+ ]
+}

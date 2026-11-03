@@ -4,13 +4,17 @@ import {createVirtualMachineBch2026, encodeDataPush, hash256} from '@bitauth/lib
 export const VMS = {consensus: createVirtualMachineBch2026(false), standard: createVirtualMachineBch2026(true)};
 export const p2sh32 = (redeem) => Uint8Array.from([0xaa, 0x20, ...hash256(redeem), 0x87]);
 export const encodeUnlocking = (pushes) => Uint8Array.from(pushes.flatMap((b) => [...encodeDataPush(Uint8Array.from(b))]));
+// Track 11: the outputs of the runner's transaction (default: one OP_RETURN output, as before); real-keys/covenant.mjs
+// sets an OP_RETURN carrying the public values.
+let OUTPUTS = [{lockingBytecode: Uint8Array.of(0x6a), valueSatoshis: 1000n}];
+export const setOutputs = (o) => { OUTPUTS = o; };
 export const budgetOf = (unlocking) => (41 + unlocking.length) * 800;
 export const programOf = (lockings, unlockings, inputIndex) => ({
   inputIndex,
   sourceOutputs: lockings.map((l) => ({lockingBytecode: Uint8Array.from(l), valueSatoshis: 1000n})),
   transaction: {version: 2, locktime: 0,
     inputs: unlockings.map((u, n) => ({outpointIndex: n, outpointTransactionHash: new Uint8Array(32), sequenceNumber: 0, unlockingBytecode: Uint8Array.from(u)})),
-    outputs: [{lockingBytecode: Uint8Array.of(0x6a), valueSatoshis: 1000n}]},
+    outputs: OUTPUTS},
 });
 // evaluate every input; accepted = the VM's verify() result for that input (consensus or standard rules)
 export function spendAll(lockings, unlockings, mode = 'consensus') {
