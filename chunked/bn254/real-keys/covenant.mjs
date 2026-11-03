@@ -66,8 +66,9 @@ export function covenantHook(P) {
   };
 }
 // build the covenant program and point the runner's output 0 at the application's PV (fixture 0)
-export function buildCovenantProgram(FIXTURES) {
-  const P = covenantParams(FIXTURES);
+// (override: replace application parameters, e.g. a covenant pinned to another program, for the rejection tests)
+export function buildCovenantProgram(FIXTURES, override = {}) {
+  const P = {...covenantParams(FIXTURES), ...override};
   setCovenant(covenantHook(P));
   try { const prog = buildProgram(); prog.covenant = P; return prog; } finally { setCovenant(null); }
 }

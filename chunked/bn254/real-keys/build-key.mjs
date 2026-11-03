@@ -67,7 +67,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
         marginStandard: +(100 * (1 - runs.standard[i].opCost / runs.standard[i].budget)).toFixed(2), marginConsensus: +(100 * (1 - runs.consensus[i].opCost / runs.consensus[i].budget)).toFixed(2)}))});
     console.log(`${fx.id}: n_q ${core.nq}, unlocking ${T.unlockings.map((u) => u.length).join(' / ')}, op std ${runs.standard.map((x) => x.opCost).join(' / ')} (margins ${fixtures.at(-1).inputs.map((x) => x.marginStandard).join(' / ')}%)`);
   }
-  const out = {key, covenant, system: FIXTURES.system, vkJsonSha256: FIXTURES.vkJsonSha256, tag: hex(TAG), vkDigest: hex(VK_DIGEST),
+  const deployment = covenant
+    ? 'covenant example: role 2 pins n0, n1 to the application of fixture 0 (program + public values from output 0); example code, not independently reviewed'
+    : 'VERIFIER CORE, NOT DEPLOYABLE WITHOUT APPLICATION BINDING: n0, n1 are free statement inputs, so this build accepts a valid proof of ANY program (any RISC Zero image id / journal) under this key; a spending covenant must derive and pin n0, n1 itself (see covenant.mjs)';
+  const out = {key, covenant, deployment, system: FIXTURES.system, vkJsonSha256: FIXTURES.vkJsonSha256, tag: hex(TAG), vkDigest: hex(VK_DIGEST),
     codeBytes: prog.code.length, codeSha256: sha(prog.code), redeemBytes: prog.R.length, redeemHex: hex(prog.R), lockingHex: hex(lock), lockingSha256: sha(lock),
     codePieces: prog.pieces.map((x) => x.length), codePiecesHex: prog.pieces.map(hex), covenantParams: prog.covenant ?? undefined,
     libauth: '@bitauth/libauth 3.1.0-next.8 + zk-verifier-bench patches/@bitauth__libauth@3.1.0-next.8.patch (OP_DEFINE body cost)',

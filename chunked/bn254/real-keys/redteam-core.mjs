@@ -2,7 +2,8 @@
 // Changes against the reviewed suite (everything else verbatim): imports from ../bn-native-sound; the build check
 // reads <key>.build.json; "proof 1" is the next real fixture, or (RISC Zero, one receipt) a second valid witness of
 // fixture 0 (lattice-shifted GT-GLS digits) for the staple runs and real other-version receipts for the point runs;
-// every non-graph run is asserted to differ from the valid transaction; section 10 adds the real-key public-input runs.
+// every non-graph run is asserted to differ from the valid transaction; section 10 adds the real-key public-input runs;
+// section 10b (fix round) adds one false-statement run per key with the GT-GLS digits and the walk recomputed.
 //
 // Rejection suite for bn-native-sound (ordinary, constructive rejection tests only: malformed or mismatched inputs
 // that a sound verifier must reject; no witness is ever searched or rebuilt to satisfy a false statement).
@@ -23,8 +24,8 @@ import {readFileSync, writeFileSync} from 'node:fs';
 import {encodeDataPush, decodeAuthenticationInstructions, encodeAuthenticationInstruction} from '@bitauth/libauth';
 import {bn254} from '@noble/curves/bn254.js';
 import {sp1Digest, sha as sha256, risc0Inputs, claimDigest} from './claims.mjs';
-import {FIXTURES, p, r, PI, GLS_OFFSET, LATTICE, mod, F2, f2, Fp} from '../sound-si-gls/math.mjs';
-import {BOUNDS, proveCore, factorSchedule, runRange, startState, encodeHand, zOf, zTail, sha, le32, rdle, STMT_LAYOUT, CUTS, ROLES, NQ_MAX, TAG, toFp} from '../bn-native-sound/protocol.mjs';
+import {FIXTURES, p, r, PI, GLS_OFFSET, LATTICE, mod, F2, f2, Fp, F12, NE, GLS_BITS, glsDecompose, monicRep, fromPoly, pneg} from '../sound-si-gls/math.mjs';
+import {BOUNDS, proveCore, factorSchedule, runRange, startState, encodeHand, zOf, zTail, sha, le32, rdle, STMT_LAYOUT, CUTS, ROLES, NQ_MAX, TAG, toFp, isBoundary} from '../bn-native-sound/protocol.mjs';
 import {buildProgram} from '../bn-native-sound/script.mjs';
 import {transactionFor, unlockingsFor} from '../bn-native-sound/transaction.mjs';
 import {encodeUnlocking, spendAll, programOf, VMS, p2sh32} from '../bn-native-sound/vm.mjs';
@@ -269,6 +270,39 @@ for (const [label, mix] of [['input 0 from proof 1', [1, 0, 0]], ['input 1 from 
   for (const o of OTHER) recommitted(`whole statement of ${o.id} (a real proof${o.verifiesUnderControlRoot ? ' valid under control root ' + o.verifiesUnderControlRoot.commit.slice(0, 8) : ''}) with fixture 0's witness`, 'real-other-proof',
     {STMT: setWord(setWord(Buffer.concat([pointsOf(o.proof), W.STMT.subarray(256)]), L.n0, BigInt(o.publicInputs[0])), L.n1, BigInt(o.publicInputs[1]))});
   for (const o of OTHER) recommitted(`fixture 0's public inputs with ${o.id}'s proof points`, 'real-other-proof', {STMT: Buffer.concat([pointsOf(o.proof), W.STMT.subarray(256)])});
+}
+// ---------------- 10b. Track 11 fix round: a false statement with digits and walk recomputed ----------------
+// The section-10 claim runs keep fixture 0's GT-GLS digits, so they stop at the shallow r2:binding check. Here the
+// statement is false (wrong public values / journal, digest recomputed), and the honest prover functions are applied
+// to it: glsDecompose of the new n0, n1 (so binding holds), factorSchedule over the new digits (inverse-norm witnesses
+// t), and the Miller-loop states from the same recurrence as proveCore, seeded with fixture 0's residue root. The residue
+// root and the quotient stay fixture 0's (none exists for a false statement: proveCore's Groth16 check would fail).
+// Inputs 0 and 1 then hold an internally consistent walk, binding passes, and only the deeper checks after the loop
+// (terminal / final identity / quotient) can reject. Deterministic, no search.
+{ const L = STMT_LAYOUT;
+  const deep = (label, a, b) => {
+    const ns = [a, b]; ns.forEach((n) => assert.ok(n >= 0n && n < r));
+    const es = ns.map((n) => glsDecompose(n));
+    es.forEach((e, k) => { assert.equal(mod(e.reduce((s, v, i) => s + v * PI[i], 0n), r), ns[k]); e.forEach((v) => assert.ok(v >= -GLS_OFFSET && v < GLS_OFFSET)); });
+    const N = es.map((e) => { const u = e.map((v) => v + GLS_OFFSET); return Array.from({length: NE}, (_, ev) => u.reduce((s, v, i) => s | (Number((v >> BigInt(GLS_BITS - 1 - ev)) & 1n) << i), 0)); });
+    assert.ok(N.some((x, k) => !Buffer.from(x).equals(Buffer.from(W.N[k]))), 'digits changed');
+    const st2 = {...W.st, N}; const sched2 = factorSchedule(st2); assert.ok(sched2.endpoint, 'B walk unchanged');
+    const Sc = W.Sc; const cPoly = (sg) => (sg > 0 ? pneg(Sc) : Sc);
+    let Fc = fromPoly(pneg(Sc)); const states2 = [];
+    sched2.events.forEach((ev, e) => { Fc = F12.sqr(Fc); for (const f of ev.fs) Fc = F12.mul(Fc, fromPoly(f)); if (ev.cSign) Fc = F12.mul(Fc, fromPoly(cPoly(ev.cSign))); if (isBoundary(e)) states2.push(monicRep(Fc)); });
+    assert.equal(states2.length, W.states.length);
+    const S2 = ROLES.map(({chunks, i}) => { const out = [];
+      for (const k of chunks) { for (let e = (k ? BOUNDS[k - 1] : 0); e < BOUNDS[k]; e++) out.push(...sched2.events[e].ts.map((t) => le32(mod(t)))); out.push(...states2[k].slice(0, 6).map((v) => le32(mod(v)))); }
+      if (i === ROLES.length - 1) out.push(...sched2.tts.map((t) => le32(mod(t))));
+      const bf = Buffer.concat(out); assert.equal(bf.length, ROLES[i].streamSize); return bf; });
+    const STMT2 = Buffer.concat([W.STMT.subarray(0, L.n0), le32(a), le32(b), Buffer.from(N[0]), Buffer.from(N[1]), W.STMT.subarray(L.sc)]);
+    assert.equal(STMT2.length, W.STMT.length);
+    recommitted(label, 'real-public-input-deep', {STMT: STMT2, S: S2, core: {...W, st: st2, sched: sched2, states: states2}, expect: ['accept', 'accept', 'r2:cleanup']}); // binding passes; the final identity fails
+  };
+  if (KEY === 'sp1-v5') { const pv2 = Buffer.from(fx0.publicValuesHex, 'hex'); pv2[0] ^= 1;
+    deep('false statement: wrong public values (first byte flipped), n1 = its digest, GT-GLS digits + t + states recomputed; residue root and quotient of fixture 0', BigInt(fx0.publicInputs[0]), sp1Digest(pv2)); }
+  else { const j2 = Buffer.from(fx0.journalHex, 'hex'); j2[0] ^= 1; const [a, b] = risc0Inputs(fx0.imageId, j2);
+    deep('false statement: wrong journal (first byte flipped), (n0, n1) = its claim digest halves, GT-GLS digits + t + states recomputed; residue root and quotient of fixture 0', a, b); }
 }
 // ---------------- locate the first rejecting guard ----------------
 const roleIns = [0, 1, 2].map((i) => { const c = prog.funcCodes['role' + i]; const d = decodeAuthenticationInstructions(c); const o = []; let x = 0; for (const t of d) { o.push(x); x += encodeAuthenticationInstruction(t).length; } return {n: d.length, offs: o}; });

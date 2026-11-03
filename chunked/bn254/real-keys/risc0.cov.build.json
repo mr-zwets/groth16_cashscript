@@ -1,6 +1,7 @@
 {
  "key": "risc0",
  "covenant": true,
+ "deployment": "covenant example: role 2 pins n0, n1 to the application of fixture 0 (program + public values from output 0); example code, not independently reviewed",
  "system": "RISC Zero Groth16 receipt verifier (risc0-ethereum RiscZeroGroth16Verifier VERSION 5.0.0-rc.1), control root and BN254 control id folded into IC0",
  "vkJsonSha256": "a0966f75bdfb2e1d702157c5a9e49a78a93efd14aa47d77e38344255ba1a2221",
  "tag": "424e4d58332f319d6a5330c4d827ac6ddedc8a3695cfcc8dca5fd2acd7d94ff0e753d086c2855d",

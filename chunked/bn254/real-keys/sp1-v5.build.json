@@ -1,6 +1,7 @@
 {
  "key": "sp1-v5",
  "covenant": false,
+ "deployment": "VERIFIER CORE, NOT DEPLOYABLE WITHOUT APPLICATION BINDING: n0, n1 are free statement inputs, so this build accepts a valid proof of ANY program (any RISC Zero image id / journal) under this key; a spending covenant must derive and pin n0, n1 itself (see covenant.mjs)",
  "system": "SP1 v5.0.0 Groth16 (gnark), verifier hash 0xa4594c59bbc142f3b81c3ecb7f50a7c34bc9af7c4c444b5d48b795427e285913",
  "vkJsonSha256": "4938e2b1907d8d51a8e1a187ab5d7b22eb6b91b2abe1b193ab50f4b4610b3b33",
  "tag": "424e4d58332f31824f5b746e675b93ff9ef9904a5749fec5c0733e5f85064e5ed4dd7f1e0b25bb",

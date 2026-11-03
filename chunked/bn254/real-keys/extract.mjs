@@ -1,5 +1,6 @@
 // Track 11 (real keys): derive the two real BN254 Groth16 verifying keys and their published proof fixtures from the
-// pinned upstream files in ./upstream (copied verbatim; provenance in ./upstream/SOURCES.md), check every proof with
+// pinned upstream files in ./upstream (byte-identical to the pinned commits; provenance and git blob ids in
+// ./upstream/SOURCES.md), check every proof with
 // noble's pairing against the FULL upstream statement, and write the fixture files that ../sound-si-gls/math.mjs loads
 // when BN_VK_FIXTURES points at them.
 //
@@ -94,6 +95,13 @@ console.log(`SP1 v5: ${sp1Fixtures.length} published proofs verify (noble), vk j
 
 // ---------------------------------------------------------------- RISC Zero -------------------------------------------
 const rzSrc = U('risc0-Groth16Verifier.sol'), rzCtl = U('risc0-ControlID.sol');
+// the vendored wrapper and claim library must still say what split / claimDigest below implement (text pins, fix round)
+{ const wrap = U('risc0-RiscZeroGroth16Verifier.sol').replace(/\s+/g, ' '), lib = U('risc0-IRiscZeroVerifier.sol').replace(/\s+/g, ' ');
+  for (const t of ['uint256 reversed = reverseByteOrderUint256(uint256(digest));', 'return (bytes16(uint128(reversed)), bytes16(uint128(reversed >> 128)));',
+    'uint256(uint128(CONTROL_ROOT_0)), uint256(uint128(CONTROL_ROOT_1)), uint256(uint128(claim0)), uint256(uint128(claim1)), uint256(BN254_CONTROL_ID) ]',
+    '_verifyIntegrity(seal, ReceiptClaimLib.ok(imageId, journalDigest).digest());']) assert.ok(wrap.includes(t), 'RiscZeroGroth16Verifier.sol: ' + t);
+  for (const t of ['sha256("risc0.ReceiptClaim")', 'sha256("risc0.SystemState")', 'sha256("risc0.Output")', 'uint16(4) << 8', 'uint16(2) << 8', 'uint16(1) << 8'])
+    assert.ok(lib.includes(t), 'IRiscZeroVerifier.sol: ' + t); }
 const Z = consts(rzSrc); assert.equal(Z.r, r); assert.equal(Z.q, p);
 // snarkjs constants: x1 = imaginary (c1), x2 = real (c0); checked by the receipts below (exactly one orientation verifies)
 const rzVk = {alpha: g1(Z.alphax, Z.alphay), beta: g2(Z.betax2, Z.betax1, Z.betay2, Z.betay1), gamma: g2(Z.gammax2, Z.gammax1, Z.gammay2, Z.gammay1),

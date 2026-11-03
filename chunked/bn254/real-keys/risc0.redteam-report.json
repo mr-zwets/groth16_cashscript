@@ -2272,6 +2272,23 @@
    "reason": "Program failed an OP_VERIFY operation.",
    "at": "input 0: r0:loop > BDBL@275",
    "bench": true
+  },
+  {
+   "label": "false statement: wrong journal (first byte flipped), (n0, n1) = its claim digest halves, GT-GLS digits + t + states recomputed; residue root and quotient of fixture 0",
+   "kind": "real-public-input-deep",
+   "consensus": false,
+   "standard": false,
+   "rejectingInputs": [
+    2
+   ],
+   "expect": [
+    "accept",
+    "accept",
+    "r2:cleanup"
+   ],
+   "reason": "final stack 1",
+   "at": "input 2: r2:cleanup",
+   "bench": true
   }
  ],
  "controls": [

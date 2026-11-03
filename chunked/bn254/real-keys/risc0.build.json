@@ -1,6 +1,7 @@
 {
  "key": "risc0",
  "covenant": false,
+ "deployment": "VERIFIER CORE, NOT DEPLOYABLE WITHOUT APPLICATION BINDING: n0, n1 are free statement inputs, so this build accepts a valid proof of ANY program (any RISC Zero image id / journal) under this key; a spending covenant must derive and pin n0, n1 itself (see covenant.mjs)",
  "system": "RISC Zero Groth16 receipt verifier (risc0-ethereum RiscZeroGroth16Verifier VERSION 5.0.0-rc.1), control root and BN254 control id folded into IC0",
  "vkJsonSha256": "a0966f75bdfb2e1d702157c5a9e49a78a93efd14aa47d77e38344255ba1a2221",
  "tag": "424e4d58332f319d6a5330c4d827ac6ddedc8a3695cfcc8dca5fd2acd7d94ff0e753d086c2855d",

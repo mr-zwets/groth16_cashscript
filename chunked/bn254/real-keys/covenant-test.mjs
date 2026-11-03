@@ -18,20 +18,20 @@ cov.useOutputsFor(pv0); const T0 = tx.transactionFor(fx0, prog);
 // the section of role 2 where the first failing instruction sits (as in redteam-core.mjs's guardOf, role programs only)
 const roleIns = [0, 1, 2].map((i) => { const d = decodeAuthenticationInstructions(prog.funcCodes['role' + i]); const o = []; let x = 0; for (const t of d) { o.push(x); x += encodeAuthenticationInstruction(t).length; } return {n: d.length, offs: o}; });
 const marks = prog.marks.slice().sort((a, b) => a.roff - b.roff);
-const sectionOf = (unl, input) => { const tr = vm.VMS.consensus.debug(vm.programOf(LOCKS, unl, input)); let sec = 'unlocking/redeem';
+const sectionOf = (unl, input, locks = LOCKS) => { const tr = vm.VMS.consensus.debug(vm.programOf(locks, unl, input)); let sec = 'unlocking/redeem';
   for (const s of tr) { const ri = roleIns.findIndex((x) => x.n === s.instructions?.length);
     if (ri >= 0) { let n = 'r' + ri + ':start'; for (const m of marks) if (m.role === ri && m.roff <= roleIns[ri].offs[Math.max(0, s.ip - 1)]) n = m.name; sec = n; }
     if (s.error) break; }
   return sec; };
 const runs = [];
-const run = (label, kind, outputs, unlockings = T0.unlockings) => {
+const run = (label, kind, outputs, unlockings = T0.unlockings, locks = LOCKS) => {
   vm.setOutputs(outputs);
-  const res = Object.fromEntries(['consensus', 'standard'].map((m) => [m, vm.spendAll(LOCKS, unlockings, m)]));
+  const res = Object.fromEntries(['consensus', 'standard'].map((m) => [m, vm.spendAll(locks, unlockings, m)]));
   const acc = (m) => res[m].every((x) => x.accepted);
   runs.push({label, kind, consensus: acc('consensus'), standard: acc('standard'),
-    rejecting: res.consensus.map((x, i) => (x.accepted ? null : {input: i, section: sectionOf(unlockings, i), error: String(x.error).replace(/^.*?: /, '').slice(0, 90)})).filter(Boolean),
+    rejecting: res.consensus.map((x, i) => (x.accepted ? null : {input: i, section: sectionOf(unlockings, i, locks), error: String(x.error).replace(/^.*?: /, '').slice(0, 90)})).filter(Boolean),
     opCost: res.standard.map((x) => x.opCost),
-    tx: {lockingHex: Buffer.from(lock).toString('hex'), unlockingsHex: unlockings.map((u) => Buffer.from(u).toString('hex')),
+    tx: {lockingHex: Buffer.from(locks[0]).toString('hex'), unlockingsHex: unlockings.map((u) => Buffer.from(u).toString('hex')),
       outputs: outputs.map((o) => ({lockingHex: Buffer.from(o.lockingBytecode).toString('hex'), valueSatoshis: o.valueSatoshis.toString()}))}});
   return runs.at(-1);
 };
@@ -57,6 +57,19 @@ if (P.kind === 'risc0') {
   // the claim digest of an older receipt's journal under this image id (real other journals of the test receipts are
   // all the same string, so use a modified one)
   run('PV = journal with every byte xor 0x20', 'wrong-public-values', out(Buffer.from(pv0.map((b) => b ^ 0x20))));
+}
+// ---- a covenant pinned to another program (fix round): the application's PV length, but the pinned program
+// (SP1 programVKey / RISC Zero image id) differs in its last byte; spent with the application's valid proof and PV.
+// The role code (and so the locking script) differs, so the transaction is rebuilt for that program; the section map
+// is the same (the covenant block has the same layout), so the failing section is read with this program's offsets.
+{ const other = P.kind === 'sp1' ? {programVKey: ((h) => h.slice(0, -2) + ((parseInt(h.slice(-2), 16) ^ 1).toString(16).padStart(2, '0')))(P.programVKey)}
+    : {imageId: ((h) => h.slice(0, -2) + ((parseInt(h.slice(-2), 16) ^ 1).toString(16).padStart(2, '0')))(P.imageId)};
+  const progX = cov.buildCovenantProgram(FIXTURES, other); assert.notDeepEqual(Buffer.from(progX.code), Buffer.from(prog.code));
+  const lockX = tx.lockingOf(progX); cov.useOutputsFor(pv0); const TX = tx.transactionFor(fx0, progX, {fills: T0.fills}); // the application's fillers (same code size)
+  const r = run(`covenant pinned to another ${P.kind === 'sp1' ? 'programVKey' : 'image id'} (${Object.values(other)[0].slice(0, 12)}…, last byte xor 1), spent with the application's valid proof and PV`,
+    'wrong-pinned-program', out(pv0), TX.unlockings, [lockX, lockX, lockX]);
+  // sectionOf maps through prog's marks; the role-2 covenant block sits at the same offsets in progX (same instruction count)
+  assert.equal(decodeAuthenticationInstructions(progX.funcCodes.role2).length, roleIns[2].n, 'same role-2 layout');
 }
 vm.setOutputs(out(pv0));
 const bad = runs.filter((x) => x.kind !== 'control' && (x.consensus || x.standard));
