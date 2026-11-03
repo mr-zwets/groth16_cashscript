@@ -18,6 +18,7 @@ import {decodeAuthenticationInstructions, encodeAuthenticationInstruction} from 
 import {loadKey} from './keys.mjs';
 import {encodePV, publicInputsFor, sha, normalizeOutputs} from './pv.mjs';
 import {MASK253, splitDigest, claimDigest} from '../real-keys/claims.mjs';
+import {INSTANCE, TEST_PROGRAM_VKEY, TEST_IMAGE_ID, P2PKH, OUTS} from './example-params.mjs';
 
 const [key, outPath] = process.argv.slice(2);
 const K = await loadKey(key);
@@ -26,14 +27,8 @@ const {r, g1, g2, FIXTURES} = math;
 const hex = (b) => Buffer.from(b).toString('hex');
 const H = (s) => sha(Buffer.from(s)).toString('hex');
 
-// ---------------- the example application (fixed parameters) ----------------
-// instance id and program / image id of the example (test key). The SP1 programVKey is any field element; the image id
-// any 32 bytes. For the real keys the same INSTANCE is used; the pinned program is a placeholder (no guest was built).
-export const INSTANCE = H('verifier.cash/track12/example-instance/v1');
-export const TEST_PROGRAM_VKEY = '0x00' + H('verifier.cash/track12/test-program').slice(2);
-export const TEST_IMAGE_ID = H('verifier.cash/track12/test-image');
-const P2PKH = (b) => '76a914' + b.repeat(20) + '88ac';
-const OUTS = [{lockingBytecode: P2PKH('11'), valueSatoshis: 200000n}, {lockingBytecode: '6a' + '0b' + hex(Buffer.from('track12 pay')), valueSatoshis: 0n}];
+// ---------------- the example application (fixed parameters, example-params.mjs) ----------------
+// For the real keys the same INSTANCE is used; the pinned program is a placeholder (no guest was built).
 const norm = (o) => normalizeOutputs(o);
 
 // ---------------- runner ----------------

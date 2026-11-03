@@ -1,0 +1,5 @@
+# RISC Zero (risc0-zkvm 3.0.x) host + methods of the Track 12 example (NOT compiled in this repository).
+# The released 3.0.x prover's receipts verify under control root a54dc85a…: deploy the covenant with key 'risc0-v3'.
+[workspace]
+resolver = "2"
+members = ["host", "methods"]

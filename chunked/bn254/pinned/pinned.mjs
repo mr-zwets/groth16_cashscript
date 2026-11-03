@@ -50,7 +50,7 @@ export async function openPinned(key, params) {
       const fee = utxos.reduce((s, u) => s + BigInt(u.valueSatoshis), 0n) - T.outs.reduce((s, o) => s + o.valueSatoshis, 0n);
       assert.ok(fee >= 0n, 'outputs exceed the covenant UTXOs');
       const raw = encodeTransaction(transaction);
-      return {transaction, hex: Buffer.from(raw).toString('hex'), bytes: raw.length, fee, txid: Buffer.from(hashTransaction(raw)).toString('hex'),
+      return {transaction, hex: Buffer.from(raw).toString('hex'), bytes: raw.length, fee, txid: (h => (typeof h === 'string' ? h : Buffer.from(h).toString('hex')))(hashTransaction(raw)), // display order
         unlockings: T.unlockings, fills: T.fills, publicInputs: T.fx.publicInputs, publicValues: encodePV(params.instanceId, T.outs),
         sourceOutputs: utxos.map((u) => ({lockingBytecode: locking, valueSatoshis: BigInt(u.valueSatoshis)}))};
     },
