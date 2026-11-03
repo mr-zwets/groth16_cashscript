@@ -9,6 +9,8 @@
 //   node example.mjs example-statement <statement.json>
 //       writes the example statement (REGTEST / CHIPNET ONLY: payout to an unspendable P2PKH, public INSTANCE)
 //   node example.mjs request <secretHex> <statement.json> <request.json> [--regtest]
+//       (the guest hosts' `vkey` / `imageid` / `prove` likewise refuse a build with the example LOCK_HASH unless
+//       --regtest is passed to them)
 //       the guest input: statement.json = {"instanceId": "<32 B hex>", "outputs": [{"lockingHex": "..",
 //       "valueSatoshis": ".."}, ..]}; feed request.json to guest/sp1/script or guest/risc0/host (`prove`)
 //   node example.mjs pin <key> <programId> <instanceId> [--mainnet] [--regtest]
@@ -61,7 +63,7 @@ if (cmd === 'example-statement') {
   const st = readJson(stPath); assert.ok(/^[0-9a-f]{64}$/i.test(st.instanceId), 'statement.instanceId: 32 B hex');
   const outputs = st.outputs.map((o) => ({lockingBytecode: o.lockingHex, valueSatoshis: BigInt(o.valueSatoshis)}));
   const exampleSecret = createHash('sha256').update(Buffer.from(secretHex, 'hex')).digest('hex') === EXAMPLE_LOCK_HASH;
-  const exampleOuts = st.instanceId.toLowerCase() === INSTANCE || outputs.some((o) => o.lockingBytecode === OUTS[0].lockingBytecode);
+  const exampleOuts = st.instanceId.toLowerCase() === INSTANCE || outputs.some((o) => o.lockingBytecode.toLowerCase() === OUTS[0].lockingBytecode.toLowerCase()) // hex case must not skip the gate;
   if (exampleSecret || exampleOuts) { assert.ok(regtest, 'the example secret / INSTANCE / payout are public or unspendable: replace them (or --regtest)');
     warn('example values (public secret / public INSTANCE / burn payout): regtest only'); }
   const pvBytes = encodePV(st.instanceId, outputs).length; // also enforces the spendability caps

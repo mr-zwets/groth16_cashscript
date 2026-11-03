@@ -16,6 +16,7 @@ import {writeFileSync} from 'node:fs';
 import {bn254} from '@noble/curves/bn254.js';
 import {decodeAuthenticationInstructions, encodeAuthenticationInstruction} from '@bitauth/libauth';
 import {loadKey} from './keys.mjs';
+import {openPinned} from './pinned.mjs';
 import {encodePV, publicInputsFor, sha, normalizeOutputs} from './pv.mjs';
 import {MASK253, splitDigest, claimDigest} from '../real-keys/claims.mjs';
 import {INSTANCE, TEST_PROGRAM_VKEY, TEST_IMAGE_ID, P2PKH, OUTS} from './example-params.mjs';
@@ -44,10 +45,16 @@ function sectionOf(prog, locks, unl, input) {
 }
 // outputs: normalized (+ optional token field, passed to the VM as is)
 // sections: the expected rejecting inputs and their failing sections, 'input:section,...' (default for a rejection:
-// '2:r2:covenant', i.e. only role 2 fails, inside the template). failOp: optional hex opcode that every rejecting input must fail on (libauth names NUMEQUALVERIFY and VERIFY alike).
+// '2:r2:covenant', i.e. only role 2 fails, inside the template). failOps: the expected failing opcode (hex) per rejecting
+// input, 'input:op,...' (libauth names NUMEQUALVERIFY and VERIFY alike, so the opcode tells them apart); by default
+// derived from `sections` with SECTION_OP; sections it does not cover (unlocking/redeem) need an explicit failOps.
 // No rejection may come from a resource limit (op cost, stack item size): those are asserted absent on every run.
 const RESOURCE = /operation cost|exceed|maximum|limit/i;
-function run(label, kind, {prog, unlockings, outputs, expect = 'reject', system, bench = true, note, sections = expect === 'reject' ? '2:r2:covenant' : '', failOp}) {
+// observed failing opcodes per section: the statement checks in the template / graph (NUMEQUALVERIFY 9d), the public-
+// input range checks (VERIFY 69), the reviewed core's transcript / handover checks (EQUALVERIFY 88)
+const SECTION_OP = {covenant: '9d', graph: '9d', statement: '69', transcript: '88', post: '88'};
+const opsOf = (sections) => (sections ? sections.split(',').map((x) => { const [i, , sec] = x.split(':'); assert.ok(sec in SECTION_OP, 'failOps needed for ' + x); return i + ':' + SECTION_OP[sec]; }).join(',') : '');
+function run(label, kind, {prog, unlockings, outputs, expect = 'reject', system, bench = true, note, sections = expect === 'reject' ? '2:r2:covenant' : '', failOps = opsOf(sections)}) {
   const lock = tx.lockingOf(prog); const locks = unlockings.map(() => lock);
   vm.setOutputs(outputs);
   const res = Object.fromEntries(['consensus', 'standard'].map((m) => [m, vm.spendAll(locks, unlockings, m)]));
@@ -59,9 +66,9 @@ function run(label, kind, {prog, unlockings, outputs, expect = 'reject', system,
       outputs: outputs.map((o) => ({lockingHex: hex(o.lockingBytecode), valueSatoshis: o.valueSatoshis.toString(), ...(o.token ? {token: {category: hex(o.token.category), amount: o.token.amount.toString()}} : {})}))}};
   runs.push(r0);
   const got = rejecting.map((y) => y.input + ':' + y.section).join(',');
-  r0.sectionsExpected = sections; r0.sectionsOk = got === sections && rejecting.every((y) => !RESOURCE.test(y.error)) && (!failOp || rejecting.every((y) => y.failOp === failOp));
+  r0.sectionsExpected = sections; r0.sectionsOk = got === sections && rejecting.every((y) => !RESOURCE.test(y.error)) && rejecting.map((y) => y.input + ':' + y.failOp).join(',') === failOps;
   const ok = (expect === 'accept' ? r0.consensus && r0.standard : !r0.consensus && !r0.standard) && r0.sectionsOk;
-  console.log(`${ok ? 'ok  ' : 'FAIL'}${r0.sectionsOk ? '' : ' (sections: expected ' + sections + ')'} ${expect === 'accept' ? 'accept' : 'reject'} [${system}] ${label}${rejecting.length ? '  [' + rejecting.map((y) => 'input ' + y.input + ' ' + y.section + ': ' + y.error).join('; ') + ']' : ''}`);
+  console.log(`${ok ? 'ok  ' : 'FAIL'}${r0.sectionsOk ? '' : ' (sections / ops: expected ' + sections + ' / ' + failOps + ')'} ${expect === 'accept' ? 'accept' : 'reject'} [${system}] ${label}${rejecting.length ? '  [' + rejecting.map((y) => 'input ' + y.input + ' ' + y.section + ': ' + y.error).join('; ') + ']' : ''}`);
   return r0;
 }
 
@@ -185,17 +192,17 @@ if (key === 'test') {
     // ---- input / output index games ----
     go('outputs swapped (memo first, payout second)', 'index-games', {outputs: norm([OUTS[1], OUTS[0]])});
     go('payout split into two outputs (100,000 + 100,000)', 'index-games', {outputs: norm([{...OUTS[0], valueSatoshis: 100000n}, {...OUTS[0], valueSatoshis: 100000n}, OUTS[1]])});
-    go('inputs 0 and 2 swapped (unlockings permuted)', 'index-games', {unlockings: [U[2], U[1], U[0]], sections: '0:unlocking/redeem,1:unlocking/redeem,2:unlocking/redeem'});
-    go('inputs 0 and 1 swapped', 'index-games', {unlockings: [U[1], U[0], U[2]], sections: '0:unlocking/redeem,1:unlocking/redeem,2:unlocking/redeem'});
-    go('a 4th input (input 2 duplicated)', 'index-games', {unlockings: [U[0], U[1], U[2], U[2]], sections: '0:r0:graph,1:r1:graph,2:r2:graph,3:unlocking/redeem'});
+    go('inputs 0 and 2 swapped (unlockings permuted)', 'index-games', {unlockings: [U[2], U[1], U[0]], sections: '0:unlocking/redeem,1:unlocking/redeem,2:unlocking/redeem', failOps: '0:7f,1:7f,2:7f'}); // OP_SPLIT out of range
+    go('inputs 0 and 1 swapped', 'index-games', {unlockings: [U[1], U[0], U[2]], sections: '0:unlocking/redeem,1:unlocking/redeem,2:unlocking/redeem', failOps: '0:88,1:88,2:88'});
+    go('a 4th input (input 2 duplicated)', 'index-games', {unlockings: [U[0], U[1], U[2], U[2]], sections: '0:r0:graph,1:r1:graph,2:r2:graph,3:unlocking/redeem', failOps: '0:9d,1:9d,2:9d,3:8a'}); // input 3 fails at OP_INVOKE (8a), libauth error '0x19'
     go('only inputs 0 and 1 (2 inputs)', 'index-games', {unlockings: [U[0], U[1]], sections: '0:r0:graph,1:r1:graph'});
-    go('payout output carries a fungible token (category = 32 x 0xab, amount 1)', 'index-games', {bench: false, note: 'libauth only: on BCHN a token output with an unknown category fails the token rules before the script verdict matters',
+    go('payout output carries a fungible token (category = 32 x 0xab, amount 1)', 'index-games', {bench: false, failOps: '2:88', note: 'libauth only: on BCHN a token output with an unknown category fails the token rules before the script verdict matters',
       outputs: [{...O[0], token: {category: Buffer.alloc(32, 0xab), amount: 1n}}, O[1]]});
     // ---- change back to the covenant's own locking (a valid proof of exactly that statement): the on-chain
     //      self-payment guard (OP_VERIFY of NOT(b_k == UTXOBYTECODE(INPUTINDEX))) must reject it
     { const own = tx.lockingOf(prog);
       const Os = norm([{lockingBytecode: own, valueSatoshis: 150000n}, OUTS[1]]), Os2 = norm([OUTS[0], {lockingBytecode: own, valueSatoshis: 50000n}]);
-      const sv = (l, outs) => run(l, 'self-payment', {prog, system, unlockings: spend(prog, M(...publicInputsFor(P, outs)), publicInputsFor(P, outs), outs).unlockings, outputs: outs, failOp: '69'}); // OP_VERIFY after EQUAL NOT: the guard, not a NUMEQUALVERIFY (9d) of the statement
+      const sv = (l, outs) => run(l, 'self-payment', {prog, system, unlockings: spend(prog, M(...publicInputsFor(P, outs)), publicInputsFor(P, outs), outs).unlockings, outputs: outs, failOps: '2:69'}); // OP_VERIFY after EQUAL NOT: the guard, not a NUMEQUALVERIFY (9d) of the statement
       sv('valid proof whose outputs pay change back to THIS covenant (output 0)', Os);
       sv('valid proof whose outputs pay the payout + change back to THIS covenant (output 1)', Os2); }
     // ---- mixing inputs of two valid spends of this covenant ----
@@ -209,6 +216,22 @@ if (key === 'test') {
       assert.throws(() => encodePV(INSTANCE, many(97, 1)), /outputs/); encodePV(INSTANCE, many(96, 21));
       assert.throws(() => encodePV(INSTANCE, many(1, 9900)), /PV/); encodePV(INSTANCE, many(1, 9849));
       assert.throws(() => encodePV(INSTANCE, many(96, 60)), /x \|PV\|/); encodePV(INSTANCE, many(64, 60)); }
+    // preflight (BEFORE proving) refuses outputs that libauth's standard verify() of the finished spend would refuse:
+    // a non-OP_RETURN locking > 201 B, and OP_RETURN outputs over the 223-B data-carrier cap (sum of length + 1).
+    // Each case is cross-checked against libauth verify() (standard) of the control transaction with those outputs.
+    { const cov = await openPinned('test', {...P, allowTestKey: true}); const L = tx.lockingOf(prog);
+      const so = U.map(() => ({lockingBytecode: L, valueSatoshis: 400000n}));
+      const stdErr = (outs) => { vm.setOutputs(outs); const v = vm.VMS.standard.verify({sourceOutputs: so,
+        transaction: {version: 2, locktime: 0, outputs: outs, inputs: U.map((u, i) => ({outpointTransactionHash: Buffer.alloc(32, 0xab), outpointIndex: i, sequenceNumber: 0, unlockingBytecode: u}))}}); return String(v); };
+      const opret = (n) => Buffer.concat([Buffer.from([0x6a, 0x4c, n]), Buffer.alloc(n, 0x61)]); // OP_RETURN PUSHDATA1 <n B>: n + 3 B locking
+      const pre = (outs) => cov.preflight({outputs: outs, utxoTotal: 1200000n});
+      const cases = [[norm([OUTS[0], {lockingBytecode: Buffer.alloc(202, 0x51), valueSatoshis: 10000n}]), /non-standard/, /non-standard/],
+        [norm([OUTS[0], {lockingBytecode: opret(220), valueSatoshis: 0n}]), /data-carrier/, /arbitrary data/], // 223 + 1 B
+        [norm([OUTS[0], {lockingBytecode: opret(110), valueSatoshis: 0n}, {lockingBytecode: opret(110), valueSatoshis: 0n}]), /data-carrier/, /arbitrary data/]]; // 2 x 114 B
+      for (const [outs, mine, theirs] of cases) { assert.throws(() => pre(outs), mine); assert.match(stdErr(outs), theirs); }
+      for (const outs of [norm([OUTS[0], {lockingBytecode: Buffer.alloc(201, 0x51), valueSatoshis: 10000n}]), norm([OUTS[0], {lockingBytecode: opret(219), valueSatoshis: 0n}])]) {
+        pre(outs); assert.doesNotMatch(stdErr(outs), /non-standard|arbitrary data/); } // at the caps: standard (the script itself rejects these outputs)
+      pre(O); vm.setOutputs(O); }
     // ---- public inputs >= r (honest witness, STMT word patched; DG, challenges and handovers recomputed) ----
     go('STMT n0 + r (alias)', 'public-input-range', {unlockings: recommitStmt(T, (s) => le32(n0 + r).copy(s, STMT_LAYOUT.n0)), sections: '0:r0:statement,1:r1:statement,2:r2:statement'});
     go('STMT n1 + r (alias)', 'public-input-range', {unlockings: recommitStmt(T, (s) => le32(n1 + r).copy(s, STMT_LAYOUT.n1)), sections: '0:r0:statement,1:r1:statement,2:r2:statement'});

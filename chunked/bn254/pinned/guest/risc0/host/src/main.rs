@@ -1,11 +1,26 @@
 //! Track 12 example host (RISC Zero 3.0.x).
 //!   cargo run --release -- imageid                   print the image id to pin in the covenant (key 'risc0-v3')
 //!   cargo run --release -- prove <request.json> <proof.json>
+//! Both refuse while guest/shared/pv.rs has the example LOCK_HASH, unless --regtest is given.
 //! proof.json: {"system": "risc0", "imageId": "..", "journalHex": "..", "sealHex": "<selector ‖ 8 words>"}
 //! Groth16 on x86-64 Linux needs the risc0-groth16 prover component (rzup) or docker.
 use methods::{PAYOUT_ELF, PAYOUT_ID};
 use risc0_zkvm::{default_prover, sha::Digest, ExecutorEnv, ProverOpts, VerifierContext};
 use serde::Deserialize;
+
+// The guest's LOCK_HASH (the same file the guest includes) and the PUBLIC example value: refuse to print a program id
+// for, or prove with, the example build unless --regtest is given (anyone can prove for any outputs under it).
+#[allow(dead_code)]
+mod shared { include!("../../../shared/pv.rs"); }
+// sha256("verifier.cash track12 example secret: REPLACE with >=128 random bits") = example-params.mjs EXAMPLE_LOCK_HASH
+const EXAMPLE_LOCK_HASH: &str = "99a364f66b31c63e9f7413d84a752e065825a6befa6d026eed90070c8e7836bf";
+fn refuse_example_lock_hash(regtest: bool) {
+    if hex::encode(shared::LOCK_HASH) == EXAMPLE_LOCK_HASH && !regtest {
+        eprintln!("refused: guest/shared/pv.rs still has the EXAMPLE LOCK_HASH (public secret): replace it with sha256 of YOUR \
+                   secret (>= 128 random bits) and rebuild, or pass --regtest");
+        std::process::exit(2);
+    }
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,7 +30,10 @@ struct Output { locking_hex: String, value_satoshis: String }
 struct Request { secret_hex: String, instance_id: String, outputs: Vec<Output> }
 
 fn main() -> anyhow_free::Result {
-    let args: Vec<String> = std::env::args().collect();
+    let all: Vec<String> = std::env::args().collect();
+    let regtest = all.iter().any(|x| x == "--regtest");
+    let args: Vec<String> = all.into_iter().filter(|x| x != "--regtest").collect();
+    refuse_example_lock_hash(regtest);
     let image_id = hex::encode(Digest::from(PAYOUT_ID).as_bytes());
     if args.get(1).map(String::as_str) == Some("imageid") { println!("{image_id}"); return Ok(()); }
     assert!(args.len() == 4 && args[1] == "prove", "usage: imageid | prove <request.json> <proof.json>");

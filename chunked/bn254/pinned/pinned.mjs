@@ -3,7 +3,8 @@
 //   import {openPinned} from './pinned.mjs';
 //   const cov = await openPinned('sp1-v5', {system: 'sp1', programVKey: '0x00ab…', instanceId: '…32 bytes hex…'});
 //   cov.lockingBytecode / cov.address        // P2SH32 of the 3-input redeem; fund it ONCE with exactly 3 UTXOs
-//   cov.preflight({outputs, utxoTotal})      // BEFORE proving: spendable shape, no self-payment, dust, fee floor
+//   cov.preflight({outputs, utxoTotal})      // BEFORE proving: spendable shape, standard outputs, 223-B OP_RETURN cap,
+//                                            //   no self-payment, dust, fee floor
 //   cov.publicValuesFor(outputs)             // the exact bytes the guest must commit (pv.mjs layout)
 //   cov.buildSpend({proof, outputs, utxos})  // -> {unlockings, transaction (libauth), hex, txid, ...}
 //
@@ -16,7 +17,7 @@
 // The builder never takes n0, n1 from the caller: it derives them from the parameters and the outputs, exactly as
 // the covenant does, and refuses a proof that does not verify for that statement (noble pairing, via proveCore).
 import assert from 'node:assert/strict';
-import {encodeTransaction, hashTransaction, lockingBytecodeToCashAddress, hash256} from '@bitauth/libauth';
+import {encodeTransaction, hashTransaction, lockingBytecodeToCashAddress, hash256, isArbitraryDataOutput, ConsensusBch} from '@bitauth/libauth';
 import {loadKey} from './keys.mjs';
 import {encodePV, normalizeOutputs, publicInputsFor, assertSpendableShape} from './pv.mjs';
 
@@ -25,6 +26,23 @@ import {encodePV, normalizeOutputs, publicInputsFor, assertSpendableShape} from 
 export const MIN_FEE_RATE = 1;
 const csLen = (n) => (n < 253 ? 1 : n <= 0xffff ? 3 : 5);
 export const dustThreshold = (lb) => (lb[0] === 0x6a ? 0n : BigInt(3 * (8 + csLen(lb.length) + lb.length + 148)));
+// output standardness, as libauth's bch-2026 verify() (standard mode) applies it: an output is standard if it is an
+// arbitrary-data output (OP_RETURN + pushes only) or its locking is <= 201 B (ConsensusBch2026Overrides
+// .maximumStandardLockingBytecodeLength, i.e. pay-to-script; the 2026 consensus object is not exported, so the value
+// is restated here; P2PKH, P2SH20/32, P2PK and bare multisig all fit it); and the data-carrier outputs together carry
+// <= 223 B, counted as sum(locking length + 1) (ConsensusBch.maximumDataCarrierBytes).
+export const MAX_STANDARD_LOCKING_BYTES = 201;
+export const MAX_DATA_CARRIER_BYTES = ConsensusBch.maximumDataCarrierBytes;
+export function assertStandardOutputs(outs) {
+  let carrier = 0;
+  outs.forEach((o, k) => {
+    const lb = o.lockingBytecode, data = isArbitraryDataOutput(lb);
+    if (data) carrier += lb.length + 1;
+    assert.ok(data || lb.length <= MAX_STANDARD_LOCKING_BYTES,
+      `output ${k} is non-standard (${lb.length} B locking, not OP_RETURN + pushes): the spend would not relay`);
+  });
+  assert.ok(carrier <= MAX_DATA_CARRIER_BYTES, `OP_RETURN outputs carry ${carrier} B > ${MAX_DATA_CARRIER_BYTES} B (data-carrier cap): the spend would not relay`);
+}
 // worst-case spend size: 3 inputs with 10,000 B unlockings, plus the outputs
 export const maxSpendBytes = (outs) => 4 + 1 + 3 * (32 + 4 + 3 + 10000 + 4) + 1 + outs.reduce((s, o) => s + 8 + csLen(o.lockingBytecode.length) + o.lockingBytecode.length, 0) + 4;
 
@@ -53,6 +71,7 @@ export async function openPinned(key, params) {
     // fee at the worst-case size. utxoTotal: the value of the 3 covenant UTXOs this proof will spend.
     preflight({outputs, utxoTotal, minFeeRate = MIN_FEE_RATE}) {
       const outs = normalizeOutputs(outputs); assertSpendableShape(outs.length, encodePV(params.instanceId, outs).length);
+      assertStandardOutputs(outs);
       outs.forEach((o, k) => {
         assert.ok(!Buffer.from(o.lockingBytecode).equals(Buffer.from(locking)), `output ${k} pays this covenant's own locking: change must go to a covenant with a FRESH INSTANCE (the covenant rejects it on chain)`);
         assert.ok(o.valueSatoshis >= dustThreshold(o.lockingBytecode), `output ${k} is dust (< ${dustThreshold(o.lockingBytecode)} sat): the spend would not relay`);

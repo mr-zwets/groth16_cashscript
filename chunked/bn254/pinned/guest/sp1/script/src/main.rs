@@ -1,6 +1,7 @@
 //! Track 12 example host (SP1 v5).
 //!   cargo run --release -- vkey                       print the programVKey to pin in the covenant
 //!   cargo run --release -- prove <request.json> <proof.json>
+//! Both refuse while guest/shared/pv.rs has the example LOCK_HASH, unless --regtest is given.
 //! request.json (written by `node ../../../example.mjs request <secretHex> <statement.json> request.json`):
 //!   {"secretHex": "..", "instanceId": "<32 B hex>", "outputs": [{"lockingHex": "..", "valueSatoshis": "200000"}, ..]}
 //! proof.json: {"system": "sp1", "programVKey": "0x..", "publicValuesHex": "..", "proofHex": "<a4594c59 ‖ 8 words>"}
@@ -9,6 +10,20 @@ use serde::Deserialize;
 use sp1_sdk::{include_elf, HashableKey, ProverClient, SP1Stdin};
 
 const ELF: &[u8] = include_elf!("bch-pinned-payout");
+
+// The guest's LOCK_HASH (the same file the guest includes) and the PUBLIC example value: refuse to print a program id
+// for, or prove with, the example build unless --regtest is given (anyone can prove for any outputs under it).
+#[allow(dead_code)]
+mod shared { include!("../../../shared/pv.rs"); }
+// sha256("verifier.cash track12 example secret: REPLACE with >=128 random bits") = example-params.mjs EXAMPLE_LOCK_HASH
+const EXAMPLE_LOCK_HASH: &str = "99a364f66b31c63e9f7413d84a752e065825a6befa6d026eed90070c8e7836bf";
+fn refuse_example_lock_hash(regtest: bool) {
+    if hex::encode(shared::LOCK_HASH) == EXAMPLE_LOCK_HASH && !regtest {
+        eprintln!("refused: guest/shared/pv.rs still has the EXAMPLE LOCK_HASH (public secret): replace it with sha256 of YOUR \
+                   secret (>= 128 random bits) and rebuild, or pass --regtest");
+        std::process::exit(2);
+    }
+}
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -19,7 +34,10 @@ struct Request { secret_hex: String, instance_id: String, outputs: Vec<Output> }
 
 fn main() {
     sp1_sdk::utils::setup_logger();
-    let args: Vec<String> = std::env::args().collect();
+    let all: Vec<String> = std::env::args().collect();
+    let regtest = all.iter().any(|x| x == "--regtest");
+    let args: Vec<String> = all.into_iter().filter(|x| x != "--regtest").collect();
+    refuse_example_lock_hash(regtest);
     let client = ProverClient::from_env();
     let (pk, vk) = client.setup(ELF);
     if args.get(1).map(String::as_str) == Some("vkey") { println!("{}", vk.bytes32()); return; }

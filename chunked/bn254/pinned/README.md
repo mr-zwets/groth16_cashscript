@@ -91,15 +91,18 @@ only imports `../bn-native-sound` (script, protocol, transaction, vm) and `../re
   proving. It is not implemented here; the BCHN harness funds random outpoints.)
 - **Change must go to a covenant with a fresh INSTANCE.** Change sent back to the same covenant would be a second
   funding of the same INSTANCE, and the already-public proof could be replayed against it. The covenant therefore
-  rejects any output whose locking equals its own P2SH32 locking (tested: `self-payment`). The same redeem script
-  wrapped as **P2SH20** is a different locking that the guard does not see, but `GRAPH` would accept it, so never pay
-  the covenant's P2SH20 alias either. (The redeem script commits to the code, so the code cannot contain its own
-  P2SH20 hash.)
+  rejects any output whose locking equals its own P2SH32 locking (tested: `self-payment`). The guard does **not**
+  cover the covenant's two other lockings of the same redeem script `R`, and `GRAPH` would accept either: **P2SH20**
+  (`OP_HASH160 <HASH160(R)> OP_EQUAL`), and **bare `R`** as the locking itself (non-standard to create, so it does not
+  relay, but consensus-valid if mined). Never pay either. A P2SH20 guard is **not implemented**: the code cannot
+  contain `HASH160(R)` as a constant (`R` commits to the code), but it could likely be closed by computing
+  `HASH160(R)` at runtime from the input's redeem script; that would change the covenant script and is left open.
 - **Fee.** fee = (sum of the 3 UTXOs actually spent) − (sum of the outputs). The proof fixes the outputs, not the
   inputs, so it fixes the fee only together with the funding. The transaction cannot get a fee input later (`GRAPH`
   admits exactly 3 inputs), and the only fee-bump path is a child spending one of the outputs (CPFP). The outputs
   the guest commits must therefore leave at least the relay fee: about 1 sat/B × up to 30.2 kB. `cov.preflight`
-  checks this before proving, along with dust and the shape caps below.
+  checks this before proving, along with dust, output standardness (libauth bch-2026: OP_RETURN + pushes, or a
+  locking ≤ 201 B), the 223-B OP_RETURN data-carrier cap (sum of locking length + 1) and the shape caps below.
 - **The txid is not final until confirmation.** Nothing signs the transaction. Any relay can re-randomize A, B, C
   (still valid), or change version, locktime or sequence numbers. The outputs and fee stay the same, but the txid
   changes, so do not chain unconfirmed child transactions on the txid that `buildSpend` printed.
@@ -137,7 +140,8 @@ payout hash160 (`0x11` × 20) has no known key, so the 200,000 sat are burned, a
 - The example `LOCK_HASH` is the hash of a **public** string, so anyone can prove for any outputs of a covenant that
   pins the unmodified example guest. Replace it and the secret (≥ 128 bits of entropy) before any real use:
   `LOCK_HASH` can be read from the published program, so a guessable secret can be brute-forced. `example.mjs request`
-  refuses the example secret without `--regtest`.
+  refuses the example secret without `--regtest`, and the guest hosts (`vkey`, `imageid`, `prove`) refuse a build
+  whose `guest/shared/pv.rs` still has the example `LOCK_HASH` (`99a364f6…36bf`) unless `--regtest` is passed.
 
 ## Results (libauth BCH 2026 with the bench's OP_DEFINE patch, i.e. BCHN accounting)
 
@@ -171,7 +175,9 @@ Shape: 1 standard transaction, 3 inputs, all `P2SH32(R)` (35-byte locking, 65-by
 **Test key: 92 runs, 6 accepted controls, 86 rejections, consensus = standard on every run.** Each "valid proof of …"
 rejection carries a valid Groth16 proof of exactly the statement in `STMT` (minted). The verifier would accept it, so
 only the template can reject it. Every such run fails at role 2's `covenant` section. **The suite asserts, per run,
-which inputs fail and in which section** (and, for the self-payment runs, the failing opcode), and it asserts that no
+which inputs fail, in which section and on which opcode** (`NUMEQUALVERIFY` 0x9d for the statement checks, `OP_VERIFY`
+0x69 for the range checks and the self-payment guard, `EQUALVERIFY` 0x88 for the transcript, and the recorded opcode
+for the permuted-input and token runs), and it asserts that no
 rejection comes from a resource limit (op cost or stack-item size). A rejection for the wrong reason fails the
 suite.
 
@@ -234,18 +240,21 @@ workloads, all as expected, BCHN = libauth on every one.** Both nodes were stopp
 # 0. replace LOCK_HASH in guest/shared/pv.rs with sha256 of YOUR secret (>= 128 random bits); pick a fresh INSTANCE
 #    (32 random bytes) and write statement.json = {"instanceId": "<INSTANCE>", "outputs": [{"lockingHex", "valueSatoshis"}]}
 #    (on regtest you may instead use: node example.mjs example-statement statement.json, and pass --regtest below)
+#    (the hosts refuse the example LOCK_HASH unless --regtest is appended to their commands)
 cd guest/sp1/script && SP1_PROVER=cpu cargo run --release -- vkey            # YOUR programVKey: pin this value
 # RISC Zero 3.0.x: rzup install (cargo-risczero, r0vm 3.0.x, risc0-groth16); the covenant key is 'risc0-v3'
 cd guest/risc0 && cargo run --release -p host -- imageid                       # YOUR image id: pin this value
 # 1. the covenant, from YOUR program id (never from a proof file); bchtest prefix unless --mainnet
 node example.mjs pin sp1-v5 <programVKey> <INSTANCE>        # (or risc0-v3 <imageId>) locking + address
-#    before proving, check the outputs against the amount you will fund (pinned.mjs cov.preflight: caps, dust,
-#    self-payment, fee >= 1 sat/B at worst-case size); then fund the address ONCE with exactly 3 UTXOs
-# 2. prove
+#    check the outputs against the amount you WILL fund (pinned.mjs cov.preflight: caps, standard outputs, 223-B
+#    OP_RETURN cap, dust, self-payment, fee >= 1 sat/B at worst-case size). Do not fund yet.
+# 2. prove: the proof depends only on the outputs and INSTANCE (not on the funding), so prove BEFORE funding; if
+#    proving fails, nothing is locked
 node example.mjs request <secretHex> statement.json request.json
 cd guest/sp1/script && SP1_PROVER=cpu cargo run --release -- prove ../../../request.json ../../../proof.json
 cd guest/risc0 && cargo run --release -p host -- prove ../../request.json ../../proof.json
-# 3. spend: refuses a proof.json that names another program, a PV for another INSTANCE, and a proof that does not
+# 3. fund the address ONCE with exactly 3 UTXOs totalling the amount preflight was run with; write utxos.json
+# 4. spend: refuses a proof.json that names another program, a PV for another INSTANCE, and a proof that does not
 #    verify for the statement derived from YOUR program id and the outputs; runs libauth verify() and prints the txid
 node example.mjs spend sp1-v5 <programVKey> <INSTANCE> proof.json utxos.json tx.json
 ```
@@ -272,9 +281,10 @@ const cov = await openPinned('sp1-v5', {system: 'sp1', programVKey: '0x00…' /*
                                         instanceId: '…' /* 32 random bytes, one per deployment */});
 cov.address;                                  // bchtest: by default; pass prefix: 'bitcoincash' for mainnet
 const outputs = [{lockingBytecode: payoutLocking, valueSatoshis: 200000n}];
-cov.preflight({outputs, utxoTotal: 240000n}); // BEFORE proving: caps, dust, no self-payment, fee >= 1 sat/B
-// fund cov.address ONCE with exactly 3 UTXOs totalling utxoTotal (the verifier is a 3-input transaction)
-cov.publicValuesFor(outputs);                 // what your guest must commit_slice: PV bytes
+cov.preflight({outputs, utxoTotal: 240000n}); // BEFORE proving: caps, standard outputs, 223-B OP_RETURN cap, dust,
+                                              // no self-payment, fee >= 1 sat/B
+cov.publicValuesFor(outputs);                 // what your guest must commit_slice: PV bytes; prove now
+// THEN fund cov.address ONCE with exactly 3 UTXOs totalling utxoTotal (the verifier is a 3-input transaction)
 const {hex} = cov.buildSpend({proof: proofHex /* proof.bytes() */, outputs, utxos});  // broadcast hex
 ```
 
@@ -302,7 +312,7 @@ const {hex} = cov.buildSpend({proof: proofHex /* proof.bytes() */, outputs, utxo
 - No real proof of the template statement exists yet. The accept path is shown with test-key proofs (exact statement)
   and with real proofs on the plain core. Real-key liveness is argued from Track 11.
 - A proof does not choose which UTXOs it spends. Any second funding of an INSTANCE (a top-up, a stray deposit, change
-  sent to its P2SH20 alias) can be taken by replaying a used proof: the same outputs are paid again and any surplus
+  sent to its P2SH20 or bare-`R` alias) can be taken by replaying a used proof: the same outputs are paid again and any surplus
   goes to fees (see "What the statement does not bind"). Change back to the covenant's own P2SH32 locking is rejected
   on chain.
 
