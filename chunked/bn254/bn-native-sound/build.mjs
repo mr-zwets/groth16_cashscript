@@ -61,6 +61,10 @@ const out = {
     schedule: {firstDigit: SCHEDULE[i].d0, digits: hex(SCHEDULE[i].sch), boundaries: hex(SCHEDULE[i].bnd)}, codeBytes: prog.info.roles[i]})),
   functions: prog.info.funcs, roleFunctionIds: [0, 1, 2].map((i) => prog.info.roleId + i), prologueBytes: prog.info.prologue,
   degreeBound: {NQ_MAX, states: NSTATES, identities: K_IDS, note: 'affine B lines have the SI-GLS slot degrees (<= 9), so the SI-GLS bound (deg <= 275, n_q <= 132) carries over'},
+  // op costs below are BCHN accounting: libauth 3.1.0-next.8 + patches/@bitauth__libauth@3.1.0-next.8.patch (OP_DEFINE
+  // charges its body as stack-pushed bytes, bitauth/libauth#166). fixture0 re-sizes the fillers fresh; the shipped bench
+  // vectors keep the pre-patch fillers 96/41/67 (see README Results).
+  accounting: 'BCHN (OP_DEFINE body charged as stack-pushed bytes; libauth 3.1.0-next.8 patched, bitauth/libauth#166)',
   fixture0: {nq: core.nq, fills, margin: MARGIN, unlocking: unlockings.map((u) => u.length), unlockingTotal: total,
     // bench score model: unlockings + 3 P2SH32 lockings + tx overhead (envelope 8, input/output counts 2, OP_RETURN output 10,
     // per input outpoint+sequence 40 + script-length varint 3)
