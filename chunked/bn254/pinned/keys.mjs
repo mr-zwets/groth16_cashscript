@@ -1,5 +1,8 @@
 // Track 12: select the BN254 verifying key for this process, then load the verifier modules.
-//   'sp1-v5' | 'risc0'  the real production keys of Track 11 (../real-keys/*.fixtures.json, provenance there)
+//   'sp1-v5' | 'risc0'  the real production keys of Track 11 (../real-keys/*.fixtures.json, provenance there);
+//                       'risc0' folds risc0-ethereum main's control root b1f64013 (= risc0 main @ fc0222ab, unreleased)
+//   'risc0-v3'          the same RISC Zero Groth16 VK folded for the RELEASED control root a54dc85a (risc0-zkvm 3.0.x,
+//                       risc0-ethereum v3.0.1): ./risc0-v3.fixtures.json, written by fold-risc0.mjs
 //   'test'              the reviewed build's own fixture VK (densless-recovered), whose trapdoor scalars are published
 //                       in zk-verifier-bench (src/checkpoints/pairing-vectors.json): ../sound-si-gls/mint.mjs mints
 //                       valid proofs for ANY statement under it. Used only to test the template with proofs of its
@@ -8,7 +11,7 @@
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
 
-export const KEYS = {'sp1-v5': '../real-keys/sp1-v5.fixtures.json', risc0: '../real-keys/risc0.fixtures.json', test: null};
+export const KEYS = {'sp1-v5': '../real-keys/sp1-v5.fixtures.json', risc0: '../real-keys/risc0.fixtures.json', 'risc0-v3': './risc0-v3.fixtures.json', test: null};
 let loaded = null;
 export async function loadKey(key) {
   assert.ok(key in KEYS, 'key: ' + Object.keys(KEYS).join(' | '));
