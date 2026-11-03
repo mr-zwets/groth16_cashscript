@@ -185,9 +185,13 @@ Margins stay at 6%.
 
 - This track shows that the **Groth16 wrapper** is verified soundly on BCH under the production keys. End-to-end
   security is the minimum of: BN254 pairing security (about 100–110 bits classical, not post-quantum); the trusted
-  setups behind both keys; and the inner STARKs that the Groth16 circuits wrap. Per Track 10's security panel
-  (soundcalc @ b325e30, `reports/risc0.md`; not re-checked here [UNV]), RISC Zero's succinct receipts are 97 bits
-  *conjectured* and 48 bits Johnson-bound provable. SP1's level was not assessed in this track.
+  setups behind both keys; and the inner STARKs that the Groth16 circuits wrap. **A covenant
+  that accepts these receipts is no more secure than the zkVM itself.** RISC Zero's succinct receipts are 97 bits
+  *conjectured* (risc0 `zkp/src/lib.rs`) and about 48 bits provable in the Johnson-bound regime (EF soundcalc @ b325e30,
+  `reports/risc0.md`; recomputed independently in Track 10 G0 as 48.22, bench `research/pq-stark/design-t10/params10.py`).
+  For SP1, soundcalc's summary lists SP1 6.1.0 at 100 bits (unique-decoding regime); SP1 v5, the version pinned here,
+  is not in that summary and was not assessed. Any application or site text that mentions RISC Zero receipts should
+  carry the 48-bit provable figure.
 - The verifier itself carries bn-native-sound's open risks unchanged (README there). The new code here is
   `covenant.mjs` (about 60 lines of script generation), the `math.mjs` switch and the two hooks. The Track 11 review
   passed them with minor findings only, and those were fixed in the fix round. The fix-round additions themselves
