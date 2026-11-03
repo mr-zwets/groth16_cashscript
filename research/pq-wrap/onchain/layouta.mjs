@@ -51,7 +51,8 @@ export function txsA(plan, pg, wit, G, outputs, {commitments} = {}) {
     const sourceOutputs = unl.map((_, i) => {
       let value = 2_000n;
       if (final && i === (T > 1 ? 1 : 0)) value = 1_000_000n;
-      if (!final && i === 0) value = 200_000n;
+      // G2: tx0 also funds the T - 2 middle transactions (200,000 sat each on their NFT output)
+      if (!final && i === 0) value = t === 0 ? 200_000n * BigInt(Math.max(1, T - 1)) : 200_000n;
       if (T > 1 && final && i === 0) value = 5_000n;
       const token = CAT && i === 0 ? (t === 0 ? tok('minting') : tok('none', commitments?.[t] ?? threadCommit(G, t))) : undefined;
       return {lockingBytecode: pg.redeem, valueSatoshis: value, ...(token ? {token} : {})};
@@ -59,7 +60,7 @@ export function txsA(plan, pg, wit, G, outputs, {commitments} = {}) {
     // G2: plans of T > 2 transactions: a middle transaction (0 < t < T - 1) burns its NFT and pays one plain output
     const outs = final ? outputs
       : t > 0 ? [{lockingBytecode: MIDDLE_OUT, valueSatoshis: 100_000n}]
-      : [{lockingBytecode: pg.redeem, valueSatoshis: 5_000n, token: tok('minting')}, ...Array.from({length: T - 1}, (_, k) => ({lockingBytecode: pg.redeem, valueSatoshis: 5_000n, token: tok('none', commitments?.[k + 1] ?? threadCommit(G, k + 1))}))];
+      : [{lockingBytecode: pg.redeem, valueSatoshis: 5_000n, token: tok('minting')}, ...Array.from({length: T - 1}, (_, k) => ({lockingBytecode: pg.redeem, valueSatoshis: k + 1 < T - 1 ? 200_000n : 5_000n, token: tok('none', commitments?.[k + 1] ?? threadCommit(G, k + 1))}))];
     const transaction = {version: 2, locktime: 0, inputs: unl.map((u, i) => ({outpointTransactionHash: new Uint8Array(32).fill(0x70 + t), outpointIndex: i, sequenceNumber: 0, unlockingBytecode: u})), outputs: outs};
     return {transaction, sourceOutputs, unl, txBytes: encodeTransaction(transaction).length};
   });
