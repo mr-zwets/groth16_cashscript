@@ -75,8 +75,9 @@ Sources:
 
 The column `λ (bound)` is the Soundness phase's per-round bound for each vector's exact parameters and AIR shape
 (zk-verifier-bench `wip/pq-stark-verifier` `research/pq-stark/verifier/security.json`, fib / mimc). Every set here
-batches with powers of one challenge, so that bound rests on the Soundness phase's **powers-batching adaptation,
-which is not published** (sketch in `research/pq-stark/soundness/SOUNDNESS.md` §2.1). Where Plonky3's LDR estimator
+batches with powers of one challenge, so that bound rests on **powers batching: a direct application of BCIKS20 Thm 7.2, with the remaining FRI step
+proved in zk-verifier-bench `research/pq-stark/BATCHING-PROOF.md`, reviewed internally but not externally** (sketch in
+`research/pq-stark/soundness/SOUNDNESS.md` §2.1). Where Plonky3's LDR estimator
 and the bound differ, the bound is the figure to quote: **P128 is 126.3 (fib) / 125.9 (mimc), not 128**, and its ZK
 variants 123.2-124.2. The S-sets below are the Soundness phase's picks. All sets
 use SHA-256 digests of 32 bytes unless `h` says otherwise.

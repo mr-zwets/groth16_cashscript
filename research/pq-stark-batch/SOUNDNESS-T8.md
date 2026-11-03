@@ -24,9 +24,11 @@ witness lanes, ACC canonicity via CODE, the extra ζ^n ≠ −1 check) and the n
 - **Unit check (S8a, extended in S8b):** `onchain/s8-arith.mjs` → `onchain/results/s8-arith.json` (§9.1).
 - **Base:** Track 5's `research/pq-stark/soundness/SOUNDNESS.md` and `params5.py`, used unchanged.
 
-Every λ figure in this document carries the label **"JB, powers-batching adaptation, unpublished"**: it is a
-list-decoding (Johnson bound) figure that uses Track 5's own, unreviewed adaptation of [ADK] Thm 2 to Plonky3's
-powers-of-one-challenge batching (§6).
+Every λ figure in this document carries the label **"JB; powers batching by [BCIKS20] Thm 7.2, FRI step proved in BATCHING-PROOF.md (internally reviewed, not externally)"**: it is a list-decoding (Johnson bound) figure.
+Plonky3's powers-of-one-challenge batching is handled by a direct application of [BCIKS20] Thm 7.2 (in place of
+Thm 7.4 inside [ADK] Thm 2); the remaining FRI step (per-height ladders, degree-a roll-ins, Lemmas 3 and 4 below) is
+proved in zk-verifier-bench `research/pq-stark/BATCHING-PROOF.md` (2026-11-03). That proof has been reviewed internally but not externally (§6). The DEEP-ALI
+front end is still [ADK] Thm 2 as applied, not re-proved.
 
 ## 1. Result
 
@@ -58,9 +60,10 @@ powers-of-one-challenge batching (§6).
      - With the fix, Track 5's residue argument applies: a non-canonical lane is another byte encoding of the same
        residue, hence another oracle query, and the 128-bit statement covers the as-built scripts against arbitrary
        witnesses (subject to §6 and the stated limits in §12).
-3. **What rests on our unreviewed Track 5 adaptation** (§6): the batching round of every set (margin 8.33 bits
+3. **What rests on the powers-batching proof (BCIKS20 Thm 7.2 + BATCHING-PROOF.md; internally reviewed, not
+   externally)** (§6): the batching round of every set (margin 8.33 bits
    over 128 for M1, 7.15 for M2), the roll-in fold of M2 (margin 0.87), and the per-height splitting of the batching
-   term (our own extension). The query rounds, ALI, DEEP and LogUp terms do not depend on it.
+   term. The query rounds, ALI, DEEP and LogUp terms do not depend on it.
 4. **CTX** (the transaction-output binding) is not constrained by the AIR. It is bound because it is a public value
    observed before every challenge (Lemma 13). That a mempool observer cannot re-bind someone else's proof to new
    outputs additionally needs simulation extractability of the Fiat–Shamir-compiled ZK STARK, which this document
@@ -129,7 +132,8 @@ case is covered by the congruence argument of §9.1 and the op-level check in `s
   term 4h = 128 (birthday convention) or 127.21 (strict reading).
 - **Powers batching** (Track 5 SOUNDNESS §2.1): Plonky3 combines t opened quotients with powers of one α′; replacing
   BCIKS Thm 7.4 by Thm 7.2 (curve of degree t − 1) inside the [ADK] proof multiplies the batching error by t − 1.
-  **Ours, unpublished, unreviewed.** §6 says what depends on it.
+  This is a direct application of [BCIKS20] Thm 7.2; the remaining FRI step is proved in zk-verifier-bench `research/pq-stark/BATCHING-PROOF.md`,
+  **reviewed internally but not externally.** §6 says what depends on it.
 - **Grinding** adds g bits to the round whose challenge it precedes.
 - **Track 5's on-chain primitives**, reused by S4–S7:
   - the transcript as a chain of SHA-256 digests, byte-identical to `SerializingChallenger64<HashChallenger<Sha256>>`;
@@ -185,7 +189,7 @@ nonzero polynomial of degree ≤ |C_i| − 1 for that list element. Union bound 
 **Lemma 3 (batching per height).** Plonky3's `open_input` reduces the claims of each LDE height with its own α′
 ladder (powers restart at α′^0 for each height). For each height h the bad event "the t_h quotients have no
 correlated agreement but their α′-combination has agreement above the Johnson threshold" is a curve of degree
-t_h − 1 in α′; by the powers-batching adaptation it has probability ≤ (t_h − 1)(A0 + B1). Union over heights:
+t_h − 1 in α′; by [BCIKS20] Thm 7.2 (BATCHING-PROOF.md Lemma 1, Theorem 2 (T0)) it has probability ≤ (t_h − 1)(A0 + B1). Union over heights:
 ε_batch ≤ Σ_h (t_h − 1)(A0(N_max) + B1(N_max)).
 - Every height is charged at N_max (A0 grows with |D|²), which over-charges the shorter heights. Charging each at
   its own N_h gives M2 135.88 instead of 135.15 (sensitivity).
@@ -264,20 +268,25 @@ term), with no separate round term, provided the verifier fixes the tree geometr
 | query | 128.70 | **128.70** |
 | λ_IOP | 128.06 | 128.70 |
 
-## 6. What rests on the unpublished powers-batching adaptation
+## 6. What rests on the powers-batching proof
 
-| item | what depends on it | M1 | M2 | if the adaptation failed |
+The batching step is a direct application of [BCIKS20] Thm 7.2; the FRI step (per-height ladders, roll-ins) is proved
+in zk-verifier-bench `research/pq-stark/BATCHING-PROOF.md` (Lemma 1, Theorem 2). That proof has been reviewed internally but not externally.
+It shows that the exact batching error is max_h rather than Σ_h, so Lemma 3's charge is conservative, and that the
+roll-in error is exactly Lemma 4's a·ε_J.
+
+| item | what depends on it | M1 | M2 | if the proof failed |
 |---|---|---|---|---|
 | batching round, factor (t_h − 1) | Lemma 3 | 136.33 (8.33 over 128) | 135.15 (7.15 over 128) | the bound would have to be redone; batch PoW is a free knob (Plonky3 `batch_proof_of_work_bits`), so a larger constant factor costs grinding, not bytes |
-| per-height splitting of the batching term | Lemma 3, our extension of the adaptation | – (one height) | included above | as above |
-| curve of degree a in a roll-in fold | Lemma 4, the same Thm 7.2 substitution inside [ADK]'s proof | – (no roll-in) | fold1 128.87 (0.87 over 128) | commit PoW is the knob: +1 bit per bit lost, no byte cost |
+| per-height splitting of the batching term | Lemma 3 (BATCHING-PROOF.md Theorem 2 (T0)) | – (one height) | included above | as above |
+| curve of degree a in a roll-in fold | Lemma 4 (BATCHING-PROOF.md Theorem 2 (T2)) | – (no roll-in) | fold1 128.87 (0.87 over 128) | commit PoW is the knob: +1 bit per bit lost, no byte cost |
 | ALI with powers of α | Lemma 1 (Track 5 §2.1 item 4, Schwartz–Zippel) | 174.94 | 174.34 | 46 bits of slack |
 
 - For comparison, independent batching challenges (the published [ADK] Thm 2 with Thm 7.4) would give a batch round
   of 142.87 (M1) and 141.87 (M2); the powers factor costs 6.54 / 6.72 bits, and batch PoW 20 pays for it with margin.
-- Not dependent on the adaptation: ALI (except item 4's standard argument), DEEP, LogUp, the query round, the
+- Not dependent on powers batching: ALI (except item 4's standard argument), DEEP, LogUp, the query round, the
   non-roll-in folds and the digest term.
-- In words: M1's binding round (fold1, 128.06) does not use the adaptation; its batching round does, with 8.33 bits of
+- In words: M1's binding round (fold1, 128.06) does not use the powers factor; its batching round does, with 8.33 bits of
   slack. M2's roll-in fold uses the curve version with 0.87 bits of slack, and that is the tightest dependence in
   Track 8.
 
@@ -624,7 +633,7 @@ refuses a DAG that reads it). It enters only transcript step 1, before every cha
 
 - 128 bits is **classical**, with the birthday convention for the 256-bit digests; the strict [BGKTTZ] reading is
   127.21. Generic quantum collision search gives about 85 bits for T∘P and SHA-256.
-- Every λ is "JB, powers-batching adaptation, unpublished" (§6).
+- Every λ is "JB; powers batching by [BCIKS20] Thm 7.2, FRI step proved in BATCHING-PROOF.md (internally reviewed, not externally)" (§6).
 - ZK is by construction; FRI-layer hiding and simulation extractability are not proved (§11).
 - Proof lanes are not range-checked: the scripts accept non-canonical encodings of the same residues (malleability, no
   soundness effect after the S8b fix, §9.1).
@@ -638,8 +647,9 @@ refuses a DAG that reads it). It enters only transcript step 1, before every cha
 
 1. ~~§9.1~~ **closed in S8b** (2p offsets, op-level check on maximal lanes, all S4–S7 suites re-run on the fixed
    scripts, 0 unexpected; §2).
-2. **Write the powers-batching adaptation (Track 5 §2.1) and its two curve extensions (per-height ladders, roll-in
-   degree a) as a proof** and have it checked; M2's roll-in has only 0.87 bits of slack.
+2. ~~Write the powers-batching adaptation as a proof~~ **written** (2026-11-03): zk-verifier-bench `research/pq-stark/BATCHING-PROOF.md`,
+   reviewed internally (pass, minor fixes applied). Still open: an external review; M2's roll-in has only 0.87 bits of
+   slack.
 3. **Simulation extractability** for the CTX lemma: find a published result that covers BCS-compiled, hiding FRI
    STARKs, or state the assumption in REPORT exactly as in §11.
 4. ~~ROOT lanes < p~~ asserted by the generator in S8b (§9.2).
