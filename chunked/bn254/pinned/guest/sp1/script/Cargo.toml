@@ -1,0 +1,14 @@
+# SP1 v5 host of the Track 12 example (NOT compiled in this repository).
+[package]
+name = "bch-pinned-payout-script"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sp1-sdk = "=5.2.4"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+hex = "0.4"
+
+[build-dependencies]
+sp1-build = "=5.2.4"

@@ -1,0 +1,9 @@
+# SP1 v5 guest of the Track 12 example (NOT compiled in this repository; see ../../../README.md "Producing real proofs").
+[package]
+name = "bch-pinned-payout"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+sp1-zkvm = "=5.2.4"
+sha2 = "0.10"
