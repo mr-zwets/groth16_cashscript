@@ -10,4 +10,10 @@
 - [x] covenant-cost.mjs: template block SP1 +133 B / +10.1k op, RISC Zero +315 B / +12.7k op (2 outputs)
 - [x] BCHN node-check t12a, t12b (fresh nodes, stopped): 92/92 as expected, BCHN = libauth, 9/9 valid allowed (POLICY=1)
 - [x] README (chunked/bn254/pinned/README.md), bench node-check README section
-- [ ] Independent review of the template (not done)
+- [x] Two internal reviews (A: pass, 4 minors; B: fix, 3 majors + 5 minors). Fix round (a7edd02 + README):
+      on-chain self-payment guard; spendability caps (n <= 96, |PV| <= 9,900, n x |PV| <= 300,000, measured);
+      example CLI takes program id / INSTANCE from arguments, regtest-only example values, bchtest default prefix;
+      pinned.mjs preflight (caps, dust, self-payment, 1 sat/B fee floor) + libauth verify in buildSpend; key opt-ins
+      for 'test' / 'risc0'; README fee / replay / change / txid / token-burn corrections; tests assert sections and
+      opcodes, add self-payment + mixing runs (test key 92 runs: 6 accept, 86 reject). BCHN t12c: 108/108 as expected.
+- [ ] Independent (external) review of the template (not done)
