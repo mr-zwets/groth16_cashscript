@@ -570,3 +570,19 @@ cd ../batch && node cost-model.mjs                         # MODELLED tables (se
 ```
 
 `cost-model.mjs` imports the reviewed `asm.mjs`, `kernels.mjs` and `math.mjs` read-only. It contains no verifier code.
+
+## Addendum (2026-11-04): independent cost check
+
+An independent reviewer reran `profile.mjs`. Its measured per-phase costs match the ones this note uses, and so does the op-cost to bytes conversion. The note's pricing of the G1 scalar multiplications (Jacobian dbl/madd) is not the cheapest one available. A witnessed affine G1 kernel uses the exact `t·2y ≡ 1` / `t·Δx ≡ 1` checks, the same argument as the B walk, and statically estimates at about 23.0k per doubling and 16.4k per addition, against 34.2k and 49.1k for Jacobian. These are static estimates with the ×1.1 factor, not measured. Model: `cost-model-affine.mjs`.
+
+| variant | N = 3 (tx / per proof) | N = 4 |
+|---|---|---|
+| Jacobian-128 (this note) | 88.1 KB / 29.4 KB (−7%) | does not fit |
+| Jacobian-128 + GLV | 81.1 KB / 27.0 KB (+2%) | does not fit |
+| affine-128 | 79.8 KB / 26.6 KB (+3%) | 103.4 KB, does not fit |
+| affine-128 + GLV | 74.4 KB / 24.8 KB (+10%) | 95.9 KB / 24.0 KB (+13%), fits |
+| affine-100 + GLV | 72.1 KB / 24.0 KB (+13%) | 92.7 KB / 23.2 KB (+16%) |
+
+Savings are relative to the unbatched 27,559 B tx. Saving 20% or more per proof needs 100-bit coefficients, GLV, the affine kernel and N ≥ 7, which comes to about 153 KB: several transactions, or a raised tx limit plus a cross-tx design.
+
+**Decision (2026-11-04):** not built for now. The best one-transaction variant saves about 13% per proof, at N = 4 with about 2 KB of slack. It would add soundness-critical code to about 12 inputs: G1 scalar multiplication, GLV injectivity, a second challenge stage, and a third GT-GLS table. That is a poor trade against the review burden. Reopen if a user needs many same-key proofs per transaction, or if the standard tx size is raised.
