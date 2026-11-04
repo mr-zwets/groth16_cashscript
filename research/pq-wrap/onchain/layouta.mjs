@@ -38,7 +38,7 @@ export function witnessesA(vk, plan, pg, enc, pis) {
   return plan.txs.map((tx, t) => [
     pg.hItems.map(([k]) => (k === 'NF' ? nf : k === 'CTXW' ? ctx : enc.PT[k])),
     ...pg.code.map((c, j) => (t === 0 ? [c, enc.ACC[j]] : [c])),
-    [...(plan.pad ? [Buffer.alloc(plan.pad.fin)] : []), enc.PT.FIN, enc.TBL],
+    [...(plan.pad ? [Buffer.alloc(plan.pad.fin)] : []), enc.PT.FIN, enc.TBL, ...(plan.opt?.lad ? [enc.LAD] : [])],
     ...tx.qry.map(([lo, hi], j) => { const it = plan.pad ? [Buffer.alloc(plan.pad.qry[t][j])] : []; for (let q = lo; q < hi; q++) it.push(enc.L[q], ...(plan.opt?.sib ? sibs(enc.PTH[q]) : [enc.PTH[q]])); return it; }),
   ]);
 }

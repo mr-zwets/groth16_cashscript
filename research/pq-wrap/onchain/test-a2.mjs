@@ -115,6 +115,23 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
   // G2: offsets inside the item for any cap (Track 8's were for cap 5: 32 digests per cap)
   const capD = vk.capB.quotient / 32, fD = (vk.friB[vk.friB.length - 1] ?? 32) / 32;
   for (const [k, at] of [['ROOTS', 5], ['ROOTS', vk.capOff.quotient + 32 * Math.min(17, capD - 1) + 2], ['ROOTS', vk.capOff.random + 9], ['OOD', 100], ['BPOW', 0], ['FROOTS', vk.friOff[vk.friOff.length - 1] + 32 * (fD - 1)], ['CPOW', 0], ['QPOW', 0]]) add('input', `HEAD: ${k} byte ${at} flipped`, {mutate: m((x) => { if (at >= x[0][0][hIdx(k)].length) throw new Error('offset outside the item'); x[0][0][hIdx(k)] = flip(x[0][0][hIdx(k)], at); })});
+  if (plan.opt?.lad) {
+    // opt.lad: FIN's LAD push (alpha'^0 .. alpha'^(maxLadder - 1), 24 B each), checked by FIN, read by QRY
+    const LI = fo + 2, E = 24, last = T - 1;
+    const setLad = (t, f) => m((x) => { x[t][FIN][LI] = f(Buffer.from(x[t][FIN][LI])); });
+    add('lad', 'FIN: wrong ladder value (LAD element 0 = alpha\'^0, byte 0 flipped)', {mutate: setLad(0, (b) => flip(b, 0))});
+    add('lad', 'FIN: wrong ladder value (LAD element 50, limb 1 byte 3 flipped)', {mutate: setLad(0, (b) => flip(b, 50 * E + 8 + 3))});
+    add('lad', 'FIN: wrong ladder value (last LAD element, last byte flipped)', {mutate: setLad(0, (b) => flip(b, -1))});
+    add('lad', `FIN of tx${last} (final): wrong ladder value (LAD element 7 flipped)`, {mutate: setLad(last, (b) => flip(b, 7 * E + 2))});
+    add('lad', 'FIN: LAD element 1 non-canonical (limb 0 + p, same value mod p, if < 2^64)', {mutate: setLad(0, (b) => { const v = b.readBigUInt64LE(E); if (v + P < M64) b.writeBigUInt64LE(v + P, E); else b.writeBigUInt64LE(v - 1n, E); return b; })});
+    add('lad', 'FIN: LAD shifted by one element (alpha\'^1 .. alpha\'^n)', {mutate: setLad(0, (b) => Buffer.concat([b.subarray(E), b.subarray(-E)]))});
+    add('lad', 'FIN: LAD elements 3 and 4 swapped', {mutate: setLad(0, (b) => { const c = Buffer.from(b); b.copy(c, 3 * E, 4 * E, 5 * E); b.copy(c, 4 * E, 3 * E, 4 * E); return c; })});
+    add('lad', 'FIN: LAD truncated by one element', {mutate: setLad(0, (b) => b.subarray(0, -E))});
+    add('lad', 'FIN: LAD extended by one byte', {mutate: setLad(0, (b) => Buffer.concat([b, Buffer.alloc(1)]))});
+    add('lad', 'FIN: LAD missing', {mutate: m((x) => { x[0][FIN] = x[0][FIN].slice(0, LI); })});
+    add('lad', 'FIN: LAD all zero', {mutate: setLad(0, (b) => Buffer.alloc(b.length))});
+    add('lad', 'FIN: LAD of alpha\'+1 (the ladder of another alpha\')', {mutate: setLad(0, (b) => { const F = vk.F; const enc = encodeA(vk, Buffer.from(v.proof_hex, 'hex'), base, plan.parts); const a = F.add(enc.t.alphaP, F.one()); let z = F.one(); const out = []; for (let i = 0; i < b.length / E; i++) { out.push(...z.map((y) => { const q = Buffer.alloc(8); q.writeBigUInt64LE(y % P); return q; })); z = F.mul(z, a); } return Buffer.concat(out); })});
+  }
   add('input', 'FIN: final polynomial byte flipped', {mutate: m((x) => { x[0][FIN][fo] = flip(x[0][FIN][fo], 1000); })});
   add('input', 'HEAD: extra empty item', {mutate: m((x) => { x[0][0].push(Buffer.alloc(0)); })});
   add('input', 'HEAD: CTXW missing', {mutate: m((x) => { x[0][0].pop(); })});
@@ -150,12 +167,19 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
     add('sib', 'QRY: siblings of the first query moved after L of the second query (per-query order)', {mutate: m((x) => { if (per0 < 2) { const [a2, k2] = q2(x); const a = x[0][Q0]; [a[s0], a2[k2 + 1]] = [a2[k2 + 1], a[s0]]; return; } const a = x[0][Q0]; const L2 = a.splice(qo + pq, 1)[0]; a.splice(qo + 1, 0, L2); })});
   }
   if (plan.pad) {
-    add('pad', 'QRY: pad byte 0 set to 1', {mutate: m((x) => { x[0][Q0][0] = flip(x[0][Q0][0], 0); })});
-    add('pad', 'QRY: pad one byte shorter', {mutate: m((x) => { x[0][Q0][0] = x[0][Q0][0].subarray(1); })});
+    // an empty pad (pad length 0: the input is byte-bound) has no byte to flip or remove: those cases become 'the
+    // empty pad replaced by one byte 0x01'
+    const pq0 = plan.pad.qry[0][0], pf0 = plan.pad.fin;
+    if (pq0) {
+      add('pad', 'QRY: pad byte 0 set to 1', {mutate: m((x) => { x[0][Q0][0] = flip(x[0][Q0][0], 0); })});
+      add('pad', 'QRY: pad one byte shorter', {mutate: m((x) => { x[0][Q0][0] = x[0][Q0][0].subarray(1); })});
+    } else add('pad', 'QRY: empty pad replaced by one byte 0x01', {mutate: m((x) => { x[0][Q0][0] = Buffer.from([1]); })});
     add('pad', 'QRY: pad one byte longer', {mutate: m((x) => { x[0][Q0][0] = Buffer.concat([x[0][Q0][0], Buffer.alloc(1)]); })});
     add('pad', 'QRY: pad missing', {mutate: m((x) => { x[0][Q0] = x[0][Q0].slice(1); })});
-    add('pad', 'FIN: pad last byte set to 1', {mutate: m((x) => { x[0][FIN][0] = flip(x[0][FIN][0], -1); })});
-    add('pad', 'FIN: pad one byte shorter', {mutate: m((x) => { x[0][FIN][0] = x[0][FIN][0].subarray(1); })});
+    if (pf0) {
+      add('pad', 'FIN: pad last byte set to 1', {mutate: m((x) => { x[0][FIN][0] = flip(x[0][FIN][0], -1); })});
+      add('pad', 'FIN: pad one byte shorter', {mutate: m((x) => { x[0][FIN][0] = x[0][FIN][0].subarray(1); })});
+    } else add('pad', 'FIN: empty pad replaced by one byte 0x01', {mutate: m((x) => { x[0][FIN][0] = Buffer.from([1]); })});
   }
   add('input', 'QRY: two QRY inputs swapped (witnesses)', {mutate: m((x) => { [x[0][Q0], x[0][Q0 + 1]] = [x[0][Q0 + 1], x[0][Q0]]; })});
   // the input graph and the code
@@ -179,6 +203,7 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
     const ow = () => spendA(vk, plan, Buffer.from(ov.proof_hex, 'hex'), op, outs).wit;
     add('mix', `HEAD from ${label}`, {mutate: (w) => { const x = cloneWit(w), y = ow(); x[0][0] = y[0][0]; return x; }});
     add('mix', `FIN from ${label}`, {mutate: (w) => { const x = cloneWit(w), y = ow(); x[0][FIN] = y[0][FIN]; return x; }});
+    if (plan.opt?.lad) add('mix', `LAD (FIN's ladder) from ${label}`, {mutate: (w) => { const x = cloneWit(w), y = ow(); x[0][FIN][(plan.pad ? 1 : 0) + 2] = y[0][FIN][(plan.pad ? 1 : 0) + 2]; return x; }});
     add('mix', `HEAD and FIN from ${label}`, {mutate: (w) => { const x = cloneWit(w), y = ow(); x[0][0] = y[0][0]; x[0][FIN] = y[0][FIN]; return x; }});
     add('mix', `ACC of CODE 1 from ${label}`, {mutate: (w) => { const x = cloneWit(w), y = ow(); x[0][1][1] = y[0][1][1]; return x; }});
     add('mix', `one QRY input from ${label}`, {mutate: (w) => { const x = cloneWit(w), y = ow(); x[0][Q0 + 1] = y[0][Q0 + 1]; return x; }});

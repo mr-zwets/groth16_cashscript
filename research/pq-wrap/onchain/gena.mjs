@@ -62,6 +62,10 @@ function localFn(args, build) {
 //   opt.sib  Merkle climb with one 32 B push per sibling (layout-review candidate 1): each query carries L and then
 //            its (depth - capH) siblings per tree as separate items, in climb order; every level fetches its sibling
 //            from the stack bottom (DEPTH 1SUB ROLL) and checks SIZE 32, instead of re-pushing the remaining PTH blob
+//   opt.lad  the alpha' ladder published once by FIN (layout-review candidate 3): FIN pushes LAD = alpha'^0 ..
+//            alpha'^(maxLadder - 1) (24 B each, canonical u64 LE limbs) after TBL, builds the same string from the
+//            powers its own A-sums loop walks and EQUALVERIFYs it (as TBL); QRY reads LAD from FIN's unlocking and
+//            only packs the row keys (no extension multiplications); every height's ladder is a prefix of LAD
 export function buildA(vk, pis, plan, opts = {}) {
   { let next = 0;
     for (const tx of plan.txs) for (const r of tx.qry) {
@@ -70,7 +74,7 @@ export function buildA(vk, pis, plan, opts = {}) {
     }
     if (next !== vk.Q) throw new Error(`plan: query ranges cover [0, ${next})`); }
   const T = plan.txs.length, thread = plan.thread, nc = plan.nc;
-  const OPT = plan.opt ?? {}, SIB = !!OPT.sib;
+  const OPT = plan.opt ?? {}, SIB = !!OPT.sib, LADO = !!OPT.lad;
   if (T > 1 && !thread) throw new Error('plan: several transactions need the NFT thread');
   const parts = plan.parts;
   if (parts.length !== nc) throw new Error('plan: one constraint range per CODE input');
@@ -87,7 +91,7 @@ export function buildA(vk, pis, plan, opts = {}) {
   // (FIN: pad.fin; QRY input j: pad.qry[j] of its transaction, in the role stub); checked byte for byte, so the
   // unlocking stays fully determined. They raise the input's density budget (41 + unlocking) * 800 only.
   const pad = plan.pad ?? null;
-  const fItems = [...(pad ? [['PADF', pad.fin]] : []), ['FIN', vk.L * e8], ['TBL', vk.tblB]];
+  const fItems = [...(pad ? [['PADF', pad.fin]] : []), ['FIN', vk.L * e8], ['TBL', vk.tblB], ...(LADO ? [['LAD', vk.maxLadder * e8]] : [])];
   const hNames = hItems.map(([k]) => k);
   const tRegion = [...vk.ptItems.map(([k]) => k), 'NF', 'CTXW'];
   const cleanup = (S) => { if (!S.st.length) S.push(0, 'z'); S.raw(['BEGIN', 'DROP', 'DEPTH', 'NOT', 'UNTIL'], S.st.length); S.push(1); };
@@ -108,7 +112,7 @@ export function buildA(vk, pis, plan, opts = {}) {
     return (F[key] = defFn(key, s.bytes()));
   };
   const parseHead = (S) => S.raw([parser('PARSE_H', 0, hItems), 'INVOKE'], 0, hNames);
-  const parseFin = (S) => { S.raw([parser('PARSE_F', FIN_IN, fItems), 'INVOKE'], 0, fItems.map(([k]) => k)); if (pad) S.drop('PADF'); };
+  const parseFin = (S, keepLad = false) => { S.raw([parser('PARSE_F', FIN_IN, fItems), 'INVOKE'], 0, fItems.map(([k]) => k)); if (pad) S.drop('PADF'); if (LADO && !keepLad) S.drop('LAD'); };
   // transcript: NF lanes (< p), CTX lanes (< 2^56), then the S5 transcript (keeps ROOTS OOD FROOTS FIN; G kept)
   const trn = (S) => shared(S, 'TRN', tRegion, (s) => {
     s.pick('NF'); s.raw(['BEGIN', 8, 'SPLIT', 'SWAP', B0, 'CAT', 'BIN2NUM', 'DUP', P, 'LESSTHAN', 'VERIFY', 'SWAP', 'SIZE', 'NOT', 'UNTIL', 'DROP'], 1, names('nf', 4));
@@ -348,7 +352,7 @@ export function buildA(vk, pis, plan, opts = {}) {
     mark(S, 'entry');
     trn(S);
     mark(S, 'transcript');
-    dropAllBut(S, ['TBL', 'OOD', ...zeta, ...names('ap', D), /^be\d+_\d$/, /^idx\d+$/]);
+    dropAllBut(S, ['TBL', ...(LADO ? ['LAD'] : []), 'OOD', ...zeta, ...names('ap', D), /^be\d+_\d$/, /^idx\d+$/]);
     // DEEP point constants (genn consts, first block)
     {
       const b = new PB(D, F);
@@ -373,8 +377,12 @@ export function buildA(vk, pis, plan, opts = {}) {
     for (const x of zeta) if (S.has(x)) S.drop(x);
     mark(S, 'deep-points');
     // A sums per height and point: A_p = sum over the height's claims at point p of alpha'^(ladder) v (genn AZ loop
-    // without the row-key parts)
+    // without the row-key parts); opt.lad: the (first) height with the longest ladder also serializes every power it
+    // walks into 'lad' (canonical: P MOD, 8 bytes LE per limb)
+    const hLad = LADO ? vk.heights.find((hh) => vk.ladder[hh] === vk.maxLadder) : null;
+    if (LADO && hLad === undefined) throw new Error('opt.lad: no height with the longest ladder');
     for (const hh of vk.heights) {
+      const emit = hh === hLad;
       const m = vk.hp[hh].length;
       const cl = vk.claims.filter((c) => c.logH === hh);
       const ranges = []; for (const c of cl) { const l = ranges[ranges.length - 1]; if (l && l.v0 + l.n === c.v0) l.n += c.width; else ranges.push({v0: c.v0, n: c.width}); }
@@ -382,17 +390,19 @@ export function buildA(vk, pis, plan, opts = {}) {
         S.pick('OOD'); S.raw([...(rg.v0 ? [rg.v0 * e8, 'SPLIT', 'NIP'] : []), ...(rg.v0 + rg.n < vk.numVals ? [rg.n * e8, 'SPLIT', 'DROP'] : [])], 1, [i ? 'hz2' : 'hz']);
         if (i) S.raw(['CAT'], 2, ['hz']);
       });
-      const st = [...Array.from({length: m}, (_, p) => names(`A${p}_`, D)).flat(), ...names('zq', D), ...names('za', D), 'hz'];
+      const st = [...Array.from({length: m}, (_, p) => names(`A${p}_`, D)).flat(), ...names('zq', D), ...names('za', D), 'hz', ...(emit ? ['lad'] : [])];
       S.roll('hz');
       for (let k = 0; k < m * D; k++) S.push(0, st[k]);
       S.push(1, 'zq0'); S.push(0, 'zq1'); S.push(0, 'zq2');
       names('ap', D).forEach((x, i) => S.pick(x, 'za' + i));
       S.roll('hz');
+      if (emit) S.push(new Uint8Array(0), 'lad');
       const segs = []; cl.forEach((c) => { const l = segs[segs.length - 1]; if (l && l.ptl === c.ptl) l.n += c.width; else segs.push({ptl: c.ptl, n: c.width}); });
       for (const sg of segs) {
-        const key = `AS${m}_${sg.ptl}`;
+        const key = `AS${emit ? 'L' : ''}${m}_${sg.ptl}`;
         if (!F[key]) {
           F[key] = defFn(key, localFn([...st, 'n'], (s) => {
+            if (emit) { s.roll('lad'); for (let c = 0; c < D; c++) { s.pick('zq' + c); s.raw([P, 'MOD', 9, 'NUM2BIN', 8, 'SPLIT', 'DROP', 'CAT'], 2, ['lad']); } }
             s.roll('hz'); s.raw([e8, 'SPLIT', 'SWAP', F.RDV, 'INVOKE'], 1, ['hz', ...names('vv', D)]);
             const bb = new PB(D, F);
             const t = bb.mul(names('zq', D), names('vv', D));
@@ -408,6 +418,7 @@ export function buildA(vk, pis, plan, opts = {}) {
         S.raw([sg.n, 'BEGIN', F[key], 'INVOKE', 'DUP', 'NOT', 'UNTIL', 'DROP'], st.length, st);
       }
       S.roll('hz'); S.raw([new Uint8Array(0), 'EQUALVERIFY'], 1);
+      if (emit) { S.roll('lad'); S.roll('LAD'); S.raw(['EQUALVERIFY'], 2); }
       for (const x of [...names('zq', D), ...names('za', D)]) S.drop(x);
       for (let p = 0; p < m; p++) names(`A${p}_`, D).forEach((x, c) => S.rename(x, `nA${hh}_${p}_${c}`));
     }
@@ -435,15 +446,33 @@ export function buildA(vk, pis, plan, opts = {}) {
     S.pick('hi'); S.pick('lo'); S.raw(['SUB', perQ, 'MUL', pad ? 5 : 3, 'ADD', 'DEPTH', 'NUMEQUALVERIFY'], 2);
     // the pad (first push, bottom of the stack) must be exactly pn zero bytes
     if (pad) { S.roll('pn'); S.raw(['DEPTH', '1SUB', 'ROLL', 'SWAP', 0, 'SWAP', 'NUM2BIN', 'EQUALVERIFY'], 1); }
-    parseHead(S); parseFin(S);
-    dropAllBut(S, ['lo', 'hi', 'ROOTS', 'FROOTS', 'FIN', 'TBL']);
+    parseHead(S); parseFin(S, true);
+    dropAllBut(S, ['lo', 'hi', 'ROOTS', 'FROOTS', 'FIN', 'TBL', ...(LADO ? ['LAD'] : [])]);
     // TBL -> numbers: Q indices (idxB bytes), then u64 values
     S.roll('TBL'); S.raw([Q * vk.idxB, 'SPLIT', 'SWAP', 'BEGIN', vk.idxB, 'SPLIT', 'SWAP', 'BIN2NUM', 'SWAP', 'SIZE', 'NOT', 'UNTIL', 'DROP'], 1, ['TB8', ...names('idx', Q)]);
     S.roll('TB8'); S.raw([F.RDV, 'INVOKE'], 1, tblNames.slice(Q));
     mark(S, 'entry');
     // alpha' ladder and the packed row keys (genn AZ loop: the row-key parts only)
     const Kname = new Map(); let kseq = 0;
-    for (const hh of vk.heights) {
+    if (LADO) for (const hh of vk.heights) {
+      // opt.lad: kk = zq0 | zq1 << 8 SB | zq2 << 16 SB (shifted by 8 SB D ptl), assembled as bytes from the LAD element
+      // (zq_c are canonical u64 LE: FIN serialized and checked them), then BIN2NUM; the ladder of height hh is the
+      // prefix of LAD of its length
+      const cl = vk.claims.filter((c) => c.logH === hh);
+      S.pick('LAD', 'lad'); if (vk.ladder[hh] < vk.maxLadder) S.raw([vk.ladder[hh] * e8, 'SPLIT', 'DROP'], 1, ['lad']);
+      const segs = []; cl.forEach((c) => { const l = segs[segs.length - 1]; if (l && l.ptl === c.ptl) l.n += c.width; else segs.push({ptl: c.ptl, n: c.width}); });
+      const Z = new Uint8Array(SB - 8);
+      for (const sg of segs) {
+        const key = `KL_${sg.ptl}`;
+        if (!F[key]) F[key] = defFn(key, asm('SWAP', e8, 'SPLIT', 'SWAP', 8, 'SPLIT', 8, 'SPLIT', B0, 'CAT', 'SWAP', Z, 'CAT', 'SWAP', 'CAT', 'SWAP', Z, 'CAT', 'SWAP', 'CAT',
+          ...(sg.ptl ? [new Uint8Array(SB * D * sg.ptl), 'SWAP', 'CAT'] : []), 'BIN2NUM', 'TOALTSTACK', 'SWAP', '1SUB'));
+        S.raw([sg.n, 'BEGIN', F[key], 'INVOKE', 'DUP', 'NOT', 'UNTIL', 'DROP'], 1, ['lad']);
+      }
+      S.raw([new Uint8Array(0), 'EQUALVERIFY'], 1);
+      for (const c of cl) for (let j = 0; j < c.width; j++) Kname.set(`${c.ri}:${c.mi}:${c.p}:${j}`, 'K' + kseq++);
+    }
+    if (LADO) S.drop('LAD');
+    else for (const hh of vk.heights) {
       const cl = vk.claims.filter((c) => c.logH === hh);
       const st = [...names('zq', D), ...names('za', D)];
       S.push(1, 'zq0'); S.push(0, 'zq1'); S.push(0, 'zq2');
