@@ -261,7 +261,7 @@ node example.mjs spend sp1-v5 <programVKey> <INSTANCE> proof.json utxos.json tx.
 
 - Expected resources (unverified here): SP1's CPU Groth16 pipeline (core, compress, shrink, wrap, gnark) is
   memory-heavy. Run it niced on 4 threads and check that it fits in 24 GB before relying on it. RISC Zero's
-  `ProverOpts::groth16()` on x86-64 Linux needs the risc0-groth16 component or docker.
+  `ProverOpts::groth16()` on x86-64 Linux CPU needs docker (risc0-groth16 3.0.x runs the `risczero/risc0-groth16-prover` image; the rzup component is used only with the `cuda` feature).
 - `pinned.mjs` checks the SP1 selector `a4594c59` (SP1 v5.0.0 circuits). The proof must also verify (noble pairing)
   for the statement derived from the pinned program id, INSTANCE and outputs, or the builder refuses it.
 - `openPinned` refuses key `risc0` (Track 11's unreleased root `b1f64013…`) without `allowUnreleasedRisc0`, and key
