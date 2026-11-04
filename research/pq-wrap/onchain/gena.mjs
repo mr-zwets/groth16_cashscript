@@ -455,6 +455,10 @@ export function buildA(vk, pis, plan, opts = {}) {
         const key = `AS${emit ? 'L' : ''}${m}_${sg.ptl}`;
         if (!F[key]) {
           F[key] = defFn(key, localFn([...st, 'n'], (s) => {
+            // LAD canonicity relies on zq >= 0 (P MOD of a negative number stays negative, and 9 NUM2BIN 8 SPLIT DROP
+            // would then give |x|): zq starts at (1, 0, 0) and is only ever the output of MULE (zq x za), whose limbs are
+            // P MOD of sums of products of non-negative inputs; za = alpha' is parsed from TBL by RDV (bytes || 0x00,
+            // BIN2NUM: non-negative). So every zq limb is in [0, p) and P MOD only restates it
             if (emit) { s.roll('lad'); for (let c = 0; c < D; c++) { s.pick('zq' + c); s.raw([P, 'MOD', 9, 'NUM2BIN', 8, 'SPLIT', 'DROP', 'CAT'], 2, ['lad']); } }
             s.roll('hz'); s.raw([e8, 'SPLIT', 'SWAP', F.RDV, 'INVOKE'], 1, ['hz', ...names('vv', D)]);
             const bb = new PB(D, F);
@@ -499,9 +503,11 @@ export function buildA(vk, pis, plan, opts = {}) {
     S.pick('hi'); S.pick('lo'); S.raw(['SUB', perQ, 'MUL', pad ? 5 : 3, 'ADD', 'DEPTH', 'NUMEQUALVERIFY'], 2);
     // the pad (first push, bottom of the stack) must be exactly pn zero bytes
     if (pad) { S.roll('pn'); S.raw(['DEPTH', '1SUB', 'ROLL', 'SWAP', 0, 'SWAP', 'NUM2BIN', 'EQUALVERIFY'], 1); }
+    const cutPre = S.code.length;
     if (r1) { parseState(S); if (CL) parseTop(S); } else { parseHead(S); parseFin(S, true); }
     const qKeep = ['lo', 'hi', 'ROOTS', 'FROOTS', 'FIN', 'TBL', ...(LADO ? ['LAD'] : []), ...(CL ? ['LAYER'] : [])];
     dropAllBut(S, qKeep); S.arrange(qKeep);
+    const cutPost = S.code.length;
     // TBL -> numbers: Q indices (idxB bytes), then u64 values
     S.roll('TBL'); S.raw([Q * vk.idxB, 'SPLIT', 'SWAP', 'BEGIN', vk.idxB, 'SPLIT', 'SWAP', 'BIN2NUM', 'SWAP', 'SIZE', 'NOT', 'UNTIL', 'DROP'], 1, ['TB8', ...names('idx', Q)]);
     S.roll('TB8'); S.raw([F.RDV, 'INVOKE'], 1, tblNames.slice(Q));
@@ -612,6 +618,8 @@ export function buildA(vk, pis, plan, opts = {}) {
     S.raw(['BEGIN', idQ, 'INVOKE', '1ADD', '2DUP', 'NUMEQUAL', 'UNTIL'], 0);
     mark(S, 'queries');
     cleanup(S);
+    // opt.state: QROLE1 must equal QROLE apart from the parse section (asserted after both are built)
+    (g.qroleParts ??= {})[r1 ? 'r1' : 'r0'] = {pre: Buffer.from(S.code.slice(0, cutPre)), post: Buffer.from(S.code.slice(cutPost))};
     return S.bytes();
   };
   // fresh path runs (genn merkleFns: F1 .. F16 only)
@@ -684,6 +692,8 @@ export function buildA(vk, pis, plan, opts = {}) {
   let R1 = null;
   if (STV) {
     const idQRY1 = defFn('QROLE1', qryRole(true));
+    { const {r0, r1} = g.qroleParts;
+      if (!r0.pre.equals(r1.pre) || !r0.post.equals(r1.post)) throw new Error('opt.state: QROLE1 differs from QROLE outside the parse section'); }
     const r1Roles = [];
     const stateRole = (kind) => {
       const S = new Stk([...sNames]);

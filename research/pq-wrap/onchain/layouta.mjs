@@ -57,6 +57,13 @@ export function stateValsA(pg, enc, pis) {
   const v = {ROOTS: enc.PT.ROOTS, FROOTS: enc.PT.FROOTS, FIN: enc.PT.FIN, TBL: enc.TBL, LAD: enc.LAD, NF: u64s(pis.slice(4, 8)), CTXW: u64s(pis.slice(8, 12)), G: enc.G};
   return pg.sItems.map(([k]) => v[k]);
 }
+// opt.state: the state values as tx0's witness carries them (an item that is missing falls back to the honest value)
+export function stateValsOfWit(pg, w0, enc, pis) {
+  const honest = stateValsA(pg, enc, pis), names = pg.sItems.map(([k]) => k);
+  const head = Object.fromEntries(pg.hItems.map(([k], i) => [k, w0[0]?.[i]]));
+  const fin = Object.fromEntries(pg.fItems.map(([k], i) => [k, w0[pg.FIN_IN]?.[i]]));
+  return names.map((k, i) => (k === 'G' ? honest[i] : (k === 'ROOTS' || k === 'FROOTS' || k === 'NF' || k === 'CTXW' ? head[k] : fin[k]) ?? honest[i]));
+}
 const capOf = (plan) => (plan.opt?.cap ? +plan.opt.cap : 0);
 // witnesses: per transaction, per input, the pushed items (bottom first)
 export function witnessesA(vk, plan, pg, enc, pis) {
@@ -109,7 +116,10 @@ export function spendA(vk, plan, proof, pis, outputs, opts = {}, mutate) {
   let wit = witnessesA(vk, plan, pg, enc, pis);
   if (mutate) wit = mutate(wit, enc, pg) ?? wit;
   // opt.state: tx0 mints NFT k over the honest state values (stateCommit), unless the caller gives commitments
-  const o2 = pg.R1 && !opts.commitments ? {...opts, commitments: plan.txs.map((_, k) => (k ? stateCommit(stateValsA(pg, enc, pis), k) : null))} : opts;
+  // the commitments tx0's HEAD would compute from tx0's own witness (HEAD's items, FIN's TBL / LAD; G is the honest
+  // transcript digest): a tampered tx0 then mints over its tampered values, so HEAD's HS check passes and the input
+  // that owns the value (FIN for TBL and LAD) is the one that must reject it (test-a2 owner checks)
+  const o2 = pg.R1 && !opts.commitments ? {...opts, commitments: plan.txs.map((_, k) => (k ? stateCommit(stateValsOfWit(pg, wit[0], enc, pis), k) : null))} : opts;
   const txs = txsA(plan, pg, wit, opts.G ?? enc.G, outputs, o2);
   return {pg, enc, wit, txs};
 }

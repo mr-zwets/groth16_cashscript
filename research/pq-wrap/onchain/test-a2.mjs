@@ -23,7 +23,7 @@ import {vkxA, verifyModelA, encodeA, P, sha} from './modela.mjs';
 import {applyTamper} from './modeln.mjs';
 import {makePlanA, spendA, evaluateTxA, verifyTxA, CATEGORY, parseOpt, stateValsA} from './layouta.mjs';
 import {threadCommit, stateCommit} from './gena.mjs';
-import {planFor} from './grade-a2.mjs';
+import {planFor, roleOf} from './grade-a2.mjs';
 import {runCase, vkFromVector, parse as strictParse} from '../verifier/verify-batch.mjs';
 import {ctxOf} from './ctx.mjs';
 
@@ -58,17 +58,18 @@ function chainRun(vk, plan, buf, pis, outs, expectValid, {mutate, txMutate, ...o
   const sp = spendA(vk, plan, buf, pis, outs, o, mutate);
   let txs = sp.txs;
   if (txMutate) txs = txMutate(txs.map((tx) => ({...tx, transaction: {...tx.transaction, inputs: [...tx.transaction.inputs], outputs: [...tx.transaction.outputs]}, sourceOutputs: [...tx.sourceOutputs]})), sp) ?? txs;
-  let acc = true, err = null;
+  let acc = true, err = null, rejects = null;
   for (const [t, tx] of txs.entries()) {
     if (expectValid) {
       for (const vm of ['bchStd', 'bchCons']) { const r = evaluateTxA(tx, vm); const bad = r.findIndex((x) => !x.accepted); if (bad >= 0) { acc = false; err ??= `tx${t} in${bad} ${vm}: ${r[bad].error}`; } }
       if (acc) { const w = verifyTxA(tx, 'bchStd'); if (w !== true) { acc = false; err = `tx${t} whole-tx: ${w}`; } }
     } else {
-      const r = evaluateTxA(tx, 'looseStd', {stopAtReject: true}); const bad = r.findIndex((x) => !x.accepted);
-      if (bad >= 0) { acc = false; err = `tx${t} in${bad}: ${r[bad].error}`; break; }
+      // every input of the first rejecting transaction: the set of rejecting inputs (owner checks)
+      const r = evaluateTxA(tx, 'looseStd'); const bad = r.findIndex((x) => !x.accepted);
+      if (bad >= 0) { acc = false; err = `tx${t} in${bad}: ${r[bad].error}`; rejects = {t, ins: r.map((x, i) => (x.accepted ? -1 : i)).filter((i) => i >= 0)}; break; }
     }
   }
-  return {acc, err, sp, txs};
+  return {acc, err, sp, txs, rejects};
 }
 const same = (wa, wb) => wa.length === wb.length && wa.every((tx, t) => tx.length === wb[t].length && tx.every((it, i) => it.length === wb[t][i].length && it.every((x, k) => Buffer.compare(Buffer.from(x), Buffer.from(wb[t][i][k])) === 0)));
 const flip = (b, at) => { const c = Buffer.from(b); c[at < 0 ? c.length + at : at] ^= 1; return c; };
@@ -288,7 +289,8 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
     add('state', 'tx1 STATE: G missing', {mutate: m((x) => { x[1][0] = x[1][0].slice(0, -1); })});
     add('state', 'tx1 STATE: extra empty item', {mutate: m((x) => { x[1][0].push(Buffer.alloc(0)); })});
     add('state', 'tx1 STATE: ROOTS and FROOTS swapped', {mutate: m((x) => { const a = x[1][0]; [a[0], a[1]] = [a[1], a[0]]; })});
-    add('state', 'tx1 STATE: the honest state of kind 2 (another commitment index)', {txMutate: (txs, sp) => { const so = txs[1].sourceOutputs; so[0] = {...so[0], token: {...so[0].token, nft: {...so[0].token.nft, commitment: Uint8Array.from(stateCommit(stateValsA(sp.pg, sp.enc, base), 2))}}}; return txs; }});
+    // STATE accepts it (a valid kind-2 state); the QRY inputs reject it through their per-kind lo/hi role stubs
+    add('state', 'tx1 STATE: the honest state of kind 2 (another commitment index; rejected by QRY, its per-kind lo/hi stubs)', {txMutate: (txs, sp) => { const so = txs[1].sourceOutputs; so[0] = {...so[0], token: {...so[0].token, nft: {...so[0].token.nft, commitment: Uint8Array.from(stateCommit(stateValsA(sp.pg, sp.enc, base), 2))}}}; return txs; }});
     add('state', 'tx1: input 0 (STATE, with its NFT) locked to R0', {txMutate: (txs, sp) => { const so = txs[1].sourceOutputs; so[0] = {...so[0], lockingBytecode: sp.pg.redeem}; return txs; }});
     add('state', 'tx1: every input locked to R0', {txMutate: (txs, sp) => { txs[1].sourceOutputs.forEach((o, i, a) => { a[i] = {...o, lockingBytecode: sp.pg.redeem}; }); return txs; }});
     add('state', 'tx1: library input carries R0 code blob 1', {mutate: (w, enc, pg) => { const x = cloneWit(w); x[1][1] = [Buffer.from(pg.code[0])]; return x; }});
@@ -300,8 +302,41 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
     add('state', 'tx0: NFT output 1 locked to R1 + one byte', {txMutate: (txs, sp) => { const o = txs[0].transaction.outputs; o[1] = {...o[1], lockingBytecode: Uint8Array.from([...sp.pg.R1.redeem, 0x61])}; return txs; }});
     add('state', 'tx0: NFT output 1 with the commitment of the old thread scheme (k | SHA256(tag | G | k))', {txMutate: (txs, sp) => { const o = txs[0].transaction.outputs; o[1] = {...o[1], token: {...o[1].token, nft: {...o[1].token.nft, commitment: Uint8Array.from(threadCommit(sp.enc.G, 1))}}}; return txs; }});
     add('state', 'tx0: NFT outputs 1 and 2 swapped', {txMutate: (txs) => { const o = txs[0].transaction.outputs; [o[1], o[2]] = [o[2], o[1]]; return txs; }});
+    // R1 QRY inputs run R1's QROLE1, which shares QA (and its pad and item-count checks' code) with R0; these check
+    // the R1 side end to end
+    const R0q = Q0of(1);
+    if (SIB) {
+      add('sib', 'tx1 (R1) QRY: wrong sibling (sibling 0 replaced by sibling 1)', {owner: [1, R0q], mutate: m((x) => { const a = x[1][R0q]; a[qo + 1] = Buffer.from(a[qo + 2]); })});
+      add('sib', 'tx1 (R1) QRY: missing sibling (sibling 5 removed)', {owner: [1, R0q], mutate: m((x) => { x[1][R0q].splice(qo + 6, 1); })});
+      add('sib', 'tx1 (R1) QRY: sibling truncated by one byte', {owner: [1, R0q], mutate: m((x) => { const a = x[1][R0q]; a[qo + 9] = a[qo + 9].subarray(0, 31); })});
+    }
+    if (plan.pad) {
+      add('pad', 'tx1 (R1) QRY: pad one byte longer', {owner: [1, R0q], mutate: m((x) => { x[1][R0q][0] = Buffer.concat([x[1][R0q][0], Buffer.alloc(1)]); })});
+      add('pad', 'tx1 (R1) QRY: pad missing', {owner: [1, R0q], mutate: m((x) => { x[1][R0q] = x[1][R0q].slice(1); })});
+    }
     add('state', `tx${last} (final): the NFT passed on to an extra output (R1 mints nothing)`, {txMutate: (txs) => { const tx = txs[last]; tx.transaction.outputs.push({lockingBytecode: tx.sourceOutputs[0].lockingBytecode, valueSatoshis: 1000n, token: tx.sourceOutputs[0].token}); return txs; }});
   }
+  // the input that owns each checked value must be among the rejecting inputs: [transaction, input]
+  const ownerOf = (c) => {
+    if (c.owner) return c.owner;
+    const f = c.family, n = c.nm, tx = (n.match(/^tx(\d+)/) ?? [])[1];
+    switch (f) {
+      case 'constants': {
+        if (/^FIN: TBL/.test(n)) return [0, FIN];
+        const j = n.match(/^CODE (\d): ACC/); if (j) return [0, +j[1]];
+        if (/^CODE/.test(n)) return [0, 1];
+        if (/CTXW|NF/.test(n)) return [0, 0];
+        return null;
+      }
+      case 'lad': { const s = n.match(/^STATE of tx(\d+)/), fi = n.match(/^FIN of tx(\d+)/); return s ? [+s[1], 0] : fi ? [+fi[1], FIN] : [0, FIN]; }
+      case 'sib': return [0, Q0];
+      case 'pad': return /^QRY/.test(n) ? [0, Q0] : [0, FIN];
+      case 'layer': if (/^HEAD/.test(n)) return [0, 0]; if (/^QRY/.test(n)) return [0, Q0]; return tx ? [+tx, /missing/.test(n) ? 0 : 2] : null;
+      case 'state': if (/kind 2/.test(n)) return [1, Q0of(1)]; if (/library blob|library input carries/.test(n)) return [1, 1]; return tx !== undefined ? [+tx, 0] : null;
+      default: return null;
+    }
+  };
+  for (const c of C) c.owner = ownerOf(c);
   return C;
 }
 
@@ -377,7 +412,23 @@ for (const f of files) {
       continue;
     }
     const c = chainRun(vk, plan, buf, base, outs, false, {mutate: lc.mutate, txMutate: lc.txMutate, commitments: lc.commitments});
-    record(file, lc.family, lc.nm, false, c.acc, null, null, c.acc ? '' : String(c.err ?? '').slice(0, 70));
+    // rejecting inputs (roles) of the first rejecting transaction; the owner must be among them
+    const F = fam(lc.family);
+    let ownerOk = true, at = '';
+    if (c.rejects) {
+      const roles = c.rejects.ins.map((i) => `${roleOf(plan, i, c.rejects.t)}@in${i}`);
+      at = `rejected by tx${c.rejects.t} [${roles.join(' ')}]`;
+      const first = `tx${c.rejects.t > 0 ? 'k' : '0'}:${roleOf(plan, c.rejects.ins[0], c.rejects.t)}`;
+      (F.firstReject ??= {})[first] = (F.firstReject[first] ?? 0) + 1;
+      if (lc.owner) {
+        const [ot, oi] = lc.owner; F.ownerChecked = (F.ownerChecked ?? 0) + 1;
+        ownerOk = c.rejects.t === ot && c.rejects.ins.includes(oi);
+        const ok = `tx${ot > 0 ? 'k' : '0'}:${roleOf(plan, oi, ot)}`;
+        if (ownerOk) { F.ownerRejects = (F.ownerRejects ?? 0) + 1; (F.owners ??= {})[ok] = (F.owners[ok] ?? 0) + 1; }
+        else at += ` OWNER tx${ot} in${oi} (${roleOf(plan, oi, ot)}) DID NOT REJECT`;
+      }
+    }
+    record(file, lc.family, lc.nm, false, ownerOk ? c.acc : true, null, null, c.acc ? '' : `${at}; first: ${String(c.err ?? '').slice(0, 60)}`);
   }
 }
 console.log(`test-a (plan ${PLAN}${HARNESS ? ', harness: CTX a witness item' : ', production: CTX from the final transaction'}): ${stats.files} files, ${stats.cases} cases, ${stats.unexpected} unexpected, ${stats.na} n/a, ${stats.refused} refused by the statement layer/generator, ${stats.malformed} malformed (${stats.encoderOnly} encoder-only), ${stats.skippedFiles.length} files skipped`);

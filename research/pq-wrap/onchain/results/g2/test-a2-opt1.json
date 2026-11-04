@@ -118,43 +118,93 @@
    "cases": 60,
    "chainReject": 60,
    "accept": 0,
-   "unexpected": 0
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:FIN": 40,
+    "tx0:HEAD": 20
+   },
+   "ownerChecked": 60,
+   "ownerRejects": 60,
+   "owners": {
+    "tx0:FIN": 44,
+    "tx0:CODE1": 8,
+    "tx0:CODE2": 2,
+    "tx0:CODE3": 2,
+    "tx0:HEAD": 4
+   }
   },
   "input": {
    "cases": 46,
    "chainReject": 46,
    "accept": 0,
-   "unexpected": 0
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:HEAD": 22,
+    "tx0:QRY": 24
+   }
   },
   "sib": {
    "cases": 24,
    "chainReject": 24,
    "accept": 0,
-   "unexpected": 0
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:QRY": 24
+   },
+   "ownerChecked": 24,
+   "ownerRejects": 24,
+   "owners": {
+    "tx0:QRY": 24
+   }
   },
   "pad": {
    "cases": 12,
    "chainReject": 12,
    "accept": 0,
-   "unexpected": 0
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:QRY": 8,
+    "tx0:FIN": 2,
+    "tx0:HEAD": 2
+   },
+   "ownerChecked": 12,
+   "ownerRejects": 12,
+   "owners": {
+    "tx0:QRY": 8,
+    "tx0:FIN": 4
+   }
   },
   "graph": {
    "cases": 16,
    "chainReject": 16,
    "accept": 0,
-   "unexpected": 0
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:HEAD": 14,
+    "tx0:QRY": 2
+   }
   },
   "mix": {
    "cases": 12,
    "chainReject": 12,
    "accept": 0,
-   "unexpected": 0
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:HEAD": 8,
+    "tx0:QRY": 2,
+    "txk:HEAD": 2
+   }
   },
   "thread": {
    "cases": 30,
    "chainReject": 30,
    "accept": 0,
-   "unexpected": 0
+   "unexpected": 0,
+   "firstReject": {
+    "txk:HEAD": 16,
+    "txk:QRY": 2,
+    "tx0:HEAD": 12
+   }
   }
  },
  "list": [],

@@ -336,8 +336,9 @@ interpreter; every budget percentage is unchanged to 0.1 point):
 
 Research only, nothing deployed. These are the candidates from the pq-merkle-bytes layout review
 (zk-verifier-bench `research/pq-wrap/layout-review/PLAN.md`), built behind `--opt` in `grade-a2.mjs`, `profile-a2.mjs`
-and `test-a2.mjs` (`gena.mjs` `plan.opt`). Without `--opt` the generator is the baseline: its grade is reproduced byte
-for byte (`results/g2/grade-a2-cap0.log`).
+and `test-a2.mjs` (`gena.mjs` `plan.opt`). Without `--opt` the generator is the baseline: a rerun on this branch
+(`results/g2/grade-a2-cap0-rerun.log`) is identical, line for line, to the g2-0 part of the main-era
+`results/g2/grade-a2-cap0.log` (`grade-a2-cap0-rerun.diff.txt`).
 
 | `--opt` | candidate | what changes |
 |---|---|---|
@@ -348,6 +349,16 @@ for byte (`results/g2/grade-a2-cap0.log`).
 
 All figures below are MEASURED on `tw2x18x16-g2-0` cap 0 (libauth BCH 2026 standard and consensus, BCHN-adjusted
 op-cost, grade target 0.93). `test-a2 --layout` was run on both cap-0 case files.
+
+test-a2 evaluates every input of the first rejecting transaction. For the families constants, lad, sib, pad, state
+and layer, it asserts that the input owning the tampered value is among the rejecting inputs (for example FIN for
+TBL and LAD, CODE j for ACC_j, the tampered QRY input, STATE, TOP). Under `state`, tx0's NFTs are minted over tx0's
+own (tampered) witness values, so HEAD's state-hash check passes and the owner is reached. Without that, every tx0
+TBL or LAD tamper would be rejected by HEAD's hash comparison first. Two labels, for the record:
+- the FIN pad case "empty pad replaced by 0x01" is rejected first by HEAD's push-prefix parse of FIN's input, and
+  also by FIN's own pad check;
+- "honest state of kind 2" passes STATE (it is a valid kind-2 state) and is rejected by the QRY inputs' per-kind
+  lo/hi role stubs.
 
 | plan | txs | inputs | bytes | QRY input | pad | q/input | max % | test-a2 |
 |---|---|---|---|---|---|---|---|---|
@@ -395,6 +406,9 @@ Results are in `results/g2/{grade,profile,test}-a2-opt{1,12,123,1235}.*`, `grade
     `EQUALVERIFY`s its own push.
   - QRY reads LAD only from FIN's input, through the checked parse. Every height's ladder is a prefix of LAD.
   - A non-canonical limb with the same value mod p is rejected (test family 'lad').
+  - The serialization (`P MOD 9 NUM2BIN 8 SPLIT DROP`) is canonical only for limbs ≥ 0; for a negative x it would
+    give |x|. The invariant holds: zq starts at (1, 0, 0) and is only ever MULE's output (P MOD of sums of products
+    of non-negative limbs), and alpha' is parsed unsigned from TBL. This is stated at `gena.mjs`'s emit site.
 - *state:* behaviour change. Later txs no longer re-derive the transcript; they rest on tx0's HEAD and FIN plus
   SHA-256 collision resistance of HS.
   - Every preimage field has a fixed length, and k appears both in the clear and inside the hash.
@@ -404,7 +418,10 @@ Results are in `results/g2/{grade,profile,test}-a2-opt{1,12,123,1235}.*`, `grade
     - no other input or output carries a token, so R1 never mints;
     - CTXW = CTX(outputs) in the final kind;
     - every input is R1.
-  - R1's QA function is asserted byte-identical to R0's, and R1's blob is the call-graph closure of its roles.
+  - R1's QA function is asserted byte-identical to R0's. The whole QRY role is asserted too: QROLE1 equals QROLE
+    except for the parse section (parse STATE, and TOP with `cap`, instead of HEAD and FIN, then the same drop and
+    arrange to the same named items). R1's blob is the call-graph closure of its roles.
+  - test-a2 also runs R1-side sib and pad cases (tx1 QRY), rejected by that QRY input.
   - R0 now dispatches kind 0 only.
   - Review items: HS covers exactly what tx0 checked (HEAD hashes copies taken before the transcript; TBL and LAD come
     from FIN's input in the same tx); the closure scan (it refuses computed invokes); R1 dispatch kinds 1..T−1 (kind 0
@@ -422,6 +439,10 @@ Results are in `results/g2/{grade,profile,test}-a2-opt{1,12,123,1235}.*`, `grade
     input 2 in R1 txs. It is not carried in the NFT.
   - c is a covenant constant, and LAYER has an exact length.
   - QRY reads LAYER only from the fixed input, with the same index convention as the paths (k − 2^c).
-  - The top c layers contain no injected rows, since every tree is at least 2^13 high.
+  - The top c layers contain no injected rows. In this layout every injection happens below level B: the shorter
+    matrices of an input tree are hashed into the bottom B levels, which each query walks from its own blob, and FRI
+    trees have no injections. The climb from level B to the root is plain pairwise SHA-256 (the F1..F16 runs). So the
+    top c levels are plain compressions whenever c ≤ depth − B, which `gena.mjs` enforces as c ≤ min depth (the
+    depths count from level B; the smallest is 13).
   - The encoder derives LAYER from the proof's own paths. On this vector every node at c ≤ 5 is covered; a node that
     no query reaches could not be derived from the proof alone, and a real prover would supply it from the tree.
