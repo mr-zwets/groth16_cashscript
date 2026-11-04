@@ -2,7 +2,7 @@
 //
 // SAFETY: the program id and INSTANCE always come from YOUR arguments, never from a proof file: pin the programVKey /
 // image id printed by your own guest build (`vkey` / `imageid`), and pick a fresh random 32-byte INSTANCE per funding.
-// Addresses default to the test-network prefix ('bchtest'); `--mainnet` is required for a 'bitcoincash' address.
+// Addresses use the test-network prefix ('bchtest'); `--mainnet` is refused until a real-key accepting spend exists.
 // The built-in example values (statement, INSTANCE, secret) are public and burn the payout: they are refused unless
 // `--regtest` is given.
 //
@@ -37,6 +37,9 @@ import {INSTANCE, TEST_PROGRAM_VKEY, TEST_IMAGE_ID, OUTS, EXAMPLE_LOCK_HASH} fro
 const argv = process.argv.slice(2); const flags = new Set(argv.filter((x) => x.startsWith('--'))); const [cmd, ...a] = argv.filter((x) => !x.startsWith('--'));
 const regtest = flags.has('--regtest'), mainnet = flags.has('--mainnet');
 assert.ok(!(regtest && mainnet), '--regtest and --mainnet exclude each other');
+// No real proof of the template statement has been accepted yet (test-key accepts only), so this example refuses
+// mainnet addresses: funds could be locked under a covenant whose real-key accepting spend is unproven.
+assert.ok(!mainnet, '--mainnet is disabled: no real-key accepting spend of the template statement exists yet (test-key only)');
 const readJson = (f) => JSON.parse(readFileSync(f, 'utf8'));
 const hex = (b) => Buffer.from(b).toString('hex');
 const warn = (m) => console.error('WARNING: ' + m);

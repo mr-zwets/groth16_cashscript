@@ -244,7 +244,7 @@ workloads, all as expected, BCHN = libauth on every one.** Both nodes were stopp
 cd guest/sp1/script && SP1_PROVER=cpu cargo run --release -- vkey            # YOUR programVKey: pin this value
 # RISC Zero 3.0.x: rzup install (cargo-risczero, r0vm 3.0.x, risc0-groth16); the covenant key is 'risc0-v3'
 cd guest/risc0 && cargo run --release -p host -- imageid                       # YOUR image id: pin this value
-# 1. the covenant, from YOUR program id (never from a proof file); bchtest prefix unless --mainnet
+# 1. the covenant, from YOUR program id (never from a proof file); bchtest prefix (--mainnet is refused until a real-key accept exists)
 node example.mjs pin sp1-v5 <programVKey> <INSTANCE>        # (or risc0-v3 <imageId>) locking + address
 #    check the outputs against the amount you WILL fund (pinned.mjs cov.preflight: caps, standard outputs, 223-B
 #    OP_RETURN cap, dust, self-payment, fee >= 1 sat/B at worst-case size). Do not fund yet.
@@ -279,7 +279,7 @@ node example.mjs spend sp1-v5 <programVKey> <INSTANCE> proof.json utxos.json tx.
 import {openPinned} from './pinned.mjs';
 const cov = await openPinned('sp1-v5', {system: 'sp1', programVKey: '0x00…' /* your guest's vk.bytes32() */,
                                         instanceId: '…' /* 32 random bytes, one per deployment */});
-cov.address;                                  // bchtest: by default; pass prefix: 'bitcoincash' for mainnet
+cov.address;                                  // bchtest: by default; mainnet only after a real-key accept (see the status table)
 const outputs = [{lockingBytecode: payoutLocking, valueSatoshis: 200000n}];
 cov.preflight({outputs, utxoTotal: 240000n}); // BEFORE proving: caps, standard outputs, 223-B OP_RETURN cap, dust,
                                               // no self-payment, fee >= 1 sat/B
