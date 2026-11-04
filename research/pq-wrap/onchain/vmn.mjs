@@ -2,7 +2,8 @@
 //   r100   per-input unlocking, bytecode and stack-item limits raised to 100,000 B; transaction limit 100,000 B
 //   r100t  r100 with the standard transaction size limit raised to 200,000 B (two 100 KB inputs in one transaction)
 //   spec   libauth bch-spec;  bch  today's rules
-// Relay/standardness limits raised, not a new transaction version.
+// Not a new transaction version. The per-input unlocking/bytecode/stack-item limits are consensus (BCHN vm_limits.h
+// MAX_SCRIPT_SIZE); only the 100,000 B standard transaction size is relay policy (policy.h MAX_STANDARD_TX_SIZE).
 import {createInstructionSetBch2026, createVirtualMachine, ripemd160, secp256k1, sha1, sha256} from '@bitauth/libauth';
 import {VMS, consensusR100, consensusR150} from './vm.mjs';
 

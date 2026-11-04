@@ -2,7 +2,7 @@
 //   bch (real BCH 2026 = today's relay rules, standard/consensus), loose (BCH 2026 with every ceiling lifted: a reject
 //   is a failed check), spec (libauth BCH_SPEC: density base 10,000, 100,000 B scripts), r100 (BCH 2026 with the
 //   per-input unlocking, bytecode and stack-item limits raised to 100,000 B; density base 41 and the 100,000 B
-//   transaction limit unchanged: the "one 100 KB input" regime, i.e. relay/standardness limits raised) and r100u
+//   transaction limit unchanged: the "one 100 KB input" regime; the per-input limits it raises are consensus limits in BCHN) and r100u
 //   (r100 with the density budget lifted: measures the op-cost an input needs).
 // An optional OP_NOP counter locates a failure (opts.markers in the generator).
 import {
