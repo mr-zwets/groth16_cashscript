@@ -21,8 +21,8 @@ import {writeFileSync, existsSync} from 'node:fs';
 import {readVector} from './layoutn.mjs';
 import {vkxA, verifyModelA, encodeA, P, sha} from './modela.mjs';
 import {applyTamper} from './modeln.mjs';
-import {makePlanA, spendA, evaluateTxA, verifyTxA, CATEGORY, parseOpt} from './layouta.mjs';
-import {threadCommit} from './gena.mjs';
+import {makePlanA, spendA, evaluateTxA, verifyTxA, CATEGORY, parseOpt, stateValsA} from './layouta.mjs';
+import {threadCommit, stateCommit} from './gena.mjs';
 import {planFor} from './grade-a2.mjs';
 import {runCase, vkFromVector, parse as strictParse} from '../verifier/verify-batch.mjs';
 import {ctxOf} from './ctx.mjs';
@@ -85,6 +85,12 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
   const flipPath = (a, k, off) => { const [i, b] = pathAt(a, k, off); a[i] = flip(a[i], b); };
   const swapPaths = (a, k, a2, k2) => { for (let j = 1; j <= np; j++) [a[k + j], a2[k2 + j]] = [a2[k2 + j], a[k + j]]; };
   const hIdx = (k) => ['ROOTS', 'OOD', 'BPOW', 'FROOTS', 'CPOW', 'QPOW', 'NF', 'CTXW'].indexOf(k);
+  // opt.state: transactions t >= 1 run under R1: input 0 STATE (gena sItems), input 1 the library, QRY from input 2
+  const STV = !!plan.opt?.state && T > 1;
+  const sNames = ['ROOTS', 'FROOTS', 'FIN', 'TBL', ...(plan.opt?.lad ? ['LAD'] : []), 'NF', 'CTXW', 'G'];
+  const sIdx = (k) => sNames.indexOf(k);
+  const in0Idx = (t, k) => (STV && t > 0 ? sIdx(k) : hIdx(k));
+  const Q0of = (t) => (STV && t > 0 ? 2 : Q0);
   const m = (f) => (w) => { const x = cloneWit(w); f(x); return x; };
   // constants: TBL fields (FIN checks its own push), ACC (each CODE input checks its own), CTXW (final HEAD)
   let o = 0;
@@ -109,8 +115,8 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
     return x;
   }});
   add('constants', 'CODE 1: ACC push missing', {mutate: m((x) => { x[0][1] = [x[0][1][0]]; })});
-  add('constants', 'HEAD: CTXW lane 0 byte 0 flipped', {mutate: m((x) => { for (const tx of x) tx[0][hIdx('CTXW')] = flip(tx[0][hIdx('CTXW')], 0); })});
-  add('constants', 'HEAD: NF lane 0 byte 0 flipped', {mutate: m((x) => { for (const tx of x) tx[0][hIdx('NF')] = flip(tx[0][hIdx('NF')], 0); })});
+  add('constants', `HEAD${STV ? ' and STATE' : ''}: CTXW lane 0 byte 0 flipped`, {mutate: m((x) => { x.forEach((tx, t) => { tx[0][in0Idx(t, 'CTXW')] = flip(tx[0][in0Idx(t, 'CTXW')], 0); }); })});
+  add('constants', `HEAD${STV ? ' and STATE' : ''}: NF lane 0 byte 0 flipped`, {mutate: m((x) => { x.forEach((tx, t) => { tx[0][in0Idx(t, 'NF')] = flip(tx[0][in0Idx(t, 'NF')], 0); }); })});
   // HEAD and FIN proof data
   // G2: offsets inside the item for any cap (Track 8's were for cap 5: 32 digests per cap)
   const capD = vk.capB.quotient / 32, fD = (vk.friB[vk.friB.length - 1] ?? 32) / 32;
@@ -122,7 +128,8 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
     add('lad', 'FIN: wrong ladder value (LAD element 0 = alpha\'^0, byte 0 flipped)', {mutate: setLad(0, (b) => flip(b, 0))});
     add('lad', 'FIN: wrong ladder value (LAD element 50, limb 1 byte 3 flipped)', {mutate: setLad(0, (b) => flip(b, 50 * E + 8 + 3))});
     add('lad', 'FIN: wrong ladder value (last LAD element, last byte flipped)', {mutate: setLad(0, (b) => flip(b, -1))});
-    add('lad', `FIN of tx${last} (final): wrong ladder value (LAD element 7 flipped)`, {mutate: setLad(last, (b) => flip(b, 7 * E + 2))});
+    if (STV) add('lad', `STATE of tx${last} (final): wrong ladder value (LAD element 7 flipped)`, {mutate: m((x) => { x[last][0][sIdx('LAD')] = flip(x[last][0][sIdx('LAD')], 7 * E + 2); })});
+    else add('lad', `FIN of tx${last} (final): wrong ladder value (LAD element 7 flipped)`, {mutate: setLad(last, (b) => flip(b, 7 * E + 2))});
     add('lad', 'FIN: LAD element 1 non-canonical (limb 0 + p, same value mod p, if < 2^64)', {mutate: setLad(0, (b) => { const v = b.readBigUInt64LE(E); if (v + P < M64) b.writeBigUInt64LE(v + P, E); else b.writeBigUInt64LE(v - 1n, E); return b; })});
     add('lad', 'FIN: LAD shifted by one element (alpha\'^1 .. alpha\'^n)', {mutate: setLad(0, (b) => Buffer.concat([b.subarray(E), b.subarray(-E)]))});
     add('lad', 'FIN: LAD elements 3 and 4 swapped', {mutate: setLad(0, (b) => { const c = Buffer.from(b); b.copy(c, 3 * E, 4 * E, 5 * E); b.copy(c, 4 * E, 3 * E, 4 * E); return c; })});
@@ -208,6 +215,10 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
     add('mix', `ACC of CODE 1 from ${label}`, {mutate: (w) => { const x = cloneWit(w), y = ow(); x[0][1][1] = y[0][1][1]; return x; }});
     add('mix', `one QRY input from ${label}`, {mutate: (w) => { const x = cloneWit(w), y = ow(); x[0][Q0 + 1] = y[0][Q0 + 1]; return x; }});
     if (T > 1) add('mix', `transaction 1 (all inputs) from ${label}, the NFT of this proof (replay)`, {mutate: (w) => { const x = cloneWit(w), y = ow(); x[1] = y[1]; return x; }});
+    if (T > 1 && plan.opt?.state) {
+      add('mix', `tx1 STATE (all items) from ${label}, the NFT of this proof`, {mutate: (w) => { const x = cloneWit(w), y = ow(); x[1][0] = y[1][0]; return x; }});
+      add('mix', `tx1 STATE TBL from ${label}`, {mutate: (w) => { const x = cloneWit(w), y = ow(); x[1][0][3] = y[1][0][3]; return x; }});
+    }
     if (label.startsWith('another proof')) {
       add('control', `control: ${label} verifies on its own (same VK)`, {other: [ov, op], expect: true});
     }
@@ -228,7 +239,7 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
     // G2: the statement outputs (CTX) are the final transaction's; with T > 2, tx1 is a middle transaction whose one
     // plain output is not bound (as tx0's extra plain outputs in Track 8): the case targets the final transaction
     add('thread', `tx${T - 1} (final): outputs changed (value - 1, so CTX differs)`, {txMutate: (txs) => { const tx = txs[T - 1]; tx.transaction.outputs = altOutputs(tx.transaction.outputs); return txs; }});
-    add('thread', 'tx1: a QRY input of tx0 (queries 0-2) instead of its own', {mutate: m((x) => { x[1][Q0] = x[0][Q0]; })});
+    add('thread', 'tx1: a QRY input of tx0 (queries 0-2) instead of its own', {mutate: m((x) => { x[1][Q0of(1)] = x[0][Q0]; })});
     add('thread', 'tx0: baton returned to another locking', {txMutate: (txs) => { const o = txs[0].transaction.outputs; o[0] = {...o[0], lockingBytecode: Uint8Array.from([0x6a])}; return txs; }});
     add('thread', 'tx0: baton not returned (output 0 is the NFT only)', {txMutate: (txs) => { const o = txs[0].transaction.outputs; o.shift(); return txs; }});
     add('thread', 'tx0: thread NFT with another commitment', {txMutate: (txs) => { const o = txs[0].transaction.outputs; o[1] = {...o[1], token: tok('none', flip(o[1].token.nft.commitment, 5))}; return txs; }});
@@ -236,6 +247,31 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
     add('thread', 'tx0: an extra NFT minted (extra token output)', {txMutate: (txs) => { const o = txs[0].transaction.outputs; o.push({...o[1]}); return txs; }});
     add('thread', 'tx0: input 0 without the minting baton', {txMutate: (txs) => { const so = txs[0].sourceOutputs; const {token, ...rest} = so[0]; void token; so[0] = rest; return txs; }});
     void setIn0;
+  }
+  // opt.state: the STATE input (R1, input 0 of every later transaction) and the R1 locking
+  if (STV) {
+    const last = T - 1;
+    const setS = (t, k, f) => m((x) => { x[t][0][sIdx(k)] = f(Buffer.from(x[t][0][sIdx(k)])); });
+    for (const [k, at] of [['ROOTS', 5], ['FROOTS', 40], ['FIN', 1000], ['TBL', 3], ...(plan.opt?.lad ? [['LAD', 30]] : []), ['NF', 9], ['CTXW', 2], ['G', 31]]) add('state', `tx1 STATE: ${k} byte ${at} flipped`, {mutate: setS(1, k, (b) => flip(b, at))});
+    add('state', `tx${last} STATE (final): TBL byte 0 flipped (a query index)`, {mutate: setS(last, 'TBL', (b) => flip(b, 0))});
+    add('state', 'tx1 STATE: TBL truncated by one byte', {mutate: setS(1, 'TBL', (b) => b.subarray(0, -1))});
+    add('state', 'tx1 STATE: FIN extended by one byte', {mutate: setS(1, 'FIN', (b) => Buffer.concat([b, Buffer.alloc(1)]))});
+    add('state', 'tx1 STATE: G missing', {mutate: m((x) => { x[1][0] = x[1][0].slice(0, -1); })});
+    add('state', 'tx1 STATE: extra empty item', {mutate: m((x) => { x[1][0].push(Buffer.alloc(0)); })});
+    add('state', 'tx1 STATE: ROOTS and FROOTS swapped', {mutate: m((x) => { const a = x[1][0]; [a[0], a[1]] = [a[1], a[0]]; })});
+    add('state', 'tx1 STATE: the honest state of kind 2 (another commitment index)', {txMutate: (txs, sp) => { const so = txs[1].sourceOutputs; so[0] = {...so[0], token: {...so[0].token, nft: {...so[0].token.nft, commitment: Uint8Array.from(stateCommit(stateValsA(sp.pg, sp.enc, base), 2))}}}; return txs; }});
+    add('state', 'tx1: input 0 (STATE, with its NFT) locked to R0', {txMutate: (txs, sp) => { const so = txs[1].sourceOutputs; so[0] = {...so[0], lockingBytecode: sp.pg.redeem}; return txs; }});
+    add('state', 'tx1: every input locked to R0', {txMutate: (txs, sp) => { txs[1].sourceOutputs.forEach((o, i, a) => { a[i] = {...o, lockingBytecode: sp.pg.redeem}; }); return txs; }});
+    add('state', 'tx1: library input carries R0 code blob 1', {mutate: (w, enc, pg) => { const x = cloneWit(w); x[1][1] = [Buffer.from(pg.code[0])]; return x; }});
+    add('state', 'tx1: library blob byte flipped', {mutate: m((x) => { x[1][1][0] = flip(x[1][1][0], 700); })});
+    add('state', 'tx1: library input missing (STATE then QRY)', {txMutate: (txs) => { const tx = txs[1]; tx.transaction.inputs.splice(1, 1); tx.sourceOutputs.splice(1, 1); return txs; }});
+    add('state', 'tx1: extra input (a copy of a QRY input)', {txMutate: (txs) => { const tx = txs[1]; tx.transaction.inputs.push({...tx.transaction.inputs[2], outpointIndex: 99}); tx.sourceOutputs.push(tx.sourceOutputs[2]); return txs; }});
+    add('state', 'tx1: STATE and the library input swapped (order)', {txMutate: (txs) => { const tx = txs[1]; const i = tx.transaction.inputs; [i[0], i[1]] = [i[1], i[0]]; [tx.sourceOutputs[0], tx.sourceOutputs[1]] = [tx.sourceOutputs[1], tx.sourceOutputs[0]]; return txs; }});
+    add('state', 'tx0: NFT output 1 locked to R0 instead of R1', {txMutate: (txs, sp) => { const o = txs[0].transaction.outputs; o[1] = {...o[1], lockingBytecode: sp.pg.redeem}; return txs; }});
+    add('state', 'tx0: NFT output 1 locked to R1 + one byte', {txMutate: (txs, sp) => { const o = txs[0].transaction.outputs; o[1] = {...o[1], lockingBytecode: Uint8Array.from([...sp.pg.R1.redeem, 0x61])}; return txs; }});
+    add('state', 'tx0: NFT output 1 with the commitment of the old thread scheme (k | SHA256(tag | G | k))', {txMutate: (txs, sp) => { const o = txs[0].transaction.outputs; o[1] = {...o[1], token: {...o[1].token, nft: {...o[1].token.nft, commitment: Uint8Array.from(threadCommit(sp.enc.G, 1))}}}; return txs; }});
+    add('state', 'tx0: NFT outputs 1 and 2 swapped', {txMutate: (txs) => { const o = txs[0].transaction.outputs; [o[1], o[2]] = [o[2], o[1]]; return txs; }});
+    add('state', `tx${last} (final): the NFT passed on to an extra output (R1 mints nothing)`, {txMutate: (txs) => { const tx = txs[last]; tx.transaction.outputs.push({lockingBytecode: tx.sourceOutputs[0].lockingBytecode, valueSatoshis: 1000n, token: tx.sourceOutputs[0].token}); return txs; }});
   }
   return C;
 }

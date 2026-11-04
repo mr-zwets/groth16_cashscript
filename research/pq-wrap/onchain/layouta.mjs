@@ -3,7 +3,7 @@
 //         QRY inputs; T > 1 transactions are linked by the NFT thread (kind 0 mints, kind k > 0 burns)
 //   CTX   is the final transaction's outputs (the statement outputs); the other transactions carry the thread
 import {encodeTransaction, hash256} from '@bitauth/libauth';
-import {buildA, threadCommit} from './gena.mjs';
+import {buildA, threadCommit, stateCommit} from './gena.mjs';
 import {encodeA, partsOf} from './modela.mjs';
 import {pushes, VMS, evaluate} from './vm.mjs';
 
@@ -32,14 +32,23 @@ export function programA(vk, pis, plan, opts = {}) {
   return cache.get(key);
 }
 
+// opt.state: the STATE items (gena sItems order) of one proof
+export function stateValsA(pg, enc, pis) {
+  const v = {ROOTS: enc.PT.ROOTS, FROOTS: enc.PT.FROOTS, FIN: enc.PT.FIN, TBL: enc.TBL, LAD: enc.LAD, NF: u64s(pis.slice(4, 8)), CTXW: u64s(pis.slice(8, 12)), G: enc.G};
+  return pg.sItems.map(([k]) => v[k]);
+}
 // witnesses: per transaction, per input, the pushed items (bottom first)
 export function witnessesA(vk, plan, pg, enc, pis) {
   const nf = u64s(pis.slice(4, 8)), ctx = u64s(pis.slice(8, 12));
+  const qryItems = (t, [lo, hi], j) => { const it = plan.pad ? [Buffer.alloc(plan.pad.qry[t][j])] : []; for (let q = lo; q < hi; q++) it.push(enc.L[q], ...(plan.opt?.sib ? sibs(enc.PTH[q]) : [enc.PTH[q]])); return it; };
+  // opt.state: transaction t >= 1 = STATE, R1's code blob(s), QRY inputs
+  if (pg.R1) return plan.txs.map((tx, t) => (t === 0 ? null : [stateValsA(pg, enc, pis), ...pg.R1.code.map((c) => [c]), ...tx.qry.map((r, j) => qryItems(t, r, j))]))
+    .map((x, t) => x ?? witnessesA(vk, {...plan, txs: [plan.txs[0]]}, {...pg, R1: null}, enc, pis)[0]);
   return plan.txs.map((tx, t) => [
     pg.hItems.map(([k]) => (k === 'NF' ? nf : k === 'CTXW' ? ctx : enc.PT[k])),
     ...pg.code.map((c, j) => (t === 0 ? [c, enc.ACC[j]] : [c])),
     [...(plan.pad ? [Buffer.alloc(plan.pad.fin)] : []), enc.PT.FIN, enc.TBL, ...(plan.opt?.lad ? [enc.LAD] : [])],
-    ...tx.qry.map(([lo, hi], j) => { const it = plan.pad ? [Buffer.alloc(plan.pad.qry[t][j])] : []; for (let q = lo; q < hi; q++) it.push(enc.L[q], ...(plan.opt?.sib ? sibs(enc.PTH[q]) : [enc.PTH[q]])); return it; }),
+    ...tx.qry.map((r, j) => qryItems(t, r, j)),
   ]);
 }
 
@@ -59,12 +68,13 @@ export function txsA(plan, pg, wit, G, outputs, {commitments} = {}) {
       if (!final && i === 0) value = t === 0 ? 200_000n * BigInt(Math.max(1, T - 1)) : 200_000n;
       if (T > 1 && final && i === 0) value = 5_000n;
       const token = CAT && i === 0 ? (t === 0 ? tok('minting') : tok('none', commitments?.[t] ?? threadCommit(G, t))) : undefined;
-      return {lockingBytecode: pg.redeem, valueSatoshis: value, ...(token ? {token} : {})};
+      // opt.state: transactions t >= 1 spend R1 UTXOs
+      return {lockingBytecode: t > 0 && pg.R1 ? pg.R1.redeem : pg.redeem, valueSatoshis: value, ...(token ? {token} : {})};
     });
     // G2: plans of T > 2 transactions: a middle transaction (0 < t < T - 1) burns its NFT and pays one plain output
     const outs = final ? outputs
       : t > 0 ? [{lockingBytecode: MIDDLE_OUT, valueSatoshis: 100_000n}]
-      : [{lockingBytecode: pg.redeem, valueSatoshis: 5_000n, token: tok('minting')}, ...Array.from({length: T - 1}, (_, k) => ({lockingBytecode: pg.redeem, valueSatoshis: k + 1 < T - 1 ? 200_000n : 5_000n, token: tok('none', commitments?.[k + 1] ?? threadCommit(G, k + 1))}))];
+      : [{lockingBytecode: pg.redeem, valueSatoshis: 5_000n, token: tok('minting')}, ...Array.from({length: T - 1}, (_, k) => ({lockingBytecode: pg.R1 ? pg.R1.redeem : pg.redeem, valueSatoshis: k + 1 < T - 1 ? 200_000n : 5_000n, token: tok('none', commitments?.[k + 1] ?? threadCommit(G, k + 1))}))];
     const transaction = {version: 2, locktime: 0, inputs: unl.map((u, i) => ({outpointTransactionHash: new Uint8Array(32).fill(0x70 + t), outpointIndex: i, sequenceNumber: 0, unlockingBytecode: u})), outputs: outs};
     return {transaction, sourceOutputs, unl, txBytes: encodeTransaction(transaction).length};
   });
@@ -76,7 +86,9 @@ export function spendA(vk, plan, proof, pis, outputs, opts = {}, mutate) {
   const enc = encodeA(vk, proof, pis, plan.parts);
   let wit = witnessesA(vk, plan, pg, enc, pis);
   if (mutate) wit = mutate(wit, enc, pg) ?? wit;
-  const txs = txsA(plan, pg, wit, opts.G ?? enc.G, outputs, opts);
+  // opt.state: tx0 mints NFT k over the honest state values (stateCommit), unless the caller gives commitments
+  const o2 = pg.R1 && !opts.commitments ? {...opts, commitments: plan.txs.map((_, k) => (k ? stateCommit(stateValsA(pg, enc, pis), k) : null))} : opts;
+  const txs = txsA(plan, pg, wit, opts.G ?? enc.G, outputs, o2);
   return {pg, enc, wit, txs};
 }
 
