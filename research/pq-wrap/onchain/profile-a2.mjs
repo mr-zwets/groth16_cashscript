@@ -8,11 +8,11 @@
 //   FIN   entry, transcript, DEEP point constants, A sums (alpha' ladder over the 94 opened values), TBL serialization
 //   QRY   entry (R, parses, TBL), alpha' ladder and row keys, constants (fold columns, tables, final polynomial), the
 //         queries (x, DEEP, folds, final polynomial, full paths)
-// usage: node profile-a2.mjs [--nc N] [--per N] [--out FILE] VECTOR.json
+// usage: node profile-a2.mjs [--nc N] [--per N] [--opt a,b] [--out FILE] VECTOR.json
 import {writeFileSync} from 'node:fs';
 import {readVector} from './layoutn.mjs';
 import {vkxA} from './modela.mjs';
-import {makePlanA, spendA} from './layouta.mjs';
+import {makePlanA, spendA, parseOpt} from './layouta.mjs';
 import {planFor} from './grade-a2.mjs';
 import {evaluate} from './vm.mjs';
 
@@ -21,7 +21,7 @@ const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] :
 const path = args[args.length - 1];
 const v = readVector(path); const vk = vkxA(v); const pis = v.public_values.flat().map(BigInt);
 const outputs = v.s4_outputs.map((o) => ({lockingBytecode: Uint8Array.from(Buffer.from(o.lockingBytecode, 'hex')), valueSatoshis: BigInt(o.valueSatoshis)}));
-const pf = planFor(vk, Buffer.from(v.proof_hex, 'hex'), pis, outputs, {nc: +opt('--nc', 3), per: opt('--per') ? +opt('--per') : undefined, pad: opt('--pad') !== '0'});
+const pf = planFor(vk, Buffer.from(v.proof_hex, 'hex'), pis, outputs, {nc: +opt('--nc', 3), per: opt('--per') ? +opt('--per') : undefined, pad: opt('--pad') !== '0', opt: parseOpt(opt('--opt'))});
 if (!pf.plan) throw new Error('no plan ' + JSON.stringify(pf.tried));
 const plan = pf.plan;
 const sp = spendA(vk, plan, Buffer.from(v.proof_hex, 'hex'), pis, outputs, {gen: {markers: true, ...(pf.gen ?? {})}});

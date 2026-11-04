@@ -1,0 +1,13 @@
+in0 HEAD: op 2489309 (+51970 define bytes) entry 347718, transcript 289461, air 1022133, air1 784528, thread 15895, cleanup 29574
+in1 CODE1: op 4928599 (+51970 define bytes) entry 370651, transcript 289461, air-pre 1615191, air-dag 2587696, cleanup 65600
+in2 CODE2: op 4244889 (+51970 define bytes) entry 370657, transcript 289461, air-pre 1615191, air-dag 1903980, cleanup 65600
+in3 CODE3: op 4357702 (+51970 define bytes) entry 370650, transcript 289461, air-pre 1615191, air-dag 2016800, cleanup 65600
+in4 FIN: op 6137152 (+51970 define bytes) entry 323603, transcript 289461, deep-points 93109, a-sums 5339455, tbl 90822, cleanup 702
+in5 QRY: op 4290461 (+51970 define bytes) entry 479025, row-keys 657032, unpack 1406994, consts 0, q-x 17152, q-deep 425106, q-folds 466070, q-final+paths 282012, queries 408559, cleanup 148511
+in6 QRY: op 4274977 (+51970 define bytes) entry 479027, row-keys 657032, unpack 1406994, consts 0, q-x 17188, q-deep 425431, q-folds 465953, q-final+paths 266269, queries 408572, cleanup 148511
+in7 QRY: op 4287342 (+51970 define bytes) entry 479027, row-keys 657032, unpack 1406994, consts 0, q-x 17499, q-deep 425496, q-folds 465420, q-final+paths 278747, queries 408616, cleanup 148511
+in8 QRY: op 4282284 (+51970 define bytes) entry 479027, row-keys 657032, unpack 1406994, consts 0, q-x 17381, q-deep 425403, q-folds 465528, q-final+paths 273804, queries 408604, cleanup 148511
+in9 QRY: op 4289453 (+51970 define bytes) entry 479027, row-keys 657032, unpack 1406994, consts 0, q-x 17739, q-deep 425765, q-folds 465326, q-final+paths 280495, queries 408564, cleanup 148511
+in10 QRY: op 4287849 (+51970 define bytes) entry 479027, row-keys 657032, unpack 1406994, consts 0, q-x 17647, q-deep 425446, q-folds 466204, q-final+paths 278358, queries 408630, cleanup 148511
+in11 QRY: op 4286418 (+51970 define bytes) entry 479027, row-keys 657032, unpack 1406994, consts 0, q-x 17606, q-deep 425618, q-folds 466209, q-final+paths 276800, queries 408621, cleanup 148511
+in12 QRY: op 4290437 (+51970 define bytes) entry 479027, row-keys 657032, unpack 1406994, consts 0, q-x 17488, q-deep 425348, q-folds 466062, q-final+paths 281392, queries 408583, cleanup 148511

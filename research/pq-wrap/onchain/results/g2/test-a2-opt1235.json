@@ -1,0 +1,275 @@
+{
+ "plan": "1tx",
+ "harness": false,
+ "files": 2,
+ "cases": 436,
+ "unexpected": 0,
+ "na": 0,
+ "refused": 2,
+ "encoderOnly": 4,
+ "malformed": 18,
+ "families": {
+  "valid": {
+   "cases": 2,
+   "chainReject": 0,
+   "accept": 2,
+   "unexpected": 0
+  },
+  "cap": {
+   "cases": 2,
+   "chainReject": 2,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "ood": {
+   "cases": 4,
+   "chainReject": 4,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "random": {
+   "cases": 2,
+   "chainReject": 2,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "pow": {
+   "cases": 12,
+   "chainReject": 12,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "final": {
+   "cases": 4,
+   "chainReject": 4,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "row": {
+   "cases": 6,
+   "chainReject": 6,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "salt": {
+   "cases": 6,
+   "chainReject": 6,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "sibling": {
+   "cases": 14,
+   "chainReject": 14,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "count": {
+   "cases": 14,
+   "chainReject": 12,
+   "accept": 0,
+   "unexpected": 0,
+   "encoderOnlyRelabel": 2
+  },
+  "fri_value": {
+   "cases": 16,
+   "chainReject": 16,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "truncate": {
+   "cases": 2,
+   "chainReject": 2,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "extend": {
+   "cases": 2,
+   "chainReject": 0,
+   "accept": 0,
+   "unexpected": 0,
+   "encoderOnlyRelabel": 2
+  },
+  "noncanon": {
+   "cases": 2,
+   "chainReject": 2,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "statement": {
+   "cases": 12,
+   "chainReject": 10,
+   "accept": 0,
+   "unexpected": 0,
+   "notRunOnChain": 2
+  },
+  "tx": {
+   "cases": 8,
+   "chainReject": 8,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "root": {
+   "cases": 2,
+   "chainReject": 2,
+   "accept": 0,
+   "unexpected": 0
+  },
+  "constants": {
+   "cases": 60,
+   "chainReject": 60,
+   "accept": 0,
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:FIN": 40,
+    "tx0:HEAD": 20
+   },
+   "ownerChecked": 60,
+   "ownerRejects": 60,
+   "owners": {
+    "tx0:FIN": 44,
+    "tx0:CODE1": 8,
+    "tx0:CODE2": 2,
+    "tx0:CODE3": 2,
+    "tx0:HEAD": 4
+   }
+  },
+  "input": {
+   "cases": 46,
+   "chainReject": 46,
+   "accept": 0,
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:HEAD": 22,
+    "tx0:QRY": 24
+   }
+  },
+  "lad": {
+   "cases": 24,
+   "chainReject": 24,
+   "accept": 0,
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:FIN": 16,
+    "txk:STATE": 2,
+    "tx0:HEAD": 6
+   },
+   "ownerChecked": 24,
+   "ownerRejects": 24,
+   "owners": {
+    "tx0:FIN": 22,
+    "txk:STATE": 2
+   }
+  },
+  "sib": {
+   "cases": 30,
+   "chainReject": 30,
+   "accept": 0,
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:QRY": 24,
+    "txk:QRY": 6
+   },
+   "ownerChecked": 30,
+   "ownerRejects": 30,
+   "owners": {
+    "tx0:QRY": 24,
+    "txk:QRY": 6
+   }
+  },
+  "pad": {
+   "cases": 12,
+   "chainReject": 12,
+   "accept": 0,
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:QRY": 6,
+    "tx0:HEAD": 2,
+    "txk:QRY": 4
+   },
+   "ownerChecked": 12,
+   "ownerRejects": 12,
+   "owners": {
+    "tx0:QRY": 6,
+    "tx0:FIN": 2,
+    "txk:QRY": 4
+   }
+  },
+  "graph": {
+   "cases": 16,
+   "chainReject": 16,
+   "accept": 0,
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:HEAD": 14,
+    "tx0:QRY": 2
+   }
+  },
+  "mix": {
+   "cases": 22,
+   "chainReject": 22,
+   "accept": 0,
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:HEAD": 10,
+    "tx0:FIN": 2,
+    "tx0:QRY": 2,
+    "txk:STATE": 6,
+    "txk:TOP": 2
+   }
+  },
+  "thread": {
+   "cases": 30,
+   "chainReject": 30,
+   "accept": 0,
+   "unexpected": 0,
+   "firstReject": {
+    "txk:STATE": 16,
+    "txk:QRY": 2,
+    "tx0:HEAD": 12
+   }
+  },
+  "layer": {
+   "cases": 32,
+   "chainReject": 32,
+   "accept": 0,
+   "unexpected": 0,
+   "firstReject": {
+    "tx0:HEAD": 16,
+    "tx0:QRY": 4,
+    "txk:TOP": 10,
+    "txk:STATE": 2
+   },
+   "ownerChecked": 32,
+   "ownerRejects": 32,
+   "owners": {
+    "tx0:HEAD": 16,
+    "tx0:QRY": 4,
+    "txk:TOP": 10,
+    "txk:STATE": 2
+   }
+  },
+  "state": {
+   "cases": 54,
+   "chainReject": 54,
+   "accept": 0,
+   "unexpected": 0,
+   "firstReject": {
+    "txk:STATE": 44,
+    "txk:QRY": 2,
+    "tx0:HEAD": 8
+   },
+   "ownerChecked": 54,
+   "ownerRejects": 54,
+   "owners": {
+    "txk:STATE": 40,
+    "txk:QRY": 2,
+    "txk:LIB": 4,
+    "tx0:HEAD": 8
+   }
+  }
+ },
+ "list": [],
+ "skippedFiles": [],
+ "encoderOnlyRelabel": 4,
+ "notRunOnChain": 2
+}

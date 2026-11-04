@@ -1,0 +1,1000 @@
+{
+ "vector": "tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json",
+ "plan": [
+  {
+   "qry": [
+    [
+     0,
+     1
+    ],
+    [
+     1,
+     2
+    ],
+    [
+     2,
+     3
+    ],
+    [
+     3,
+     4
+    ],
+    [
+     4,
+     5
+    ],
+    [
+     5,
+     6
+    ],
+    [
+     6,
+     7
+    ]
+   ]
+  },
+  {
+   "qry": [
+    [
+     7,
+     8
+    ],
+    [
+     8,
+     9
+    ],
+    [
+     9,
+     10
+    ],
+    [
+     10,
+     11
+    ],
+    [
+     11,
+     12
+    ],
+    [
+     12,
+     13
+    ],
+    [
+     13,
+     14
+    ]
+   ]
+  },
+  {
+   "qry": [
+    [
+     14,
+     15
+    ],
+    [
+     15,
+     16
+    ],
+    [
+     16,
+     17
+    ],
+    [
+     17,
+     18
+    ],
+    [
+     18,
+     19
+    ],
+    [
+     19,
+     20
+    ],
+    [
+     20,
+     21
+    ]
+   ]
+  },
+  {
+   "qry": [
+    [
+     21,
+     22
+    ],
+    [
+     22,
+     23
+    ],
+    [
+     23,
+     24
+    ],
+    [
+     24,
+     25
+    ],
+    [
+     25,
+     26
+    ],
+    [
+     26,
+     27
+    ],
+    [
+     27,
+     28
+    ]
+   ]
+  },
+  {
+   "qry": [
+    [
+     28,
+     29
+    ],
+    [
+     29,
+     30
+    ],
+    [
+     30,
+     31
+    ],
+    [
+     31,
+     32
+    ],
+    [
+     32,
+     33
+    ],
+    [
+     33,
+     34
+    ],
+    [
+     34,
+     35
+    ]
+   ]
+  },
+  {
+   "qry": [
+    [
+     35,
+     36
+    ],
+    [
+     36,
+     37
+    ],
+    [
+     37,
+     38
+    ],
+    [
+     38,
+     39
+    ],
+    [
+     39,
+     40
+    ],
+    [
+     40,
+     41
+    ],
+    [
+     41,
+     42
+    ],
+    [
+     42,
+     43
+    ]
+   ]
+  }
+ ],
+ "parts": [
+  [
+   0,
+   19
+  ],
+  [
+   19,
+   23
+  ],
+  [
+   23,
+   53
+  ]
+ ],
+ "code": [
+  8844,
+  8837,
+  8842
+ ],
+ "redeem": 177,
+ "fnSizes": [
+  [
+   "QA",
+   5437
+  ],
+  [
+   "AIRPRE",
+   3786
+  ],
+  [
+   "ROLE0_0",
+   3766
+  ],
+  [
+   "FINR",
+   2292
+  ],
+  [
+   "CODE1",
+   1441
+  ],
+  [
+   "CODE2",
+   1280
+  ],
+  [
+   "TRN",
+   1275
+  ],
+  [
+   "CODE3",
+   1251
+  ],
+  [
+   "QROLE",
+   1154
+  ],
+  [
+   "ROLE5_0",
+   271
+  ],
+  [
+   "PER5_11",
+   251
+  ],
+  [
+   "ROLE1_0",
+   186
+  ],
+  [
+   "ROLE2_0",
+   186
+  ],
+  [
+   "ROLE3_0",
+   186
+  ],
+  [
+   "ROLE4_0",
+   186
+  ],
+  [
+   "FOLD3",
+   159
+  ],
+  [
+   "PAIRK",
+   153
+  ],
+  [
+   "TBL4",
+   118
+  ],
+  [
+   "D_SUBL",
+   105
+  ],
+  [
+   "MULE",
+   103
+  ],
+  [
+   "D_RSUBL",
+   102
+  ],
+  [
+   "D_SUB",
+   83
+  ],
+  [
+   "SUBE",
+   81
+  ],
+  [
+   "PARSE_H",
+   78
+  ],
+  [
+   "AS2_0",
+   78
+  ],
+  [
+   "D_NEG",
+   74
+  ],
+  [
+   "F4",
+   72
+  ],
+  [
+   "D_ADDL",
+   72
+  ],
+  [
+   "HG",
+   68
+  ],
+  [
+   "AS2_1",
+   66
+  ],
+  [
+   "AS1_0",
+   66
+  ],
+  [
+   "PKL",
+   63
+  ],
+  [
+   "TBL3",
+   57
+  ],
+  [
+   "D_MK1",
+   57
+  ],
+  [
+   "D_MK8",
+   57
+  ],
+  [
+   "COLSK",
+   55
+  ],
+  [
+   "FOLD2",
+   54
+  ],
+  [
+   "D_ADD",
+   50
+  ],
+  [
+   "ADDE",
+   48
+  ],
+  [
+   "MULF",
+   47
+  ],
+  [
+   "KR_1",
+   47
+  ],
+  [
+   "KR_0",
+   43
+  ],
+  [
+   "PARSE_F",
+   40
+  ],
+  [
+   "F2",
+   36
+  ],
+  [
+   "D_MULL",
+   27
+  ],
+  [
+   "TBL2",
+   26
+  ],
+  [
+   "D_LD",
+   24
+  ],
+  [
+   "ENC",
+   23
+  ],
+  [
+   "POPB",
+   18
+  ],
+  [
+   "F1",
+   18
+  ],
+  [
+   "D_LDB",
+   18
+  ],
+  [
+   "POP8",
+   16
+  ],
+  [
+   "PW",
+   14
+  ],
+  [
+   "RDV",
+   13
+  ],
+  [
+   "MM",
+   12
+  ],
+  [
+   "D_CK1",
+   12
+  ],
+  [
+   "D_CK8",
+   12
+  ],
+  [
+   "ROLE2_8",
+   10
+  ],
+  [
+   "ROLE2_9",
+   10
+  ],
+  [
+   "ROLE2_10",
+   10
+  ],
+  [
+   "ROLE2_11",
+   10
+  ],
+  [
+   "ROLE3_5",
+   10
+  ],
+  [
+   "ROLE3_6",
+   10
+  ],
+  [
+   "ROLE3_7",
+   10
+  ],
+  [
+   "ROLE3_8",
+   10
+  ],
+  [
+   "ROLE3_9",
+   10
+  ],
+  [
+   "ROLE3_10",
+   10
+  ],
+  [
+   "ROLE3_11",
+   10
+  ],
+  [
+   "ROLE4_5",
+   10
+  ],
+  [
+   "ROLE4_6",
+   10
+  ],
+  [
+   "ROLE4_7",
+   10
+  ],
+  [
+   "ROLE4_8",
+   10
+  ],
+  [
+   "ROLE4_9",
+   10
+  ],
+  [
+   "ROLE4_10",
+   10
+  ],
+  [
+   "ROLE4_11",
+   10
+  ],
+  [
+   "ROLE5_5",
+   10
+  ],
+  [
+   "ROLE5_6",
+   10
+  ],
+  [
+   "ROLE5_7",
+   10
+  ],
+  [
+   "ROLE5_8",
+   10
+  ],
+  [
+   "ROLE5_9",
+   10
+  ],
+  [
+   "ROLE5_10",
+   10
+  ],
+  [
+   "ROLE5_11",
+   10
+  ],
+  [
+   "ROLE5_12",
+   10
+  ],
+  [
+   "SQE",
+   9
+  ],
+  [
+   "D_RUN",
+   9
+  ],
+  [
+   "ROLE2_7",
+   9
+  ],
+  [
+   "ROLE0_5",
+   8
+  ],
+  [
+   "ROLE0_6",
+   8
+  ],
+  [
+   "ROLE0_7",
+   8
+  ],
+  [
+   "ROLE0_8",
+   8
+  ],
+  [
+   "ROLE0_9",
+   8
+  ],
+  [
+   "ROLE0_10",
+   8
+  ],
+  [
+   "ROLE0_11",
+   8
+  ],
+  [
+   "ROLE1_5",
+   8
+  ],
+  [
+   "ROLE1_6",
+   8
+  ],
+  [
+   "ROLE1_7",
+   8
+  ],
+  [
+   "ROLE1_8",
+   8
+  ],
+  [
+   "ROLE1_9",
+   8
+  ],
+  [
+   "ROLE1_10",
+   8
+  ],
+  [
+   "ROLE1_11",
+   8
+  ],
+  [
+   "ROLE2_5",
+   8
+  ],
+  [
+   "ROLE2_6",
+   8
+  ],
+  [
+   "D_MUL",
+   5
+  ],
+  [
+   "ROLE1_1",
+   5
+  ],
+  [
+   "ROLE1_2",
+   5
+  ],
+  [
+   "ROLE1_3",
+   5
+  ],
+  [
+   "ROLE2_1",
+   5
+  ],
+  [
+   "ROLE2_2",
+   5
+  ],
+  [
+   "ROLE2_3",
+   5
+  ],
+  [
+   "ROLE3_1",
+   5
+  ],
+  [
+   "ROLE3_2",
+   5
+  ],
+  [
+   "ROLE3_3",
+   5
+  ],
+  [
+   "ROLE4_1",
+   5
+  ],
+  [
+   "ROLE4_2",
+   5
+  ],
+  [
+   "ROLE4_3",
+   5
+  ],
+  [
+   "ROLE5_1",
+   5
+  ],
+  [
+   "ROLE5_2",
+   5
+  ],
+  [
+   "ROLE5_3",
+   5
+  ],
+  [
+   "F8",
+   4
+  ],
+  [
+   "F16",
+   4
+  ],
+  [
+   "ROLE0_1",
+   3
+  ],
+  [
+   "ROLE0_2",
+   3
+  ],
+  [
+   "ROLE0_3",
+   3
+  ],
+  [
+   "ROLE0_4",
+   3
+  ],
+  [
+   "ROLE1_4",
+   3
+  ],
+  [
+   "ROLE2_4",
+   3
+  ],
+  [
+   "ROLE3_4",
+   3
+  ],
+  [
+   "ROLE4_4",
+   3
+  ],
+  [
+   "ROLE5_4",
+   3
+  ]
+ ],
+ "dag": [
+  {
+   "instance": 0,
+   "part": [
+    0,
+    19
+   ],
+   "steps": 269,
+   "progBytes": 903,
+   "chunks": 23,
+   "registers": 20,
+   "leafCopies": 33,
+   "stackAtStart": 189,
+   "maxDepth": 249
+  },
+  {
+   "instance": 0,
+   "part": [
+    19,
+    23
+   ],
+   "steps": 269,
+   "progBytes": 754,
+   "chunks": 20,
+   "registers": 24,
+   "leafCopies": 33,
+   "stackAtStart": 189,
+   "maxDepth": 261
+  },
+  {
+   "instance": 0,
+   "part": [
+    23,
+    53
+   ],
+   "steps": 205,
+   "progBytes": 729,
+   "chunks": 19,
+   "registers": 4,
+   "leafCopies": 33,
+   "stackAtStart": 189,
+   "maxDepth": 201
+  },
+  {
+   "instance": 1,
+   "steps": 32,
+   "progBytes": 96,
+   "chunks": 3,
+   "registers": 2,
+   "leafCopies": 0,
+   "stackAtStart": 163,
+   "maxDepth": 169
+  }
+ ],
+ "rows": [
+  {
+   "input": 0,
+   "role": "HEAD",
+   "unlocking": 3684,
+   "opStd": 2475332,
+   "opBchnAdjusted": 2527698,
+   "phases": {
+    "entry": 330243,
+    "transcript": 289461,
+    "air": 1022555,
+    "air1": 784528,
+    "thread": 18971,
+    "cleanup": 29574
+   }
+  },
+  {
+   "input": 1,
+   "role": "CODE1",
+   "unlocking": 8872,
+   "opStd": 4911199,
+   "opBchnAdjusted": 4963565,
+   "phases": {
+    "entry": 353251,
+    "transcript": 289461,
+    "air-pre": 1615191,
+    "air-dag": 2587696,
+    "cleanup": 65600
+   }
+  },
+  {
+   "input": 2,
+   "role": "CODE2",
+   "unlocking": 8865,
+   "opStd": 4227476,
+   "opBchnAdjusted": 4279842,
+   "phases": {
+    "entry": 353244,
+    "transcript": 289461,
+    "air-pre": 1615191,
+    "air-dag": 1903980,
+    "cleanup": 65600
+   }
+  },
+  {
+   "input": 3,
+   "role": "CODE3",
+   "unlocking": 8870,
+   "opStd": 4340301,
+   "opBchnAdjusted": 4392667,
+   "phases": {
+    "entry": 353249,
+    "transcript": 289461,
+    "air-pre": 1615191,
+    "air-dag": 2016800,
+    "cleanup": 65600
+   }
+  },
+  {
+   "input": 4,
+   "role": "FIN",
+   "unlocking": 7261,
+   "opStd": 5356605,
+   "opBchnAdjusted": 5408971,
+   "phases": {
+    "entry": 322043,
+    "transcript": 289460,
+    "deep-points": 93109,
+    "a-sums": 4560469,
+    "tbl": 90822,
+    "cleanup": 702
+   }
+  },
+  {
+   "input": 5,
+   "role": "QRY",
+   "unlocking": 7726,
+   "opStd": 5702207,
+   "opBchnAdjusted": 5754573,
+   "phases": {
+    "entry": 464939,
+    "row-keys": 2082864,
+    "unpack": 1406994,
+    "consts": 0,
+    "q-x": 17152,
+    "q-deep": 425106,
+    "q-folds": 466070,
+    "q-final+paths": 282012,
+    "queries": 408559,
+    "cleanup": 148511
+   }
+  },
+  {
+   "input": 6,
+   "role": "QRY",
+   "unlocking": 7726,
+   "opStd": 5686723,
+   "opBchnAdjusted": 5739089,
+   "phases": {
+    "entry": 464941,
+    "row-keys": 2082864,
+    "unpack": 1406994,
+    "consts": 0,
+    "q-x": 17188,
+    "q-deep": 425431,
+    "q-folds": 465953,
+    "q-final+paths": 266269,
+    "queries": 408572,
+    "cleanup": 148511
+   }
+  },
+  {
+   "input": 7,
+   "role": "QRY",
+   "unlocking": 7726,
+   "opStd": 5699088,
+   "opBchnAdjusted": 5751454,
+   "phases": {
+    "entry": 464941,
+    "row-keys": 2082864,
+    "unpack": 1406994,
+    "consts": 0,
+    "q-x": 17499,
+    "q-deep": 425496,
+    "q-folds": 465420,
+    "q-final+paths": 278747,
+    "queries": 408616,
+    "cleanup": 148511
+   }
+  },
+  {
+   "input": 8,
+   "role": "QRY",
+   "unlocking": 7726,
+   "opStd": 5694030,
+   "opBchnAdjusted": 5746396,
+   "phases": {
+    "entry": 464941,
+    "row-keys": 2082864,
+    "unpack": 1406994,
+    "consts": 0,
+    "q-x": 17381,
+    "q-deep": 425403,
+    "q-folds": 465528,
+    "q-final+paths": 273804,
+    "queries": 408604,
+    "cleanup": 148511
+   }
+  },
+  {
+   "input": 9,
+   "role": "QRY",
+   "unlocking": 7726,
+   "opStd": 5701199,
+   "opBchnAdjusted": 5753565,
+   "phases": {
+    "entry": 464941,
+    "row-keys": 2082864,
+    "unpack": 1406994,
+    "consts": 0,
+    "q-x": 17739,
+    "q-deep": 425765,
+    "q-folds": 465326,
+    "q-final+paths": 280495,
+    "queries": 408564,
+    "cleanup": 148511
+   }
+  },
+  {
+   "input": 10,
+   "role": "QRY",
+   "unlocking": 7726,
+   "opStd": 5699595,
+   "opBchnAdjusted": 5751961,
+   "phases": {
+    "entry": 464941,
+    "row-keys": 2082864,
+    "unpack": 1406994,
+    "consts": 0,
+    "q-x": 17647,
+    "q-deep": 425446,
+    "q-folds": 466204,
+    "q-final+paths": 278358,
+    "queries": 408630,
+    "cleanup": 148511
+   }
+  },
+  {
+   "input": 11,
+   "role": "QRY",
+   "unlocking": 7726,
+   "opStd": 5698164,
+   "opBchnAdjusted": 5750530,
+   "phases": {
+    "entry": 464941,
+    "row-keys": 2082864,
+    "unpack": 1406994,
+    "consts": 0,
+    "q-x": 17606,
+    "q-deep": 425618,
+    "q-folds": 466209,
+    "q-final+paths": 276800,
+    "queries": 408621,
+    "cleanup": 148511
+   }
+  }
+ ]
+}

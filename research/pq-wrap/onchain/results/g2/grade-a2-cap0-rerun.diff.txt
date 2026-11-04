@@ -1,0 +1,3 @@
+# rerun of the baseline grade (no --opt) on 923c556+fixes, vector g2-0 only;
+# diff against the first 43 lines (vector g2-0) of grade-a2-cap0.log (main-era run, both vectors + timing):
+IDENTICAL (43 of 43 lines)

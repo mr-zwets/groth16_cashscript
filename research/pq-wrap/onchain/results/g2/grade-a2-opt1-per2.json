@@ -1,0 +1,48 @@
+{
+ "rows": [
+  {
+   "vector": "tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json",
+   "plan": null,
+   "tried": [
+    {
+     "per": 2,
+     "probe": 0,
+     "finOp": 5390468,
+     "qryOp": 7368027,
+     "pad": {
+      "fin": 546,
+      "qry": 1112
+     }
+    },
+    {
+     "per": 2,
+     "probe": 1,
+     "finOp": 5392182,
+     "qryOp": 7369743,
+     "pad": {
+      "fin": 548,
+      "qry": 1120
+     }
+    },
+    {
+     "per": 2,
+     "probe": 2,
+     "finOp": 5392188,
+     "qryOp": 7369749,
+     "pad": {
+      "fin": 548,
+      "qry": 1120
+     }
+    },
+    {
+     "per": 2,
+     "T": 1,
+     "maxUnlocking": 13095,
+     "txBytes": [
+      319343
+     ]
+    }
+   ]
+  }
+ ]
+}

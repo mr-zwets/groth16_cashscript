@@ -163,6 +163,8 @@ export function encodeA(vk, buf, pis, parts) {
   out.TBL = t ? tblBytes(vk, t, c) : Buffer.alloc(vk.tblB);
   out.ACC = t && parts ? airPartsN(vk, pr, c, t, pis, parts).map((a) => Buffer.concat(a.map(le8))) : (parts ?? []).map(() => Buffer.alloc(E8));
   out.G = t ? t.G : Buffer.alloc(32);
+  // opt.lad: the alpha' ladder alpha'^0 .. alpha'^(maxLadder - 1), canonical u64 LE limbs (FIN's LAD push)
+  out.LAD = c ? Buffer.concat(c.apow.slice(0, vk.maxLadder).flatMap((z) => z.map((x) => le8(md(BigInt(x)))))) : Buffer.alloc(vk.maxLadder * E8);
   return out;
 }
 

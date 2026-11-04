@@ -331,3 +331,118 @@ interpreter; every budget percentage is unchanged to 0.1 point):
   mean 93,612 vs 93,181 at redeem 19,024; b2 M1 tx 97,417 vs about 97,591 at lib 19,468; b2 M2 tx 158,006 vs about
   155,926 at lib 27,759; a′ 98,690 vs 98.5–101.5 KB). All are above S0's modelled ranges because the code came out
   larger than the 13–18 KB (b), 18–24 KB (b2) and 7.5–9 KB (a′) assumed.
+
+# Track 10 G2: layout-review optimizations of layout a′ (measured)
+
+Research only, nothing deployed. These are the candidates from the pq-merkle-bytes layout review
+(zk-verifier-bench `research/pq-wrap/layout-review/PLAN.md`), built behind `--opt` in `grade-a2.mjs`, `profile-a2.mjs`
+and `test-a2.mjs` (`gena.mjs` `plan.opt`). Without `--opt` the generator is the baseline: a rerun on this branch
+(`results/g2/grade-a2-cap0-rerun.log`) is identical, line for line, to the g2-0 part of the main-era
+`results/g2/grade-a2-cap0.log` (`grade-a2-cap0-rerun.diff.txt`).
+
+| `--opt` | candidate | what changes |
+|---|---|---|
+| `sib` | 1 | one 32 B push per Merkle sibling, fetched by `DEPTH 1SUB ROLL` with `SIZE 32`; replaces re-pushing the PTH blob at every level |
+| `lad` | 3 | FIN publishes LAD = α′^0..α′^93 (2,256 B) and checks it against the powers it walks for the A sums; QRY only packs the row keys from it |
+| `state` | 2 | tx0 (R0) mints NFT k = k ‖ SHA256(STAG ‖ k ‖ HS), HS = SHA256(ROOTS‖FROOTS‖FIN‖TBL‖LAD‖NF‖CTXW‖G), locked to R1; later txs under R1 have STATE + one library blob + QRY inputs |
+| `cap=c` | 5 | LAYER (2^c nodes per tree at level c) in tx0's HEAD and in a TOP input (input 2) of R1 txs, checked against the roots; paths stop at level c |
+
+All figures below are MEASURED on `tw2x18x16-g2-0` cap 0 (libauth BCH 2026 standard and consensus, BCHN-adjusted
+op-cost, grade target 0.93). `test-a2 --layout` was run on both cap-0 case files.
+
+test-a2 evaluates every input of the first rejecting transaction. For the families constants, lad, sib, pad, state
+and layer, it asserts that the input owning the tampered value is among the rejecting inputs (for example FIN for
+TBL and LAD, CODE j for ACC_j, the tampered QRY input, STATE, TOP). Under `state`, tx0's NFTs are minted over tx0's
+own (tampered) witness values, so HEAD's state-hash check passes and the owner is reached. Without that, every tx0
+TBL or LAD tamper would be rejected by HEAD's hash comparison first. Two labels, for the record:
+- the FIN pad case "empty pad replaced by 0x01" is rejected first by HEAD's push-prefix parse of FIN's input, and
+  also by FIN's own pad check;
+- "honest state of kind 2" passes STATE (it is a valid kind-2 state) and is rejected by the QRY inputs' per-kind
+  lo/hi role stubs.
+
+| plan | txs | inputs | bytes | QRY input | pad | q/input | max % | test-a2 |
+|---|---|---|---|---|---|---|---|---|
+| baseline | 7 | 78 | 639,351 | 8,587 | 2,170 | 1 | 92.72 | 286 cases, 0 unexpected |
+| `sib` | 6 | 73 | 561,732 | 7,726 | 1,176 | 1 | 92.62 | 310, 0 |
+| `sib,lad` | 5 | 68 | 480,380 | 6,548 | 0 | 1 | 86.36 | 332, 0 |
+| `sib,lad,state` | 4 | 54 | 377,245 | 6,548 | 0 | 1 | 87.27 | 390, 0 |
+| `sib,lad,state,cap=3` | 4 | 57 | 355,817 | 5,855 | 0 | 1 | 91.62 | 426, 0 |
+
+- **sib:** the QRY "queries" phase drops from 1,059,906 to 408,559 op. The review modelled 0.42M and 7 txs at about
+  602 KB; it predicted 6 txs would miss by about 190 B. In fact the 8-QRY final tx is 99,841 B, so 6 txs fit.
+- **lad:** the QRY row-keys phase (PACK) drops from 2,082,864 to 657,032 op. That is above the PLAN's 0.48M zero-pad
+  threshold but below its 0.7M 5-tx threshold. With `sib` the pads still go to 0: QRY is byte-bound at 82%.
+  FIN's a-sums phase rises from 4,560,469 to 5,339,455 op, and FIN is 8,918 B.
+- **state:**
+  - The R1 query-only library blob is 9,077 B (66 functions, redeem 59 B). The review estimated 8.6–9.3 KB.
+  - STATE is 9,244 B at 3.1% of its budget. LIB is at 1.9%, and R1 QRY inputs are at 78.5%.
+  - HEAD's thread phase rises from 22,047 to 101,800 op, which puts HEAD at 87.27%.
+  - The review modelled 6 txs / about 491 KB for `state` alone, and 4 txs / about 372 KB together with the ladder.
+- **cap=c sweep (with `sib,lad,state`):**
+  - c=1: 370,149 B; c=2: 362,088 B; c=3: 355,817 B.
+  - c=4: 365,576 B, because QRY is op-bound again and needs a 282 B pad.
+  - c=5: no plan, because HEAD with the 7,168 B layer is 10,855 B.
+  - In R1 txs the layer cannot share STATE's input (11,039 B > 10,000), so it gets its own TOP input.
+- **per=2 still has no plan** with any of these. At `sib` the QRY op fits (7.37M), but the unlocking is 13,095 B
+  (11,709 B at cap 3).
+- The second vector (g2-1) gives the same tx counts.
+
+Reproduce (each grade takes about 20 s, test-a2 about 75 s):
+```
+nice -n 19 node grade-a2.mjs --nc 3 --opt sib,lad,state,cap=3 --out results/g2/grade-a2-opt1235.json <vec0>/tw2x18x16-g2-0-*cap0.json
+nice -n 19 node test-a2.mjs --layout --nc 3 --opt sib,lad,state,cap=3 <cases0>/tw2x18x16-g2-{0,1}-*cap0.json
+```
+Results are in `results/g2/{grade,profile,test}-a2-opt{1,12,123,1235}.*`, `grade-a2-opt1{,2}-per2.*`,
+`grade-a2-opt1235-csweep.log` and `profile-a2-base.*`.
+
+**Soundness and seam notes (not reviewed):**
+- *sib:*
+  - The compressions, left/right order and root comparison are the same as before.
+  - The item count is fixed by the QRY `DEPTH` check (1 + siblings per query), and each sibling is `SIZE 32`.
+  - There is no new cross-input read.
+  - The 'sib' test family covers wrong, missing, extra, swapped, resized and merged siblings.
+- *lad:*
+  - FIN owns LAD the way it owns TBL: it serializes the powers of the α′ it derived (canonical limbs, `P MOD`) and
+    `EQUALVERIFY`s its own push.
+  - QRY reads LAD only from FIN's input, through the checked parse. Every height's ladder is a prefix of LAD.
+  - A non-canonical limb with the same value mod p is rejected (test family 'lad').
+  - The serialization (`P MOD 9 NUM2BIN 8 SPLIT DROP`) is canonical only for limbs ≥ 0; for a negative x it would
+    give |x|. The invariant holds: zq starts at (1, 0, 0) and is only ever MULE's output (P MOD of sums of products
+    of non-negative limbs), and alpha' is parsed unsigned from TBL. This is stated at `gena.mjs`'s emit site.
+- *state:* behaviour change. Later txs no longer re-derive the transcript; they rest on tx0's HEAD and FIN plus
+  SHA-256 collision resistance of HS.
+  - Every preimage field has a fixed length, and k appears both in the clear and inside the hash.
+  - tx0's HEAD pins each NFT output to R1's exact bytecode and to the immutable category.
+  - R1 checks:
+    - input 0 is exactly CAT;
+    - no other input or output carries a token, so R1 never mints;
+    - CTXW = CTX(outputs) in the final kind;
+    - every input is R1.
+  - R1's QA function is asserted byte-identical to R0's. The whole QRY role is asserted too: QROLE1 equals QROLE
+    except for the parse section (parse STATE, and TOP with `cap`, instead of HEAD and FIN, then the same drop and
+    arrange to the same named items). R1's blob is the call-graph closure of its roles.
+  - test-a2 also runs R1-side sib and pad cases (tx1 QRY), rejected by that QRY input.
+  - R0 now dispatches kind 0 only.
+  - Review items: HS covers exactly what tx0 checked (HEAD hashes copies taken before the transcript; TBL and LAD come
+    from FIN's input in the same tx); the closure scan (it refuses computed invokes); R1 dispatch kinds 1..T−1 (kind 0
+    has input count 0).
+- *Ordering hole (open, unchanged, not fixed here):*
+  - tx0 still mints every thread NFT, so the final tx (which creates the CTX outputs) does not depend on the middle
+    txs having run. Only tx0's and the final tx's queries are enforced before the outputs exist: 9 + 12 = 21 of 43
+    with `state` (counts 9/11/11/12), and 10 + 11 = 21 with `cap=3` (10/11/11/11); the baseline has 6 + 7 = 13.
+  - `state` makes this hole more visible but does not widen it. Each later tx was already independent of the others,
+    and `state` adds no new way to skip one.
+  - The natural fix forwards one NFT through the chain (mutable commitment, k raised each step). That needs an
+    NFT update path in R1, which conflicts with "R1 never mints". The two must be designed together.
+- *cap:*
+  - LAYER is recomputed against the roots in every tx: HEAD's own roots in tx0, and STATE's roots via the fixed TOP
+    input 2 in R1 txs. It is not carried in the NFT.
+  - c is a covenant constant, and LAYER has an exact length.
+  - QRY reads LAYER only from the fixed input, with the same index convention as the paths (k − 2^c).
+  - The top c layers contain no injected rows. In this layout every injection happens below level B: the shorter
+    matrices of an input tree are hashed into the bottom B levels, which each query walks from its own blob, and FRI
+    trees have no injections. The climb from level B to the root is plain pairwise SHA-256 (the F1..F16 runs). So the
+    top c levels are plain compressions whenever c ≤ depth − B, which `gena.mjs` enforces as c ≤ min depth (the
+    depths count from level B; the smallest is 13).
+  - The encoder derives LAYER from the proof's own paths. On this vector every node at c ≤ 5 is covered; a node that
+    no query reaches could not be derived from the proof alone, and a real prover would supply it from the tree.
