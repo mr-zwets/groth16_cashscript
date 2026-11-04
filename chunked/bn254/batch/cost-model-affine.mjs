@@ -3,9 +3,9 @@
 // static op-cost estimates of new G1 kernels (asm.mjs scheduler), and prints the N = 1..6 tables.
 //   node cost-model.mjs            (KMUL=1.0: uncalibrated kernel estimates). Rows over 100,000 B do not fit one standard
 //   tx; a multi-tx batch needs a cross-tx design that DESIGN.md does not cover.
-import {Asm, Kernel} from '/home/mrzwets/BCH-projects/verifier.cash/work/g16-batch/code/chunked/bn254/bn-native-sound/asm.mjs';
-import {kADblN, kDStep} from '/home/mrzwets/BCH-projects/verifier.cash/work/g16-batch/code/chunked/bn254/bn-native-sound/kernels.mjs';
-import {DIGITS, NE} from '/home/mrzwets/BCH-projects/verifier.cash/work/g16-batch/code/chunked/bn254/sound-si-gls/math.mjs';
+import {Asm, Kernel} from '../bn-native-sound/asm.mjs';
+import {kADblN, kDStep} from '../bn-native-sound/kernels.mjs';
+import {DIGITS, NE} from '../sound-si-gls/math.mjs';
 const k = 1e3, M = 1e6;
 // ---------------- G1 kernel estimates (static model) ----------------
 const est = (K, stack, outs) => new Asm(['p', ...stack]).kernel(K, outs, {iters: 3000}).cost;
