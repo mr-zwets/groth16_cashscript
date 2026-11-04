@@ -8,16 +8,17 @@
 // whole-transaction verification (standard) and size. Op-cost "BCHN-adjusted" = max(std, cons) + OP_DEFINE body bytes
 // (Track 8a; exact on BCHN 29.1.0), against the budget (41 + unlocking) * 800.
 //   pad   FIN and QRY inputs get a checked zero pad (gena.mjs) sized so that op-cost <= target (0.93) of the budget
-// usage: node grade-a2.mjs [--per N] [--nc N] [--maxT N] [--pad 0|1] [--target 0.93] [--out FILE] VECTOR.json...
+//   opt   layout-review optimizations (gena.mjs plan.opt), e.g. --opt sib; absent = the baseline generator
+// usage: node grade-a2.mjs [--per N] [--nc N] [--maxT N] [--pad 0|1] [--target 0.93] [--opt a,b] [--out FILE] VECTOR.json...
 import {writeFileSync} from 'node:fs';
 import {readVector} from './layoutn.mjs';
 import {vkxA} from './modela.mjs';
-import {makePlanA, spendA, evaluateTxA, verifyTxA} from './layouta.mjs';
+import {makePlanA, spendA, evaluateTxA, verifyTxA, parseOpt} from './layouta.mjs';
 import {evaluate} from './vm.mjs';
 
 const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
-const files = args.filter((a, i) => !a.startsWith('--') && !['--per', '--nc', '--out', '--maxT', '--pad', '--target'].includes(args[i - 1]));
+const files = args.filter((a, i) => !a.startsWith('--') && !['--per', '--nc', '--out', '--maxT', '--pad', '--target', '--opt'].includes(args[i - 1]));
 const outFile = opt('--out', new URL('./results/grade-a2.json', import.meta.url).pathname);
 const NC = +opt('--nc', 2), MAXT = +opt('--maxT', 8);
 const roleOf = (plan, i) => (i === 0 ? 'HEAD' : i <= plan.nc ? `CODE${i}` : i === plan.nc + 1 ? 'FIN' : 'QRY');
@@ -41,7 +42,7 @@ function padFor(op, unlNoPad, target) {
   return n;
 }
 
-export function planFor(vk, proof, pis, outputs, {per, nc = NC, pad = true, target = 0.93} = {}) {
+export function planFor(vk, proof, pis, outputs, {per, nc = NC, pad = true, target = 0.93, opt} = {}) {
   const pers = per ? [per] : [3, 2, 1];
   const tried = [];
   for (const pq of pers) {
@@ -52,7 +53,7 @@ export function planFor(vk, proof, pis, outputs, {per, nc = NC, pad = true, targ
       padv = {fin: 0, qry: [qs.map(() => 0)]};
       for (let it = 0; it < 4; it++) {
         let sp;
-        try { sp = spendA(vk, makePlanA(vk, [qs], {nc, pad: padv}), proof, pis, outputs); } catch (e) { tried.push({per: pq, probe: it, error: String(e.message).slice(0, 160)}); padv = null; break; }
+        try { sp = spendA(vk, makePlanA(vk, [qs], {nc, pad: padv, opt}), proof, pis, outputs); } catch (e) { tried.push({per: pq, probe: it, error: String(e.message).slice(0, 160)}); padv = null; break; }
         const cs = costs(sp)[0], fin = nc + 1;
         const next = {fin: padFor(cs[fin].op, cs[fin].unl - pushHdr(padv.fin), target), qry: [qs.map((_, j) => padFor(cs[fin + 1 + j].op, cs[fin + 1 + j].unl - pushHdr(padv.qry[0][j]), target))]};
         const byCount = new Map(); qs.forEach((n, j) => byCount.set(n, Math.max(byCount.get(n) ?? 0, next.qry[0][j])));
@@ -68,7 +69,7 @@ export function planFor(vk, proof, pis, outputs, {per, nc = NC, pad = true, targ
     for (let T = 1; T <= MAXT; T++) {
       const counts = share(qs, T);
       if (counts.some((c) => !c.length)) break;
-      const plan = makePlanA(vk, counts, {nc, ...(padv ? {pad: {fin: padv.fin, qry: counts.map((c) => c.map((n) => padOfCount.get(n)))}} : {})});
+      const plan = makePlanA(vk, counts, {nc, opt, ...(padv ? {pad: {fin: padv.fin, qry: counts.map((c) => c.map((n) => padOfCount.get(n)))}} : {})});
       let sp;
       try { sp = spendA(vk, plan, proof, pis, outputs); } catch (e) { tried.push({per: pq, T, error: String(e.message).slice(0, 160)}); break; }
       const unl = sp.txs.flatMap((tx) => tx.unl.map((u) => u.length));
@@ -87,7 +88,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     const v = readVector(path); const vk = vkxA(v); const pis = v.public_values.flat().map(BigInt);
     const outputs = v.s4_outputs.map((o) => ({lockingBytecode: Uint8Array.from(Buffer.from(o.lockingBytecode, 'hex')), valueSatoshis: BigInt(o.valueSatoshis)}));
     const proof = Buffer.from(v.proof_hex, 'hex');
-    const {plan, sp, per, T, tried} = planFor(vk, proof, pis, outputs, {per: opt('--per') ? +opt('--per') : undefined, pad: opt('--pad') !== '0', target: +opt('--target', 0.93)});
+    const {plan, sp, per, T, tried} = planFor(vk, proof, pis, outputs, {per: opt('--per') ? +opt('--per') : undefined, pad: opt('--pad') !== '0', target: +opt('--target', 0.93), opt: parseOpt(opt('--opt'))});
     if (!plan) { console.log(`${path.split('/').pop()}: NO PLAN ${JSON.stringify(tried)}`); rows.push({vector: path.split('/').pop(), plan: null, tried}); continue; }
     const txs = sp.txs.map((tx, t) => {
       const std = evaluateTxA(tx, 'bchStd'), cons = evaluateTxA(tx, 'bchCons'), spec = evaluateTxA(tx, 'specStd');
@@ -100,7 +101,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       });
       return {tx: t, bytes: tx.txBytes, inputs: inputs.length, whole: whole === true ? true : String(whole), allStd: inputs.every((x) => x.std && x.cons && x.bchnWithinBudget), allSpec: inputs.every((x) => x.spec), detail: inputs};
     });
-    const row = {vector: path.split('/').pop(), per, T, pad: plan.pad ?? null, counts: plan.txs.map((x) => x.qry.map(([a, b]) => b - a)), txs: txs.length, inputs: txs.reduce((a, t) => a + t.inputs, 0),
+    const row = {vector: path.split('/').pop(), opt: plan.opt ?? {}, per, T, pad: plan.pad ?? null, counts: plan.txs.map((x) => x.qry.map(([a, b]) => b - a)), txs: txs.length, inputs: txs.reduce((a, t) => a + t.inputs, 0),
       totalBytes: txs.reduce((a, t) => a + t.bytes, 0), proofBytes: proof.length,
       accepted: txs.every((t) => t.allStd && t.whole === true && t.bytes <= 100_000),
       code: sp.pg.code.map((c) => c.length), redeem: sp.pg.redeem.length, defineBytes: sp.pg.defineBytes,

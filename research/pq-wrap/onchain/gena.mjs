@@ -57,7 +57,11 @@ function localFn(args, build) {
 }
 
 // plan: {txs: [{qry: [[lo, hi], ...]}], nc (code inputs), parts, thread?: {category (32 B, internal order)},
-//        ctx?: 'witness' (harness: the final HEAD takes CTXW as a witness item instead of the outputs' CTX)}
+//        ctx?: 'witness' (harness: the final HEAD takes CTXW as a witness item instead of the outputs' CTX),
+//        opt?: {sib?} (layout-review optimizations; absent = the baseline generator, byte for byte)}
+//   opt.sib  Merkle climb with one 32 B push per sibling (layout-review candidate 1): each query carries L and then
+//            its (depth - capH) siblings per tree as separate items, in climb order; every level fetches its sibling
+//            from the stack bottom (DEPTH 1SUB ROLL) and checks SIZE 32, instead of re-pushing the remaining PTH blob
 export function buildA(vk, pis, plan, opts = {}) {
   { let next = 0;
     for (const tx of plan.txs) for (const r of tx.qry) {
@@ -66,6 +70,7 @@ export function buildA(vk, pis, plan, opts = {}) {
     }
     if (next !== vk.Q) throw new Error(`plan: query ranges cover [0, ${next})`); }
   const T = plan.txs.length, thread = plan.thread, nc = plan.nc;
+  const OPT = plan.opt ?? {}, SIB = !!OPT.sib;
   if (T > 1 && !thread) throw new Error('plan: several transactions need the NFT thread');
   const parts = plan.parts;
   if (parts.length !== nc) throw new Error('plan: one constraint range per CODE input');
@@ -425,7 +430,9 @@ export function buildA(vk, pis, plan, opts = {}) {
   const tblNames = vk.tblLayout.flatMap(([nm, n]) => (n === 1 && !/_$/.test(nm) && nm !== 'idx' ? [nm] : names(nm, n)));
   const qryRole = () => {
     const S = new Stk(pad ? ['lo', 'hi', 'pn'] : ['lo', 'hi']);
-    S.pick('hi'); S.pick('lo'); S.raw(['SUB', 2, 'MUL', pad ? 5 : 3, 'ADD', 'DEPTH', 'NUMEQUALVERIFY'], 2);
+    // items per query: L and PTH, or (opt.sib) L and one item per sibling
+    const perQ = SIB ? 1 + vk.pathB / h : 2;
+    S.pick('hi'); S.pick('lo'); S.raw(['SUB', perQ, 'MUL', pad ? 5 : 3, 'ADD', 'DEPTH', 'NUMEQUALVERIFY'], 2);
     // the pad (first push, bottom of the stack) must be exactly pn zero bytes
     if (pad) { S.roll('pn'); S.raw(['DEPTH', '1SUB', 'ROLL', 'SWAP', 0, 'SWAP', 'NUM2BIN', 'EQUALVERIFY'], 1); }
     parseHead(S); parseFin(S);
@@ -498,18 +505,18 @@ export function buildA(vk, pis, plan, opts = {}) {
     QA.raw(['DEPTH', '1SUB', 'ROLL', 'SIZE', vk.blob.total, 'NUMEQUALVERIFY'], 0, ['L']);
     g.emitQuery(QA);
     QA.raw(['FROMALTSTACK'], 0, ['kb']);
-    QA.raw(['DEPTH', '1SUB', 'ROLL', 'SIZE', vk.pathB, 'NUMEQUALVERIFY'], 0, ['PTH']);
+    if (!SIB) QA.raw(['DEPTH', '1SUB', 'ROLL', 'SIZE', vk.pathB, 'NUMEQUALVERIFY'], 0, ['PTH']);
     vk.trees.forEach((tr, ti) => {
       QA.pick('kb'); QA.raw([4, 'SPLIT', ...(ti ? [ti * h, 'SPLIT', 'NIP'] : []), h, 'SPLIT', 'DROP', 'SWAP', 'BIN2NUM', ...(tr.shift ? [tr.shift, 'RSHIFTNUM'] : []), 1 << tr.depth, 'ADD', 'SWAP'], 1, ['k', 'cur']);
-      QA.roll('PTH');
       let d = tr.depth - tr.capH; const runs = [];
       for (const [len, id] of [[16, OPS.F16], [8, OPS.F8], [4, OPS.F4], [2, OPS.F2], [1, OPS.F1]]) while (d >= len) { runs.push(id); d -= len; }
-      QA.raw(runs.flatMap((id) => [id, 'INVOKE', 'DROP']), 3, ['k', 'cur', 'PTH']);
+      if (SIB) QA.raw(runs.flatMap((id) => [id, 'INVOKE']), 2, ['k', 'cur']);
+      else { QA.roll('PTH'); QA.raw(runs.flatMap((id) => [id, 'INVOKE', 'DROP']), 3, ['k', 'cur', 'PTH']); }
       const [src, off] = tr.kind === 'fri' ? ['FROOTS', vk.friOff[tr.r]] : ['ROOTS', vk.capOff[tr.name]];
       QA.roll('cur'); QA.pick(src, 'cp'); QA.roll('k');
       QA.raw([1 << tr.capH, 'SUB', h, 'MUL', ...(off ? [off, 'ADD'] : []), 'SPLIT', 'NIP', h, 'SPLIT', 'DROP', 'EQUALVERIFY'], 3);
     });
-    QA.roll('PTH'); QA.raw([new Uint8Array(0), 'EQUALVERIFY'], 1);
+    if (!SIB) { QA.roll('PTH'); QA.raw([new Uint8Array(0), 'EQUALVERIFY'], 1); }
     QA.drop('kb');
     if (QA.st.length !== S.st.length || !QA.st.every((x) => S.st.includes(x))) throw new Error('QRY query function changes the shape: ' + QA.st.filter((x) => !S.st.includes(x)) + ' / ' + S.st.filter((x) => !QA.st.includes(x)));
     QA.arrange(S.st);
@@ -520,7 +527,15 @@ export function buildA(vk, pis, plan, opts = {}) {
     return S.bytes();
   };
   // fresh path runs (genn merkleFns: F1 .. F16 only)
-  {
+  if (SIB) {
+    // [k cur] -> [k' cur']: bit = k mod 2; sibling = the bottom item (exactly h bytes); cur' = SHA256(bit ? sib|cur :
+    // cur|sib); k' = k >> 1 (same order and compressions as the blob climb)
+    const sibLevel = ['OVER', 2, 'MOD', 'DEPTH', '1SUB', 'ROLL', 'SIZE', h, 'NUMEQUALVERIFY', 'SWAP', 'ROLL', 'CAT', 'SHA256', 'SWAP', 1, 'RSHIFTNUM', 'SWAP'];
+    const sibRun = (n) => asm(Array.from({length: n}, () => sibLevel));
+    defFn('F1', sibRun(1), OPS.F1); defFn('F2', sibRun(2), OPS.F2); defFn('F4', sibRun(4), OPS.F4);
+    defFn('F8', asm(OPS.F4, 'INVOKE', OPS.F4, 'INVOKE'), OPS.F8);
+    defFn('F16', asm(OPS.F8, 'INVOKE', OPS.F8, 'INVOKE'), OPS.F16);
+  } else {
     const freshLevel = ['FROMALTSTACK', 'DUP', 2, 'MOD', 'SWAP', 1, 'RSHIFTNUM', 'FROMALTSTACK', h, 'SPLIT', 'TOALTSTACK', 'SWAP', 'TOALTSTACK', 'SWAP', 'ROLL', 'CAT', 'SHA256'];
     const freshRun = (n) => asm('TOALTSTACK', 'SWAP', 'TOALTSTACK', Array.from({length: n}, () => freshLevel), 'FROMALTSTACK', 'FROMALTSTACK', 'ROT', 'SWAP', 0);
     defFn('F1', freshRun(1), OPS.F1); defFn('F2', freshRun(2), OPS.F2); defFn('F4', freshRun(4), OPS.F4);

@@ -1,0 +1,11 @@
+in0 HEAD: op 2482556 (+53101 define bytes) entry 333627, transcript 289461, air 1023319, air1 784528, thread 22047, cleanup 29574
+in1 CODE1: op 4914703 (+53101 define bytes) entry 356755, transcript 289461, air-pre 1615191, air-dag 2587696, cleanup 65600
+in2 CODE2: op 4230994 (+53101 define bytes) entry 356762, transcript 289461, air-pre 1615191, air-dag 1903980, cleanup 65600
+in3 CODE3: op 4343813 (+53101 define bytes) entry 356761, transcript 289461, air-pre 1615191, air-dag 2016800, cleanup 65600
+in4 FIN: op 5359989 (+53101 define bytes) entry 325427, transcript 289460, deep-points 93109, a-sums 4560469, tbl 90822, cleanup 702
+in5 QRY: op 6346140 (+53101 define bytes) entry 457660, row-keys 2082864, unpack 1406994, consts 0, q-x 17017, q-deep 425106, q-folds 466070, q-final+paths 282012, queries 1059906, cleanup 148511
+in6 QRY: op 6330656 (+53101 define bytes) entry 457662, row-keys 2082864, unpack 1406994, consts 0, q-x 17053, q-deep 425431, q-folds 465953, q-final+paths 266269, queries 1059919, cleanup 148511
+in7 QRY: op 6343021 (+53101 define bytes) entry 457662, row-keys 2082864, unpack 1406994, consts 0, q-x 17364, q-deep 425496, q-folds 465420, q-final+paths 278747, queries 1059963, cleanup 148511
+in8 QRY: op 6337963 (+53101 define bytes) entry 457662, row-keys 2082864, unpack 1406994, consts 0, q-x 17246, q-deep 425403, q-folds 465528, q-final+paths 273804, queries 1059951, cleanup 148511
+in9 QRY: op 6345132 (+53101 define bytes) entry 457662, row-keys 2082864, unpack 1406994, consts 0, q-x 17604, q-deep 425765, q-folds 465326, q-final+paths 280495, queries 1059911, cleanup 148511
+in10 QRY: op 6343528 (+53101 define bytes) entry 457662, row-keys 2082864, unpack 1406994, consts 0, q-x 17512, q-deep 425446, q-folds 466204, q-final+paths 278358, queries 1059977, cleanup 148511

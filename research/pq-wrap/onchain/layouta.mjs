@@ -14,16 +14,20 @@ const MIDDLE_OUT = Uint8Array.from([0x76, 0xa9, 0x14, ...hash256(Uint8Array.from
 const u64s = (xs) => Buffer.concat(xs.map((x) => { const b = Buffer.alloc(8); b.writeBigUInt64LE(((x % (1n << 64n)) + (1n << 64n)) & M64); return b; }));
 
 // counts: per transaction, the number of queries of each QRY input, e.g. [[3, 3, 3, 3, 3, 3, 3], [3]]
-export function makePlanA(vk, counts, {nc = 2, ctx, pad} = {}) {
+// opt: gena.mjs plan.opt (layout-review optimizations; {} or absent = baseline)
+export function makePlanA(vk, counts, {nc = 2, ctx, pad, opt} = {}) {
   let q = 0;
   const txs = counts.map((cs) => ({qry: cs.map((n) => { const r = [q, q + n]; q += n; return r; })}));
   if (q !== vk.Q) throw new Error(`plan covers ${q} of ${vk.Q} queries`);
-  return {txs, nc, parts: partsOf(vk, nc), ...(txs.length > 1 ? {thread: {category: CATEGORY}} : {}), ...(ctx ? {ctx} : {}), ...(pad ? {pad} : {})};
+  return {txs, nc, parts: partsOf(vk, nc), ...(txs.length > 1 ? {thread: {category: CATEGORY}} : {}), ...(ctx ? {ctx} : {}), ...(pad ? {pad} : {}), ...(opt && Object.keys(opt).length ? {opt} : {})};
 }
+// CLI helper: '--opt sib,lad' -> {sib: true, lad: true}
+export const parseOpt = (s) => Object.fromEntries((s ?? '').split(',').filter(Boolean).map((k) => [k, true]));
+const sibs = (b) => Array.from({length: b.length / 32}, (_, i) => b.subarray(32 * i, 32 * i + 32));
 
 const cache = new Map();
 export function programA(vk, pis, plan, opts = {}) {
-  const key = JSON.stringify([vk.SO.batch.toString('hex'), vk.Q, vk.qpow, vk.capHeight, pis.slice(0, 4).map(String), plan.txs, plan.nc, plan.parts, plan.ctx ?? 'tx', plan.pad ?? null, opts]);
+  const key = JSON.stringify([vk.SO.batch.toString('hex'), vk.Q, vk.qpow, vk.capHeight, pis.slice(0, 4).map(String), plan.txs, plan.nc, plan.parts, plan.ctx ?? 'tx', plan.pad ?? null, plan.opt ?? null, opts]);
   if (!cache.has(key)) cache.set(key, buildA(vk, pis, plan, opts));
   return cache.get(key);
 }
@@ -35,7 +39,7 @@ export function witnessesA(vk, plan, pg, enc, pis) {
     pg.hItems.map(([k]) => (k === 'NF' ? nf : k === 'CTXW' ? ctx : enc.PT[k])),
     ...pg.code.map((c, j) => (t === 0 ? [c, enc.ACC[j]] : [c])),
     [...(plan.pad ? [Buffer.alloc(plan.pad.fin)] : []), enc.PT.FIN, enc.TBL],
-    ...tx.qry.map(([lo, hi], j) => { const it = plan.pad ? [Buffer.alloc(plan.pad.qry[t][j])] : []; for (let q = lo; q < hi; q++) it.push(enc.L[q], enc.PTH[q]); return it; }),
+    ...tx.qry.map(([lo, hi], j) => { const it = plan.pad ? [Buffer.alloc(plan.pad.qry[t][j])] : []; for (let q = lo; q < hi; q++) it.push(enc.L[q], ...(plan.opt?.sib ? sibs(enc.PTH[q]) : [enc.PTH[q]])); return it; }),
   ]);
 }
 

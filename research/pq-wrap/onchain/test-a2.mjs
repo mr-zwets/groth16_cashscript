@@ -14,13 +14,14 @@
 // input (witness manipulations of one input), graph (input order, count, locking, code), mix (inputs from another
 // proof: cross-input and cross-transaction mixing), thread (2-transaction plan: NFT commitment, category,
 // capability, replays), tx (outputs changed, so CTX differs), root (another script ROOT).
-// usage: node test-a.mjs [--plan 1tx|2tx] [--harness] [--layout] [--out FILE] CASEFILE...
+// usage: node test-a.mjs [--plan 1tx|2tx] [--harness] [--layout] [--opt a,b] [--out FILE] CASEFILE...
+//   --opt  layout-review optimizations (gena.mjs plan.opt; absent = baseline); opt.sib adds the 'sib' family
 //   --harness  CTX is a witness item (S3's generic cap-5 case files, whose statements are not transaction-bound)
 import {writeFileSync, existsSync} from 'node:fs';
 import {readVector} from './layoutn.mjs';
 import {vkxA, verifyModelA, encodeA, P, sha} from './modela.mjs';
 import {applyTamper} from './modeln.mjs';
-import {makePlanA, spendA, evaluateTxA, verifyTxA, CATEGORY} from './layouta.mjs';
+import {makePlanA, spendA, evaluateTxA, verifyTxA, CATEGORY, parseOpt} from './layouta.mjs';
 import {threadCommit} from './gena.mjs';
 import {planFor} from './grade-a2.mjs';
 import {runCase, vkFromVector, parse as strictParse} from '../verifier/verify-batch.mjs';
@@ -30,13 +31,13 @@ const args = process.argv.slice(2);
 const opt = (k, d) => { const i = args.indexOf(k); return i >= 0 ? args[i + 1] : d; };
 const HARNESS = args.includes('--harness'), LAYOUT = args.includes('--layout'), PLAN = opt('--plan', '1tx');
 const outFile = opt('--out', null);
-const files = args.filter((a, i) => !a.startsWith('--') && !['--out', '--plan', '--nc'].includes(args[i - 1]));
+const files = args.filter((a, i) => !a.startsWith('--') && !['--out', '--plan', '--nc', '--opt'].includes(args[i - 1]));
 const M64 = 1n << 64n;
 const outputsOf = (v) => (v.s4_outputs ?? [{lockingBytecode: '76a914' + '00'.repeat(20) + '88ac', valueSatoshis: '900000'}]).map((o) => ({lockingBytecode: Uint8Array.from(Buffer.from(o.lockingBytecode, 'hex')), valueSatoshis: BigInt(o.valueSatoshis)}));
 const altOutputs = (outs) => outs.map((o, i) => (i === 0 ? {...o, valueSatoshis: o.valueSatoshis - 1n} : o));
 const countsOf = (vk, which) => { const per = Array.from({length: Math.ceil(vk.Q / 3)}, (_, i) => Math.min(3, vk.Q - 3 * i)); return which === '1tx' ? [per] : [per.slice(0, -1), per.slice(-1)]; };
 void countsOf; void makePlanA;
-const planOf = (vk, v, outs) => { const p = planFor(vk, Buffer.from(v.proof_hex, 'hex'), v.public_values.flat().map(BigInt), outs, {nc: +opt('--nc', 3)}); if (!p.plan) throw new Error('no plan: ' + JSON.stringify(p.tried)); return HARNESS ? {...p.plan, ctx: 'witness'} : p.plan; };
+const planOf = (vk, v, outs) => { const p = planFor(vk, Buffer.from(v.proof_hex, 'hex'), v.public_values.flat().map(BigInt), outs, {nc: +opt('--nc', 3), opt: parseOpt(opt('--opt'))}); if (!p.plan) throw new Error('no plan: ' + JSON.stringify(p.tried)); return HARNESS ? {...p.plan, ctx: 'witness'} : p.plan; };
 
 const stats = {plan: PLAN, harness: HARNESS, files: 0, cases: 0, unexpected: 0, na: 0, refused: 0, encoderOnly: 0, malformed: 0, families: {}, list: [], skippedFiles: []};
 const fam = (f) => (stats.families[f] ??= {cases: 0, chainReject: 0, accept: 0, unexpected: 0});
@@ -78,6 +79,11 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
   const C = []; const add = (family, nm, o) => C.push({family, nm, ...o});
   const nc = plan.nc, FIN = nc + 1, Q0 = nc + 2, T = plan.txs.length;
   const fo = plan.pad ? 1 : 0, qo = plan.pad ? 1 : 0, per0 = plan.txs[0].qry[0][1] - plan.txs[0].qry[0][0];
+  // QRY items per query: L PTH, or (opt.sib) L and nS siblings of 32 B
+  const SIB = !!plan.opt?.sib, nS = vk.pathB / 32, pq = SIB ? 1 + nS : 2, np = pq - 1;
+  const pathAt = (a, k, off) => { if (!SIB) return [k + 1, off]; const o = off < 0 ? vk.pathB + off : off; return [k + 1 + Math.floor(o / 32), o % 32]; };
+  const flipPath = (a, k, off) => { const [i, b] = pathAt(a, k, off); a[i] = flip(a[i], b); };
+  const swapPaths = (a, k, a2, k2) => { for (let j = 1; j <= np; j++) [a[k + j], a2[k2 + j]] = [a2[k2 + j], a[k + j]]; };
   const hIdx = (k) => ['ROOTS', 'OOD', 'BPOW', 'FROOTS', 'CPOW', 'QPOW', 'NF', 'CTXW'].indexOf(k);
   const m = (f) => (w) => { const x = cloneWit(w); f(x); return x; };
   // constants: TBL fields (FIN checks its own push), ACC (each CODE input checks its own), CTXW (final HEAD)
@@ -115,18 +121,34 @@ function layoutCases(vk, plan, v, file, dir, base, outs) {
   // QRY inputs
   const hintOff = vk.blob.total - 8;
   // the second query's items: inside the same QRY input (per0 >= 2) or the next QRY input's first query
-  const q2 = (x) => (per0 >= 2 ? [x[0][Q0], qo + 2] : [x[0][Q0 + 1], qo]);
+  const q2 = (x) => (per0 >= 2 ? [x[0][Q0], qo + pq] : [x[0][Q0 + 1], qo]);
   add('input', 'QRY: hint T + 1', {mutate: m((x) => { const b = Buffer.from(x[0][Q0][qo]); b.writeBigUInt64LE((b.readBigUInt64LE(hintOff) + 1n) % P, hintOff); x[0][Q0][qo] = b; })});
   add('input', 'QRY: hint T of another query', {mutate: m((x) => { const b = Buffer.from(x[0][Q0][qo]); const [a2, k2] = q2(x); a2[k2].copy(b, hintOff, hintOff, hintOff + 8); x[0][Q0][qo] = b; })});
   add('input', 'QRY: L byte (trace row) flipped', {mutate: m((x) => { x[0][Q0][qo] = flip(x[0][Q0][qo], 3); })});
   add('input', 'QRY: L byte (FRI sibling value) flipped', {mutate: m((x) => { x[0][Q0][qo] = flip(x[0][Q0][qo], vk.blob.total - 8 - 40); })});
-  add('input', 'QRY: path byte (input tree) flipped', {mutate: m((x) => { x[0][Q0][qo + 1] = flip(x[0][Q0][qo + 1], 100); })});
-  add('input', 'QRY: path byte (FRI tree, last level below the cap) flipped', {mutate: m((x) => { x[0][Q0][qo + 1] = flip(x[0][Q0][qo + 1], -5); })});
-  add('input', 'QRY: queries of two QRY positions swapped (L and path)', {mutate: m((x) => { const [a2, k2] = q2(x); const a = x[0][Q0]; [a[qo], a2[k2]] = [a2[k2], a[qo]]; [a[qo + 1], a2[k2 + 1]] = [a2[k2 + 1], a[qo + 1]]; })});
+  add('input', 'QRY: path byte (input tree) flipped', {mutate: m((x) => { flipPath(x[0][Q0], qo, 100); })});
+  add('input', 'QRY: path byte (FRI tree, last level below the cap) flipped', {mutate: m((x) => { flipPath(x[0][Q0], qo, -5); })});
+  add('input', 'QRY: queries of two QRY positions swapped (L and path)', {mutate: m((x) => { const [a2, k2] = q2(x); const a = x[0][Q0]; [a[qo], a2[k2]] = [a2[k2], a[qo]]; swapPaths(a, qo, a2, k2); })});
   add('input', 'QRY: L and path swapped', {mutate: m((x) => { const a = x[0][Q0]; [a[qo], a[qo + 1]] = [a[qo + 1], a[qo]]; })});
-  add('input', 'QRY: last query (L, path) missing', {mutate: m((x) => { x[0][Q0] = x[0][Q0].slice(0, -2); })});
+  add('input', 'QRY: last query (L, path) missing', {mutate: m((x) => { x[0][Q0] = x[0][Q0].slice(0, -pq); })});
   add('input', 'QRY: extra empty push', {mutate: m((x) => { x[0][Q0].push(Buffer.alloc(0)); })});
-  add('input', 'QRY: paths of two queries swapped', {mutate: m((x) => { const [a2, k2] = q2(x); const a = x[0][Q0]; [a[qo + 1], a2[k2 + 1]] = [a2[k2 + 1], a[qo + 1]]; })});
+  add('input', 'QRY: paths of two queries swapped', {mutate: m((x) => { const [a2, k2] = q2(x); swapPaths(x[0][Q0], qo, a2, k2); })});
+  if (SIB) {
+    // opt.sib: one witness item per Merkle sibling (count fixed by the DEPTH check, each SIZE 32)
+    const s0 = qo + 1, sL = qo + nS;   // first and last sibling of the input's first query
+    add('sib', 'QRY: wrong sibling (sibling 0 replaced by sibling 1)', {mutate: m((x) => { const a = x[0][Q0]; a[s0] = Buffer.from(a[s0 + 1]); })});
+    add('sib', 'QRY: wrong sibling (last FRI sibling replaced by zeros)', {mutate: m((x) => { x[0][Q0][sL] = Buffer.alloc(32); })});
+    add('sib', 'QRY: wrong sibling (sibling 7 from the next query)', {mutate: m((x) => { const [a2, k2] = q2(x); x[0][Q0][s0 + 7] = Buffer.from(a2[k2 + 1 + 7]); })});
+    add('sib', 'QRY: two adjacent siblings swapped (levels 2 and 3)', {mutate: m((x) => { const a = x[0][Q0]; [a[s0 + 2], a[s0 + 3]] = [a[s0 + 3], a[s0 + 2]]; })});
+    add('sib', 'QRY: missing sibling (sibling 5 removed)', {mutate: m((x) => { x[0][Q0].splice(s0 + 5, 1); })});
+    add('sib', 'QRY: missing sibling (last removed), extra 32-byte push at the end (count kept)', {mutate: m((x) => { const a = x[0][Q0]; a.splice(sL, 1); a.push(Buffer.alloc(32)); })});
+    add('sib', 'QRY: missing sibling, an empty push in its place (count kept)', {mutate: m((x) => { x[0][Q0][s0 + 5] = Buffer.alloc(0); })});
+    add('sib', 'QRY: extra sibling (sibling 0 duplicated)', {mutate: m((x) => { const a = x[0][Q0]; a.splice(s0, 0, Buffer.from(a[s0])); })});
+    add('sib', 'QRY: sibling extended by one byte', {mutate: m((x) => { const a = x[0][Q0]; a[s0 + 9] = Buffer.concat([a[s0 + 9], Buffer.alloc(1)]); })});
+    add('sib', 'QRY: sibling truncated by one byte', {mutate: m((x) => { const a = x[0][Q0]; a[s0 + 9] = a[s0 + 9].subarray(0, 31); })});
+    add('sib', 'QRY: siblings 4 and 5 merged into one 64-byte push, an empty push at the end (count kept)', {mutate: m((x) => { const a = x[0][Q0]; a.splice(s0 + 4, 2, Buffer.concat([a[s0 + 4], a[s0 + 5]])); a.push(Buffer.alloc(0)); })});
+    add('sib', 'QRY: siblings of the first query moved after L of the second query (per-query order)', {mutate: m((x) => { if (per0 < 2) { const [a2, k2] = q2(x); const a = x[0][Q0]; [a[s0], a2[k2 + 1]] = [a2[k2 + 1], a[s0]]; return; } const a = x[0][Q0]; const L2 = a.splice(qo + pq, 1)[0]; a.splice(qo + 1, 0, L2); })});
+  }
   if (plan.pad) {
     add('pad', 'QRY: pad byte 0 set to 1', {mutate: m((x) => { x[0][Q0][0] = flip(x[0][Q0][0], 0); })});
     add('pad', 'QRY: pad one byte shorter', {mutate: m((x) => { x[0][Q0][0] = x[0][Q0][0].subarray(1); })});
