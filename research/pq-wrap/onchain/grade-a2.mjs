@@ -10,7 +10,8 @@
 //   pad   FIN and QRY inputs get a checked zero pad (gena.mjs) sized so that op-cost <= target (0.93) of the budget
 //   opt   layout-review optimizations (gena.mjs plan.opt), e.g. --opt sib; absent = the baseline generator. With
 //         opt.state the transactions after tx0 run under R1 (STATE, one library input, QRY inputs): tx0 takes as many
-//         QRY inputs as fit and the later transactions share the rest
+//         QRY inputs as fit and the later transactions share the rest; --opt ...,cap=3 adds the per-transaction
+//         Merkle cap layer at level 3
 // usage: node grade-a2.mjs [--per N] [--nc N] [--maxT N] [--pad 0|1] [--target 0.93] [--opt a,b] [--out FILE] VECTOR.json...
 import {writeFileSync} from 'node:fs';
 import {readVector} from './layoutn.mjs';
@@ -24,7 +25,7 @@ const files = args.filter((a, i) => !a.startsWith('--') && !['--per', '--nc', '-
 const outFile = opt('--out', new URL('./results/grade-a2.json', import.meta.url).pathname);
 const NC = +opt('--nc', 2), MAXT = +opt('--maxT', 8);
 const r1Of = (plan, t) => t > 0 && !!plan.opt?.state && plan.txs.length > 1;
-const roleOf = (plan, i, t = 0) => (r1Of(plan, t) ? (i === 0 ? 'STATE' : i === 1 ? 'LIB' : 'QRY')
+const roleOf = (plan, i, t = 0) => (r1Of(plan, t) ? (i === 0 ? 'STATE' : i === 1 ? 'LIB' : i === 2 && plan.opt?.cap ? 'TOP' : 'QRY')
   : i === 0 ? 'HEAD' : i <= plan.nc ? `CODE${i}` : i === plan.nc + 1 ? 'FIN' : 'QRY');
 // OP_DEFINE body bytes of an input of transaction t (R0 or, opt.state, R1)
 export const defineBytesOf = (sp, t) => (t > 0 && sp.pg.R1 ? sp.pg.R1.defineBytes : sp.pg.defineBytes);

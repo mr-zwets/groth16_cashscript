@@ -1,0 +1,433 @@
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [valid] valid: chain ACCEPT model ACCEPT ref ACCEPT 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [cap] cap: cap.trace[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [ood] ood: ood[0].trace_local[0] c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [ood] ood: ood[1].random[2] c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [random] random: random_values.random[0][0][0] c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.batch + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.commit[0] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.commit[1] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.commit[2] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.commit[3] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.query + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [final] final: final_poly[0] c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [final] final: final_poly[255] c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [row] row: random matrix 0 (instance 0, 2^24) q0 col 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [salt] salt: random matrix 0 (instance 0, 2^24) q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [row] row: trace matrix 0 (instance 0, 2^24) q0 col 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [salt] salt: trace matrix 0 (instance 0, 2^24) q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [row] row: quotient matrix 0 (instance 0, 2^24) q0 col 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [salt] salt: quotient matrix 0 (instance 0, 2^24) q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: sib.random[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: sib.random count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: sib.trace[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: sib.trace count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: sib.quotient[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: sib.quotient count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: fri[0].sib[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: fri[0].sib count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: fri[1].sib[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: fri[1].sib count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: fri[2].sib[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: fri[2].sib count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: fri[3].sib[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: fri[3].sib count + 1: chain ACCEPT (malformed p3b-v1: truncated; the encoder refuses it; the full-path witness is the valid proof's, so the script accepts it)
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[0] q0 value 0 c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[0] q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[1] q0 value 0 c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[1] q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[2] q0 value 0 c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[2] q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[3] q0 value 0 c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[3] q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [truncate] truncate: length - 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [extend] extend: 1 byte at the end: chain ACCEPT (malformed p3b-v1: 1 trailing bytes; the encoder refuses it; the full-path witness is the valid proof's, so the script accepts it)
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [noncanon] noncanon: ood value ood[0].trace_local[0] = p: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: pv[0] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: pv[4] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: pv[8] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: all public values zero: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: first two public values swapped: chain reject model reject ref reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: public values moved to instance 1: chain NOT RUN (reject) ref reject (public values in another per-instance layout: refused by the statement layer)
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [tx] output value - 1 sat: chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [tx] recipient changed (one byte of the locking bytecode): chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [tx] extra OP_RETURN output: chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [tx] token added to the output: chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [root] script ROOT[3] + 1: chain reject 
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field idx byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL idx_0 replaced by idx_1 (another valid index): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field ap byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field be0_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field be1_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field be2_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field be3_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nt0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nc0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nd0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nB0_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nC0_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nt1 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nc1 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nd1 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nB1_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nC1_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nA24_0_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nA24_1_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nA22_0_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL truncated by one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL extended by one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE 1: ACC byte 3 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE 2: ACC byte 3 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE 3: ACC byte 3 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE 1 and CODE 2: ACC values swapped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE: ACC_1 + 1 and ACC_2 compensated (HEAD sum unchanged): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE 1: ACC push missing: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] HEAD and STATE: CTXW lane 0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] HEAD and STATE: NF lane 0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: ROOTS byte 5 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: ROOTS byte 34 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: ROOTS byte 73 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: OOD byte 100 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: BPOW byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: FROOTS byte 96 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: CPOW byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: QPOW byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: wrong ladder value (LAD element 0 = alpha'^0, byte 0 flipped): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: wrong ladder value (LAD element 50, limb 1 byte 3 flipped): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: wrong ladder value (last LAD element, last byte flipped): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] STATE of tx3 (final): wrong ladder value (LAD element 7 flipped): chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD element 1 non-canonical (limb 0 + p, same value mod p, if < 2^64): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD shifted by one element (alpha'^1 .. alpha'^n): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD elements 3 and 4 swapped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD truncated by one element: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD extended by one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD missing: chain reject tx0 in0: Program called an OP_SPLIT operation with an invalid index. s
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD all zero: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD of alpha'+1 (the ladder of another alpha'): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] FIN: final polynomial byte flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: extra empty item: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: CTXW missing: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: hint T + 1: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: hint T of another query: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: L byte (trace row) flipped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: L byte (FRI sibling value) flipped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: path byte (input tree) flipped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: path byte (FRI tree, last level below the cap) flipped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: queries of two QRY positions swapped (L and path): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: L and path swapped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: last query (L, path) missing: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: extra empty push: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: paths of two queries swapped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: wrong sibling (sibling 0 replaced by sibling 1): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: wrong sibling (last FRI sibling replaced by zeros): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: wrong sibling (sibling 7 from the next query): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: two adjacent siblings swapped (levels 2 and 3): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: missing sibling (sibling 5 removed): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: missing sibling (last removed), extra 32-byte push at the end (count kept): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: missing sibling, an empty push in its place (count kept): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: extra sibling (sibling 0 duplicated): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: sibling extended by one byte: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: sibling truncated by one byte: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: siblings 4 and 5 merged into one 64-byte push, an empty push at the end (count kept): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: siblings of the first query moved after L of the second query (per-query order): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pad] QRY: empty pad replaced by one byte 0x01: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pad] QRY: pad one byte longer: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pad] QRY: pad missing: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pad] FIN: empty pad replaced by one byte 0x01: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: two QRY inputs swapped (witnesses): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] CODE 1: code blob byte flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] CODE 2: code blob truncated by one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] inputs HEAD and FIN swapped (order): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] inputs CODE 1 and CODE 2 swapped (order): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] two QRY inputs swapped (order): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] one input with another locking (R + one byte): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] extra input (a copy of a QRY input): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] last QRY input missing: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] HEAD from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] FIN from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] LAD (FIN's ladder) from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] HEAD and FIN from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] ACC of CODE 1 from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] one QRY input from another statement: chain reject tx0 in6: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] transaction 1 (all inputs) from another statement, the NFT of this proof (replay): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] tx1 STATE (all items) from another statement, the NFT of this proof: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] tx1 STATE TBL from another statement: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] HEAD LAYER from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] tx1 TOP (LAYER) from another statement: chain reject tx1 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: spends an NFT minted for another proof (commitment of another G): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: NFT commitment index byte 2 (k = 2): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: NFT of another category: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: input 0 NFT is mutable: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: input 0 without the NFT: chain reject tx1 in0: Program called an OP_SPLIT operation with an invalid index. s
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: the NFT passed on to an extra output: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: another input carries a token of the category: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx3 (final): outputs changed (value - 1, so CTX differs): chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: a QRY input of tx0 (queries 0-2) instead of its own: chain reject tx1 in3: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: baton returned to another locking: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: baton not returned (output 0 is the NFT only): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: thread NFT with another commitment: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: thread NFT minted mutable: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: an extra NFT minted (extra token output): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: input 0 without the minting baton: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER tree 0 node 0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER last tree, last node, last byte flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER tree 0 nodes 0 and 1 swapped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER trees 0 and 1 swapped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER truncated by 32 bytes: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER extended by one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER missing: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER all zero: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] QRY: full path (the top c siblings of every tree pushed again): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] QRY: tree 0 one level short (its last pushed sibling removed, an empty push at the end): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx1 TOP: LAYER byte 100 flipped: chain reject tx1 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx3 TOP (final): LAYER last byte flipped: chain reject tx3 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx1 TOP: LAYER truncated by one byte: chain reject tx1 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx1 TOP: extra empty item: chain reject tx1 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx1 TOP: input missing (STATE, LIB, QRY): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx1 TOP and the first QRY input swapped (order): chain reject tx1 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: ROOTS byte 5 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: FROOTS byte 40 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: FIN byte 1000 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: TBL byte 3 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: LAD byte 30 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: NF byte 9 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: CTXW byte 2 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: G byte 31 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx3 STATE (final): TBL byte 0 flipped (a query index): chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: TBL truncated by one byte: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: FIN extended by one byte: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: G missing: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: extra empty item: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: ROOTS and FROOTS swapped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: the honest state of kind 2 (another commitment index): chain reject tx1 in3: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: input 0 (STATE, with its NFT) locked to R0: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: every input locked to R0: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: library input carries R0 code blob 1: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: library blob byte flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: library input missing (STATE then QRY): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: extra input (a copy of a QRY input): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: STATE and the library input swapped (order): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx0: NFT output 1 locked to R0 instead of R1: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx0: NFT output 1 locked to R1 + one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx0: NFT output 1 with the commitment of the old thread scheme (k | SHA256(tag | G | k)): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx0: NFT outputs 1 and 2 swapped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-0-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx3 (final): the NFT passed on to an extra output (R1 mints nothing): chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [valid] valid: chain ACCEPT model ACCEPT ref ACCEPT 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [cap] cap: cap.trace[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [ood] ood: ood[0].trace_local[0] c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [ood] ood: ood[1].random[2] c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [random] random: random_values.random[0][0][0] c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.batch + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.commit[0] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.commit[1] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.commit[2] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.commit[3] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pow] pow: pow.query + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [final] final: final_poly[0] c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [final] final: final_poly[255] c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [row] row: random matrix 0 (instance 0, 2^24) q0 col 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [salt] salt: random matrix 0 (instance 0, 2^24) q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [row] row: trace matrix 0 (instance 0, 2^24) q0 col 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [salt] salt: trace matrix 0 (instance 0, 2^24) q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [row] row: quotient matrix 0 (instance 0, 2^24) q0 col 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [salt] salt: quotient matrix 0 (instance 0, 2^24) q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: sib.random[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: sib.random count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: sib.trace[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: sib.trace count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: sib.quotient[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: sib.quotient count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: fri[0].sib[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: fri[0].sib count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: fri[1].sib[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: fri[1].sib count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: fri[2].sib[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: fri[2].sib count + 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sibling] sibling: fri[3].sib[0] byte 0: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [count] count: fri[3].sib count + 1: chain ACCEPT (malformed p3b-v1: truncated; the encoder refuses it; the full-path witness is the valid proof's, so the script accepts it)
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[0] q0 value 0 c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[0] q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[1] q0 value 0 c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[1] q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[2] q0 value 0 c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[2] q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[3] q0 value 0 c0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [fri_value] fri_value: fri[3] q0 salt 0 + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [truncate] truncate: length - 1: chain reject model reject ref reject (malformed: truncated; encoder refuses; lenient witness rejected)
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [extend] extend: 1 byte at the end: chain ACCEPT (malformed p3b-v1: 1 trailing bytes; the encoder refuses it; the full-path witness is the valid proof's, so the script accepts it)
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [noncanon] noncanon: ood value ood[0].trace_local[0] = p: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: pv[0] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: pv[4] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: pv[8] + 1: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: all public values zero: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: first two public values swapped: chain reject model reject ref reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [statement] statement: public values moved to instance 1: chain NOT RUN (reject) ref reject (public values in another per-instance layout: refused by the statement layer)
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [tx] output value - 1 sat: chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [tx] recipient changed (one byte of the locking bytecode): chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [tx] extra OP_RETURN output: chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [tx] token added to the output: chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [root] script ROOT[3] + 1: chain reject 
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field idx byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL idx_0 replaced by idx_1 (another valid index): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field ap byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field be0_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field be1_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field be2_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field be3_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nt0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nc0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nd0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nB0_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nC0_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nt1 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nc1 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nd1 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nB1_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nC1_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nA24_0_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nA24_1_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL field nA22_0_ byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL truncated by one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] FIN: TBL extended by one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE 1: ACC byte 3 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE 2: ACC byte 3 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE 3: ACC byte 3 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE 1 and CODE 2: ACC values swapped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE: ACC_1 + 1 and ACC_2 compensated (HEAD sum unchanged): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] CODE 1: ACC push missing: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] HEAD and STATE: CTXW lane 0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [constants] HEAD and STATE: NF lane 0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: ROOTS byte 5 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: ROOTS byte 34 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: ROOTS byte 73 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: OOD byte 100 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: BPOW byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: FROOTS byte 96 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: CPOW byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: QPOW byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: wrong ladder value (LAD element 0 = alpha'^0, byte 0 flipped): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: wrong ladder value (LAD element 50, limb 1 byte 3 flipped): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: wrong ladder value (last LAD element, last byte flipped): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] STATE of tx3 (final): wrong ladder value (LAD element 7 flipped): chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD element 1 non-canonical (limb 0 + p, same value mod p, if < 2^64): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD shifted by one element (alpha'^1 .. alpha'^n): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD elements 3 and 4 swapped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD truncated by one element: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD extended by one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD missing: chain reject tx0 in0: Program called an OP_SPLIT operation with an invalid index. s
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD all zero: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [lad] FIN: LAD of alpha'+1 (the ladder of another alpha'): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] FIN: final polynomial byte flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: extra empty item: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] HEAD: CTXW missing: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: hint T + 1: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: hint T of another query: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: L byte (trace row) flipped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: L byte (FRI sibling value) flipped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: path byte (input tree) flipped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: path byte (FRI tree, last level below the cap) flipped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: queries of two QRY positions swapped (L and path): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: L and path swapped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: last query (L, path) missing: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: extra empty push: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: paths of two queries swapped: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: wrong sibling (sibling 0 replaced by sibling 1): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: wrong sibling (last FRI sibling replaced by zeros): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: wrong sibling (sibling 7 from the next query): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: two adjacent siblings swapped (levels 2 and 3): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: missing sibling (sibling 5 removed): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: missing sibling (last removed), extra 32-byte push at the end (count kept): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: missing sibling, an empty push in its place (count kept): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: extra sibling (sibling 0 duplicated): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: sibling extended by one byte: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: sibling truncated by one byte: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: siblings 4 and 5 merged into one 64-byte push, an empty push at the end (count kept): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [sib] QRY: siblings of the first query moved after L of the second query (per-query order): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pad] QRY: empty pad replaced by one byte 0x01: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pad] QRY: pad one byte longer: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pad] QRY: pad missing: chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [pad] FIN: empty pad replaced by one byte 0x01: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [input] QRY: two QRY inputs swapped (witnesses): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] CODE 1: code blob byte flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] CODE 2: code blob truncated by one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] inputs HEAD and FIN swapped (order): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] inputs CODE 1 and CODE 2 swapped (order): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] two QRY inputs swapped (order): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] one input with another locking (R + one byte): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] extra input (a copy of a QRY input): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [graph] last QRY input missing: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] HEAD from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] FIN from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] LAD (FIN's ladder) from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] HEAD and FIN from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] ACC of CODE 1 from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] one QRY input from another statement: chain reject tx0 in6: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] transaction 1 (all inputs) from another statement, the NFT of this proof (replay): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] tx1 STATE (all items) from another statement, the NFT of this proof: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] tx1 STATE TBL from another statement: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] HEAD LAYER from another statement: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [mix] tx1 TOP (LAYER) from another statement: chain reject tx1 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: spends an NFT minted for another proof (commitment of another G): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: NFT commitment index byte 2 (k = 2): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: NFT of another category: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: input 0 NFT is mutable: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: input 0 without the NFT: chain reject tx1 in0: Program called an OP_SPLIT operation with an invalid index. s
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: the NFT passed on to an extra output: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: another input carries a token of the category: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx3 (final): outputs changed (value - 1, so CTX differs): chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx1: a QRY input of tx0 (queries 0-2) instead of its own: chain reject tx1 in3: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: baton returned to another locking: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: baton not returned (output 0 is the NFT only): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: thread NFT with another commitment: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: thread NFT minted mutable: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: an extra NFT minted (extra token output): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [thread] tx0: input 0 without the minting baton: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER tree 0 node 0 byte 0 flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER last tree, last node, last byte flipped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER tree 0 nodes 0 and 1 swapped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER trees 0 and 1 swapped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER truncated by 32 bytes: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER extended by one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER missing: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] HEAD: LAYER all zero: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] QRY: full path (the top c siblings of every tree pushed again): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] QRY: tree 0 one level short (its last pushed sibling removed, an empty push at the end): chain reject tx0 in5: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx1 TOP: LAYER byte 100 flipped: chain reject tx1 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx3 TOP (final): LAYER last byte flipped: chain reject tx3 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx1 TOP: LAYER truncated by one byte: chain reject tx1 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx1 TOP: extra empty item: chain reject tx1 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx1 TOP: input missing (STATE, LIB, QRY): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [layer] tx1 TOP and the first QRY input swapped (order): chain reject tx1 in2: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: ROOTS byte 5 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: FROOTS byte 40 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: FIN byte 1000 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: TBL byte 3 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: LAD byte 30 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: NF byte 9 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: CTXW byte 2 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: G byte 31 flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx3 STATE (final): TBL byte 0 flipped (a query index): chain reject tx3 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: TBL truncated by one byte: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: FIN extended by one byte: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: G missing: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: extra empty item: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: ROOTS and FROOTS swapped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1 STATE: the honest state of kind 2 (another commitment index): chain reject tx1 in3: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: input 0 (STATE, with its NFT) locked to R0: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: every input locked to R0: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: library input carries R0 code blob 1: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: library blob byte flipped: chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: library input missing (STATE then QRY): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: extra input (a copy of a QRY input): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx1: STATE and the library input swapped (order): chain reject tx1 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx0: NFT output 1 locked to R0 instead of R1: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx0: NFT output 1 locked to R1 + one byte: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx0: NFT output 1 with the commitment of the old thread scheme (k | SHA256(tag | G | k)): chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx0: NFT outputs 1 and 2 swapped: chain reject tx0 in0: Program failed an OP_VERIFY operation.
+ok   tw2x18x16-g2-1-Z128_lb5_lf8_q43_bpow20_cpow11_cap0.json [state] tx3 (final): the NFT passed on to an extra output (R1 mints nothing): chain reject tx3 in0: Program failed an OP_VERIFY operation.
+test-a (plan 1tx, production: CTX from the final transaction): 2 files, 426 cases, 0 unexpected, 0 n/a, 2 refused by the statement layer/generator, 18 malformed (4 encoder-only), 0 files skipped
+2 not run on chain (short-circuit, counted as rejects: {"statement":2}); 4 encoder-only relabels (reference rejects; script accepts the valid witness; inside the ok count)
+{"valid":{"cases":2,"chainReject":0,"accept":2,"unexpected":0},"cap":{"cases":2,"chainReject":2,"accept":0,"unexpected":0},"ood":{"cases":4,"chainReject":4,"accept":0,"unexpected":0},"random":{"cases":2,"chainReject":2,"accept":0,"unexpected":0},"pow":{"cases":12,"chainReject":12,"accept":0,"unexpected":0},"final":{"cases":4,"chainReject":4,"accept":0,"unexpected":0},"row":{"cases":6,"chainReject":6,"accept":0,"unexpected":0},"salt":{"cases":6,"chainReject":6,"accept":0,"unexpected":0},"sibling":{"cases":14,"chainReject":14,"accept":0,"unexpected":0},"count":{"cases":14,"chainReject":12,"accept":0,"unexpected":0,"encoderOnlyRelabel":2},"fri_value":{"cases":16,"chainReject":16,"accept":0,"unexpected":0},"truncate":{"cases":2,"chainReject":2,"accept":0,"unexpected":0},"extend":{"cases":2,"chainReject":0,"accept":0,"unexpected":0,"encoderOnlyRelabel":2},"noncanon":{"cases":2,"chainReject":2,"accept":0,"unexpected":0},"statement":{"cases":12,"chainReject":10,"accept":0,"unexpected":0,"notRunOnChain":2},"tx":{"cases":8,"chainReject":8,"accept":0,"unexpected":0},"root":{"cases":2,"chainReject":2,"accept":0,"unexpected":0},"constants":{"cases":60,"chainReject":60,"accept":0,"unexpected":0},"input":{"cases":46,"chainReject":46,"accept":0,"unexpected":0},"lad":{"cases":24,"chainReject":24,"accept":0,"unexpected":0},"sib":{"cases":24,"chainReject":24,"accept":0,"unexpected":0},"pad":{"cases":8,"chainReject":8,"accept":0,"unexpected":0},"graph":{"cases":16,"chainReject":16,"accept":0,"unexpected":0},"mix":{"cases":22,"chainReject":22,"accept":0,"unexpected":0},"thread":{"cases":30,"chainReject":30,"accept":0,"unexpected":0},"layer":{"cases":32,"chainReject":32,"accept":0,"unexpected":0},"state":{"cases":54,"chainReject":54,"accept":0,"unexpected":0}}
+
+real	1m18.565s
+user	1m32.150s
+sys	0m3.531s

@@ -4,7 +4,7 @@
 //   CTX   is the final transaction's outputs (the statement outputs); the other transactions carry the thread
 import {encodeTransaction, hash256} from '@bitauth/libauth';
 import {buildA, threadCommit, stateCommit} from './gena.mjs';
-import {encodeA, partsOf} from './modela.mjs';
+import {encodeA, partsOf, sha} from './modela.mjs';
 import {pushes, VMS, evaluate} from './vm.mjs';
 
 export const CATEGORY = Buffer.from(hash256(Uint8Array.from(Buffer.from('pq-stark-batch/thread category (test genesis outpoint)'))));
@@ -22,8 +22,28 @@ export function makePlanA(vk, counts, {nc = 2, ctx, pad, opt} = {}) {
   return {txs, nc, parts: partsOf(vk, nc), ...(txs.length > 1 ? {thread: {category: CATEGORY}} : {}), ...(ctx ? {ctx} : {}), ...(pad ? {pad} : {}), ...(opt && Object.keys(opt).length ? {opt} : {})};
 }
 // CLI helper: '--opt sib,lad' -> {sib: true, lad: true}
-export const parseOpt = (s) => Object.fromEntries((s ?? '').split(',').filter(Boolean).map((k) => [k, true]));
+export const parseOpt = (s) => Object.fromEntries((s ?? '').split(',').filter(Boolean).map((k) => { const [a, b] = k.split('='); return [a, b === undefined ? true : +b]; }));
 const sibs = (b) => Array.from({length: b.length / 32}, (_, i) => b.subarray(32 * i, 32 * i + 32));
+// opt.cap = c: the path of every tree without its top c siblings (they sit under LAYER)
+const trimPath = (vk, pth, c) => { const out = []; let o = 0; for (const tr of vk.trees) { const n = tr.depth - tr.capH; out.push(...sibs(pth.subarray(o, o + 32 * (n - c)))); o += 32 * n; } return out; };
+// opt.cap = c: LAYER = the 2^c nodes at level c of every tree, from the honest climbs of all queries (paths and their
+// siblings; parents filled from known children); a node no query reaches cannot be derived from the proof
+const layerCache = new WeakMap();
+export function layerA(vk, enc, c) {
+  if (layerCache.has(enc)) return layerCache.get(enc);
+  const maps = vk.trees.map(() => new Map());
+  for (let q = 0; q < vk.Q; q++) {
+    if (!enc.dig[q]) continue;
+    let o = 0;
+    vk.trees.forEach((tr, ti) => {
+      let k = (1 << tr.depth) + (enc.idx[q] >>> tr.shift), cur = enc.dig[q][ti]; const m = maps[ti];
+      for (let l = 0; l < tr.depth - tr.capH; l++) { const s = enc.PTH[q].subarray(o, o + 32); o += 32; m.set(k, cur); m.set(k ^ 1, s); cur = k & 1 ? sha(s, cur) : sha(cur, s); k >>>= 1; }
+    });
+  }
+  const out = Buffer.concat(vk.trees.map((tr, ti) => Buffer.concat(Array.from({length: 1 << c}, (_, j) => maps[ti].get((1 << c) + j) ?? Buffer.alloc(32)))));
+  layerCache.set(enc, out);
+  return out;
+}
 
 const cache = new Map();
 export function programA(vk, pis, plan, opts = {}) {
@@ -37,15 +57,17 @@ export function stateValsA(pg, enc, pis) {
   const v = {ROOTS: enc.PT.ROOTS, FROOTS: enc.PT.FROOTS, FIN: enc.PT.FIN, TBL: enc.TBL, LAD: enc.LAD, NF: u64s(pis.slice(4, 8)), CTXW: u64s(pis.slice(8, 12)), G: enc.G};
   return pg.sItems.map(([k]) => v[k]);
 }
+const capOf = (plan) => (plan.opt?.cap ? +plan.opt.cap : 0);
 // witnesses: per transaction, per input, the pushed items (bottom first)
 export function witnessesA(vk, plan, pg, enc, pis) {
   const nf = u64s(pis.slice(4, 8)), ctx = u64s(pis.slice(8, 12));
-  const qryItems = (t, [lo, hi], j) => { const it = plan.pad ? [Buffer.alloc(plan.pad.qry[t][j])] : []; for (let q = lo; q < hi; q++) it.push(enc.L[q], ...(plan.opt?.sib ? sibs(enc.PTH[q]) : [enc.PTH[q]])); return it; };
+  const c = capOf(plan);
+  const qryItems = (t, [lo, hi], j) => { const it = plan.pad ? [Buffer.alloc(plan.pad.qry[t][j])] : []; for (let q = lo; q < hi; q++) it.push(enc.L[q], ...(c ? trimPath(vk, enc.PTH[q], c) : plan.opt?.sib ? sibs(enc.PTH[q]) : [enc.PTH[q]])); return it; };
   // opt.state: transaction t >= 1 = STATE, R1's code blob(s), QRY inputs
-  if (pg.R1) return plan.txs.map((tx, t) => (t === 0 ? null : [stateValsA(pg, enc, pis), ...pg.R1.code.map((c) => [c]), ...tx.qry.map((r, j) => qryItems(t, r, j))]))
+  if (pg.R1) return plan.txs.map((tx, t) => (t === 0 ? null : [stateValsA(pg, enc, pis), ...pg.R1.code.map((b) => [b]), ...(c ? [[layerA(vk, enc, c)]] : []), ...tx.qry.map((r, j) => qryItems(t, r, j))]))
     .map((x, t) => x ?? witnessesA(vk, {...plan, txs: [plan.txs[0]]}, {...pg, R1: null}, enc, pis)[0]);
   return plan.txs.map((tx, t) => [
-    pg.hItems.map(([k]) => (k === 'NF' ? nf : k === 'CTXW' ? ctx : enc.PT[k])),
+    pg.hItems.map(([k]) => (k === 'NF' ? nf : k === 'CTXW' ? ctx : k === 'LAYER' ? layerA(vk, enc, c) : enc.PT[k])),
     ...pg.code.map((c, j) => (t === 0 ? [c, enc.ACC[j]] : [c])),
     [...(plan.pad ? [Buffer.alloc(plan.pad.fin)] : []), enc.PT.FIN, enc.TBL, ...(plan.opt?.lad ? [enc.LAD] : [])],
     ...tx.qry.map((r, j) => qryItems(t, r, j)),
