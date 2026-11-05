@@ -1,0 +1,27 @@
+pragma cashscript ^0.14.0;
+import "../../../singleton/bls12-381/lib/lazy/Bls12381Lazy.cash";
+// BLS12-381 final-exp chunk ops [0,13)  final=false
+contract FinalExpBlsChunk() {
+    function spend(int w0_0,int w0_1,int w0_2,int w0_3,int w0_4,int w0_5,int w0_6,int w0_7,int w0_8,int w0_9,int w0_10,int w0_11,int iv2_0,int iv2_1,int iv2_2,int iv2_3,int iv2_4,int iv2_5,int iv2_6,int iv2_7,int iv2_8,int iv2_9,int iv2_10,int iv2_11, bytes unused zeroPadding) {
+        require(tx.inputs[this.activeInputIndex].nftCommitment == hash256(toPaddedBytes(w0_0, 48) + toPaddedBytes(w0_1, 48) + toPaddedBytes(w0_2, 48) + toPaddedBytes(w0_3, 48) + toPaddedBytes(w0_4, 48) + toPaddedBytes(w0_5, 48) + toPaddedBytes(w0_6, 48) + toPaddedBytes(w0_7, 48) + toPaddedBytes(w0_8, 48) + toPaddedBytes(w0_9, 48) + toPaddedBytes(w0_10, 48) + toPaddedBytes(w0_11, 48)));
+        int iP = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
+        (int t0,int t1,int t2,int t3,int t4,int t5,int t6,int t7,int t8,int t9,int t10,int t11) = fp12Conj(w0_0,w0_1,w0_2,w0_3,w0_4,w0_5,w0_6,w0_7,w0_8,w0_9,w0_10,w0_11);
+        (int t12,int t13,int t14,int t15,int t16,int t17,int t18,int t19,int t20,int t21,int t22,int t23) = fp12Mul(w0_0,w0_1,w0_2,w0_3,w0_4,w0_5,w0_6,w0_7,w0_8,w0_9,w0_10,w0_11, iv2_0,iv2_1,iv2_2,iv2_3,iv2_4,iv2_5,iv2_6,iv2_7,iv2_8,iv2_9,iv2_10,iv2_11);
+        require(t12 % iP == 1); require(t13 % iP == 0); require(t14 % iP == 0); require(t15 % iP == 0); require(t16 % iP == 0); require(t17 % iP == 0); require(t18 % iP == 0); require(t19 % iP == 0); require(t20 % iP == 0); require(t21 % iP == 0); require(t22 % iP == 0); require(t23 % iP == 0);
+        (int t24,int t25,int t26,int t27,int t28,int t29,int t30,int t31,int t32,int t33,int t34,int t35) = fp12Mul(t0,t1,t2,t3,t4,t5,t6,t7,t8,t9,t10,t11,iv2_0,iv2_1,iv2_2,iv2_3,iv2_4,iv2_5,iv2_6,iv2_7,iv2_8,iv2_9,iv2_10,iv2_11);
+        (int t36,int t37,int t38,int t39,int t40,int t41,int t42,int t43,int t44,int t45,int t46,int t47) = fp12Frob2(t24,t25,t26,t27,t28,t29,t30,t31,t32,t33,t34,t35);
+        (int t48,int t49,int t50,int t51,int t52,int t53,int t54,int t55,int t56,int t57,int t58,int t59) = fp12Mul(t36,t37,t38,t39,t40,t41,t42,t43,t44,t45,t46,t47,t24,t25,t26,t27,t28,t29,t30,t31,t32,t33,t34,t35);
+        (int t60,int t61,int t62,int t63,int t64,int t65,int t66,int t67,int t68,int t69,int t70,int t71) = cycSqr(t48,t49,t50,t51,t52,t53,t54,t55,t56,t57,t58,t59);
+        (int t72,int t73,int t74,int t75,int t76,int t77,int t78,int t79,int t80,int t81,int t82,int t83) = fp12Mul(t60,t61,t62,t63,t64,t65,t66,t67,t68,t69,t70,t71,t48,t49,t50,t51,t52,t53,t54,t55,t56,t57,t58,t59);
+        (int t84,int t85,int t86,int t87,int t88,int t89,int t90,int t91,int t92,int t93,int t94,int t95) = cycSqr(t72,t73,t74,t75,t76,t77,t78,t79,t80,t81,t82,t83);
+        (int t96,int t97,int t98,int t99,int t100,int t101,int t102,int t103,int t104,int t105,int t106,int t107) = cycSqr(t84,t85,t86,t87,t88,t89,t90,t91,t92,t93,t94,t95);
+        (int t108,int t109,int t110,int t111,int t112,int t113,int t114,int t115,int t116,int t117,int t118,int t119) = fp12Mul(t96,t97,t98,t99,t100,t101,t102,t103,t104,t105,t106,t107,t48,t49,t50,t51,t52,t53,t54,t55,t56,t57,t58,t59);
+        (int t120,int t121,int t122,int t123,int t124,int t125,int t126,int t127,int t128,int t129,int t130,int t131) = cycSqr(t108,t109,t110,t111,t112,t113,t114,t115,t116,t117,t118,t119);
+        (int t132,int t133,int t134,int t135,int t136,int t137,int t138,int t139,int t140,int t141,int t142,int t143) = cycSqr(t120,t121,t122,t123,t124,t125,t126,t127,t128,t129,t130,t131);
+        (int t144,int t145,int t146,int t147,int t148,int t149,int t150,int t151,int t152,int t153,int t154,int t155) = cycSqr(t132,t133,t134,t135,t136,t137,t138,t139,t140,t141,t142,t143);
+        int Pmod = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
+        require(tx.outputs[0].nftCommitment == hash256(toPaddedBytes(t48 % Pmod, 48) + toPaddedBytes(t49 % Pmod, 48) + toPaddedBytes(t50 % Pmod, 48) + toPaddedBytes(t51 % Pmod, 48) + toPaddedBytes(t52 % Pmod, 48) + toPaddedBytes(t53 % Pmod, 48) + toPaddedBytes(t54 % Pmod, 48) + toPaddedBytes(t55 % Pmod, 48) + toPaddedBytes(t56 % Pmod, 48) + toPaddedBytes(t57 % Pmod, 48) + toPaddedBytes(t58 % Pmod, 48) + toPaddedBytes(t59 % Pmod, 48) + toPaddedBytes(t144 % Pmod, 48) + toPaddedBytes(t145 % Pmod, 48) + toPaddedBytes(t146 % Pmod, 48) + toPaddedBytes(t147 % Pmod, 48) + toPaddedBytes(t148 % Pmod, 48) + toPaddedBytes(t149 % Pmod, 48) + toPaddedBytes(t150 % Pmod, 48) + toPaddedBytes(t151 % Pmod, 48) + toPaddedBytes(t152 % Pmod, 48) + toPaddedBytes(t153 % Pmod, 48) + toPaddedBytes(t154 % Pmod, 48) + toPaddedBytes(t155 % Pmod, 48)));
+        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);
+        require(tx.outputs[0].lockingBytecode == 0xaa20adbff89211d6f2634bf7af22e596e5270907fbbed7b925a4a7bed36d71d37bae87);
+    }
+}

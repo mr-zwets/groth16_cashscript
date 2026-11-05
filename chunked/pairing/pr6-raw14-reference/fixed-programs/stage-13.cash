@@ -1,0 +1,49 @@
+pragma cashscript ^0.14.0;
+import "../singleton/bn254/lib/lazy/Bn254LazyG.cash";
+// c^-(6x+2)-fused prepared-VK batched BN254 Miller chunk: ops [342,348). [+ residue-tail verdict fused]
+// state = f(12) + R0(4 affine) [+ runtime points] + torus u(6); root data is constant
+// carried witness. cf folds c^-1/c into f modulo Fp6 scaling (residue method, ePrint 2024/640).
+contract MillerFusedTailChunk() {
+    function spend(int f0,int f1,int f2,int f3,int f4,int f5,int f6,int f7,int f8,int f9,int f10,int f11,int R0xa,int R0xb,int R0ya,int R0yb,int Pu0,int Pv0,int Q0xa,int Q0xb,int Q0ya,int Q0yb,int Pu2,int Pv2,int Pu3,int Pv3,int u0,int u1,int u2,int u3,int u4,int u5,int m344_0a,int m344_0b,int m344_1a,int m344_1b, bytes unused zeroPadding) {
+        require(tx.inputs[this.activeInputIndex].nftCommitment == hash256(toPaddedBytes(f0, 32) + toPaddedBytes(f1, 32) + toPaddedBytes(f2, 32) + toPaddedBytes(f3, 32) + toPaddedBytes(f4, 32) + toPaddedBytes(f5, 32) + toPaddedBytes(f6, 32) + toPaddedBytes(f7, 32) + toPaddedBytes(f8, 32) + toPaddedBytes(f9, 32) + toPaddedBytes(f10, 32) + toPaddedBytes(f11, 32) + toPaddedBytes(R0xa, 32) + toPaddedBytes(R0xb, 32) + toPaddedBytes(R0ya, 32) + toPaddedBytes(R0yb, 32) + toPaddedBytes(Pu0, 32) + toPaddedBytes(Pv0, 32) + toPaddedBytes(Q0xa, 32) + toPaddedBytes(Q0xb, 32) + toPaddedBytes(Q0ya, 32) + toPaddedBytes(Q0yb, 32) + toPaddedBytes(Pu2, 32) + toPaddedBytes(Pv2, 32) + toPaddedBytes(Pu3, 32) + toPaddedBytes(Pv3, 32) + toPaddedBytes(u0, 32) + toPaddedBytes(u1, 32) + toPaddedBytes(u2, 32) + toPaddedBytes(u3, 32) + toPaddedBytes(u4, 32) + toPaddedBytes(u5, 32)));
+        (int v0,int v1,int v2,int v3,int v4,int v5,int v6,int v7,int v8,int v9,int v10,int v11) = lineUnitDirect(f0,f1,f2,f3,f4,f5,f6,f7,f8,f9,f10,f11, 18207363672443581513407030080555898788950147022322085801922082995464554229159,19001453415330970148672143714450235556768604697019991075977074589877859072255,1692345189434971691447381647965116640156180325231312588032810510704093366307,15073847287451600631824834788919137217836915932307427250030459814818479467639, Pu2, Pv2);
+        (int v12,int v13,int v14,int v15,int v16,int v17,int v18,int v19,int v20,int v21,int v22,int v23) = lineUnitDirect(v0,v1,v2,v3,v4,v5,v6,v7,v8,v9,v10,v11, 8473413808729944693288429770614912462018925313282924434600639477075904860371,7065383457150164728466634561510598629323095036464541946466175647530588572491,1475103180593821736298014588286947791796612103366451847448282045081611253944,6393282328374167398874690816842983817567621605407222120243581345570109822613, Pu3, Pv3);
+        (int v24,int v25,int v26,int v27) = psi(Q0xa, Q0xb, Q0ya, Q0yb);
+        (int v28,int v29,int v30,int v31,int v32,int v33,int v34,int v35) = pointAddAffine(R0xa,R0xb,R0ya,R0yb, v24,v25,v26,v27, m344_0a,m344_0b);
+        (int v36,int v37,int v38,int v39,int v40,int v41,int v42,int v43,int v44,int v45,int v46,int v47) = lineUnitDirect(v12,v13,v14,v15,v16,v17,v18,v19,v20,v21,v22,v23, v28,v29,v30,v31, Pu0, Pv0);
+        (int v48,int v49,int v50,int v51) = psi(v24,v25,v26,v27);
+        (int v52,int v53) = fp2Neg(v50, v51, 64);
+        (int v54,int v55,int v56,int v57,int v58,int v59,int v60,int v61) = pointAddAffine(v32,v33,v34,v35, v48, v49, v52, v53, m344_1a,m344_1b);
+        // The two checked affine additions compute R+psi(B)-psi^2(B).
+        // Requiring the result to equal -psi^3(B) proves exact G2 membership.
+        (int v62,int v63) = fp2Scale(v24, v25, 21888242871839275220042445260109153167277707414472061641714758635765020556616);
+        int subgroupP = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require((v58 - v62) % subgroupP == 0);
+        require((v59 - v63) % subgroupP == 0);
+        require((v60 - v26) % subgroupP == 0);
+        require((v61 - v27) % subgroupP == 0);
+        (int v64,int v65,int v66,int v67,int v68,int v69,int v70,int v71,int v72,int v73,int v74,int v75) = lineUnitDirect(v36,v37,v38,v39,v40,v41,v42,v43,v44,v45,v46,v47, v54,v55,v56,v57, Pu0, Pv0);
+        (int v76,int v77,int v78,int v79,int v80,int v81,int v82,int v83,int v84,int v85,int v86,int v87) = lineUnitDirect(v64,v65,v66,v67,v68,v69,v70,v71,v72,v73,v74,v75, 814711127619153927168397174623523236463845368076463987177116466477952878986,8553470198483339140140974104798822752970596154015779846159538743060637996702,19030749173724739840845935379540266383446814192246023312418925979944635275162,10848467540097722766307503974462517732359739680651143770499269589247714842671, Pu2, Pv2);
+        (int v88,int v89,int v90,int v91,int v92,int v93,int v94,int v95,int v96,int v97,int v98,int v99) = lineUnitDirect(v76,v77,v78,v79,v80,v81,v82,v83,v84,v85,v86,v87, 13079515042705289519724331551263511972869326792436002001218772694523989721221,21811134593452633609077927424111522229585969881337201060900923018143230921590,21866278964516441556065409880060686800676754350808979190097067819216993625639,17830013169252878219187786668583571446496807789897910198332882022669207238619, Pu2, Pv2);
+        (int v100,int v101,int v102,int v103,int v104,int v105,int v106,int v107,int v108,int v109,int v110,int v111) = lineUnitDirect(v88,v89,v90,v91,v92,v93,v94,v95,v96,v97,v98,v99, 4492075121358401950345742301963145073219667746375331112500046923927566964491,10267945023729075404802475410663050770970342749444082375258741360300448489336,4699464732718048292791565827054232267420262000470468375263866734213404743955,5322772737851671789200188277741929055561381126843730590601235600278860872038, Pu3, Pv3);
+        (int v112,int v113,int v114,int v115,int v116,int v117,int v118,int v119,int v120,int v121,int v122,int v123) = lineUnitDirect(v100,v101,v102,v103,v104,v105,v106,v107,v108,v109,v110,v111, 21334041801351334978026265878551530327595712712579575597412622239807734086998,19939364551534977992798487391015256427610150918072277813690980061508590496964,6781510138949954426898753778457526530581926731661451420124052106256934342760,6361551979952287240522108168984609101947825717051825752094269627131089148068, Pu3, Pv3);
+        (int v124,int v125,int v126,int v127,int v128,int v129,int v130,int v131,int v132,int v133,int v134,int v135) = fp12MulTorus(v112,v113,v114,v115,v116,v117,v118,v119,v120,v121,v122,v123, 2721092132525928974081600693360000141411666971584919120193147795253796928270,1031632393586974885399902798599819867475655707338652270815653145619327206118,20907699472397346687969343884362104215389250412797668745642921109622802839854,14391030592429287604024124067466474840665941201668462686365420118096781698112,14081856395538642116287225979114146587310930049336584020051499560996724070107,11344862851187053441393324667169064838711518805814962720657088712613739951004);
+        (int tailU1_0,int tailU1_1,int tailU1_2,int tailU1_3,int tailU1_4,int tailU1_5) = torusFrob1(u0,u1,u2,u3,u4,u5);
+        int frobNeg = 2203960485148121921418603742825762020974279258880205651966; int frobPos = 2203960485148121921418603742825762020974279258880205651967;
+        int tailU2_0 = -mulFp(u0, frobNeg); int tailU2_1 = -mulFp(u1, frobNeg); int tailU2_2 = -u2; int tailU2_3 = -u3; int tailU2_4 = mulFp(u4, frobPos); int tailU2_5 = mulFp(u5, frobPos);
+        int tailU3_0 = -mulFp(tailU1_0, frobNeg); int tailU3_1 = -mulFp(tailU1_1, frobNeg); int tailU3_2 = -tailU1_2; int tailU3_3 = -tailU1_3; int tailU3_4 = mulFp(tailU1_4, frobPos); int tailU3_5 = mulFp(tailU1_5, frobPos);
+        (int tailLhs0,int tailLhs1,int tailLhs2,int tailLhs3,int tailLhs4,int tailLhs5,int tailLhs6,int tailLhs7,int tailLhs8,int tailLhs9,int tailLhs10,int tailLhs11) = fp12MulTorus(v124,v125,v126,v127,v128,v129,v130,v131,v132,v133,v134,v135, tailU2_0,tailU2_1,tailU2_2,tailU2_3,tailU2_4,tailU2_5);
+        // Signed field representatives are zero exactly when their integer value is zero.
+        require(tailLhs0 != 0 || tailLhs1 != 0 || tailLhs2 != 0 || tailLhs3 != 0 || tailLhs4 != 0 || tailLhs5 != 0 || tailLhs6 != 0 || tailLhs7 != 0 || tailLhs8 != 0 || tailLhs9 != 0 || tailLhs10 != 0 || tailLhs11 != 0);
+        (int tailQ0,int tailQ1,int tailQ2,int tailQ3,int tailQ4,int tailQ5) = fp6MulRaw(tailU1_0,tailU1_1,tailU1_2,tailU1_3,tailU1_4,tailU1_5, tailU3_0,tailU3_1,tailU3_2,tailU3_3,tailU3_4,tailU3_5);
+        (int tailCrossL0,int tailCrossL1,int tailCrossL2,int tailCrossL3,int tailCrossL4,int tailCrossL5) = fp6MulRaw(tailLhs0,tailLhs1,tailLhs2,tailLhs3,tailLhs4,tailLhs5, tailU1_0+tailU3_0,tailU1_1+tailU3_1,tailU1_2+tailU3_2,tailU1_3+tailU3_3,tailU1_4+tailU3_4,tailU1_5+tailU3_5);
+        (int tailCrossR0,int tailCrossR1,int tailCrossR2,int tailCrossR3,int tailCrossR4,int tailCrossR5) = fp6MulRaw(tailLhs6,tailLhs7,tailLhs8,tailLhs9,tailLhs10,tailLhs11, 1+9*tailQ4-tailQ5,tailQ4+9*tailQ5,tailQ0,tailQ1,tailQ2,tailQ3);
+        int tailP = 21888242871839275222246405745257275088696311157297823662689037894645226208583;
+        require((tailCrossL0 - tailCrossR0) % tailP == 0); require((tailCrossL1 - tailCrossR1) % tailP == 0); require((tailCrossL2 - tailCrossR2) % tailP == 0); require((tailCrossL3 - tailCrossR3) % tailP == 0); require((tailCrossL4 - tailCrossR4) % tailP == 0); require((tailCrossL5 - tailCrossR5) % tailP == 0);
+        require(tx.inputs.length == 1); require(tx.outputs.length == 1);
+        require(tx.inputs[this.activeInputIndex].tokenCategory == 0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd01);
+        require(tx.outputs[0].tokenCategory == 0xcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcdcd);
+        require(tx.outputs[0].nftCommitment.length == 0);
+        require(tx.outputs[0].lockingBytecode == tx.inputs[this.activeInputIndex].lockingBytecode);
+    }
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "bn254-pr6-raw14-source-qualification/v1",
+  "status": "CONDITIONAL_FIXED_KEY_RAW14_FULL_EQUATION",
+  "originalSourceRevision": "0b5b2240cbb2f723a87dce2f43b92fc6f38e4b4d",
+  "compilerRevision": "1c707c1dbf87396b30ba5e0704b1db44475ce893",
+  "sourceManifest": "source-manifest.json",
+  "sourceManifestSha256": "9f3707aa8ff4217e460c49cd7ec78fddf2480ebde1b23d8299e1242340780ab0",
+  "compilerPin": "compiler-pin.json",
+  "compilerPinSha256": "9312ba25d8bc9f3f1d1f084d3d0d4400a09e20b04b1b76709c0fbec4cba63495",
+  "sourceFiles": {
+    "README.md": "c4cd7843066dbae0acf68e70b7a3ff39cdd1ab09e1b43f6d61760e4cbe442f3f",
+    "compiler-pin.json": "9312ba25d8bc9f3f1d1f084d3d0d4400a09e20b04b1b76709c0fbec4cba63495",
+    "fixed-programs/stage-00.cash": "8d82ae13488582ec0a8b33b3d439cb88e010f0f6e64bd17c5bceacc9fa2ff2f0",
+    "fixed-programs/stage-01.cash": "aeeade83777c563da34ea6f118ae1c123d009b5b9a6ce4ed56303f370e45cf85",
+    "fixed-programs/stage-02.cash": "7f7bfc7e28c1df089ca79e67efda1f2d2e4d61c51ab4dc0e8d52d8dc0a9570bf",
+    "fixed-programs/stage-03.cash": "8972a31e6792670f7480ce4dcd0ad8bb7ad84345191315ef1fb07cccd4784889",
+    "fixed-programs/stage-04.cash": "501479166e3e9f3bf2f463540f8aeec77f5ba0b346a6d13df185f8e745791a6a",
+    "fixed-programs/stage-05.cash": "bc4925ae11e057f7d7a79bc38745abe3238d7c8a9cf8d764aab43deccc6225f8",
+    "fixed-programs/stage-06.cash": "073917cc86fa566137684cfc803284344dcf9a0fee899c4519b931fe2a05e573",
+    "fixed-programs/stage-07.cash": "40e35d0cc0d6f1ab30caf63f616998e87cac0cb5e238a292b37489e0d32297e6",
+    "fixed-programs/stage-08.cash": "e77290b1f5577c08486483bea153bacef1680bd83b25d3810bd23c93d5cd1e2a",
+    "fixed-programs/stage-09.cash": "17c90228f5f90ed871582737b0a27cba0f6b224792beb473473816a7ee801468",
+    "fixed-programs/stage-10.cash": "c260f7969f6e0f6c2c3a14c840c7e3e64e97b3f14b0f847aec4a3713d445fef2",
+    "fixed-programs/stage-11.cash": "eadbd2a142108327dabe2b39882bb4c3f9fe481c64d4d93c644b2c2f69a127e1",
+    "fixed-programs/stage-12.cash": "9581fa8338890c065d18bdbcec1505052173c519582f4bd9604d5163e43de364",
+    "fixed-programs/stage-13.cash": "5544c6fde4d787df6ffd210eb16a03f362593fda78f143607c3b4ec387e05857",
+    "rebuild/rebuild-fixed-policy-v2.mjs": "c8c0f2bbe8a3d23ceaaf11710decbcb5acd99d6dea196d3bc7f914738ea15095",
+    "rebuild-policy.json": "4c6d6e68e8e53e919b25c746390c86c524939137ee51115349325d844f1f910e",
+    "singleton/bn254/lib/lazy/Bn254Lazy.cash": "a20fff3f6ded52b3c847d8ff208d63d04618f9a172303321838f1c73b8a2b35b",
+    "singleton/bn254/lib/lazy/Bn254LazyG.cash": "93535e833ebdf82d4a8afa8413b45e5f539a2ec1613fcc21bd27fb508293d657",
+    "source-manifest.json": "9f3707aa8ff4217e460c49cd7ec78fddf2480ebde1b23d8299e1242340780ab0"
+  },
+  "claim": "Every mathematically accepting rooted14program repairedgraph satisfies e(-A,B)e(alpha,beta)e(IC0+n0IC1+n1IC2,gamma)e(C,delta)=1.",
+  "domainAndPremises": {
+    "equation": "Every mathematically accepting rooted14program repairedgraph satisfies e(-A,B)e(alpha,beta)e(IC0+n0IC1+n1IC2,gamma)e(C,delta)=1.",
+    "proofSteps": [
+      "ExactZ prefix binds canonicalpublicscalars to boundedGLVcomponents; every128bitdigit and canonicalgrouphelper branch is certified; finalIC0 addition and finiteinverse bind exactVKx while carryingrawproof unchanged.",
+      "Repairedgenesis actualBoolean/polynomial predicates enforce correctA/C identities, inverseunitencoding, finiteBtwistmembership andcanonicalroot. All348actualMillerSSA events bind currentF/R and originalpoints/root; canonicalhelpers, exact8half integerpolynomials and nestedintegertraces justify fieldinterpretation and committedbytes.",
+      "IndependentVK arithmetic proves all176gamma/deltalines and thealpha/beta fixedfactor. ThelineLaurentidentity, ordinaryoptimalAte theorem and endpointkernel calculation give the intendedpairing product. ActualterminalFrobenius and6crossproducts withnonzero guard give [g]=[c^lambda]; gcd(lambda,p^6+1)=R makes the image exactly reducedpairingkernel.",
+      "Fullcompiledtokenlifecycle, compulsorybyteequalities andhashpreimages bind every320B/544B/1024B seam toits designated successor. The unchanged9continuations and first4programs differingonly successorhashliteral transfer theiralreadyexecuted mathematics; repairedgenesis/ranges/lifecycle/byteIDs/Zprefix are independently reexecuted."
+    ],
+    "externalPremises": [
+      "Assumes standardBN254 group orders/primality/Frobenius/optimalAte and collisionresistance plus a validledger thread rooted in the designated mintingauthority.",
+      "This is an isolated source repair. It does not change the publishedhead, reproduce the inherited archivedcovenant programs, establishproducer completeness orclaimresource/live-network acceptance.",
+      "The rawproof domain has finiteB; admitting rawBidentity would require a separately authenticatedrawidentity normalization, not reusing a finitegenerator sentinel."
+    ],
+    "graphPremise": "The exact repaired 14-program P2SH32 graph and its successor locks are supplied/authenticated externally; each program and callee namespace is pinned above.",
+    "ledgerPremise": "A valid-ledger thread rooted in the designated initial minting NFT with zero fungible amount and token conservation is required.",
+    "finiteDomain": "The repaired raw-proof theorem requires finite raw B; raw B identity is not admitted by the finite-generator correction.",
+    "genericAffineSeparation": "The generic grouped-affine component is not part of this raw14 graph proof and remains separately qualified."
+  },
+  "fullGenericAffineVerifierClaim": false,
+  "originalWithdrawalUnchanged": true
+}

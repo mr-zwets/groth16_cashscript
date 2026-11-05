@@ -1,0 +1,34 @@
+{
+  "schema": "source4-publish-parent-source-manifest/v2",
+  "status": "SOURCE_CLOSURE_SEALED_FIXED_PROGRAMS_AND_REQUIRED_LIBRARIES",
+  "closure": {
+    "programs": { "bn254": 48, "bls12-381": 86, "total": 134 },
+    "requiredCashLibraries": 10,
+    "fileCount": 144,
+    "sha256": "636412ead6dd63a5d84ae6a955020c5276b85ce9b882b3475a447e027b9ea4f3",
+    "programGlobs": [
+      "generated-bn-v1/covenant_*.cash",
+      "source/chunked/bls12-381/generated-master-equivalence-v1/stage-*.cash"
+    ],
+    "libraryRoot": "source/singleton"
+  },
+  "metadata": {
+    "readme": "README.md",
+    "rebuild": "rebuild-fixed-policy.mjs",
+    "excluded": ["package.json", "pnpm-lock.yaml", "node_modules", "generators", "runtime copies"]
+  },
+  "compiler": {
+    "repositoryHead": "1c707c1dbf87396b30ba5e0704b1db44475ce893",
+    "packageVersion": "0.14.0-next.1",
+    "packageSha256": "672de1d16406b72316157d2f3c34eca9e089960f8eeeae2432afd9cb24ea1c48",
+    "entrySha256": "2ebf0b95e78a2b7dc12c4778a1ee2fcac258aa3244d9f3a6871d8000b2b3e6fc",
+    "compilerModuleSha256": "5e92acd05a37bea1d71e0a5ae35fe0d79d437229e1ef6e354d94147e7375bd70",
+    "implementationSha256": "df9c6967b8c2887de44ee6ee9486d804cdc1c1b80e6c733078ff4640c8a7af25",
+    "options": { "rescheduleStacks": true },
+    "frozenPerProgramVariants": {
+      "raw": [79, 81, 83, 84],
+      "rescheduleStacks": 130
+    }
+  },
+  "imports": { "relative": true, "unresolved": 0 }
+}

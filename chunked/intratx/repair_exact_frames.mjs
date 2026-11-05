@@ -21,7 +21,12 @@ import {
 
 const sha256 = (value) => createHash('sha256').update(value).digest('hex');
 
-// The gate certificates below were produced by this exact CashScript package.
+// The gate certificates below were produced by cashc 0.14.0-next.1 at the
+// CashScript revision 1c707c1dbf87396b30ba5e0704b1db44475ce893. The package's
+// gitHead below is bf02a4b641d5d03c035d052247a545109c17b708: it identifies the
+// installed package metadata, not the certifying source checkout. A rebuild
+// from source must use the 1c707c1d revision; the package and resolved-entry
+// hashes remain the local reproduction guards.
 // Pin both package metadata and the resolved compiler entry so a later local
 // dependency cannot silently change the selected instruction boundary.
 const require = createRequire(import.meta.url);

@@ -10,6 +10,8 @@ const manifest = JSON.parse(readFileSync(new URL('./registered-bls-large-repair.
 const sha256 = (bytes) => createHash('sha256').update(bytes).digest();
 const digest = (bytes) => sha256(bytes).toString('hex');
 const hash256 = (bytes) => sha256(sha256(bytes));
+const repairManifestSha256 = digest(readFileSync(new URL('./registered-bls-large-repair.json', import.meta.url)));
+const repairHelperSha256 = digest(readFileSync(fileURLToPath(import.meta.url)));
 const repairs = new Map(manifest.repairs.map((row) => [row.input, row]));
 assert.equal(manifest.originalProgramSha256.length, 3);
 assert.equal(manifest.selectedProgramSha256.length, 3);
@@ -113,7 +115,15 @@ export function repairPositiveArtifact(originalBytes) {
       selectedProgramSha256: manifest.selectedProgramSha256,
       statement: 'The selected positive fixture keeps every non-code byte identical and adds only the three role-specific exact frame predicates. This is an artifact correction, not a current-BCH or full-domain admission certificate.',
       scope: manifest.scope,
-      sourceBinding: manifest.sourceBinding,
+      // Emit the provenance fields rather than requiring a post-generation
+      // hand edit. The helper hash is computed from this source file itself,
+      // so the value remains exact after source changes without a
+      // self-referential literal.
+      sourceBinding: {
+        ...manifest.sourceBinding,
+        repairManifestSha256,
+        repairHelperSha256,
+      },
       negatives: 'Original invalid fixtures remain only in the unchanged historical input; none are read or emitted by this helper.',
     },
   };

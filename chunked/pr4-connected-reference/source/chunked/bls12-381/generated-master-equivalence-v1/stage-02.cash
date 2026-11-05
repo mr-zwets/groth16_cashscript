@@ -1,0 +1,43 @@
+pragma cashscript ^0.14.0;
+import "../../../singleton/bls12-381/lib/Fp.cash";
+import "../../../singleton/bls12-381/lib/Fp2.cash";
+import "../../../singleton/bls12-381/lib/G2Check.cash";
+// BLS12-381 G2 input-validation chunk: [x]B double-and-add bits [44,64); first=false last=true.
+contract G2CheckBls() {
+    function spend(int RXa,int RXb,int RYa,int RYb,int RZa,int RZb,int Bxa,int Bxb,int Bya,int Byb,int Ax,int Ay,int Cx,int Cy, int input0, int input1, bytes unused zeroPadding) {
+        require(tx.inputs[this.activeInputIndex].nftCommitment == hash256(toPaddedBytes(RXa, 48) + toPaddedBytes(RXb, 48) + toPaddedBytes(RYa, 48) + toPaddedBytes(RYb, 48) + toPaddedBytes(RZa, 48) + toPaddedBytes(RZb, 48) + toPaddedBytes(Bxa, 48) + toPaddedBytes(Bxb, 48) + toPaddedBytes(Bya, 48) + toPaddedBytes(Byb, 48) + toPaddedBytes(Ax, 48) + toPaddedBytes(Ay, 48) + toPaddedBytes(Cx, 48) + toPaddedBytes(Cy, 48) + toPaddedBytes(input0, 48) + toPaddedBytes(input1, 48)));
+        (int v0,int v1,int v2,int v3,int v4,int v5) = g2Double(RXa,RXb,RYa,RYb,RZa,RZb);
+        (int v6,int v7,int v8,int v9,int v10,int v11) = g2Double(v0,v1,v2,v3,v4,v5);
+        (int v12,int v13,int v14,int v15,int v16,int v17) = g2Double(v6,v7,v8,v9,v10,v11);
+        (int v18,int v19,int v20,int v21,int v22,int v23) = g2Double(v12,v13,v14,v15,v16,v17);
+        (int v24,int v25,int v26,int v27,int v28,int v29) = g2AddAffine(v18,v19,v20,v21,v22,v23, Bxa,Bxb,Bya,Byb);
+        (int v30,int v31,int v32,int v33,int v34,int v35) = g2Double(v24,v25,v26,v27,v28,v29);
+        (int v36,int v37,int v38,int v39,int v40,int v41) = g2Double(v30,v31,v32,v33,v34,v35);
+        (int v42,int v43,int v44,int v45,int v46,int v47) = g2Double(v36,v37,v38,v39,v40,v41);
+        (int v48,int v49,int v50,int v51,int v52,int v53) = g2Double(v42,v43,v44,v45,v46,v47);
+        (int v54,int v55,int v56,int v57,int v58,int v59) = g2Double(v48,v49,v50,v51,v52,v53);
+        (int v60,int v61,int v62,int v63,int v64,int v65) = g2Double(v54,v55,v56,v57,v58,v59);
+        (int v66,int v67,int v68,int v69,int v70,int v71) = g2Double(v60,v61,v62,v63,v64,v65);
+        (int v72,int v73,int v74,int v75,int v76,int v77) = g2Double(v66,v67,v68,v69,v70,v71);
+        (int v78,int v79,int v80,int v81,int v82,int v83) = g2Double(v72,v73,v74,v75,v76,v77);
+        (int v84,int v85,int v86,int v87,int v88,int v89) = g2Double(v78,v79,v80,v81,v82,v83);
+        (int v90,int v91,int v92,int v93,int v94,int v95) = g2Double(v84,v85,v86,v87,v88,v89);
+        (int v96,int v97,int v98,int v99,int v100,int v101) = g2Double(v90,v91,v92,v93,v94,v95);
+        (int v102,int v103,int v104,int v105,int v106,int v107) = g2Double(v96,v97,v98,v99,v100,v101);
+        (int v108,int v109,int v110,int v111,int v112,int v113) = g2Double(v102,v103,v104,v105,v106,v107);
+        (int v114,int v115,int v116,int v117,int v118,int v119) = g2Double(v108,v109,v110,v111,v112,v113);
+        (int v120,int v121,int v122,int v123,int v124,int v125) = g2Double(v114,v115,v116,v117,v118,v119);
+        (int psxa,int psxb,int psya,int psyb) = g2psi(Bxa,Bxb,Bya,Byb);
+        (int npya,int npyb) = fp2Neg(psya, psyb);
+        (int z2a,int z2b) = fp2Sqr(v124, v125);
+        (int z3a,int z3b) = fp2Mul(z2a, z2b, v124, v125);
+        (int cxa,int cxb) = fp2Mul(psxa, psxb, z2a, z2b);
+        (int cya,int cyb) = fp2Mul(npya, npyb, z3a, z3b);
+        require(v120 == cxa); require(v121 == cxb); require(v122 == cya); require(v123 == cyb);
+        require(v124 % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787 != 0 || v125 % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787 != 0);
+        int Pmod = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
+        require(tx.outputs[0].nftCommitment == hash256(toPaddedBytes(0 % Pmod, 48) + toPaddedBytes(1 % Pmod, 48) + toPaddedBytes(0 % Pmod, 48) + toPaddedBytes(input0 % Pmod, 48) + toPaddedBytes(input1 % Pmod, 48) + toPaddedBytes(Bxa % Pmod, 48) + toPaddedBytes(Bxb % Pmod, 48) + toPaddedBytes(Bya % Pmod, 48) + toPaddedBytes(Byb % Pmod, 48) + toPaddedBytes(Ax % Pmod, 48) + toPaddedBytes(Ay % Pmod, 48) + toPaddedBytes(Cx % Pmod, 48) + toPaddedBytes(Cy % Pmod, 48)));
+        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);
+        require(tx.outputs[0].lockingBytecode == 0xaa20405d06f3bea456ac75106b679aa349c514bcd8ccb78d059be8c0e99016939d8287);
+    }
+}

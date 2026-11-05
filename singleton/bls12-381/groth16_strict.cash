@@ -1,5 +1,12 @@
 pragma cashscript ^0.14.0;
 
+// Strict reference domain: canonical finite G1/G2 coordinates are range- and
+// curve-checked; finite G1 points satisfy [r]P = O, finite G2 points satisfy
+// the psi(B) == -[|x|]B subgroup endpoint, and the unique G1/G2 infinity
+// sentinels are accepted on their neutral pairing paths.
+// Built with CashScript cashc 0.14.0-next.1 at revision
+// 1c707c1dbf87396b30ba5e0704b1db44475ce893 (not compiler-optimizations-8).
+// Published 17,465-byte native locking artifact; native admission HOLD.
 // BLS12-381 singleton harness `groth16` — arithmetic from the shared lib/ libraries (see lib/README.md).
 import "./lib/Miller.cash";
 import "./lib/FinalExp.cash";

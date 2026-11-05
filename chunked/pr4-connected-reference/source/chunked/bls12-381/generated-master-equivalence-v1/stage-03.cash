@@ -1,0 +1,66 @@
+pragma cashscript ^0.14.0;
+// BLS12-381 vk_x chunk: Shamir window [0,26), final=false.
+function addFp(int x, int y) returns (int) { return (x + y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+function subFp(int x, int y) returns (int) { return (x - y + 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+function mulFp(int x, int y) returns (int) { return (x * y) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+function sqrFp(int x) returns (int) { return (x * x) % 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787; }
+function jacDouble(int x, int y, int z) returns (int, int, int) {
+    int a = sqrFp(x); int b = sqrFp(y); int c = sqrFp(b);
+    int d = mulFp(2, subFp(subFp(sqrFp(addFp(x, b)), a), c));
+    int e = mulFp(3, a); int f = sqrFp(e);
+    int nx = subFp(f, mulFp(2, d));
+    int ny = subFp(mulFp(e, subFp(d, nx)), mulFp(8, c));
+    int nz = mulFp(2, mulFp(y, z));
+    return nx, ny, nz;
+}
+function jacAddAffine(int aX, int aY, int aZ, int bX, int bY) returns (int, int, int) {
+    int rx = bX; int ry = bY; int rz = 1;
+    if (aZ != 0) {
+        int z1z1 = sqrFp(aZ);
+        int u2 = mulFp(bX, z1z1);
+        int s2 = mulFp(mulFp(bY, aZ), z1z1);
+        if (aX == u2 && aY == s2) {
+            int da = sqrFp(aX); int db = sqrFp(aY); int dc = sqrFp(db);
+            int dd = mulFp(2, subFp(subFp(sqrFp(addFp(aX, db)), da), dc));
+            int de = mulFp(3, da); int df = sqrFp(de);
+            int dnx = subFp(df, mulFp(2, dd));
+            int dny = subFp(mulFp(de, subFp(dd, dnx)), mulFp(8, dc));
+            int dnz = mulFp(2, mulFp(aY, aZ));
+            rx = dnx; ry = dny; rz = dnz;
+        } else {
+            int h = subFp(u2, aX); int i2 = sqrFp(mulFp(2, h)); int jj = mulFp(h, i2);
+            int rr = mulFp(2, subFp(s2, aY)); int vv = mulFp(aX, i2);
+            int anx = subFp(subFp(sqrFp(rr), jj), mulFp(2, vv));
+            int any = subFp(mulFp(rr, subFp(vv, anx)), mulFp(2, mulFp(aY, jj)));
+            int anz = mulFp(subFp(subFp(sqrFp(addFp(aZ, 1)), z1z1), 1), h);
+            rx = anx; ry = any; rz = anz;
+        }
+    }
+    return rx, ry, rz;
+}
+function selectPoint(int b0, int b1) returns (int, int, int) {
+    int aX = 0; int aY = 0; int doAdd = 0;
+    if (b0 == 1 && b1 == 1) { aX = 2386781901035473772144341182407687860118005925033428055218509614629770831545237878364312588177396809142590665502445; aY = 2721985711015193199868848835229056819857651383925471979786755635273858421658233285328399263507021600622741844499993; doAdd = 1; }
+    else { if (b0 == 1) { aX = 1940386630589042756063486004190165295069185078823041184114464346315715796897349637805088429212932248421554491972448; aY = 3114296198575988357603748217414299058449850389627766458803888308926785677746356789015548793127623382888106859156543; doAdd = 1; }
+           else { if (b1 == 1) { aX = 1063080548659463434646774310890803636667161539235054707411467714858983518890075240133758563865893724012200489498889; aY = 3669927104170827068533340245967707139563249539898402807511810342954528074138727808893798913182606104785795124774780; doAdd = 1; } } }
+    return aX, aY, doAdd;
+}
+contract VkxBlsChunk() {
+    function spend(int rX, int rY, int rZ, int input0, int input1, int Bxa, int Bxb, int Bya, int Byb, int Ax, int Ay, int Cx, int Cy, bytes unused zeroPadding) {
+        require(tx.inputs[this.activeInputIndex].nftCommitment == hash256(toPaddedBytes(rX, 48) + toPaddedBytes(rY, 48) + toPaddedBytes(rZ, 48) + toPaddedBytes(input0, 48) + toPaddedBytes(input1, 48) + toPaddedBytes(Bxa, 48) + toPaddedBytes(Bxb, 48) + toPaddedBytes(Bya, 48) + toPaddedBytes(Byb, 48) + toPaddedBytes(Ax, 48) + toPaddedBytes(Ay, 48) + toPaddedBytes(Cx, 48) + toPaddedBytes(Cy, 48)));
+        require(rX == 0 && rY == 1 && rZ == 0);
+        require(input0 >= 0 && input0 < 52435875175126190479447740508185965837690552500527637822603658699938581184513); require(input1 >= 0 && input1 < 52435875175126190479447740508185965837690552500527637822603658699938581184513);
+        for (int k = 0; k < 26; k = k + 1) {
+            int i = 254 - k;
+            if (rZ != 0) { (int dx, int dy, int dz) = jacDouble(rX, rY, rZ); rX = dx; rY = dy; rZ = dz; }
+            int b0 = (input0 >> i) % 2;
+            int b1 = (input1 >> i) % 2;
+            (int aX, int aY, int doAdd) = selectPoint(b0, b1);
+            if (doAdd == 1) { (int ax, int ay, int az) = jacAddAffine(rX, rY, rZ, aX, aY); rX = ax; rY = ay; rZ = az; }
+        }
+        int Pmod = 4002409555221667393417789825735904156556882819939007885332058136124031650490837864442687629129015664037894272559787;
+        require(tx.outputs[0].nftCommitment == hash256(toPaddedBytes(rX % Pmod, 48) + toPaddedBytes(rY % Pmod, 48) + toPaddedBytes(rZ % Pmod, 48) + toPaddedBytes(input0 % Pmod, 48) + toPaddedBytes(input1 % Pmod, 48) + toPaddedBytes(Bxa % Pmod, 48) + toPaddedBytes(Bxb % Pmod, 48) + toPaddedBytes(Bya % Pmod, 48) + toPaddedBytes(Byb % Pmod, 48) + toPaddedBytes(Ax % Pmod, 48) + toPaddedBytes(Ay % Pmod, 48) + toPaddedBytes(Cx % Pmod, 48) + toPaddedBytes(Cy % Pmod, 48)));
+        require(tx.outputs[0].tokenCategory == tx.inputs[this.activeInputIndex].tokenCategory);
+        require(tx.outputs[0].lockingBytecode == 0xaa20f296f79fffaa7fe71197c10fec288196985b017532b7f5165efd31975f388bec87);
+    }
+}
